@@ -67,7 +67,7 @@ try {
   await dismissRegionBlock();
 
   await page.locator('input:visible').first().fill('demo_player03');
-  await page.locator('input[type="password"]:visible').first().fill('Demo@12345');
+  await page.locator('input[type="password"]:visible').first().fill(process.env.DEMO_PASSWORD);
   await shot('00-signin-filled');
   await page.locator('button:visible', { hasText: /^Sign In$/ }).last().click({ timeout: 10000 });
   await page.waitForTimeout(2500);

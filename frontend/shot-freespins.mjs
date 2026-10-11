@@ -95,7 +95,7 @@ try {
   await page.waitForTimeout(900);
   await dismiss();
   await page.locator('input:visible').first().fill(ACCOUNT);
-  await page.locator('input[type="password"]:visible').first().fill('Demo@12345');
+  await page.locator('input[type="password"]:visible').first().fill(process.env.DEMO_PASSWORD);
   await page.locator('button:visible', { hasText: /^Sign In$/ }).last().click({ timeout: 10000 });
   await page.waitForTimeout(2600);
   await dismiss();

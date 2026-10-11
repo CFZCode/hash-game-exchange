@@ -27,7 +27,7 @@ import { MemoryRouter } from 'react-router-dom';
  * right account to be safe.
  */
 const PLAYER = process.env.PLAYER || 'demo_player05';
-const PASS = process.env.PASS || 'Demo@12345';
+const PASS = process.env.PASS || process.env.DEMO_PASSWORD;
 
 const { Window } = await import(pathToFileURL(process.env.HAPPY_DOM + '/lib/index.js').href);
 const win = new Window({ url: 'http://localhost:5173/' });

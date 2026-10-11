@@ -80,7 +80,7 @@ try {
 
   // ══════════════════════════════════════════════════════════════════════
   section('gap 10 — the notification drawer');
-  const { account } = await auth.login({ identifier: 'demo_player03', password: 'Demo@12345' });
+  const { account } = await auth.login({ identifier: 'demo_player03', password: process.env.DEMO_PASSWORD });
   persist.createPersistedStore('account', accountCtx.ACCOUNT_DEFAULTS).write({
     login: true, name: account.name, setting: account.setting,
   });
@@ -219,7 +219,7 @@ try {
 
   // ══════════════════════════════════════════════════════════════════════
   section('gap 25 — sign one device out');
-  const second = await auth.login({ identifier: 'demo_player03', password: 'Demo@12345' });
+  const second = await auth.login({ identifier: 'demo_player03', password: process.env.DEMO_PASSWORD });
   const sessions = await auth.getSessions();
   check('getSessions lists devices', Array.isArray(sessions) && sessions.length > 0, `${sessions.length} devices`);
   const target = sessions[0];

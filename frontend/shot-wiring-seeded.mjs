@@ -30,7 +30,7 @@ const { rows: [me] } = await db.query(`select id from users where name='demo_pla
 const login = async () => {
   const r = await fetch(API + '/user/auth/login', {
     method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ identifier: 'demo_player03', password: 'Demo@12345' }),
+    body: JSON.stringify({ identifier: 'demo_player03', password: process.env.DEMO_PASSWORD }),
   });
   return (await r.json())?.data?.accessToken;
 };
@@ -117,7 +117,7 @@ try {
   await page.waitForTimeout(900);
   await dismiss();
   await page.locator('input:visible').first().fill('demo_player03');
-  await page.locator('input[type="password"]:visible').first().fill('Demo@12345');
+  await page.locator('input[type="password"]:visible').first().fill(process.env.DEMO_PASSWORD);
   await page.locator('button:visible', { hasText: /^Sign In$/ }).last().click({ timeout: 10000 });
   await page.waitForTimeout(2600);
   await dismiss();

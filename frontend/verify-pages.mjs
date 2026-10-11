@@ -21,7 +21,7 @@ import { MemoryRouter } from 'react-router-dom';
    runs in both, which is what makes this a regression check rather than two different tests. */
 const LIVE = !process.env.FIXTURES;
 const PLAYER = process.env.PLAYER || 'demo_player03';
-const PASS = process.env.PASS || 'Demo@12345';
+const PASS = process.env.PASS || process.env.DEMO_PASSWORD;
 
 /* ── DOM ─────────────────────────────────────────────────────────────────────────────────────
    Only the globals, never the timers: copying happy-dom's setTimeout breaks Vite's own. */

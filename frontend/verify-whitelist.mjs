@@ -74,7 +74,7 @@ try {
   snapshot = { userId: me.id, rows: before, enforcement: flag.withdraw_whitelist_only };
   console.log(`snapshot: ${before.length} existing address(es), enforcement=${snapshot.enforcement}\n`);
 
-  await auth.login({ identifier: ACCOUNT, password: 'Demo@12345' });
+  await auth.login({ identifier: ACCOUNT, password: process.env.DEMO_PASSWORD });
 
   // ══════════════════════════════════════════════════════════════════════
   section('the read, and the adapter under it');

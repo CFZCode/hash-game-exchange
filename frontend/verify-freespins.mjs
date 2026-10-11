@@ -67,7 +67,7 @@ try {
   lockSnapshot = row.withdraw_locked_until;
   console.log(`snapshot: withdraw_locked_until=${lockSnapshot ?? 'null'}\n`);
 
-  await auth.login({ identifier: ACCOUNT, password: 'Demo@12345' });
+  await auth.login({ identifier: ACCOUNT, password: process.env.DEMO_PASSWORD });
 
   // ══════════════════════════════════════════════════════════════════════
   section('gap 8 — a player can finally see their own free spins');

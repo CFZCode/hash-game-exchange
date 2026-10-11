@@ -20,7 +20,7 @@ import { createServer } from 'vite';
 globalThis.window = globalThis.window ?? { location: { origin: 'http://localhost:5173' } };
 
 const PLAYER = process.env.PLAYER || 'demo_player03';
-const PASS = process.env.PASS || 'Demo@12345';
+const PASS = process.env.PASS || process.env.DEMO_PASSWORD;
 
 /* `FIXTURES=1` runs the same pass with the seam turned back to the captured payloads — the
    regression check the loading notes prescribe after any data-layer change. `define` rather than a
