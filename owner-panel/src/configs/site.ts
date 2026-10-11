@@ -2,9 +2,9 @@
 export const SESSION_COOKIE = 'cfz_owner_session'
 
 export const siteConfig = {
-  key: 'casino-sportsbook',
+  key: 'hash-game-exchange',
   name: 'Owner Panel',
-  tagline: 'casino-sportsbook',
+  tagline: 'hash-game-exchange',
   environment: process.env.NEXT_PUBLIC_ENV_LABEL ?? 'localhost'
 } as const
 
@@ -19,8 +19,8 @@ export const serverConfig = {
 
   // Ed25519 private key (base64 PKCS8 DER). The backend holds only the public half.
   signingKey: process.env.OWNER_SIGNING_KEY ?? '',
-  siteKey: process.env.SITE_KEY || 'casino-sportsbook',
-  siteName: process.env.SITE_NAME || 'Casino Sportsbook',
+  siteKey: process.env.SITE_KEY || 'hash-game-exchange',
+  siteName: process.env.SITE_NAME || 'Hash Game Exchange',
   gatewayUrl: process.env.SITE_GATEWAY_URL ?? '',
   adminUrl: process.env.SITE_ADMIN_URL ?? '',
   frontendUrl: process.env.SITE_FRONTEND_URL ?? '',

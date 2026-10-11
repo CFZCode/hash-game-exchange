@@ -1,6 +1,6 @@
-# casino-sportsbook — owner panel
+# hash-game-exchange — owner panel
 
-The platform's own panel for this one site (port 3075). It decides what the client is
+The platform's own panel for this one site (port 3085). It decides what the client is
 *entitled* to; see `../docs/OWNER-PANEL.md` for the full contract.
 
 - Login: `OWNER_USERNAME` / `OWNER_PASSWORD` from `.env.local` (no database, no site staff account).
@@ -11,7 +11,7 @@ The platform's own panel for this one site (port 3075). It decides what the clie
 
 ```
 npm install
-npm run dev        # http://localhost:3075
+npm run dev        # http://127.0.0.1:3085
 npm run check-types && npm run lint
 ```
 
@@ -24,10 +24,10 @@ tips = peer_to_peer, …), every flag entitled, policies hybrid / both / both / 
 feature options at their defaults (spin wheel, `bonus.wagering_lock` = on, tournaments page).
 
 ```
-npm run seed:owner -- --site casino-sportsbook            # dry run: lists what would change
-npm run seed:owner -- --site casino-sportsbook --apply    # write it
-npm run seed:owner -- --site casino-sportsbook --reset    # dry run of the FULL demo state (overrides owner choices)
-npm run seed:owner -- --site casino-sportsbook --data-dir /tmp/owner-copy --apply   # try it on a copy
+npm run seed:owner -- --site hash-game-exchange            # dry run: lists what would change
+npm run seed:owner -- --site hash-game-exchange --apply    # write it
+npm run seed:owner -- --site hash-game-exchange --reset    # dry run of the FULL demo state (overrides owner choices)
+npm run seed:owner -- --site hash-game-exchange --data-dir /tmp/owner-copy --apply   # try it on a copy
 ```
 
 - Default (merge) keeps the owner's choices: a feature or flag switched off, a chosen variant or

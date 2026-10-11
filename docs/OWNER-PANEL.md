@@ -1,13 +1,13 @@
-# Owner panel ↔ site contract (casino-sportsbook)
+# Owner panel ↔ site contract (hash-game-exchange)
 
 Three apps, two owners:
 
 | App | Path | Port | Who uses it |
 |---|---|---|---|
-| Owner panel | `owner-panel/` | 3075 | **Us** (the platform). Never handed to the client. |
-| Site admin | `admin/` (from the hub's `site-admin`) | 3060 | The client's staff. |
-| Frontend | `frontend/` | 3070 | Players. |
-| Backend gateway | `backend/` | 4600 | All of the above. |
+| Owner panel | `owner-panel/` | 3085 | **Us** (the platform). Never handed to the client. |
+| Site admin | `admin/` (from the hub's `site-admin`) | 3080 | The client's staff. |
+| Frontend | `frontend/` | 5190 | Players. |
+| Backend gateway | `backend/` | 4700 | All of the above. |
 
 **The rule:** the owner panel decides what the client is *entitled* to. Only entitled things work.
 Features (their ON/OFF and variant) and the business / deposit / withdrawal policies are set **only**
@@ -17,7 +17,7 @@ see or reach a non-entitled thing.
 
 **Data separation:** the owner panel's data (entitlements, its login, its audit log) is stored **only**
 in the owner panel (`owner-panel/data/`, `owner-panel/.env.local`). Nothing of it is written to the
-site database (`cfz_casino_sportsbook`), to the admin, or to the frontend. The backend keeps the
+site database (`cfz_hash_game_exchange`), to the admin, or to the frontend. The backend keeps the
 last copy it fetched in a file (`backend/data/owner-entitlements.json`), never in a table.
 
 ## 1. Owner panel login (config, not database)
@@ -28,7 +28,7 @@ last copy it fetched in a file (`backend/data/owner-entitlements.json`), never i
 OWNER_USERNAME, OWNER_PASSWORD      # the one owner login
 OWNER_SESSION_SECRET                # HMAC key for the session cookie
 OWNER_SHARED_SECRET                 # also in backend/.env; the backend pulls entitlements with it
-SITE_KEY, SITE_NAME, SITE_GATEWAY_URL, SITE_ADMIN_URL, SITE_FRONTEND_URL, PORT=3075
+SITE_KEY, SITE_NAME, SITE_GATEWAY_URL, SITE_ADMIN_URL, SITE_FRONTEND_URL, PORT=3085
 ```
 
 No user table, no staff account on the site. Compare with `crypto.timingSafeEqual`. Session cookie
@@ -41,7 +41,7 @@ a line to `owner-panel/data/audit.jsonl` (`{at, user, version, changes:[{kind,ke
 
 ```json
 {
-  "site": "casino-sportsbook",
+  "site": "hash-game-exchange",
   "version": 7,
   "updatedAt": "2026-10-09T13:00:00.000Z",
   "features": { "gift_cards": true, "swap": true, "vault": false, "...": true },
@@ -108,7 +108,7 @@ Owner panel: `GET /api/entitlements` with header `x-owner-key: <OWNER_SHARED_SEC
 { "data": { ...the document... }, "signature": "<hex HMAC-SHA256 of JSON.stringify(data) with OWNER_SHARED_SECRET>" }
 ```
 
-Backend env (`backend/.env`): `OWNER_PANEL_URL=http://127.0.0.1:3075`, `OWNER_SHARED_SECRET`,
+Backend env (`backend/.env`): `OWNER_PANEL_URL=http://127.0.0.1:3085`, `OWNER_SHARED_SECRET`,
 `OWNER_POLL_SECONDS=15`.
 
 Hardening (the HMAC key is also the `x-owner-key` sent on every poll, so on its own it only
@@ -217,7 +217,7 @@ restores the client's own choice.
 
 ## 5. Site admin (`admin/`)
 
-Comes from the hub's `site-admin` via `node agents/push-admin.mjs casino-sportsbook` (from `cfz/admins`).
+A copy of the hub's `site-admin` (`cfz/admins/site-admin`), taken as `agents/push-admin.mjs` would push it; this repo does not depend on the hub to run it.
 Entitlement support is added **in the hub's `site-admin`** (generic, so the next push keeps it) and
 tolerates a backend without the route (404 → everything entitled):
 - sidebar: a nav item whose `flag` / feature is not entitled is hidden;

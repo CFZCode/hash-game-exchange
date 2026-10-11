@@ -23,8 +23,8 @@
  * E2E_STAFF_PASS, E2E_PLAYER_USER, E2E_PLAYER_PASS. They are never printed or written anywhere,
  * and no screenshot is taken while a login form is filled.
  *
- * URLs: E2E_OWNER_URL (http://127.0.0.1:3075), E2E_ADMIN_URL (http://localhost:3060),
- * E2E_FRONTEND_URL (http://localhost:3070), E2E_GATEWAY_URL (SITE_GATEWAY_URL or http://127.0.0.1:4600),
+ * URLs: E2E_OWNER_URL (http://127.0.0.1:3085), E2E_ADMIN_URL (http://localhost:3080),
+ * E2E_FRONTEND_URL (http://localhost:5190), E2E_GATEWAY_URL (SITE_GATEWAY_URL or http://127.0.0.1:4700),
  * E2E_HUB_CREDENTIALS (path of the hub CREDENTIALS.md).
  *
  * Output: a table (feature × surface × hide s × reappear s × result), screenshots of every step
@@ -110,7 +110,7 @@ function parsePlayer(text) {
   return out
 }
 
-/** Hub CREDENTIALS.md: the table whose header has "Staff login"; the casino-sportsbook row. */
+/** Hub CREDENTIALS.md: the table whose header has "Staff login"; this site's row. */
 function parseStaff(text, site) {
   const lines = text.split(/\r?\n/)
   let staffCol = -1
@@ -138,7 +138,7 @@ function parseStaff(text, site) {
 const ownerEnv = parseEnv(readText(path.join(PANEL, '.env.local')))
 const player = parsePlayer(readText(path.join(REPO, 'credentials.md')))
 const hubFile = process.env.E2E_HUB_CREDENTIALS || path.resolve(REPO, '..', '..', 'admins', 'CREDENTIALS.md')
-const staff = parseStaff(readText(hubFile), ownerEnv.SITE_KEY || 'casino-sportsbook')
+const staff = parseStaff(readText(hubFile), ownerEnv.SITE_KEY || 'hash-game-exchange')
 
 const CREDS = {
   ownerUser: process.env.E2E_OWNER_USER || ownerEnv.OWNER_USERNAME,
@@ -161,10 +161,10 @@ if (missing.length) {
 const strip = u => u.replace(/\/$/, '')
 
 const URLS = {
-  owner: strip(process.env.E2E_OWNER_URL || `http://127.0.0.1:${ownerEnv.PORT || 3075}`),
-  admin: strip(process.env.E2E_ADMIN_URL || 'http://localhost:3060'),
-  front: strip(process.env.E2E_FRONTEND_URL || 'http://localhost:3070'),
-  gateway: strip(process.env.E2E_GATEWAY_URL || ownerEnv.SITE_GATEWAY_URL || 'http://127.0.0.1:4600')
+  owner: strip(process.env.E2E_OWNER_URL || `http://127.0.0.1:${ownerEnv.PORT || 3085}`),
+  admin: strip(process.env.E2E_ADMIN_URL || 'http://localhost:3080'),
+  front: strip(process.env.E2E_FRONTEND_URL || 'http://localhost:5190'),
+  gateway: strip(process.env.E2E_GATEWAY_URL || ownerEnv.SITE_GATEWAY_URL || 'http://127.0.0.1:4700')
 }
 
 // ── labels the site admin shows on its Features screen (backend catalogue) ──────────────────

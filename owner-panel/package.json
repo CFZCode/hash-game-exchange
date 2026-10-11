@@ -1,11 +1,11 @@
 {
-  "name": "cfz-casino-sportsbook-owner",
+  "name": "cfz-hash-game-exchange-owner",
   "version": "1.0.0",
   "license": "MIT",
   "scripts": {
-    "dev": "next dev -H 127.0.0.1 -p 3075",
+    "dev": "next dev -H 127.0.0.1 -p 3085",
     "build": "next build",
-    "start": "next start -H 127.0.0.1 -p 3075",
+    "start": "next start -H 127.0.0.1 -p 3085",
     "lint": "eslint",
     "lint:fix": "eslint --fix",
     "format": "prettier --write \"src/**/*.{js,jsx,ts,tsx}\"",
@@ -14,7 +14,8 @@
     "seed:owner": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/seed-owner.mjs",
     "e2e:flow": "node scripts/e2e-flow.mjs",
     "clean": "rm -rf .next dist",
-    "clean:node_modules": "rm -rf .next dist node_modules"
+    "clean:node_modules": "rm -rf .next dist node_modules",
+    "seed:plan": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/seed-plan.mjs"
   },
   "dependencies": {
     "@base-ui/react": "1.6.0",

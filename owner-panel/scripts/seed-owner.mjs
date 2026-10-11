@@ -9,10 +9,10 @@
  * write (mode 600), one audit line. It never writes secrets: integration keys (e.g. the OneSignal
  * App API key) are sealed in the backend's site_features and are entered in the UI.
  *
- *   node scripts/seed-owner.mjs --site casino-sportsbook            dry run: print what would change
- *   node scripts/seed-owner.mjs --site casino-sportsbook --apply    write it
- *   node scripts/seed-owner.mjs --site casino-sportsbook --reset    (dry run) force the full demo state
- *   node scripts/seed-owner.mjs --site casino-sportsbook --reset --apply
+ *   node scripts/seed-owner.mjs --site hash-game-exchange            dry run: print what would change
+ *   node scripts/seed-owner.mjs --site hash-game-exchange --apply    write it
+ *   node scripts/seed-owner.mjs --site hash-game-exchange --reset    (dry run) force the full demo state
+ *   node scripts/seed-owner.mjs --site hash-game-exchange --reset --apply
  *
  * Options:
  *   --data-dir <dir>    the owner data dir (default $OWNER_DATA_DIR, else owner-panel/data).
@@ -287,7 +287,7 @@ async function main() {
   const site = arg('--site')
 
   if (!site) {
-    console.error('--site <key> is required (e.g. --site casino-sportsbook)')
+    console.error('--site <key> is required (e.g. --site hash-game-exchange)')
     process.exit(2)
   }
 
