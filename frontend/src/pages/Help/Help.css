@@ -1,0 +1,285 @@
+/* The fairness documents' stylesheet, from `modules/games/assets/GameFairnessFile-BVGLWB2L.css`.
+ *
+ * The originals are written with native CSS nesting under a single `.game-fairness` block;
+ * they are flattened here so the cascade is readable, but every declaration is verbatim and the
+ * selectors resolve to the same elements. The documents themselves are dangerously-set HTML with
+ * no classes of their own beyond `item`, `help-content`, `code-area`, `space-a/b/c`, `cl-primary`
+ * and `text-decoration`, so styling them by element is the original's approach, not a shortcut —
+ * the same situation as `.feedback-html` in the footer.
+ *
+ * The `@media (prefers-color-scheme: dark)` block in the original only restates the `.code-area`
+ * colours it already sets, so it is dropped rather than duplicated. `.jbyellowtheme` is a
+ * white-label brand override and is not reachable here. */
+
+.game-fairness {
+  --bg-color: rgb(45 48 53 / 0.5);
+  margin-bottom: 44px;
+
+  /* NO `font-weight` AND NO `line-height` HERE, both on purpose, and both were wrong once.
+   *
+   * The document stylesheet sets neither, and the prose is meant to INHERIT both from the pane:
+   * `font-semibold` and `leading-normal` sit on the wrapper in index.jsx, which is where the
+   * original carries them. Declaring 400 here made the answer a full step lighter than the live
+   * page; declaring `line-height: 21px` matched by coincidence (1.5 x 14px) and would have
+   * drifted the moment the font-size moved.
+   *
+   * The headings look heavier than the body but are the SAME 600 — `h2` is `color: primary`
+   * (white) against the body's `secondary` (grey), and white on a dark card reads bolder at an
+   * identical weight. That contrast is what made 400 look plausible for the body when reading
+   * the capture; it is not. */
+}
+
+.game-fairness .item h2 {
+  font-size: 14px;
+  margin: 0 0 8px;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.game-fairness .item h2:first-of-type {
+  margin-top: 8px;
+}
+
+.game-fairness .item .help-content {
+  margin-bottom: 16px;
+}
+
+.game-fairness .item .help-content p {
+  margin: 12px 0;
+  word-break: break-word;
+}
+
+/* The worked examples. `code-area` wraps a `<pre>` whose own margins have to go, and the
+   horizontal scroll is on the pre rather than the box — the mines document ships a full
+   JavaScript listing and it must not widen the page. */
+.game-fairness .item .code-area {
+  padding: 20px;
+  border-radius: 4px;
+  color: #f5f6f7;
+  background-color: var(--bg-color);
+  border: 1px solid #2d3035;
+}
+
+.game-fairness .item .code-area pre {
+  margin: 0;
+  padding: 0;
+  overflow-x: auto;
+}
+
+.game-fairness .item a {
+  padding-left: 2px;
+}
+
+/* The three indent steps the documents use for nested worked examples. `space-b` and `space-c`
+   are the same 30px in the original — not a slip, they are simply both one level in. */
+.game-fairness .item .space-a {
+  margin-left: 15px;
+}
+
+.game-fairness .item .space-b,
+.game-fairness .item .space-c {
+  margin-left: 30px;
+}
+
+.game-fairness .item ol,
+.game-fairness .item ul {
+  padding-left: 1.2em;
+  margin: 0;
+}
+
+.game-fairness .item ol li,
+.game-fairness .item ul li {
+  margin: 0 0 16px;
+}
+
+.game-fairness .item ol.special li {
+  margin: 0 0 1rem;
+}
+
+/* `#24ee89` written out rather than tokenised: it is the document stylesheet's own literal, and
+   these files are quoted material. It is the same value as `--color-brand`. */
+.game-fairness .item .cl-primary {
+  color: #24ee89;
+}
+
+.game-fairness .item .cl-primary.pointer {
+  cursor: pointer;
+}
+
+.game-fairness .item .text-decoration {
+  text-decoration: underline;
+  cursor: pointer;
+  padding-left: 0.2rem;
+}
+
+/* ---------------------------------------------------------------- the help topic documents
+ *
+ * The other sixteen rail rows. These are a SIBLING document family to the fairness ones — same
+ * shape (h2 headings over prose, ordered lists, `cl-primary` for the green links) but from the
+ * `static` remote rather than `games`, and they carry a few classes of their own:
+ * `blocked-game-list`, `li-info`, `em`, `content`.
+ *
+ * THEIR OWN STYLESHEET WAS NOT FOUND. All 33 CSS files in the `static` remote were fetched and
+ * none contains `li-info`, `blocked-game-list` or `help-center-box`, and neither does the main
+ * bundle's. So unlike everything else on this page these rules are NOT quoted — they are the
+ * minimum needed to render 454KB of legal copy as readable prose, built to match the fairness
+ * documents beside them so the two families look like one page. Replace them wholesale if the
+ * real stylesheet turns up. */
+/* 800 headings over 600 body, and BOTH are heavier than the rendered DOM's class lists say.
+   The markup has `text-sm font-semibold` here and nothing at all on the pane, which computes to
+   600 over 400 — but side by side the live page is visibly heavier than that on both. The extra
+   weight has to come from `.help-center-box`'s own rule, and that stylesheet is the one file
+   this page could not recover: all 33 CSS files in the `static` remote were fetched and none
+   defines it. So these two values are matched by eye against the capture rather than quoted.
+
+   Unlayered CSS beats utilities, so this rule and the `font-extrabold` on the element must
+   agree or this one silently wins and the class list lies about what renders. */
+/* NO `font-size` AND NO `font-weight` HERE ANY MORE, and both are now SOURCED rather than
+   fitted. `parseHTML-b5I5HqGJ.js` — the `static` remote's own section splitter, which is what
+   turns one document into `{title, content}` pairs — renders the heading from one template:
+
+     C = template('<h2 class="text-sm font-semibold text-primary">')
+
+   so the element carries its size and weight as utilities and the stylesheet sets neither. This
+   rule declared `font-size: 14px; font-weight: 800`, and being unlayered it BEAT both utilities
+   (the cascade hazard, in the direction the note below warns about) — two weight steps heavy, and
+   a HARD PX SIZE, which is the part that showed: below 640 the root font-size scales with the
+   viewport, so `text-sm` is 12.8px at a 393px phone while a pinned 14px does not move. The
+   headings rendered ~9% larger than the prose around them and the gap grew as the screen got
+   narrower. Colour stays, since the utility agrees with it and the element is not the only
+   consumer.
+
+   The margins below are still this build's own: preflight zeroes them (`blockquote,dl,dd,h1..h6,
+   hr,figure,p,pre{margin:0}`) and no rule in any stylesheet the site ships puts them back. */
+.help-doc h2,
+.help-doc h3 {
+  /* Margins collapse against the siblings either side, so the gap ABOVE a heading is
+     max(previous <p>'s 12px bottom, this 8px top) = 12, and the gap BELOW is max(this 4px,
+     the list's 8px top) = 8. Lowering the top margin alone is what tightened the heading to
+     the prose above it. */
+  margin: 8px 0 4px;
+  color: var(--color-primary);
+}
+
+.help-doc h2:first-child,
+.help-doc h3:first-child {
+  margin-top: 0;
+}
+
+.help-doc p {
+  margin: 12px 0;
+  word-break: break-word;
+}
+
+/* Tailwind's preflight sets `list-style: none` on every ul/ol, so these documents lost their
+   bullets and numbers entirely — the markers have to be put back by hand. `outside` keeps the
+   marker in the gutter the padding above reserves rather than indenting the first line. */
+.help-doc ol,
+.help-doc ul {
+  /* 2rem. The lists carry NO classes in the rendered markup, so their indent lives in
+     `.help-raw-html`'s own rule — part of the `.help-center-box` stylesheet this page could not
+     recover (all 33 CSS files in the `static` remote were fetched; none defines it). So this is
+     fitted by eye, not quoted, and it has been walked down from an over-wide 2.75rem: my read of
+     the capture put a list item's text 45px right of the paragraph above it, which measured too
+     far in practice. Adjust here — it is the only place lists are indented. */
+  padding-left: 2.25rem;
+  margin: 8px 0;
+  list-style-position: outside;
+}
+
+/* THE BULLET IS INLINE, NOT A HANGING MARKER, and that is the structural point — a native
+   marker (or an absolutely-positioned dot) gives a hanging indent where wrapped lines tuck under
+   the first line's text. The capture does the opposite: a question that runs to two lines has
+   its second line back at the CONTAINER's left edge, level with the heading above it, while the
+   first line's text sits ~25px further in behind the bullet.
+
+   So the list has no indent of its own and the dot is an inline-block at the head of the first
+   line. `ul` therefore takes `padding-left: 0`; `ol` keeps its indent below, since numbers do
+   still hang.
+
+   The two margins are the knobs: the left one sets how far the dot sits from the edge, the
+   right one the dot-to-text gap. */
+.help-doc ul {
+  list-style-type: none;
+  /* REQUESTED, and there is nothing to check it against — see the note above: `.help-center-box`,
+     `.help-raw-html` and `.help-doc` carry no rules in ANY stylesheet the site ships (all 33 in
+     the `static` remote, the mirror's six and the current deploy's `index-WymgNldA.css`, all
+     searched), and preflight's `ol,ul,menu{list-style:none;margin:0;padding:0}` is global — so on
+     the live site these lists have no marker and no indent at all, and every value here is this
+     build's. This was 0, which put the bullet flush with the paragraph above it. One knob. */
+  padding-left: 1rem;
+}
+
+.help-doc ul > li::before {
+  content: '';
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background-color: currentColor;
+  vertical-align: middle;
+  /* `middle` centres the dot on the x-height, which sits low against these two-line items.
+     Nudged up with a relative offset rather than by switching to a `vertical-align` length —
+     that would re-reference the whole thing to the baseline and move it sideways in effect.
+     This is the knob: more negative lifts it further. */
+  position: relative;
+  top: -2px;
+  margin: 0 14px 0 0;
+}
+
+.help-doc ol {
+  list-style-type: decimal;
+}
+
+/* 12px. Like the indent above, this is fitted by eye rather than quoted — the list items carry
+   no classes and their rule is in the `.help-center-box` stylesheet that could not be recovered.
+   It was briefly 7px, from reading the capture as a 36px pitch against our 41; that came out
+   visibly tighter than the live page, so it is back up. */
+.help-doc li {
+  margin: 0 0 8px;
+}
+
+/* The documents' own green — the same literal the fairness stylesheet uses, and the same value
+   as `--color-brand`. Kept as written because these files are quoted material. */
+.help-doc .cl-primary {
+  color: #24ee89;
+}
+
+.help-doc a {
+  color: #24ee89;
+  word-break: break-word;
+}
+
+/* `em` is a CLASS here, not the element — the documents use it to mark emphasised runs, so it
+   would inherit nothing otherwise. */
+.help-doc .em {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.help-doc .li-info {
+  margin-left: 1rem;
+}
+
+/* Long tables of blocked titles. Columns rather than one very long list, and they must not push
+   the pane wider than its track. */
+.help-doc .blocked-game-list {
+  columns: 2;
+  column-gap: 1.5rem;
+  word-break: break-word;
+}
+
+.help-doc table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0;
+  display: block;
+  overflow-x: auto;
+}
+
+.help-doc th,
+.help-doc td {
+  border: 1px solid var(--color-third);
+  padding: 8px 12px;
+  text-align: start;
+}

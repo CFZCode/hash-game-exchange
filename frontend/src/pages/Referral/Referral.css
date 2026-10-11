@@ -1,0 +1,82 @@
+/* The two hand-written classes the Live Rewards strip carries. Both are verbatim from
+   index-DxOqNczA.css, which IS in the mirror — the page's chunk was the missing piece, not its
+   stylesheet, so nothing here is reconstructed.
+
+   Only the `[dir=ltr]` arms are kept. The originals ship an `[dir=rtl] …:not(:where([dir=ltr],
+   [dir=ltr] *))` twin for every direction-dependent property; this build renders `dir="ltr"`
+   throughout, so the RTL half would never match. The logical-property rewrite that would fold
+   both into one rule is deliberately not done — these are quoted, and a quote that has been
+   improved is no longer a reference. */
+
+/* The pulsing green bullet beside the "Live Rewards" label. `#45d91e` is the original's own
+   literal and is NOT the brand green (`#24EE89`) — it is a full step yellower, and it is the
+   only place on the page that uses it, so it stays a literal rather than becoming a token. */
+.live-dot {
+  display: inline-block;
+  background-color: #45d91e;
+  width: 8px;
+  height: 8px;
+  border-radius: 4px;
+  position: relative;
+  margin-right: 8px;
+}
+
+/* The halo. It is a second copy of the dot at 30% opacity scaling to 2.5x and snapping back —
+   there is no fade in the keyframes, so the ring pops rather than dissolving. The negative
+   margins are half the dot, centring the pseudo-element on it. */
+.live-dot:after {
+  content: '';
+  position: absolute;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  top: 50%;
+  margin-top: -4px;
+  left: 50%;
+  margin-left: -4px;
+  background-color: #45d91e;
+  opacity: 0.3;
+  animation: online infinite 1.5s linear;
+}
+
+@keyframes online {
+  0% {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(2.5);
+  }
+}
+
+/* The ticker. The strip is a two-row grid inside an `h-12 overflow-hidden` box, and this walks
+   it up by its OWN height — `-100%` of the grid, not of the window it shows through — then
+   snaps back.
+
+   THE `.live-overflowing` GATE IS OURS. The original declares the animation straight on
+   `.live-container` with no condition, and that is fine for it: because the translate is
+   `-100%` of the grid, the window ends every cycle EMPTY regardless of row count, and only a
+   feed long enough to keep something in view for most of the 30s hides that. Four rows — all
+   that was recoverable from the capture — leave a ~40px grid in a 48px window, so the strip
+   spends most of the loop blank.
+
+   The class is toggled from a layout effect in index.jsx that compares the grid's `offsetHeight`
+   against the window's `clientHeight`, so this reverts to the original's behaviour on its own
+   once the real feed fills the grid. To go back to the unconditional original, move the
+   declaration up onto `.live-container` and drop the effect.
+
+   `scroll` is a generic name for a global keyframe and it is kept because it is the original's,
+   the same call the `moveX` block in RecentBigWins.css makes. Nothing else in this project
+   declares it — check before adding a second. */
+.live-container.live-overflowing {
+  animation: scroll 30s linear infinite;
+}
+
+@keyframes scroll {
+  0% {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-100%);
+  }
+}

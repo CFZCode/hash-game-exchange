@@ -1,0 +1,82 @@
+
+.raffle-amount {
+  background-image:
+    conic-gradient(
+      from -26.52deg at 48.56% 46.69%,
+      #d1b860 0deg,
+      #e1d17c 31.84deg,
+      #feffaf 61.18deg,
+      #feffaf 78.99deg,
+      #b18a33 111.56deg,
+      #f9ec92 171.3deg,
+      #fff49a 210.88deg,
+      #bb9231 242.64deg,
+      #ac7d1b 261.9deg,
+      #feffaf 293.47deg,
+      #f0e997 339.07deg,
+      #caae56 360deg
+    ),
+    linear-gradient(0deg, rgba(255, 250, 220, 0.2), rgba(255, 250, 220, 0.2));
+  color: transparent;
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+/* The header's ticket feed.
+ *
+ * `.carousels` and its 16px window are the original's, from index-DxOqNczA.css:
+ *
+ *   .carousels { display: flex; overflow: hidden; position: relative; align-content: flex-start }
+ *   .carousels-enter-wrap .carousels { height: 16px; display: block !important; overflow: hidden }
+ *
+ * Only the part this page uses is reproduced. The track is this project's: the original
+ * drives keen-slider, which writes a per-slide transform, and here one transform moves the
+ * stack instead. Note the `display` declarations stay confined to `.carousels`, whose
+ * visibility no responsive utility controls — see the cascade hazard in CLAUDE.md.
+ */
+.carousels {
+  position: relative;
+  display: flex;
+  align-content: flex-start;
+  overflow: hidden;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: pan-y;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.carousels-enter-wrap .carousels {
+  display: block;
+  height: 16px;
+  overflow: hidden;
+}
+
+.raffle-ticker-track {
+  transition: transform 0.4s cubic-bezier(0.36, 0.66, 0.04, 1);
+}
+
+/* The ticker's mobile arm. `index-BLT5gN04.js` writes `animation: marquee <n>s linear infinite`
+   inline on the track and these are the keyframes it names, index-WymgNldA.css verbatim:
+
+     @keyframes marquee { 0% { transform: translate(0) }
+                          to  { transform: translate(var(--marquee-end)) } }
+     .marquee { --marquee-end: -100%; --marquee-duration: 1s }
+
+   AND `--marquee-end` IS NOT DECLARED FOR THIS ELEMENT ON THE LIVE SITE EITHER. It lives on
+   `.marquee`, a class the raffle's track does not carry and does not inherit from, so the `to`
+   keyframe is invalid at computed-value time, gets dropped, and the animation resolves to a
+   single frame at 0. The strip is therefore STATIC — which is exactly what the phone capture
+   shows, one copy of the rows filling the visible width with the duplicate clipped behind it.
+
+   Kept as found, for the reason `f-ull` and the missing `dice` sprite are. Uncomment the
+   declaration below and it scrolls. */
+@keyframes marquee {
+  0% {
+    transform: translate(0);
+  }
+  to {
+    transform: translate(var(--marquee-end));
+  }
+}
+
+/* .raffle-ticker-marquee { --marquee-end: -100%; } */

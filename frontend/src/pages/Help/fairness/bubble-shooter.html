@@ -1,0 +1,94 @@
+<div class="item">
+  <h2>How Are the Results Calculated?</h2>
+  <div class="content">
+    <p>
+      To get the results, we calculate the hash value of the combination
+      with HMAC_SHA256. This gives us a 64-character hexadecimal string:
+      hash = HMAC_SHA256 (clientSeed:nonce, serverSeed).
+    </p>
+    <div class="code-area">
+      <pre>
+        public static long pointFromHashAndRtp( String seed, String salt, Integer rtp ) {
+            // number of most significant bits to use
+            int nBits = 52;
+            // 1. HMAC_SHA256(message=seed, key=salt)
+            // const hmac = CryptoJS.HmacSHA256(CryptoJS.enc.Hex.parse(seed), salt);
+            // seed = hmac.toString(CryptoJS.enc.Hex);
+            if ( salt != null && !"".equals(salt) ) {
+            seed = HmacSHA.sha256(StringHandler.hex2byte(seed), salt.getBytes());
+            }
+            
+            // 2. r = 52 most significant bits
+            BigDecimal r = new BigDecimal(Long.parseLong(seed.substring(0, nBits / 4), 16));
+            
+            // 3. X = r / 2^52
+            // uniformly distributed in [0; 1)
+            BigDecimal x = r.divide(new BigDecimal(Math.pow(2, nBits)), 9, RoundingMode.HALF_DOWN);
+            
+            // 4. X = 99 / (1-X)
+            x = new BigDecimal(1).subtract(x);
+            
+            x = new BigDecimal(rtp % 100).divide(x, 0, RoundingMode.FLOOR);
+            
+            // 5. return max(trunc(X), 100)
+            // const result = Math.floor(X);
+            return Math.max(100L, x.longValue());
+        }
+
+        public static final int RAINBOW_GREEN = 5;
+        public static final int RAINBOW_YELLOW = 6;
+        public static final int RAINBOW_BLUE = 7;
+        public static final int JACKPOT = 8;
+
+        private static final Map<Integer, TreeMap<Integer, Integer>> PAYOUT_TABLE = new TreeMap<>();
+            static {
+                TreeMap<Integer, Integer> rainbowGreen = new TreeMap<>();
+                rainbowGreen.put(20, 120);
+                rainbowGreen.put(30, 130);
+                rainbowGreen.put(40, 150);
+                rainbowGreen.put(94, 200);
+                rainbowGreen.put(98, 500);
+                rainbowGreen.put(100, 1000);
+                PAYOUT_TABLE.put(RAINBOW_GREEN, rainbowGreen);
+
+                TreeMap<Integer, Integer> rainbowYellowBlue = new TreeMap<>();
+                rainbowYellowBlue.put(20, 200);
+                rainbowYellowBlue.put(30, 200);
+                rainbowYellowBlue.put(40, 300);
+                rainbowYellowBlue.put(94, 500);
+                rainbowYellowBlue.put(98, 1000);
+                rainbowYellowBlue.put(100, 5000);
+                PAYOUT_TABLE.put(RAINBOW_YELLOW, rainbowYellowBlue);
+                PAYOUT_TABLE.put(RAINBOW_BLUE, rainbowYellowBlue);
+
+                TreeMap<Integer, Integer> jackpot = new TreeMap<>();
+                jackpot.put(10, 300);
+                jackpot.put(30, 500);
+                jackpot.put(40, 700);
+                jackpot.put(94, 1000);
+                jackpot.put(98, 1500);
+                jackpot.put(100, 10000);
+                PAYOUT_TABLE.put(JACKPOT, jackpot);
+            }
+
+        public static int getPayoutByRandom(int colorId, int randomNumber) {
+            TreeMap<Integer, Integer> config = PAYOUT_TABLE.get(colorId);
+            if (config == null) return 0;
+
+            Map.Entry<Integer, Integer> entry = config.ceilingEntry(randomNumber);
+            return entry != null ? entry.getValue() : 0;
+            }
+
+            public static int getRandomNumber(String serverSeed, String clientSeed, long nonce, long round){
+            String key = String.format("%s:%d:%d", clientSeed, nonce, round);
+            String hash = HmacSHA.sha256(key, serverSeed);
+
+            // random [1,100]
+            int randomNumber = GenerateRandomV2.slideWindowNumber(hash, 100) + 1;
+
+            return randomNumber;
+        }
+        </pre>
+    </div>
+  </div>
+</div>

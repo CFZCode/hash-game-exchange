@@ -1,0 +1,41 @@
+<div class="item">
+    <h2>How Are the Results Calculated?</h2>
+    <div class="content">
+
+        <p>
+            To get the results, we calculate the hash value of the combination
+            with HMAC_SHA256. This gives us a 64-character hexadecimal string:
+            hash = HMAC_SHA256 (clientSeed:nonce, serverSeed).
+        </p>
+
+        <div class="code-area">
+
+            <pre>
+getResult(serverSeed, clientSeed, nonce) {
+    const BASE_RANGE = 1000000;
+    const key = `${clientSeed}:${nonce}`;
+    const hash = this.hmacSHA256(key, serverSeed);
+    return Math.floor(slideWindowNumber(hash, BASE_RANGE));
+},
+
+hmacSHA256(key, seed) {
+    const res = CryptoJS.HmacSHA256(key, seed).toString(CryptoJS.enc.Hex);
+    return res;
+},
+
+slideWindowNumber(hash, events) {
+    const index = parseInt(hash.substring(0, 15), 16) % 47;
+    return this.calNumberFromIndex(hash, index, events);
+},
+
+calNumberFromIndex(hash, beginIndex, events) {
+    const MAX_BORDER = 1.0 / Math.pow(2, 53);
+    const safeIndex = Math.min(hash.length - 14, beginIndex);
+    const num = parseInt(hash.substring(safeIndex, safeIndex + 14), 16) >> 3;
+    const normalized = num * MAX_BORDER;
+    return Math.floor(normalized * events);
+}
+        </pre>
+        </div>
+    </div>
+</div>

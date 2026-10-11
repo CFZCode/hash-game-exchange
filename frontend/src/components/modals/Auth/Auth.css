@@ -1,0 +1,236 @@
+/* The dialog shell, from index-DxOqNczA.css.
+ *
+ * The original's dialog manager renders four nested boxes and this project keeps all four,
+ * because each one does a job: `.dialog-root` is the fixed, centring scrim, `.dialog-list` is
+ * the card that the manager animates between sizes, `.dialog-overlayer` is the clipping frame
+ * one dialog occupies inside that card, and `.dialog-item` is the dialog itself.
+ *
+ * The one structural thing worth knowing: `.dialog-list` and `.dialog-overlayer` carried inline
+ * `width`/`height` in the captured markup (29.375rem x 45rem — 470 x 720), written by the
+ * manager because it animates `transition: width .3s, height .3s` as you move between dialogs
+ * of different sizes. There is one dialog here and nothing to animate between, so the size is
+ * declared in CSS instead. That also fixes what the inline values would otherwise do on a
+ * phone, where 29.375rem is wider than the screen.
+ */
+
+/* DESKTOP vs MOBILE is `.pc` on the original's root element, toggled from
+   `Zi().classList.toggle("pc", !ee.mobile)` — the same `m.mobile` flag this project maps to
+   `lg` everywhere else. So: below lg the dialog is a full-screen sheet with no scrim, and from
+   lg up it is a centred card over a #000a scrim. Both are the original's; only the line
+   between them is ours. */
+
+.dialog-root {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1000;
+  width: 100%;
+  height: 100%;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding-bottom: var(--safe-bottom, 0px);
+}
+
+.dialog-visible {
+  display: flex;
+}
+
+.dialog-list {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  opacity: 0;
+  transition: width 0.3s, height 0.3s;
+}
+
+.dialog-visible .dialog-list {
+  opacity: 1;
+}
+
+.dialog-overlayer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1000;
+  /* `!important` in the original, on the mobile side only — it is what defeats the inline
+     size the manager writes. Kept as plain declarations here since nothing writes inline. */
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  touch-action: pan-x;
+  background-color: var(--color-layer2);
+}
+
+.dialog-item {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding-top: var(--safe-header, 0px);
+}
+
+/* index-DxOqNczA.css verbatim. THE HORIZONTAL PADDING IS PART OF THE SHELL and was missing here
+   — only `flex: 1` had been transcribed, which is why the deposit dialog had to write its own
+   `px-4` at the call site. It is safe to add: the one existing consumer is the auth dialog,
+   which carries `dialog-transparent-title` and so already zeroes both sides below. */
+.dialog-content {
+  flex: 1;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+.dialog-content > .scroll-container {
+  padding-bottom: 1rem;
+}
+
+/* `box-sizing: content-box` with `border-top: var(--safe-top) solid transparent` is how the
+   original pushes a dialog's title bar below a notch without changing its height — the same
+   trick `.page-header` uses. `--header` is 3.5rem; on a notchless viewport `--safe-top` is 0,
+   so this is a plain 56px bar here. */
+.dialog-title {
+  box-sizing: content-box;
+  height: 3.5rem;
+  border-top: var(--safe-top, 0px) solid transparent;
+  line-height: 2rem;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--color-primary);
+}
+
+/* `.dialog-close` is NOT `.pop-close`, and the difference is where it sits. `.pop-close` pins
+   itself to `top: .75rem`; this one carries no position at all — the markup wraps it in
+   `absolute right-4 top-0 flex items-center h-full`, so it centres against the title bar's full
+   height rather than hanging from the top. That is the whole of the "the cross sits too high"
+   symptom.
+
+   BOTH FILLS ARE WRITTEN NOW, and the base is not the one you would guess. The original's pair
+   is `.dialog-close, .dialog-back, .dialog-action { background-color: var(--white_alpha5) }`
+   with `.dark .dialog-close, … { background-color: #373e3f }` over it — so the LIGHT arm goes
+   through the token and the DARK arm is a flat literal, which is the opposite of how the rest of
+   this file works. Faithful either way: in the dark theme `--white_alpha5` is a 5% white wash
+   that would take its colour from whatever is behind the button, and the literal is what pins it
+   to one value regardless of which dialog it is sitting in. */
+.dialog-close {
+  border-radius: var(--radius-lg);
+  width: 1.5rem;
+  height: 1.5rem;
+  background-color: var(--color-white_alpha5);
+  color: var(--color-secondary);
+}
+
+.dark .dialog-close,
+.dark .dialog-back {
+  background-color: #373e3f;
+}
+
+.dialog-close > svg {
+  width: 0.875rem;
+  height: 0.875rem;
+  fill: var(--color-secondary);
+}
+
+/* `.dialog-back` — the arrow the manager draws at the title bar's left when a dialog sits on top of
+   another one in its stack (see components/shared/DialogShell). The original declares it alongside
+   `.dialog-close` and then, unlike the close button, gives it a POSITION of its own: the close is
+   centred by a wrapper the markup supplies, this one pins itself. `bottom: 1rem` in a 3.5rem bar
+   around a 1.5rem button leaves 1rem above it, so it is centred either way.
+
+   This is the `pc` pair — 1.5rem around a 0.875rem glyph. The phone's is 2rem/1.25rem and is
+   transcribed separately as `.route-dialog .dialog-back` in RouteDialog.css, which also departs
+   from it deliberately; that rule is 0,2,0 against this one's 0,1,0, so it wins wherever it
+   applies regardless of which file loads first. */
+.dialog-back {
+  position: absolute;
+  left: 1rem;
+  bottom: 1rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: var(--radius-lg);
+  /* The dark arm is `.dark .dialog-back`, declared beside `.dialog-close` above — the original
+     groups all three of close/back/action into one pair of rules and so does this. */
+  background-color: var(--color-white_alpha5);
+  color: var(--color-secondary);
+}
+
+.dialog-back > svg {
+  width: 0.875rem;
+  height: 0.875rem;
+  fill: var(--color-secondary);
+}
+
+/* `.dialog-transparent-title` normally pulls the content up under a floating title bar and
+   zeroes the horizontal padding; with `.dialog-no-title` alongside it, only the padding half
+   applies — there is no title to slide under, just the sticky tab bar this dialog supplies
+   itself. Both classes are on the captured element, so both are reproduced. */
+.dialog-transparent-title .dialog-content {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.scroll-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+/* From lg up: the centred card.
+ *
+ * THE DEFAULT IS 30rem x 40rem AND IT IS NOW A REAL RULE HERE. The original hangs the whole card
+ * treatment — that size, the 1rem radius and the layer2 fill — off `.pc .dialog-list`, and a
+ * dialog that asks for its own size gets it written inline over the top. Two dialogs here each
+ * restated the radius and the fill beside their own size, with a note saying to hoist the pair
+ * the day a third one needed it; `/free-plays` is that third one, and its route carries a bare
+ * `dialog: !0` — no `size` at all — so what it wants IS the default. The two size classes below
+ * now override nothing but width and height, which is exactly the original's arrangement.
+ *
+ * `.dialog-list.<name>` is 0,2,0 against this rule's 0,1,0, so nothing here can beat a dialog's
+ * own size. Both sit in the same query on purpose: below lg every dialog is a full-screen sheet
+ * and `.dialog-list` is already 100%/100%, which is why `size` is likewise ignored on a phone
+ * (`dialog: m.mobile || {size}` hands the manager a bare `true` there). */
+@media (min-width: 1024px) {
+  .dialog-root {
+    background-color: #000a;
+  }
+
+  .dialog-list {
+    width: 30rem;
+    height: 40rem;
+    /* `max-height: calc(100% - 2rem)` is the original's and was missing here — read off
+       `.pc .dialog-list` in the CURRENT deploy's `index-Dxw2IdQj.css`, which carries all five
+       declarations in one rule. Without it a 40rem card on a viewport shorter than 640px runs off
+       the top and bottom instead of shrinking to leave a 1rem margin either side, and the taller
+       dialogs are where that shows: the 2FA enrolment and the KYC form both fill the card. The
+       height stays 40rem, so this changes nothing on a viewport with room for it. */
+    max-height: calc(100% - 2rem);
+    border-radius: 1rem;
+    background-color: var(--color-layer2);
+  }
+
+  /* 29.375rem x 45rem is the size the manager wrote inline for the auth dialog. */
+  .dialog-list.login-layout-dialog-size {
+    width: 29.375rem;
+    height: 45rem;
+  }
+
+  /* `[30, 12]` on `/settings/verify/enter/:levelName` — `v3` turns an array size into inline
+     `width`/`height` in rem, so this is the manager writing 480x192. A SHORT card, and the only
+     one in the project: the cockpit beside it declares no size and takes the 30x40 above. */
+  .dialog-list.verify-enter-dialog-size {
+    width: 30rem;
+    height: 12rem;
+  }
+}
+
+/* The password field's reveal toggle is inside the input box, and the box already sets
+   `padding-inline-end: .5rem`; the markup overrides that with `!pr-3`. Nothing else to add —
+   this file deliberately stops at the shell. */

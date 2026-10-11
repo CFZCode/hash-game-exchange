@@ -1,0 +1,44 @@
+/* `/chat-public`'s box — the phone chat screen. Geometry read off hash.game/chat-public at 390
+ * with a phone UA (the numbers are in index.jsx): the panel is fixed, fills the viewport down to
+ * the tabbar, and its own `header-layer` lands at the very top over the site header.
+ *
+ * `4.5rem` IS THE TABBAR'S OWN HEIGHT rather than a measurement repeated here — `.tabbar` in
+ * `Tabbar.css` declares exactly that, so the two cannot drift, and because it is rem it tracks the
+ * scaled root below 640 the way the bar itself does (65px at 390, which is what the live page
+ * measures). The bar stays visible and the panel stops above it, which is the live arrangement:
+ * the Chat tab is lit while you are on this screen, so it has to be on screen to be lit.
+ *
+ * `z-index: 100` is the live panel's own, and the number matters in both directions: `.page-header`
+ * is z-99 here as it is there, so the chat covers the site header rather than anything having to
+ * unmount it; the tabbar's z-[99] is under this, which is why the box ends at 4.5rem rather than
+ * relying on the stack.
+ *
+ * `position: fixed` in a plain stylesheet is safe here — the cascade hazard in CLAUDE.md is about
+ * `display` on elements whose visibility is a responsive utility, and this element is not one:
+ * the route it belongs to is JS-guarded to phones and never renders at `lg`.
+ */
+.chat-public {
+  position: fixed;
+  /* top | inline | bottom */
+  inset: 0 0 4.5rem;
+  z-index: 100;
+  /* A MARGIN PARTICIPATES IN A FIXED BOX'S HEIGHT WHEN BOTH INSETS ARE SET, and this page is the
+     layout column's `:last-child`, which `MainLayout.css` gives `margin-bottom: 1rem`. With `top`
+     and `bottom` both named and `height` auto, the used height solves
+     `top + margin-top + height + margin-bottom + bottom = viewport`, so that inherited rem came
+     straight off the bottom of the panel: measured at 390 it ended at 764.2 against a tabbar
+     starting at 778.7, leaving a 15px strip of page showing between the two. Nothing about the
+     symptom points at a margin, hence the note. */
+  margin: 0;
+  /* `.right-slide-content`'s pair, and the same two values for the same reason — it is the same
+     panel, and its fill belongs to the container rather than to `components/Chat`, which
+     declares none. #292d2e is layer3, the fill the header and sidebar carry, so the screen reads
+     as chrome rather than as a card; the light one is the PAGE background rather than light
+     layer3 (which is pure white), so the two themes are not one relationship stated twice. Both
+     are index-DxOqNczA.css's own; see the note at `.right-slide-content` in RightDrawer.css. */
+  background: #292d2e;
+}
+
+.app-root:not(.dark) .chat-public {
+  background: #f4f4f4;
+}

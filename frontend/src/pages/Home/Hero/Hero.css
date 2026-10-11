@@ -1,0 +1,23 @@
+/* The signed-out hero's panel. Both stops are TOKENS rather than the literals that stood here —
+   `#292D2E` is layer3 exactly and `#4A5354` is layer6 exactly, so nothing about the dark theme
+   changed by writing them this way, and the light theme now gets a panel that is white shading to
+   white rather than a slab of dark grey on a pale page.
+
+   The gradient angle and both stop positions are the original's own and are untouched; only the
+   two colours moved. Note that in the light theme layer3 and layer6 are BOTH `#FFFFFF`, so the
+   mobile gradient flattens to a plain white panel — which is correct rather than a degenerate
+   case: the light palette carries its depth in borders, not in fills, and the panel's own markup
+   supplies those. */
+.hero-panel {
+  background: var(--color-layer3);
+}
+
+@media (max-width: 1023px) {
+  .hero-panel {
+    background: linear-gradient(
+      317deg,
+      var(--color-layer3) 40.85%,
+      var(--color-layer6) 109.03%
+    );
+  }
+}

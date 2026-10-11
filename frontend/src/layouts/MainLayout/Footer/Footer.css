@@ -1,0 +1,235 @@
+/* `.footer-bg` is the original's own class name; the background is layer1. */
+
+/* THE 1rem TOP MARGIN IS THIS BUILD'S, NOT THE ORIGINAL'S — the live site butts the footer
+ * straight against the page — and it is now zero below `sm`, which is the re-tuning CLAUDE.md
+ * has been deferring. It was measured: between the bottom of the casino page's Latest round &
+ * Race card and the top of the tabbar the original leaves 14px against this build's 69, and the
+ * 55px was `pb-12` on the casino page (dealt with at its own call site) plus this.
+ *
+ * THE BLAST RADIUS IS FAR SMALLER THAN IT LOOKS, because this margin only ever showed where the
+ * page contributed less than 16px of its own. Adjacent margins collapse to the larger, so every
+ * page carrying a trailing `mb-4` or `mb-6` for exactly this purpose — the promotions grid, the
+ * deposit-offer cards — already wins that collapse and does not move by a pixel. What moves is
+ * the handful of pages ending in something smaller, which here is the bets panel's own `my-3`:
+ * 16px becomes its 12, and 12 is the original's 14 to within the error of reading a crop.
+ *
+ * Kept from `sm` up because desktop is out of scope for this pass; the original says it should
+ * go there too. */
+.footer-bg {
+  /* `--footer-bg` IS THE ORIGINAL'S OWN TOKEN AND IT IS NOT layer1 IN EITHER THEME — it just
+     coincides with it in the dark one, which is why this rule read as `var(--color-layer1)` for
+     as long as there was only one theme:
+
+       .footer-bg           { --footer-bg: #fff;    background: var(--footer-bg) }
+       .app-root.dark .footer-bg { --footer-bg: #1e2121; background: var(--footer-bg) }
+
+     #1e2121 is layer1's dark value exactly, so nothing changed by writing the token instead.
+     The light value is pure WHITE, where light layer1 is #EEF1F4 — so keeping the layer
+     reference would have put the footer a shade darker than the page's own cards rather than a
+     shade lighter than its background. Reproduced as the original writes it: the light arm on
+     the bare class, the dark arm one specificity step above it. */
+  --footer-bg: #fff;
+
+  background-color: var(--footer-bg);
+  margin-block: 0;
+  margin-inline: calc(var(--content-inset-x, 0px) * -1);
+
+  /* This one DELIBERATELY beats a utility, which is normally the bug CLAUDE.md warns about.
+     The original's markup puts `w-full` on the footer, and `width: 100%` resolves against
+     the containing block — so the negative margins above only SHIFT the box, they cannot
+     widen it. The left edge went flush and the right kept its inset, which is the gap that
+     survived the first attempt. As a stretched flex item with `width: auto` the used width
+     becomes container + both insets instead, so the box actually grows into the bleed.
+     Unlayered CSS outranks the utilities layer, so this wins without !important. */
+  width: auto;
+}
+
+.app-root.dark .footer-bg {
+  --footer-bg: #1e2121;
+}
+
+@media (min-width: 640px) {
+  .footer-bg {
+    margin-block: 0rem;
+  }
+}
+
+/* `divide-y` changed SIDES between Tailwind v3 and v4, and the footer is where it shows.
+ *
+ *   v3 (the original):  & > * + *            { border-top-width: 1px }
+ *   v4 (ours):          & > :not(:last-child) { border-bottom-width: 1px }
+ *
+ * The same rules get drawn in the same places, so it looks equivalent — but each band's
+ * MARGIN then falls on the wrong side of its rule. The prose band carries `mb-6`, which on
+ * v3 puts 24px above the rule and leaves the awards band's `pt-8` as the 32px below it. On
+ * v4 the rule sits at the prose band's bottom edge instead, so that 24px lands underneath
+ * and stacks with the 32: nothing above the rule, 56px below. Measured off the render as
+ * 3.2px and 56.8px against the original's 24 and 32.
+ *
+ * That pair only exists on the home page now, since the prose band is gated there — but every
+ * remaining band boundary (awards/partners, partners/columns, columns/licence) has the same
+ * asymmetry, so this is not home-page-specific.
+ *
+ * Restated here as v3's border-top so the markup can keep the original's `divide-y
+ * divide-third`. v4 emits its rule inside `:where()`, which has zero specificity, so this
+ * needs no !important. */
+.footer-bg > :not(:last-child) {
+  border-bottom-width: 0;
+}
+
+.footer-bg > * + * {
+  border-top: 1px solid var(--color-third);
+}
+
+/* `divide-x` flipped the same way: v3 is `& > * + * { border-left }`, v4 is
+   `& > :not(:last-child) { border-inline-end }`. On v4 the partner rule draws on the FIRST
+   group's trailing edge, so it reads as hanging off the 18+ mark; on v3 it draws on the
+   second group's leading edge, which puts the row's gap-x-10 (2.5rem) on one side of it and
+   the second group's own pl-6 (1.5rem) on the other. That is what centres it between 18+ and Leicester, and it
+   matches the live row, where the rule sits 46.4px from 18+ and 27.2px from Leicester. */
+.footer-partners > :not(:last-child) {
+  border-inline-end-width: 0;
+}
+
+.footer-partners > * + * {
+  border-left: 1px solid var(--color-third);
+}
+
+/* Every width, not just mobile. Each group is `flex-shrink-0` over marks that are themselves
+   `shrink-0` at declared px widths, so a group's min-content width is the SUM of its marks:
+   the certifiers add up to 649 (94 + 104 + 125 + 180 + 50, plus four 24px gaps). The band's
+   own `flex-wrap` only wraps the two GROUPS past each other — it cannot break a group — so
+   any container narrower than 649 was overflowed rather than wrapped, and because
+   `.main-layout-content` is `overflow: visible` that became a horizontal scroll on the whole
+   page. It bites from 640 to ~712, where the band's inner width (viewport - 32 gutter - 32
+   sm:px-4) first clears 649.
+
+   Wrapping changes a flex container's min-content width from the sum of its items to the
+   widest single item (180 here), which is what removes the overflow. It is inert wherever the
+   marks already fit on one line, so the desktop row is untouched. */
+.footer-partners > div {
+  flex-wrap: wrap;
+}
+
+/* `.feedback-html` verbatim from index-DxOqNczA.css, which turned out to be in the mirror
+   after all — the block is dangerously-set HTML, so the original styles it by element:
+
+     .feedback-html {
+       > .other-info { display: none }
+       > h2 { font-size: 1.125rem; line-height: 1.75rem; font-weight: 600; color: primary }
+       > p  { font-size: .875rem;  line-height: 1.25rem; color: secondary }
+     }
+
+   Child combinators, not descendant, and the h2 weight is 600 — which the wrapper's
+   `font-semibold` was already supplying, so it renders the same either way. `.other-info` is
+   a block this page does not carry. */
+.feedback-html > h2 {
+  font-size: 1.125rem;
+  line-height: 1.75rem;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.feedback-html > p {
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  color: var(--color-secondary);
+}
+
+/* ---------------------------------------------------------------------------------------
+   Mobile, below sm.  CURRENTLY INERT.
+   ---------------------------------------------------------------------------------------
+
+   The footer is `hidden lg:flex` — it does not render below 1024, so nothing in this block
+   applies today. It is kept rather than deleted because it is the corrected layout for these
+   widths, and deleting it would mean rediscovering the flex-shrink traps below if the footer
+   is ever shown on a phone again.
+
+   `footer-jnUVITid.js` was never saved into the mirror, so unlike the desktop footer — whose
+   every class list came off the live DOM — there is no reference for what the original does
+   below 640. These rules are therefore OURS: the minimum needed to stop the transcribed
+   desktop layout from overflowing or collapsing into unreadable columns on a phone. They are
+   scoped to `width < 640` so the measured >= 640 rendering is bit-for-bit unchanged; if the
+   real mobile markup ever turns up, this block is what it replaces.
+
+   One caution carried over from CLAUDE.md: `display` is set here on `.footer-links`, which is
+   normally the rule that bit the tabbar. It is safe in this case because nothing toggles that
+   band's visibility with a responsive utility — it renders at every width — and the
+   declaration is inside a media query rather than applying globally.
+
+   Everything below 640 is already rem-scaled by remScale.js (root = clientWidth / 430 * 16),
+   so these values are in rem and ride that scale. The two exceptions are called out where
+   they appear. */
+@media (width < 640px) {
+  /* The feedback column, and the one overflow that is NOT about a declared width.
+     `flex-shrink-0` with `basis: auto` makes the item's flex base size its max-content width —
+     the security sentence, which is far wider than a phone — and `max-w-[500px]` then clamps
+     that to exactly 500. Shrinking is off, so 500 is what it renders at whatever the line is
+     worth: on a 373 screen the band's line is 341 and the text ran 159 past the right edge.
+     The cap did not cause it, it only set where the overflow stopped.
+
+     Restoring shrink is the whole fix — the item then takes the line width, and its own
+     min-content floor (the longest unbroken token, `feedback@bcgame.com`) is well under it.
+     Nothing above 640 is affected: the band's line is wider than 500 there, so the cap binds
+     first and shrink never engages. */
+  .footer-feedback {
+    flex-shrink: 1;
+  }
+
+  /* Certifiers over sponsorships instead of beside them. Three things have to move together
+     for that: the axis, the rule, and the second group's leading padding — the vertical
+     divider and its `pl-6` only make sense on a row. gap-x-10 no longer applies on a column,
+     so the 1.5rem below restates the group separation on the block axis. */
+  .footer-partners {
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .footer-partners > * + * {
+    border-left: 0;
+    border-top: 1px solid var(--color-third);
+    padding-left: 0;
+    padding-top: 1.5rem;
+  }
+
+  .footer-partners > div {
+    gap: 1rem 1.5rem;
+  }
+
+  /* Two even columns in DOM order. `justify-between` on a wrapping flex row is what gives the
+     desktop band its uneven offsets, and that is correct there; on a phone the same rule
+     strands columns at both edges with a ragged gutter down the middle, so this band becomes
+     a grid instead. `minmax(0, 1fr)` rather than `1fr` — a bare 1fr floors at min-content, and
+     "Sport Betting Insights" next to its external-link icon is wider than half of a 320
+     screen, which would push the grid past the viewport. `start` keeps each column's heading
+     at the top of its row rather than stretching the short ones. */
+  .footer-links {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+
+  /* The community block is the band's last child and the one cell that cannot live in half a
+     screen: `grid-cols-4` over `size-10` buttons needs 184 on its own. Full width, capped at
+     the GameCheck badge's own 218.4 so the social grid keeps the same pitch as the badge under
+     it, exactly as it does in the desktop column. 218.4px and not 13.65rem on purpose — it is
+     matching a sibling that is itself declared in px (`w-[218.4px]`), so it has to stay pinned
+     to that same value as the root scales. */
+  .footer-links > :last-child {
+    grid-column: 1 / -1;
+    max-width: 218.4px;
+  }
+
+  /* The legal band keeps its two columns for the logo and the seal — that pairing is small
+     and reads fine at any width — and hands both prose blocks the full width. At half a phone
+     screen the licence paragraph wraps to roughly two words a line. */
+  .footer-legal-grid > :nth-child(n + 3) {
+    grid-column: 1 / -1;
+  }
+
+  /* gap-y-3 is enough between the logo row and the text that follows it; between two long
+     paragraphs it reads as one block. */
+  .footer-legal-grid {
+    row-gap: 1rem;
+  }
+}

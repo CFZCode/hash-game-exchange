@@ -1,0 +1,264 @@
+/* The MOBILE arm of the dialog shell — the parts of `index-DxOqNczA.css` that only render when a
+ * dialog route is served as a full-screen sheet rather than as a centred card.
+ *
+ * The shell itself (`.dialog-root`, `.dialog-list`, `.dialog-overlayer`, `.dialog-item`,
+ * `.dialog-content`, `.dialog-close`, `.scroll-container`) lives in `Auth.css`, where it was
+ * transcribed for the first dialog that needed it. What is here is everything the auth dialog
+ * never exercised: an absolutely-positioned title bar with a scroll-driven fill, the back arrow
+ * that replaces the close square on a phone, and the `transparent-title` behaviour.
+ *
+ * ALL OF IT IS SCOPED TO `.route-dialog` RATHER THAN WRITTEN BARE, and that is not tidiness. The
+ * original's selectors are bare (`.dialog-title`, `.dialog-transparent-title .dialog-content`),
+ * and the auth dialog carries `dialog-transparent-title` as well — paired with `dialog-no-title`,
+ * which is what suppresses the bar there. It survives on the live site because `--safe-header` is
+ * genuinely declared; this build deliberately leaves that variable undeclared (see the
+ * `--spacing-sh` note in CLAUDE.md), so bare rules would resolve against a `0px` fallback and
+ * quietly move the auth dialog's content. Unscope them the day the auth dialog is re-checked at
+ * every width.
+ */
+
+/* `--safe-header` is `calc(var(--header) + var(--safe-top))` on the original, with `--header` at
+ * 3.5rem. Declared on the LIST rather than on `:root` so it does not reach `.dialog-item` in
+ * `Auth.css`, which currently renders on its own `0px` fallback and must go on doing so.
+ *
+ * `--safe-top` IS ZERO, WHICH IS THE ORIGINAL'S OWN VALUE OFF A NOTCHED DEVICE, and that is what
+ * makes the title bar measure exactly `--header`: 3.5rem, which is 57.3px at a viewport where the
+ * scaled root font-size is 16.37px (see the remScale note in CLAUDE.md — below 640 the root is
+ * `16 * clientWidth / 430`, so 3.5rem is a different pixel count at every width and 57.3 is that
+ * number at ~440px). The bar's total height is this inset plus `--header`, so anything non-zero
+ * here makes it measure taller than the live site's.
+ *
+ * It was 1rem for a while, as a stand-in for the status-bar strip a real phone reports and to
+ * answer "add the top gap" back when the bar sat flush against the viewport edge. That gap is now
+ * spent on the arrow's own offset instead, which does not change the bar's height.
+ *
+ * Kept as a declared variable rather than folded away: it is the seam an `env(safe-area-inset-top)`
+ * goes into the day this ships to a device that reports one, and the title bar already consumes it
+ * as `border-top` under `box-sizing: content-box`, so the bar would grow around its contents
+ * rather than shifting them. `0px` and not `0` — `--safe-header`'s `calc()` adds a length to it,
+ * and a bare `0` is a number, which makes the whole expression invalid at computed-value time. */
+.route-dialog {
+  --safe-top: 0px;
+  --safe-header: calc(3.5rem + var(--safe-top));
+}
+
+/* `height: var(--header)`, NOT `--safe-header` — `.dialog-title` in `Auth.css` is
+   `box-sizing: content-box` with `border-top: var(--safe-top) solid transparent`, so the two add
+   up to the full offset and writing the total here would count the inset twice. */
+.route-dialog .dialog-title {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  z-index: 100;
+  height: 3.5rem;
+  transition: background-color 0.1s linear;
+  /* THE FILL IS DRIVEN BY SCROLL, and the formula is the original's:
+   *
+   *   .dialog-title { --tw-bg-opacity: calc((var(--scroll) * 100 / 15) - 50%);
+   *                   --bg: var(--layer4);
+   *                   background-color: rgb(var(--bg) / var(--tw-bg-opacity)) }
+   *
+   * with `--scroll` written onto `.dialog-overlayer` as a PERCENTAGE — `"--scroll": `${_()}%``.
+   * `_()` starts at 100 and is only ever updated for a `transparent-title` dialog, where it
+   * becomes `100 * scrollTop / innerHeight`. So an ordinary dialog's bar is opaque from the first
+   * frame (100% drives the alpha far past 1 and it clamps), and a transparent one fades in over
+   * the first 7.5%–22.5% of a viewport height of scroll — roughly 64px to 190px on a phone. The
+   * `-50%` term is what makes the first stretch produce a negative alpha, which clamps to 0.
+   *
+   * `--layer4-rgb` is `--color-layer4` as a triple, declared beside it in BOTH palette blocks of
+   * `index.css` (50 55 56 dark, 255 255 255 light). It used to be spelled out here as `50 55 56`,
+   * and a literal triple cannot follow the theme: the light sweep found every phone dialog's bar
+   * painted charcoal over a white page, the title unreadable on it, while hash.game's own light
+   * bar is white. The original reaches the same value through `--bg`,
+   * which a route can override with `info.titleColor` (the deposit dialog's is `var(--layer2)`).
+   * `--bg` IS NOW WIRED rather than spelled out: the promotions page is the first route here to
+   * want another value — its own dialog carries `[&_.dialog-title]:bg-layer3` — and a Tailwind
+   * arbitrary variant cannot deliver it, because these rules are UNLAYERED and a utility is not.
+   * That is the cascade hazard in CLAUDE.md, and the original's own channel is the way through:
+   * the `titleColor` prop writes `--bg` inline and this falls back to layer4 when it does not.
+   * The value is an `R G B` TRIPLE and not a hex, because it is fed to `rgb()` with an alpha; This project's `@theme` carries only the hex form, which is why
+   * the channel is spelled out — the same adaptation `components/shared/Skeleton` records. */
+  background-color: rgb(var(--bg, var(--layer4-rgb)) / calc((var(--scroll, 100%) * 100 / 15) - 50%));
+}
+
+/* THE FALLBACK HAS TO DIFFER PER ARM, and getting that wrong is visible for exactly one frame's
+   worth of user action. `--scroll` is only written by JS, and only on a scroll EVENT — so before
+   the first scroll there is no value at all and the declaration above falls back to 100%, which is
+   correct for an opaque bar and wrong for a transparent one. The symptom was precise: the bar
+   opened filled, and turned transparent the first time you scrolled down and back to the top,
+   because that is when the handler first wrote `0%`.
+
+   Fixed in CSS rather than by seeding an inline style at mount, which is the same fix one layer
+   further from the render: nothing to write, nothing to re-apply if React re-renders the
+   overlayer, and no chance of a filled first paint. The inline value still inherits down and wins
+   over both fallbacks the moment it exists, so the two arms agree from the first scroll onward. */
+.route-dialog .dialog-transparent-title > .dialog-title {
+  background-color: rgb(var(--bg, var(--layer4-rgb)) / calc((var(--scroll, 0%) * 100 / 15) - 50%));
+}
+
+/* `transparent-title` moves the header's reservation INSIDE the scroller, which is what lets the
+   content pass under the bar instead of starting below it. `.dialog-item`'s own
+   `padding-top: var(--safe-header)` is cancelled by the negative margin and put back on the
+   scroll container. */
+.route-dialog .dialog-transparent-title > .dialog-content {
+  margin-top: calc(0px - var(--safe-header));
+  padding-left: 0;
+  padding-right: 0;
+}
+
+/* `:not(.dialog-no-title)` IS THE ORIGINAL'S OWN GUARD AND IT IS LOAD-BEARING — the stylesheet
+   spells this selector out in full:
+
+     .dialog-transparent-title:not(.dialog-no-title) .dialog-content>.scroll-container {
+         padding-top: var(--safe-header) }
+
+   The negative margin above cancels `.dialog-item`'s reservation for BOTH behaviours, because
+   `no-title` is written as a transparent-title dialog as well (`(v || y) &&
+   "dialog-transparent-title"` in the manager). What differs is what goes back: a floating bar
+   needs its height reserved inside the scroller so the content starts below it and passes under
+   it on scroll, and a dialog with NO bar needs nothing — `/bonus` below lg draws its own sticky
+   tab strip in that space. Without the guard the strip started 56px down AND the scroller ran 56px
+   past the bottom of the sheet, putting the last 56px of the page out of reach. */
+.route-dialog .dialog-transparent-title:not(.dialog-no-title) > .dialog-content > .scroll-container {
+  padding-top: var(--safe-header);
+}
+
+/* An ordinary bar is opaque and sits in front of the content, so the scroller has to start below
+   it. `.dialog-item`'s own `padding-top: var(--safe-header)` does that on the original; it reads
+   the variable declared above and needs nothing more. */
+
+/* `.dialog-back` — the arrow at the bar's left, and `.dialog-close` in `Auth.css` is its twin.
+   The close button carries no `position` of its own and this one does, because the bar is
+   absolute and centres its title: the arrow is pinned to the bar's bottom-left rather than being
+   a flex sibling.
+
+   THE BOX IS THE ORIGINAL'S DESKTOP PAIR, NOT ITS PHONE PAIR, and that is a departure asked for
+   by name. `.appbar .dialog-back` is 2rem around a 1.25rem glyph; `.pc .dialog-back` is 1.5rem
+   around 0.875rem at `bottom: 1rem`. The bar here is the phone's, so 2rem/1.25rem is what the
+   original would draw, and it read as oversized against the rest of the page.
+
+   `bottom: 1rem` IS THE CENTRING VALUE, and it is where this landed after being walked up and
+   back down: a 1.5rem box in a 3.5rem bar leaves exactly 1rem above and below, so the arrow sits
+   on the bar's own axis. It was 1.25 and then 2rem while `--safe-top` still reserved a strip above
+   the bar; with that inset at 0 the higher values pushed it toward the viewport edge.
+
+   Nothing else moves with it. The content below starts at `--safe-header`, which this value is not
+   a term in — the gap between the arrow and the profile is `this + any padding on the header`, and
+   the header carries none, so lowering the arrow only closes that gap from the arrow's side.
+
+   The fill is NOT the `#373e3f` square every other dialog control wears:
+   `.dialog-transparent-title .dialog-title button { background-color: #0000000d !important }`
+   swaps it for a 5% black wash so the arrow reads against whatever it floats over. Applied to
+   both arms here, since the opaque bar's own layer4 is close enough that the difference is a
+   hairline and one rule is easier to reason about than two. */
+.route-dialog .dialog-back {
+  position: absolute;
+  left: 1rem;
+  bottom: 1rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: var(--radius-lg);
+  background-color: #0000000d;
+  color: var(--color-secondary);
+  z-index: 11;
+}
+
+.route-dialog .dialog-back > svg {
+  width: 0.875rem;
+  height: 0.875rem;
+  fill: var(--color-secondary);
+}
+
+/* THE PAGE SUPPLIES THE GUTTER, NOT THE SHELL — see `pageGutter` in index.jsx.
+ *
+ * A route carrying `info.dialog = m.mobile` mounts one component two ways: a page inside the
+ * layout column on a desktop, a full-screen dialog on a phone. Every one of those pages already
+ * writes the original's own `px-4 sm:px-0` on its root, since `.main-layout-content` runs
+ * `padding-inline: 0` below 640 by design and each page insets itself there. Stacked on
+ * `.dialog-content`'s own 1rem that reads as a 32px margin on a 397px screen, which is twice
+ * what the reference shows.
+ *
+ * Zeroed on the SHELL rather than dropped from the pages, and that direction is deliberate: the
+ * page's own value is the original's and is what its desktop arm needs, while this padding is
+ * the manager's default for a dialog whose content brings none. Editing the pages would make
+ * each one carry knowledge of which shell it happens to be in — and there are a dozen more
+ * routes with the same flag still to come. `.dialog-transparent-title > .dialog-content` above
+ * zeroes the same axis for the same reason, one behaviour over. */
+.route-dialog .dialog-page-gutter > .dialog-content {
+  padding-inline: 0;
+}
+
+/* THE TITLE BAR'S ACTION SLOT — `info.dialog.actions`, opposite the back arrow.
+ *
+ * `.dialog-action` itself is the manager's own class and its box is transcribed from
+ * `index-DxOqNczA.css` verbatim: it shares the `.dialog-close, .dialog-back, .dialog-action`
+ * declaration (a `--radius-lg` square in `--white_alpha5`, `#373e3f` in the dark theme) and then
+ * takes its own 2rem/1.25rem pair, where the back arrow keeps 1.5/0.875. Those two rules are why
+ * the action reads a step larger than the arrow across the bar from it, which is what the
+ * reference shows. `.pc` collapses both back to 1.5 on a desktop and cannot apply here, since
+ * this shell is the phone arm.
+ *
+ * The WRAPPER is this build's. The bar centres its title with `justify-content: center`, so an
+ * action in the flow would shift the title left by its own width; absolute positioning is what
+ * `.dialog-back` already does one end over, and this mirrors it. `inset-inline-end` rather than
+ * `right` so it follows the document direction as the rest of the shell does. */
+.route-dialog .dialog-actions {
+  position: absolute;
+  inset-inline-end: 1rem;
+  bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.route-dialog .dialog-action {
+  border-radius: var(--radius-lg);
+  width: 2rem;
+  height: 2rem;
+  background-color: var(--color-white_alpha5);
+  color: var(--color-secondary);
+  z-index: 11;
+}
+
+/* `.dark` and not `.app-root.dark`, matching `.dialog-close`/`.dialog-back` in Auth.css — the
+   original writes the light arm through the token and pins the dark one to a flat literal, which
+   is the opposite of the rest of this project and is faithful for the reason recorded there. */
+.dark .route-dialog .dialog-action {
+  background-color: #373e3f;
+}
+
+.route-dialog .dialog-action > svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  fill: var(--color-secondary);
+}
+
+/* THE SCROLLBAR'S GUTTER IS RESERVED, WHICH IS WHY THE CONTENT IS 4px NARROWER THAN THE VIEWPORT.
+ *
+ * The reference shows a persistent bar down the end edge of every one of these pages — 4px wide
+ * and sampling #4a5354, which is `.app-root ::-webkit-scrollbar-thumb`'s own literal, so it is the
+ * SITE's scrollbar on the dialog's own scroller and not the browser's on the document. That bar
+ * takes width from the content, and the difference reads as the two builds disagreeing about the
+ * page width when it is only the gutter.
+ *
+ * `.scroll-y` already reads `scrollbar-gutter: var(--scrollbar-gutter, auto)` — the seam exists
+ * precisely so a call site can ask for this without redeclaring the property — and `/bonus` below
+ * lg is its other consumer, for a reason worth repeating: with `auto` the gutter appears and
+ * disappears with the content, so anything whose length changes (a tab strip, a filter) shifts
+ * every row by 4px as you use it. Reserving pins the width to the narrower of the two, which is
+ * what the reference renders at.
+ *
+ * `stable` and NOT `stable both-edges`: the bar is on the end edge only, and both edges would
+ * inset the content twice. The original's own `.app-root` carries `scrollbar-gutter: stable
+ * both-edges`, which reserves it on EVERY scroller in the app including the document — that is a
+ * far broader change and is still deliberately not made; see the note at `.app-root
+ * ::-webkit-scrollbar` in index.css. This is the first instalment of it, scoped to the shell whose
+ * pages are being checked against captures.
+ *
+ * On the shell rather than per page: every route that reaches this component is a full page whose
+ * content scrolls, so the gutter is occupied anyway and `auto` and `stable` render identically
+ * except in the jumpy case this is here to fix. */
+.route-dialog .dialog-content {
+  --scrollbar-gutter: stable;
+}

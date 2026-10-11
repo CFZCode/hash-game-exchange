@@ -1,0 +1,1864 @@
+/* The sports lobby's geometry.
+ *
+ * WHERE THE NUMBERS COME FROM. Every other CSS file in this project cites a mirrored
+ * stylesheet by filename. This one cannot: /sports is BetBy's widget, rendered into an open
+ * shadow root, so there is no bc.game stylesheet to read and its own rules are hashed
+ * styled-components classes with no stable names. These values are measured off desktop
+ * screenshots of the live lobby instead — a documented exception, recorded in CLAUDE.md.
+ *
+ * THE SCREENSHOTS ARE AT devicePixelRatio 1.25. All three come out at 1596-1608 image px wide,
+ * i.e. 1277-1286 CSS px — a 1280 window. So every figure below is an image measurement divided
+ * by 1.25, and a value that looks oddly non-round (a 34px odds button) is a measurement, not a
+ * mistake. Do not tidy them toward multiples of 4 without re-measuring.
+ *
+ * WHAT IS NOT MEASURED. Only the desktop lobby was captured. The breakpoints below the
+ * three-column grid are this project's own (`sm` 640 / `lg` 1024), chosen so the page degrades
+ * sensibly, and they are NOT the widget's — BetBy's own are `max-width: 600px / 444px / 412px`,
+ * read off its stylesheets, and what it renders at those widths has not been seen. Re-measure
+ * before trusting anything under `lg` here.
+ *
+ * Values are in rem (design px / 16) per the project's responsive rule, so they scale with the
+ * root font-size below 640. The exceptions are icon boxes, which are pinned in px exactly as
+ * this project pins .color_icon_img / .menu_icon_img to 32px — the point of that rule is that
+ * icon geometry stays constant while the text around it scales.
+ *
+ * THE WHOLE RAIL IS ONE OF THOSE EXCEPTIONS. Every dimension in the `.sports-rail*` block is
+ * px, including the bar's own height, padding and dividers — because its contents are all
+ * px-pinned icon boxes and a container sized in rem around px children grows away from them
+ * below 640. Do not "normalise" that block to rem for consistency with the rest of the file.
+ */
+
+/* ------------------------------------------------------------------ shell integration
+ *
+ * Three things the layout shell does to every other page have to be undone for this one. All
+ * three are measured off the capture, not preferences.
+ *
+ * 1. NO 1216px CAP. `.main-layout-container` caps and centres every page at 1216px. At the
+ *    capture's 1280 viewport that would put the lobby in a 1216 box with 32px gutters either
+ *    side; what the capture actually shows is content from 17.6 to 1262 CSS px — 1244 wide
+ *    with ~16px gutters, i.e. the full content column. So the cap is not applied to this page
+ *    on the real site.
+ *
+ * 2. NO GAP UNDER THE HEADER. `--header-mb` is 16px from lg up and is the only vertical space
+ *    between the site header and the first panel. The lobby's rail sits flush against it.
+ *
+ * Both are reached with `:has()` because they belong to boxes the shell owns — a page cannot
+ * otherwise escape a cap or an offset declared above it. Each scores 0,2,0 against the base
+ * rule's 0,1,0, so they win on specificity and the source order between the two files does not
+ * matter.
+ */
+.main-layout-container:has(.sports-lobby) {
+  max-width: none;
+}
+
+.main-layout-content:has(.sports-lobby) {
+  /* `0px`, never a bare `0` — this is consumed by a calc() in MainLayout.css, and a unitless
+     zero there is a <number>, not a <length>, which invalidates the whole padding-top. That
+     exact mistake has already cost this project once; see the note at MainLayout.css:12. */
+  --header-mb: 0px;
+}
+
+/* ------------------------------------------------------------------ the top rail */
+
+/* 3. THE RAIL IS FULL-BLEED, and it is the only part of the lobby that is: in the capture its
+ *    background reaches both edges while the tab pills below it start at the same ~16px gutter
+ *    as everything else. Same breakout the Footer already uses (Footer.css:18) — cancel
+ *    exactly `--content-inset-x`, which the shell keeps equal to the inset it applied, so this
+ *    lands flush against the sidebar at lg rather than sliding underneath it. Below sm it
+ *    resolves to 0px because the page wrapper's own `-mx-4` has already done the job. */
+.sports-rail {
+  margin-inline: calc(var(--content-inset-x, 0px) * -1);
+  display: flex;
+  align-items: center;
+  /* The tooltip is positioned against this box, so it has to be the offset parent — and it
+     must NOT clip, which is why the tip lives here and not inside the scroller. */
+  position: relative;
+
+  /* PX, NOT REM, and that is the whole point of this block.
+   *
+   * Everything inside this bar is pinned in px — 48px cells, 32px icons, a 19px badge — for
+   * the same reason this project pins .color_icon_img to 32px: icon geometry must not move
+   * with the root font-size. The bar's own height and padding were in rem, so below 640,
+   * where the root scales to clientWidth/430, the bar grew while its contents did not: at a
+   * 500px viewport `4rem` resolves to 74px around 48px cells, and the rail reads far too tall.
+   * A container whose children are px-pinned has to be px-pinned too.
+   *
+   * 48px, NOT 64. The 64 came from measuring the widget's MOBILE navbar, which is a taller
+   * component; on desktop the bar hugs its cells. The divider settles it — BetBy's own rule is
+   * `height: 32px` (given below), and a 32px divider centred with 32px icons inside 48px cells
+   * leaves 8px of clearance, which is what the bar actually is. There is no vertical padding
+   * on top of that; the cells ARE the height. */
+  height: 48px;
+  /* The rail's own inner padding, not the page gutter the margin above cancels: the first
+     cell's box starts ~6.4 CSS px in from the rail's left edge in the capture. */
+  padding-inline: 8px;
+  /* #323738 = layer4, NOT layer3. The rail is one step lighter than the header/sidebar
+     surface, which is why it reads as a bar sitting on the page rather than as part of the
+     page. This was layer3 (#292D2E) and the difference was visible. */
+  background-color: var(--color-layer4);
+}
+
+/* NO GAP. The capture's icon centres are 60 image px apart = a 48px pitch, and the cells are
+   themselves 48px, so they butt up against each other. A 6px gap here looks harmless and is
+   not: across 25 cells it adds 150px, which pushed the last three sports and the overflow
+   arrow off the end of the row. Do not reintroduce it. */
+.sports-rail-scroll {
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+/* 48px around a 32px icon — corroborated twice, off the desktop capture and off the live
+   widget's own shadow DOM. Pinned in px, not rem, exactly as this project pins
+   .color_icon_img / .menu_icon_img to 32px: icon boxes stay constant while text scales. */
+.sports-rail-cell {
+  position: relative;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  cursor: pointer;
+}
+
+/* NO background change on hover. The rail's hover state is carried entirely by the icon
+   turning brand green plus the tooltip — the cell itself stays flat. An earlier version lit
+   the cell to layer5; that is not what the widget does. */
+
+.sports-rail-icon {
+  width: 32px;
+  height: 32px;
+}
+
+/* The composite Highlights cell — a 28px flag disc with a 20px icon centred over it. Both
+   sizes are BetBy's own inline values. The icon is forced white rather than following the
+   cell, because on the live rail it sits on full-colour flag artwork. */
+.sports-rail-stack {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+}
+
+.sports-rail-flag {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.sports-rail-stack-icon,
+.sports-rail-stack-icon svg {
+  position: relative;
+  width: 20px;
+  height: 20px;
+}
+
+.sports-rail-cell .sports-rail-stack-icon svg {
+  fill: var(--color-alw_white);
+}
+
+.sports-rail-icon svg,
+.sports-rail-more-arrow svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* The base fill, and it has to be stated. BetBy's SVGs carry no fill of their own — the widget
+   colours them from its stylesheet — so without this they inherit the initial value and render
+   solid black. That is exactly what happened: the two sport icons that did resolve came out as
+   black blobs against the dark rail. */
+.sports-rail-cell svg {
+  fill: var(--color-secondary);
+}
+
+.sports-rail-cell:hover svg,
+.sports-rail-cell:focus-visible svg {
+  fill: var(--color-brand);
+}
+
+/* Home is the selected cell and is the one green mark on the rail at rest. */
+.sports-rail-cell.is-active svg,
+.sports-rail-cell.is-active:hover svg {
+  fill: var(--color-brand);
+}
+
+/* The overflow arrow is INERT on hover — no colour change, and it reports no tooltip. It is a
+   disclosure control rather than a destination. Its cell is also narrower than the rest, which
+   is what closes the gap to the last sport: at a full 48px the 16px triangle floats in the
+   middle of an oversized box and reads as a hole in the row. */
+.sports-rail-more {
+  width: 24px;
+}
+
+.sports-rail-cell.sports-rail-more:hover svg,
+.sports-rail-cell.sports-rail-more:focus-visible svg {
+  fill: var(--color-secondary);
+}
+
+/* 16px is BetBy's own inline size on `ic-rounded-arrow`; px, like everything else in the rail. */
+.sports-rail-more-arrow {
+  width: 16px;
+  height: 16px;
+}
+
+/* BetBy's own rule, verbatim — `width: 1px; height: 32px; background: rgb(179,190,193)`. That
+   colour is `--color-secondary`, so it is written as the token rather than the literal. It was
+   24px and `--color-third` (a 10% white), which was both too short and far too faint. */
+.sports-rail-divider {
+  flex: none;
+  width: 1px;
+  height: 32px;
+  margin-inline: 4px;
+  background-color: var(--color-secondary);
+}
+
+/* The hot pin. NOT a counter — BetBy's pin element holds `ic-badge-hot` and no text at all, so
+   there is no number to place and nothing to centre inside the flame. 19px and
+   rgb(255,78,78) are its own inline width and color. */
+.sports-rail-hot {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 19px;
+  height: 19px;
+  /* The flame sits on a white disc. The SVG itself carries no background — the pin element
+     around it does — so the disc belongs here rather than in the file. Without it the red
+     flame sits straight on the layer4 rail and all but disappears. */
+  border-radius: 50%;
+  background-color: var(--color-alw_white);
+}
+
+.sports-rail-hot svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* Beats the `.sports-rail-cell svg` fill below on specificity, so the flame keeps its own
+   colour while the sport icon under it follows the cell. */
+.sports-rail-cell .sports-rail-hot svg {
+  fill: #ff4e4e;
+}
+
+.sports-rail-search {
+  flex: none;
+  margin-left: auto;
+}
+
+/* The hover tooltip. Owned by `.sports-rail` rather than by each cell, because the scroller
+   clips (see the note in SportRail.jsx). `left` arrives inline as the hovered cell's centre and
+   the translate re-centres the box on it. */
+.sports-rail-tip {
+  position: absolute;
+  top: calc(100% + 6px);
+  transform: translateX(-50%);
+  z-index: 3;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--color-primary);
+  background-color: var(--color-layer5);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------------------ expanded navbar */
+
+/* The panel under the rail. Its own surface is layer3 — one step DARKER than the layer4 rail,
+   so the rail still reads as the bar and this as the sheet hanging off it. */
+/* The rail and its dropdown, together, so the panel has something to hang from. `z-index` on the
+   dock rather than on the panel: it has to lift the panel above everything later in the column,
+   and a stacking context on the parent is what does that without a z-index race between
+   siblings. */
+.sports-rail-dock {
+  position: relative;
+  z-index: 3;
+}
+
+/* ── AN OVERLAY, NOT A BLOCK IN THE COLUMN ────────────────────────────────────────────────────
+ *
+ * This was `position: relative`, so it sat in `.sports-lobby`'s flow and opening it pushed the
+ * tabs, the bets feed, the sport filter and the entire event grid down the page — the lobby
+ * reflowed instead of the panel covering it. A dropdown covers.
+ *
+ * `top: 100%` of the dock puts it directly under the rail whatever height the rail is, which
+ * matters because the rail's own box is px-pinned while the column around it is not. Left and
+ * right are pinned to the dock rather than to the rail, so the panel aligns to the content
+ * column — the rail deliberately bleeds 16px past it on each side (see `.sports-rail`), and a
+ * dropdown that inherited that bleed would hang over the gutter.
+ *
+ * The shadow is what separates it from the cards it now covers; the widget draws no border. */
+.sports-expanded {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 0.5rem;
+  border-radius: 0.75rem;
+  padding: 1rem;
+  background-color: var(--color-layer3);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.45);
+}
+
+.sports-expanded-head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+/* A segmented control, not the free-standing pills the lobby tabs use: one layer2 trough with
+   the selected segment raised out of it in layer5. */
+.sports-expanded-tabs {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border-radius: 0.5rem;
+  background-color: var(--color-layer2);
+}
+
+.sports-expanded-tab {
+  min-width: 9rem;
+  height: 2.25rem;
+  padding-inline: 1rem;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-secondary);
+  transition:
+    background-color 0.15s,
+    color 0.15s;
+}
+
+.sports-expanded-tab:hover {
+  color: var(--color-primary);
+}
+
+.sports-expanded-tab.is-active {
+  background-color: var(--color-layer5);
+  color: var(--color-primary);
+}
+
+.sports-expanded-stat {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 0.5rem;
+  background-color: var(--color-layer2);
+}
+
+.sports-expanded-stat-icon,
+.sports-expanded-stat-icon svg {
+  width: 1rem;
+  height: 1rem;
+  /* rgb(255,152,32) — the same orange as the Popular tab's crown, and BetBy's own inline
+     colour on this glyph. Not a token; it exists in exactly these two places. */
+  fill: #ff9820;
+}
+
+/* BetBy's `featurePin`, an 8px disc it renders inline with no glyph in it. */
+.sports-expanded-pin {
+  position: absolute;
+  top: 0.375rem;
+  right: 0.375rem;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--color-brand);
+}
+
+/* Five columns on the capture, degrading down. Only the 5-up arrangement is measured; the
+   narrower steps are this project's own, like the event grid's. */
+.sports-expanded-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.25rem;
+  margin-top: 1rem;
+  max-height: 30rem;
+  overflow-y: auto;
+}
+
+@media (min-width: 640px) {
+  .sports-expanded-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .sports-expanded-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+.sports-expanded-row {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  min-width: 0;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  text-align: left;
+  transition: background-color 0.15s;
+}
+
+.sports-expanded-row:hover {
+  background-color: var(--color-layer4);
+}
+
+.sports-expanded-mark {
+  position: relative;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+}
+
+.sports-expanded-icon,
+.sports-expanded-icon svg {
+  width: 32px;
+  height: 32px;
+  fill: var(--color-secondary);
+}
+
+.sports-expanded-row:hover .sports-expanded-icon svg {
+  fill: var(--color-primary);
+}
+
+.sports-expanded-hot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 19px;
+  height: 19px;
+}
+
+.sports-expanded-hot svg {
+  width: 100%;
+  height: 100%;
+  fill: #ff4e4e;
+}
+
+.sports-expanded-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sports-expanded-count {
+  flex: none;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-tertiary);
+}
+
+.sports-expanded-empty {
+  padding-block: 2.5rem;
+  text-align: center;
+  color: var(--color-secondary);
+}
+
+/* Sits behind the panel's own content and catches a click anywhere else on the page. */
+.sports-expanded-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  cursor: default;
+}
+
+/* Open, the rail's arrow flips and turns brand green. */
+.sports-rail-more.is-open .sports-rail-more-arrow {
+  transform: rotate(180deg);
+}
+
+.sports-rail-cell.sports-rail-more.is-open svg {
+  fill: var(--color-brand);
+}
+
+/* ------------------------------------------------------------------ lobby tabs + sport filter */
+
+/* The two pill rows share their geometry and differ only in the selected treatment, so the
+   shape lives in one place. A selected lobby tab goes one layer lighter; a selected sport goes
+   brand green with black text — the only brand-filled control on the page. */
+.sports-tabs,
+.sports-filter {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  overflow-x: auto;
+}
+
+.sports-tab,
+.sports-filter-pill {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: 2.25rem; /* 44 image px */
+  padding-inline: 1rem;
+  border-radius: 9999px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  white-space: nowrap;
+  background-color: var(--color-layer3);
+  color: var(--color-primary);
+  transition:
+    background-color 0.15s,
+    color 0.15s;
+}
+
+.sports-tab:hover,
+.sports-filter-pill:hover {
+  background-color: var(--color-layer4);
+}
+
+/* The label colour is not constant across the row, and the difference is bigger than the
+   background change: the widget's computed `color` is white on the selected tab and
+   rgb(179,190,193) — secondary — on every other one. */
+.sports-tab {
+  color: var(--color-secondary);
+}
+
+.sports-tab.is-active {
+  background-color: var(--color-layer5);
+  color: var(--color-primary);
+}
+
+.sports-filter-pill.is-active {
+  background-color: var(--color-brand);
+  /* Already in @theme for exactly this: the black the contest's Active flag and Winner ribbon
+     use on the same green. */
+  color: var(--color-primary_brand);
+}
+
+.sports-filter-pill.is-active:hover {
+  background-color: var(--color-brand);
+}
+
+/* 18px, which is the widget's own measured box on all six — not 20, and not scaled from the
+   32-unit viewBox two of them happen to use. `--glyph` carries BetBy's computed fill for this
+   particular tab; it arrives inline from lobby.js because three of the six are BetBy colours
+   that deliberately are not tokens. */
+.sports-tab-glyph {
+  width: 1.125rem;
+  height: 1.125rem;
+  flex: none;
+}
+
+.sports-tab-glyph svg {
+  width: 100%;
+  height: 100%;
+  fill: var(--glyph, currentColor);
+}
+
+.sports-filter-icon,
+.sports-filter-icon svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex: none;
+}
+
+.sports-filter-icon svg {
+  fill: currentColor;
+}
+
+/* ------------------------------------------------------------------ featured banner */
+
+.sports-feature {
+  position: relative;
+  height: 17.125rem; /* 342 image px */
+  padding: 2rem;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+
+  /* The wash the promo photograph sits on. The photograph itself is remote and not in the
+     mirror (see FeaturedBanner.jsx); --sports-feature-art is the hook for dropping one in, and
+     resolves to nothing until it is set, leaving the wash alone rather than a broken url(). */
+  background-color: #2a1b3d;
+  background-image: var(--sports-feature-art, none),
+    linear-gradient(105deg, #241733 0%, #3a2258 48%, #1d1430 100%);
+  background-size: cover;
+  background-position: center right;
+}
+
+/* One measure for the whole content column — head, teams, market and odds all line up on it
+   in the capture, with the artwork occupying everything to its right. */
+.sports-feature-content {
+  width: 30rem;
+  max-width: 100%;
+}
+
+.sports-feature-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-secondary);
+}
+
+.sports-feature-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.sports-feature-tournament {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sports-feature-sport,
+.sports-feature-sport svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex: none;
+  fill: var(--color-secondary);
+}
+
+.sports-feature-start {
+  flex: none;
+  color: var(--color-primary);
+}
+
+.sports-feature-teams {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1.75rem;
+}
+
+.sports-feature-side {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.sports-feature-side.is-away {
+  justify-content: flex-end;
+}
+
+.sports-feature-name {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A circular crop, so a rectangular flag SVG reads as the round badge the capture shows. */
+.sports-feature-flag,
+.sports-feature-flag svg,
+.sports-feature-flag img {
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  object-fit: cover;
+  background-color: var(--color-layer5);
+}
+
+.sports-feature-market {
+  margin-top: 0.75rem;
+  text-align: center;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-secondary);
+}
+
+.sports-feature-odds {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+/* Translucent rather than a solid layer token: these sit on the artwork, so the wash has to
+   show through them the way it does in the capture. */
+.sports-feature-odd {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  height: 2.5rem;
+  padding-inline: 0.75rem;
+  border-radius: 0.5rem;
+  background-color: rgba(255, 255, 255, 0.08);
+  transition: background-color 0.15s;
+}
+
+.sports-feature-odd:hover {
+  background-color: rgba(255, 255, 255, 0.16);
+}
+
+.sports-feature-odd-name {
+  font-size: 0.875rem;
+  color: var(--color-secondary);
+}
+
+.sports-feature-odd-value {
+  font-size: 0.875rem;
+  font-weight: 800;
+  color: var(--color-primary);
+}
+
+.sports-feature-dots {
+  position: absolute;
+  left: 2rem;
+  bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+/* The active dot is a stretched bar, not a bigger circle — that is what the capture shows and
+   it is the only thing distinguishing it besides colour. */
+.sports-feature-dot {
+  width: 0.375rem;
+  height: 0.25rem;
+  border-radius: 9999px;
+  background-color: rgba(255, 255, 255, 0.35);
+  transition:
+    width 0.2s,
+    background-color 0.2s;
+}
+
+.sports-feature-dot.is-active {
+  width: 1.75rem;
+  background-color: var(--color-brand);
+}
+
+/* ------------------------------------------------------------------ bets feed */
+
+.sports-feed {
+  display: flex;
+  gap: 1rem;
+  overflow-x: auto;
+}
+
+/* Fixed width, so a fourth card is left peeking at the right edge. That peek is what tells you
+   the strip scrolls — the same device the home page's game rows and Highlights row use. */
+.sports-feed-card {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  /* 360, READ OFF THE WIDGET rather than divided out of a screenshot. It was 22.375rem, from
+     "448 image px" at dpr 1.25 — 358.4, and 2px short, which is the kind of error an edge
+     measurement makes and a computed value does not. The same 360 is the module width the event
+     grid's `minmax` uses; see the note there. */
+  width: 22.5rem;
+  height: 12.875rem; /* 257 image px */
+  border-radius: 0.75rem;
+  overflow: hidden;
+  background-color: var(--color-layer3);
+}
+
+.sports-feed-legs {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  overflow: hidden;
+}
+
+.sports-feed-leg {
+  position: relative;
+  display: flex;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+/* The ring is a bordered circle, and the rule joining consecutive legs is the same element's
+   ::after — one element, so the two can never drift apart vertically. */
+.sports-feed-ring {
+  position: relative;
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-top: 0.3125rem;
+  border-radius: 50%;
+  border: 1.5px solid var(--color-brand);
+}
+
+.sports-feed-leg.has-next .sports-feed-ring::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 2px);
+  transform: translateX(-50%);
+  width: 1.5px;
+  height: 1.75rem;
+  background-color: var(--color-brand);
+  opacity: 0.4;
+}
+
+.sports-feed-lines {
+  min-width: 0;
+}
+
+.sports-feed-pick {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sports-feed-fixture {
+  margin-top: 0.125rem;
+  font-size: 0.75rem;
+  color: var(--color-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Pinned to the bottom by the legs' flex-grow above, so a two-leg ticket and a four-leg one
+   have their totals on the same line across the strip — which is what the capture shows. */
+/* AN INSET PILL, NOT A FULL-BLEED BAND, and all four values are computed ones off the live
+   widget: 344 x 40 inside a 360 card — so 8px in on each side — with an 8px radius and a 10%
+   white fill rather than layer4. It was a 44px band spanning the card's full width in layer4,
+   which is what a screenshot of a dark pill on a dark card reads as. */
+.sports-feed-total {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 2.5rem;
+  margin-inline: 0.5rem;
+  margin-bottom: 0.5rem;
+  padding-inline: 0.75rem;
+  border-radius: 0.5rem;
+  background-color: var(--color-white_alpha10);
+}
+
+.sports-feed-total-label {
+  font-size: 0.875rem;
+  color: var(--color-secondary);
+}
+
+.sports-feed-total-value {
+  font-size: 0.875rem;
+  font-weight: 800;
+  color: var(--color-primary);
+}
+
+/* ------------------------------------------------------------------ event grid */
+
+/* Three columns on the capture. The two narrower arrangements are this project's own — the
+   widget was never seen below desktop. See the file header. */
+.sports-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+/* ── THE COLUMN COUNT IS A MINIMUM WIDTH, NOT A BREAKPOINT ────────────────────────────────────
+ *
+ * This replaces a 2-at-640 / 3-at-1024 pair that was this project's own invention — the note at
+ * the head of this file said as much, because only one desktop width had ever been captured.
+ * Three have been now, and they do not fit a fixed-count rule:
+ *
+ *   content 1008 (viewport 1280)   2 columns, cards 496 wide
+ *   content 1168 (viewport 1440)   3 columns, cards 379 wide
+ *   content 1328 (viewport 1600)   3 columns, cards ~433 wide
+ *
+ * Two of those were read off screenshots of the live lobby and the 1440 one by scanning the
+ * card fills along a horizontal line, which is why its 379 is exact rather than eyeballed.
+ * A fixed count cannot produce that: 1280 and 1440 are both "desktop" and differ.
+ *
+ * Solving `auto-fill` for the minimum: three columns must fit at 1168 (3N + 32 <= 1168, so
+ * N <= 378.7) and must NOT fit at 1008 (3N + 32 > 1008, so N > 325.3). Anything in that band
+ * reproduces all three widths; 360px is the value picked because it is not a free choice — it
+ * is the width BetBy gives its bets-feed cards, measured at exactly 360 with a 16px gap in the
+ * same lobby. One module width, used twice.
+ *
+ * Checked against all three afterwards, and 1440 was already right: ours renders 3 x 379 there
+ * with cards starting at x=256, which is the live layout to the pixel. Only 1280 moved. */
+@media (min-width: 640px) {
+  .sports-grid {
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  }
+}
+
+.sports-event {
+  padding: 1rem;
+  border-radius: 0.75rem;
+  background-color: var(--color-layer3);
+}
+
+.sports-event-league {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-width: 0;
+  font-size: 0.75rem;
+  color: var(--color-tertiary);
+}
+
+.sports-event-tournament {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The middot between country and tournament is shared with the Highlights card, where it is
+   white. Here the whole line is tertiary, so it is toned down to match rather than punching a
+   white dot through a grey line. */
+.sports-event-league .sports-dont {
+  flex: none;
+  background-color: var(--color-tertiary);
+}
+
+.sports-event-globe {
+  flex: none;
+  width: 0.875rem;
+  height: 0.875rem;
+  fill: var(--color-tertiary);
+}
+
+.sports-event-start {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin-top: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+/* Lineups and statistics. Blue is BetBy's, not a repo token — it appears nowhere else in this
+   build, so it stays a literal here rather than being promoted into @theme. */
+.sports-event-feed {
+  flex: none;
+  width: 1rem;
+  height: 1rem;
+  fill: #3b9bff;
+}
+
+.sports-event-teams {
+  margin-top: 0.875rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.sports-event-team {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  min-width: 0;
+}
+
+/* An empty disc when no crest resolves, which is every club in the capture — BetBy serves them
+   from an internal competitor id that is not in the mirror. The disc holds the row's geometry
+   so everything else on the card can still be checked. */
+.sports-event-crest {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background-color: var(--color-layer5);
+  overflow: hidden;
+}
+
+.sports-event-crest-icon,
+.sports-event-crest-icon svg {
+  width: 1rem;
+  height: 1rem;
+  fill: var(--color-secondary);
+}
+
+.sports-event-name {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sports-event-market {
+  margin-top: 0.875rem;
+  font-size: 0.75rem;
+  color: var(--color-tertiary);
+}
+
+.sports-event-odds {
+  display: flex;
+  gap: 0.375rem;
+  margin-top: 0.375rem;
+}
+
+/* flex-1 on the outcomes and a fixed width on the chevron, so a two-way market fills the row
+   the same way a three-way one does. Eleven of the twelve cards are 1x2; the CFR Cluj card is
+   a two-way Total, and it is the reason this is not a three-column grid. */
+.sports-event-odd {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.375rem;
+  height: 2.125rem; /* 42 image px */
+  padding-inline: 0.5rem;
+  border-radius: 0.375rem;
+  background-color: var(--color-layer5);
+  transition: background-color 0.15s;
+}
+
+.sports-event-odd:hover {
+  background-color: var(--color-layer6);
+}
+
+/* A selected outcome, and it is the one state on this row that is NOT measured: a signed-out
+   visitor cannot put a leg in the widget's slip, so the live lobby never showed one. It takes
+   the treatment the rest of this page already gives a chosen thing — the sport filter's active
+   pill and the rail's active cell both go brand-green with dark ink — so the odds button is
+   consistent with its own page rather than with a guess at BetBy's. Flagged here for the day a
+   capture of a selected outcome exists.
+
+   `--color-button-brand` rather than `--brand`, for the reason index.css records at that token:
+   brand FILLS on the live deploy are the button green, and `--brand` stays for indicators. */
+.sports-event-odd.is-selected {
+  background-color: var(--color-button-brand);
+}
+
+.sports-event-odd.is-selected:hover {
+  background-color: var(--color-button-brand);
+  filter: brightness(1.05);
+}
+
+.sports-event-odd.is-selected .sports-event-odd-name,
+.sports-event-odd.is-selected .sports-event-odd-value {
+  color: var(--color-alw_dark);
+}
+
+.sports-event-odd-name {
+  font-size: 0.8125rem;
+  color: var(--color-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sports-event-odd-value {
+  flex: none;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.sports-event-more {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.125rem;
+  height: 2.125rem;
+  border-radius: 0.375rem;
+  background-color: var(--color-layer5);
+  transition: background-color 0.15s;
+}
+
+.sports-event-more:hover {
+  background-color: var(--color-layer6);
+}
+
+.sports-event-more-chevron {
+  width: 0.875rem;
+  height: 0.875rem;
+  fill: var(--color-secondary);
+  transform: rotate(-90deg);
+}
+
+/* ------------------------------------------------------------------ pager */
+
+.sports-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+}
+
+.sports-pager-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  background-color: var(--color-layer3);
+  transition:
+    background-color 0.15s,
+    opacity 0.15s;
+}
+
+.sports-pager-button:hover:not(:disabled) {
+  background-color: var(--color-layer4);
+}
+
+/* The capture's prev arrow is dimmed and has no disc behind it, which is how a disabled page
+   button reads there. */
+.sports-pager-button:disabled {
+  background-color: transparent;
+  opacity: 0.4;
+  cursor: default;
+}
+
+.sports-pager-chevron {
+  width: 1rem;
+  height: 1rem;
+  fill: var(--color-secondary);
+}
+
+.sports-pager-button.is-next .sports-pager-chevron {
+  transform: rotate(180deg);
+}
+
+.sports-pager-range {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-secondary);
+}
+
+/* ------------------------------------------------------------------ odds format + disclaimer */
+
+.sports-odds-format {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+}
+
+/* The only letter-spaced small-caps treatment on the page. */
+.sports-odds-format-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-tertiary);
+}
+
+.sports-odds-format-control {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* A real <select> under the pill: it carries no captured styling of its own beyond the pill, so
+   the native control is worth having for keyboard and touch behaviour. `appearance: none`
+   strips the platform arrow so the shared chevron can sit where the capture puts it. */
+.sports-odds-format-select {
+  appearance: none;
+  height: 2.5rem;
+  padding-left: 1.25rem;
+  padding-right: 2.75rem;
+  border-radius: 9999px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  background-color: var(--color-layer3);
+  cursor: pointer;
+}
+
+.sports-odds-format-select:hover {
+  background-color: var(--color-layer4);
+}
+
+.sports-odds-format-chevron {
+  position: absolute;
+  right: 1rem;
+  width: 0.875rem;
+  height: 0.875rem;
+  fill: var(--color-secondary);
+  transform: rotate(-90deg);
+  pointer-events: none;
+}
+
+.sports-disclaimer {
+  max-width: 46rem;
+  margin: 1.5rem auto 0;
+  text-align: center;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--color-tertiary);
+}
+
+/* ------------------------------------------------------------------ page rhythm */
+
+/* One gap rule for the whole column, then three exceptions. Every override below is written as
+   `.sports-lobby .x` rather than `.x` on purpose: the base rule scores 0,1,0 and sits last in
+   the file, so a bare `.x { margin-top }` earlier in the file would tie on specificity and
+   lose. Two classes beat one and the order stops mattering. */
+.sports-lobby > * + * {
+  margin-top: 1rem;
+}
+
+.sports-lobby .sports-filter {
+  margin-top: 1.5rem;
+}
+
+.sports-lobby .sports-pager {
+  margin-top: 1.5rem;
+}
+
+.sports-lobby .sports-lobby-footer {
+  margin-top: 2.5rem;
+}
+
+/* ─── The bet slip ──────────────────────────────────────────────────────────────────────────
+ *
+ * EVERY NUMBER HERE IS A LINE OF THE LIVE SLIP'S PAINT LIST — the widget's own computed boxes at
+ * dpr 1, taken with a leg in the slip and expressed relative to the slip's top-left corner. The
+ * comments give that corner-relative box (`y x  w×h`) so a later diff can be read against the
+ * dump directly. Where a value is odd (22.8px, 6.6px, 97.1px) it is a measurement, not a slip.
+ *
+ * Pure black is used four times on the live slip — the count badge, the toggle's border and knob,
+ * the stake form — and none of this build's tokens is pure black, so it is declared once here.
+ */
+.sports-betslip {
+  --slip-ink: rgb(0 0 0);
+  position: fixed;
+  right: 70px;
+  bottom: 0;
+  z-index: 100;
+  width: 320px;                                   /* 0 0  320×615.8 */
+  max-width: calc(100vw - 2rem);
+  border-radius: 6px 6px 0 0;
+  background-color: var(--color-layer2);          /* rgb(35 38 38) */
+  overflow: hidden;
+}
+
+/* ── header — 0 0  320×56, brand ─────────────────────────────────────────────────────────── */
+.sports-betslip-bar {
+  display: flex;
+  height: 56px;
+  align-items: center;
+  padding: 0 22.8px 0 16px;                       /* toggle's right edge lands at 297.2 */
+  background-color: var(--color-layer2);
+}
+
+.sports-betslip.has-picks .sports-betslip-bar {
+  background-color: var(--color-brand);           /* rgb(36 238 137) once there is a leg */
+}
+
+.sports-betslip-toggle {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  background: none;
+  text-align: left;
+}
+
+.sports-betslip-mark {                            /* 12 16  32×32 */
+  display: flex;
+  height: 32px;
+  width: 32px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background-color: var(--slip-ink);
+}
+
+.sports-betslip-mark-icon svg {
+  height: 18px;
+  width: 18px;
+  fill: var(--color-alw_white);
+}
+
+.sports-betslip-label {                           /* 17.5 56  51×21 — 16px/600 */
+  margin-left: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: normal;
+  color: var(--color-primary);
+}
+
+.sports-betslip.has-picks .sports-betslip-label { color: var(--slip-ink); }
+
+.sports-betslip-count {                           /* 17 111  22×22 — black, brand digits */
+  display: flex;
+  height: 22px;
+  width: 22px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  margin-left: 4px;
+  border-radius: 11px;
+  background-color: var(--slip-ink);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 22px;
+  color: var(--color-brand);
+}
+
+/* `ChevronIcon` points LEFT; +90 is up (shut, the panel opens upward), -90 is down (open). */
+.sports-betslip-chevron {                         /* 20 137  16×16 */
+  height: 16px;
+  width: 16px;
+  flex: none;
+  margin-left: 4px;
+  fill: var(--color-brand);
+  transform: rotate(90deg);
+  transition: transform 0.2s ease;
+}
+
+.sports-betslip.has-picks .sports-betslip-chevron { fill: var(--slip-ink); }
+.sports-betslip.is-open .sports-betslip-chevron { transform: rotate(-90deg); }
+
+.sports-betslip-quick {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.sports-betslip-quick-label {                     /* 22 184.8  52.4×12 — 10px/700, uppercase */
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 12px;
+  text-transform: uppercase;
+  color: var(--color-tertiary);
+}
+
+.sports-betslip.has-picks .sports-betslip-quick-label { color: var(--slip-ink); }
+
+/* An OUTLINED pill, not a filled track: 52×24, 2px border, radius 60, with a black 18px knob
+   3px in from the edge carrying a brand lightning glyph. */
+.sports-betslip-switch {                          /* 16 245.2  52×24 */
+  position: relative;
+  height: 24px;
+  width: 52px;
+  flex: none;
+  border: 2px solid var(--color-tertiary);
+  border-radius: 60px;
+  background: none;
+}
+
+.sports-betslip.has-picks .sports-betslip-switch { border-color: var(--slip-ink); }
+
+.sports-betslip-switch-knob {                     /* 19 248.2  18×18 */
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  display: flex;
+  height: 18px;
+  width: 18px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background-color: var(--slip-ink);
+  transition: transform 0.15s ease;
+}
+
+.sports-betslip-switch.is-on .sports-betslip-switch-knob { transform: translateX(28px); }
+
+.sports-betslip-switch-bolt {                     /* 20 249.2  16×16 */
+  height: 16px;
+  width: 16px;
+  fill: var(--color-brand);
+}
+
+/* ── panel ─────────────────────────────────────────────────────────────────────────────────── */
+.sports-betslip-panel {
+  max-height: min(70vh, 40rem);
+  overflow-y: auto;
+  padding-bottom: 8px;                            /* footer ends 607.8, panel 615.8 */
+}
+
+/* ── tabs — 56 0  320×42 on a layer3 band ──────────────────────────────────────────────────── */
+.sports-betslip-types {
+  display: flex;
+  height: 42px;
+  align-items: flex-start;
+  background-color: var(--color-layer3);          /* rgb(41 45 46) */
+}
+
+.sports-betslip-type {                            /* 56 0/106.7/213.3  106.7×40 — 12px/600 */
+  position: relative;
+  flex: 1 1 0;
+  height: 40px;
+  background: none;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+  color: rgb(255 255 255 / 0.25);
+}
+
+.sports-betslip-type.is-active { color: var(--color-alw_white); }
+
+.sports-betslip-type.is-active::after {          /* 96 0  106.7×2, brand */
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  height: 2px;
+  background-color: var(--color-brand);
+}
+
+/* ── the pick card — 106 4  312×97.1 ─────────────────────────────────────────────────────── */
+.sports-betslip-list {
+  padding: 8px 4px 0;
+}
+
+.sports-betslip-list > * + * { margin-top: 8px; }
+
+.sports-betslip-pick {
+  display: flex;
+  align-items: stretch;
+  border-radius: 6px;
+  background-color: var(--color-layer4);          /* rgb(50 55 56) */
+}
+
+.sports-betslip-remove {                          /* 106 4  40×97.1 — layer5, left corners only */
+  display: flex;
+  width: 40px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px 0 0 4px;
+  background-color: var(--color-layer5);          /* rgb(58 65 66) */
+}
+
+.sports-betslip-remove-icon {                     /* 142.5 12  24×24 */
+  height: 24px;
+  width: 24px;
+  fill: rgb(255 255 255 / 0.74);
+}
+
+.sports-betslip-pick-main {
+  min-width: 0;
+  flex: 1;
+  padding: 10.5px 8px 8px;                        /* team at 116.5; content x=52; form ends 308 */
+}
+
+.sports-betslip-pick-team {                       /* 116.5 52  …×16 — 12px/600 */
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 16px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+  color: var(--color-alw_white);
+}
+
+.sports-betslip-pick-team > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sports-betslip-pick-sport {                      /* 119.1 52  16×16 — 2.6px below the text line */
+  display: flex;
+  margin-top: 2.6px;
+}
+
+.sports-betslip-pick-sport svg {
+  height: 16px;
+  width: 16px;
+  flex: none;
+  fill: var(--color-alw_white);
+}
+
+.sports-betslip-pick-event,                       /* 139.1 52  256×16 — 10px/400 at 74% */
+.sports-betslip-pick-market {                     /* 155.1 52  256×16 */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 16px;
+  color: rgb(255 255 255 / 0.74);
+}
+
+.sports-betslip-pick-event { margin-top: 6.6px; }
+
+.sports-betslip-pick-foot {                       /* 171.1  …×24 */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 24px;
+}
+
+.sports-betslip-pick-odd {                        /* 171.1 52  30.5×24 — 18px/600 */
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 24px;
+  color: var(--color-alw_white);
+}
+
+.sports-betslip-stake {                           /* 171.1 180  128×24 — black form */
+  display: flex;
+  height: 24px;
+  width: 128px;
+  flex: none;
+  align-items: center;
+  border: 1px solid var(--slip-ink);
+  border-radius: 6px;
+  background-color: var(--slip-ink);
+  padding-left: 8px;                              /* symbol at 189 */
+}
+
+.sports-betslip-stake-symbol {                    /* 175.1 189  9.4×16 — 16px/500 */
+  flex: none;
+  font-style: normal;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 16px;
+  color: var(--color-alw_white);
+}
+
+.sports-betslip-stake-input {                     /* 172.1 206.4  100.6×22 */
+  height: 22px;
+  min-width: 0;
+  flex: 1;
+  margin-left: 8px;
+  border-radius: 6px;
+  background: none;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--color-alw_white);
+}
+
+/* ── wordmark, between the card (ends 203.1) and the chips (252.8) ──────────────────────── */
+.sports-betslip-logo {
+  display: block;
+  height: 22px;
+  margin: 14px auto 13.7px;
+}
+
+/* ── chips — 252.8 8/86/164/242  70×40 ───────────────────────────────────────────────────── */
+.sports-betslip-chips {
+  display: flex;
+  gap: 8px;
+  padding-inline: 8px;
+}
+
+.sports-betslip-chip {
+  height: 40px;
+  width: 70px;
+  flex: none;
+  border-radius: 24px;
+  background-color: var(--color-layer5);          /* rgb(58 65 66) */
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 40px;
+  color: var(--color-alw_white);
+}
+
+/* ── totals — two columns, 172.8 + 115.2, inside a 16px inset ────────────────────────────── */
+.sports-betslip-totals {
+  padding: 18px 16px 0;                           /* Total Bet at 310.8 */
+}
+
+.sports-betslip-total-row {                       /* 310.8  15 tall — 12px/400 at 60% */
+  display: flex;
+  height: 15px;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 15px;
+  color: rgb(255 255 255 / 0.6);
+}
+
+.sports-betslip-total-row.is-win {                /* 329.8  18 tall — 12px/600 solid, uppercase */
+  margin-top: 4px;
+  height: 18px;
+  font-weight: 600;
+  line-height: 18px;
+  color: var(--color-alw_white);
+}
+
+.sports-betslip-total-label { width: 172.8px; flex: none; }
+.sports-betslip-total-row.is-win .sports-betslip-total-label { text-transform: uppercase; }
+.sports-betslip-total-value { width: 115.2px; flex: none; text-align: right; }
+
+/* ── the login line — 365.8, a 24px row centred at 63.2 ─────────────────────────────────── */
+.sports-betslip-note {
+  display: flex;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 18px;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: normal;
+  color: var(--color-alw_white);
+}
+
+.sports-betslip-note-icon {                       /* 365.8 63.2  24×24 */
+  height: 24px;
+  width: 24px;
+  flex: none;
+  color: var(--color-alw_white);
+}
+
+/* ── Book 413.8 and Login 470.8 — 272×41 at x=24, radius 24, 14px/600, uppercase ─────────── */
+.sports-betslip-secondary,
+.sports-betslip-primary {
+  display: block;
+  height: 41px;
+  width: 272px;
+  margin: 0 auto;
+  border-radius: 24px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: normal;
+  text-transform: uppercase;
+}
+
+.sports-betslip-secondary {
+  margin-top: 24px;
+  background-color: var(--color-layer4);          /* rgb(50 55 56) */
+  color: var(--color-alw_white);
+}
+
+.sports-betslip-primary {
+  margin-top: 16px;
+  background-color: var(--color-brand);
+  color: var(--slip-ink);
+}
+
+.sports-betslip-primary:disabled { opacity: 0.4; }
+
+/* Pending: the label dims and a 16px ring turns beside it, the same ring `components/shared/
+   Loading` draws, at the size `.pagination-button .loading` uses for a button. */
+.sports-betslip-primary.is-pending {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  opacity: 0.7;
+}
+
+.sports-betslip-spinner {
+  height: 16px;
+  width: 16px;
+  flex: none;
+  border: 2px solid rgb(0 0 0 / 0.25);
+  border-top-color: var(--slip-ink);
+  border-radius: 50%;
+  animation: sports-betslip-spin 0.8s linear infinite;
+}
+
+@keyframes sports-betslip-spin { to { transform: rotate(360deg); } }
+
+/* ── the receipt — ours; the widget's post-placement view needs an account to see ─────────── */
+.sports-betslip-receipt {
+  padding: 24px 16px 8px;
+}
+
+.sports-betslip-receipt-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.sports-betslip-receipt-check {
+  display: flex;
+  height: 40px;
+  width: 40px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background-color: var(--color-brand);
+}
+
+.sports-betslip-receipt-check svg { height: 20px; width: 20px; fill: var(--slip-ink); }
+
+.sports-betslip-receipt-title { font-size: 14px; font-weight: 600; color: var(--color-alw_white); }
+.sports-betslip-receipt-id { font-size: 10px; line-height: 16px; color: rgb(255 255 255 / 0.5); }
+
+.sports-betslip-receipt-leg {
+  border-radius: 6px;
+  background-color: var(--color-layer4);
+  padding: 10px 12px;
+}
+
+.sports-betslip-receipt-leg + .sports-betslip-receipt-leg { margin-top: 8px; }
+.sports-betslip-receipt-leg-team { font-size: 12px; font-weight: 600; line-height: 16px; color: var(--color-alw_white); }
+.sports-betslip-receipt-leg-sub { font-size: 10px; line-height: 16px; color: rgb(255 255 255 / 0.74); }
+
+.sports-betslip-receipt .sports-betslip-totals { padding: 16px 0 0; }
+.sports-betslip-receipt .sports-betslip-secondary { margin-top: 24px; width: 100%; }
+
+/* ── the join line — 527.8, 16 tall, 12px ────────────────────────────────────────────────── */
+.sports-betslip-join {
+  display: flex;
+  height: 16px;
+  align-items: center;
+  justify-content: center;
+  gap: 0;                                         /* "Don't…" ends at 204.9 where "Join Now!" starts */
+  margin-top: 16px;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: normal;
+  color: var(--color-alw_white);
+}
+
+.sports-betslip-join button {
+  background: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-alw_white);
+  text-decoration: underline;
+}
+
+/* ── footer — 567.8, 40 tall; trash 16..56, settings 68..304 ─────────────────────────────── */
+.sports-betslip-footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 24px;
+  padding-inline: 16px;
+}
+
+.sports-betslip-trash {                           /* 567.8 16  40×40 */
+  display: flex;
+  height: 40px;
+  width: 40px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background-color: var(--color-layer4);
+}
+
+.sports-betslip-trash-icon {                      /* 579.8 28  16×16 */
+  height: 16px;
+  width: 16px;
+  fill: rgb(255 255 255 / 0.5);
+}
+
+.sports-betslip-settings {                        /* 567.8 68  236×40 */
+  position: relative;
+  display: flex;
+  height: 40px;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 8px;
+  background-color: var(--color-layer4);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 15px;
+  color: rgb(255 255 255 / 0.5);
+}
+
+.sports-betslip-settings-icon {                   /* 579.8 135.4  16×16 */
+  height: 16px;
+  width: 16px;
+  fill: currentColor;
+}
+
+.sports-betslip-settings-dot {                    /* 563.8 301  8×8 — brand over a layer2 ring */
+  position: absolute;
+  top: -4px;
+  right: -5px;
+  height: 8px;
+  width: 8px;
+  border-radius: 50%;
+  background-color: var(--color-brand);
+  box-shadow: 0 0 0 1px var(--color-layer2);
+}
+
+/* ── the empty state — ours; the widget's empty slip was only ever seen collapsed ─────────── */
+.sports-betslip-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 24px 12px;
+  text-align: center;
+}
+
+.sports-betslip-empty-icon svg { height: 32px; width: 32px; fill: var(--color-quarterary); }
+.sports-betslip-empty-title { font-size: 14px; font-weight: 800; color: var(--color-primary); }
+.sports-betslip-empty-note { font-size: 12px; color: var(--color-tertiary); }
+
+/* ── the phone arm ────────────────────────────────────────────────────────────────────────────
+ * BetBy replaces the bar with a floating circle on a phone; our tabbar owns that corner below
+ * `lg` (72px), so the disc clears it. A width query where the widget uses a device test — the two
+ * agree here because the tabbar being cleared is width-gated at the same line. */
+@media (max-width: 1023px) {
+  .sports-betslip {
+    right: 1rem;
+    bottom: calc(72px + 1rem);
+    width: auto;
+    border-radius: 999px;
+  }
+
+  .sports-betslip:not(.is-open) .sports-betslip-bar {
+    height: 56px;
+    width: 56px;
+    justify-content: center;
+    padding: 0;
+    background-color: var(--color-brand);
+  }
+
+  .sports-betslip:not(.is-open) .sports-betslip-toggle { justify-content: center; }
+  .sports-betslip:not(.is-open) .sports-betslip-mark { background: none; }
+  .sports-betslip:not(.is-open) .sports-betslip-mark-icon svg { fill: var(--slip-ink); }
+
+  .sports-betslip:not(.is-open) .sports-betslip-label,
+  .sports-betslip:not(.is-open) .sports-betslip-chevron,
+  .sports-betslip:not(.is-open) .sports-betslip-count,
+  .sports-betslip:not(.is-open) .sports-betslip-quick { display: none; }
+
+  .sports-betslip.is-open {
+    right: 1rem;
+    left: 1rem;
+    width: auto;
+    border-radius: 12px;
+  }
+}

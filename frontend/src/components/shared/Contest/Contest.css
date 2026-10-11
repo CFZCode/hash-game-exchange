@@ -1,0 +1,24 @@
+/* `.table` from index-DxOqNczA.css — fixed layout with alignment by column position, which is
+   why the standings cells carry no width or alignment classes of their own.
+
+   MOVED here from LatestBets.css. It was there while the Wager Contest tab was its only
+   consumer; the widget now serves the daily-contest page too, so the rule travels with it and
+   the bet feed's own stylesheet keeps only the zebra rules it actually uses. Nothing else in
+   the build renders `.table`. */
+.table {
+  display: table;
+  width: 100%;
+  table-layout: fixed;
+}
+
+.table td {
+  text-align: center;
+}
+
+.table td:nth-child(1) {
+  text-align: left;
+}
+
+.table td:last-child {
+  text-align: right;
+}

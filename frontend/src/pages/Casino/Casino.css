@@ -1,0 +1,77 @@
+/* The casino page.
+ *
+ * Almost everything here is utilities plus the shared primitives in index.css — the one thing
+ * that needs a stylesheet is the tab strip's sprite icons, below.
+ */
+
+/* Five of the sixteen tabs — Game Shows, Blackjack, Roulette, Baccarat, Themes — have no SVG
+ * anywhere in the mirror. Their icon chunks (`IconBaccarat-BVqEdz90.js` and friends) are
+ * listed in the dependency map but were never saved, and the eleven that DO have one are in
+ * components/Explore/icons.jsx already — including Burst Games, whose chunk
+ * (`IconBurstgames-Bk55W9zc.js`) IS in the save.
+ *
+ * The greyscale menu sprite has all five, at exact coordinates, so they are drawn from that
+ * rather than hand-drawn. Its natural cell is 32px on a 352x352 sheet; the tab icons are 20px
+ * (`size-5`), so the sheet and every offset are scaled by 20/32 = .625 — which lands each one
+ * on a whole pixel, because every position in NavItem-NXfL5xSI.css is a multiple of 32.
+ *
+ * The sheet is used as a MASK, not as a background-image, and that is what lets these tabs
+ * light up green when selected the way the SVG ones do. As a background-image they could not:
+ * the bitmap's colour is fixed, so a selected Themes tab kept its grey glyph while every other
+ * selected tab turned brand.
+ *
+ * This is safe rather than a tint hack. Sampling the five cells shows the glyphs are flat
+ * #B4BDC2 — which IS --color-secondary — over a real alpha channel, with only antialiasing
+ * between. Masking therefore reproduces the exact glyph shape and substitutes the colour,
+ * instead of pushing the existing pixels around: `background-color: secondary` reproduces the
+ * sheet as drawn, and `brand` reproduces what the original's green sheet (`--menuicon-g-img`,
+ * not in the mirror) would have shown. That is a different thing from the sidebar's hover
+ * state, which brightens the sheet and IS an approximation — the warning in CLAUDE.md about
+ * never dimming the normal sheet to fake a state still stands.
+ *
+ * Both prefixed and unprefixed mask properties: WebKit still needs `-webkit-` for these.
+ */
+.casino-tab-sprite {
+  width: 20px;
+  height: 20px;
+  -webkit-mask-image: url('../../assets/menuicon.png');
+  mask-image: url('../../assets/menuicon.png');
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 220px 220px;
+  mask-size: 220px 220px;
+  background-color: var(--color-secondary);
+}
+
+.casino-tab-sprite[data-selected] {
+  background-color: var(--color-brand);
+}
+
+/* THE LIGHT ARM OF THE SELECTED STATE, and it is white rather than green — these five cells are
+   this build stand-ins for the tab icon chunks that were never saved, so they have to follow the
+   ELEVEN REAL SVGs beside them rather than invent their own rule. Those take no fill utility at
+   all when selected in the light theme (the chunk writes `D.darken ? "fill-brand" : ""`) and so
+   inherit the anchor inline `color: rgb(var(--alw_white))`. A mask has no `currentColor` to
+   inherit, so the same result has to be written out.
+
+   0,4,0 against the rule above own 0,2,0, so source order between them does not matter. */
+.app-root:not(.dark) .casino-tab-sprite[data-selected] {
+  background-color: var(--color-alw_white);
+}
+
+/* The Show Blocked switch's resting fill used to be forced here, as
+ * `.casino-show-blocked[aria-checked='false'] { background: #272b2c }`. IT IS THE ORIGINAL'S OWN
+ * `bg-input_bright` UTILITY NOW, and the arithmetic is what settles it: `.switch` paints a 5%
+ * black gradient over its background COLOUR, and 5% black over `input_bright`'s #292D2E is
+ * #272B2C to the digit — the value that rule was hard-coding. Its comment claimed that setting
+ * `background` outright, and so clearing the wash, was what landed on #272B2C; the wash is in
+ * fact what produces it, and clearing it only worked because a second, matching literal went in
+ * its place. See ShowBlocked.jsx, and the note on the switch's checked state in index.css for
+ * why that state had to leave `@layer components` when a utility took over the resting one. */
+
+/* Positions from NavItem-NXfL5xSI.css, each multiplied by .625. */
+.casino-tab-sprite.game_shows { -webkit-mask-position: -120px -120px; mask-position: -120px -120px }
+.casino-tab-sprite.blackjack  { -webkit-mask-position: -80px -60px;   mask-position: -80px -60px }
+.casino-tab-sprite.roulette   { -webkit-mask-position: -180px -160px; mask-position: -180px -160px }
+.casino-tab-sprite.baccarat   { -webkit-mask-position: 0 -40px;       mask-position: 0 -40px }
+.casino-tab-sprite.themes     { -webkit-mask-position: -200px -80px;  mask-position: -200px -80px }

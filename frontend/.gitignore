@@ -1,0 +1,39 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Saved mirror of the live site — reference only, never imported or shipped.
+# See CLAUDE.md ("Reference material"). Kept out of the repo because it is a
+# third party's own asset bundle; re-save it locally to do pixel work.
+/bc.game/
+/bc images/
+
+# Local env overrides (.env.example is tracked)
+.env
+.env.*
+!.env.example
+
+# Runtime uploads the backend writes (KYC documents, deposit screenshots). Created by running the
+# platform locally — test artefacts, not source.
+backend copy/services/*/storage/

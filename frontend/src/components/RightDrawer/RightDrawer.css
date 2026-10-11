@@ -1,0 +1,149 @@
+/* The right-hand drawer.
+ *
+ * `.chat-notice` and `.right-slide-content` are the ORIGINAL'S OWN RULES, and they were not in
+ * the saved mirror's `index-DxOqNczA.css` — only `.right-slide-content` is there. The whole
+ * `.chat-notice` family came off the CURRENT deploy's stylesheet, `hash.game/assets/
+ * index-DGr5jguQ.css`, which is a later build of the same site; the `.right-slide-content`
+ * declaration is byte-identical in both, which is what makes the rest of the block trustworthy.
+ *
+ * IT IS THE SAME MECHANISM AS `.explore-pop`, one axis over: a permanently mounted `position:
+ * fixed` container that is 0 WIDE with `overflow: hidden` until a class lands on <body>, at which
+ * point it becomes 380px. Nothing here toggles `display`, so the panel inside can animate on its
+ * own — and because the width is transitioned, the container's own 0.2s close is what clips the
+ * exit rather than a second animation.
+ *
+ * THE DRAWER PUSHES THE PAGE; IT DOES NOT OVERLAY IT. That is the part a screenshot rebuild
+ * would most likely miss, and it is measured as well as read: in the reference capture the
+ * header's avatar and every page column end exactly 380px short of the window's right edge.
+ * `.chat-unfold #root { margin-inline-end: 380px }` is the original's line, over
+ * `@media (min-width: 1080px) { .chat-unfold > .header { padding-inline-end: 380px } }`. This
+ * build's `#root` is `.main-layout-content` and its `.header` is the same element by name.
+ *
+ * ALL OF IT SITS INSIDE `@media screen and (min-width: 640px)` on the original and is kept
+ * there, exactly as Explore.css keeps its own block — below that line bc.game has no drawer at
+ * all, because `/notification` is a real dialog route there and the mobile bell navigates to it.
+ * The JS gate is tighter still (`clientWidth > 1024`, see index.jsx), so the rules are unreachable
+ * between 640 and 1024 either way; keeping the query means they cannot start applying by accident.
+ */
+@media (min-width: 640px) {
+  .chat-notice {
+    position: fixed;
+    width: 0;
+    inset-inline-end: 0;
+    top: 0;
+    bottom: 0;
+    transition: all 0.2s;
+    overflow: hidden;
+    /* Above `.header`, which is z-101 on the original and z-99 here — the drawer runs the full
+       height of the window and covers the header's right end rather than sliding under it. */
+    z-index: 102;
+    box-shadow: -2px 0 4px #0000000d;
+  }
+
+  .chat-unfold .chat-notice {
+    width: 380px;
+  }
+
+  /* `#root`, i.e. this build's page column. The original declares no transition on it — the
+     drawer slides and the content snaps — but this project already animates the same element's
+     `padding-left` for the sidebar fold, so `margin-inline-end` was added to that transition in
+     MainLayout.css rather than leaving one side sliding and the other jumping. Change both
+     together or neither. */
+  .chat-unfold .main-layout-content {
+    margin-inline-end: 380px;
+  }
+
+  /* The original's own breakpoint, and it is 1080 rather than 1024: below it the header keeps
+     its full width and the drawer simply covers the end of it. Reproduced as written.
+
+     A DESCENDANT SELECTOR WHERE THE ORIGINAL HAS A CHILD ONE (`.chat-unfold > .header`), and the
+     change is forced: over there the header is PORTALLED to <body>, so it really is body's own
+     child; here it is inside `.main-layout-wrapper` inside `#root`, and `>` would never match.
+     Same for `.main-layout-content` above, which stands in for `#root`. */
+  @media (min-width: 1080px) {
+    .chat-unfold .header {
+      padding-inline-end: 380px;
+    }
+  }
+
+  /* Verbatim, and it looks like a contradiction until you notice what it does: in this band the
+     page is NOT pushed, so the drawer overlays it instead. The original writes `margin-right`
+     rather than the logical property here, which is its own asymmetry — and it is the reason
+     this cancels the rule above rather than being cancelled by it, since a later declaration of
+     the physical property wins over the earlier logical one in LTR. Unreachable in this build,
+     where the JS closes the drawer at 1024 and under; kept because the rule is the site's. */
+  @media (min-width: 645px) and (max-width: 896px) {
+    .chat-unfold .main-layout-content {
+      margin-right: 0;
+    }
+  }
+}
+
+/* `.right-slide-content` — #292d2e in `.app-root.dark` and #f4f4f4 in the bare `.app-root`, both
+   index-DxOqNczA.css's own. The dark one is layer3, the same fill the header and sidebar carry,
+   which is why the drawer reads as an extension of the chrome rather than as a card; the light
+   one is NOT light layer3 (which is pure white) but the page background, so the two themes are
+   not the same relationship expressed twice.
+ *
+ * Polarity inverted from the original, as everywhere in this project: dark is the base and
+ * `.app-root:not(.dark)` is the override. See the light-theme block in index.css. */
+.right-slide-content {
+  background: #292d2e;
+}
+
+.app-root:not(.dark) .right-slide-content {
+  background: #f4f4f4;
+}
+
+/* `fadeRight`, out of the transition table in index-BsFv7ByC.js:
+ *
+ *   fadeRight: { from: {opacity: 0, x: "100%"}, to: {opacity: 1, x: 0},
+ *                config: {duration: .3, ease: "power2.out"} }
+ *
+ * GSAP tweens it, so there is no stylesheet to copy — these are that table's own numbers, and
+ * `power2` is the CUBIC curve (power3 is quartic; the deposit-offer note has the same warning).
+ *
+ * BOTH HALVES EXIST HERE, which is the difference from `fadeUp2` in Explore.css and AfterLogin.css.
+ * `g3`'s `onExit` runs `fromTo(el, to, {...from, onComplete})` — the same tween backwards, with
+ * the unmount deferred until it finishes — and that is exactly the slide-out being asked for.
+ * Two keyframe sets rather than one played in reverse, because `reverse` would flip the easing
+ * as well as the direction.
+ */
+@keyframes notice-fade-right-in {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes notice-fade-right-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+
+  to {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}
+
+.notice-enter {
+  animation: notice-fade-right-in 0.3s cubic-bezier(0.215, 0.61, 0.355, 1) both;
+}
+
+.notice-exit {
+  animation: notice-fade-right-out 0.3s cubic-bezier(0.215, 0.61, 0.355, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notice-enter,
+  .notice-exit {
+    animation-duration: 0.01ms;
+  }
+}

@@ -1,0 +1,107 @@
+/* Home page container. The panels below the hero will each own their own CSS file,
+   the same way the layout components do — keep this file for page-level layout only. */
+.home-page {
+  width: 100%;
+}
+
+/* THE HOME PAGE'S CLEARANCE ABOVE THE TABBAR, and it is MEASURED off the reference rather
+   than reasoned about — which is the whole history of this one value.
+   ---------------------------------------------------------
+   `2.75rem` is read off a crop of the LIVE home page at a 397px viewport, and it stands on that
+   one image alone — no comparison against a shot of this build is involved, which matters,
+   because the build-side crop it was first set beside turned out to be the CASINO page. Below
+   640 the root is `16 * width / 430`, i.e. 14.77px here, and THAT SCALE IS CROSS-CHECKED TWICE
+   inside the same image before anything is read off it: the tabbar's own 4.5rem predicts 66.5px
+   and measures 66 (y 87..153), and the bets panel's `p-2` predicts 7.4px and measures 7
+   (y 40..47). Against that scale the live page's last panel ends 40px above the bar, i.e.
+   2.71rem; 2.75 is the nearest step and lands at 40.6px. A measurement that cannot be
+   cross-checked against something of known size is not a measurement — see CLAUDE.md.
+
+   IT IS THE LIVE HOME PAGE AND NOT THE LIVE CASINO PAGE, and the two genuinely differ even
+   though both end on the same Latest round & Race card. The casino note in pages/Casino/index.jsx
+   measures its live counterpart at 14px, i.e. the layout's `--content-gap-y` and nothing else,
+   and this build's casino page takes exactly that. 40 against 14 is ~24px, which is one page-root
+   `pb-6` the home page carries there and the casino page does not — consistent with both
+   measurements rather than contradicting either. THE TELL FOR WHICH PAGE A CROP IS OF IS THE
+   TABBAR: the Casino cell lights brand green on `/casino` and on nothing else, so a shot with no
+   green tab is the home page. Check that before reading a gap off anything here.
+
+   The one assumption left is that the crop was scrolled to the true bottom; the tabbar is fixed,
+   so mid-scroll the content simply passes under it and any gap above it is an artefact. If a
+   later capture says otherwise, this is one line.
+
+   IT WENT 2rem -> 1 -> 0.5 -> 0.25 AND BACK TO MORE THAN IT STARTED, and the round trip is worth
+   understanding before trimming it again — because for most of it this value was not the one
+   being looked at. The report was of too much space above the tabbar on the CASINO page, and
+   what caused it was neither page's margin: the right-hand drawer's container was portalled to
+   <body> unstyled below 640, and its close square's absolute box added ~46px to the DOCUMENT'S
+   SCROLLABLE OVERFLOW. Fixing that (components/RightDrawer) is what actually resolved it, and
+   every trim here in the meantime moved a page nobody was watching.
+
+   NOTHING ELSE HAS TO CARRY HALF OF IT. `.home-page` has no padding and no border, so its last
+   child's margin collapses THROUGH it and the larger wins — at 2.75rem this dominates the bets
+   panel's `my-3` outright, which is why that panel is back to the original's own class list. Only
+   a value under 0.75rem needs a matching arm over there.
+
+   `max-width: 1023px` is load-bearing in a way a bare `margin-bottom` would not be: from `lg` up
+   the layout's bottom padding is zero and the FOOTER is the next sibling, so an unscoped rule
+   would spend this whole 2.75rem there. The original butts the two together on desktop; this
+   build does open a small gap, but it is 8px and it is a `lg:pb-2` on the page ROOT in
+   index.jsx — deliberately not this rule, so the two figures stay independent. */
+@media (max-width: 1023px) {
+  .home-page {
+    margin-bottom: 2.75rem;
+  }
+}
+
+/* SCROLL REVEAL — the TRIGGER is this build's; the MOTION is the site's own.
+   ---------------------------------------------------------
+   bc.game animates its cards on MOUNT: `io` hands every tile past the first
+   `game-tile-animate` plus `--game-tile-animation-delay: min(index, 11) * 15ms`, so on the
+   live site everything below the fold has already played its entrance before you scroll to
+   it. These rules play the SAME entrance when a card reaches the fold instead;
+   `hooks/useScrollReveal.js` is what puts the classes on.
+
+   EVERY VALUE BELOW IS `.game-tile-animate`'s, out of index-DxOqNczA.css — the 0.3s, the
+   `backwards`, and the `linear()` ramp that overshoots to 1.15 before settling. Do not
+   substitute a plain ease-out or a longer duration: the overshoot is the site's signature and
+   a soft 0.45s fade reads as a different page. The 15ms-per-index step and its cap at 11 are
+   `io`'s own and live in the hook.
+
+   The keyframe itself is NOT redeclared here. `game-tile-fade-slide` is transcribed once in
+   GameSection.css, exactly as the original declares it once in its own stylesheet, and
+   keyframes are global — every home page render mounts a GameSection, so it is always loaded.
+
+   Scoped to `.home-page` rather than written bare, for the reason the cascade note in
+   CLAUDE.md gives: these are plain rules in an unlayered file, so they beat any Tailwind
+   utility on the same element, and `opacity` / `transform` are exactly the two properties a
+   card is most likely to want one for. Lift them out only alongside a second consumer. */
+.home-page .scroll-reveal {
+  opacity: 0;
+  transform: translateY(30px);
+  /* `!important` because this has to beat `.game-tile-animate`, which is a plain rule of the
+     same 0,1,0 specificity in another unlayered file — so source order between the two would
+     otherwise decide it. Without the cancel, a home tile plays its MOUNT animation while held
+     hidden, reappears at the end of it (an animation's own values outrank a normal
+     declaration) and then plays the reveal: the card animates in, vanishes, animates in
+     again. One of the two entrances has to go, and the mount one is the one nobody sees. */
+  animation: none !important;
+}
+
+.home-page .scroll-reveal-in {
+  animation: game-tile-fade-slide 0.3s ease-out backwards;
+  animation-timing-function: linear(0, 0.08, 0.32, 0.62, 0.9, 1.12, 1.15, 1.08, 1.02, 1);
+  animation-delay: var(--scroll-reveal-delay, 0ms);
+}
+
+/* The hook bails out before it writes a class, so this is belt and braces for a visitor whose
+   setting changes without a reload — and it matches how the original opts `.game-tile-animate`
+   out of the identical animation. */
+@media (prefers-reduced-motion: reduce) {
+  .home-page .scroll-reveal,
+  .home-page .scroll-reveal-in {
+    opacity: 1;
+    transform: none;
+    animation: none !important;
+  }
+}

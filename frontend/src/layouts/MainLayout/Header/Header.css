@@ -1,0 +1,41 @@
+/* Mobile/tablet header sizing.
+
+   This file used to carry four near-identical breakpoint blocks (320 / 375 / 425 /
+   tablet), each restating the same measurements in px with !important. Dividing every
+   one of those numbers by the root font-size at the width it was measured at shows
+   they are all a single rem value:
+
+     header height  3.4988 / 3.4995 / 3.5025 / 3.5000  -> 3.5rem
+     inner padding  0.9994 / 0.9997 / 1.0006 / 1.0000  -> 1rem   (already px-4 in markup)
+     button w       5.9998 / 5.9992 / 6.0038 / 6.0000  -> 6rem
+     button h       2.4994 / 2.4997 / 2.5019 / 2.5000  -> 2.5rem
+     button font    0.9994 / 0.9997 / 0.9975 / 1.0000  -> 1rem   (already text-base)
+     Sign Up ml     0.2494 / 0.2494 / 0.2525 / 0.2500  -> 0.25rem (already ml-1)
+
+   So the px blocks were four samples of one rem rule. Keeping them broke the moment
+   the root font-size started scaling above 430px (see --u in index.css): the header
+   would have stayed frozen at its 425px pixel sizes while the text inside it grew.
+   Anything already expressed by a utility in the markup is dropped here rather than
+   restated, which is also why the !important goes away — these rules are unlayered
+   and outrank Tailwind's utilities without it.
+
+   The logo is the one genuine breakpoint change, not a scale artifact: 10.125 x 2.25rem
+   below sm against 9 x 2rem at tablet and up. */
+
+.mobile-logo-img {
+  width: 10.125rem;
+  height: 2.25rem;
+}
+
+@media (min-width: 640px) {
+  .mobile-logo-img {
+    width: 9rem;
+    height: 2rem;
+  }
+}
+
+.mobile-header-btn {
+  min-width: 6rem;
+  width: 6rem;
+  height: 2.5rem;
+}

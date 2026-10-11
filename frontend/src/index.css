@@ -1,0 +1,2422 @@
+/* source("./") limits class scanning to src/. Without it Tailwind also scans the
+   `bc.game/` and `bc images/` reference mirrors and emits ~80KB of unused utilities. */
+@import "tailwindcss" source("./");
+
+/* `dark:` KEYS OFF THE CLASS, NOT THE OPERATING SYSTEM — and this is a bug fix as much as it is
+   groundwork for the toggle.
+ *
+ * Tailwind v4's stock `dark:` is `@media (prefers-color-scheme: dark)`. This build had no `.dark`
+ * variant and no theme of its own, so every `dark:` utility in the project was silently keyed to
+ * the VISITOR'S OS: on a machine set to light, `dark:bg-layer3` simply did not apply, and the
+ * handful of files that still carry unguarded `dark:` pairs (Auth, LanguageCurrencyModal,
+ * SectionHeader, DetailDialog, and a dozen since) rendered their LIGHT arm on a page that was
+ * otherwise dark. That is the latent problem CLAUDE.md records; it is closed by this line rather
+ * than by editing those call sites.
+ *
+ * `.dark` is the original's own class and it is on the same element: `QS()` in
+ * index-BsFv7ByC.js does `Zi().classList.toggle("dark", Ce.darken)`, where `Zi()` is
+ * `document.querySelector(".app-root") || document.body` — which here is `<body>`.
+ *
+ * `:where()` keeps the variant at ZERO added specificity, so `dark:bg-layer3` still weighs the
+ * same as `bg-layer3` and the usual last-one-wins ordering between them is preserved. Without it
+ * every dark arm would gain 0,1,0 and start beating utilities written after it. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Official BC.Game Averta Std Webfonts (Hosted locally to bypass CORS restrictions) */
+@font-face {
+  font-family: 'avertastd';
+  src: url('./assets/fonts/avertastd-regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'avertastd';
+  src: url('./assets/fonts/avertastd-semibold.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'avertastd';
+  src: url('./assets/fonts/avertastd-extrabold.woff2') format('woff2');
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* THE FOURTH FACE IS A DIGITS-ONLY MONO, and it is the original's own — index-DxOqNczA.css
+   verbatim but for the local path:
+
+     @font-face { font-family: mono;
+                  src: url(/assets/avertastd-mono-extrabold-2-Tg6n77.woff2) format("woff2"), …
+                  unicode-range: U+0030-0039, U+002E, U+002C, U+00D7, U+002B, U+002D, U+003A }
+
+   The saved mirror holds that file as a 74-byte STUB, which is why `--font-mono` here used to
+   point straight at avertastd with a note saying the face could not be reproduced. It can:
+   `hash.game/assets/…` serves the real 6.6 KB subset, under the hash the stylesheet already
+   names. Same route as every other recovered asset in this project.
+
+   It is not a cosmetic difference. Measured off both files at 1000/em, the mono '5' is 711
+   units tall against the proportional ExtraBold's 687 and 600 wide against its 536 — taller and
+   TABULAR, so a column of figures lines up and every digit reads a size larger. That is the
+   whole of "the 5 looks bigger on the original", and it reaches every `font-mono` here: the
+   contest prize pool and its countdown, the BC Token price, the wallet's amounts.
+
+   The unicode-range is the load-bearing part and is transcribed exactly. Only digits, the two
+   separators, ×, +, - and : are covered, so a `$`, a ticker or a word inside the same element
+   falls through to avertastd — which is how "$50,000.00" gets a proportional dollar sign in
+   front of tabular digits on the live site too. No `font-weight` descriptor, also the
+   original's: the subset is ExtraBold only and answers at every weight the markup asks for. */
+@font-face {
+  font-family: mono;
+  src: url('./assets/fonts/avertastd-mono-extrabold.woff2') format('woff2');
+  unicode-range: U+0030-0039, U+002E, U+002C, U+00D7, U+002B, U+002D, U+003A;
+  font-display: swap;
+}
+
+@theme {
+  --radius-lg: 0.5rem;
+  /* `.button`'s default corner, from the original's token block. */
+  --radius-md: 0.375rem;
+
+  /* `sh` is the original's own spacing name, not one invented here: `.pt-sh` in
+     index-DxOqNczA.css is `padding-top: var(--safe-header)`, and `.app-root` declares
+     `--safe-header: calc(var(--header) + var(--safe-top))` with `--header: 3.5rem`. Its
+     sibling `.pt-st` is `--safe-top` alone.
+
+     Declared as a flat 3.5rem rather than wired to a `--safe-header` variable on purpose. The
+     only consumer is the VIP page's `sm:pt-sh`, which is an `sm:` variant — at 640px and up
+     `--safe-top` is `env(safe-area-inset-top)` on a notchless viewport, i.e. 0, so the calc
+     has nothing to add. Declaring the variable globally instead would also reach
+     `.dialog-item` in Auth.css, which reads `var(--safe-header, 0px)` and currently renders on
+     the fallback; changing that dialog is a separate piece of work from this one.
+
+     This stacks ON TOP of `.main-layout-content`'s header offset, which is correct rather than
+     double-counting: `#page-content` on the original carries the identical
+     `padding-top: calc(var(--header) + var(--safe-top))` AND the VIP page root adds `pt-sh`
+     inside it. Both are reproduced, so the totals match. */
+  --spacing-sh: 3.5rem;
+
+  /* The original is on Tailwind v3, where `backdrop-blur-sm` is 4px. v4 renamed the
+     scale and its `sm` is 8px, which doubles the frosting on the hero's Google/Telegram
+     buttons. Point the token back at the original's value rather than swapping the
+     class in the markup, so copied class lists keep rendering what they render on the
+     real site. */
+  --blur-sm: 4px;
+
+  /* The original's type scale is stock Tailwind except for TWO steps it tightens, and both
+     are declared here. Every other step already agrees: xs .75/1, sm .875/1.25, base 1/1.5,
+     lg 1.125/1.75, 3xl 1.875/2.25.
+
+       .text-xl  { font-size: 1.25rem; line-height: 1.5rem }    (stock v3 pairs 1.75rem)
+       .text-2xl { font-size: 1.5rem;  line-height: 1.75rem }   (stock v3 pairs 2rem)
+
+     `text-xl` sat undeclared for a long time on the note that nothing used it yet. Several
+     things do now, and the Refer dialog is where the 4px showed: its headline is a `text-xl`
+     block wrapping a `text-3xl` figure, so the two outer lines were rendering in a 28px box
+     against the original's 24 and the card came out 8px tall. Most other call sites are
+     immune either way — `Contest`'s countdown digit is inside a fixed `h-15`, PokerTab's
+     heading inside an `h-8 flex`, and the hero banner and HowToDeposit write their own
+     `leading-*` — so this reaches the handful that let the step decide, and brings each of
+     them to the value the page was measured against. */
+  --text-xl--line-height: 1.5rem;
+  --text-2xl--line-height: 1.75rem;
+
+  /* Those four agree only until something overrides the font-size. The original is on
+     Tailwind v3, where `.text-sm` pairs an ABSOLUTE `line-height: 1.25rem`; v4 ships the
+     same step as the RATIO `calc(1.25 / .875)`. Both compute to 1.25rem at the step's own
+     size, so nothing renders differently today — but a ratio rescales and an absolute value
+     does not. `sm:text-[22px]` on the category cards' CASINO/SPORTS titles sets font-size
+     only and inherits text-sm's line-height: the original stays at 20px, v4 went to 31.43px.
+     Restating them as absolute lengths is what the original actually declares, and it stops
+     the same trap firing at every later call site. Verified as a no-op against the built CSS
+     at the time it was added — every existing use resolves to the identical pixel value. */
+  --text-xs--line-height: 1rem;
+  --text-sm--line-height: 1.25rem;
+  --text-base--line-height: 1.5rem;
+  --text-lg--line-height: 1.75rem;
+
+  /* Surface layers, darkest to lightest. Single source of truth for bg-layer* —
+     do not redeclare in component CSS. Values are the original's `.app-root.dark`
+     tokens: layer1 #1E2121, layer2 #232626 (page bg), layer3 #292D2E, layer4 #323738,
+     layer5 #3A4142, layer6 #4A5354. */
+  --color-layer1: #1E2121;
+  /* layer2 doubles as the page background AND as a recessed well inside a layer4 card —
+     the contest's prize-pool pill and its three countdown boxes are both `bg-layer2`. It
+     was named in the comment above but never declared, so `bg-layer2` generated no rule at
+     all and those four boxes rendered with no background: the amount and the digits sat
+     straight on the card, and the only colour behind them was the card's own #323738. */
+  --color-layer2: #232626;
+  --color-layer3: #292D2E;
+  /* layer3_alt is a distinct token on the original but resolves to the same value in the
+     dark theme; the odds buttons on the Highlights cards use it. */
+  --color-layer3_alt: #292D2E;
+  --color-layer4: #323738;
+  /* THE SAME TWO LAYERS AS `R G B` TRIPLES, for the one place that feeds a layer to `rgb()` with
+     its own alpha: the route dialog's title bar, whose fill is scroll-driven. The original keeps
+     every token as a triple; this project keeps hex, so the bar used to spell `50 55 56` out as
+     its fallback — and a spelled-out triple does not move with the theme, which painted every
+     phone dialog's bar charcoal over a white page in the light theme. Both blocks carry these. */
+  --layer3-rgb: 41 45 46;
+  --layer4-rgb: 50 55 56;
+  /* layer4_alt is the same story one step down: `--layer4_alt: 50 55 56` in `.app-root.dark`,
+     which is layer4's own value, against 230 233 235 in the light theme. The fiat deposit
+     tab's payment-method tiles ask for it by name. */
+  --color-layer4_alt: #323738;
+  --color-layer5: #3A4142;
+  --color-layer6: #4A5354;
+  /* Tab chrome, from `.app-root.dark`: tab_nopadding 50 55 56 (= layer4) is the strip's
+     own background, tab_selected 58 65 66 (= layer5) the active pill. Separate tokens on
+     the original even though they duplicate layer values in this theme. */
+  --color-tab_nopadding: #323738;
+  --color-tab_selected: #3A4142;
+  /* primary_alw 213 226 229 — the active tab's label. Slightly cooler than pure white. */
+  --color-primary_alw: #D5E2E5;
+  /* Contest chrome. layer5-table (58 65 66) is the zebra band on the standings; it is a
+     separate token on the original even though it duplicates layer5 in this theme.
+     button_bright is `--Button-BrightBg`, the raised secondary button (History).
+     primary_brand (0 0 0) is text ON brand green — the Active flag and Winner ribbon. */
+  --color-layer5-table: #3A4142;
+  --color-button_bright: #464F50;
+  --color-primary_brand: #000000;
+
+  /* `mono, avertastd` — the original's own stack, and BOTH halves now exist here: see the
+     fourth @font-face above, which the mirror's 74-byte stub had made unreproducible and
+     `hash.game` supplies in full. `mono` covers digits and a few separators and avertastd
+     answers for everything else in the same string. Do NOT let this resolve to a system
+     monospace stack, which would look nothing like the site, and no tail past avertastd, for
+     the reason spelled out beside `body`. */
+  --font-mono: mono, avertastd;
+
+  /* Divider/border tone. From `.app-root.dark`: #e4eaf019 — a slightly cool near-white
+     at ~10% alpha, not pure white at 15%, which rendered the submenu divider heavier
+     than the site. Also used by the header's Sign In border and its language/currency
+     separator, so those track it too. */
+  --color-third: #e4eaf019;
+  --color-primary: #ffffff;
+  /* Both from `.app-root.dark`. black_alpha5 is the tint the hero's Google/Telegram
+     buttons sit on, over the banner art plus a backdrop blur. */
+  --color-black_alpha5: #0000000d;
+  --color-black_alpha10: rgba(0, 0, 0, 0.1);
+  /* The scrim behind a game tile's online-player count. From `:root` in the original —
+     unlike the layer colours, the alpha tokens are not redeclared per theme. */
+  --color-black_alpha20: rgba(0, 0, 0, 0.2);
+  /* alw = "always": white and near-black that stay put in both themes, used where the
+     element sits on artwork rather than on a surface. Dark theme: 255 255 255 / 23 26 26. */
+  --color-alw_white: #ffffff;
+  --color-alw_dark: #171A1A;
+  --color-accent-green: #24EE89;
+  --color-header-bg: #292D2E;
+  --color-white_alpha20: rgba(255, 255, 255, 0.2);
+  /* Muted text. From `.app-root.dark`: secondary 179 190 193, tertiary 132 145 148.
+     These were previously #98a6b3 / #6c7a85, both noticeably darker than the original. */
+  --color-secondary: #B3BEC1;
+  --color-tertiary: #849194;
+  --color-brand: #24EE89;
+  /* `--button-brand`, and it is NOT `--brand` — the two are separate tokens on the live deploy and
+     they hold different greens. `index-CC0pUCwE.css` (hash.game, fetched 2026-09-02) declares
+     `.button-brand { color: rgb(var(--primary_brand)); font-weight: 800;
+     background-color: rgb(var(--button-brand)) }` with `--button-brand: 44 217 125` on `.app-root`
+     and no `.dark` override, while `--brand` stays 36 238 137 and is what the tab indicator, the
+     icons and every green text still take. Measured on the live page rather than read off the
+     rule: the header's Sign Up button samples rgb(44, 217, 125) and `.tabs-indicator`
+     rgb(36, 238, 137), on the same paint.
+     THE SAVED MIRROR HAS NO SUCH TOKEN — `index-DxOqNczA.css` paints `.button-brand` with
+     `--brand` — so this is the deploy moving on since the mirror was taken, not a transcription
+     miss. Declared here as its own token for that reason: the day the two greens converge again
+     it is one value to change, and until then nothing else in the palette is touched. */
+  --color-button-brand: #2CD97D;
+  /* `.app-root.dark` declares --error as 252 60 60. This was #ef4444, a Tailwind default
+     that had crept in — visibly duller than the red on the auth dialog's required-field
+     asterisks, which is the first place the token actually renders. */
+  --color-error: #FC3C3C;
+  /* Form field chrome, all from `.app-root.dark`. `input` 58 65 66 is the BORDER (the same
+     value as layer5, but a separate token on the original), `input_bright` 41 45 46 the
+     default fill, `input_darken` 30 33 33 the recessed fill the auth dialog asks for with
+     `bg-input_darken`. */
+  --color-input: #3A4142;
+  --color-input_bright: #292D2E;
+  --color-input_darken: #1E2121;
+  /* input_button 58 65 66 — the little square that holds a Select's chevron. A third token
+     resolving to the same #3A4142 in this theme; it is separate on the original and diverges
+     in the light one (231 235 237), so it is kept separate here too. */
+  --color-input_button: #3A4142;
+  /* brand_alt 159 232 113 — a yellower green than --brand, used for the Cwallet mark. */
+  --color-brand_alt: #9FE871;
+  /* quarterary 161 175 178 — one step below tertiary; the original's placeholder colour. */
+  --color-quarterary: #A1AFB2;
+  /* `--second`, #e4eaf04c in `.app-root.dark` — and it is NOT a shade of `--secondary` despite
+     the name. It is `--fourth`'s own #E4EAF0 at 30% alpha, which is the same base `--third`
+     takes at 10%, and the original spends it in exactly one place: `.text-second`, the dimmer
+     second line under a wallet row's converted amount. Declared here rather than as a plain
+     class so `text-second` is generated from @theme like every other colour utility. */
+  --color-second: #E4EAF04C;
+  /* Four more from `.app-root.dark` and `.app-root.dark .bonus-scope` in index-DxOqNczA.css,
+     added for the promotions page — which is where the `bonus-scope` class in its markup comes
+     from: the original re-declares a handful of tokens inside that scope. All four are the
+     same in both blocks, so they are declared once here rather than as a scoped override.
+
+     `fourth` 228 234 240 is a border base and is only ever used at low alpha
+     (`border-fourth/10`, `border-fourth/5`). It shares its triple with `--third`, which is that
+     same colour pre-multiplied to 10% — keep both, since the original does and they are spelt
+     differently at call sites.
+
+     `quinary` 75 80 82 is much darker than it looks in a screenshot: it is the promo card's
+     description and its "Ends" label, deliberately low-contrast against `card_dark`. Do not
+     lighten it to match a compressed capture — the stylesheet is the authority.
+
+     `card_dark` 23 26 26 resolves to the same value as `alw_dark`; it stays separate because
+     the markup asks for it by name (`dark:bg-card_dark`) and the two diverge in the light
+     theme. */
+  --color-fourth: #E4EAF0;
+  --color-quinary: #4B5052;
+  --color-card_dark: #171A1A;
+  --color-white_alpha5: rgba(255, 255, 255, 0.05);
+  /* Its sibling one step up, asked for by name in the deposit-bonus dialog — the calculator
+     panel's outline, the divider inside it, and the numbered markers on How to Participate all
+     read `white_alpha10`. Declared beside white_alpha5 and white_alpha20 so the three stay
+     together. */
+  --color-white_alpha10: rgba(255, 255, 255, 0.1);
+
+  /* `text-xxs` is used on the promo card's "Ends <date>" line. Unlike every other value here it
+     is NOT in the saved CSS — the promotions page's own chunk was never captured — so 10px is
+     inferred from the badge beside it, which asks for `text-[10px]` explicitly. Correct it if
+     that chunk ever turns up. */
+  --text-xxs: 0.625rem;
+  --text-xxs--line-height: 1rem;
+  /* tab_padding 39 43 44, the `data-type="inner"` tab strip's own background. Declared with
+     its two siblings above so the three tab tokens stay together. */
+  --color-tab_padding: #272B2C;
+  /* `.app-root.dark` declares --success as 36 238 137, the same triple as --brand. They are
+     separate tokens on the original and used in different places (the live dot on Recent Big
+     Wins is bg-success, the win amount next to it is text-brand), so both are kept. */
+  --color-success: #24EE89;
+  /* `--warning`, 255 152 32 in `.app-root.dark` (230 140 33 in the light theme, which this
+     build never reaches). The dark arm is what the deposit dialog's "not supported in this
+     currency" notice sits on at 10%. Note the `+180%` corner tags and the currency dropdown's
+     unsettled-bets banner use the same orange but write it as a literal through a
+     `--Alpha-function-orange-*` variable, so they do not go through this token. */
+  --color-warning: #FF9820;
+  /* `--main`, #e4eaf0cc — `--fourth`'s own #E4EAF0 at 80%, the third member of the
+     fourth/second/third alpha family above. The quest page's tab strip writes
+     `[&_.tabs-indicator]:bg-main` over `.tabs-indicator`'s brand green, which is why its
+     underline reads near-white rather than green. */
+  --color-main: #e4eaf0cc;
+  /* `--card`, 30 33 33 in `.app-root.dark` — the surface a card sits on when the markup asks
+     for it by name rather than by layer. NOTE that `.bonus-scope` re-declares it to 23 26 26,
+     the same value as `card_dark` / `alw_dark`; that override is below, outside @theme, because
+     it is scoped. Every consumer today (the quest cards) is inside a bonus-scope, so what
+     actually renders is the darker one — but the global value is what belongs in the theme. */
+  --color-card: #1E2121;
+  /* `--warning_brighter`, 255 173 77 — a lighter amber than `--warning`'s #FF9820, and a
+     separate token in `.app-root` as well as `.app-root.dark`. The bonus page spends it on the
+     Instant $BC and Level Up glyphs, the "W" of Weekly Bonus, and two of the five VIP perks. */
+  --color-warning_brighter: #FFAD4D;
+  /* `--secondary-light`, and it is declared ONLY inside `bonus-scope` on the original — 171 149
+     255 in the light arm, 149 122 255 in the dark one. The dark value is written here rather
+     than scoped below because there is no value outside that scope to fall back to, and every
+     consumer is inside one: the "M" of Monthly Bonus and the monthly countdown's tint. */
+  --color-secondary-light: #957AFF;
+  /* `--mail`, and it is the same story one token over: declared ONLY inside `bonus-scope` on the
+     original — 23 26 26 in the light arm, 213 226 229 in the dark one — so there is no outside
+     value to fall back to and the dark half goes straight here. Its one consumer is the Free
+     Plays dialog, where a free spin's `fullName` prints in it. The value is `primary_alw`
+     exactly, but the two are separate names on the original and diverge in the light theme, so
+     they stay separate here for the reason `card_dark` and `alw_dark` do. */
+  --color-mail: #D5E2E5;
+}
+
+/* `.app-root.dark .bonus-scope` in index-DxOqNczA.css re-declares a handful of tokens, and this
+   is the part of it that DIFFERS from the global dark block. The other six values it lists
+   (`fourth`, `vip`, `card-dark`, `secondary-light`, `mail`, `orange`) either match the global
+   block or are already in @theme, so only these two need scoping — diffed rule against rule
+   rather than eyeballed.
+
+   `--quarterary` is the one that matters and the easy one to miss: it is 161 175 178 globally
+   and 105 112 114 here, a step and a half darker. The quest page spends it on every group
+   heading, every card description and the "One-step task" footer, so getting it wrong would
+   wash the whole page out. The promotions page — the other bonus-scope consumer — happens to
+   use `quinary` instead, which is identical in both blocks, which is why this never surfaced
+   before.
+
+   Declaring the custom properties on a class and letting the utilities resolve them at the use
+   site is the ORIGINAL'S own mechanism, not a workaround: `bg-card` compiles to
+   `background-color: var(--color-card)`, so the nearest declaring ancestor wins by plain
+   inheritance and no specificity contest is involved. */
+.bonus-scope {
+  --color-quarterary: #697072;
+  --color-card: #171A1A;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════════════════
+   THE LIGHT THEME
+   ═══════════════════════════════════════════════════════════════════════════════════════════
+
+   Every value below is `.app-root`'s own from index-DxOqNczA.css, converted from the original's
+   `R G B` triples to hex. Nothing here is sampled, inferred or chosen — the original ships the
+   whole light palette in a single block and this is it.
+
+   THE POLARITY IS INVERTED FROM THE ORIGINAL AND THAT IS DELIBERATE. There, LIGHT is the base
+   (`.app-root`) and dark is the override (`.app-root.dark`). Here `@theme` already holds the
+   dark values — that is what every comment in this file documents and what every page was built
+   against — so light arrives as the override instead. The alternative was to duplicate the dark
+   palette into an `.app-root.dark` block so both sides were explicit, and that is worse: two
+   copies of forty-eight colours where editing `@theme` silently loses to the copy. One palette
+   in `@theme`, one override here, no value written twice.
+
+   WHY THIS BEATS `@theme` WITHOUT A SPECIFICITY ARGUMENT. Tailwind v4 emits `@theme` into
+   `@layer theme { :root, :host { … } }`, and this rule is unlayered — so it wins outright, the
+   same cascade rule the hazard note in CLAUDE.md is about, for once working in our favour. The
+   utilities themselves are untouched: `bg-layer4` compiles to `background-color:
+   var(--color-layer4)` either way, so redeclaring the property on the `.app-root` element is
+   enough and every descendant picks it up by plain inheritance.
+
+   `:not(.dark)` is the original's own light selector (`.app-root:not(.dark)` appears four times
+   in its stylesheet), so this is not a foreign construct invented for the port. */
+.app-root:not(.dark) {
+  /* Surfaces. Note layer3, layer4 and layer6 are ALL pure white in this theme — the depth that
+     the dark theme carries in the fills is carried by borders and shadows instead, which is why
+     `--input` and `--third` change so much more than they look like they should. */
+  --color-layer1: #eef1f4;
+  --color-layer2: #f7f9fa;
+  --color-layer3: #ffffff;
+  --color-layer3_alt: #edf0f2;
+  --color-layer4: #ffffff;
+  --layer3-rgb: 255 255 255;                        /* the triples above, in this theme */
+  --layer4-rgb: 255 255 255;
+  --color-layer4_alt: #e6e9eb;
+  --color-layer5: #f0f3f5;
+  --color-layer6: #ffffff;
+  --color-card: #ffffff;
+  --color-layer5-table: #f7f7f7;
+  /* `--color-header-bg` is this build's name for the header's fill and tracks layer3, which is
+     what the original paints it with. */
+  --color-header-bg: #ffffff;
+
+  /* Tab chrome. `--tab_selected` is the one token that inverts rather than lightening: 27 26 26,
+     a near-black pill under light text, where the dark theme uses layer5. Not a transcription
+     slip — read it beside `--tab_padding` (247 248 250), which is the strip behind it. */
+  --color-tab_selected: #1b1a1a;
+  --color-tab_padding: #f7f8fa;
+  --color-tab_nopadding: #ffffff;
+
+  /* Text. `--primary_alw` and `--primary_brand` are "always" colours and do not move — that is
+     what the names mean, and it is why the original declares them in both blocks unchanged. */
+  --color-primary: #070f0b;
+  --color-secondary: #595f66;
+  --color-tertiary: #868f96;
+  --color-quarterary: #adb6bd;
+  --color-quinary: #b6c0c7;
+
+  /* Brand and status. `--brand` and `--success` are the same green in both themes; `--brand_alt`
+     and `--error` are not, and `--warning` moves a step down (255 152 32 -> 230 140 33) while
+     `--warning_brighter` holds. */
+  --color-brand_alt: #91f6c3;
+  --color-error: #cd3030;
+  --color-warning: #e68c21;
+
+  /* Form chrome. `--input` is the field BORDER, `--input_darken` / `--input_bright` its fills,
+     `--input_button` the filled square a Select puts its chevron in. All four go pale together;
+     two of them land on pure white, which is what makes `--input`'s border the only thing
+     separating a field from the card behind it. */
+  --color-input: #dee9eb;
+  --color-input_button: #e7ebed;
+  --color-input_darken: #ffffff;
+  --color-input_bright: #ffffff;
+  --color-button_bright: #f2f4f5;
+
+  /* THE FOUR ALPHA FAMILIES FLIP THEIR BASE COLOUR, NOT JUST THEIR OPACITY, and the naming is
+     what makes that easy to get wrong. `--white_alpha*` is a dark GREY (48 54 55) at the same
+     three opacities in this theme — the name records what it does (lift the surface), not what
+     colour it is. `--black_alpha*` really is black in both. And `--main` / `--second` / `--third`
+     — the divider tones — swap a cool near-white for a deep teal at the identical alphas. */
+  --color-white_alpha5: #3036370f;
+  --color-white_alpha10: #30363714;
+  --color-white_alpha20: #30363733;
+  --color-main: #0a515d66;
+  --color-second: #0a515d33;
+  --color-third: #0a515d1a;
+
+  /* `--alw_dark` is 7 15 11 here against 23 26 26 in the dark theme — a rare case of an "always"
+     token that does move. `--fourth`, `--secondary-light` and `--mail` are declared ONLY inside
+     `bonus-scope` on the original, in both arms; this build promoted all three to global tokens,
+     so their light values are that block's. */
+  --color-alw_dark: #070f0b;
+  --color-fourth: #0a515d;
+  --color-secondary-light: #ab95ff;
+  --color-mail: #171a1a;
+
+  /* THE ONE INVENTED VALUE ON THIS PAGE, and it is one line to change. The original declares
+     `--card-dark` in `.app-root.dark .bonus-scope` and NOWHERE ELSE — there is no light value,
+     so `bg-card_dark` resolves to an invalid substitution in the light theme and the promotions
+     cards would paint nothing at all. White is `--card`'s own light value, which is what those
+     cards sit on; leaving the token undefined to be faithful would render the page broken. */
+  --color-card_dark: #ffffff;
+
+  /* The page background, `--site_bg`. Consumed by `body` below and matched by the pre-boot rule
+     in index.html, which is why both carry the literal rather than referring to each other. */
+  --site-bg: #f4f4f4;
+
+  /* `--darkness-*` / `--lightness-*` are the original's own, off `.app-root`. The light theme
+     darkens on hover where the dark theme lightens, and both do it with a background-IMAGE over
+     whatever the element's background-COLOR already is — see the `.fix-light-hover` block far
+     below, which is the only consumer. */
+  --darkness-3: linear-gradient(0deg, rgba(0, 0, 0, 0.03) 0%, rgba(0, 0, 0, 0.03) 100%);
+  --darkness-5: linear-gradient(0deg, rgba(0, 0, 0, 0.05) 0%, rgba(0, 0, 0, 0.05) 100%);
+}
+
+/* The light half of the `bonus-scope` re-declaration, and it needs its own selector for a
+   cascade reason rather than a stylistic one: `.app-root:not(.dark)` above is 0,2,0 and the bare
+   `.bonus-scope` block is 0,1,0, so without this the light palette would beat the scope and the
+   quest and promotions pages would lose their overrides. 0,3,0 here restores the order, which is
+   exactly why the original writes its two as `.app-root .bonus-scope` and
+   `.app-root.dark .bonus-scope` rather than as a bare class.
+
+   Diffed against the light block above rule by rule, the same way the dark pair was: of the
+   thirty-odd tokens `.app-root .bonus-scope` lists, only these three differ from the global
+   light values. `--quarterary` is the notable one — 105 112 114, IDENTICAL to the dark scope's,
+   so this single token is the same colour in both themes while the global one it overrides
+   moves from #A1AFB2 to #ADB6BD. */
+.app-root:not(.dark) .bonus-scope {
+  /* EVERY TOKEN THE BARE `.bonus-scope` DECLARES HAS TO BE REDECLARED HERE, NOT JUST THE ONES
+     THAT DIFFER FROM THE GLOBAL LIGHT VALUES — and getting that wrong is what left the quest
+     page's cards near-black on a white panel.
+
+     The reasoning that produced the bug was a specificity argument, and specificity is not what
+     decides this. `.bonus-scope` is 0,1,0 and `.app-root:not(.dark)` is 0,2,0, so it looks as
+     though the light palette wins — but the two rules match DIFFERENT ELEMENTS. The palette
+     declares on `<body>`; the scope declares on the page's own wrapper. A custom property is
+     inherited, so what a descendant sees is the value from the NEAREST declaring ancestor, and
+     the wrapper is nearer than body no matter how the selectors weigh up. `--color-card` was
+     omitted here on the grounds that light `bonus-scope` and light global are both #FFFFFF —
+     true, and irrelevant, because the bare rule's #171A1A was never being overridden at all.
+
+     That is the same mechanism the note over the dark block describes as "the nearest declaring
+     ancestor wins by plain inheritance and no specificity contest is involved". It cuts both
+     ways: it is why the scope works, and why the scope must be complete. */
+  --color-quarterary: #697072;
+  --color-card: #ffffff;
+  /* A white pill on this page where the rest of the light theme uses a near-black one, over a
+     slightly cooler strip. Both are the scope's own. */
+  --color-tab_selected: #ffffff;
+  --color-tab_padding: #f0f3f5;
+}
+
+/* --u is one "design pixel".
+
+   The original computes its root font-size in JS (index-BsFv7ByC.js):
+
+     const m1 = 430, _5 = 640;
+     const f = document.documentElement.clientWidth;
+     const h = f < _5 ? f : m1;              // clientWidth below 640, else 430
+     remScale = h / m1;                       // NOT capped at 1
+     document.documentElement.style.fontSize = remScale * 16 + "px";
+
+   So the scale is clientWidth/430 all the way up to 639 — it passes through 1 at 430
+   and keeps GROWING, reaching 1.486 (a 23.78px root) at 639 — then snaps back to
+   exactly 1 the moment 640 is crossed. That discontinuity at the sm breakpoint is the
+   original's behaviour, not a rounding artifact.
+
+   This was previously written as min(1px, 100vw / 430), i.e. capped at 1, which left
+   everything between 430 and 639 rendering at a 16px root while the real site was
+   scaling up to 23.78px. Every fractional measurement in this repo comes from this
+   scale (56 * 0.7442 = 41.66 at 320px, and so on).
+
+   What follows is only the FALLBACK. A stylesheet cannot read clientWidth, so it uses
+   100vw — and 100vw counts a classic scrollbar where clientWidth does not, which on a
+   desktop window under 640px inflates every rem by a few percent (at a 426px client
+   width with a 15px scrollbar the hero's Sign Up button came out 139.5 x 32.8 instead
+   of 134.73 x 31.70). src/utils/remScale.js reads clientWidth and sets the root
+   font-size inline before the first render, which outranks this rule and removes the
+   error. These declarations still cover the moment before that script runs. */
+:root {
+  /* At >= 640 the scale resolves to exactly 1, so one design pixel is one CSS pixel.
+     The media query below is the only place the scale applies. */
+  --u: 1px;
+
+  /* Every rem-based value — all Tailwind spacing, text sizes, radii, and the inherited
+     line metrics around inline content — then scales with the viewport automatically,
+     instead of each one being converted by hand. Sprites are deliberately NOT
+     rem-based: the original pins .color_icon_img and .menu_icon_img to 32px, so icon
+     boxes stay a constant size at every width. */
+  font-size: calc(16 * var(--u));
+}
+
+@media (width < 640px) {
+  :root {
+    --u: calc(100vw / 430);
+  }
+}
+
+/* The original's `.app-root`, applied to body since this app has no equivalent wrapper.
+   The font-size matters: `.app-root` sets .875rem, so any text without an explicit size
+   class inherits 14px, not the 16px root. Missing it is why the hero's "Or Register
+   With" and Sign Up rendered a size too large, and why `.bc-token-inner` in Sidebar.css
+   had to restate 14px by hand for its em-based padding to resolve correctly. */
+/* `font-family: avertastd` WITH NO FALLBACK LIST, which is the original's own declaration in
+ * `.app-root` — and the missing fallbacks are load-bearing rather than an omission.
+ *
+ * AVERTA'S EXTRABOLD FACE HAS NO RUPEE SIGN. Checked, not guessed: decompressing the three
+ * woff2 files and reading their cmaps, U+20B9 is in the 400 and 600 faces and NOT in the 800,
+ * and neither is U+20A9 (won). So every 800-weight `₹` on this site — the fiat deposit tab's
+ * amount chips, its "Extra +₹1,800.00" — is a FALLBACK glyph, on the live site as much as here.
+ *
+ * What the fallback list changed was which font answered. `system-ui` on Windows 11 is Segoe UI
+ * Variable, which carries a real 800, so the rupee arrived as a genuinely extra-bold sans and
+ * sat noticeably heavier than the Averta digits beside it. With the list gone the request falls
+ * through to the browser's default family, which is what the original gets, and the glyph is
+ * the lighter one the live page shows. Do not "improve" this by adding a stack back. */
+body {
+  /* `--site_bg` is the original's own token and the only one it spends on `.app-root`'s own
+     `background-color`. Declared here rather than in `@theme` because it is not a Tailwind
+     colour namespace — nothing generates a `bg-site-bg` utility and nothing should. The dark
+     value lives on this rule and the light theme overrides it from `.app-root:not(.dark)`,
+     which is the SAME element at 0,2,0 against this rule's 0,0,1.
+
+     Both literals are also written into the pre-boot `<style>` in index.html, on purpose: that
+     block has to paint before this stylesheet has been fetched, so it cannot refer to anything
+     declared here. Change one and change the other. */
+  --site-bg: #232626;
+
+  background-color: var(--site-bg);
+  /* Was a hardcoded #ffffff. `--primary` is that value in the dark theme and #070F0B in the
+     light one, and the original sets exactly this on `.app-root` (`color: rgb(var(--primary))`),
+     so every piece of text with no colour class of its own follows the theme instead of staying
+     white on a white page. */
+  color: var(--color-primary);
+  font-family: avertastd;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+/* Core helper classes used in the original header HTML */
+.header {
+  height: 60px;
+  background-color: var(--color-header-bg);
+  /* The notification drawer's push, declared on the resting element so it animates BOTH ways —
+     see the same note on `.main-layout-content` in MainLayout.css. The rule that moves it is
+     `.chat-unfold .header` in components/RightDrawer/RightDrawer.css. */
+  transition: padding-inline-end 0.2s ease-in-out;
+}
+
+/* 3.5rem, not 55px: the mobile header measures 41.66 / 48.83 / 55.48 / 56 at the four
+   sampled widths, which is exactly 3.5rem at each one. As rem it tracks the scale at
+   every width instead of only at the sampled ones — see Header.css.
+
+   No background here. The original's `.page-header` is height and box-model only —
+
+     .page-header { box-sizing: content-box; border-top: var(--safe-top) solid transparent;
+                    height: var(--header) }
+
+   — and the colour comes from `alpha-layer4` below, whose opacity the header drives from
+   scrollTop. This rule used to carry `background-color: #232626 !important`, which painted
+   the bar permanently solid in the page-background colour: wrong colour (the original's is
+   layer4), wrong constancy (it should fade in), and an !important that nothing could
+   override. */
+.page-header {
+  height: 3.5rem;
+}
+
+/* index-DxOqNczA.css, verbatim in effect:
+
+     .alpha-layer4 { --tw-bg-opacity: 1; background-color: rgb(var(--layer4) / var(--tw-bg-opacity)) }
+
+   The original's tokens are bare `R G B` triples, so it can slash an alpha straight into
+   rgb(). Ours are hex, so the alpha is applied with color-mix against transparent instead —
+   same result, and it keeps @theme the single source of truth for the colour rather than
+   restating 50 55 56 here.
+
+   The mobile header is the only consumer: it writes --tw-bg-opacity from its scroll position
+   (see Header/index.jsx), which is what fades the bar in as the page moves. */
+.alpha-layer4 {
+  --tw-bg-opacity: 1;
+
+  background-color: color-mix(
+    in srgb,
+    var(--color-layer4) calc(var(--tw-bg-opacity) * 100%),
+    transparent
+  );
+}
+
+/* The button primitive, in @layer components on purpose.
+
+   These are size *defaults* in the original — every call site then overrides them with
+   utilities (`h-8 sm:h-10`, `p-0`, ...). Left unlayered they would outrank those
+   utilities and pin every `.button-m` to 40px, which is exactly what flattened the
+   hero's Google/Telegram buttons on mobile. Layered, utilities win as they do on the
+   real site. Values are index-DxOqNczA.css's `.button` / `.button-m` / `.button-brand`
+   verbatim and nothing else — no transition, no :active, no :hover, no white-space,
+   none of which the original declares. `.button-m` is 2.5rem rather than a hardcoded
+   40px, so it scales below a 430px viewport like everything else. */
+@layer components {
+  .button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 3rem;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+    cursor: pointer;
+    border-radius: var(--radius-md);
+    user-select: none;
+  }
+
+  .button-m {
+    height: 2.5rem;
+    border-radius: var(--radius-lg);
+  }
+
+  /* No font-size and no font-family here on purpose: the original sets neither, so a
+     `.button-brand` inherits body's .875rem. Forcing 16px made the hero's Sign Up label
+     a size too big. Colours are `--primary_brand` (0 0 0) on `--button-brand` (44 217 125),
+     which is a DIFFERENT green from `--brand` — see the token's own note. */
+  .button-brand {
+    color: rgb(0, 0, 0);
+    font-weight: 800;
+    background-color: var(--color-button-brand);
+  }
+
+  /* `.button-second`, index-DxOqNczA.css verbatim — the raised grey button, `type="second"` in
+     the Button component's own type map (`{brand, second, input, cashout}`). Its background is
+     `--Button-BrightBg`, which this project already carries as `button_bright`; the referral
+     page's three "View Details" / "Send Now" buttons are the first call sites.
+
+     Layered with the rest for the usual reason: the referral cards write `w-full bg-layer5`
+     over it, so the utility has to win. */
+  .button-second {
+    color: var(--color-primary);
+    font-weight: 800;
+    background-color: var(--color-button_bright);
+  }
+
+  /* `.button-brightBg`, index-DxOqNczA.css verbatim — #f2f2f2 light, #464f50 dark, declared
+     beside `.right-slide-content` in the same pair of rules. NOT a button type: it is a bare
+     background override a call site writes ON TOP of a type, and the one consumer is a notice
+     row's View More link, which carries `button-second button-brightBg` and then ALSO writes the
+     same two colours as `bg-[#f2f2f2] dark:bg-[#464f50]`. The class and the utilities say the
+     same thing, which is the original's own belt and braces rather than a mistake in either.
+
+     `--color-button_bright` is that same #464F50 in the dark arm, so this could be written as
+     the token — it is spelled out instead because the original spells it out, and because the two
+     names DIVERGE in the light theme (#f2f2f2 here against `--Button-BrightBg`'s #f2f4f5), which
+     is the reason `card_dark` and `alw_dark` are kept apart too.
+
+     Layered, because the utility beside it has to be able to win — and the light arm has to be
+     layered WITH it, or an unlayered override would beat the very utilities it sits under. */
+  .button-brightBg {
+    background: #464f50;
+  }
+
+  .app-root:not(.dark) .button-brightBg {
+    background: #f2f2f2;
+  }
+
+  /* The pager, from index-DxOqNczA.css's `.pagination*` block. Layered with `.button` and for
+     the same reason: `.pagination-button` is a `.button.button-m` at its call site, so leaving
+     these unlayered would let them outrank the utilities beside them.
+
+     TOKENS TRANSLATED, not copied. The original reads `rgb(var(--Pagination-bg))` and
+     `rgb(var(--Pagination-currentPage))`, which resolve to nothing here — this project
+     declares finished colours. Their dark-theme values are `41, 45, 46` and `58, 65, 66`,
+     which are exactly `--color-layer3` (#292D2E) and `--color-layer5` (#3A4142), so the two
+     existing tokens carry them.
+
+     Both corner sets are verbatim: the outer edge of each arrow button is `--radius-lg` and
+     the edge facing the number is `--radius-sm`, so the three controls read as one pill. The
+     `[dir=rtl]` mirrors are dropped — nothing here is RTL. */
+  .pagination-button {
+    background-color: var(--color-layer3);
+    height: 2.5rem;
+    color: var(--color-primary);
+  }
+
+  .pagination-prev {
+    border-top-left-radius: var(--radius-lg);
+    border-bottom-left-radius: var(--radius-lg);
+    border-top-right-radius: var(--radius-sm);
+    border-bottom-right-radius: var(--radius-sm);
+  }
+
+  .pagination-next {
+    border-top-right-radius: var(--radius-lg);
+    border-bottom-right-radius: var(--radius-lg);
+    border-top-left-radius: var(--radius-sm);
+    border-bottom-left-radius: var(--radius-sm);
+  }
+
+  .pagination {
+    background-color: var(--color-layer3);
+    display: flex;
+    align-items: center;
+    column-gap: 0.15rem;
+    border-radius: var(--radius-sm);
+    padding: 0.25rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    font-weight: 800;
+    color: var(--color-primary);
+  }
+
+  /* `border`/`outline` are not the original's — its number is a styled div. Ours is a real
+     input so you can type a page, and without these it keeps the UA's own box. */
+  .pagination-current {
+    background-color: var(--color-layer5);
+    height: 2rem;
+    min-width: 2rem;
+    border-radius: var(--radius-md);
+    padding: 0.5rem;
+    text-align: center;
+    border: none;
+    outline: none;
+  }
+
+  /* One chevron path serves both buttons; next is the same glyph turned around. */
+  .pagination-prev .pagination-arrow {
+    transform: rotate(0);
+  }
+
+  .pagination-next .pagination-arrow {
+    transform: rotate(180deg);
+  }
+
+  /* Not the original's — it ships no disabled rule because its own button component stops
+     rendering the arrow. Ours stays in place at the ends of the range, so it needs to read
+     as unavailable. `.button`'s cursor is the only thing being undone. */
+  .pagination-button:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  /* `.btn-like` shares every interaction rule with `.button` on the original but none of its
+     box model — it is what the footer's social buttons carry. The dark-theme hover/active
+     brightness is 1.05, not the light theme's .95. */
+  .btn-like {
+    user-select: none;
+    touch-action: manipulation;
+  }
+
+  .btn-like:active {
+    filter: brightness(1.05);
+    transform: translateY(1px);
+  }
+
+  @media (hover: hover) and (pointer: fine) and (min-width: 640px) {
+    .btn-like:not([aria-selected], :disabled):hover {
+      filter: brightness(1.05);
+    }
+  }
+
+  /* `.badge`, index-DxOqNczA.css verbatim — the green count pill `hh` draws when its `type` is
+     `"number"` (its default) and the value is non-zero. Its OTHER arm is the bare
+     `h-2 w-2 -translate-y-1/2 rounded-full bg-brand` dot the desktop header already writes as a
+     local component, so the two are one component on the original and are not merged here: the
+     header hardcodes the dot arm and never passes a value.
+
+     Layered, because the one call site passes `class: "mr-2"` and would be free to pass a colour
+     the same way. */
+  .badge {
+    height: 1rem;
+    line-height: 1rem;
+    padding-left: 0.35rem;
+    padding-right: 0.35rem;
+    border-radius: var(--radius-md);
+    font-size: 0.75rem;
+    text-align: center;
+    z-index: 50;
+    font-weight: 800;
+    color: var(--color-primary_brand);
+    background-color: var(--color-brand);
+  }
+
+  /* `.setting-button { background: var(--Button-BrightBg) }` — the raised square a settings row
+     puts its chevron in, out of the `account` remote's own bootstrap stylesheet
+     (`init-9cZaIprL.js`, which inlines it). `--Button-BrightBg` is #464F50 in the dark arm and is
+     already in `@theme` as `button_bright`, so this is the one declaration the class carries.
+
+     Layered like the rest: no call site overrides it today, but every one of them is a `<button>`
+     that would take a `bg-*` utility if it ever needed to, and an unlayered rule would beat it. */
+  .setting-button {
+    background-color: var(--color-button_bright);
+  }
+
+  /* index-DxOqNczA.css verbatim. Layered for the same reason as .button: every call site
+     sizes its own icon with utilities (`h-4.5 w-4.5` on the contest help icon), and an
+     unlayered 2rem would beat them and pin every icon to 32px. `fill: currentColor` is the
+     point of the class — it is what makes an icon take the colour of the text around it. */
+  .icon {
+    width: 2rem;
+    height: 2rem;
+    fill: currentColor;
+  }
+
+  /* `.active-tab-group`, index-DxOqNczA.css: `background: var(--Chip-Group-Tab)`, where that
+     variable is `#3a4142`. Pointed at the `layer5` token rather than restating the literal —
+     they are the same value, and the @theme block is this project's single source of truth for
+     colour. The name is the original's: it is the selected chip/tab background, and the Help
+     Center's rail carries it on the current topic. */
+  .active-tab-group {
+    background: var(--color-layer5);
+  }
+
+  /* `.button-input`, index-DxOqNczA.css verbatim — one of the four button TYPES (`zx` maps
+   * `{brand, second, input, cashout}` onto `button-brand`, `button-second`, `button-input`,
+   * `button-cashout`), and the only one that is not really a button: it is the little filled
+   * square a Select puts its chevron in, which is why `.button:hover:not(:disabled,
+   * .button-input)` excludes it from the brightness hover — the rule that has been sitting in
+   * this file naming a class that was never defined.
+   *
+   * `input_button` resolves to the same #3A4142 as `layer5` in this theme and is a separate
+   * token on the original, which is why @theme keeps both. */
+  .button-input {
+    color: var(--color-primary);
+    font-weight: 800;
+    background-color: var(--color-input_button);
+  }
+
+  /* `.button-l`, the large variant. The auth dialog's submit is `button-brand button-l`, then
+     overrides the height again with `h-14`. */
+  .button-l {
+    height: 3rem;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+    border-radius: var(--radius-lg);
+  }
+
+  /* The text-field primitive, index-DxOqNczA.css verbatim.
+
+     Layered, and this one is not academic: the auth dialog's fields carry `bg-input_darken`,
+     a UTILITY, over this rule's own `background-color`. Unlayered, the rule would win and
+     every field would render in input_bright (#292D2E) instead of the recessed #1E2121 the
+     dialog asks for — the exact hazard CLAUDE.md describes, and the reason `.button` is
+     layered too. The original is on Tailwind v3, where source order alone settles it.
+
+     `[data-focus]` rather than `:focus-within`: the original drives the state from JS and puts
+     the attribute on the wrapper, because the green ring belongs to the box, not the <input>
+     inside it. Reproduced as an attribute so the markup stays the original's. */
+  /* `index-DxOqNczA.css` verbatim — the label above an `.input`, and it belongs to the HOST
+     stylesheet rather than to the account remote even though the remote's flows are what use it.
+     LAYERED, deliberately: every call site in the change-password flow writes its own top margin
+     (`mt-3 input-label`, `mt-4 input-label`, `mt-6 input-label`) and an unlayered rule here would
+     beat those utilities outright — the cascade hazard in CLAUDE.md, in the direction that makes
+     the markup a lie. The original gets the same result by source order, which Tailwind v3's
+     unlayered output gave it for free. */
+  .input-label {
+    margin-top: 1.25rem;
+    margin-bottom: 0.375rem;
+    padding-inline-start: 0.375rem;
+    padding-inline-end: 0.375rem;
+    color: var(--color-secondary);
+  }
+
+  .input {
+    display: flex;
+    align-items: center;
+    height: 3rem;
+    gap: 0.5rem;
+    padding-inline-start: 0.75rem;
+    padding-inline-end: 0.5rem;
+    border: 1px solid var(--color-input);
+    border-radius: var(--radius-lg);
+    background-color: var(--color-input_bright);
+    color: var(--color-primary);
+    transition: all 0.35s var(--ease-out, ease-out);
+  }
+
+  .input[data-focus] {
+    border-color: var(--color-brand);
+    caret-color: var(--color-brand);
+  }
+
+  .input[data-disabled] {
+    opacity: 0.6;
+  }
+
+  .input > input {
+    flex: 1;
+    width: 8rem;
+    background-color: transparent;
+    outline: none;
+  }
+
+  .input > input::placeholder {
+    color: var(--color-quarterary);
+  }
+
+  /* `.pc .input` in the original, mapped to lg like every other `.pc` rule here. The end
+     padding drops to .1875rem because on desktop the trailing slot holds a `.button-s`,
+     which brings its own 2px of breathing room. */
+  @media (min-width: 1024px) {
+    .input {
+      height: 2.5rem;
+      padding-inline-start: 0.5rem;
+      padding-inline-end: 0.1875rem;
+    }
+  }
+
+  /* The tab strip, index-DxOqNczA.css verbatim, and the reason it lives here rather than in a
+     component file is that it now has two consumers: the bet table's Latest Bet / High Roller
+     / Wager Contest strip and the auth dialog's two strips.
+   *
+   * Three variants, keyed off `data-type` exactly as the original keys them:
+   *
+   *   no attribute      pill on a tab_nopadding track   — the bet table, and the auth
+   *                                                       dialog's Password / One-time Code
+   *   data-type=inner   pill on a padded tab_padding track (nothing here uses it yet)
+   *   data-type=indicator  no track, no pill; a brand underline slides between labels
+   *                        — the auth dialog's Sign In / Sign Up
+   *
+   * The indicator is one element positioned by two custom properties the strip sets inline,
+   * `--tabs-width` (one tab's width) and `--tabs-indicator-position` (how far to slide it).
+   * Layered for the same reason as `.input`: the auth dialog writes `tabs-content
+   * bg-transparent`, and that utility has to beat `.tabs-content`'s own layer4 fill. */
+  .tabs-title {
+    display: flex;
+    flex: none;
+    height: 2.5rem;
+    position: relative;
+    border-radius: var(--radius-lg);
+    color: var(--color-secondary);
+  }
+
+  .tabs-title:not([data-type]) {
+    background-color: var(--color-tab_nopadding);
+  }
+
+  .tabs-title[data-type='inner'] {
+    background-color: var(--color-tab_padding);
+    padding: 0.25rem;
+  }
+
+  .tabs-title[data-type='inner'] .tabs-btn {
+    border-radius: var(--radius-md);
+  }
+
+  .tabs-title[data-type='indicator'] {
+    border-radius: 0;
+    padding: 0;
+  }
+
+  .tabs-title[data-type='indicator'] .tabs-btn {
+    border-radius: 0;
+  }
+
+  /* The selected tab in this variant is a colour change only — the pill is explicitly
+     unset, because the underline is doing that job. */
+  .tabs-title[data-type='indicator'] .tabs-btn[aria-selected] {
+    background-color: unset;
+    color: var(--color-primary);
+  }
+
+  .tabs-btn-group {
+    display: flex;
+    flex: 1;
+    align-self: stretch;
+  }
+
+  .tabs-btn {
+    border-radius: var(--radius-lg);
+    flex: 1;
+    align-self: stretch;
+    text-wrap: nowrap;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+    color: var(--color-secondary);
+  }
+
+  .tabs-btn[aria-selected] {
+    background-color: var(--color-tab_selected);
+    color: var(--color-primary_alw);
+    font-weight: 800;
+  }
+
+  /* Hidden in every variant but `indicator`, which is how the original gets away with
+     rendering the element unconditionally. */
+  .tabs-indicator {
+    display: none;
+  }
+
+  .tabs-title[data-type='indicator'] .tabs-indicator {
+    display: block;
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    z-index: 1;
+    height: 0.15rem;
+    width: var(--tabs-width);
+    background-color: var(--color-brand);
+    transform: translate(var(--tabs-indicator-position));
+    transition: transform 0.3s;
+  }
+
+  /* The hairline under the whole strip, drawn only when the call site asks for it with
+     `divider`. Independent of `data-type`: the indicator slides ON TOP of this line (z-index 1
+     against a static pseudo-element), which is what makes the underline read as a highlight of
+     one segment of a full-width rule rather than a floating bar. `--color-third` is
+     #e4eaf019 — a near-white at 10%, so it tints whatever surface it sits on. */
+  .tabs-title[data-divider]::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background-color: var(--color-third);
+    pointer-events: none;
+  }
+
+  .tabs-content {
+    background-color: var(--color-layer4);
+    border-radius: var(--radius-lg);
+    margin-top: 0.5rem;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* The checkbox, index-DxOqNczA.css verbatim. Worth reading before changing: the box you see
+     when it is CHECKED is not this rule's border — it is the SVG's own stroked rounded square.
+     `:before` draws a 2px --third border while unselected and goes transparent when selected,
+     and the tick svg fades and scales up from .6 over it. So the two states cross-fade rather
+     than one element changing colour, which is why both have to be present in the markup.
+
+     `.pc` narrows the box from 1.5rem to 1.25rem — mapped here to lg, like every other `.pc`
+     rule in this project. The call site then adds `scale-[90%]`, which is what takes the live
+     one to the 18px its <svg width> attribute advertises. */
+  .checkbox {
+    display: flex;
+    height: 2.75rem;
+    flex: none;
+    align-items: center;
+  }
+
+  .checkbox-ico {
+    position: relative;
+    width: 1.5rem;
+    height: 1.5rem;
+    flex: none;
+    margin-inline-end: 0.5rem;
+  }
+
+  .checkbox-ico::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border: 0.125rem solid var(--color-third);
+    border-radius: var(--radius-md);
+    transition: all 0.15s;
+  }
+
+  .checkbox-ico[aria-selected]::before {
+    border-color: transparent;
+  }
+
+  .checkbox-ico svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    transform: scale(0.6);
+    transition: opacity 0.15s, transform 0.15s var(--ease-out, ease-out);
+    will-change: transform, opacity;
+  }
+
+  .checkbox-ico[aria-selected] svg {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  @media (min-width: 1024px) {
+    .checkbox {
+      height: 2.5rem;
+    }
+
+    .checkbox-ico {
+      width: 1.25rem;
+      height: 1.25rem;
+    }
+  }
+
+  /* `.row-group` and `.card-group`, index-DxOqNczA.css verbatim — the site's two list shapes,
+   * and the bonus page uses one of each in the same column.
+   *
+   * A ROW GROUP IS ONE BOX WITH SHARED HAIRLINES, and the way it gets there is worth reading:
+   * every child takes a full border and square corners, each child after the first is pulled up
+   * by `-1px` so adjacent borders overlap into a single line, and the first and last round only
+   * their outer corners. `:only-child` then rounds all four, so a one-row group is a plain card.
+   * A CARD GROUP is the same border on every child and a 12px radius all round, laid out on a
+   * grid the call site sizes.
+   *
+   * The colour is a custom property so a call site can retint the whole group; the original
+   * writes `rgb(var(--fourth) / 0.05)` as its default, which this build cannot copy verbatim
+   * because `@theme` carries `--color-fourth` as a hex rather than a triple. Same colour,
+   * written the way Tailwind v4 writes `border-fourth/5`.
+   *
+   * Layered with the rest of the primitives, and for `display` that is not optional — an
+   * unlayered `display: grid` here would outrank any responsive visibility utility on the same
+   * element, which is exactly the trap `.center` sprang on the tabbar. */
+  .row-group {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .row-group > * {
+    border-radius: 0;
+    border: 1px solid
+      var(--row-group-border-color, color-mix(in oklab, var(--color-fourth) 5%, transparent));
+  }
+
+  .row-group > *:not(:first-child) {
+    margin-top: -1px;
+  }
+
+  .row-group > *:first-child {
+    border-radius: 0.75rem 0.75rem 0 0;
+  }
+
+  .row-group > *:last-child {
+    border-radius: 0 0 0.75rem 0.75rem;
+  }
+
+  .row-group > *:only-child {
+    border-radius: 0.75rem;
+  }
+
+  .card-group {
+    display: grid;
+  }
+
+  .card-group > * {
+    border-radius: 0.75rem;
+    border: 1px solid
+      var(--card-group-border-color, color-mix(in oklab, var(--color-fourth) 5%, transparent));
+  }
+
+  /* `.button-s`, the small variant — the referral row's Paste button. */
+  .button-s {
+    height: 2rem;
+    border-radius: var(--radius-md);
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
+  }
+
+  /* `.button-xs`, index-DxOqNczA.css verbatim — the smallest step, and the hero carousel's
+     "Check" pill is its first call site. Note that pill then writes `h-9` over it, so the 24px
+     here never actually renders: exactly the reason this family is layered. */
+  .button-xs {
+    height: 1.5rem;
+    border-radius: var(--radius-md);
+  }
+
+  /* The two scroll primitives the dialog needs.
+
+     `scrollbar-gutter` IS THE ORIGINAL'S OWN FIFTH DECLARATION and was missing here. Nothing in
+     the mirror ever sets `--scrollbar-gutter` — not one of the six stylesheets, not the bundle —
+     so it resolves to its own `auto` fallback on the live site and every consumer behaves exactly
+     as it does today. It is restored because it is the seam: a call site that wants a scroller
+     whose content width does not jump when the bar appears sets the variable rather than
+     redeclaring the property. `/bonus` below lg is the first to (see pages/Bonus/Bonus.css). */
+  .scroll-y {
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-gutter: var(--scrollbar-gutter, auto);
+  }
+
+  .scroll-x {
+    overflow-y: hidden;
+    overflow-x: auto;
+    overscroll-behavior: contain;
+  }
+
+}
+
+/* UNLAYERED, and that is not a style choice. `.grid-col-3 > div > *` sets
+   `position: absolute; inset: 0` on the tile, and every tile carries Tailwind's `relative`
+   in its class list (`game-item group relative flex ...`, straight off the original). In a
+   layer the utility wins, the tile stops being pulled out of flow, and it lands BELOW the
+   spacer div whose 133% padding-top was supposed to be holding its place — every row of
+   games ends up roughly twice as tall as it should be.
+
+   This is the CLAUDE.md cascade hazard from the other direction: these rules have to beat
+   utilities, so they must stay outside `@layer`. They live in index.css rather than
+   GameSection.css only because the Explore grid and its tab strip are second consumers. */
+/* `border-radius: .625rem` — a 10px corner the original declares as its own utility because
+   Tailwind has no step between `rounded-lg` (8) and `rounded-xl` (12). The weekly raffle's
+   hero, its two how-to-earn cards and its results panel all carry it. Layered, because it is
+   a plain radius nothing needs to outrank; a `rounded-*` utility at a call site should win. */
+@layer components {
+  .rounded-lg10 {
+    border-radius: 0.625rem;
+  }
+}
+
+/* Scrollbar suppression. Two classes, both the original's, and they are NOT the same rule:
+   `.hide-scroll` is what the carousel carries, `.hidden-scroll-bar` what the Explore
+   overlay and the sidebar carry. The original declares both, with slightly different
+   bodies, so both are here rather than one aliased to the other.
+
+   These moved out of GameSection.css when Explore became a second consumer — same reason
+   `.input` and the `.tabs-*` family live here rather than in the component that introduced
+   them. */
+.hide-scroll {
+  scrollbar-width: none;
+}
+
+.hide-scroll::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  background: transparent;
+}
+
+.hidden-scroll-bar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.hidden-scroll-bar::-webkit-scrollbar {
+  width: 0 !important;
+}
+
+/* The snap scroller. Moved here with .hide-scroll, and it must keep coming BEFORE
+   `.smooth-list` (still in GameSection.css, still unlayered, so it wins either way) —
+   both declare scroll-padding-inline and the list's value is the one that has to apply.
+   See the note there. */
+.smooth-scroll {
+  --snap-align: start;
+  /* Promotes the scroller to its own layer. The original carries it, and without it the
+     card images repaint on every scroll frame. */
+  transform: translateZ(0);
+  scroll-padding-inline: var(--scroll-padding-inline);
+}
+
+.smooth-scroll > * {
+  scroll-snap-align: var(--snap-align);
+}
+
+/* --grid-column is the number of cards visible at once; everything else derives from it.
+   --grid-side exists for the `chat-unfold` case (the site drops 2 columns when the chat
+   panel is open); no chat panel is built yet, so only the variable is carried over.
+
+   Here rather than in GameSection.css because the Explore results grid is a second
+   consumer — it is the same `grid-col-3` at `--aspect-ratio: .75`, just without the
+   horizontal overflow. */
+.grid-col-3 {
+  --grid-gap: 0px;
+  --grid-column: 3;
+  --aspect-ratio: 1;
+  --grid-side: 2;
+  --grid-cols: var(--grid-column);
+  --item-width: calc((100% - var(--grid-gap) * (var(--grid-cols) - 1)) / var(--grid-cols));
+  grid-template-columns: repeat(auto-fill, var(--item-width));
+  grid-auto-columns: var(--item-width);
+}
+
+/* Each card is wrapped in a spacer div whose padding-top sets the height from the width —
+   at --aspect-ratio .75 that is 133.33%, the 3:4 portrait tile. The card itself is then
+   pulled out of flow and stretched over it. */
+.grid-col-2 > div,
+.grid-col-3 > div {
+  position: relative;
+  padding-top: calc(100% / var(--aspect-ratio));
+}
+
+.grid-col-2 > div > *,
+.grid-col-3 > div > * {
+  position: absolute;
+  inset: 0;
+}
+
+/* The second grid preset. Same machinery as .grid-col-3, fewer columns at every step —
+   the Upcoming Lottery Draw row uses it with --aspect-ratio .92 instead of the games' .75. */
+.grid-col-2 {
+  --grid-gap: 0px;
+  --grid-column: 2;
+  --aspect-ratio: 1;
+  --grid-side: 1;
+  --grid-cols: var(--grid-column);
+  --item-width: calc((100% - var(--grid-gap) * (var(--grid-cols) - 1)) / var(--grid-cols));
+  grid-template-columns: repeat(auto-fill, var(--item-width));
+  grid-auto-columns: var(--item-width);
+}
+
+@media (min-width: 640px) {
+  .grid-col-2 { --grid-column: 3 }
+  .grid-col-3 { --grid-column: 4 }
+}
+
+@media (min-width: 768px) {
+  .grid-col-2 { --grid-column: 3 }
+  .grid-col-3 { --grid-column: 5 }
+}
+
+@media (min-width: 1024px) {
+  .grid-col-2 { --grid-column: 4 }
+  .grid-col-3 { --grid-column: 7 }
+}
+
+@media (min-width: 1280px) {
+  .grid-col-2 { --grid-column: 5 }
+  .grid-col-3 { --grid-column: 8 }
+}
+
+@media (min-width: 1536px) {
+  .grid-col-2 { --grid-column: 6 }
+  .grid-col-3 { --grid-column: 8 }
+}
+
+@layer components {
+  /* The spinner, index-DxOqNczA.css verbatim — `sa` in index-BsFv7ByC.js, which the site draws
+   * wherever something is still arriving. Layered because every call site sizes its own
+   * (`<Loading class="size-4"/>` in the currency dropdown), and unlayered this 20px would beat
+   * the utility. The original is on Tailwind v3, where source order alone settles it.
+   *
+   * The animation is keyed off `[dir]` rather than declared on `.loading` itself, because the
+   * RTL half spins the other way. Only the LTR arm is written: nothing in this build sets
+   * `dir="rtl"`, and the layer that uses this sets `dir="ltr"` explicitly. */
+  .loading {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+
+  [dir='ltr'] .loading {
+    animation: spin-ltr 1s linear infinite;
+  }
+
+  /* The Select trigger, index-DxOqNczA.css verbatim. It is a `.button` first — height and
+     radius come from whichever button variant the call site picks — and this rule only adds
+     the outline and the start padding. Layered because the Explore search bar strips both
+     back off with `border-none bg-transparent px-0`, which are utilities. */
+  .select {
+    border: 1px solid var(--color-input);
+    gap: 0.5rem;
+    padding-inline-start: 0.75rem;
+  }
+
+  .select-item {
+    width: 100%;
+    border-radius: var(--radius-lg);
+    padding-inline: 0.75rem 0.5rem;
+  }
+
+  .select-item[aria-selected] {
+    background-color: var(--color-layer4);
+  }
+
+  /* `--layer0` IS NOT A COLOUR TOKEN, IT IS "WHATEVER LAYER I AM SITTING ON", and reading it as
+   * a fifth layer name is the mistake to avoid. index-DxOqNczA.css declares it on the theme root
+   * at layer4 and then RE-DECLARES IT ON THE UTILITIES THEMSELVES:
+   *
+   *   .bg-layer2 { --layer0: rgb(var(--layer2)) }   .bg-layer4 { --layer0: rgb(var(--layer4)) }
+   *   .bg-layer3 { --layer0: rgb(var(--layer3)) }   .bg-layer5 { --layer0: rgb(var(--layer5)) }
+   *   .bg-layer0 { background-color: var(--layer0) }
+   *
+   * so painting a box `bg-layer3` publishes that fill to its descendants, and any child written
+   * `bg-layer0` matches it without knowing what it is. It inherits, so the nearest painted
+   * ancestor wins and no specificity contest is involved.
+   *
+   * The one consumer here is the Select layer's sticky search row, which has to be opaque enough
+   * to scroll rows under and must be the panel's own colour to do it invisibly — and the panel is
+   * `bg-layer3` at that call site and `.select-options`' forced layer3 on the original. Written
+   * generally rather than as `bg-layer3` on the search bar, because the whole point of the
+   * variable is that the bar does not name the panel's colour.
+   *
+   * The original also sets it on `.tooltip` and on the two light-theme tab groups; neither is
+   * reachable in a dark-only build with no tooltip component, so neither is transcribed. */
+  :root {
+    --layer0: var(--color-layer4);
+  }
+
+  .bg-layer2 {
+    --layer0: var(--color-layer2);
+  }
+
+  .bg-layer3 {
+    --layer0: var(--color-layer3);
+  }
+
+  .bg-layer4 {
+    --layer0: var(--color-layer4);
+  }
+
+  .bg-layer5 {
+    --layer0: var(--color-layer5);
+  }
+
+  .bg-layer0 {
+    background-color: var(--layer0);
+  }
+
+  /* `.fix-light-hover` and its two companions, and the interesting part is which of the three
+   * actually paints anything in a dark-only build.
+   *
+   * The original declares them in two blocks (index-DxOqNczA.css):
+   *
+   *   .app-root:not(.dark) { .light-darkness, .fix-light-hover.scroll-target,
+   *                          .select-item[aria-selected=true] { background-image: darkness-5 } }
+   *
+   *   @media (hover:hover) and (pointer:fine) and (min-width:640px) {
+   *     .dark { .select-item, .fix-light-hover {
+   *               &:hover  { background-image: lightness-3 }
+   *               &:active { background-image: lightness-5 } } }
+   *     .app-root:not(.dark) { ...the same pair with darkness-3 / darkness-5 }
+   *   }
+   *
+   * So the FIRST block is light-theme only, and BOTH ARMS ARE WRITTEN NOW. `.light-darkness` and
+   * `.fix-light-hover.scroll-target` were kept in the markup as dead classes while this build had
+   * no light palette — the same call the header's `w-30`-adjacent dead classes get — and they
+   * stop being dead the moment the toggle is thrown. Nothing in the markup changed for that; the
+   * classes were already there, which is the whole argument for having kept them.
+   *
+   * The mechanism is `background-IMAGE` over whatever the element's `background-COLOR` already
+   * is — a 3% wash ON TOP of the fill, not instead of it — so `hover:bg-layer4` and this can
+   * both apply to the same row without either being lost. The dark theme washes WHITE and the
+   * light theme washes BLACK, which is why the two arms are separate rules rather than one rule
+   * over a swapped variable.
+   *
+   * The media query is the original's own and is what keeps a touch device from latching the
+   * hover state on tap. */
+
+  /* The light theme's resting states. No dark counterpart exists — in the dark theme the
+     selected row is coloured by its own `bg-layer4` utility instead, which is why nothing was
+     missing here before. */
+  .app-root:not(.dark) .light-darkness,
+  .app-root:not(.dark) .fix-light-hover.scroll-target,
+  .app-root:not(.dark) .select-item[aria-selected='true'] {
+    background-image: var(--darkness-5);
+  }
+
+  @media (hover: hover) and (pointer: fine) and (min-width: 640px) {
+    /* The gradients here are written out rather than referenced as `--lightness-3` /
+       `--lightness-5`. Those two are declared on `.app-root` on the original and this build has
+       no dark-side declaration of them — the light pair below DOES go through `--darkness-*`,
+       because the light palette block declares them. Asymmetric, and the alternative is two more
+       tokens whose only consumer is four rules. */
+    .select-item:hover,
+    .fix-light-hover:hover {
+      background-image: linear-gradient(
+        0deg,
+        rgba(255, 255, 255, 0.03) 0%,
+        rgba(255, 255, 255, 0.03) 100%
+      );
+    }
+
+    .select-item:active,
+    .fix-light-hover:active {
+      background-image: linear-gradient(
+        0deg,
+        rgba(255, 255, 255, 0.05) 0%,
+        rgba(255, 255, 255, 0.05) 100%
+      );
+    }
+
+    /* 0,3,1 against the 0,2,0 above, so the light arm wins wherever it applies without either
+       rule needing to know about the other's source position. */
+    .app-root:not(.dark) .select-item:hover,
+    .app-root:not(.dark) .fix-light-hover:hover {
+      background-image: var(--darkness-3);
+    }
+
+    .app-root:not(.dark) .select-item:active,
+    .app-root:not(.dark) .fix-light-hover:active {
+      background-image: var(--darkness-5);
+    }
+  }
+
+  /* The toggle switch, index-DxOqNczA.css verbatim — the casino page's Poker tab is the first
+     consumer ("Show Blocked"), and the account and settings panels use the same one.
+   *
+   * The original's colours are written `rgb(var(--layer5))` / `var(--black_alpha5)`, which is
+   * ITS custom-property scheme, not this project's: here `@theme` declares `--color-layer5`
+   * and friends as finished colours. Transcribing the declarations literally is exactly the
+   * mistake that produced the broken unlayered duplicate of `.input` and `.tabs-*` — every
+   * colour resolved to nothing. Translated, not copied.
+   *
+   * `aria-checked` rather than a class, because that is the attribute the original keys off
+   * and it is the one a button with role="switch" already needs to carry. One deviation: the
+   * original matches on the attribute's PRESENCE (`[aria-checked]`) and removes it when off,
+   * while a role="switch" button is required to carry `aria-checked="false"` — so these match
+   * on the value instead. Same rendering, correct semantics.
+   *
+   * `.switch-xs` must come after `.switch`: same specificity, so source order settles the
+   * size. The checked knob offsets are the only pair where the modifier is more specific. */
+  .switch {
+    background: linear-gradient(
+        0deg,
+        var(--color-black_alpha5) 0%,
+        var(--color-black_alpha5) 100%
+      ),
+      var(--color-layer5);
+    cursor: pointer;
+    border-radius: 9999px;
+    padding: 0.25rem;
+    transition-property: all;
+    transition-duration: 0.15s;
+    width: 4rem;
+    height: 2.25rem;
+  }
+
+  .switch[data-disabled] {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .switch > div {
+    width: 1.75rem;
+    height: 1.75rem;
+    background: linear-gradient(
+        0deg,
+        var(--color-white_alpha20) 0%,
+        var(--color-white_alpha20) 100%
+      ),
+      var(--color-layer6);
+    border-radius: 9999px;
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.2);
+    transition-property: all;
+    transition-duration: 0.15s;
+    margin-left: 0;
+  }
+
+  .switch-xs {
+    width: 2.75rem;
+    height: 1.5rem;
+  }
+
+  .switch-xs > div {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  /* The CHECKED state is deliberately not here — it is unlayered, just past the end of this
+     block, because a call site paints the resting colour with a utility. See the note there. */
+
+  /* The radio dot. The original groups this with `.checkbox` above — they share the box
+     model and differ only in the marker — but they are written out separately here because
+     `.checkbox` was transcribed first, for the auth dialog, and merging the two selectors
+     now would put one component's rule inside another's comment block.
+
+     `.select-item.radio::before` is the interesting one: inside a dropdown row the dot moves
+     to the END of the line (order 100, auto start margin), so the label leads and the dot
+     trails. That is what every select on the site looks like. */
+  .radio {
+    display: flex;
+    height: 2.75rem;
+    flex: none;
+    align-items: center;
+  }
+
+  .radio::before {
+    content: '';
+    display: block;
+    flex: none;
+    transition-property: all;
+    transition-duration: 0.15s;
+    border-radius: 100rem;
+    width: 1.5rem;
+    height: 1.5rem;
+    margin-inline-end: 0.5rem;
+    border: 0.125rem solid var(--color-third);
+  }
+
+  .radio[aria-selected]::before {
+    border-width: 0.375rem;
+    border-color: var(--color-brand);
+  }
+
+  .select-item.radio::before {
+    order: 100;
+    margin-inline-start: auto;
+    margin-inline-end: 0;
+  }
+
+  /* `.pc` in the original, mapped to lg like every other `.pc` rule in this project. */
+  @media (min-width: 1024px) {
+    .radio {
+      height: 2.5rem;
+    }
+
+    .radio::before {
+      width: 1.25rem;
+      height: 1.25rem;
+    }
+
+    .radio[aria-selected]::before {
+      border-width: 0.3125rem;
+    }
+  }
+
+  /* The popover the Select opens. `position: fixed` with left/top at 0 is deliberate — the
+     original positions it from JS against the trigger's bounding box, and so does ours. The
+     18rem width is fixed for every dropdown on the site, not derived from the trigger. */
+  .dropdown-layer {
+    position: fixed;
+    z-index: 10000;
+    padding: 0 0.5rem;
+    border-radius: var(--radius-lg);
+    width: 18rem;
+    max-height: 20rem;
+    left: 0;
+    top: 0;
+    box-shadow: 0 4px 6px -1px #00000014, 0 2px 4px -1px #0000000f;
+  }
+
+  /* No scrollbar rules here. The original declares none on `.dropdown-layer` either — every
+     scroller on the site is styled once, globally, by the `.app-root` rule near the bottom of
+     this file. */
+
+  .dropdown-layer.select-options {
+    padding: 0.5rem;
+  }
+
+  /* index-DxOqNczA.css verbatim — the wallet's currency picker, the one layer on the site that
+   * is not 18rem by whatever its rows add up to. Note `min-height` beside `height`: it is what
+   * beats `.dropdown-layer`'s own `max-height: 20rem`, which would otherwise cap the panel at
+   * 320px and put the sticky footer a third of the way up. The original declares all three the
+   * same way and relies on the same precedence. */
+  .dropdown-layer.currency-select {
+    width: 24rem;
+    height: 36rem;
+    min-height: 36rem;
+  }
+
+}
+
+/* THE SWITCH'S CHECKED STATE, UNLAYERED, and the reason is a cascade difference between the
+ * original's Tailwind and ours rather than a preference.
+ *
+ * The casino page's Show Blocked switch is `class="switch switch-xs bg-input_bright"` — the
+ * original's own markup — so a UTILITY paints its resting colour. On Tailwind v3 the two settle
+ * by specificity, and `.switch[aria-checked='true']` at 0,2,0 beats `.bg-input_bright` at 0,1,0,
+ * so the checked switch is brand green. On v4 the layer decides instead and utilities outrank
+ * `@layer components` outright, so leaving these inside it painted a CHECKED switch
+ * `input_bright` and the control simply stopped responding. Unlayered here, they beat the
+ * utility again and the v3 outcome is restored.
+ *
+ * Only the `background` line is actually contested; the two `margin-left` rules move with it so
+ * the checked state stays one block rather than being split across a layer boundary.
+ *
+ * Note what this does NOT do: `.switch`'s own resting `background` stays layered, which is what
+ * lets `bg-input_bright` override it in the first place. That asymmetry is the whole mechanism —
+ * the resting colour is meant to be overridable and the checked colour is not. */
+.switch[aria-checked='true'] {
+  background: var(--color-brand);
+}
+
+.switch[aria-checked='true'] > div {
+  background: var(--color-alw_white);
+  margin-left: 1.75rem;
+}
+
+.switch-xs[aria-checked='true'] > div {
+  margin-left: 1.25rem;
+}
+
+/* Every icon inside that layer is 20px rather than `.icon`'s 32 — the search magnifier, the
+   clear cross, the add-currency plus and the footer's settings hexagon, none of which carries a
+   `size-*` utility at its call site because this rule already sizes it.
+
+   UNLAYERED, and this one is not cosmetic. The BCD/BC rows' `(i)` link is
+   `<IconInform class="size-4"/>`, so `.currency-select .icon` and `.size-4` both apply to it.
+   On the original — Tailwind v3, no cascade layers — specificity settles it 0,2,0 to 0,1,0 and
+   the icon renders at 20px. In a layer here the utilities layer would win outright and it would
+   render at 16. Same hazard CLAUDE.md describes for `.grid-col-3 > div > *`, and the same fix:
+   a rule that has to beat a utility cannot be in a layer. */
+.currency-select .icon {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+/* index-DxOqNczA.css, and the `rotate` beside the `transform` is the original's own. It ships
+   this block TWICE — once hand-written with `transform` alone, once among Tailwind's generated
+   `animate-*` keyframes with both — and the later copy wins. The two do not override each other,
+   they COMPOSE: `transform` and the individual `rotate` property are separate transforms, so the
+   spinner turns 720deg per second rather than 360. That reads like a mistake in their build and
+   is what the live site renders, so it is reproduced. Our minifier folds the pair into a single
+   `transform: rotate(360deg)rotate(360deg)`, which is the same 720deg written the other way.
+   Outside the layer because a @keyframes block is not a style rule. */
+@keyframes spin-ltr {
+  to {
+    transform: rotate(360deg);
+    rotate: 360deg;
+  }
+}
+
+/* The dropdown's entry animation. The original tweens it with GSAP — `g3` wrapping the
+   layer with `from {opacity: 0, y: -10} to {opacity: 1, y: 0}` over 0.2s — which has no
+   equivalent here, so it is a keyframe with the same numbers. Outside the layer because a
+   @keyframes block is not a style rule and gains nothing from being in one. */
+@keyframes dropdown-fade-down {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.dropdown-enter {
+  animation: dropdown-fade-down 0.2s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dropdown-enter {
+    animation: none;
+  }
+}
+
+/* From the original's base layer. Tailwind's preflight does not dim a disabled button, so
+   without this the carousel arrows kept their full-strength look at the ends of the strip:
+   the `disabled` attribute was set and the click was inert, but nothing said so. */
+button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* index-DaCxbF1r.css verbatim, both halves. The mask over a maintained deposit channel puts
+   its icon in one of these. The RTL arm is the original's own: it flips to `right: 50%` with
+   the transform mirrored, rather than relying on `inset-inline`. */
+.absolute-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.absolute-center:not(:where([dir='ltr'], [dir='ltr'] *)) {
+  right: 50%;
+  transform: translate(50%, -50%);
+}
+
+/* index-DxOqNczA.css verbatim. `hooks/useDialogScrollLock.js` puts this on <body> while a
+   dialog is open.
+
+   IT IS NO LONGER THE WHOLE LOCK, AND THE RULE BELOW IS WHY. This comment used to end "overflow
+   on <body> propagates to the viewport as long as <html> is `overflow: visible`, which it is, so
+   this one declaration is the whole lock" — and that was true when it was written. Then
+   `:root { overflow-y: scroll }` was added a few rules down to hold the gutter, and CSS Overflow
+   §3.3 says the viewport takes <body>'s overflow ONLY when the root element's own overflow is
+   `visible` in both axes. Declaring `scroll` there ended the propagation, so this declaration
+   started applying to <body> alone — where it clips nothing, because <body>'s height is its
+   content height. Every dialog in the build silently stopped locking the page behind it: the
+   scrim went up, the track stayed painted, and the page kept scrolling under it.
+
+   Fixed by locking the element that is actually the scroller, in `:root:has()` below. This rule
+   stays because it is the original's, and because it is what would take effect again if the
+   root's `overflow-y` ever went back to `visible`. */
+/* The lock. Plain `overflow: hidden`, which is what the original does.
+ *
+ * A `position: fixed` body was tried here to keep the scrollbar drawn while a dialog is open —
+ * the bar survives because the `html` scroller stays in place. It works for that, but a fixed
+ * body becomes a STACKING CONTEXT, and every fixed overlay in the app then resolves its z-index
+ * inside it rather than against the page. The visible symptom was the header staying lit above
+ * a dialog's scrim instead of being covered. A broken overlay is worse than a missing thumb, so
+ * it is reverted.
+ *
+ * `:root`'s `overflow-y: scroll` above stays: it holds the 15px gutter, so the page no longer
+ * jumps sideways when a dialog opens even though the bar itself still goes. That was the
+ * original complaint and it is still fixed. */
+.lock-scroll {
+  overflow: hidden;
+}
+
+/* THE PAGE IS NOT LOCKED BEHIND A DIALOG IN THIS BUILD, AND THAT IS THE REQUESTED DEPARTURE.
+ * The original locks; keeping the scrollbar is worth more here, and the two cannot both be had.
+ *
+ * Why they cannot: a scrollbar with a THUMB is only painted for a container that actually has
+ * somewhere to scroll. Every way of stopping the page from moving takes that away —
+ *
+ *   overflow: hidden on :root      the track stops being painted entirely. Tried; this is what
+ *                                  made the bar vanish on dialog open. `scrollbar-gutter: stable`
+ *                                  holds the 15px so nothing shifts, but the reserved strip is
+ *                                  bare page background, which reads as "the scrollbar is gone"
+ *                                  because it is.
+ *   overflow: hidden on body       inert, and only inert by accident — see the note above
+ *                                  `.lock-scroll`. If the root's `overflow-y` ever goes back to
+ *                                  `visible` this one starts propagating and takes the bar with
+ *                                  it, so that note is worth keeping even though the rule is not
+ *                                  currently doing anything.
+ *   height: 100vh + overflow       the root keeps its `scroll` track but loses its overflow, so
+ *                                  the track is drawn with no thumb. Half a scrollbar.
+ *   position: fixed on body        holds both the position and the bar, and is the only one that
+ *                                  does. Reverted for a different reason: a fixed body is a
+ *                                  stacking context, and every fixed overlay then resolves its
+ *                                  z-index inside it rather than against the page — the header
+ *                                  stayed lit above a dialog's scrim. Do not re-derive it.
+ *
+ * So nothing carries the lock, and `.lock-scroll` is left on <body> as a marker: it is what the
+ * original writes, the hook that writes it is a faithful port, and a rule can be hung off it the
+ * day the trade is made the other way. What the visitor gets is a page that scrolls behind the
+ * dialog with its scrollbar unchanged — which is also why `:root`'s `overflow-y: scroll` above
+ * matters more than it looks: it is now the only thing keeping the bar's width constant. */
+
+/* `scrollbar-gutter: stable` — A DELIBERATE DEPARTURE FROM THE ORIGINAL, requested.
+ *
+ * `overflow: hidden` on the viewport takes the classic 15px scrollbar away, which widens the
+ * viewport — so the page, and the fixed header, sidebar and tabbar laid out against it, all
+ * reflow 15px wider the moment a dialog opens and snap back when it closes. Reserving the
+ * gutter holds the width and removes the shift entirely.
+ *
+ * THE LIVE SITE DOES NOT DO THIS. It reflows: the background visibly grows into the
+ * scrollbar's strip as the dialog appears, which is plain `overflow: hidden` and nothing else.
+ * This exact rule stood here for one revision and was removed for that reason, and the removal
+ * note said observed behaviour beats the tidier layout. It is back because the shift was asked
+ * about directly — but it IS a difference from the site, not a fix to a bug, so anyone chasing
+ * pixel parity on dialog open should delete these three lines first.
+ *
+ * On the root rather than on `body`: the scrollbar belongs to the viewport, and `body`'s
+ * overflow is what propagates to it — a gutter on `body` reserves space inside the wrong box.
+ * Unscoped rather than tied to `.lock-scroll`, because reserving it only while locked would
+ * itself be the shift. */
+:root {
+  /* `overflow-y: scroll`, not `scrollbar-gutter: stable`. The gutter reserves the WIDTH but the
+     bar itself still disappears with the lock; forcing the scroller keeps the track drawn at
+     all times, which is what stops both the shift and the disappearance. It also makes short
+     pages show an inert track, which is the trade. */
+  overflow-y: scroll;
+}
+
+/* Two more of the original's global helpers, verbatim from index-DxOqNczA.css. Both are
+   plain classes rather than Tailwind utilities, so being unlayered costs nothing here —
+   nothing generates a `.text-xxs` or `.ellipsis` utility to be outranked.
+
+   text-xxs is a 12px box drawn at 10px: the transform shrinks the glyphs but leaves the
+   1rem line box behind, so two stacked lines still occupy 32px. Every place the original
+   needs sub-12px text goes through this, which is why the labels it wraps are laid out in
+   an 118%-wide container and scaled back down. Do not "simplify" it to font-size: .625rem —
+   the line metrics would change and the label block would lose 6px of height. */
+.text-xxs {
+  font-size: 0.75rem;
+  line-height: 1rem;
+  transform: scale(0.833);
+}
+
+/* THE SKELETON PRIMITIVE, index-DxOqNczA.css verbatim.
+ *
+ * It is not a grey box you render INSTEAD of the content — it wraps the real markup and covers
+ * it, which is why the placeholder is always exactly the right shape and why nothing reflows
+ * when the data lands. `:before` paints layer4 over the content and `:after` paints layer5 on
+ * top of that, and it is the `:after` that pulses; `data-visible` and `data-animate` are what
+ * turn each half on.
+ *
+ * Two adaptations, both forced and neither a value change. The original writes
+ * `rgb(var(--layer4))`, over space-separated channel tokens it declares alongside the hex ones;
+ * this project's `@theme` block carries only the hex form, so the two fills name
+ * `--color-layer4` / `--color-layer5` instead — the same colours. And the original's `.skeleton`
+ * rule sets `transform` twice, once to `translateZ(0)` and then to Tailwind v3's full transform
+ * chain, so the second wins and the GPU hint is dead on arrival; `translateZ(0)` is written
+ * once here and the v3 chain is not reproduced, because v4 has no such variables.
+ *
+ * UNLAYERED, and that is load-bearing in the usual direction: a call site writes
+ * `rounded-lg`/`aspect-[3/4]` on the same element, and the pseudo-elements have to sit inside
+ * whatever radius the utility gives it. Nothing here fights a utility — the two `background-color`
+ * declarations are on `::before`/`::after`, which no utility can reach. */
+.skeleton {
+  position: relative;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+}
+
+.skeleton[data-animate='true']::after {
+  animation: skeleton-fade 2.5s linear infinite;
+}
+
+.skeleton[data-visible='true'] {
+  overflow: hidden;
+}
+
+.skeleton[data-visible='true']::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  background-color: var(--color-layer4);
+}
+
+.skeleton[data-visible='true']::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  background-color: var(--color-layer5);
+}
+
+@keyframes skeleton-fade {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* No `display` here on purpose. The original's rule sets none, so these <div>s are
+   display:block. Making them inline-block puts them on the text baseline, which adds
+   descender space below the icon inside any non-flex wrapper — that was showing up as
+   an oversized gap between the tabbar icons and their labels. Everywhere else the
+   sprite sits inside a flex container, where block vs inline-block makes no difference. */
+.color_icon_img {
+  width: 32px;
+  height: 32px;
+  background-image: url('./assets/coloricon.png');
+  background-repeat: no-repeat;
+  background-size: 301px 256px;
+}
+
+/* ALL 33 SPRITE FAMILIES, TRANSCRIBED WHOLE — the same call `menu_icon_img` and `game_icon_img`
+   already made, and made here because the light theme is what finally needed the other half of
+   the sheet. This block used to carry nine hand-added `normal` cells and a note saying the
+   original "swaps to a wholly different sprite cell for the light theme (`_w`) and the selected
+   state (`_g`)"; that note was right and the cells were simply missing, so every sprite icon in
+   the chrome stayed on its dark-theme cell and went invisible on a white page.
+
+   From Enter-uT7xMZD7.css, generated rather than typed. The suffixes decode as:
+
+     X        dark, normal        X_w      light, normal
+     X_g      dark, selected      X_g_w    light, selected
+     X_p      dark, "pure"        X_p_w    light, pure     (the tabbar's flat variant)
+
+   which is exactly what `ge` in Enter-MsmOuq5R.js picks between:
+
+     n.select      ? (j.darken ? i.select : i.select_light)
+     : icontype==="tabbar" ? (j.darken ? i.pure : i.pure_w)
+                           : (j.darken ? i.normal : i.light)
+
+   THE ORIGINAL CHOOSES THE CLASS IN JS AND THIS BUILD CHOOSES IT IN CSS, which is the one
+   departure and the reason each light rule is written as a PAIR of selectors:
+
+     .app-root:not(.dark) .color_icon_img.menu,
+     .color_icon_img.menu_w              { background-position: -128px -160px }
+
+   The second half keeps `menu_w` addressable for anything that ever names it directly; the first
+   half is what makes the eight existing call sites — which write `menu`, `chat_p`, `sports_p` and
+   a couple of dynamic names inline, with no shared component to change — follow the theme with no
+   markup edit at all. Both halves share one coordinate, so there is nothing to keep in sync.
+
+   `.app-root:not(.dark) .color_icon_img.X` is 0,4,0 against the base rule's 0,2,0, so the light
+   arm wins on specificity and source order between them is irrelevant.
+
+   `.predict` and `.promotion` moved here from Sidebar.css with the rest. They were kept there as
+   "sidebar-only", which was true of the dark cell and is not a reason to split the table.
+
+   Regenerate rather than hand-edit. */
+.color_icon_img.bcpoker_g { background-position: -32px 0 }
+.app-root:not(.dark) .color_icon_img.bcpoker_g,
+.color_icon_img.bcpoker_g_w { background-position: 0 0 }
+
+.color_icon_img.bcpoker { background-position: -32px -32px }
+.app-root:not(.dark) .color_icon_img.bcpoker,
+.color_icon_img.bcpoker_w { background-position: 0 -32px }
+
+.color_icon_img.bingo_g { background-position: -64px -32px }
+.app-root:not(.dark) .color_icon_img.bingo_g,
+.color_icon_img.bingo_g_w { background-position: -64px 0 }
+
+.color_icon_img.bingo { background-position: -32px -64px }
+.app-root:not(.dark) .color_icon_img.bingo,
+.color_icon_img.bingo_w { background-position: 0 -64px }
+
+.color_icon_img.casino_g { background-position: -96px 0 }
+.app-root:not(.dark) .color_icon_img.casino_g,
+.color_icon_img.casino_g_w { background-position: -64px -64px }
+
+.color_icon_img.casino_p { background-position: -96px -64px }
+.app-root:not(.dark) .color_icon_img.casino_p,
+.color_icon_img.casino_p_w { background-position: -96px -32px }
+
+.color_icon_img.casino { background-position: -32px -96px }
+.app-root:not(.dark) .color_icon_img.casino,
+.color_icon_img.casino_w { background-position: 0 -96px }
+
+.color_icon_img.chat_g { background-position: -96px -96px }
+.app-root:not(.dark) .color_icon_img.chat_g,
+.color_icon_img.chat_g_w { background-position: -64px -96px }
+
+.color_icon_img.chat_p { background-position: -128px -32px }
+.app-root:not(.dark) .color_icon_img.chat_p,
+.color_icon_img.chat_p_w { background-position: -128px 0 }
+
+.color_icon_img.chat { background-position: -128px -96px }
+.app-root:not(.dark) .color_icon_img.chat,
+.color_icon_img.chat_w { background-position: -128px -64px }
+
+.color_icon_img.explore_g { background-position: -32px -128px }
+.app-root:not(.dark) .color_icon_img.explore_g,
+.color_icon_img.explore_g_w { background-position: 0 -128px }
+
+.color_icon_img.explore_p { background-position: -96px -128px }
+.app-root:not(.dark) .color_icon_img.explore_p,
+.color_icon_img.explore_p_w { background-position: -64px -128px }
+
+.color_icon_img.explore { background-position: -160px 0 }
+.app-root:not(.dark) .color_icon_img.explore,
+.color_icon_img.explore_w { background-position: -128px -128px }
+
+.color_icon_img.lottery_g { background-position: -160px -64px }
+.app-root:not(.dark) .color_icon_img.lottery_g,
+.color_icon_img.lottery_g_w { background-position: -160px -32px }
+
+.color_icon_img.lottery { background-position: -160px -128px }
+.app-root:not(.dark) .color_icon_img.lottery,
+.color_icon_img.lottery_w { background-position: -160px -96px }
+
+.color_icon_img.menu_g { background-position: -32px -160px }
+.app-root:not(.dark) .color_icon_img.menu_g,
+.color_icon_img.menu_g_w { background-position: 0 -160px }
+
+.color_icon_img.menu_p { background-position: -96px -160px }
+.app-root:not(.dark) .color_icon_img.menu_p,
+.color_icon_img.menu_p_w { background-position: -64px -160px }
+
+.color_icon_img.menu { background-position: -160px -160px }
+.app-root:not(.dark) .color_icon_img.menu,
+.color_icon_img.menu_w { background-position: -128px -160px }
+
+.color_icon_img.notice_g { background-position: -192px -32px }
+.app-root:not(.dark) .color_icon_img.notice_g,
+.color_icon_img.notice_g_w { background-position: -192px 0 }
+
+.color_icon_img.notice { background-position: -192px -96px }
+.app-root:not(.dark) .color_icon_img.notice,
+.color_icon_img.notice_w { background-position: -192px -64px }
+
+.color_icon_img.predict_g { background-position: -192px -160px }
+.app-root:not(.dark) .color_icon_img.predict_g,
+.color_icon_img.predict_g_w { background-position: -192px -128px }
+
+.color_icon_img.predict { background-position: -32px -192px }
+.app-root:not(.dark) .color_icon_img.predict,
+.color_icon_img.predict_w { background-position: 0 -192px }
+
+.color_icon_img.promotion_g { background-position: -96px -192px }
+.app-root:not(.dark) .color_icon_img.promotion_g,
+.color_icon_img.promotion_g_w { background-position: -64px -192px }
+
+.color_icon_img.promotion { background-position: -160px -192px }
+.app-root:not(.dark) .color_icon_img.promotion,
+.color_icon_img.promotion_w { background-position: -128px -192px }
+
+.color_icon_img.racing_g { background-position: -224px 0 }
+.app-root:not(.dark) .color_icon_img.racing_g,
+.color_icon_img.racing_g_w { background-position: -192px -192px }
+
+.color_icon_img.racing { background-position: -224px -64px }
+.app-root:not(.dark) .color_icon_img.racing,
+.color_icon_img.racing_w { background-position: -224px -32px }
+
+.color_icon_img.sports_g { background-position: -224px -128px }
+.app-root:not(.dark) .color_icon_img.sports_g,
+.color_icon_img.sports_g_w { background-position: -224px -96px }
+
+.color_icon_img.sports_p { background-position: -224px -192px }
+.app-root:not(.dark) .color_icon_img.sports_p,
+.color_icon_img.sports_p_w { background-position: -224px -160px }
+
+.color_icon_img.sports { background-position: -32px -224px }
+.app-root:not(.dark) .color_icon_img.sports,
+.color_icon_img.sports_w { background-position: 0 -224px }
+
+.color_icon_img.trading_g { background-position: -96px -224px }
+.app-root:not(.dark) .color_icon_img.trading_g,
+.color_icon_img.trading_g_w { background-position: -64px -224px }
+
+.color_icon_img.trading { background-position: -160px -224px }
+.app-root:not(.dark) .color_icon_img.trading,
+.color_icon_img.trading_w { background-position: -128px -224px }
+
+.color_icon_img.hot { background-position: -256px 0; width: 45px; height: 18px }
+.app-root:not(.dark) .color_icon_img.hot,
+.color_icon_img.hot_w { background-position: -192px -224px; width: 45px; height: 18px }
+
+.color_icon_img.new { background-position: -256px -36px; width: 40px; height: 18px }
+.app-root:not(.dark) .color_icon_img.new,
+.color_icon_img.new_w { background-position: -256px -18px; width: 40px; height: 18px }
+
+
+/* The site's ONE scrollbar rule, from index-DxOqNczA.css, where it is written nested inside
+   `.app-root` / `.app-root.dark` — so it reaches every scroller on the page and no component
+   styles its own. `.pop-content`, `.scroll-y` and `.dropdown-layer` used to carry a
+   hand-written 6px/white-20% version each; all three are gone, this replaces them.
+
+   `!important` is the original's, not a patch over a specificity fight — keep it, it is what
+   stops a component reintroducing a private scrollbar. The light-theme thumb (#e6e6e6) is
+   dropped and the dark value written directly, as everywhere else in this build.
+
+   READ THIS BEFORE ADDING `scrollbar-width` ANYWHERE. Setting `scrollbar-width` or
+   `scrollbar-color` on an element makes Chrome (121+) switch that scroller to the STANDARD
+   scrollbar and ignore its `::-webkit-scrollbar` rules outright — they do not combine. The
+   old per-component blocks paired `scrollbar-width: thin` with `width: 6px`, so Chrome threw
+   the 6px away and drew its own "thin" bar: a measured 10px gutter against the original's 4.
+   That is why the modal's scrollbar read as thick. `thin` is not thin.
+
+   Not carried over: the original also puts `scrollbar-gutter: stable both-edges` on
+   `.app-root`, which reserves the gutter on both sides of every scroller including the page
+   body. That shifts layout everywhere and is deliberately left for a separate change. */
+.app-root ::-webkit-scrollbar {
+  width: 4px !important;
+}
+
+/* #4a5354, NOT layer6. The original writes this as native CSS nesting —
+   `.app-root.dark { ::-webkit-scrollbar-thumb { background-color: #4a5354 !important } }`, which
+   resolves to the descendant selector below — and the value is its own literal, a step lighter
+   than layer6's #3A4142. The port reached for the nearest token, which put the thumb close enough
+   to `layer3`/`layer4` that it read as an empty track on every in-app scroller. It has no token
+   because the original gives it none.
+
+   BOTH ARMS ARE WRITTEN, and note they are `.app-root.dark` / bare `.app-root` on the original
+   rather than a `:not()` pair — so the light one is the LOWER-specificity rule of the two and
+   the ordering below has to match that or the dark thumb would win in both themes. `!important`
+   is on both, which is the original's too, so specificity is what separates them and nothing
+   else can.
+
+   Note neither reaches the page's own scrollbar, on the original either: the selector is a
+   DESCENDANT one, and the viewport's bar is painted from the root element, which no rule here
+   touches. What the visitor sees at the edge of the window is the browser's own. */
+.app-root ::-webkit-scrollbar-thumb {
+  background-color: #e6e6e6 !important;
+}
+
+.app-root.dark ::-webkit-scrollbar-thumb {
+  background-color: #4a5354 !important;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────────────────
+   The `.pop-*` dialog family, from index-DxOqNczA.css. Distinct from the `.dialog-*` shell in
+   Auth.css: `.dialog-*` is the router-driven dialog manager, `.pop-*` is the imperative
+   `le.push()` popover stack that the region block and the Language / View-in-currency panel
+   ride on.
+
+   LAYERED, for the same reason `.input` and the `.tabs-*` family are: the call sites resize
+   these primitives with utilities that have to WIN. The merged Language / View-in-currency
+   panel is the proof — it carries `pt-16 sm:pt-14`, `[&_.pop-title]:h-14` and
+   `[&_.pop-close]:top-4` to grow the title slot from a line of text into a 56px two-tab strip.
+
+   Unlayered, `.pop-title`'s own `height` beat `h-14` and the slot stayed 48px (3rem, from the
+   `.pc` rule below) while the `.tabs-title` inside it stayed 56px. A flex parent with
+   `align-items: center` centres the taller child rather than clipping it, so the strip hung 4px
+   out of the bottom of its own parent — straight under the search field, which is `sticky
+   top-0 z-10 bg-layer2` and painted right over it. The two things living at the strip's
+   `bottom: 0`, the green tab indicator and the `[data-divider]` hairline, were covered along
+   the whole width of that field and survived only in the ~28px gutters either side of it. Both
+   looked like missing CSS; both were fine and simply buried.
+
+   Nothing here duplicates a rule inside `@layer components`, and that is the point. A second
+   copy of `.input`, `.radio`, `.select-item` and the whole `.tabs-*` family used to stand at
+   this spot, re-transcribed from the mirror with the ORIGINAL's colour syntax intact —
+   `rgb(var(--brand))`, `var(--third)`, `rgb(var(--layer4))`. Those custom properties do not
+   exist in this build; the `@theme` block declares `--color-brand`, `--color-third`,
+   `--color-layer4`. So every colour in that copy resolved to nothing, and because the copy was
+   unlayered it beat the correct layered rules wholesale: the radio dots lost their border, the
+   selected row lost its fill, the tab indicator lost its green, the search field lost its
+   border and background, and the inactive tab label lost its grey. The language modal rendered
+   as a bare list of white words. Colours here are `var(--color-*)`; the bare `rgb(var(--x))`
+   form belongs to the mirror, not to this file, and its presence anywhere in `src/` is a bug.
+   ───────────────────────────────────────────────────────────────────────────────────────── */
+@layer components {
+  /* THE SCRIM LIVES HERE, and that is a correction rather than an addition. It is not in the
+   * original's stylesheet either — the popup manager writes it inline on the overlayer element,
+   * once, for every dialog that rides this shell:
+   *
+   *   o.className = "pop-overlayer";
+   *   he(() => { o.style.backgroundColor = `rgba(16, 18, 18, ${a() * .8})` })
+   *
+   * where `a()` is the dialog's open progress, tweened 0 -> 1 by GSAP over `duration: .35` with
+   * `ease: "power3.out"` (easeOutQuart = cubic-bezier(.165, .84, .44, 1)). So the resting colour
+   * is #101212 at 80% and it fades in with the panel — NOT the `#000a` the heavier `.dialog-root`
+   * uses. It looks nearly transparent and is not; the value was sampled off the deposit-offer
+   * capture before the source turned up, and the two agree to the digit.
+   *
+   * Because it was inline on the original there was nothing to transcribe, so four dialogs each
+   * arrived at it separately: `.deposit-offer-scrim`, `.after-login-pop-scrim`,
+   * `.region-block-overlay` and an inline style on the language panel. All four declare this
+   * exact colour, so this rule changes nothing for them and they are now redundant; clearing
+   * them out is a separate pass. What it does do is give every FUTURE `.pop-overlayer` its
+   * scrim without a fifth copy — which is what the Manage Assets sheet needed. */
+  .pop-overlayer {
+    position: fixed;
+    inset: 0;
+    touch-action: pan-x;
+    z-index: 1100;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(16, 18, 18, 0.8);
+    animation: pop-overlayer-in 0.35s cubic-bezier(0.165, 0.84, 0.44, 1);
+  }
+
+  .pop-bottomsheet,
+  .pop-center {
+    position: absolute;
+    opacity: 1;
+    display: flex;
+    flex-direction: column;
+    max-height: 80%;
+    padding-top: 3rem;
+  }
+
+  .pop-center {
+    width: 26rem;
+    max-width: 90%;
+    border-radius: var(--radius-xl);
+  }
+
+  /* index-DxOqNczA.css verbatim — the arm `cl` takes on a phone, which stood unreachable here
+     for a long time because nothing passed a `type`. The Select's mobile dropdown is the first
+     consumer: below `lg` the filter's Sort By / Providers layers become sheets rather than
+     positioned dropdowns, which is `js`'s own `dropdownType ? … : ee.mobile` test.
+
+     `width: 100% !important` is the original's, and it is not defensive — it has to beat
+     `.pop-center`'s `width: 26rem` in the source above when a call site swaps classes, and it
+     also beats any `w-*` a caller wrote for the centred arm. `--safe-bottom` is the home
+     indicator; the sheet sits on the viewport floor, so without it the last row is under the
+     gesture bar. Rounded at the top two corners only, for the same reason. */
+  .pop-bottomsheet {
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100% !important;
+    border-top-left-radius: 0.75rem;
+    border-top-right-radius: 0.75rem;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+
+    /* THE SHEET SLIDES; THE CENTRED CARD SCALES, and the original picks between them by reading
+       the class off the element it is animating:
+
+         const r = !n.classList.contains("pop-center") && !item.disableDragClose
+         he(r ? () => { n.style.transform = `translate3d(0, ${(1-i())*100}%, 0)` }
+              : () => { n.style.opacity = String(i()), n.style.transform = `scale(${i()*.2+.8})` })
+
+       `i()` is the popup manager's single 0->1 tween — `duration: .35, ease: "power3.out"` — the
+       same clock the scrim's `rgba(16,18,18, i()*.8)` reads, which is why the two never drift
+       apart. Reproduced as a keyframe rather than a per-frame write for the reason the confirm
+       dialog's is: one value driving two elements is what a shared duration and easing already
+       give you. `power3.out` is GSAP's quartic ease-out, hence the same bezier the overlayer's
+       own fade carries above.
+
+       Enter only. The sheet unmounts rather than transitioning out, exactly as `dropdown-enter`
+       and the account dropdown's `fadeUp2` do — the exit half needs the popup STACK, which this
+       build does not have. */
+    animation: pop-sheet-in 0.35s cubic-bezier(0.165, 0.84, 0.44, 1);
+  }
+
+  @keyframes pop-sheet-in {
+    from {
+      transform: translate3d(0, 100%, 0);
+    }
+    to {
+      transform: translate3d(0, 0, 0);
+    }
+  }
+
+  /* Absolute, and the panel reserves room for it with its own `padding-top` — which is why the
+     merged Language/currency panel raises that padding to `pt-16 sm:pt-14` and stretches the
+     title to `h-14`: the title slot is holding a two-tab strip rather than a line of text. */
+  .pop-title {
+    position: absolute;
+    top: 0;
+    width: 100%;
+    display: flex;
+    flex: none;
+    justify-content: center;
+    align-items: center;
+    height: 3.5rem;
+    font-size: 1rem;
+    font-weight: 800;
+    color: var(--color-primary);
+  }
+
+  .pop-content {
+    padding: 0 1rem 1rem;
+  }
+
+  .pop-content .scroll-container {
+    min-height: auto !important;
+  }
+
+  /* `.pop-close { background-color: var(--white_alpha5) }` with `.dark .pop-close
+     { background-color: #373e3f }` over it — the token carries the LIGHT arm and the literal the
+     dark one, which is the same inversion `.dialog-close` documents in Auth.css and is the
+     original's own arrangement for all four of these buttons. */
+  .pop-close {
+    position: absolute;
+    top: 0.75rem;
+    border-radius: var(--radius-lg);
+    width: 1.5rem;
+    height: 1.5rem;
+    background-color: var(--color-white_alpha5);
+  }
+
+  .dark .pop-close {
+    background-color: #373e3f;
+  }
+
+  [dir='ltr'] .pop-close {
+    right: 1rem;
+  }
+
+  .pop-close svg {
+    width: 0.875rem;
+    height: 0.875rem;
+    fill: var(--color-secondary);
+  }
+
+  /* `.pc` again, mapped to lg. The `.pop-title` line is the one that matters: a plain
+     desktop dialog gets a 3rem title, and any dialog that needs more says so with a utility —
+     which only works because this whole block is layered. `.pop-close` restates the base
+     .75rem and `.pop-center`'s min-width can only bite below 462px, where this query does not
+     apply; both are the original's rules and are kept rather than silently dropped. */
+  @media (min-width: 1024px) {
+    .pop-title {
+      height: 3rem;
+    }
+
+    .pop-close {
+      top: 0.75rem;
+    }
+
+    .pop-center {
+      min-width: 26rem;
+    }
+  }
+}
+
+/* The scrim's fade, standing in for the GSAP tween described on `.pop-overlayer` above. It
+   animates the COLOUR from zero alpha rather than the element's `opacity`, which matters: the
+   panel is a child of the overlayer, so fading opacity would fade the dialog with it. Outside
+   the layer because a @keyframes block is not a style rule. */
+@keyframes pop-overlayer-in {
+  from {
+    background-color: rgba(16, 18, 18, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pop-overlayer {
+    animation: none;
+  }
+}
+

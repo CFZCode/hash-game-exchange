@@ -1,0 +1,260 @@
+.main-layout-wrapper {
+  /* The header owns the gap beneath itself; the page content below starts at zero.
+     --header-mb is that gap, and it is the ONLY vertical space between the header and
+     the first panel — the hero and everything under it have no top margin of their own.
+     It is 0 below lg (the mobile hero sits flush) and 16px from lg up.
+
+     It is applied as part of the content's padding-top rather than as a real
+     margin-bottom on the header because the header is position:fixed and therefore out
+     of flow: a margin on it would occupy no space at all. Same box model, declared
+     where it can take effect. Change the gap here, not on the hero. */
+  --header-h: 3.5rem; /* mobile/tablet .page-header; must match index.css */
+  /* `0px`, never a bare `0`. This value is consumed by calc() below, and inside calc()
+     a unitless zero is a <number>, not a <length> — `calc(3.5rem + 0)` is a type error,
+     so the whole padding-top became invalid at computed-value time and fell back to 0.
+     The hero then started at the top of the page and the fixed header covered its first
+     3.5rem. Desktop was unaffected only because its 12px value made the calc valid. */
+  --header-mb: 0px; /* below lg the hero sits flush against the header */
+
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  width: 100%;
+}
+
+@media (min-width: 1024px) {
+  .main-layout-wrapper {
+    --header-h: 60px; /* desktop .header */
+    /* Desktop keeps its gap — only the mobile/tablet hero was asked to sit flush.
+       Set the base value above to 16px too if this should go everywhere.
+
+       16px, MEASURED OFF THE LIVE SITE rather than chosen: at 1440, 1280 and 1024 the first panel
+       on hash.game starts at y=76 against a 60px header, and ours started at 72. The live site
+       spends it as a `margin-top: 16px` on a wrapper inside the container that carries the
+       header's own `padding-top: 60px` — same box model, one declaration here instead of two
+       there. It was 12px, which put every page 4px high from the hero down; the drift was
+       identical on every block below it, which is what identified it as one number rather than a
+       per-section spacing bug. */
+    --header-mb: 16px;
+  }
+}
+
+/* `flex: 1 0 auto`, NOT `flex: 1`.
+
+   `flex: 1` expands to `1 1 0%`. A zero flex-basis means this element's own content does
+   not contribute to its base size, so in the column wrapper its height resolves to the
+   free space — exactly 100vh — and it does not grow when the page is taller than the
+   viewport. .main-layout-content then stretches to that same 100vh, and its children,
+   which are ordinary flex items with the default flex-shrink: 1, get COMPRESSED to fit.
+
+   That is not theoretical: on a short viewport the hero panel, which asks for a fixed
+   h-[14.375rem], was rendering at 75% of its height with its heading clipped by the
+   panel's own overflow-hidden. `auto` restores the content-based base size, and `0`
+   stops the shrink, so the page grows past 100vh and scrolls instead of squashing. */
+.main-layout-body {
+  display: flex;
+  flex: 1 0 auto;
+  width: 100%;
+}
+
+/* --content-gap-* is the inset between the page content and the fixed chrome.
+
+   Every side that clears fixed chrome must ADD the gap to that offset, never replace
+   it. This previously read `padding: 24px` followed by bare `padding-top: 60px` /
+   `padding-left: 240px`, which overwrote the inset on exactly those sides — content
+   ended up flush against the header and sidebar while only the right kept its 24px.
+   The vertical top inset now lives on the header as --header-mb instead. */
+.main-layout-content {
+  /* 16px, matching the original's page wrapper, which is
+     `relative z-10 w-full px-4 mx-auto max-w-[1248px]` at every width from sm up — the
+     px-4 IS the gutter. This was 32px, which made every section 32px narrower than the
+     real site: at a 1440 window the original's rows measure 1168 and ours came out 1136.
+     Below sm the axis is zeroed further down and each section supplies its own px-4. */
+  --content-gap-x: 16px;
+  /* THE GAP BETWEEN THE LAST SECTION AND THE TABBAR, and it only exists below `lg` — the
+     block at the bottom of this file zeroes the whole `padding-bottom` from 1024 up, so
+     everything here is mobile-and-tablet by construction and desktop cannot see it.
+
+     It matters more here than the name suggests, because on mobile there is nothing between
+     the page and the bar: `Footer` is `hidden … lg:flex`, so on the home page the last thing
+     above the tabbar is the Latest round & Race section itself.
+
+     THE ORIGINAL'S OWN FLOOR IS 1rem, not 12px, and it spells it as a margin rather than
+     padding — `#page-content > :last-child { margin-bottom: 1rem }` in index-DxOqNczA.css,
+     over `padding-bottom: calc(var(--footer) + var(--safe-bottom))`. `--footer` is the 4.5rem
+     the bar occupies and `--safe-bottom` is `env(safe-area-inset-bottom, 0px)`, both that
+     file's own. So the clearance below the last section is 1rem plus the home-indicator strip,
+     and 12px was under it at every width — and being px, it also froze while the 4.5rem beside
+     it scaled with `remScale` below 640.
+
+     1rem, i.e. exactly the original — and the extra rem that briefly sat here has MOVED TO THE
+     HOME PAGE, which is the only place that asked for it. As a shared token it reached every
+     mobile route, and the next one built wanted the opposite: `/explore` ends in a pager, and
+     32px under it read as too much where 32px under the home page's last game row read as too
+     little. A token that two pages disagree about is not a token. Home now carries its own
+     `margin-bottom` in Home.css, scoped below `lg`; this stays the floor everything gets.
+
+     AND IT IS SPENT AS THAT MARGIN NOW, not as a third term in `padding-bottom` — see the
+     `:last-child` rule further down and the note on the padding itself. The paragraph above had
+     the original's mechanism written out correctly and the code did not follow it, which cost
+     an extra page-margin of clearance on every mobile route: as padding it ADDED to the last
+     block's own trailing margin, where as a margin it collapses with it and the larger wins.
+     That is also what makes "this stays the floor everything gets" literally true, which it was
+     not before. */
+  --content-gap-y: 1rem;
+
+  /* How far a full-bleed child has to reach back to escape this column's own gutter.
+     It equals padding-right in every state, and — because padding-left is always
+     sidebarWidth + this — cancelling it on BOTH sides lands such a child flush against the
+     sidebar on the left and the window edge on the right. The footer is the only user.
+     `0px`, not `0`: a unitless value makes the calc() that consumes it a type error, which
+     computes to nothing and silently drops the rule. */
+  --content-inset-x: 0px;
+
+  flex: 1;
+  background-color: var(--color-layer2); /* matches body background */
+
+  /* Without this the column is as wide as its WIDEST descendant, not as wide as the window.
+     `flex: 1` is `1 1 0%`, but a flex item also gets `min-width: auto`, which floors it at
+     its min-content size — and a horizontally scrolling row reports a min-content width of
+     the whole row. `overflow: hidden` on that row does not help: zeroing the automatic
+     minimum size is something `overflow` only does for a flex or grid ITEM, and these rows
+     are ordinary blocks.
+
+     Recent Big Wins is 40 non-shrinkable 56px cards, so it pushed this column to 3114px in a
+     1265px window: the page scrolled sideways, and the hero — `w-full` inside it — stretched
+     to 2810px, which threw its right-anchored banner art off screen entirely. Every carousel
+     section still to come (BC Originals, Slots, Live Casino) overflows the same way, so this
+     stays regardless of what is on the page. The original never hits this because it offsets
+     its content with `margin-left: 240px` on #root rather than a flex row. */
+  min-width: 0;
+
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  /* `margin-inline-end` is the right-hand drawer's push (see RightDrawer.css) and it is here
+     rather than there because a transition declared inside `.chat-unfold` would only animate the
+     way IN — the property has to be transitionable on the resting element for the way out to
+     animate too. The original transitions neither side; this build already chose to animate the
+     sidebar fold, so both sides are consistent. */
+  transition:
+    padding-left 0.2s ease-in-out,
+    margin-inline-end 0.2s ease-in-out;
+
+  /* Clears the fixed header, plus the gap the header owns. Nothing else contributes:
+     the content adds no vertical inset of its own at the top. */
+  padding-top: calc(var(--header-h) + var(--header-mb));
+
+  /* Zero on BOTH sides below sm, where the hero supplies its own px-4. This was
+     `padding-left: 0` against a `padding: … var(--content-gap-x)` shorthand, so the
+     left came out at the hero's 1rem while the right was 1rem + 32px — the page sat
+     visibly off-centre. Set the axis, never one side, or they drift apart again. */
+  padding-inline: 0;
+
+  /* Tabbar height plus the home-indicator strip, AND NOTHING ELSE — this is
+     `padding-bottom: calc(var(--footer) + var(--safe-bottom))` from index-DxOqNczA.css, term
+     for term. `env()` resolves to 0 in a desktop browser and only shows up on the device where
+     it is needed.
+
+     `--content-gap-y` USED TO BE A THIRD TERM HERE AND THAT WAS THE BUG. The original does not
+     spend its 1rem as padding; it spends it as `#page-content > :last-child { margin-bottom:
+     1rem }`, which REPLACES whatever trailing margin the page's last block already had, because
+     the two collapse. Added to the padding instead it STACKS on that margin, so every mobile
+     route sat one page-margin too low: on the casino page the bets panel's own `my-3` put 12px
+     under the content and this padding then added 16 on top of it, for 28px above the tabbar
+     against the original's 14. The rem has moved to the `:last-child` rule below. */
+  padding-bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px));
+}
+
+/* The original caps its page wrapper at 1248px and centres it (`mx-auto max-w-[1248px]`).
+   That 1248 is the border box of a wrapper that also carries px-4, so the CONTENT stops at
+   1216 — which is why the gutter lives on .main-layout-content and only the cap lives here.
+   Below a 1488px window this never binds; above it, rows stop widening and centre instead
+   of stretching across an ultrawide monitor. */
+.main-layout-container {
+  width: 100%;
+  max-width: 1216px;
+  margin-inline: auto;
+}
+
+/* `#page-content > :last-child { margin-bottom: 1rem }`, index-DxOqNczA.css verbatim in
+   everything but the selector — this column is what `#page-content` is here.
+ *
+ * A MARGIN AND NOT PADDING, which is the whole point of moving it off `padding-bottom` above.
+ * The page's own last block already brings a trailing margin of its own, and two adjacent
+ * margins collapse to the larger rather than summing: the casino page's `my-3` becomes 16px
+ * rather than 12 + 16, and the home page's larger one (Home.css, below `lg`) simply wins and is
+ * unchanged. As padding it added to every one of them instead.
+ *
+ * Scoped below `lg` where the original leaves it unscoped, because the padding it replaces was
+ * scoped that way too — from 1024 up the tabbar is gone, `padding-bottom` is zeroed further
+ * down this file, and the footer owns the space instead. Unscoping it would put a rem back
+ * above the desktop footer, which is exactly what was just taken out of `.footer-bg`. */
+@media (max-width: 1023px) {
+  /* WRAPPED IN `:where()` SO IT HAS ZERO SPECIFICITY, and that is what keeps it a floor rather
+     than a ceiling. The element it lands on is the page root itself — the same element a page
+     styles by its own class — so at any real specificity this would win outright and silently
+     replace whatever that page had asked for. `.home-page`'s deliberate extra rem was exactly
+     that case, and it is 1rem, so the override would have been invisible in the stylesheet and
+     visible only as home's bottom clearance quietly halving. Any page class now beats this. */
+  :where(.main-layout-container) > :where(:last-child) {
+    margin-bottom: var(--content-gap-y);
+  }
+}
+
+/* Page panels stack down this column; none of them may be compressed to make the column
+   fit its container. A panel with a fixed height means that height. This backs up the
+   flex-basis fix above — a future `height` or `min-height` on the content would
+   otherwise reintroduce the same squash. */
+.main-layout-content > *,
+.main-layout-container > * {
+  flex-shrink: 0;
+}
+
+/* From sm up the hero switches to sm:px-0, so the inset has to come from here instead. */
+@media (min-width: 640px) {
+  .main-layout-content {
+    --content-inset-x: var(--content-gap-x);
+
+    padding-inline: var(--content-gap-x);
+  }
+}
+
+/* Tablet used to override this to 16px while desktop ran at 32. Both are 16 now — the
+   original uses one gutter at every width — so the override is gone rather than restating
+   the base value. 16px rather than 1rem is not a scaling exception: at >= 640 the rem
+   scale is exactly 1, so the two are the same value here. */
+
+@media (min-width: 1024px) {
+  /* Zero, not --content-gap-y. The tabbar is hidden at this width, so that padding was doing
+     nothing but printing a strip of page background BELOW the footer — and the footer is the
+     last child of this column at every lg route, so the strip is always what you see at the
+     end of the page. The original's footer ends flush with the document. The footer's own
+     `py-6` still holds the copyright line off its bottom edge; this only removes the gap
+     outside it. */
+  .main-layout-content {
+    padding-bottom: 0;
+  }
+
+  .main-layout-content.sidebar-expanded {
+    padding-left: calc(240px + var(--content-gap-x));
+  }
+
+  /* THE CONTENT TAKES THE SPACE THE RAIL GAVE UP, which is a REVERSAL of what this rule used to
+     do and is the live site's own behaviour rather than a preference. It used to keep the column
+     at exactly the width it has beside an open sidebar and centre it in the space — half the
+     reclaimed 168px added to each side — on the reasoning that a toggle which re-lays out every
+     game grid reads as a zoom rather than as hiding a panel. That reasoning still holds; the
+     original simply does not do it.
+
+     Measured across the fold band on hash.game rather than assumed: the first block sits at
+     x = 88 with a 16px right gutter at 1200, 1100 and 1024 alike, so the column is
+     `viewport − 72 − 32` and grows with the window. Ours was pinned at x = 172 with a 100px
+     right gutter — 168px narrower — which is exactly the reclaimed width being held back.
+     Above 1280 the two arms already agreed to the pixel (x = 256, w = 1008 at 1280), so this is
+     the only band that ever differed. 72px must match .sidebar-container.collapsed width. */
+  .main-layout-content.sidebar-collapsed {
+    padding-left: calc(72px + var(--content-gap-x));
+    padding-right: var(--content-gap-x);
+  }
+}

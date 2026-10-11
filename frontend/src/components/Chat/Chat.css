@@ -1,0 +1,59 @@
+/* The global chat panel's own rules. All four are the ORIGINAL'S, out of `index-DxOqNczA.css` in
+ * the saved mirror — unlike the drawer container around it, whose `.chat-notice` family had to
+ * come off the current deploy (see RightDrawer.css).
+ *
+ * There is very little here because the panel is almost entirely utilities; what the stylesheet
+ * carries is the stacking of the header, the scroller's floor, and the send button's entrance.
+ */
+
+/* The chat header sits ABOVE the message list rather than in the flow with it — `q1` is
+   `absolute` from `sm` up, and this is what keeps a message from painting over it as it scrolls
+   past. 100 rather than 101/102, so it stays UNDER the drawer's own close square, which is
+   `z-[101]`: the cross belongs to the container and has to stay clickable over whichever panel
+   is showing. */
+.header-layer {
+  z-index: 100;
+}
+
+/* `.chat-scroll-layer .scroll-container { min-height: 1000px }` verbatim. Its job is to make a
+   nearly-empty room still scroll, which is what lets the "scroll to bottom" on join land in a
+   consistent place instead of doing nothing. Written against a child here for the same reason it
+   is there: the scroller is the element that overflows, the container is what grows.
+
+   THE PROJECT'S OWN SCROLLBAR REACHES THIS, and that is deliberate — the drawer is
+   `hidden-scroll-bar`-free for the reason the notification drawer documents: `_e` hands its
+   scroller a bare `h-full` where the Explore overlay gets `hidden-scroll-bar`, a real difference
+   between the two rather than an oversight in either. */
+.chat-scroll-layer > .scroll-container,
+.chat-scroll-layer .scroll-container {
+  min-height: 1000px;
+}
+
+/* `.sliding`, and it is not a fade — the send button ENTERS PAST ITS MARK AND SETTLES: 100% to
+   -8% to 10% to 0. It only ever runs when the composer takes focus, since that is the only thing
+   that mounts the button. The original writes the pair as `[dir=ltr]` / `[dir=rtl]` with a second
+   keyframe set travelling the other way; this build is LTR-only, so only that arm is here. */
+@keyframes slide-in-ltr {
+  0% {
+    transform: translate(100%);
+  }
+  60% {
+    transform: translate(-8%);
+  }
+  80% {
+    transform: translate(10%);
+  }
+  to {
+    transform: translate(0);
+  }
+}
+
+.sliding {
+  animation: slide-in-ltr 0.2s ease-out forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sliding {
+    animation-duration: 0.01ms;
+  }
+}

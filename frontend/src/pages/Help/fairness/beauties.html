@@ -1,0 +1,45 @@
+<div class="item">
+  <h2>Fairness Verification</h2>
+  <div class="help-content">
+    <p>To get the results:</p>
+    <ul>
+      <li>
+        First we calculate the hash value of the combination with
+        HMAC_SHA256. This gives us a 64-character hexadecimal string:
+        hash = HMAC_SHA256 (clientSeed:nonce:round, serverSeed).
+      </li>
+      <li>
+        Finally, we get 8 characters of the hash, and convert them to an
+        int32 value. Then we divide the converted value by 0x100000000
+        and multiply it by the number of symbols on each reel, so that
+        the resulting number conforms to the constraints of the reel
+        range.
+      </li>
+    </ul>
+    <p>
+      Note: The number of symbols for the regular reels and the free reels
+      are different. For more details, please go to My Bet -> Choose Game ID
+      -> Verify.
+    </p>
+    <p>
+      <br />
+    </p>
+    <p>
+      If three BONUS symbols appear in the first round, you will enter
+      the bonus game, and can flip up to 4 puzzles.
+    </p>
+    <ul>
+      <li>
+        First we calculate the hash value of the combination with
+        HMAC_SHA256. This gives us a 64-character hexadecimal string:
+        hash = HMAC_SHA256 (clientSeed:nonce:round:puzzle, serverSeed).
+      </li>
+      <li>
+        Finally, we take 8 characters of the hash, and convert them to
+        an int32 value. Then we divide the converted value by
+        0x100000000 and multiply it by the probability of the
+        corresponding puzzle. If the result hits 0, the bonus game ends.
+      </li>
+    </ul>
+  </div>
+</div>

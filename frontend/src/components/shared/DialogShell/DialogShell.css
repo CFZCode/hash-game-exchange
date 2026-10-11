@@ -1,0 +1,227 @@
+/* The dialog manager's ENTER MOTION, transcribed from `index-BsFv7ByC.js`. It is not CSS on the
+ * original — it is three Web Animations calls sharing one options object:
+ *
+ *   const wo = { duration: 300, easing: `cubic-bezier(${[.36,.66,.04,1].join(",")})` }
+ *
+ *   root  Qu = [{backgroundColor: "#0000"}, {backgroundColor: "#000a"}]        // the scrim
+ *   card  IS = [{transform:"scale(.92)", opacity:0}, {transform:"scale(1)", opacity:1}]
+ *   item  c(S, x, T) = translateX(sp[x]) -> translateX(sp[T])
+ *         with sp = { 0: "100%", 1: "0%", 2: "-17%" }
+ *
+ * WHICH OF THE THREE RUNS IS DECIDED BY THE TRANSITION, not by the dialog. `N()` runs the scrim and
+ * the card together ONLY when the route type changes BASE <-> DIALOG — `if (W !== void 0 && W === H)
+ * return W` bails out when it did not — and `BS` then runs the slide per item, with the direction
+ * off the navigation action:
+ *
+ *   x === "POP" && E ? c(S, 2, 1) : (… c(S, 0, 1))
+ *
+ * where `E` is "the route we came from was already a dialog". So:
+ *
+ *   page -> dialog     scrim fades in, card scales up, NO slide
+ *   dialog -> dialog   scrim and card untouched; a push slides 100% -> 0, a pop slides -17% -> 0
+ *
+ * **That second row is the whole reason `enter` is threaded down from `App.jsx` rather than derived
+ * from `onBack`.** The dialog you pop back TO has no back arrow, so an `onBack` test called it a
+ * first open and re-ran the scrim fade and the 0.92 card scale — which reads exactly as the dialog
+ * closing and reopening. It is the transition that has a direction, not the dialog.
+ *
+ * ── ENTER ONLY, and that is the same trade three other animations here have made ───────────────
+ *
+ * The outgoing half needs both dialogs mounted at once. On the original they are — the manager
+ * keeps a stack and only sets `display: none` when the slide finishes. Here `App.jsx` matches one
+ * pathname and swaps components, so the dialog you came from is gone before the new one paints.
+ * `fadeUp2` on the account dropdown, the PopCenter sheet and the confirm dialog's scale all stop at
+ * the same place for the same reason; lift them together the day the popup stack lands.
+ *
+ * So `c(S, 1, 2)` — the outgoing 0% -> -17% — has no counterpart here, which is why the pop's -17%
+ * start looks like it comes from nowhere: on the live site that dialog really is sitting a sixth of
+ * the way off to the left, waiting. Keep the -17% anyway; it is what makes the return read as the
+ * card settling back rather than as a fresh slide.
+ *
+ * Reproduced as keyframes rather than as `element.animate()` because a keyframe cannot be a
+ * utility and a one-shot enter has nothing to drive imperatively — the same call `AfterLogin.css`
+ * makes for `fadeUp2`.
+ */
+
+@keyframes dialog-scrim-in {
+  from {
+    background-color: #0000;
+  }
+  to {
+    background-color: #000a;
+  }
+}
+
+@keyframes dialog-card-in {
+  from {
+    transform: scale(0.92);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* `c(S, 0, 1)` — a PUSH. */
+@keyframes dialog-slide-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+/* `c(S, 2, 1)` — a POP, and note it comes back from -17% rather than from -100%: the dialog
+   underneath only ever slid a sixth of the way out, so it slides that same sixth back. */
+@keyframes dialog-slide-back {
+  from {
+    transform: translateX(-17%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+/* One easing and one duration for all of them, as `wo` is. */
+.dialog-card-in,
+.dialog-slide-in,
+.dialog-slide-back {
+  animation: 0.3s cubic-bezier(0.36, 0.66, 0.04, 1) both;
+}
+
+.dialog-card-in {
+  animation-name: dialog-card-in;
+}
+
+/* Both slides are on `.dialog-overlayer`, the box one dialog occupies INSIDE the card, and that
+   placement is what keeps them from looking wrong: `.dialog-list` carries `overflow: hidden`, so a
+   translate from 100% is clipped to the card's own edges instead of sweeping across the page. */
+.dialog-slide-in {
+  animation-name: dialog-slide-in;
+}
+
+.dialog-slide-back {
+  animation-name: dialog-slide-back;
+}
+
+/* The scrim only exists from lg up — below it a dialog route is a full-screen sheet with no
+   backdrop at all, so there is nothing to fade. `.dialog-root`'s own `#000a` is declared in the
+   same query in Auth.css; `both` holds the end state so the two cannot disagree. */
+@media (min-width: 1024px) {
+  .dialog-scrim-in {
+    animation: dialog-scrim-in 0.3s cubic-bezier(0.36, 0.66, 0.04, 1) both;
+  }
+}
+
+/* THE OUTGOING HALF — and this block used to say it was this build's invention. IT IS NOT, and
+ * reading `BS`'s exit arm rather than only its entry arm is what settled it. `a(S)`, the half
+ * that runs when an item is leaving, is a switch across four cases:
+ *
+ *   function R() { c(S, 1, 0, D) }        // 0% -> 100%, then display:none
+ *   function k() { c(S, 1, 2, D) }        // 0% -> -17%, then display:none
+ *   function O() { o = setTimeout(D, wo.duration) }   // no slide, just wait then hide
+ *
+ *   A === "POP" ? (E ? (ee.mobile ? R() : O()) : (…, R()))
+ *               : (E && ee.mobile ? R() : … k())
+ *
+ * where `E` is "the route being navigated TO is not a dialog", i.e. this is the last dialog
+ * closing back to a page. So a phone closing a dialog to the page beneath it runs `R()` — which
+ * is `translateX(0)` -> `translateX(100%)`, exactly the keyframes below. `k()`, the `-17%` arm,
+ * is the dialog-to-dialog case that needs both mounted at once and is the one this build cannot
+ * reproduce; `O()` is the DESKTOP close, where nothing slides because the card scale and the
+ * scrim fade in `N()` are the whole animation.
+ *
+ * So: same duration and same curve as `dialog-slide-in`, opening and closing read as one
+ * gesture, and it is the manager's own gesture rather than a plausible reverse. */
+@keyframes dialog-slide-out {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+.dialog-slide-out {
+  animation: dialog-slide-out 0.3s cubic-bezier(0.36, 0.66, 0.04, 1) both;
+}
+
+/* The scrim goes with it. The manager fades `.dialog-root` `#0000` -> `#000a` on the way in over
+   the same 300ms; leaving the scrim at full while the panel slides away shows a dimmed page with
+   nothing on it for a third of a second. */
+@keyframes dialog-scrim-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.dialog-scrim-out {
+  animation: dialog-scrim-out 0.3s cubic-bezier(0.36, 0.66, 0.04, 1) both;
+}
+
+/* THE DESKTOP CLOSE, and it is `N()` played backwards — literally, on the original:
+ *
+ *   const ce = O.animate(H ? se : se.reverse(), de);          // O = .dialog-root, the scrim
+ *   ce.addEventListener("finish", () => O.classList.toggle("dialog-visible", H), {once: !0});
+ *   if (!ae) { P.animate(ae || H ? be : be.reverse(), de) }   // P = .dialog-list, the card
+ *
+ * with `H` = "the route we are going to is a dialog" and `ae` = `ee.mobile`. So closing a dialog
+ * on a desktop reverses BOTH tweens — the scrim back to `#0000` and the card back to `scale(.92)`
+ * with `opacity: 0` — and `.dialog-visible` is only removed when the scrim's animation finishes,
+ * which is what keeps the card on screen for the 300ms it takes. A call site here has to own that
+ * order itself (see the `runClose` note in the auth dialog), since nothing but the component's own
+ * mount keeps it rendered.
+ *
+ * `!ae` is why the card pair is not paired with a mobile arm: on a phone the manager hands the
+ * scrim two IDENTICAL keyframes (`[Qu[0], Qu[0]]`) and skips the card animate entirely, so the
+ * whole of a phone's close is `R()`'s slide above. */
+@keyframes dialog-card-out {
+  from {
+    transform: scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: scale(0.92);
+    opacity: 0;
+  }
+}
+
+.dialog-card-out {
+  animation: dialog-card-out 0.3s cubic-bezier(0.36, 0.66, 0.04, 1) both;
+}
+
+/* `se.reverse()` — the scrim's own keyframes backwards, which is a background-color tween and not
+   the opacity one `.dialog-scrim-out` above runs. The two are not interchangeable: `.dialog-root`
+   is the ancestor of the card, so fading its opacity fades the dialog with it, which is right for
+   a sheet that carries no backdrop and wrong for a card that is running its own fade. Scoped to
+   lg for the reason `dialog-scrim-in` is — below it `.dialog-root` has no background at all, and
+   an unscoped `from { background-color: #000a }` would paint a scrim on the way out that was
+   never there on the way in. */
+@media (min-width: 1024px) {
+  @keyframes dialog-scrim-back {
+    from {
+      background-color: #000a;
+    }
+    to {
+      background-color: #0000;
+    }
+  }
+
+  .dialog-scrim-back {
+    animation: dialog-scrim-back 0.3s cubic-bezier(0.36, 0.66, 0.04, 1) both;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dialog-slide-out,
+  .dialog-scrim-out,
+  .dialog-card-out,
+  .dialog-scrim-back {
+    animation-duration: 0.01ms;
+  }
+}

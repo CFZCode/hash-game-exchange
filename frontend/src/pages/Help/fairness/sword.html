@@ -1,0 +1,19 @@
+<div class="item">
+  <h2>Fairness Verification</h2>
+  <p>To get the results:</p>
+  <ul>
+    <li>
+      First, hash = HMAC_SHA512(clientSeed:nonce:round, serverSeed)
+    </li>
+    <li>
+      Finally, we get 8 characters of the hash, and convert them to an
+      int32 value. Then we divide the converted value by 0x100000000 and
+      multiply weight, so that the resulting number conforms to the
+      constraints of the range.
+    </li>
+  </ul>
+  <p>
+    Note: For more details, please go to My Bet -&gt; Choose Game ID
+    -&gt; Verify.
+  </p>
+</div>

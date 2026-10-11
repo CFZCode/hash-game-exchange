@@ -1,0 +1,1743 @@
+/* Colour tokens (layer3-6, primary/secondary/tertiary/brand/error, third) live in
+   the @theme block in src/index.css; Tailwind generates the bg-/text-/fill-/border-
+   utilities from them. Only sidebar-specific rules belong in this file. */
+
+/* THE SIDEBAR'S THREE OWN CUSTOM PROPERTIES, and they are the ORIGINAL'S — declared on `body`
+ * and `body.dark` in index-BNAZbKRq.css, which is in the mirror and had simply never been read
+ * for them:
+ *
+ *                            light                                dark
+ *   --Sidebar-Unit_bg        #f7f9fa   (#fff below 768)           #323738
+ *   --Sidebar-ListArrow-bg   #fff                                 #3a4142
+ *   --Sidebar-Cell_Expandbg  rgba(143.8, 155.54, 164.52, .05)     rgba(255, 255, 255, .05)
+ *
+ * THIS REPLACES A SINGLE `--sidebar-row-raised: #3C4142` THAT WAS CONFLATING TWO OF THEM. That
+ * value was measured off the dark page and its light half was DERIVED rather than measured — the
+ * one such value in this file. Both halves are gone now, and the reason the measurement looked
+ * like one colour is worth keeping:
+ *
+ *   `--Sidebar-Cell_Expandbg` is a 5% WHITE WASH, not a solid. Over the unit's #323738 it
+ *   composites to 0.95*50 + 0.05*255 = 60.25, i.e. #3C4142 — exactly the figure that was
+ *   measured. So the sampling was right and the mechanism was not, which is why it could not be
+ *   carried to a theme where the surface underneath changes.
+ *
+ *   `--Sidebar-ListArrow-bg` is #3a4142 — layer5, a genuinely DIFFERENT colour two points off
+ *   the other, and it is what the nav rows use for hover and for the current page. One sampled
+ *   colour was standing in for both.
+ *
+ * The `@media (max-width: 768px)` light arm is the original's too: inside the drawer the unit
+ * goes to pure white rather than #f7f9fa. Reproduced, and note 768 is the ORIGINAL'S OWN
+ * breakpoint here — it is not this project's `sm` (640) or `lg` (1024), so it stays as written
+ * rather than being normalised to either. */
+:root {
+  --Sidebar-Unit_bg: #323738;
+  --Sidebar-ListArrow-bg: #3a4142;
+  --Sidebar-Cell_Expandbg: rgba(255, 255, 255, 0.05);
+}
+
+.app-root:not(.dark) {
+  --Sidebar-Unit_bg: #f7f9fa;
+  --Sidebar-ListArrow-bg: #fff;
+  --Sidebar-Cell_Expandbg: rgba(143.8, 155.54, 164.52, 0.05);
+}
+
+@media (max-width: 768px) {
+  .app-root:not(.dark) {
+    --Sidebar-Unit_bg: #fff;
+  }
+}
+
+/* =========================================================
+   SIDEBAR CONTAINER
+   ========================================================= */
+.sidebar-container {
+  position: fixed;
+  left: 0;
+  top: 60px;
+  bottom: 0;
+  background-color: var(--color-layer3);
+  border-right: 1px solid rgba(0, 0, 0, 0.1);
+  transition: width 0.2s ease-in-out;
+  z-index: 98;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sidebar-container.expanded {
+  width: 240px;
+}
+
+/* 72px, matching the original's w-[72px] fold width — and it falls out of the layout
+   exactly: the p-4 wrapper contributes 16px a side around a 40px icon box. */
+.sidebar-container.collapsed {
+  width: 72px;
+}
+
+/* =========================================================
+   THE MOBILE DRAWER
+   ---------------------------------------------------------
+   Everything below `lg`, which is where this build renders the menu as a full-bleed panel
+   rather than a rail. On the original that panel is not an overlay at all — it renders inside
+   `#page-content`, so it inherits the page's `px-4` gutter and page background and needs no
+   rules of its own. Here it is fixed between the mobile header and the tabbar, so those two
+   things have to be supplied: `p-4` on the wrapper (see the note at its call site) and the
+   page colour on the container.
+
+   The three `background-color: … !important` declarations that used to sit on the wrapper, the
+   scroller and the nav are gone; the wrapper now carries `max-lg:bg-transparent` and lets this
+   one background show through, which is the original's own arrangement.
+   ========================================================= */
+@media (max-width: 1023px) {
+  .sidebar-container.mobile-open {
+    display: flex !important;
+    position: fixed;
+    top: 3.5rem;
+    bottom: 4.5rem;
+    left: 0;
+    right: 0;
+    width: 100% !important;
+    max-width: 100% !important;
+    z-index: 98;
+    border-right: none;
+    background-color: var(--color-layer2);
+  }
+
+  .sidebar-container.mobile-open .sidebar-scrollable {
+    width: 100%;
+    min-height: 0;
+    flex: 1;
+  }
+
+  .sidebar-container.mobile-open .sidebar-scrollable > div,
+  .sidebar-container.mobile-open nav {
+    width: 100%;
+  }
+
+  .sidebar-container.mobile-open nav > div {
+    width: 100% !important;
+  }
+
+  /* THE `display: block !important` THAT USED TO SIT HERE IS WHY THE CHEVRONS WERE OFF-CENTRE,
+     and it was never needed in the first place.
+     ---------------------------------------------------------
+     It existed to undo `.sidebar-container.collapsed .sidebar-collapse-hide { display: none }`
+     inside the drawer. But the drawer can never BE collapsed: `isExpanded` is
+     `sidebarExpanded || mobileOpen`, so opening it always writes `expanded` on the aside and
+     the `collapsed` rule cannot match. There was nothing to undo.
+
+     What it did instead was reach every element carrying the class, and two of those are flex
+     containers rather than text: the nav rows' `<button class="arrow-button center ms-auto flex
+     size-6 …">` and the language/currency `<div class="arrow-button …">`. Forcing them to
+     `block` — with `!important`, so it beat both `.arrow-button`'s own `display: flex` and the
+     `flex` utility — dropped `align-items`/`justify-content` on the floor, and the 16px chevron
+     fell to the top-left corner of its 24px square instead of sitting in the middle of it. The
+     labels it also hit are spans in a flex row, where block vs inline is normalised away, which
+     is why only the arrows showed it. */
+}
+
+/* =========================================================
+   THE HOVER FLYOUT (BC Originals)
+   ---------------------------------------------------------
+   The original writes the whole box in utilities on the panel itself:
+
+     absolute left-full top-0 -ml-4 h-full cursor-pointer pl-4 w-[256px] bg-layer3
+
+   `absolute` there resolves against the fixed sidebar, so `left-full` puts the panel at its
+   right edge, `top-0 h-full` makes it the sidebar's own height, and `-ml-4` + `pl-4` open a
+   16px transparent bridge so the pointer can cross the gap without the panel closing. Only
+   the four POSITIONING utilities are restated here; the bridge, the width and the fill stay
+   on the element as the original writes them.
+
+   WHY IT IS NOT `absolute` HERE: `.sidebar-container` carries `overflow: hidden` — the clip
+   that makes the collapse animation work — so an absolutely positioned child would be cut off
+   at the sidebar's edge and never paint. Same trap the BetBy rail's tooltip hit. The panel is
+   therefore a SIBLING of the aside and the identical box is expressed as `fixed`, which is
+   what `absolute` inside a `position: fixed` parent resolves to anyway.
+
+   `top: 60px` is the desktop header, matching `.sidebar-container`'s own; `bottom: 0` with no
+   height is what `h-full` means against a box pinned top and bottom. */
+.sidebar-flyout {
+  position: fixed;
+  top: 60px;
+  bottom: 0;
+  left: 240px;
+  z-index: 98;
+}
+
+.sidebar-container.collapsed + .sidebar-flyout {
+  left: 72px;
+}
+
+/* The row keeps the raised background while the pointer is over the PANEL, which it loses the
+   moment it leaves the 40px anchor. Same declaration as `.nav-link-item:hover`. */
+.nav-link-item.nav-flyout-open {
+  background-color: var(--Sidebar-ListArrow-bg);
+  color: var(--color-primary);
+}
+
+/* =========================================================
+   COLLAPSED STATE — icons only
+   The banner, the BC Token block and any open submenu are not rendered at all
+   (see Sidebar/index.jsx); everything else keeps its markup and just drops the
+   text, arrows and external-link glyphs so the icon column is all that remains.
+   The wrapper keeps its normal p-4 padding: 16 + 40 + 16 = 72.
+   ========================================================= */
+.sidebar-container.collapsed .sidebar-collapse-hide {
+  display: none;
+}
+
+.sidebar-container.collapsed nav > div {
+  width: 40px;
+}
+
+/* The nav rows lose their auto margins along with the labels, so centre the icons. */
+.sidebar-container.collapsed .toggle-link-item,
+.sidebar-container.collapsed .nav-link-item {
+  justify-content: center;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+/* Dark/light toggle collapses to the two icons side by side. */
+.sidebar-container.collapsed .bg-layer6 {
+  display: none;
+}
+
+/* =========================================================
+   SCROLLABLE AREA
+   ========================================================= */
+/* Two things here are load-bearing for scrolling; both look removable and are not.
+
+   1. `min-height: 0` — this is a flex item of .sidebar-container, and flex items
+      compute min-height:auto, which floors them at their content height and beats
+      any height set on them.
+
+   2. NOT being `display: flex` — its child is the `overflow-hidden bg-layer3 p-4`
+      wrapper. A flex item whose overflow is not `visible` has an automatic minimum
+      size of 0, so as a flex child that wrapper shrank to the available height and
+      clipped its own content internally. The scroll container then saw no overflow
+      at all and had nothing to scroll. As an ordinary block child it takes its
+      content height and overflows this element properly. */
+.sidebar-scrollable {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  /* Scrolls, but paints no scrollbar — the original does exactly this via its
+     .hidden-scroll-bar class. Keep all three: scrollbar-width covers Firefox,
+     -ms-overflow-style legacy Edge, and the ::-webkit-scrollbar rule below Chrome
+     and Safari. Dropping any one of them makes the bar reappear in that engine. */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.sidebar-scrollable::-webkit-scrollbar {
+  width: 0 !important;
+}
+
+/* Every block in the expanded sidebar is 207.2px wide — the nav units, the token,
+   the bottom group, Sponsorships, Live Support, the language/currency row and the
+   theme toggle. The application banner is the one exception and keeps the wrapper's
+   full 208px, hence the :not().
+
+   Scoped to .expanded so it cannot fight the collapsed rule, which narrows the same
+   wrapper to a 40px icon column. */
+@media (min-width: 1024px) {
+  .sidebar-container.expanded nav > div > *:not(.sidebar-banner-block) {
+    width: 207.2px;
+  }
+}
+
+/* Optical nudge for the Dark/Light labels. text-sm carries a 20px line box, and its
+   glyphs sit a touch low inside it next to the 16px icon, so flex centring the box
+   leaves the text looking slightly below centre. Shifted with position/top rather
+   than a margin so it moves visually without changing the flex layout. */
+.theme-toggle-label {
+  position: relative;
+  top: -1px;
+}
+
+/* =========================================================
+   SIDEBAR-UNIT_BG (matches .Sidebar-Unit_bg from live site)
+   ========================================================= */
+.Sidebar-Unit_bg {
+  background-color: var(--Sidebar-Unit_bg);
+}
+
+/* =========================================================
+   APPLICATION BANNER
+
+   THE TEMPLATE IS IN THE MIRROR — `R` in index-DuwOs_Mv.js, the sidebar's own module,
+   which also holds the menu definition. It was rebuilt from a capture before anyone
+   looked, so check it there before changing anything here:
+
+     <div class="flex cursor-pointer justify-between overflow-hidden rounded-lg bg-layer4"
+          style="background: var(--Sidebar-Unit_bg)">
+       <div class="p-4 sm:p-2.5 sm:pr-0">
+         <h3 class="text-base font-extrabold text-primary sm:text-sm">Application</h3>
+         <p class="mt-1 text-wrap text-sm font-semibold text-secondary sm:text-xs">…</p>
+       </div>
+       <div class="h-1 w-32 flex-none pr-5 pt-1 sm:w-20 sm:p-1">
+         <img class="h-auto w-full" alt="PWA app">
+     </div>
+
+   plus, written inline from JS rather than by a class:
+     background-image: radial-gradient(circle at 400% 400%, rgb(var(--brand)), transparent 92%)
+
+   THE GRADIENT IS THE ORIGINAL'S AND IT IS ARITHMETICALLY CONFIRMED, so do not flatten it
+   again. A flat #31423D stood here for a while — a fair sample of where the gradient lands
+   near the right edge, which is why it reads close — but the card is layer4 at the left and
+   only greens toward the bottom-right, and a capture settles it to the digit. The card is
+   208x76; `circle at 400% 400%` centres the gradient at (832, 304) with a farthest-corner
+   radius of 885.8, so the bottom-right corner sits at 664.3 / 885.8 = 75% of it, i.e.
+   75/92 of the way to the `transparent 92%` stop, leaving alpha .185. Compositing brand
+   green over layer4 at that alpha gives rgb(47, 89, 71); the capture samples (48, 88, 70).
+   The top-left corner is past the 92% stop, so it is bare layer4 — the capture reads
+   (50, 55, 56), which is #323738 exactly.
+
+   `--brand` is an rgb triple on the original and a hex token here, hence #24EE89 rather
+   than `rgb(var(--brand))`. The original writes both halves inline from JS (`G(n,
+   "background-image", ...)` over a `style="background: var(--Sidebar-Unit_bg)"` attribute)
+   rather than through a class, which is why neither is in any saved stylesheet — that
+   absence is what got the gradient "corrected" away twice.
+   ========================================================= */
+/* 76px, and the content budget lands on it exactly with the original's own padding and
+   leading: 10 top + 20 title + 4 gap + 32 subtitle (2 lines at the default text-xs 16px)
+   + 10 bottom = 76. Do not add leading to the subtitle without taking the same amount off
+   the padding — that is what pushed this to 80px previously, and doing it again is what
+   put a strip of background under the artwork (see the desktop block below).
+
+   min-height rather than height because the banner has overflow:hidden; content is
+   exactly 76px, so it renders at 76px, but nothing gets clipped if a line ever wraps. */
+/* NO min-height ON THIS SIDE, and the 72px that used to be here was a responsiveness bug
+   rather than a spare floor. The card's height is pure arithmetic off the original's own class
+   list — `p-4` + `text-base` + `mt-1` + `text-sm`, i.e. 1 + 1.5 + .25 + 1.25 + 1 = 5rem for a
+   single-line subtitle — and every term is a rem, so the whole card tracks `remScale` below
+   640 the way the text inside it does. A px floor does not: at a 320px viewport the root is
+   11.9px and the card wants 59.5px, so the 72 bound and inflated it by a fifth, while at 426px
+   (root 15.85) it measured the correct 79.25 and the floor did nothing. One of those two is
+   visible and the other is not, which is exactly why it survived.
+
+   The desktop block below keeps its own 76px, which is a real measurement of a card whose
+   root font-size never moves. */
+.sidebar-app-banner {
+  background-color: var(--color-layer4);
+  background-image: radial-gradient(circle at 400% 400%, var(--color-brand), transparent 92%);
+}
+
+/* THE DRAWER'S ARTWORK BOX IS THE SAME DERIVATION AS THE DESKTOP ONE BELOW, run on the arm
+   of the class list that applies below the breakpoint. `R` writes the wrapper as
+
+     h-1 w-32 flex-none pr-5 pt-1 sm:w-20 sm:p-1        over an `h-auto w-full` image
+
+   so with no `sm:` arm in play the box is `w-32` = 8rem with 1.25rem of right padding (`pr-5`)
+   and 0.25rem of top (`pt-1`), which puts a 6.75rem image against the box's left edge, a
+   quarter-rem down, and leaves that 1.25rem of clearance to the card's right edge — the
+   identical clearance the rail keeps. The desktop block restates only the two figures that
+   change.
+
+   REM, NOT PX, AND ON THIS SIDE THAT IS THE WHOLE POINT. Both figures stood here as `128px`
+   and `108px` — their value at a 16px root, which below 640 is a root the page does not have:
+   `remScale` is `clientWidth / 430`, so at a 426px viewport the root is 15.85px and the box is
+   126.8 with a 106.99 image. Pinned to px they froze at 128/108 while the card around them,
+   the text inside it and the 8rem it is measured against all kept scaling, so the artwork
+   drifted wider relative to its own box at every width below 430 and narrower above it. This
+   is the "a px value inside a sub-640 band is a smell" rule in CLAUDE.md, and the conversion
+   is the one it prescribes: divide the measurement by the root font-size at the width it was
+   taken. Desktop is unaffected either way — the root is a flat 16 from 640 up.
+
+   IT MUST NOT CLIP, and on this side that is not a subtlety — it was one. The box used to be
+   140x72 with `overflow: hidden`, which is fine exactly as long as the card is also 72px, and
+   the drawer's card is the one that is NOT: it is full-bleed rather than 208px wide, its
+   subtitle wraps or does not depending on the viewport, and the moment it grows past 72 the
+   image stopped at 72 and a strip of card background opened under it. `align-self: stretch`
+   with `height: auto` and `overflow: visible` hands the clip back to the card's own
+   `overflow-hidden`, which is what the original's `h-1` does — see the desktop note. */
+.sidebar-app-img-wrap {
+  width: 8rem;          /* w-32 */
+  height: auto;
+  align-self: stretch;
+  flex-shrink: 0;
+  overflow: visible;
+  position: relative;
+}
+
+.sidebar-app-img-wrap img {
+  width: 6.75rem;       /* w-32 minus pr-5: 8 - 1.25 */
+  max-width: none;
+  position: absolute;
+  top: 0.25rem;         /* pt-1 */
+  left: 0;
+  height: auto;
+}
+
+/* DESKTOP IS THE ORIGINAL'S OWN GEOMETRY. `R` writes the wrapper as
+   `h-1 w-32 flex-none pr-5 pt-1 sm:w-20 sm:p-1` over an `h-auto w-full` image, and from
+   640 up that resolves to an 80px box with 4px of padding on three sides and TWENTY on
+   the right — so the image is 56px wide, its left edge 4px inside the box and its top
+   4px below the card's.
+
+   `pr-5` BEATS `sm:p-1` AND SOURCE ORDER HAS NOTHING TO DO WITH IT. The reflex reading is
+   that the `sm:` block is emitted later and therefore collapses the right padding to 4px,
+   which would make the image 72px. It does not, because the site runs a logical-direction
+   plugin and every directional utility comes out wrapped:
+
+     [dir=ltr] .pr-5 { padding-right: 1.25rem }   <- 0,1,1
+     .sm\:p-1 { padding: .25rem }                 <- 0,1,0
+
+   The attribute lifts `pr-5` a whole specificity step above the shorthand, so it wins at
+   every width. This build has no such plugin, which is why the values are restated here
+   rather than left to the utilities in the markup. 56px was confirmed against a capture
+   afterwards: the image measures 56.0 CSS px with its right edge 20px off the card, and
+   an earlier 72px pass measured 72.0 with a 4px gap — the 16px the image gained is
+   exactly the 16px the gap lost, both arms of the same padding.
+
+   THE WRAPPER MUST NOT CLIP. The original gives it `h-1` — a 4px box with `overflow` left
+   visible — so the 954x1944 artwork overflows downward and the CARD's own
+   `overflow-hidden` is the only thing that cuts it. Pinning the wrapper to 76px and
+   clipping there instead means the two boxes have to agree on a height forever: the moment
+   the card renders a pixel taller than 76, the image stops at 76 and a strip of background
+   opens under it. `align-self: stretch` with `height: auto` hands the clip back to the card.
+
+   `left` rather than `right`, because the box is anchored by its LEFT content edge — the
+   asymmetric padding is what sets the width, and expressing it from the right would put
+   the two numbers in one place and make them look interchangeable. */
+@media (min-width: 1024px) {
+  .sidebar-app-banner {
+    min-height: 76px;
+  }
+  /* Only the deltas. `height: auto`, `align-self: stretch` and `overflow: visible` now sit on
+     the base rule, where the drawer needs them for exactly the reason described there — this
+     block used to be the only place they appeared. */
+  .sidebar-app-img-wrap {
+    width: 5rem;        /* sm:w-20 */
+  }
+  .sidebar-app-img-wrap img {
+    width: 3.5rem;      /* sm:w-20 minus pr-5 and sm:p-1's left: 5 - 1.25 - 0.25 */
+    left: 0.25rem;      /* sm:p-1 */
+  }
+}
+
+/* =========================================================
+   BC TOKEN TICKER
+   ========================================================= */
+.bc-token-entry {
+  margin-top: 4px;
+}
+
+.sidebar-bc-token-link {
+  color: var(--color-primary);
+  background-image: radial-gradient(85.75% 170.25% at 0% 100%, rgba(252, 60, 60, 0.15) 0%, rgba(252, 60, 60, 0) 100%);
+  background-color: var(--Sidebar-Unit_bg);
+}
+
+/* The em-based paddings resolve against a 14px context in the original: its measured
+   padding is 8px 8px 8px 11.2px, and 11.2 == 0.8em x 14. Without this the element
+   inherits the 16px root and pl-[0.8em] comes out at 12.8px. */
+.bc-token-inner {
+  font-size: 14px;
+}
+
+/* The original tags the price `font-mono`, and that family ships a single extrabold
+   face — so its own `sm:font-semibold` still paints extrabold glyphs. avertastd has a
+   real 600 weight, so honouring that class literally renders visibly lighter than the
+   site. Ask for 800 to match what actually paints. Unlayered, so it beats the utility
+   without needing !important. */
+.sidebar-bc-price-value {
+  font-weight: 800;
+  /* The original's mono face gives every digit the same advance width, so the value
+     reads wider and more evenly spaced than avertastd's proportional figures, which
+     pack together and look compacted. Tabular figures are the closest match available
+     without the real font; letter-spacing is the knob if it is still too tight. */
+  font-variant-numeric: tabular-nums;
+}
+
+/* Arrow button inside BC Token entry gets a distinct background */
+.bc-token-entry .arrow-button {
+  background-color: var(--Sidebar-ListArrow-bg);
+}
+
+/* =========================================================
+   NAV ITEMS - SHARED
+   ========================================================= */
+.toggle-link-item {
+  color: var(--color-primary);
+  transition: background-color 0.12s ease, color 0.12s ease;
+  /* NO `line-height: 1`. It stood here under a comment claiming it matched the original, and
+     the original's whole rule is `.toggle-link-item { color: rgb(var(--primary)) }` — checked
+     in index-BNAZbKRq.css, which is the only stylesheet in the mirror that mentions the class.
+     It inherits into every child that does not set its own, which is most of the row. */
+  /* Bare `avertastd`, as `.app-root` declares it — see the note beside `body` in index.css for
+     why the fallback list is deliberately absent. */
+  font-family: avertastd;
+}
+
+/* No hover background on the main rows. #3C4142 is the *expanded* state (below), and
+   painting it on hover too made the row look like it responded to the pointer rather
+   than to being opened. Hovering still springs the icon via .nav-scale-box, and the
+   sub-rows keep their own hover background. */
+
+/* Two independent states, matching the original, which applies these as two separate
+   classes rather than one:
+
+   -open   the row is expanded  -> lifted background, whatever opened it (row or arrow)
+   -active the row was chosen   -> brand green text, set only by clicking the row body
+
+   Keeping them apart is what lets the arrow expand a row without colouring its label.
+
+   Both target .toggle-link-item — the header row — so the submenu rows beneath keep
+   the unit's own #323738 and the open parent reads as raised above them. Do not move
+   either onto the wrapping .Sidebar-Unit_bg, which would tint the whole group. */
+/* `--Sidebar-Cell_Expandbg` AND NOT `--Sidebar-ListArrow-bg`, which is the distinction the old
+   single measured colour could not carry: a group HEADER that is open, hovered or current takes
+   the 5% wash, while a plain nav ROW in those states takes the solid arrow fill. Two points apart
+   in the dark theme (#3C4142 composited against #3a4142) and a different thing entirely in the
+   light one, where the wash is a 5% grey-blue and the fill is pure white. */
+.toggle-link-item.toggle-link-item-open,
+.toggle-link-item:hover {
+  background-color: var(--Sidebar-Cell_Expandbg);
+}
+
+.toggle-link-item.toggle-link-item-active {
+  color: var(--color-brand);
+}
+
+/* White, not secondary. The muted #b3bec1 tone belongs to the icons only — the
+   sprite sheet is drawn in it — while the labels themselves are full white. */
+.nav-link-item {
+  color: var(--color-primary);
+  transition: background-color 0.12s, color 0.12s;
+}
+
+.nav-link-item:hover {
+  background-color: var(--Sidebar-ListArrow-bg);
+  color: var(--color-primary);
+}
+
+/* The current page's row. Green label on the same raised background the hover uses.
+ *
+ * The ICON stays on the normal sprite sheet, which is the one thing here that is not faithful:
+ * the original swaps to a whole separate green sheet for this state (`--menuicon-g-img`), and
+ * that file was never saved — `bc.game/bc.game/assets/` has only `menuicon_retina`. It is the
+ * same gap the hover state documents above. Do not reach for a CSS filter to tint the sprite:
+ * the rule in CLAUDE.md is that these states are separate sheets, not effects on one sheet, and
+ * a hue-rotate would be wrong on every icon in a different way.
+ *
+ * Beats `:hover` because it comes later at equal specificity, so the row does not flicker back
+ * to white when you mouse over the page you are already on. */
+.nav-link-item.nav-link-active,
+.nav-link-item.nav-link-active:hover {
+  background-color: var(--Sidebar-ListArrow-bg);
+  color: var(--color-brand);
+}
+
+.nav-link-same {
+  color: var(--color-primary);
+}
+
+.nav-scale-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+}
+
+/* The `sm:size-10` arm of the icon box — 32px in the drawer, 40px in the rail.
+   ---------------------------------------------------------
+   1024, NOT 640, AND THE SAME REASON APPLIES TO EVERY `sm:` IN Sidebar/index.jsx.
+   The original's drawer is the sidebar below 640 and its compact rail from 640 up, so its
+   `sm:` variants ARE the switch between the two forms. This build renders the rail at `lg`
+   and the drawer everywhere below it, so 640..1023 is drawer here and rail there — and left
+   at 640 these rules put the rail's geometry inside the drawer across that whole band: 40px
+   icon boxes, 14px labels, rows stripped of their `px-3`, and the language and currency
+   pills stacked instead of side by side. The markup's variants were moved to `lg:` for that
+   reason and this one has to move with them.
+
+   Desktop is untouched by the move: `lg:` and `sm:` resolve identically at 1024 and up. */
+@media (min-width: 1024px) {
+  .nav-scale-box {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+/* This is what the "scale" in nav-scale-box refers to: hovering a row grows its icon
+   box slightly, on an overshooting easing curve that makes it spring. Copied verbatim
+   from the original. The transition deliberately lives in the hover rule rather than
+   on the base class, so the icon springs out on hover-in and snaps back on hover-out.
+
+   It scales the WRAPPER, which is why it composes with the icons' own transforms —
+   the sprites carry scale(0.75) and the colour icons scale-[80%] — instead of
+   fighting them. */
+.nav-link-item:hover .nav-scale-box,
+.nav-link-same:hover .nav-scale-box,
+.toggle-link-item:hover .nav-scale-box {
+  transform: scale(1.15);
+  transition: all 0.42s cubic-bezier(0.68, 2.19, 0.67, 0.22);
+}
+
+/* =========================================================
+   ARROW BUTTON
+   ========================================================= */
+.arrow-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+  padding: 0;
+  transition: background 0.12s;
+}
+.arrow-button:hover {
+  background-color: rgba(255,255,255,0.06);
+}
+
+/* `--Sidebar-ListArrow-bg`, which is #3a4142 in the dark theme — layer5, the value this used
+   to name directly — and pure WHITE in the light one. The token and the variable happen to agree
+   on one side and not the other, which is exactly why the variable has to be the one written. */
+.toggle-link-item .arrow-button,
+.nav-link-item .arrow-button {
+  background-color: var(--Sidebar-ListArrow-bg);
+}
+
+/* The one arrow that does NOT take that fill: a hovered nav row swaps its square to
+   `--white_alpha5`, so the arrow reads as recessed while the row itself is raised. The row's own
+   hover is `--Sidebar-ListArrow-bg`, i.e. the two trade places. */
+.nav-link-item:hover .arrow-button {
+  background-color: var(--color-white_alpha5);
+}
+
+/* =========================================================
+   COLOR_ICON_IMG SPRITE POSITIONS
+   Base rule (size + sheet + background-size) is in src/index.css.
+   Positions from Enter-uT7xMZD7.css in the reference mirror.
+   ========================================================= */
+/* `.predict` and `.promotion` MOVED TO index.css with the other 31 families — see the note over
+   that table. They lived here as "sidebar-only", which was true of the dark cell but stopped
+   being a reason to split the table once each one needed a light twin as well. */
+/* Only the two the sidebar alone uses are left here. .menu and .chat already lived in
+   index.css because the Header needs them without importing this file; .casino, .sports,
+   .lottery and .trading joined them once Home's category cards started using the same four.
+   Same rule as before — a position shared by more than one component belongs in index.css. */
+
+/* =========================================================
+   MENU_ICON_IMG SPRITE (menuicon.png 352x352, retina twin 704x704)
+   Sidebar-only sprite, so both the base rule and the positions stay here.
+   Positions from NavItem-NXfL5xSI.css in the reference mirror.
+   ========================================================= */
+/* No `display` here either — see the note on .color_icon_img in src/index.css.
+   ---------------------------------------------------------
+   THE SCALE IS A DEVICE TEST ON THE ORIGINAL, NOT A CONSTANT, and it is the reason this sits
+   in CSS rather than on the element. `NavItem--aJiS2FS.js`, the row renderer, writes it inline:
+
+     transform: n.scale || (v.mobile ? "scale(0.8)" : "scale(0.75)")
+
+   so a 32px cell paints at 25.6 in the drawer and 24 in the rail. This build wrote a flat
+   `scale(0.75)` at all three call sites, which is right for the rail and 1.6px small in the
+   drawer. An inline style cannot carry a media query, so the call sites drop it and the two
+   arms live here — base is the drawer's 0.8, the `lg` block below restores the rail's 0.75.
+
+   It composes with `.nav-scale-box`'s hover spring rather than fighting it, because that one
+   scales the WRAPPER and this one the icon. Do not merge them.
+
+   `v.mobile` is a DEVICE test and 1024 is a width query, which is the same approximation this
+   whole file already makes — the drawer is what renders below `lg` here. */
+.menu_icon_img {
+  width: 32px;
+  height: 32px;
+  background-image: url('../../../assets/menuicon.png');
+  background-repeat: no-repeat;
+  background-position: top left;
+  background-size: 352px 352px;
+  transform: scale(0.8);
+}
+
+/* `menuicon_w_h`, NOT `menuicon_w` — and getting this wrong is what made the sidebar icons
+   invisible in the light theme, so it is worth stating why the obvious file is the wrong one.
+   `NavItem-NXfL5xSI.css` is explicit:
+
+     .menu_icon_img                       { background-image: var(--menuicon-img);   color: #b3bec1 }
+     .menu_icon_img.menu_icon_img_light   { background-image: var(--menuicon-w-h-img); color: #000 }
+
+   So the light theme's RESTING state is the `w_h` sheet. Measured to confirm rather than taken on
+   the naming: mean luminance over the opaque pixels is 190 for `menuicon` (which is #b3bec1
+   exactly), 255 for `menuicon_h`, 24 for `menuicon_w_h` (i.e. black) — and 105 for `menuicon_w`,
+   a mid grey that reads as barely-there on white. `--menuicon-w-img` and its retina twin are
+   declared in the original's token block and REFERENCED BY NOTHING, checked across all six mirror
+   stylesheets; they are dead variables, and the two files are kept unused for the same reason
+   this project keeps dead classes.
+
+   Note the game sprite one section down does NOT work this way — there `--gameicon-w-img` is the
+   live resting sheet and `w_h` is its hover. Two sprites, two arrangements; do not unify them. */
+.app-root:not(.dark) .menu_icon_img {
+  background-image: url('../../../assets/menuicon_w_h.png');
+}
+
+@media (min-width: 1024px) {
+  .menu_icon_img {
+    transform: scale(0.75);
+  }
+}
+
+/* THE HOVER AND ACTIVE STATES ARE REAL SHEETS NOW. This block used to brighten the normal
+   sheet on hover and leave the active row's icon white, both flagged as the one approximation
+   in this file, because only `menuicon_retina` was saved in the mirror. Every other sheet is on
+   `hash.game/assets/` under the hashes `Enter-uT7xMZD7.css` already names — normal, hover,
+   active-green and all three retinas — and they are now local. Do not reach for a filter again.
+
+   Note the ACTIVE state is a class ON the icon (`menu_icon_img_active` replacing
+   `menu_icon_img_normal`), not a descendant selector off the row, which is why the markup
+   swaps the class rather than the CSS matching `.nav-link-active`.
+
+   THE `_w` SHEETS ARE THE LIGHT THEME'S AND ARE LOCAL NOW — all six of them, base and retina
+   for normal, hover and active-green. They were deliberately not fetched while this build was
+   dark-only; the light palette is the reason they are here. Their light-arm rules sit directly
+   under each dark one and the pairing is `_w` for normal, `_w_h` for hover, `_g_w` for active,
+   which is the original's own naming and not a scheme invented here (`--menuicon-w-img`,
+   `--menuicon-w-h-img`, `--menuicon-g-w-img` in Enter-uT7xMZD7.css).
+
+   Every light arm is `.app-root:not(.dark) …`, which is one specificity step above the dark
+   rule it overrides, so source order between the two does not matter and neither needs
+   `!important`. It also means the DARK rules stay the bare selectors they always were — nothing
+   about the dark theme changed here.
+
+   `menuicon.png` IS THE 1x SHEET NOW. It used to be the retina file under the plain name —
+   704x704 squeezed to 352 by `background-size`, which renders fine and is what the header
+   comment above used to say — but with three states in play the base and the `@media` block
+   have to be genuinely different files or the media query is decoration. Base is 352, retina
+   is 704, same arrangement `game_icon_img` uses. `coloricon.png` is still the retina file
+   under the plain name and has no media block at all; that one is untouched. */
+.nav-link-item:hover .menu_icon_img_normal,
+.nav-link-item-game:hover .menu_icon_img_normal,
+.toggle-link-item:hover .menu_icon_img_normal {
+  background-image: url('../../../assets/menuicon_h.png');
+}
+
+/* The same sheet as the resting state above, which is the original's own arrangement rather
+   than a copy-paste: it writes both rules and points both at `--menuicon-w-h-img`, so a light
+   theme sidebar icon does NOT change on hover the way a dark one does (grey -> white). Redundant
+   as the rules now stand and kept anyway, so that changing the resting sheet cannot silently
+   change the hover one too. */
+.app-root:not(.dark) .nav-link-item:hover .menu_icon_img_normal,
+.app-root:not(.dark) .nav-link-item-game:hover .menu_icon_img_normal,
+.app-root:not(.dark) .toggle-link-item:hover .menu_icon_img_normal {
+  background-image: url('../../../assets/menuicon_w_h.png');
+}
+
+.menu_icon_img.menu_icon_img_active {
+  background-image: url('../../../assets/menuicon_g.png');
+}
+
+.app-root:not(.dark) .menu_icon_img.menu_icon_img_active {
+  background-image: url('../../../assets/menuicon_g_w.png');
+}
+
+/* All 113 positions, transcribed whole rather than added one at a time. This file used to
+   carry 46 — every one of them correct, checked against the source before replacing them —
+   and adding a row meant looking a coordinate up first. It does not any more. */
+
+.menu_icon_img.account {
+  background-position: 0 0;
+}
+
+.menu_icon_img.achievement {
+  background-position: -32px 0;
+}
+
+.menu_icon_img.affiliate {
+  background-position: 0 -32px;
+}
+
+.menu_icon_img.alllotteries {
+  background-position: -32px -32px;
+}
+
+.menu_icon_img.americanfootball {
+  background-position: -64px 0;
+}
+
+.menu_icon_img.at {
+  background-position: -64px -32px;
+}
+
+.menu_icon_img.baccarat {
+  background-position: 0 -64px;
+}
+
+.menu_icon_img.ban {
+  background-position: -32px -64px;
+}
+
+.menu_icon_img.ban_user {
+  background-position: -64px -64px;
+}
+
+.menu_icon_img.bank {
+  background-position: -96px 0;
+}
+
+.menu_icon_img.barbados_royals {
+  background-position: -96px -32px;
+}
+
+.menu_icon_img.baseball {
+  background-position: -96px -64px;
+}
+
+.menu_icon_img.basketball {
+  background-position: 0 -96px;
+}
+
+.menu_icon_img.bc_airdrop {
+  background-position: -32px -96px;
+}
+
+.menu_icon_img.bc_exlusive {
+  background-position: -64px -96px;
+}
+
+.menu_icon_img.bc_licenses {
+  background-position: -96px -96px;
+}
+
+.menu_icon_img.bclottery {
+  background-position: -128px 0;
+}
+
+.menu_icon_img.betting_insights {
+  background-position: -128px -32px;
+}
+
+.menu_icon_img.bingo_home {
+  background-position: -128px -64px;
+}
+
+.menu_icon_img.blackjack {
+  background-position: -128px -96px;
+}
+
+.menu_icon_img.blog {
+  background-position: 0 -128px;
+}
+
+.menu_icon_img.bonus {
+  background-position: -32px -128px;
+}
+
+.menu_icon_img.boxing {
+  background-position: -64px -128px;
+}
+
+.menu_icon_img.calendar {
+  background-position: -96px -128px;
+}
+
+.menu_icon_img.casino_wager_race {
+  background-position: -128px -128px;
+}
+
+.menu_icon_img.ceo_inbox {
+  background-position: -160px 0;
+}
+
+.menu_icon_img.challenge {
+  background-position: -160px -32px;
+}
+
+.menu_icon_img.colby_covington {
+  background-position: -160px -64px;
+}
+
+.menu_icon_img.combo_king {
+  background-position: -160px -96px;
+}
+
+.menu_icon_img.counter_strike {
+  background-position: -160px -128px;
+}
+
+.menu_icon_img.cricket {
+  background-position: 0 -160px;
+}
+
+.menu_icon_img.dailycontest {
+  background-position: -32px -160px;
+}
+
+.menu_icon_img.deccan_gladiators {
+  background-position: -64px -160px;
+}
+
+.menu_icon_img.deposit_leaderboard {
+  background-position: -96px -160px;
+}
+
+.menu_icon_img.deposit_offer {
+  background-position: -128px -160px;
+}
+
+.menu_icon_img.dice {
+  background-position: -160px -160px;
+}
+
+.menu_icon_img.dota_2 {
+  background-position: -192px 0;
+}
+
+.menu_icon_img.e_sports {
+  background-position: -192px -64px;
+}
+
+.menu_icon_img.fair {
+  background-position: -192px -96px;
+}
+
+.menu_icon_img.favorites {
+  background-position: -192px -128px;
+}
+
+.menu_icon_img.favorites1 {
+  background-position: -192px -160px;
+}
+
+.menu_icon_img.featurebuy_in {
+  background-position: 0 -192px;
+}
+
+.menu_icon_img.fifa {
+  background-position: -32px -192px;
+}
+
+.menu_icon_img.fifa_events {
+  background-position: -64px -192px;
+}
+
+.menu_icon_img.forum {
+  background-position: -96px -192px;
+}
+
+.menu_icon_img.futures {
+  background-position: -128px -192px;
+}
+
+.menu_icon_img.gamble_aware {
+  background-position: -160px -192px;
+}
+
+.menu_icon_img.game_shows {
+  background-position: -192px -192px;
+}
+
+.menu_icon_img.grand_lucky_draw {
+  background-position: -224px 0;
+}
+
+.menu_icon_img.handball {
+  background-position: -224px -32px;
+}
+
+.menu_icon_img.help {
+  background-position: -224px -64px;
+}
+
+.menu_icon_img.high_low_spread {
+  background-position: -224px -96px;
+}
+
+.menu_icon_img.hold_em {
+  background-position: -224px -128px;
+}
+
+.menu_icon_img.hotgame {
+  background-position: -224px -160px;
+}
+
+.menu_icon_img.icehockey {
+  background-position: -224px -192px;
+}
+
+.menu_icon_img.independence {
+  background-position: 0 -224px;
+}
+
+.menu_icon_img.inform {
+  background-position: -32px -224px;
+}
+
+.menu_icon_img.ipl {
+  background-position: -64px -224px;
+}
+
+.menu_icon_img.jason_derulo {
+  background-position: -96px -224px;
+}
+
+.menu_icon_img.jean_silva {
+  background-position: -128px -224px;
+}
+
+.menu_icon_img.krasava {
+  background-position: -160px -224px;
+}
+
+.menu_icon_img.kwara_united {
+  background-position: -192px -224px;
+}
+
+.menu_icon_img.laptop {
+  background-position: -224px -224px;
+}
+
+.menu_icon_img.legal {
+  background-position: -256px 0;
+}
+
+.menu_icon_img.leicester_city {
+  background-position: -256px -32px;
+}
+
+.menu_icon_img.license {
+  background-position: -256px -64px;
+}
+
+.menu_icon_img.lil_pump {
+  background-position: -256px -96px;
+}
+
+.menu_icon_img.liveevents {
+  background-position: -256px -128px;
+}
+
+.menu_icon_img.miami {
+  background-position: -256px -160px;
+}
+
+.menu_icon_img.mma {
+  background-position: -256px -192px;
+}
+
+.menu_icon_img.my_bets {
+  background-position: -256px -224px;
+}
+
+.menu_icon_img.newreleases {
+  background-position: 0 -256px;
+}
+
+.menu_icon_img.notice {
+  background-position: -32px -256px;
+}
+
+.menu_icon_img.o_higgins {
+  background-position: -64px -256px;
+}
+
+.menu_icon_img.omaha {
+  background-position: -96px -256px;
+}
+
+.menu_icon_img.original_wager_race {
+  background-position: -128px -256px;
+}
+
+.menu_icon_img.pachinko {
+  background-position: -160px -256px;
+}
+
+.menu_icon_img.pdd {
+  background-position: -192px -256px;
+}
+
+.menu_icon_img.personal_verification {
+  background-position: -224px -256px;
+}
+
+.menu_icon_img.picksforyou {
+  background-position: -256px -256px;
+}
+
+.menu_icon_img.poker {
+  background-position: -288px 0;
+}
+
+.menu_icon_img.popular {
+  background-position: -288px -32px;
+}
+
+.menu_icon_img.quest {
+  background-position: -288px -64px;
+}
+
+.menu_icon_img.racing {
+  background-position: -288px -96px;
+}
+
+.menu_icon_img.recent {
+  background-position: -288px -128px;
+}
+
+.menu_icon_img.refer {
+  background-position: -288px -160px;
+}
+
+.menu_icon_img.referearn {
+  background-position: -288px -192px;
+}
+
+.menu_icon_img.referral_codes {
+  background-position: -288px -224px;
+}
+
+.menu_icon_img.roulette {
+  background-position: -288px -256px;
+}
+
+.menu_icon_img.sashimi_poker {
+  background-position: 0 -288px;
+}
+
+.menu_icon_img.slots {
+  background-position: -32px -288px;
+}
+
+.menu_icon_img.soccer {
+  background-position: -64px -288px;
+}
+
+.menu_icon_img.spin_to_win {
+  background-position: -96px -288px;
+}
+
+.menu_icon_img.sponsorship {
+  background-position: -128px -288px;
+}
+
+.menu_icon_img.sponsorships {
+  background-position: -160px -288px;
+}
+
+.menu_icon_img.sports_global {
+  background-position: -192px -288px;
+}
+
+.menu_icon_img.sports_korea {
+  background-position: -224px -288px;
+}
+
+.menu_icon_img.sports_lossback {
+  background-position: -256px -288px;
+}
+
+.menu_icon_img.st_kitts {
+  background-position: -288px -288px;
+}
+
+.menu_icon_img.table_tennis {
+  background-position: -320px 0;
+}
+
+.menu_icon_img.tablegame {
+  background-position: -320px -32px;
+}
+
+.menu_icon_img.tap_trading {
+  background-position: -320px -64px;
+}
+
+.menu_icon_img.tennis {
+  background-position: -320px -96px;
+}
+
+.menu_icon_img.themes {
+  background-position: -320px -128px;
+}
+
+.menu_icon_img.tips_help {
+  background-position: -320px -160px;
+}
+
+.menu_icon_img.tournament {
+  background-position: -320px -192px;
+}
+
+.menu_icon_img.two_factor {
+  background-position: -320px -224px;
+}
+
+.menu_icon_img.up_down {
+  background-position: -320px -256px;
+}
+
+.menu_icon_img.view_all {
+  background-position: -320px -288px;
+}
+
+.menu_icon_img.vip_club {
+  background-position: 0 -320px;
+}
+
+.menu_icon_img.vip_transfer {
+  background-position: -32px -320px;
+}
+
+.menu_icon_img.webchat {
+  background-position: -64px -320px;
+}
+
+.menu_icon_img.weekly_raffle {
+  background-position: -96px -320px;
+}
+
+/* Six sheets in here, not three: each state has a dark and a light retina twin, paired exactly
+   as the 1x rules above are. Note `background-size` is restated only once — it belongs to the
+   element, not to the sheet, and every one of these six is 704x704 squeezed to the same 352. */
+@media (min-resolution: 192dpi) {
+  .menu_icon_img {
+    background-image: url('../../../assets/menuicon_retina.png');
+    background-size: 352px 352px;
+  }
+
+  .app-root:not(.dark) .menu_icon_img {
+    background-image: url('../../../assets/menuicon_w_h_retina.png');
+  }
+
+  .nav-link-item:hover .menu_icon_img_normal,
+  .nav-link-item-game:hover .menu_icon_img_normal,
+  .toggle-link-item:hover .menu_icon_img_normal {
+    background-image: url('../../../assets/menuicon_h_retina.png');
+  }
+
+  .app-root:not(.dark) .nav-link-item:hover .menu_icon_img_normal,
+  .app-root:not(.dark) .nav-link-item-game:hover .menu_icon_img_normal,
+  .app-root:not(.dark) .toggle-link-item:hover .menu_icon_img_normal {
+    background-image: url('../../../assets/menuicon_w_h_retina.png');
+  }
+
+  .menu_icon_img.menu_icon_img_active {
+    background-image: url('../../../assets/menuicon_g_retina.png');
+  }
+
+  .app-root:not(.dark) .menu_icon_img.menu_icon_img_active {
+    background-image: url('../../../assets/menuicon_g_w_retina.png');
+  }
+}
+
+/* The third sheet, game_icon_img, IS imported now — see the block at the end of this file.
+   It was left out while Crash Games (an entry that does not render on the live site) was its
+   only sidebar consumer; the BC Originals hover flyout is a real one, with 61 rows. */
+
+/* =========================================================
+   GAME_ICON_IMG SPRITE (gameicon.png — 352x320, 11 x 10 cells of 32px)
+   ---------------------------------------------------------
+   The THIRD sprite sheet in this project, after `color_icon_img` and `menu_icon_img`, and the
+   only one whose every state was recoverable. `OriginalsGames-zlYWkqQI.css` is in the mirror
+   and holds the whole thing; the sheets themselves were not, and came off `hash.game/assets/`
+   under their content hashes — normal, hover and active-green, plus all three retinas.
+   Byte-identical rule set in the current deploy's copy of that stylesheet, which was checked.
+
+   THAT MATTERS BEYOND THIS SPRITE. `menu_icon_img` above brightens its normal sheet on hover
+   and keeps it on the active row, both flagged there as the file's one approximation, because
+   only `menuicon_retina` was ever saved. Every one of those sheets is on `hash.game` too. This
+   block is what the note above should look like once someone fetches them.
+
+   Positions transcribed whole rather than per-icon: the original ships all 107 and the flyout's
+   list is data, so adding a game must not mean editing CSS. 110 cells, 107 named — and `dice`
+   is NOT one of them. The live site has no `.game_icon_img.dice` rule either (checked against
+   the current deploy, not just the mirror), so /game/dice falls back to the base rule's
+   `background-position: top left` and draws cell (0,0), which is `andar_bahar`. Kept.
+   ========================================================= */
+/* No `display` here — see the note on .color_icon_img in src/index.css. */
+.game_icon_img {
+  width: 32px;
+  height: 32px;
+  background-image: url('../../../assets/gameicon.png');
+  background-repeat: no-repeat;
+  background-position: top left;
+  background-size: 352px 320px;
+}
+
+.app-root:not(.dark) .game_icon_img {
+  background-image: url('../../../assets/gameicon_w.png');
+}
+
+/* Real sheets, not effects on one sheet — the rule this project keeps breaking and
+   re-learning. ALL SIX STATES ARE LOCAL NOW, the light theme's `_w` / `_w_h` / `_g_w` trio
+   included; see the matching note on `menu_icon_img` above, which they arrived with. */
+.nav-link-item-game:hover .game_icon_img {
+  background-image: url('../../../assets/gameicon_h.png');
+}
+
+.app-root:not(.dark) .nav-link-item-game:hover .game_icon_img {
+  background-image: url('../../../assets/gameicon_w_h.png');
+}
+
+.nav-link-item-game.active .game_icon_img,
+.nav-link-item-game.active:hover .game_icon_img {
+  background-image: url('../../../assets/gameicon_g.png');
+}
+
+.app-root:not(.dark) .nav-link-item-game.active .game_icon_img,
+.app-root:not(.dark) .nav-link-item-game.active:hover .game_icon_img {
+  background-image: url('../../../assets/gameicon_g_w.png');
+}
+
+.game_icon_img.andar_bahar {
+  background-position: 0 0;
+}
+
+.game_icon_img.arcane_portals {
+  background-position: -32px 0;
+}
+
+.game_icon_img.bacarrat {
+  background-position: 0 -32px;
+}
+
+.game_icon_img.baccarat {
+  background-position: -32px -32px;
+}
+
+.game_icon_img.baccaratmultiplayer {
+  background-position: -64px 0;
+}
+
+.game_icon_img.bc_bingo {
+  background-position: -64px -32px;
+}
+
+.game_icon_img.bc_blackjack_c {
+  background-position: 0 -64px;
+}
+
+.game_icon_img.bc_blackjack_d {
+  background-position: -32px -64px;
+}
+
+.game_icon_img.bc_blackjack_salon_privee {
+  background-position: -64px -64px;
+}
+
+.game_icon_img.bc_hot_mania {
+  background-position: -96px 0;
+}
+
+.game_icon_img.bc_poker {
+  background-position: -96px -32px;
+}
+
+.game_icon_img.bc_speed_blackjack {
+  background-position: -96px -64px;
+}
+
+.game_icon_img.bc_vip_blackjack_2 {
+  background-position: 0 -96px;
+}
+
+.game_icon_img.bcblackjacka {
+  background-position: -32px -96px;
+}
+
+.game_icon_img.bcblackjackb {
+  background-position: -64px -96px;
+}
+
+.game_icon_img.bcgamevipblackjack {
+  background-position: -96px -96px;
+}
+
+.game_icon_img.bconeblackjack {
+  background-position: -128px 0;
+}
+
+.game_icon_img.bcspeedbaccarat {
+  background-position: -128px -32px;
+}
+
+.game_icon_img.bear_blast {
+  background-position: -128px -64px;
+}
+
+.game_icon_img.bear_smash_15000x_boost {
+  background-position: -128px -96px;
+}
+
+.game_icon_img.beauties {
+  background-position: 0 -128px;
+}
+
+.game_icon_img.blackjack {
+  background-position: -32px -128px;
+}
+
+.game_icon_img.bubble_shooter {
+  background-position: -64px -128px;
+}
+
+.game_icon_img.bullet {
+  background-position: -96px -128px;
+}
+
+.game_icon_img.burst_games {
+  background-position: -128px -128px;
+}
+
+.game_icon_img.cave {
+  background-position: -160px 0;
+}
+
+.game_icon_img.chop_chop {
+  background-position: -160px -32px;
+}
+
+.game_icon_img.clash_cash {
+  background-position: -160px -64px;
+}
+
+.game_icon_img.classicdice {
+  background-position: -160px -96px;
+}
+
+.game_icon_img.claw_booster {
+  background-position: -160px -128px;
+}
+
+.game_icon_img.coinflip {
+  background-position: 0 -160px;
+}
+
+.game_icon_img.color_game {
+  background-position: -32px -160px;
+}
+
+.game_icon_img.crash {
+  background-position: -64px -160px;
+}
+
+.game_icon_img.cursed_clown {
+  background-position: -96px -160px;
+}
+
+.game_icon_img.cursed_doll {
+  background-position: -128px -160px;
+}
+
+.game_icon_img.cyberpunk {
+  background-position: -160px -160px;
+}
+
+.game_icon_img.deadliestsea {
+  background-position: -192px 0;
+}
+
+.game_icon_img.doggyminer {
+  background-position: -192px -32px;
+}
+
+.game_icon_img.double {
+  background-position: -192px -64px;
+}
+
+.game_icon_img.dragonquest {
+  background-position: -192px -96px;
+}
+
+.game_icon_img.dragonslayer {
+  background-position: -192px -128px;
+}
+
+.game_icon_img.fast_crash {
+  background-position: -192px -160px;
+}
+
+.game_icon_img.fastparity {
+  background-position: 0 -192px;
+}
+
+.game_icon_img.fish_prawn_crab {
+  background-position: -32px -192px;
+}
+
+.game_icon_img.ganesha_golden_wheel {
+  background-position: -64px -192px;
+}
+
+.game_icon_img.ghost_boo_nanza {
+  background-position: -96px -192px;
+}
+
+.game_icon_img.goal_rush {
+  background-position: -128px -192px;
+}
+
+.game_icon_img.gold_of_olympus {
+  background-position: -160px -192px;
+}
+
+.game_icon_img.golden_year {
+  background-position: -192px -192px;
+}
+
+.game_icon_img.hashdice {
+  background-position: -224px 0;
+}
+
+.game_icon_img.hilo {
+  background-position: -224px -32px;
+}
+
+.game_icon_img.hotpot {
+  background-position: -224px -64px;
+}
+
+.game_icon_img.jacks_crypt {
+  background-position: -224px -96px;
+}
+
+.game_icon_img.jade {
+  background-position: -224px -128px;
+}
+
+.game_icon_img.jb_originallogo {
+  background-position: -224px -160px;
+}
+
+.game_icon_img.johnwild_default {
+  background-position: -224px -192px;
+}
+
+.game_icon_img.keno {
+  background-position: 0 -224px;
+}
+
+.game_icon_img.kenomultiplayer {
+  background-position: -32px -224px;
+}
+
+.game_icon_img.korean_super_speed_baccarat {
+  background-position: -64px -224px;
+}
+
+.game_icon_img.left_4_cash {
+  background-position: -96px -224px;
+}
+
+.game_icon_img.limbo {
+  background-position: -128px -224px;
+}
+
+.game_icon_img.lucky_ranch {
+  background-position: -160px -224px;
+}
+
+.game_icon_img.magic_mine {
+  background-position: -192px -224px;
+}
+
+.game_icon_img.mines {
+  background-position: -224px -224px;
+}
+
+.game_icon_img.monster_hunter {
+  background-position: -256px 0;
+}
+
+.game_icon_img.nezha {
+  background-position: -256px -32px;
+}
+
+.game_icon_img.piece_of_cash {
+  background-position: -256px -64px;
+}
+
+.game_icon_img.pinball_guessing {
+  background-position: -256px -96px;
+}
+
+.game_icon_img.pinball_striker_20000x {
+  background-position: -256px -128px;
+}
+
+.game_icon_img.plinko {
+  background-position: -256px -160px;
+}
+
+.game_icon_img.quick_ludo {
+  background-position: -256px -192px;
+}
+
+.game_icon_img.reel_big_catch {
+  background-position: -256px -224px;
+}
+
+.game_icon_img.rhino_robbery {
+  background-position: 0 -256px;
+}
+
+.game_icon_img.ringoffortune {
+  background-position: -32px -256px;
+}
+
+.game_icon_img.roulette {
+  background-position: -64px -256px;
+}
+
+.game_icon_img.roulettemultiplayer {
+  background-position: -96px -256px;
+}
+
+.game_icon_img.rummy {
+  background-position: -128px -256px;
+}
+
+.game_icon_img.runaway_zombies {
+  background-position: -160px -256px;
+}
+
+.game_icon_img.samurai_clash {
+  background-position: -192px -256px;
+}
+
+.game_icon_img.sea_of_olympus_1000 {
+  background-position: -224px -256px;
+}
+
+.game_icon_img.shield {
+  background-position: -256px -256px;
+}
+
+.game_icon_img.sic_bo {
+  background-position: -288px 0;
+}
+
+.game_icon_img.sicbo {
+  background-position: -288px -32px;
+}
+
+.game_icon_img.speed_baccarat {
+  background-position: -288px -64px;
+}
+
+.game_icon_img.speedy_andar_bahar {
+  background-position: -288px -96px;
+}
+
+.game_icon_img.star_wars {
+  background-position: -288px -128px;
+}
+
+.game_icon_img.starshine_princess {
+  background-position: -288px -160px;
+}
+
+.game_icon_img.stellar_rush {
+  background-position: -288px -192px;
+}
+
+.game_icon_img.sugar_fiesta_1000 {
+  background-position: -288px -224px;
+}
+
+.game_icon_img.super_waldo {
+  background-position: -288px -256px;
+}
+
+.game_icon_img.sword {
+  background-position: 0 -288px;
+}
+
+.game_icon_img.symbiote {
+  background-position: -32px -288px;
+}
+
+.game_icon_img.teen_patti {
+  background-position: -64px -288px;
+}
+
+.game_icon_img.teen_patti_20_20 {
+  background-position: -96px -288px;
+}
+
+.game_icon_img.teen_patti_joker {
+  background-position: -128px -288px;
+}
+
+.game_icon_img.teen_patti_multiplayer {
+  background-position: -160px -288px;
+}
+
+.game_icon_img.teenpatti_no_limit {
+  background-position: -192px -288px;
+}
+
+.game_icon_img.tim_larry {
+  background-position: -224px -288px;
+}
+
+.game_icon_img.torture_block {
+  background-position: -256px -288px;
+}
+
+.game_icon_img.towerlegend {
+  background-position: -288px -288px;
+}
+
+.game_icon_img.trading {
+  background-position: -320px 0;
+}
+
+.game_icon_img.twist {
+  background-position: -320px -32px;
+}
+
+.game_icon_img.ultimatedice {
+  background-position: -320px -64px;
+}
+
+.game_icon_img.videopoker {
+  background-position: -320px -96px;
+}
+
+.game_icon_img.wheel {
+  background-position: -320px -128px;
+}
+
+.game_icon_img.wizards_academy {
+  background-position: -320px -160px;
+}
+
+.game_icon_img.wukong {
+  background-position: -320px -192px;
+}
+
+@media (min-resolution: 192dpi) {
+  .game_icon_img {
+    background-image: url('../../../assets/gameicon_retina.png');
+    background-size: 352px 320px;
+  }
+
+  .app-root:not(.dark) .game_icon_img {
+    background-image: url('../../../assets/gameicon_w_retina.png');
+  }
+
+  .nav-link-item-game:hover .game_icon_img {
+    background-image: url('../../../assets/gameicon_h_retina.png');
+  }
+
+  .app-root:not(.dark) .nav-link-item-game:hover .game_icon_img {
+    background-image: url('../../../assets/gameicon_w_h_retina.png');
+  }
+
+  .nav-link-item-game.active .game_icon_img,
+  .nav-link-item-game.active:hover .game_icon_img {
+    background-image: url('../../../assets/gameicon_g_retina.png');
+  }
+
+  .app-root:not(.dark) .nav-link-item-game.active .game_icon_img,
+  .app-root:not(.dark) .nav-link-item-game.active:hover .game_icon_img {
+    background-image: url('../../../assets/gameicon_g_w_retina.png');
+  }
+}

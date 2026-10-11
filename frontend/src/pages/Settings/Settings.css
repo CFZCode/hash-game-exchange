@@ -1,0 +1,102 @@
+/* The settings pages' own rules, and ALL OF THEM ARE THE `account` REMOTE'S rather than the host
+ * stylesheet's — which is why none of them is in the mirror's six sheets or in the current
+ * deploy's `index-WymgNldA.css`, all checked. They live in `init-9cZaIprL.js`, the remote's
+ * bootstrap module, which IS in the mirror: the remote ships its own Tailwind build and its own
+ * handful of plain rules, and this is that handful.
+ *
+ * Transcribed verbatim except where a value had to be translated into this project's token scheme,
+ * which is the same care `index.css` documents for `.switch` and `.tabs-*`.
+ */
+
+/* `.bg-setting-yellow{background:#ff9820}` / `.bg-setting-red{background:#fc3c3c}` /
+   `.fill-setting-yellow{fill:#ff9820}`.
+ *
+ * THREE UTILITIES THAT EXIST BECAUSE THE REMOTE CANNOT SEE THE HOST'S TOKENS. `#ff9820` is
+ * `--warning` to the digit and `#fc3c3c` is `--error`, so on the host side these would have been
+ * `bg-warning` / `bg-error`; the remote has its own Tailwind config and declares them as flat
+ * literals instead. Kept as literals here for the same reason the deposit-offer page keeps its
+ * `#71E871`: they are the classes the markup asks for, and a token would be a different thing that
+ * happens to render the same. Note neither inverts with the theme, which is correct — the badge
+ * they paint carries `text-alw_dark` so its ink does not either. */
+.bg-setting-yellow {
+  background: #ff9820;
+}
+
+.bg-setting-red {
+  background: #fc3c3c;
+}
+
+.fill-setting-yellow {
+  fill: #ff9820;
+}
+
+/* `.noline{text-decoration:none!important}` — on the e-mail field's span, where a UA stylesheet
+   would otherwise underline an address. The `!important` is the remote's. */
+.noline {
+  text-decoration: none !important;
+}
+
+/* `.setting-table th,.setting-table td{width:15%}` and `.setting-table .left{width:auto}` — the
+   whole of the Sessions table's sizing. Five columns at a flat 15% with the Device column taking
+   the rest, which is what stops a long IPv6 address from stretching the table. `.setting-button`
+   is already in index.css (it came in with the mobile account page); the remote re-declares it at
+   645px over `--Button-spbg`, which is the pair below. */
+.setting-table th,
+.setting-table td {
+  width: 15%;
+}
+
+.setting-table .left {
+  width: auto;
+}
+
+/* `--Chip-Group-Tab` and `--Chip-Group-Button` are the remote's own tokens, written INLINE by the
+   Payment Methods chunk (`style={{background: "var(--Chip-Group-Tab)"}}`) rather than through a
+   class — which is why they have to be declared rather than being turned into utilities.
+   `--Chip-Group-Tab` also exists in the HOST stylesheet at a slightly different light value
+   (#f0f3f5 there, #f5f5f5 here); the remote's wins on the live site because it loads later, and
+   the remote's is what these pages were captured with. Scoped to this page rather than declared
+   globally, so the host's value is untouched everywhere else.
+
+   `--Chip-Group-Button` exists ONLY in the remote — the Payment page's card tiles read it and it
+   resolves to nothing on the host, so those tiles are transparent there. Declared here, which
+   makes this build's tiles the ones the remote intends. */
+.settings-page {
+  --Chip-Group-Tab: #f5f5f5;
+  --Chip-Group-Button: #f2f2f2;
+}
+
+.dark .settings-page {
+  --Chip-Group-Tab: #3a4142;
+  --Chip-Group-Button: #464f50;
+}
+
+/* THE SECURITY GRID, AND ITS BREAKPOINT IS 645px RATHER THAN A TAILWIND STEP — the remote's own
+ * `@media screen and (min-width: 645px)`, five pixels past `sm`, and it is the only such line in
+ * this project. Kept: rounding it to 640 would move the point at which the six tiles go from one
+ * column to two, which is a visible behaviour rather than a tidy-up.
+ *
+ * `min-width: 640px` on the ROW is what makes it wrap — three rows of two tiles each while the
+ * pane is wide enough, and one tile per row once it is not, since a 640px row cannot share a
+ * narrower pane with its neighbour. That is why the desktop capture shows two columns and why a
+ * tablet-width window shows one; there is no second media query doing it. */
+@media screen and (min-width: 645px) {
+  .settings-security {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .settings-security-flex {
+    flex: 1;
+    min-width: 640px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: nowrap;
+  }
+
+  .settings-security-flex > div {
+    width: auto;
+    flex: 1;
+  }
+}

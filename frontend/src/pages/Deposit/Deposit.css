@@ -1,0 +1,21 @@
+/* The dialog's size, and it is the one thing here that is not a class on the original.
+ *
+ * `info.dialog = { size: [30, 44] }` in the route, which the dialog manager writes INLINE onto
+ * `.dialog-list` as `width: 30rem; height: 44rem` once the centred-card layout applies. The
+ * auth dialog's own `login-layout-dialog-size` is the same mechanism with different numbers
+ * (29.375 x 45), so this follows it rather than inventing a second pattern.
+ *
+ * Below lg the shell is a full-screen sheet and `.dialog-list` is already 100%/100% — which is
+ * why this only exists inside the query, and why `size` on the original is likewise ignored on
+ * a phone (`dialog: m.mobile || {size}` hands it a bare `true` there). */
+/* The radius and the fill USED to be restated here, because the CARD treatment — the 1rem radius,
+   the layer2 fill and the 30rem x 40rem default — hangs off `.pc .dialog-list` on the original and
+   only the size is written inline. That pair is now a real `.dialog-list` rule in the same query in
+   Auth.css, hoisted when `/free-plays` became the third dialog and wanted the default outright. So
+   this rule is back to being only what the route asks for. */
+@media (min-width: 1024px) {
+  .dialog-list.deposit-dialog-size {
+    width: 30rem;
+    height: 44rem;
+  }
+}

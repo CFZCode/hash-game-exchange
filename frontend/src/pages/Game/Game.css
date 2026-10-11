@@ -1,0 +1,403 @@
+/* `/game/:gameUnique` — the shell around a game, measured off hash.game/game/crash at 1280 and
+ * at 390 with a phone UA, both at dpr 1. Only the SHELL is here; the game inside it is bc.game's
+ * own client and is not built (see index.jsx). Geometry read off the captures:
+ *
+ *   desktop   stage 256..864 (608 wide) | 16px gap | side 880..1264 (384 wide), both radius 12,
+ *             layer3; the play area ends at ~460, the bet panel under it to ~800, the toolbar row
+ *             at ~828; the info card starts at 884 and its four stats sit in one row
+ *   phone     the same blocks stacked at the page gutter — side panel below the stage, stats in
+ *             a 2 x 2 grid
+ *
+ * The bet panel is the game client's and is not reproduced; the frame takes its height instead
+ * so the stage keeps the proportion the capture has. */
+
+.game-page {
+  padding-bottom: 1.5rem;
+}
+
+.game-page-row {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+@media (min-width: 1024px) {
+  .game-page-row {
+    flex-direction: row;
+    align-items: stretch;
+  }
+}
+
+/* ── the stage ────────────────────────────────────────────────────────────────────────────── */
+.game-stage {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  border-radius: 0.75rem;
+  background-color: var(--color-layer3);
+  overflow: hidden;
+}
+
+.game-frame {
+  position: relative;
+  display: flex;
+  min-height: 24rem;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 16 / 12;
+  background-color: var(--color-layer2);
+}
+
+@media (min-width: 1024px) {
+  .game-frame {
+    min-height: 45rem;                            /* play area + bet panel on the capture */
+    aspect-ratio: auto;
+  }
+}
+
+.game-frame-iframe {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  width: 100%;
+  border: 0;
+}
+
+/* The state the live frame shows before its client is ready — a muted brand pill reading
+   "Connecting..." — with a line under it saying why it stays that way here. */
+.game-frame-connecting {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  text-align: center;
+}
+
+.game-frame-pill {                                /* 360,544 400×48 on the capture */
+  display: flex;
+  height: 3rem;
+  width: min(25rem, 100%);
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  background-color: var(--color-brand);
+  opacity: 0.5;
+  font-size: 0.875rem;
+  font-weight: 800;
+  color: var(--color-alw_dark);
+}
+
+.game-frame-note {
+  font-size: 0.75rem;
+  color: var(--color-tertiary);
+}
+
+/* ── the toolbar under the frame — y≈812..844 on the capture ───────────────────────────────── */
+.game-toolbar {
+  display: flex;
+  height: 3.5rem;
+  align-items: center;
+  gap: 1.5rem;
+  padding-inline: 1rem;
+}
+
+.game-tool {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  background: none;
+  color: var(--color-secondary);
+}
+
+.game-tool-icon {
+  height: 1.25rem;
+  width: 1.25rem;
+  fill: currentColor;
+}
+
+.game-tool-dot {
+  display: block;
+  height: 0.75rem;
+  width: 0.75rem;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+}
+
+.game-tool-count {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+/* The star, once it is a control rather than a picture. The resting state stays
+   `--color-secondary`, inherited from `.game-tool`.
+
+   ── THE COLOUR IS THE ORIGINAL'S, AND AN EARLIER PASS HERE GOT IT WRONG ────────────────────
+
+   `Layout-DI8MpYIQ.js` in the `games` remote hands the icon
+   `K("size-5 mb-0.5", e.isFavorite ? "fill-warning" : "fill-secondary")` — so the engaged colour
+   is `--warning`, a token this project already carries, and it moves with the theme (#FF9820
+   dark, #e68c21 light) exactly as every other `--warning` on the site does.
+
+   The earlier value was `#FBD765`, `--button-cashout-from`, reasoned to from the mirror's
+   palette because the mirror has no game-page CSS at all — `/game/:gameUnique` resolves through
+   the federated `games` remote and is not in `/assets/`. That is the ladder's rung 3, and
+   skipping it is what produced both a wrong colour and a wrong claim about the animation. The
+   note in index.jsx carries the resolution path.
+
+   The count goes with the star. It is the same control saying the same thing, and leaving it
+   `--color-primary` made the star look like a decoration next to an unrelated number. THAT part
+   is still this build's: the original's toolbar prints its count in a badge with its own
+   treatment, not beside the icon as this row does. */
+.game-tool-fav.is-on,
+.game-tool-fav.is-on .game-tool-count {
+  color: var(--color-warning);
+}
+
+/* A press is in flight. Dimmed rather than disabled-looking, because the button stays live —
+   the writes are idempotent, so a second press during the first is harmless. */
+.game-tool-fav[aria-busy='true'] {
+  opacity: 0.6;
+}
+
+/* ── THE PRESS ANIMATION ──────────────────────────────────────────────────────────────────────
+
+   THE PRESS ANIMATION IS STILL THIS BUILD'S, AND THAT IS NOW A SEARCHED CONCLUSION RATHER THAN
+   AN ASSUMED ONE. Three sources were read after the colour above turned out to be recoverable:
+   the mirror's `index-DxOqNczA.css` (48 keyframes), the CURRENT deploy's `index-Dxw2IdQj.css`
+   (51 — it adds `bounce`, `dialog-tg-pill-in` and `quest-breathe-sm`, none of them this), and
+   every one of the 75 chunks of the `games` remote (31 more). The favourite toolbar is `Ro` in
+   `Layout-DI8MpYIQ.js` and it carries `transition-colors` on the button and nothing else. The
+   nearest named candidates are all accounted for elsewhere: `heartleft`/`heartright` belong to
+   the losing mascot (`.animation-lose .left`), `task_star` is Quest Hub decoration, and the one
+   `animate-ping` in `Enter-B5OhVUkV.js` is the Recent Big Wins live dot.
+
+   So if the original animates this, it is not in the CSS or the chunks that draw the control,
+   and what is below is a reconstruction of the described behaviour rather than a port of it.
+
+   So the SHAPES here are the original's and the COMPOSITION is this build's, the same split the
+   gold above is under:
+
+     `fav-pop`  is `scale-pulse` (`0%,to {scale(1)} 50% {scale(1.1)}`) as a one-shot with a
+                harder overshoot and a settle, which is what a press wants and a breathing loop
+                does not.
+     `fav-ring` is `ping` (`75%,to {scale(2); opacity: 0}`), the original's own outward fade,
+                drawn as a ring instead of a filled disc.
+
+   ONLY ON THE WAY ON. Un-starring gets the colour change and nothing else — a burst celebrates
+   an addition, and firing it on a removal reads as though the removal failed. It is also driven
+   by a transient class rather than by `.is-on`, so a page that LOADS with the game already
+   starred does not animate: the state arriving from the server is not a press. */
+@keyframes fav-pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.35);
+  }
+  70% {
+    transform: scale(0.92);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+@keyframes fav-ring {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.55;
+  }
+  75%,
+  to {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+/* The ring is absolutely positioned over the icon, so the button needs to be its containing
+   block. `.game-tool` is a flex row and this changes nothing about its layout. */
+.game-tool-fav {
+  position: relative;
+}
+
+.game-tool-fav.is-burst .game-tool-icon {
+  animation: fav-pop 0.4s ease-out;
+}
+
+.game-tool-fav-ring {
+  position: absolute;
+  left: 0.625rem;
+  top: 50%;
+  height: 1.25rem;
+  width: 1.25rem;
+  margin: -0.625rem 0 0 -0.625rem;
+  border: 2px solid var(--color-warning);
+  border-radius: 50%;
+  animation: fav-ring 0.5s ease-out forwards;
+  /* Decoration over a live control — it must never eat the next press. */
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .game-tool-fav.is-burst .game-tool-icon {
+    animation: none;
+  }
+
+  .game-tool-fav-ring {
+    display: none;
+  }
+}
+
+/* ── the side panel — 384 wide on the capture ────────────────────────────────────────────── */
+.game-side {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  border-radius: 0.75rem;
+  background-color: var(--color-layer3);
+  padding: 0.75rem;
+}
+
+@media (min-width: 1024px) {
+  .game-side {
+    width: 24rem;
+  }
+}
+
+.game-side-head {                                 /* 884,138 368×26 */
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 0.5rem;
+  background-color: var(--color-layer2);
+  padding: 0.375rem 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 800;
+  color: var(--color-primary);
+}
+
+.game-side-dot {
+  height: 0.5rem;
+  width: 0.5rem;
+  border-radius: 50%;
+  background-color: var(--color-brand);
+}
+
+.game-side-columns {
+  display: grid;
+  grid-template-columns: 1fr 5rem 6rem;
+  padding: 0.75rem 0.75rem 0.5rem;
+  font-size: 0.875rem;
+  color: var(--color-secondary);
+}
+
+.game-side-empty {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  padding-block: 2rem;
+}
+
+/* ── the info card — starts at y=884 on the capture ─────────────────────────────────────── */
+.game-info {
+  margin-top: 1rem;
+  border-radius: 0.75rem;
+  background-color: var(--color-layer3);
+  padding: 1.25rem;
+}
+
+.game-info-loading,
+.game-info-empty {
+  display: flex;
+  justify-content: center;
+  padding-block: 2rem;
+}
+
+.game-info-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+}
+
+.game-info-title {                                /* 276,906 — 18px/800 */
+  font-size: 1.125rem;
+  font-weight: 800;
+  color: var(--color-primary);
+}
+
+.game-info-by {
+  margin-top: 0.125rem;
+  font-size: 0.875rem;
+  color: var(--color-secondary);
+}
+
+.game-info-provider {
+  font-weight: 600;
+  color: var(--color-brand);
+}
+
+.game-info-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.game-info-tag {                                  /* "# BC Originals" chips at x=898 */
+  display: inline-flex;
+  height: 1.75rem;
+  align-items: center;
+  border-radius: 0.375rem;
+  background-color: var(--color-layer4);
+  padding-inline: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-brand);
+}
+
+/* Four stats in a row on the capture (y≈964..1000), two by two on a phone. Each cell has a
+   hairline on its left except the first. */
+.game-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem 0;
+  margin-top: 1.25rem;
+}
+
+@media (min-width: 640px) {
+  .game-stats {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.game-stat {
+  text-align: center;
+}
+
+.game-stat + .game-stat {
+  border-left: 1px solid var(--color-third);
+}
+
+.game-stat-label {
+  font-size: 0.875rem;
+  color: var(--color-secondary);
+}
+
+.game-stat-value {
+  margin-top: 0.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-brand);
+}
+
+.game-info-signin {
+  margin-top: 1rem;
+  font-size: 0.875rem;
+  color: var(--color-secondary);
+}

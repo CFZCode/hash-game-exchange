@@ -1,0 +1,79 @@
+<div class="item" style="word-break: break-all;">
+  <h2>What is a roulette?</h2>
+  <p>
+    Roulette is a common quiz game with a total of 37 numbers, including
+    numbers 1 to 36 and 0; The numbers on the wheel are spaced in red and
+    black, but the numbers are not in order.
+  </p>
+  <h2>How does the roulette work?</h2>
+  <p>
+    There is a preparation time of 10s before the start of each game.
+    After the game starts, the wheel will rotate at high speed and stop
+    slowly. The final position of the pointer is the result of the game.
+  </p>
+  <h2>How should I play? </h2>
+  <p>
+    Side: 1-18, 19-36: The bet number can be in the upper half (small) or the lower half (large), and the odds are 1:2.
+  </p>
+  <p>Number 0: Betting number 0, odds 1:36.</p>
+  <h2>Game fairness?</h2>
+  <p>
+    The game is based on a hash hash (
+    <a
+      class="h2-link cl-primary"
+      rel="noopener noreferrer"
+      href="https://dwz.cn/5f5VdLt/"
+      target="_blank"
+    >
+      https://dwz.cn/5f5VdLtp
+    </a>
+    ). The designer generated a total of 10 million hash hashes
+    (generating chain verifiable), and each hash corresponds to a roulette
+    result.The game releases the 10 million numbers in reverse to
+    correspond to each draw in the game.So this game has 10 million
+    periods.In other words, the number of roulette results for each issue
+    of the game has long existed.
+  </p>
+  <h2>How to verify fairness?</h2>
+  <p>
+    The SHA256 of the hash from the game 23654 is: <br />
+    33d8be75c9f6cb219a1763e77e307ac0a1107c85bd9fee53e81be0ec592ff4c5
+  </p>
+  <p>
+    The final hash of the game is SHA256: <br />
+    5bf9a3fae704667be2d3704ea8b6e703796defaa5f328e1a8d46b3a0fa12269f
+  </p>
+  <p>
+    You can verify the SHA256 of the hash corresponding to any lottery period!
+  </p>
+  <p>
+    Verify address:
+    <a
+      class="h2-link cl-primary"
+      rel="noopener noreferrer"
+      href="http://www.ttmd5.com/hash.php?type=9"
+      target="_blank"
+    >
+      http://www.ttmd5.com/hash.php?type=9
+    </a>
+  </p>
+  <p>Verification result algorithm:</p>
+  <p>
+    To generate a random number between 0 and 36, we take the first 3
+    characters of the hash and convert them to a decimal number from 0 to
+    4096 (16^3).If it is less than 3700, we divide it by 100 and round it
+    up to use as a roulette result.Otherwise, we reuse the next 3
+    characters.We are able to repeat this process up to 62 times.
+  </p>
+  <p>
+    In very rare cases, the probability of (64*2/(16^64)), none of the 62
+    trials is below 3700, we use the last character and convert them to
+    your game result.
+  </p>
+  <p>
+    For example:
+    5bf9a3fae704667be2d3704ea8b6e703796defaa5f328e1a8d46b3a0fa12269f Take
+    the first 3 characters of the hash 5bf, convert to decimal equal to
+    880,880/100=8.8, after rounding, the game result is 8.
+  </p>
+</div>

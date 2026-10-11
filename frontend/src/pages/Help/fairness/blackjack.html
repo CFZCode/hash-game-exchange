@@ -1,0 +1,67 @@
+<div class="item">
+  <h2>The card sequence verification</h2>
+  <div class="help-content">
+    <p>
+      1.The random seed from server side generates hash1 first, hash1 is
+      the card sequence;
+    </p>
+    <p>2.Use hash1 to generate hash2 and hash2 is public;</p>
+    <p>
+      3.<span class="cl-primary">After the round is finished</span>,
+      the hash1 and the card sequence of the round will be public;
+    </p>
+  </div>
+
+  <h2>The single deck shuffling logic</h2>
+  <div class="help-content">
+    <p>Use seed for shuffling</p>
+    <p>The shuffling steps are as follows:</p>
+    <ol>
+      <li>
+        Create a deck of cards named ß, the card is sequenced as spade
+        A-K,heart A-K, club A-K and diamond A-K.
+      </li>
+      <li>
+        Hash256 the seed to get the hash value, which will be used as the
+        weight of the first card (spade A) in the card ß
+      </li>
+      <li>
+        Delete the first bit of the hash value and add it back as the last
+        character of the hash value (for example 54321 to 43215), the
+        new hash value will be used as the weight of the second card of ß
+        (Spades 2)
+      </li>
+      <li>Repeat step 2 to calculate the weight for all the card in ß</li>
+      <li>
+        Finally, shuffle ß according to the corresponding weights of the
+        cards, from small to large. The reordered cards is the shuffled ß.
+      </li>
+    </ol>
+  </div>
+
+  <h2>The shuffling logic for multiple decks </h2>
+  <div class="help-content">
+    <p>When multiple decks need to be shuffled:</p>
+    <ol>
+      <li>
+        First shuffle the first deck and perform the single deck shuffle
+        steps 2-4.
+      </li>
+      <li>
+        Use the hash value of the first deck as the seed for the second
+        deck, then shuffle the second deck by the performing the single
+        deck shuffle steps 2-4.
+      </li>
+      <li>
+        Use the hash value of the second deck as the seed for the third
+        deck, then shuffle the second deck by the performing the single
+        deck shuffle steps 2-4.
+      </li>
+      <li>
+        By analogy, all the cards from the decks will have their weight,
+        and finally put all cards together and perform the fourth step of
+        the single deck shuffling logic for sorting.
+      </li>
+    </ol>
+  </div>
+</div>

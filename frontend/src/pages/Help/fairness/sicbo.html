@@ -1,0 +1,25 @@
+<div class="item">
+  <h2>How Are the Results Calculated?</h2>
+  <div class="content">
+    <p>
+      To get the results, we calculate the hash value of the combination
+      with HMAC_SHA256. This gives us a 64-character hexadecimal string:
+      hash = HMAC_SHA256 (clientSeed:nonce, serverSeed).
+    </p>
+    <div class="code-area">
+      <pre>
+        public static List<Integer> calc(String seed, String salt) {
+          List<Integer> diceResults = new ArrayList<>();
+          for (int i = 0; i < 3; i++) {
+            String hash = String.format("%s:%d", seed, i);
+            String message = HmacSHA.sha256(hash, salt);
+            // Generate a random number in the range of 1 to 6.
+            int rawNumber = GenerateRandomV2.slideWindowNumber(message, 6) + 1;
+            diceResults.add(rawNumber);
+          }
+          return diceResults;
+        }
+      </pre>
+    </div>
+  </div>
+</div>

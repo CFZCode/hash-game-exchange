@@ -1,0 +1,73 @@
+/* Bottom Navigation Tabbar Styles.
+
+   Every size here is now plain rem, because the root font-size is scaled in
+   src/index.css exactly as the original scales it. 4.5rem == the original's 72
+   design px, and it resolves to 53.58px at a 320px viewport, 62.79px at 375px and
+   72px from 430px up — no media queries and no per-value conversion.
+
+   Spacing and text come from the markup's Tailwind classes (px-1 py-2 on the
+   buttons, mt-0.5 text-xs on the labels), which are the original's own classes and
+   scale for the same reason. Do not reintroduce hand-scaled overrides for them.
+
+   Do not add a `display` declaration here — it would outrank the `lg:hidden` utility. */
+/* THE TOP CORNERS ARE THE ORIGINAL'S OWN `rounded-t-2xl`, restated here rather than left to
+   the utility the markup already carries.
+   ---------------------------------------------------------
+   `Enter-MsmOuq5R.js` writes the bar as
+
+     class="tabbar center fixed bottom-0 left-0 w-full rounded-t-2xl bg-layer4"
+
+   and this build's markup carries that class verbatim, so the radius was never absent from
+   the class list — `.rounded-t-2xl` is emitted and `--radius-2xl` is declared on `:root`.
+   What it was, was the one declaration on this element coming from `@layer utilities` while
+   `.tabbar`'s own box (`height`, `background-color`) is unlayered right here. Unlayered CSS
+   beats layered CSS outright no matter the source order — the hazard CLAUDE.md documents, and
+   the reason this file already refuses to declare `display` — so any rule added to `.tabbar`
+   later that touched `border-radius`, even a shorthand reset, would silently win. Writing the
+   two corners beside the background they clip puts them on the same side of that line.
+
+   1rem is `--radius-2xl`'s value and it is a rem for the usual reason: below 640 the root is
+   scaled, so the corner tracks the bar's own 4.5rem height instead of freezing at 16px.
+
+   NO `overflow: hidden`. It is the reflex guard for children painting over a parent's radius,
+   nothing here needs it (the five `.button` children declare no background at all — checked
+   against the built stylesheet, not assumed), and the original does not clip either. Adding it
+   would quietly cut off the first badge anyone puts on a tab, which is exactly what the
+   `tag: "unread"` dot on Quest Hub looks like when it reaches this bar. */
+.tabbar {
+  height: 4.5rem;
+  background-color: var(--color-layer4);
+  border-top-left-radius: 1rem;
+  border-top-right-radius: 1rem;
+}
+
+/* Do not "tighten" the icon wrapper. The original renders the identical structure —
+   an inline-block `color_icon_img scale-[80%]` inside a plain block div — so the 3.2px
+   of dead space the transform leaves, and the inline-block's baseline descender space,
+   are both present in the original too. Removing them pulls the label ~9px too high.
+   The sprite box is a fixed 32px in the original as well, so it does not scale. */
+
+/* THE ACTIVE CELL IS `_g`, NOT THE BARE NAME, and that is the icon component's own rule
+   rather than a choice. `ge` in Enter-MsmOuq5R.js picks the cell from a six-entry table:
+
+     select ? (darken ? i.select : i.select_light)
+            : (icontype === "tabbar" ? (darken ? i.pure : i.pure_w)
+                                     : (darken ? i.normal : i.light))
+
+   and every tabbar entry's `select` is the green sheet — `menu_g`, `explore_g` — while
+   `normal` is the plain coloured one this bar never reaches, because `icontype: "tabbar"`
+   sends the idle arm to `pure` instead. Menu was lit with `menu` (the `normal` cell) here,
+   which is a different drawing rather than a different tint, and it sat next to a label that
+   correctly turned brand green. Both buttons take `_g` now.
+
+   Sports and Chat are still idle-only, so they need no `_g` cell until they light up; the
+   positions are `sports_g -224px -128px` and `chat_g -96px -96px`. */
+.color_icon_img.menu_g    { background-position: -32px -160px; }
+.color_icon_img.explore_g { background-position: -32px -128px; }
+.color_icon_img.casino_g  { background-position: -96px 0; }
+
+.color_icon_img.menu_p    { background-position: -96px -160px; }
+.color_icon_img.explore_p { background-position: -96px -128px; }
+.color_icon_img.casino_p  { background-position: -96px -64px; }
+.color_icon_img.sports_p  { background-position: -224px -192px; }
+.color_icon_img.chat_p    { background-position: -128px -32px; }

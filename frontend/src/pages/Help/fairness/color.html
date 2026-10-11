@@ -1,0 +1,29 @@
+<div class="item">
+    <h2>Result Generation Process:</h2>
+    <div class="content">
+        <p>
+            Combine Seeds: The server combines the client seed and nonce to create a unique key for the game round.​
+            Generate Hash: For each of the three dice, the server uses the HMAC-SHA256 algorithm with the unique key and
+            server seed to produce a hash value.​
+            Determine Dice Results: Each hash is converted into a number, which is then mapped to one of six possible
+            colors, corresponding to the six faces of a dice.
+        </p>
+        <div class="code-area">
+            <pre>
+function getDiceResults(serverSeed, clientSeed, nonce) {
+   const key = `${clientSeed}:${nonce}`;
+    const results = [];
+                  
+    for (let i = 0; i < 3; i++) {
+        const hash = hmacSHA256(key, `${serverSeed}:${i}`);
+        const diceResult = calculateNumber(hash, 6);
+        results.push(diceResult);
+    }
+                  
+        return results;
+}
+        </pre>
+        </div>
+        <div>The server returns an array of three numbers, each representing the color outcome of a dice roll.</div>
+    </div>
+</div>

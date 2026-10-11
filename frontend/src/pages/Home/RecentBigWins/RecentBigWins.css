@@ -1,0 +1,52 @@
+/* The Recent Big Wins marquee.
+ *
+ * Verbatim from index-DxOqNczA.css (`.recent-big-win` / `@keyframes moveX`), including the
+ * keyframe name — the original declares it globally and a later section may reuse it.
+ *
+ * --move-x is one full pass of the strip: the component renders 20 cards TWICE, so
+ * translating by the width of one set lands card 21 exactly where card 1 was and the loop is
+ * seamless. That width is 20 * (card + gap):
+ *
+ *   below sm: 20 * (w-14 + gap-3)   = 20 * (3.5rem + 0.75rem)  = 85rem
+ *   sm and up: 20 * (w-14 + gap-3.5) = 20 * (3.5rem + 0.875rem) = 87.5rem
+ *
+ * Both are in rem on purpose. Below 640 the root font-size scales with the viewport
+ * (see CLAUDE.md), and so do w-14 and gap-3 — a px value here would drift out of step with
+ * the cards it is supposed to match and the seam would show. Anything that changes the card
+ * width, the gap, or the count of 20 has to change these two numbers with it.
+ *
+ * Padding lives on the clipping parent, not here: the animated element must start at offset
+ * 0 for the translate to line up.
+ */
+@keyframes moveX {
+  0% {
+    transform: translate(0);
+  }
+  to {
+    transform: translate(var(--move-x));
+  }
+}
+
+.recent-big-win {
+  --move-x: -85rem;
+  animation: moveX 20s linear infinite;
+}
+
+/* Set while the strip is scrolled out of view — an offscreen animation still forces layout
+   work every frame. The original drives this from an IntersectionObserver with a 100px
+   root margin; see index.jsx. */
+.recent-big-win.marquee-paused {
+  animation-play-state: paused;
+}
+
+@media (min-width: 640px) {
+  .recent-big-win {
+    --move-x: -87.5rem;
+  }
+
+  /* Hover-to-pause is deliberately desktop/tablet only in the original: on a touch screen
+     :hover latches after a tap and would leave the strip frozen. */
+  .recent-big-win:hover {
+    animation-play-state: paused;
+  }
+}

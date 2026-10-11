@@ -1,0 +1,127 @@
+/* The scrim. Not a stylesheet value on the original — the `.pop-overlayer` ref callback in
+   index-BsFv7ByC.js writes it inline:
+
+     o.style.backgroundColor = `rgba(16, 18, 18, ${a() * .8})`
+
+   `a()` is the dialog's open progress, tweened 0 -> 1 by GSAP with `duration: .35` and
+   `ease: "power3.out"` (easeOutQuart = cubic-bezier(.165, .84, .44, 1)), so the resting
+   colour is #101212 at 80% and it fades in with the panel. Not the .dialog-root `#000a`
+   the original uses for its heavier dialogs. */
+.region-block-overlay {
+  background-color: rgba(16, 18, 18, 0.8);
+  animation: region-block-scrim-in 0.35s cubic-bezier(0.165, 0.84, 0.44, 1);
+}
+
+@keyframes region-block-scrim-in {
+  from {
+    background-color: rgba(16, 18, 18, 0);
+  }
+}
+
+/* ---------------------------------------------------------------------------------------
+   The globe's motion: `z3`, the single animation in diqiu-CQmxYk9W.json, which the Spine
+   runtime plays on loop. It is 6s long and drives three things.
+
+   1. `wquan` — rotate, one key pair, 0 to -120deg, linear (no curve = linear). The runtime
+      draws the skeleton with `R.scaleY = -m`, which is what makes Spine's y-up content come
+      out y-up on a y-down canvas; under that mapping the skeleton reads on screen the way
+      an artist sees it in the editor, where a negative angle is CLOCKWISE. CSS is already
+      y-down and clockwise-positive, so -120deg there becomes +120deg here — copying the
+      sign across was what had the ring turning backwards. It loops seamlessly because the
+      ring carries 36 dashes and 120deg is exactly 12 of them, so the wrap lands dash-on-dash.
+
+   2. `zuobiao` — translate, y from -1.92 to 9.14 units and back every 2s on the bezier
+      [.25 -1.92][.75 9.14], which normalises to cubic-bezier(.25, 0, .75, 1). Spine's +y is
+      up, so 9.14 is 4.113px UP and -1.92 is 0.864px down. x is a constant 1.92 (0.864px),
+      which is folded into the sprites' `left` in the markup rather than animated.
+
+   3. `s_xian1/2/3` — the meridians. Each is a mesh strip that the deform timeline bends
+      from a straight vertical bar into a half-circle of radius 75u and back, while the
+      bone's scale.x steps between 1 and -1 to mirror which side it bulges. Neither timeline
+      means anything on its own; the motion is their product, `rx = -magnitude * scale.x`:
+
+        s_xian1  scale +1 [0,1.5) -1 [1.5,3) +1 [3,4.5) -1 [4.5,6)
+                 mag     1@0  0@1.5  1@3  0@4.5  1@6
+                 rx      -1 -> 0 -> +1  |  -1 -> 0 -> +1
+
+      so it ramps LINEARLY from -R to +R over 3s and wraps. s_xian2 and s_xian3 have busier
+      key lists (they carry an extra 25.25 magnitude key) but resolve to the same 3s ramp,
+      reaching +R at t=1/4 and t=2/5 against s_xian1's t=3/6. A 1s stagger on a 3s period is
+      exactly one third, so the three are ALWAYS evenly spread, 2R/3 apart in rx.
+
+      That last part is the whole point and it is easy to get wrong. Reading the phase off
+      the peak times alone suggests a 6s triangle (+R -> 0 -> -R -> 0 -> +R); that is what
+      stood here, and with a 1s stagger it makes pairs of arcs coincide about half the time,
+      so the globe loses lines and turns at half speed. Measuring the live site settles it:
+      the three crossings sit at -0.498, +0.142 and +0.782 of R — spaced 0.640 and 0.640,
+      the 2/3 a 3s sawtooth predicts and nothing a 6s triangle produces.
+
+      The wrap from +R back to -R looks like it should snap, but a face-on meridian has
+      radius 33.75px against quan's 36px silhouette, so at that instant it is sitting on the
+      ring quan already draws and swapping halves is invisible.
+
+      The delays are negative so every arc starts mid-cycle instead of holding its first
+      frame. The arcs bulge LEFT at scaleX(1), matching the sign of the deform offsets —
+      see the path in index.jsx.
+
+   Every duration and delay below is multiplied by `--z3-rate`, which utils/spineRate.js sets
+   to 60/refreshHz. The original advances the skeleton a fixed 1/60s per displayed frame, so
+   the whole animation runs at refreshRate/60 — that file has the full story. Unset, the var
+   defaults to 1 and everything plays at the 60Hz speed the JSON describes.
+   --------------------------------------------------------------------------------------- */
+.region-block-dotted-ring {
+  animation: region-block-ring calc(6s * var(--z3-rate, 1)) linear infinite;
+}
+
+@keyframes region-block-ring {
+  to {
+    transform: rotate(120deg);
+  }
+}
+
+.region-block-pin {
+  animation: region-block-pin calc(2s * var(--z3-rate, 1)) cubic-bezier(0.25, 0, 0.75, 1)
+    infinite;
+}
+
+@keyframes region-block-pin {
+  0%,
+  100% {
+    transform: translateY(0.864px);
+  }
+  50% {
+    transform: translateY(-4.113px);
+  }
+}
+
+/* The svg's viewBox is 72 over a 72px box, so a user unit is a px and `non-scaling-stroke`
+   keeps these arcs at the same 4.5px as the unscaled lines beside them. Without it scaleX
+   would thin the stroke to nothing as the meridian turns edge-on. */
+.region-block-meridian {
+  transform-box: view-box;
+  transform-origin: 36px 36px;
+  animation: region-block-meridian calc(3s * var(--z3-rate, 1)) linear infinite;
+}
+
+/* -2s and -1s put s_xian2 and s_xian3 a third and two thirds through the 3s ramp, which
+   reproduces their t=1 and t=2 peaks against s_xian1's t=3. At t=0 that gives rx of
+   -1, +0.333 and -0.333 — the same three values the timelines resolve to. */
+.region-block-meridian-2 {
+  animation-delay: calc(-2s * var(--z3-rate, 1));
+}
+
+.region-block-meridian-3 {
+  animation-delay: calc(-1s * var(--z3-rate, 1));
+}
+
+/* Both keyframes use the same single transform function, so CSS interpolates the argument
+   rather than decomposing a matrix — scaleX really does pass through 0 and flip, instead of
+   rotating from one side to the other. */
+@keyframes region-block-meridian {
+  from {
+    transform: scaleX(-1);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}

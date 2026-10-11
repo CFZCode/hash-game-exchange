@@ -1,0 +1,107 @@
+/* `fadeUp2`, the transition the account dropdown opens with.
+ *
+ * The original animates it from JS — the panel is wrapped in `<Transition name="fadeUp2">` and
+ * the named preset lives in index-BsFv7ByC.js:
+ *
+ *   fadeUp2: { from: { opacity: 0, y: 16 }, to: { opacity: 1, y: 0 }, config: It }
+ *   It = { duration: .3, ease: "power2.out" }
+ *
+ * A keyframe cannot be written as a utility, which is the only reason this file exists.
+ *
+ * `power2.out` is GSAP's cubic ease-out, so the bezier below is `easeOutCubic` — not the
+ * `ease-out` keyword, which is much softer and reads as a slower panel.
+ *
+ * ENTER ONLY. The original's Transition also runs the reverse on exit; this unmounts the panel
+ * outright, as every other dropdown in this project does, so there is no exit half to play.
+ */
+.after-login-fade-up {
+  animation: after-login-fade-up 0.3s cubic-bezier(0.215, 0.61, 0.355, 1);
+}
+
+@keyframes after-login-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────────────────
+   The confirm dialog's three animations. Same reason this file exists: none of them is a
+   utility. See ConfirmDialog.jsx for the dialog itself.
+
+   The first two are ONE gsap tween on the original, not two. `Qx` gives every popup a
+   `{value: 0}` object and `animateTo(1)` tweens it over `{duration: .35, ease: "power3.out"}`,
+   and two separate effects read it every frame:
+
+     o.style.backgroundColor = `rgba(16, 18, 18, ${a() * .8})`      // the scrim
+     n.style.opacity = String(i()); n.style.transform = `scale(${i() * .2 + .8})`   // the panel
+
+   So the scrim runs 0 -> .8 alpha while the panel runs 0 -> 1 opacity and .8 -> 1 scale, all off
+   the same clock. Splitting that into two keyframes with identical timing keeps them in step;
+   the panel's opacity comes from the container fading, which is why `after-login-pop-in` only
+   animates transform. `power3.out` is GSAP's QUARTIC ease-out, one step sharper than the
+   `power2.out` the dropdown above uses — hence the different bezier.
+   ───────────────────────────────────────────────────────────────────────────────────────── */
+.after-login-pop-scrim {
+  background-color: rgb(16 18 18 / 0.8);
+  animation: after-login-pop-scrim 0.35s cubic-bezier(0.165, 0.84, 0.44, 1);
+}
+
+@keyframes after-login-pop-scrim {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.after-login-pop-in {
+  animation: after-login-pop-in 0.35s cubic-bezier(0.165, 0.84, 0.44, 1);
+}
+
+@keyframes after-login-pop-in {
+  from {
+    transform: scale(0.8);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+/* `.head-shake` and `@keyframes headShake-ltr`, index-DxOqNczA.css verbatim — what the popup
+   overlayer plays instead of closing when you click beside a dialog that has to be answered.
+   The rtl half is dropped, as everywhere else in this build.
+
+   MUST STAY BELOW `.after-login-pop-in`: same specificity, both set the `animation` shorthand,
+   so source order is what decides which one wins while both classes are on the element. The
+   dialog only ever carries one of them, but the ordering is what makes that safe rather than
+   load-bearing. */
+.head-shake {
+  animation: headShake-ltr 0.6s ease-in-out;
+}
+
+@keyframes headShake-ltr {
+  0% {
+    transform: translate(0);
+  }
+  6.5% {
+    transform: translate(-6px) rotateY(-9deg);
+  }
+  18.5% {
+    transform: translate(5px) rotateY(7deg);
+  }
+  31.5% {
+    transform: translate(-3px) rotateY(-5deg);
+  }
+  43.5% {
+    transform: translate(2px) rotateY(3deg);
+  }
+  50% {
+    transform: translate(0);
+  }
+}

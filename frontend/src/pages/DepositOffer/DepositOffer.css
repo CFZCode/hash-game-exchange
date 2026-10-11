@@ -1,0 +1,117 @@
+/* The two things on /deposit-offer that cannot be a utility.
+ *
+ * Everything else on this page is Tailwind, because the markup it was transcribed from is
+ * Tailwind. These two are here for the same reason a value ever leaves the markup in this
+ * project: the original writes them with ITS custom-property scheme, `rgb(var(--brand)/0.3)`,
+ * which resolves to nothing in this build — `@theme` declares `--color-brand` as a finished
+ * colour. Translating them inside an arbitrary-value class would mean escaping a
+ * comma-and-space-laden gradient into `bg-[...]`, which is unreadable and easy to break; a
+ * rule is clearer and costs nothing.
+ *
+ * Neither sets `display`. That is the cascade hazard in CLAUDE.md — every file here is
+ * unlayered, so a `display` in a component stylesheet silently beats a responsive utility on
+ * the same element.
+ */
+
+/* The dotted rail down the four-step checklist beside the stepper. The original's own value:
+   `repeating-linear-gradient(to bottom, rgb(var(--brand)/0.3) 0, rgb(var(--brand)/0.3) 3px,
+   transparent 3px, transparent 5px)` — a 3px dash on a 5px pitch at 30% brand. */
+.deposit-offer-thread {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    rgba(36, 238, 137, 0.3) 0,
+    rgba(36, 238, 137, 0.3) 3px,
+    transparent 3px,
+    transparent 5px
+  );
+}
+
+/* The glow under each checklist bullet, written inline on the original as
+   `0px 0px 5.099999904632568px rgba(65.82, 253.59, 159.71, 0.50)`. The fractional channels are
+   real CSS (Color 4 permits them and the browser rounds), and they are its own — a lighter,
+   slightly bluer green than `--brand`, so it reads as a halo rather than a fatter dot. Kept at
+   full precision rather than rounded, as with every other measured value in this repo. */
+.deposit-offer-bullet {
+  box-shadow: 0px 0px 5.099999904632568px rgba(65.82, 253.59, 159.71, 0.5);
+}
+
+/* The detail dialog's scrim.
+ *
+ * Not a stylesheet value on the original either — `.pop-overlayer` is the imperative popup
+ * stack this dialog rides on (`popupViewDetail` in the same registry as `DepositOffer`), and
+ * index-BsFv7ByC.js writes its colour inline as `rgba(16, 18, 18, ${a() * .8})`, tweened 0 -> 1
+ * over .35s on easeOutQuart. So the resting value is #101212 at 80%.
+ *
+ * That is also MEASURED here, which is worth recording because the screenshot argues against
+ * it: the page shows through the scrim looking barely dimmed. It is not. Sampling the page
+ * background beside the dialog gives #141616 (20, 22, 22) over a #232626 (35, 38, 38) page,
+ * and 35 - 19a = 20 solves to a = 0.79 on the red channel and 0.80 on the green. The JS value
+ * and the pixels agree; the eye does not. */
+.deposit-offer-scrim {
+  background-color: rgba(16, 18, 18, 0.8);
+  animation: deposit-offer-scrim-in 0.35s cubic-bezier(0.165, 0.84, 0.44, 1);
+}
+
+@keyframes deposit-offer-scrim-in {
+  from {
+    background-color: rgba(16, 18, 18, 0);
+  }
+}
+
+/* `bonus-terms-conditions` — the dialog's OWN class, carried in the rendered markup beside
+ * `pop-center`. Its rules ship in the page chunk, which is not in the mirror, so this block is
+ * a reconstruction. It is a small one, and every line of it is forced by something measurable:
+ *
+ * - WIDTH. `.pop-center` is 26rem, and this dialog is 1000. Not an override with a magic
+ *   number, though — the width is what the CONTENT asks for: the stage grid's
+ *   `sm:min-w-[36.75rem]` (588) + the column `gap-3` (12) + the calculator's `w-80` and its
+ *   wrapper's `sm:p-4` (320 + 32) + `px-6` on both sides (48) is exactly 1000, and the 4px
+ *   scrollbar accounts for the 1004 the capture measures. So the rule is `fit-content` and the
+ *   markup does the arithmetic. `.pop-center`'s own `max-width: 90%` still applies.
+ *
+ * - PADDING-TOP. `.pop-center` reserves 3rem for the absolute `.pop-title` above it. This
+ *   dialog draws its own header instead, and the capture puts the 48px artwork 12px from the
+ *   top of the card — there is no 48px band above it. So the reservation goes.
+ *
+ * - THE TITLE BAR ITSELF. `.pop-close` paints a #373E3F rounded square, and sampling the whole
+ *   top-right corner of the capture finds not one pixel of that colour; the only close on
+ *   screen is the header's svg in `secondary` on bare layer1. Hidden rather than removed from
+ *   the markup, because the bar is the shell every `.pop-*` dialog renders — and `display: none`
+ *   keeps it out of the accessibility tree, so there is no second close button.
+ *
+ * - `.pop-content` PADDING. `.pop-content` is `0 1rem 1rem`, which would inset the content by
+ *   16 on top of its own `px-6`. Both edges say otherwise: the stage grid starts 24.8px from
+ *   the card's left, and on the right the 40px gap is fully explained by `px-6` plus the
+ *   calculator wrapper's `sm:p-4`. `min-height: 0` is the flex-item guard that lets the
+ *   scroller actually shrink to the card's `max-height: 80%` instead of overflowing it.
+ */
+.pop-center.bonus-terms-conditions {
+  /* WIDTH IS THE CENTRED ARM'S ALONE. The bottom sheet is `width: 100% !important` in its own
+     rule, so `fit-content` here would be both overridden and meaningless. */
+  width: fit-content;
+}
+
+/* PADDING AND CLIPPING APPLY TO BOTH ARMS, which is why they are not in the rule above.
+ *
+ * `padding-top: 3rem` is declared on `.pop-bottomsheet, .pop-center` together — it reserves room
+ * for the absolute `.pop-title`, and this dialog hides that bar and draws its own header. Scoped
+ * to `.pop-center` only, the SHEET kept the reservation and opened with a 48px empty band above
+ * the artwork. Found when this dialog became the first call site to take the sheet arm.
+ *
+ * `overflow: hidden` for the same reason it was always here: the panel is rounded and every block
+ * inside it is square, so without it the corners show the root's own layer2 in little triangles —
+ * the sheet rounds its top two. Safe on both: the scroller is a CHILD, so clipping the parent does
+ * not break the header's `position: sticky`. */
+.bonus-terms-conditions {
+  padding-top: 0;
+  overflow: hidden;
+}
+
+.bonus-terms-conditions > .pop-title {
+  display: none;
+}
+
+.bonus-terms-conditions > .pop-content {
+  padding: 0;
+  min-height: 0;
+}

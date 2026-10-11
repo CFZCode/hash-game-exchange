@@ -1,0 +1,52 @@
+/* The wallet shell's sticky behaviour, and what is the original's versus what is ours.
+ *
+ * THE ORIGINAL PINS NOTHING. `fO` wraps both the heading and the rail in its `Qa` helper, which
+ * sets `position: sticky` and no `top` at all — and `top: auto` never pins. That is not a missing
+ * stylesheet: `.page-menu`, `.page-main` and `.page-container` appear in none of the mirror's six
+ * stylesheets and in none of the current deploy's `index-Cnadk-Sq.css` either, both checked. On
+ * the live site the rail and the heading scroll away with the page.
+ *
+ * The offsets in index.jsx (`top-15` on the heading, `top-30` on the rail) are therefore THIS
+ * BUILD'S, added on request so the rail holds while the pane scrolls beside it, and released at
+ * the end because sticky only holds within its containing block. The reasoning for each number is
+ * at the call site. The Help Center made the same departure first and documents it the same way.
+ *
+ * THE PANE'S STICKY OFFSETS ARE RE-AIMED, NOT REMOVED, and the reason is a scroll-container
+ * mismatch rather than a taste call. `SelectCurrencyContent` pins its search row at `top-[-1px]`
+ * and its group headings at `top-14`; both are correct on the original because that list sits
+ * inside a pane-local scroller, where `top` measures the pane. This build scrolls the DOCUMENT —
+ * the layout clears the fixed header with padding instead of owning a scroller — so the same
+ * offsets measure the viewport: the search row pinned behind the 60px header, and its `z-20`
+ * painted over the page heading pinned at `z-10` across 60..120.
+ *
+ * So the pane passes its own: the search row's pin is dropped (it was the thing colliding, and it
+ * is not a section title) and the group headings move to `top-15`, i.e. 60px — the fixed header's
+ * own height, so a section title rests directly against the header. It shares that band with the
+ * page heading, which pins at the same 60, and the two do not fight: the heading's text sits at
+ * the far left of a `w-full` row while the title sits in the pane's column, so only their opaque
+ * backgrounds meet, and the title is later in the DOM at the same `z-10` so it paints on top.
+ *
+ * `top-30` (120, i.e. below the pinned heading) was tried first and reads worse — it floats the
+ * title a heading's height clear of the header with its own rows already gone past.
+ *
+ * Each section's title then holds while its own rows pass under it and is pushed off by the next
+ * section's, which is the behaviour the chunk intends. That part needs no code: sticky holds only
+ * within its containing block, and each heading already shares one wrapper with its rows.
+ *
+ * The prop defaults to the chunk's own values, so a future pane-local scroller (the deposit
+ * dialog is one) gets the original's offsets with nothing to remember.
+ *
+ * `.page-main`, `.page-menu` and `.page-container` are DEAD CLASSES — none of the six stylesheets
+ * in the mirror declares them, and neither does the current deploy's. They are in the markup
+ * because they are in the original's markup. Do not give them rules here; whatever a rule did
+ * would be this project's invention, and the layout is already carried by the utilities beside
+ * them (`flex flex-wrap gap-x-4`, `w-60 flex-none`, `flex-1`).
+ *
+ * This file is therefore intentionally almost empty, and that is a finding rather than an
+ * oversight. It exists so the next person does not re-derive the paragraph above.
+ */
+
+/* `overflow-hidden` on the sub-1100 strip clips the rail's own horizontal scroll, so the strip
+   needs a scroller that hides its bar. `.hide-scroll` is already unlayered in index.css — see the
+   cascade note there about why it must stay out of a layer — and is what the original uses here
+   too. Nothing further is needed. */

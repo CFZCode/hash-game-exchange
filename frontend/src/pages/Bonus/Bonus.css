@@ -1,0 +1,43 @@
+/* `.bonus-v5-dialog` — the class `PageLayout` puts on the dialog's `.dialog-item` when `/bonus`
+   renders as a full-screen dialog below lg. Both rules are index-DxOqNczA.css verbatim:
+
+     .bonus-v5-dialog .dialog-title,
+     .bonus-v5-dialog .dialog-content { background-color: rgb(var(--layer1)) !important }
+     .bonus-v5-dialog .scroll-container { height: 100%; padding-bottom: 0 }
+
+   The fill is what makes the whole sheet layer1 rather than the shell's own layer2 — the page's
+   own `bg-layer1` only reaches as far as its content, and a short Rewards tab would otherwise
+   show layer2 under it. `.dialog-title` is in the pair on the original because the rule predates
+   the behaviour; with `no-title` there is no bar for it to reach, and it is kept as written.
+
+   `.bonus-v5-dialog` lands on `.dialog-list` here rather than on `.dialog-item` — this build's
+   `RouteDialog` takes one `className` and puts it on the outer element — which changes nothing
+   for either rule, both being descendant selectors that still match from one level further out. */
+.bonus-v5-dialog .dialog-title,
+.bonus-v5-dialog .dialog-content {
+  background-color: var(--color-layer1) !important;
+}
+
+/* THE CHILD COMBINATOR IS THIS BUILD'S AND IT IS A SPECIFICITY FIX, NOT A VALUE CHANGE. The shell
+   writes `.dialog-content > .scroll-container { padding-bottom: 1rem }` (Auth.css), which is 0,2,0
+   — exactly what the original's own `.bonus-v5-dialog .scroll-container` is, so which one wins
+   would come down to the order two separate files happen to be injected in. Naming the same
+   ancestor takes it to 0,3,0 and the answer stops depending on that. */
+.bonus-v5-dialog .dialog-content > .scroll-container {
+  height: 100%;
+  padding-bottom: 0;
+}
+
+/* THE GUTTER IS HELD WHETHER OR NOT THERE IS ANYTHING TO SCROLL, and it is this build's rather
+   than the original's — the same trade `:root { overflow-y: scroll }` already makes for the page
+   itself, and made for the same reason. The sheet's content is long enough to scroll on the
+   Rewards tab and short enough not to on some states of the VIP one, so with `auto` the 4px bar
+   comes and goes and every row, card and the redeem bar with it change width by 4px as you switch
+   tabs. Reserving the gutter pins the content width to the narrower of the two, which is what the
+   reference renders at — its own bar is present because that page scrolls.
+
+   `stable` rather than `stable both-edges`: the original's bar is on the end edge only, and both
+   edges would inset the content twice and re-centre nothing. One line to revert. */
+.bonus-v5-dialog .dialog-content {
+  --scrollbar-gutter: stable;
+}

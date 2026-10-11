@@ -1,0 +1,64 @@
+/* index-DxOqNczA.css verbatim — keen-slider's container and slide rules, under the class the
+   site's own Carousel wrapper puts on them. Unlayered like every other stylesheet here, which is
+   what lets `.carousels > div` set a slide's width without an `!important`.
+
+   `touch-action: pan-y` is the load-bearing one: it hands vertical drags back to the page so the
+   carousel does not eat a scroll gesture that started on a card. */
+.carousels {
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  align-content: flex-start;
+  display: flex;
+  overflow: hidden;
+  position: relative;
+  touch-action: pan-y;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+}
+
+.carousels > div {
+  min-height: 100%;
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+}
+
+/* On mobile, ensure slides don't exceed viewport width */
+@media (max-width: 640px) {
+  .carousels > div {
+    max-width: 100vw;
+  }
+}
+
+/* OURS, not the original's, and the one place this carousel is not a transcription. keen-slider
+   animates by rewriting every slide's transform on every frame with its own easing, so it needs
+   no CSS transition at all — and gets a free teleport when a slide wraps from one end of the
+   strip to the other, since that is just another frame. This build lets CSS do the easing
+   instead, so the transition has to be declared here and the wrap has to be suppressed per
+   slide with an inline `transition: none` (see `jumped` in index.jsx). 300ms is keen-slider's
+   own default `duration`. */
+.carousels > div {
+  transition: transform 0.3s ease;
+}
+
+/* The arrows are hover-only, and this pair is the whole mechanism — the buttons are always in
+   the DOM (when there are more slides than fit) and simply invisible until the pointer is over
+   the carousel. It is why they show in a screenshot taken with the mouse on the strip and not in
+   one taken without. */
+.carousel-cahnge-btn {
+  opacity: 0;
+}
+
+.carousel-wrap:hover .carousel-cahnge-btn {
+  opacity: 1;
+}
+
+/* index-DxOqNczA.css verbatim, `fill: rgb(var(--brand))` — the arrow goes brand green under the
+   pointer. It has to be a descendant rule rather than a `hover:fill-brand` on the svg because the
+   svg is not what the pointer is over: the hit target is the 16px-wide button beside the strip,
+   and the glyph inside it is only 16px square. Unlayered, so it beats the `fill-primary` the
+   markup carries. */
+.carousel-cahnge-btn:hover svg {
+  fill: var(--color-brand);
+}

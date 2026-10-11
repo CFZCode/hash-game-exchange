@@ -1,0 +1,75 @@
+<div class="item">
+  <p style="word-break: break-word;">
+    Starting with a secret we've generated a chain of 10,000,000 SHA256 hashes. <br />
+    Each element is the hash of the lowercase, hexadecimal string
+    representation of the previous hash. The hash of the chain's last
+    element is 54fe30623823224ef8379e00f3d88a02ed3333937862ee0383b9cbb3d1e43763
+    <br />
+    Every game maps to a hash in the chain: The 10,000,000th element of
+    the chain is the hash of game #1 and the first element in the chain is
+    the hash of game #10,000,000. <br />
+    To verify that a hash belongs to a game #n, simply hash it n times and
+    compare the result with the terminating hash.
+  </p>
+  <p>
+    To calculate a game's result from its hash: <br />
+    Code:
+  </p>
+  <div class="code-area">
+    <pre>
+const crypto = require("crypto");
+function seedGenerator(hash, salt) {
+  const hmac = CryptoJS.HmacSHA256(CryptoJS.enc.Hex.parse(hash), salt);
+  return hmac.toString(CryptoJS.enc.Hex);
+}
+function createNums(allNums, hash) {
+  const nums = [];
+  let h = CryptoJS.SHA256(hash).toString(CryptoJS.enc.Hex);
+  allNums.forEach((c) => {
+    nums.push({ num: c, hash: h });
+    h = h.substring(1) + h.charAt(0);
+  });
+  nums.sort(function (o1, o2) {
+    if (o1.hash < o2.hash) {
+      return -1;
+    } else if (o1.hash === o2.hash) {
+      return 0;
+    } else {
+      return 1;
+    }
+  });
+  return nums;
+}
+function keno(hash) {
+  const allNums = [
+  1, 30, 11, 40, 2, 29, 12, 39, 3,
+  28, 13, 38, 4, 27, 14, 37, 5, 26,
+  15, 36, 6, 25, 16, 35, 7, 24, 17,
+  34, 8, 23, 18, 33, 9, 22, 19, 32,
+  10, 21, 20, 31
+  ];
+  let seed = hash;
+  let finalNums = createNums(allNums, seed);
+  seed = String(CryptoJS.SHA256(seed));
+  finalNums = createNums(finalNums, seed);
+  return finalNums.slice(0, 10).map((m) => m.num);
+}
+let hash = "game hash";
+console.log( "result =>", keno(hash).map((item) => item.num).join(","));
+    </pre>
+  </div>
+  <p>
+    This is our multiplayer keno seed event in{" "}
+    <a
+      href="https://bitcointalk.org/index.php?topic=5255968.msg54629415#msg54629415"
+      target="_blank"
+      class="cl-primary"
+    >
+      bitcointalk
+    </a>
+  </p>
+  <p style="word-break: break-all;">
+    So our salt will be <br />
+    000000000000000000076973be291d219d283d4af9135601ff37df46491cca7e
+  </p>
+</div>

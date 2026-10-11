@@ -1,0 +1,27 @@
+/* Two global sports helpers, verbatim from index-DxOqNczA.css.
+   Neither sets `display`, so the CLAUDE.md cascade hazard does not apply to them. */
+
+/* The dot between a match's category and its tournament ("International • Champions
+   League"). It is an element rather than a `::before` because the two labels around it
+   truncate independently. */
+.sports-dont {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  display: inline-block;
+  background-color: var(--color-primary);
+}
+
+/* Sizes whatever the competitor badge resolves to — a crest, a flag, or the sport icon —
+   to a common 3rem, so the three cases line up in the same 48px slot. */
+.sports-banner-match-icon svg {
+  fill: var(--color-secondary);
+  width: auto;
+  height: 3rem;
+}
+
+.sports-banner-match-icon img {
+  height: 3rem;
+  width: auto;
+  max-width: 100%;
+}

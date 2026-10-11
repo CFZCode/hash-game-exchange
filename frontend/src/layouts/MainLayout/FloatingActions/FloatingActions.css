@@ -1,0 +1,35 @@
+/* The buttons are square by arithmetic, not by a size class: `.button` supplies
+   padding-inline .5rem and `.button-m` a 2.5rem height, so a 1.5rem icon gives
+   8 + 24 + 8 = 40px across and 40px down. That is the original's whole construction — it
+   passes `size: "m"` and a background class, nothing else.
+
+   Do NOT add `p-0` to these. It reads as harmless but `.button` lives in @layer components
+   while `p-0` is a utility, so the utility wins outright and takes padding-inline with it:
+   the buttons collapse to 24x40, the icon's own width. Measured that way before it was
+   removed. Nothing here declares a width, so the padding is the width. */
+
+/* The original animates this in with GSAP: `fadeRight` is
+   `{ opacity: 0, x: "100%" } -> { opacity: 1, x: 0 }`, duration .3, ease power2.out.
+   GSAP's power2 is the cubic curve, hence the bezier below. As CSS it only plays on enter,
+   which is all this element needs — it unmounts outright on the way out. */
+@keyframes fade-right {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.fade-right {
+  animation: fade-right 0.3s cubic-bezier(0.215, 0.61, 0.355, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fade-right {
+    animation: none;
+  }
+}

@@ -1,0 +1,94 @@
+/* The horizontal game carousel, verbatim from index-DxOqNczA.css.
+ *
+ * The layout is a grid, not a flex row: `grid-flow-col` plus an `auto-fill` template means
+ * the first N columns are laid out to fill the visible width and everything past them
+ * becomes an implicit column of the same width, spilling out of the `overflow-x-scroll`
+ * box. That is what makes a "carousel" here — there is no transform and no JS positioning,
+ * only scrollLeft, which is also why the arrow buttons can just call scrollTo().
+ *
+ * The three custom properties are set inline on the element by the original
+ * (`--grid-gap: .5rem`, `--grid-padding`, `--aspect-ratio: .75`), overriding the defaults
+ * in .grid-col-3 below. Keep them inline — the rule has to keep declaring its own fallbacks
+ * for the other call sites that do not.
+ */
+/* padding-inline, NOT the original's `padding: 0 var(--grid-padding)` shorthand.
+   The shorthand also sets padding-top: 0, and this file is unlayered while Tailwind's
+   utilities sit in @layer utilities — so it silently beat the `pt-3` on the strip and the
+   12px gap between the section header and the first row of cards disappeared, leaving the
+   arrow buttons sitting directly on the tiles.
+
+   The original gets away with the shorthand because it is on Tailwind v3, which emits no
+   real cascade layers: its `.pt-3` simply comes later in the file and wins. The longhand
+   produces the identical computed value here without depending on source order. This is
+   the hazard described in CLAUDE.md — a plain rule always outranks a utility, and the fix
+   is to narrow the rule, never to !important the utility. */
+/* .smooth-scroll MUST come before .smooth-list — same specificity, so source order decides,
+   and both set scroll-padding-inline. This is the order the original declares them in.
+   `--scroll-padding-inline` is never defined anywhere, so when .smooth-scroll wins the
+   declaration is invalid at computed-value time and scroll-padding falls back to `auto`.
+   With snap-mandatory that is not cosmetic: the browser snaps the first card's edge to the
+   scrollport edge, scrolling the strip by exactly the gutter width on load — the mobile
+   left margin appeared to vanish and the first card sat half a pixel off screen. */
+/* `.smooth-scroll` itself moved to index.css (@layer components) when the Explore panel's
+   tab strip became a second consumer; only `.smooth-list`, which nothing else uses, is left
+   here. The ordering note above still holds: `.smooth-list` is unlayered and therefore beats
+   the layered `.smooth-scroll` outright, which is the outcome that was wanted anyway. */
+.smooth-list {
+  gap: var(--grid-gap);
+  scroll-padding-inline: var(--grid-padding);
+  padding-inline: var(--grid-padding);
+}
+
+/* --grid-padding is the strip's own gutter, and it is the only thing holding the first and
+   last card off the screen edge on a phone.
+ *
+ * The original sets it inline as `m.mobile ? "1rem" : "0px"` and pairs it with `-mx-4` so
+ * the strip escapes its parent's 16px padding and goes full bleed. Here it is a media query
+ * instead, and there is no negative margin to undo: below sm the layout column already has
+ * `padding-inline: 0`, so the strip starts at the viewport edge on its own.
+ *
+ * Being padding rather than margin is the point — it pairs with `scroll-padding-inline`, so
+ * cards scroll *under* the gutter and snap back flush to it, which a margin cannot do.
+ *
+ * The original's `m.mobile` is `screen.width < 700`, not a CSS breakpoint. sm (640) is the
+ * nearest line and the one the hero and Recent Big Wins already switch their gutters on. */
+.smooth-list {
+  --grid-padding: 1rem;
+}
+
+@media (min-width: 640px) {
+  .smooth-list {
+    --grid-padding: 0px;
+  }
+}
+
+/* `.hide-scroll` and the whole `.grid-col-2` / `.grid-col-3` block moved to index.css
+   (@layer components) — the Explore results grid is a second consumer of the same
+   `grid-col-3` preset, and the tab strip a second consumer of `.hide-scroll`. */
+
+/* Cards fade up as they mount, staggered by index (capped at 11 in the component).
+   `backwards` matters: without it a card is visible at its final position for the length
+   of its delay before the animation starts. */
+@keyframes game-tile-fade-slide {
+  0% {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.game-tile-animate {
+  animation: game-tile-fade-slide 0.3s ease-out backwards;
+  animation-timing-function: linear(0, 0.08, 0.32, 0.62, 0.9, 1.12, 1.15, 1.08, 1.02, 1);
+  animation-delay: var(--game-tile-animation-delay, 0ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .game-tile-animate {
+    animation: none;
+  }
+}

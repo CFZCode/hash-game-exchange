@@ -1,0 +1,87 @@
+/* The Explore overlay.
+ *
+ * `.explore-pop` and `.explore-open` are index-DxOqNczA.css verbatim, including the media
+ * query they sit inside. That query matters: below 640 the original has no overlay at all,
+ * because Explore is a ROUTE there (`/explore`, guarded by `() => !m.mobile && "/"`) rather
+ * than a panel over the page. The header's search button — the only thing that opens this —
+ * is desktop-only, so the panel is never reachable below the line anyway; keeping the query
+ * means the rules cannot start applying if that changes by accident.
+ *
+ * The width/height trick is the whole mechanism: the container is always mounted and always
+ * fixed, but it is 0x0 with overflow hidden until `explore-open` lands on <body>, at which
+ * point it fills the viewport. Nothing here toggles display, so the content inside can
+ * animate in and out on its own.
+ */
+@media (min-width: 640px) {
+  .explore-pop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 0;
+    height: 0;
+    z-index: 9999;
+    overflow: hidden;
+  }
+
+  .explore-open .explore-pop {
+    width: 100%;
+    height: 100%;
+  }
+}
+
+/* `.casino-games-tab .tabs-content { background: transparent }` — carried over even though
+   the tab strip here is a plain button row rather than the `.tabs-*` family, because the
+   class is on the same element the original puts it on and a future `.tabs-content` inside
+   it would need the same treatment. */
+.casino-games-tab .tabs-content {
+  background: transparent;
+}
+
+/* `fadeUp2` from the transition table in index-BsFv7ByC.js:
+ *
+ *   fadeUp2: { from: {opacity: 0, y: 16}, to: {opacity: 1, y: 0}, config: {duration: .3, ease: "power2.out"} }
+ *
+ * The original tweens it with GSAP, so there is no stylesheet to copy — these are that
+ * table's own numbers. GSAP's power2 is the cubic curve, and its `.out` form is the standard
+ * cubic-out bezier below. The exit runs the same tween backwards (`onExit` does fromTo(to,
+ * from)), which is why there are two keyframes rather than one played in reverse: `reverse`
+ * would also flip the easing.
+ */
+@keyframes explore-fade-up-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes explore-fade-up-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+}
+
+.explore-enter {
+  animation: explore-fade-up-in 0.3s cubic-bezier(0.215, 0.61, 0.355, 1) both;
+}
+
+.explore-exit {
+  animation: explore-fade-up-out 0.3s cubic-bezier(0.215, 0.61, 0.355, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .explore-enter,
+  .explore-exit {
+    animation-duration: 0.01ms;
+  }
+}

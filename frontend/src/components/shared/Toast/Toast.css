@@ -1,0 +1,133 @@
+/* `.toast-layer` and `.toast`, verbatim from index-DxOqNczA.css — both were already in the
+   mirror's stylesheet and neither had anywhere to go until now.
+
+   `--toast-bg` is the theme block's own: `rgba(0, 0, 0, .75)` in the dark arm and
+   `rgba(255, 255, 255, .75)` in the light one, so it is declared here beside the rules that read
+   it rather than added to `@theme`, which holds bare hex and R/G/B triples. */
+/* THE DARK VALUE IS A REQUESTED DEPARTURE. The theme block declares `rgba(0, 0, 0, .75)`, which
+   over a layer2 page reads as a near-black wash; #242727 is the flat fill asked for. The light
+   arm keeps the token's own value, so the toast still inverts with the theme rather than being a
+   dark pill on a white page. One line each to put back. */
+.app-root {
+  --toast-bg: rgba(255, 255, 255, 0.75);
+}
+
+.app-root.dark {
+  --toast-bg: #242727;
+}
+
+/* THE THREE FLEX PROPERTIES ARE ADDED, AND `.toast`'S OWN RULE IS THE EVIDENCE FOR THEM.
+   ---------------------------------------------------------------------------------------
+   Neither the mirror's stylesheet nor the CURRENT deploy's (`index-WymgNldA.css`, fetched and
+   diffed — the two rules are byte-identical) gives `.toast-layer` a `display`, so it is a plain
+   block. But `.toast` declares `flex: 1` and `align-self: end`, and BOTH are inert on a child of
+   a block: `align-self` needs a flex or grid parent, and on a block-level child `flex` does
+   nothing at all. A stylesheet does not carry two properties that can never apply.
+
+   What they say about the parent is unambiguous — `align-self: end` right-aligns only in a COLUMN
+   flex container, and a column container is also what lets the pill shrink to its content instead
+   of spanning the full 1rem-to-1rem layer. That is exactly what the live site renders: a
+   content-width pill at the right, not a full-width bar. The layer's own `display` presumably
+   arrives from the transition wrapper `Xc` builds in JS rather than from CSS; the effect is the
+   same and this is where it is declared.
+
+   `align-items: flex-end` rather than relying on `.toast`'s `align-self`, because the row wrapper
+   below is the flex item now and the toast is inside it. */
+.toast-layer {
+  position: fixed;
+  left: 1rem;
+  right: 1rem;
+  top: 3rem;
+  margin-top: var(--safe-top, 0px);
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  /* THE LAYER IS FULL WIDTH AND INVISIBLE, WHICH IS TWO PROBLEMS IF IT TAKES THE POINTER.
+     It spans `left: 1rem` to `right: 1rem` at z-10000, so while any toast is up it sits over the
+     header and the top of the page and swallows every click that lands beside the pill. Nothing
+     paints there, so there is no clue why. The layer passes clicks through and each toast takes
+     them back — the same arrangement any notification stack needs and the reason this is not
+     simply `z-index` juggling. */
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+}
+
+.toast {
+  flex: 1;
+  display: flex;
+  align-self: end;
+  border-radius: var(--radius-xl);
+  padding: 0.75rem 0.5rem;
+  color: rgb(var(--primary));
+  backdrop-filter: blur(5rem);
+  margin: 0.25rem;
+  box-shadow: 0 0 0.25rem #0000001a;
+}
+
+/* TWO DEVIATIONS FROM THE SITE'S OWN RULE, and they are different in kind.
+   ---------------------------------------------------------------------------------------
+   THE FIRST IS A BUG IN THE ORIGINAL. Both stylesheets — the mirror's and the current deploy's,
+   diffed and byte-identical — write it as
+
+     [dir=ltr] .toast { background: linear-gradient(…), rgb(var(--toast-bg)) }
+
+   and `--toast-bg` is already a complete `rgba(…)`. `rgb(rgba(0,0,0,.75))` is not a valid colour,
+   which makes the whole `background` shorthand invalid at computed-value time — so the gradient
+   goes with it and the pill paints nothing at all. The `rgb()` wrapper is dropped and the variable
+   is used as the colour it already is.
+
+   THE SECOND IS REQUESTED: the 10% #FEF37E wash across the first 69% is gone, so the fill is the
+   flat colour and nothing tints its leading edge. The original's pair is kept here verbatim, so
+   restoring it is a copy back into the declaration below:
+
+     [dir=ltr]  linear-gradient( 90deg, rgba(254,243,126,.1) .5%, transparent 69%), var(--toast-bg)
+     [dir=rtl]  linear-gradient(-90deg, rgba(254,243,126,.1) .5%, transparent 69%), var(--toast-bg)
+
+   With no gradient the two directions no longer differ, which is why there is one rule now rather
+   than the site's two. */
+.toast {
+  background: var(--toast-bg);
+}
+
+/* THE ENTRANCE IS A KEYFRAME, NOT THE HEIGHT TWEEN, AND THE SWAP FIXED A VISIBLE FLASH.
+   ---------------------------------------------------------------------------------------
+   `Xc` measures the row's `clientHeight`, sets it to 0 and transitions back over
+   `.5s var(--ease-out)`. This reproduced that without the measurement — a `display: grid` wrapper
+   going `grid-template-rows: 0fr` to `1fr` under `@starting-style` — and it cost a full-width bar
+   for one frame every time the layer mounted: a grid item stretches to its column by default, so
+   `.toast` filled the row before the flex column above had sized anything, and the row is only
+   narrow because its content is.
+
+   A transform and an opacity cannot do that. Neither participates in layout, so the pill is its
+   final width on the frame it first paints and the animation is purely visual. `width: fit-content`
+   with `align-self: flex-end` states the sizing outright rather than leaving it to be inferred
+   through a grid, which is what made the first frame ambiguous in the first place.
+
+   The cost is that rows no longer push each other down smoothly when a second toast arrives —
+   they appear in place. Worth it against a flash on every single toast.
+
+   Reduced motion drops it entirely rather than shortening it: a message appearing is the point,
+   and the slide is decoration. */
+.toast-row {
+  align-self: flex-end;
+  width: fit-content;
+  max-width: 100%;
+  animation: toast-in 0.25s var(--ease-out, cubic-bezier(0, 0, 0.2, 1)) both;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-0.5rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast-row {
+    animation: none;
+  }
+}

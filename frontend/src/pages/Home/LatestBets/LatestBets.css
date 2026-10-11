@@ -1,0 +1,23 @@
+/* Zebra striping for the bet table. The original ships these two rules as an inline
+   <style> inside the table's own template rather than in its stylesheet — reproduced here
+   as ordinary CSS. Note the polarity: the base row is the LIGHTER layer5 and `.zebra`
+   (applied on even indices) knocks it back to layer4, the same colour as the panel behind,
+   so the first row reads as a gap rather than a band. */
+.lf-row {
+  background-color: var(--color-layer5);
+}
+
+.lf-row.zebra {
+  background-color: var(--color-layer4);
+}
+
+/* The segmented tab strip has MOVED to index.css. It was here while this section was its only
+   consumer; the auth dialog now uses the same three classes (and the `data-type="indicator"`
+   variant this file never needed), so all three variants live with the other shared primitives
+   next to `.button`. They are in @layer components there rather than unlayered, because the
+   auth markup overrides `.tabs-content` with a `bg-transparent` utility. */
+
+/* `.table` has MOVED to components/shared/Contest/Contest.css. It was here while the Wager
+   Contest tab was its only consumer; that tab now renders the shared widget, which the
+   daily-contest page renders too, so the rule travels with the markup that uses it. Nothing in
+   this file's own tree renders a `.table`. */

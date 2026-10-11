@@ -1,0 +1,114 @@
+<div class="item">
+  <h2>Fairness Verification</h2>
+  <div class="help-content">
+    <h4>Q: How is the game result generated?</h4>
+    <p>
+      A random number between 0 and 99,999 is generated using a provably
+      fair algorithm. That process is described below.
+    </p>
+    <p>
+      The random number (between 0 and 99,999) is then matched to the
+      <a
+        class="cl-primary"
+        rel="noopener noreferrer"
+        href="https://game-verify.github.io/public/slots.html#probability"
+        target="_blank"
+      >
+        probability table
+      </a>
+      and the corresponding symbol from the table is the game result.
+    </p>
+    <h4>Q: How is the random number generated?</h4>
+    <p>
+      First, combine the server seed, client seed and the nonce to get the
+      SHA512 hash.
+    </p>
+    <ol>
+      <li>
+        <p>
+          We use the combination to compute the HMAC_SHA512 hash. This
+          gives us a 128-character hex string: hash = HMAC_SHA512
+          (clientSeed:nonce, serverSeed)
+        </p>
+      </li>
+      <li>
+        Then we take the first 5 characters of the 128 character hex
+        string and convert them to a decimal number from 0 to 1,048,575
+        (16 ^ 5-1). If it is less than 1 million, it is used as the random
+        number. If it is more than 1 million, we use the next five
+        characters from the same 128 character hex string. We are able to
+        repeat the process up to 25 times.
+      </li>
+      <li>
+        In very rare cases ((48,576 / 1,000,000) ^ 25) When converting to
+        decimal, none of the 25 trials are below 1 million, we use the
+        remaining 3 characters and convert them to your random number
+      </li>
+    </ol>
+    <p>Code example:</p>
+    <p>The following code example can be used to verify bets:</p>
+    <div class="code-area">
+      <pre>
+function get (serverSeed, clientSeed, nonce) {
+  var hash = hmac_sha512(this.client_seed + ":" +this.nonce, this.server_seed);
+  var index = 0;
+  do {
+    var lucky = parseInt (hash.substr (index, 5), 16);
+    index + = 5;
+  } while (lucky> = 1000000);
+  return lucky;
+}
+      </pre>
+    </div>
+    <br />
+    <h4>
+      How to use the
+      <a
+        class="cl-primary"
+        rel="noopener noreferrer"
+        href="https://game-verify.github.io/public/slots.html#probability"
+        target="_blank"
+      >
+        probability table
+      </a>
+      ?
+    </h4>
+    <ul>
+      <li>
+        Layer = How high you climbed each of the three columns and the
+        effect it has on the probability range of each symbol.
+      </li>
+      <li>Left = Book symbol</li>
+      <li>Middle = Cross symbol</li>
+      <li>Right = Gem symbol</li>
+      <li>Ghost = Skull symbol</li>
+      <li>Blank = No symbol</li>
+    </ul>
+    <p>
+      Example: You currently have 2 layers of books, 1 layer of crosses, 
+      and 3 layers of gems. This means that the layer for reference on
+      the next spin is layer 213. The random number you obtained from the
+      SHA512 hash, converted to decimal, as described above, is 503140.
+      The corresponding layer in your table is Layer 213. The range is
+      Ghost [200800 + 122711 + 92033, 200800 + 122711 + 92033 +146113)
+    </p>
+    <br />
+    <h4>Action Spin:</h4>
+    <p>
+      If the middle tower reaches the top level, the first 10 characters
+      of the HMAC_SHA512 hash value are converted into decimal numbers and
+      modulo 5 to get a random number of [0,4], which corresponds to
+      100-500 times the prize in turn.
+    </p>
+    <p>Code example:</p>
+    <div class="code-area">
+      <pre>
+function get (serverSeed, clientSeed, nonce) {
+  var hash = hmac_sha512(this.client_seed + ":" +this.nonce, this.server_seed);
+  var lucky = parseInt (hash.substr (0, 10), 16);
+  return lucky%5;
+}
+      </pre>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,103 @@
+/* The mobile account page — `/user/enter`.
+ *
+ * Only the VIP card's per-tier gradients live here; they are the page's own stylesheet
+ * (`Enter-CtHSAdBf.css`, a CSS module whose hashed class names are mapped back to plain ones).
+ *
+ * The dialog shell this page rides — the absolute title bar, its scroll-driven fill, the back
+ * arrow and the `transparent-title` behaviour — moved to
+ * `components/shared/RouteDialog/RouteDialog.css` when `/wallet/withdraw` became its second
+ * consumer. Everything that used to be scoped to `.user-enter-dialog` is scoped to
+ * `.route-dialog` there, with the same reasoning recorded.
+ */
+
+/* ---------------------------------------------------------------------------------------- */
+/* THE VIP CARD'S TIER GRADIENTS                                                              */
+/* ---------------------------------------------------------------------------------------- */
+
+/* `Enter-CtHSAdBf.css`, the page's own stylesheet, verbatim — minus the `-light` twins.
+ *
+ * There are nine sets, indexed by TIER NUMBER and not by level: `vipTypeNum` in
+ * `data/vipConfig.js` is the lookup, and it collapses 34 levels onto 0..8. Each set is four
+ * rules — the card's own gradient, the progress fill, and three concentric discs that make the
+ * knob at the head of the bar.
+ *
+ * Sets 4/5 and 6/7/8 are written as one rule each on the original too; they are genuinely
+ * identical there, which is why Platinum spans two numbers and Diamond three.
+ *
+ * The `-light` half of every set is deliberately absent: it is selected by `R.darken` being
+ * false and this build is dark-only, the same reason the VIP page skips `banner_bg_w`.
+ */
+.user-vip-0-bg {
+  background: linear-gradient(337.9deg, #0000000d 27.42%, #d5d6db80 98.62%), #323738;
+  backdrop-filter: blur(3px);
+  border: 0 none;
+}
+.user-vip-0-progress { background: linear-gradient(90deg, #b9b9b9, #f1f1f1); }
+.user-vip-0-c1 { background: #cbcbcb33; }
+.user-vip-0-c2 { background: #cbcbcb80; }
+.user-vip-0-c3 { background: #cbcbcb; }
+
+.user-vip-1-bg {
+  background: linear-gradient(337.9deg, #0000000d 27.42%, #f2b5a180 98.62%), #323738;
+  backdrop-filter: blur(3px);
+  border: 0 none;
+}
+.user-vip-1-progress { background: linear-gradient(90deg, #ab8070, #e6cdbd); }
+.user-vip-1-c1 { background: #c1a9a133; }
+.user-vip-1-c2 { background: #c1a9a180; }
+.user-vip-1-c3 { background: #c1a9a1; }
+
+.user-vip-2-bg {
+  background: linear-gradient(337.9deg, #0000000d 27.42%, #8e98bc80 98.62%), #323738;
+  backdrop-filter: blur(3px);
+  border: 0 none;
+}
+.user-vip-2-progress { background: linear-gradient(90deg, #9caed3, #b6cef5); }
+.user-vip-2-c1 { background: #a2b3d433; }
+.user-vip-2-c2 { background: #a2b3d480; }
+.user-vip-2-c3 { background: #a2b3d4; }
+
+.user-vip-3-bg {
+  background: linear-gradient(337.9deg, #0000000d 27.42%, #e5d68c80 98.62%), #323738;
+  backdrop-filter: blur(3px);
+  border: 0 none;
+}
+.user-vip-3-progress { background: linear-gradient(270deg, #fae9c1 3.21%, #f2c15c 108.65%); }
+.user-vip-3-c1 { background: #fcd3b533; }
+.user-vip-3-c2 { background: #fcd3b580; }
+.user-vip-3-c3 { background: #fcd3b5; }
+
+.user-vip-4-bg,
+.user-vip-5-bg {
+  background: linear-gradient(337.9deg, #0000000d 27.42%, #935de980 98.62%), #323738;
+  backdrop-filter: blur(3px);
+  border: 0 none;
+}
+.user-vip-4-progress,
+.user-vip-5-progress { background: linear-gradient(270deg, #fac1f7 3.21%, #ab7de8 108.65%); }
+.user-vip-4-c1,
+.user-vip-5-c1 { background: #a2b3d433; }
+.user-vip-4-c2,
+.user-vip-5-c2 { background: #a2b3d480; }
+.user-vip-4-c3,
+.user-vip-5-c3 { background: #a2b3d4; }
+
+.user-vip-6-bg,
+.user-vip-7-bg,
+.user-vip-8-bg {
+  background: linear-gradient(337.9deg, #0000000d 27.42%, #935de980 86.52%, #76c4ff80 95.77%), #323738;
+  backdrop-filter: blur(3px);
+  border: 0 none;
+}
+.user-vip-6-progress,
+.user-vip-7-progress,
+.user-vip-8-progress { background: linear-gradient(90deg, #d4a1eb, #4fc4ff); }
+.user-vip-6-c1,
+.user-vip-7-c1,
+.user-vip-8-c1 { background: #5fc0fc33; }
+.user-vip-6-c2,
+.user-vip-7-c2,
+.user-vip-8-c2 { background: #5fc0fc80; }
+.user-vip-6-c3,
+.user-vip-7-c3,
+.user-vip-8-c3 { background: #5fc0fc; }
