@@ -1,0 +1,227 @@
+'use client'
+
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, type ReactNode } from 'react'
+
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+
+import { api, request } from '@/lib/api/client'
+
+export type Actor = {
+  staffId: number
+  roleId: number
+  roleName: string
+  level: number
+  executiveId: number | null
+
+  /** A marketing sub-login (`executives.kind = 'marketing'`) — the only session the marketing panel serves. */
+  marketing?: boolean
+
+  /**
+   * May this session see promotions at all (bonus, redeem codes, gift cards, spin wheel, VIP &
+   * club, affiliate, races, rakeback, VIP/rank columns)? False for the agent tree — staff levels
+   * 4–6 and their executives. Computed by `/api/auth/me`; re-derived from `level` here as a guard.
+   */
+  promotions: boolean
+  permissions: string[]
+  expiresAt: string
+  name?: string
+  email?: string
+
+  /**
+   * The password is one somebody else chose (a new account, or a reset by a superior). Every
+   * admin API but "who am I", change-password and logout answers 403 PASSWORD_CHANGE_REQUIRED
+   * until it is replaced; the shell sends the user to `/change-password`.
+   */
+  mustChangePassword?: boolean
+}
+
+/** The operator feature flags — `GET admin/site-config/global`. Keys are the platform's columns. */
+export type SiteFlags = Record<string, boolean>
+
+/**
+ * What the platform owner allows this site — `GET admin/entitlements`. `false` = not in the
+ * plan; a missing key (or a backend without the route) = entitled.
+ */
+export type Entitlements = {
+  features: Record<string, boolean>
+  flags: Record<string, boolean>
+  version?: number
+  fetchedAt?: string | null
+  source?: 'owner' | 'cache' | 'default'
+
+  /** The template the owner set, when the backend sends it with the plan (a key or `{ key, label }`). */
+  template?: string | { key: string; label?: string } | null
+}
+
+type SessionValue = {
+  actor: Actor | null
+  loading: boolean
+
+  /** `resource:action` → does the current role hold it (exact, `resource:*`, or `*`). */
+  can: (permission?: string | string[]) => boolean
+  flags: SiteFlags
+  flagsLoading: boolean
+  refreshFlags: () => void
+  entitlements: Entitlements | null
+
+  /** True unless the owner has taken this feature (`gift_cards`, `vault`, …) out of the plan. */
+  featureEntitled: (key?: string | null) => boolean
+
+  /** True unless the owner has taken this siteconfig flag (`casino`, `giftcards`, …) out of the plan. */
+  flagEntitled: (key?: string | null) => boolean
+  signOut: () => Promise<void>
+}
+
+const SessionContext = createContext<SessionValue | null>(null)
+
+/** How often the owner's plan is re-read (cheap: an in-memory read on the backend). */
+const ENTITLEMENTS_POLL_MS = 4_000
+
+/** How often the operator's own feature flags are re-read for the sidebar. */
+const FLAGS_POLL_MS = 15_000
+
+/** Staff levels 4–6 (SUPER_MASTER, MASTER, AGENT): the agent tree, which sees no promotions. */
+export const isAgentTreeLevel = (level?: number | null) => typeof level === 'number' && level >= 4 && level <= 6
+
+export function hasPermission(granted: string[] | undefined, required: string): boolean {
+  if (!granted?.length) return false
+  if (granted.includes('*') || granted.includes(required)) return true
+  const [resource] = required.split(':')
+
+  return granted.includes(`${resource}:*`)
+}
+
+export function SessionProvider({ children }: { children: ReactNode }) {
+  const qc = useQueryClient()
+
+  const me = useQuery<Actor>({
+    queryKey: ['session', 'me'],
+    queryFn: () =>
+      request<Actor>('/api/auth/me', { raw: true }).then(r => ({
+        ...r.data,
+        promotions: r.data.promotions !== false && !isAgentTreeLevel(r.data.level)
+      })),
+    staleTime: 60_000,
+    retry: false
+  })
+
+  const flags = useQuery<SiteFlags>({
+    queryKey: ['api', 'admin/site-config/global', null],
+    queryFn: () => api.get<SiteFlags>('admin/site-config/global'),
+    enabled: !!me.data && hasPermission(me.data.permissions, 'config:read'),
+    staleTime: 10_000,
+
+    // The poll keeps it fresh. A remount of this observer (a Suspense boundary re-showing the
+    // shell after a URL change, e.g. picking a date range) must not fire an extra read.
+    refetchOnMount: false,
+
+    // Another tab (or another operator) may switch a flag; the sidebar follows without a reload.
+    refetchInterval: FLAGS_POLL_MS,
+    refetchOnWindowFocus: true
+  })
+
+  // A backend without the route (404) or any other failure reads as "everything entitled",
+  // so a site that has no owner panel keeps working exactly as before.
+  const entitlements = useQuery<Entitlements | null>({
+    queryKey: ['api', 'admin/entitlements', null],
+    queryFn: () =>
+      api
+        .get<Partial<Entitlements>>('admin/entitlements')
+        .then(d => ({ ...d, features: d?.features ?? {}, flags: d?.flags ?? {} }))
+        .catch(() => null),
+    enabled: !!me.data && hasPermission(me.data.permissions, 'config:read'),
+
+    // Just under the poll interval: the 4 s poll still runs (refetchInterval ignores staleTime),
+    // but a URL change, a remount or a focus within that window reuses the read instead of
+    // firing it again — a date-range pick used to refetch it 4×.
+    staleTime: ENTITLEMENTS_POLL_MS - 1_000,
+    refetchOnMount: false,
+    retry: false,
+
+    // The owner can change the plan at any time; the backend re-pulls it the moment the owner saves,
+    // so a short poll here is what makes the sidebar and the Features screens follow live.
+    refetchInterval: ENTITLEMENTS_POLL_MS,
+    refetchOnWindowFocus: true
+  })
+
+  // A new plan version (or a new template from the owner) changes what the per-row `entitled`
+  // marks, the flag switches and the template card say, so every features / site-config read is
+  // refetched (the open screen updates in place).
+  const seenVersion = useRef<string | undefined>(undefined)
+  const rawTemplate = entitlements.data?.template
+  const templateKey = typeof rawTemplate === 'string' ? rawTemplate : (rawTemplate?.key ?? '')
+
+  const version =
+    entitlements.data?.version === undefined && !templateKey
+      ? undefined
+      : `${entitlements.data?.version ?? ''}|${templateKey}`
+
+  useEffect(() => {
+    if (version === undefined) return
+    const previous = seenVersion.current
+
+    seenVersion.current = version
+    if (previous === undefined || previous === version) return
+    void qc.invalidateQueries({
+      predicate: q =>
+        q.queryKey[0] === 'api' &&
+        typeof q.queryKey[1] === 'string' &&
+        (q.queryKey[1].startsWith('admin/features') || q.queryKey[1].startsWith('admin/site-config'))
+    })
+  }, [version, qc])
+
+  const featureEntitled = useCallback(
+    (key?: string | null) => !key || entitlements.data?.features[key] !== false,
+    [entitlements.data]
+  )
+
+  const flagEntitled = useCallback(
+    (key?: string | null) => !key || entitlements.data?.flags[key] !== false,
+    [entitlements.data]
+  )
+
+  const can = useCallback(
+    (permission?: string | string[]) => {
+      if (!permission || (Array.isArray(permission) && permission.length === 0)) return true
+      const list = Array.isArray(permission) ? permission : [permission]
+
+      return list.some(p => hasPermission(me.data?.permissions, p))
+    },
+    [me.data]
+  )
+
+  const signOut = useCallback(async () => {
+    await request('/api/auth/logout', { raw: true, method: 'POST', body: {} }).catch(() => undefined)
+    qc.clear()
+    location.assign('/login')
+  }, [qc])
+
+  const value = useMemo<SessionValue>(
+    () => ({
+      actor: me.data ?? null,
+      loading: me.isLoading,
+      can,
+      flags: flags.data ?? {},
+      flagsLoading: flags.isLoading,
+      refreshFlags: () => {
+        void qc.invalidateQueries({ queryKey: ['api', 'admin/site-config/global'] })
+        void qc.invalidateQueries({ queryKey: ['api', 'admin/entitlements'] })
+      },
+      entitlements: entitlements.data ?? null,
+      featureEntitled,
+      flagEntitled,
+      signOut
+    }),
+    [me.data, me.isLoading, can, flags.data, flags.isLoading, entitlements.data, featureEntitled, flagEntitled, qc, signOut]
+  )
+
+  return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>
+}
+
+export function useSession() {
+  const ctx = useContext(SessionContext)
+
+  if (!ctx) throw new Error('useSession must be used inside SessionProvider')
+
+  return ctx
+}

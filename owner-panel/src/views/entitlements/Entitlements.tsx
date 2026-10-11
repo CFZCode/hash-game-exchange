@@ -1,0 +1,500 @@
+'use client'
+
+import { useState } from 'react'
+
+import { CheckIcon, InfoIcon, Loader2Icon, SearchIcon } from 'lucide-react'
+import { toast } from 'sonner'
+
+import ErrorState from '@/components/shared/ErrorState'
+import PageHeader from '@/components/shared/PageHeader'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Switch } from '@/components/ui/switch'
+import {
+  FEATURE_CATALOGUE,
+  FEATURE_CATEGORIES,
+  FLAG_GROUPS,
+  featureByKey,
+  featureLabel,
+  flagLabel,
+  optionsOf,
+  variantLabel
+} from '@/configs/entitlementCatalogue'
+import { TEMPLATE_CATALOGUE, type TemplateEntry } from '@/configs/templateCatalogue'
+import { useApi, useApiMutation } from '@/hooks/use-api'
+import { api, ApiError } from '@/lib/api/client'
+import { buildDraft, isOwnerPick, type Draft } from '@/lib/entitlements/draft'
+import { diffDocs, type Change, type EditableDoc, type EntitlementsDoc, type ToggleChange } from '@/lib/entitlements/types'
+import { cn } from '@/lib/utils'
+import ChangeList from './ChangeList'
+
+type Kind = 'feature' | 'flag' | 'policy'
+
+const FIAT_COIN_FLAGS = new Set(FLAG_GROUPS.find(g => g.title === 'Fiat currencies')?.keys ?? [])
+
+type Row = { kind: Kind; key: string; label: string; description?: string; hint?: string; note?: string }
+type Group = { id: string; title: string; description: string; rows: Row[]; bulk?: boolean }
+
+const GROUPS: { section: string; description?: string; groups: Group[] }[] = [
+  {
+    section: 'Policies',
+    description: 'How players join, move money and are rewarded. Always on; the option chosen is the policy.',
+    groups: [
+      {
+        id: 'policy',
+        title: 'Business, cashier and rewards',
+        description: 'The site admin shows these read-only.',
+        bulk: false,
+        rows: FEATURE_CATALOGUE.filter(f => f.policy).map(f => ({ kind: 'policy' as const, key: f.key, label: f.label, description: f.description, note: f.note }))
+      }
+    ]
+  },
+  {
+    section: 'Features',
+    description: 'Each feature is ON or OFF for the site and runs one variant. The site admin shows them read-only; its staff can only key in integration settings.',
+    groups: FEATURE_CATEGORIES.map(cat => ({
+      id: `feature:${cat.key}`,
+      title: cat.title,
+      description: 'Off: hidden from players and refused by the backend.',
+      rows: FEATURE_CATALOGUE.filter(f => f.category === cat.key && !f.policy).map(f => ({
+        kind: 'feature' as const,
+        key: f.key,
+        label: f.label,
+        description: f.description,
+        hint: f.flag ? `flag ${f.flag}` : undefined
+      }))
+    })).filter(g => g.rows.length > 0)
+  },
+  {
+    section: 'Site flags',
+    groups: FLAG_GROUPS.map(g => ({
+      id: `flag:${g.title}`,
+      title: g.title,
+      description: g.description,
+      rows: g.keys.map(key => ({ kind: 'flag' as const, key, label: flagLabel(key) }))
+    }))
+  }
+]
+
+const labelOf = (c: ToggleChange) => (c.kind === 'feature' ? featureLabel(c.key) : flagLabel(c.key))
+
+/** "Vault · Term locks with a period picker" for each feature the template switches on. */
+const switchedOn = (t: TemplateEntry) =>
+  Object.entries(t.variants)
+    .filter(([, variant]) => variant !== 'none')
+    .map(([feature, variant]) => ({ feature, label: featureLabel(feature), variant: variantLabel(feature, variant) }))
+
+/** The variant a feature switched ON runs when its current one is `none`: the template's, else the first real one. */
+const firstVariant = (feature: string, template?: string) => {
+  const real = featureByKey(feature)?.variants.filter(v => v.key !== 'none') ?? []
+  const fromTemplate = TEMPLATE_CATALOGUE.find(t => t.key === template)?.variants[feature]
+
+  return real.find(v => v.key === fromTemplate)?.key ?? real[0]?.key ?? null
+}
+
+const VariantSelect = ({ feature, value, onChange, label }: { feature: string; value: string; onChange: (v: string) => void; label: string }) => {
+  const variants = featureByKey(feature)?.variants ?? []
+
+  return (
+    <Select
+      items={variants.map(v => ({ value: v.key, label: v.label }))}
+      value={value}
+      autoComplete='off'
+      onValueChange={(v, details) => v && isOwnerPick(details.reason) && onChange(v)}
+    >
+      <SelectTrigger size='sm' className='w-full sm:w-60' aria-label={`${label} variant`}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {variants.map(v => (
+          <SelectItem key={v.key} value={v.key}>
+            {v.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )
+}
+
+const TemplateCard = ({ template, selected, saved, onSelect }: { template: TemplateEntry; selected: boolean; saved: boolean; onSelect: () => void }) => (
+  <button
+    type='button'
+    aria-pressed={selected}
+    onClick={onSelect}
+    className={cn(
+      'bg-card flex flex-col gap-3 rounded-xl border p-4 text-left transition-colors',
+      selected ? 'border-primary ring-primary/30 ring-2' : 'hover:border-foreground/30'
+    )}
+  >
+    {/* Preview swatch only: accent on background. The site's real tokens live in its theme. */}
+    <div className='flex h-14 items-end gap-2 rounded-md border p-2' style={{ backgroundColor: template.swatch.background }} aria-hidden>
+      <span className='h-6 w-10 rounded-sm' style={{ backgroundColor: template.swatch.accent }} />
+      <span className='h-2 w-16 rounded-full opacity-60' style={{ backgroundColor: template.swatch.accent }} />
+    </div>
+    <div className='flex items-center justify-between gap-2'>
+      <span className='font-semibold'>{template.label}</span>
+      {selected ? (
+        <Badge className='gap-1'>
+          <CheckIcon className='size-3' /> {saved ? 'Active' : 'Selected'}
+        </Badge>
+      ) : saved ? (
+        <Badge variant='outline'>Current</Badge>
+      ) : (
+        <span className='text-muted-foreground font-mono text-xs'>{template.key}</span>
+      )}
+    </div>
+    <p className='text-muted-foreground text-xs'>{template.description}</p>
+    <div className='flex flex-wrap gap-1'>
+      {switchedOn(template).map(f => (
+        <Badge key={f.feature} variant='outline' className='font-normal' title={f.variant}>
+          {f.label}
+        </Badge>
+      ))}
+    </div>
+  </button>
+)
+
+const Entitlements = () => {
+  const { data: doc, error, isLoading, refetch } = useApi<EditableDoc>('/api/owner/entitlements')
+
+  // Edits on top of the loaded document; null = nothing touched yet.
+  const [edits, setEdits] = useState<Draft | null>(null)
+  const [query, setQuery] = useState('')
+  const [reviewing, setReviewing] = useState(false)
+
+  const draft: Draft | null = doc ? buildDraft(doc, edits) : null
+
+  const changes = doc && draft ? diffDocs(doc, draft) : []
+  const changed = new Set(changes.map(c => `${c.kind === 'variant' ? 'feature' : c.kind}:${c.key}`))
+
+  const edit = (fn: (next: Draft) => void) =>
+    setEdits(prev => {
+      const next: Draft = {
+        template: prev?.template,
+        features: { ...prev?.features },
+        flags: { ...prev?.flags },
+        variants: { ...prev?.variants },
+        options: Object.fromEntries(Object.entries(prev?.options ?? {}).map(([f, v]) => [f, { ...v }]))
+      }
+
+      fn(next)
+
+      return next
+    })
+
+  /** ON/OFF. A feature switched on while its variant is `none` gets a real one (contract: `none` = off). */
+  const set = (rows: Row[], value: boolean) =>
+    edit(next => {
+      for (const r of rows) {
+        if (r.kind === 'policy') continue
+
+        if (r.kind === 'flag') {
+          next.flags[r.key] = value
+          continue
+        }
+
+        const current = next.variants[r.key] ?? doc?.variants[r.key]
+        const variant = value && (!current || current === 'none') ? firstVariant(r.key, draft?.template) : current
+
+        // A feature with no real variant (nothing implements it yet) cannot be switched on.
+        if (value && !variant) continue
+        next.features[r.key] = value
+        if (variant && variant !== current) next.variants[r.key] = variant
+      }
+    })
+
+  /** An owner-only option of a feature (e.g. when the spin wheel grants a spin). */
+  const setOption = (feature: string, option: string, value: boolean) =>
+    edit(next => {
+      next.options[feature] = { ...next.options[feature], [option]: value }
+    })
+
+  /** Picking `none` switches the feature off; any other variant switches it on. Policies are always on. */
+  const setVariant = (r: Row, variant: string) =>
+    edit(next => {
+      next.variants[r.key] = variant
+      if (r.kind === 'feature') next.features[r.key] = variant !== 'none'
+    })
+
+  /** Fills every variant the template names, ON where it is not `none`; rows stay adjustable after. */
+  const pickTemplate = (key: string) =>
+    edit(next => {
+      const template = TEMPLATE_CATALOGUE.find(t => t.key === key)
+
+      next.template = key === doc?.template ? undefined : key
+
+      for (const [feature, variant] of Object.entries(template?.variants ?? {})) {
+        if (!featureByKey(feature)) continue
+        next.variants[feature] = variant
+        next.features[feature] = variant !== 'none'
+      }
+    })
+
+  const save = useApiMutation<void, { doc: EntitlementsDoc; changes: Change[]; live?: { live: boolean; reason?: string } }>({
+    fn: () =>
+      api.put('/api/owner/entitlements', {
+        version: doc!.version,
+        template: draft!.template,
+        features: draft!.features,
+        flags: draft!.flags,
+        variants: draft!.variants,
+        options: draft!.options
+      }),
+    invalidate: [['api']],
+    success: r =>
+      !r.changes.length
+        ? 'Nothing to save'
+        : r.live?.live
+          ? `Saved as version ${r.doc.version} — live on the site now`
+          : `Saved as version ${r.doc.version} — the backend picks it up on its next poll`,
+    onSuccess: () => {
+      setEdits(null)
+      setReviewing(false)
+    }
+  })
+
+  const q = query.trim().toLowerCase()
+
+  const match = (r: Row) =>
+    !q ||
+    r.key.toLowerCase().includes(q) ||
+    r.label.toLowerCase().includes(q) ||
+    (r.description ?? '').toLowerCase().includes(q) ||
+    (r.kind !== 'flag' && (featureByKey(r.key)?.variants ?? []).some(v => v.key.includes(q) || v.label.toLowerCase().includes(q)))
+
+  return (
+    <div className={cn(changes.length > 0 && 'pb-20')}>
+      <PageHeader
+        title='Features & plan'
+        description={
+          doc
+            ? `Version ${doc.version}. The template, the policies and every feature's ON/OFF and variant are set here only; the site admin shows them read-only.`
+            : 'Loading…'
+        }
+        actions={
+          <div className='relative'>
+            <SearchIcon className='text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2' />
+            <Input value={query} onChange={e => setQuery(e.target.value)} placeholder='Search key or label' className='w-64 pl-8' />
+          </div>
+        }
+      />
+      {error ? (
+        <ErrorState error={error} />
+      ) : isLoading || !draft ? (
+        <div className='grid gap-4 lg:grid-cols-2'>
+          {Array.from({ length: 4 }, (_, i) => (
+            <Skeleton key={i} className='h-56' />
+          ))}
+        </div>
+      ) : (
+        <div className='flex flex-col gap-8'>
+          {doc?.seededFrom && (
+            <Alert>
+              <InfoIcon />
+              <AlertTitle>No variants saved yet</AlertTitle>
+              <AlertDescription>
+                {doc.seededFrom === 'backend'
+                  ? "The variants and ON/OFF below were read from the site's live state."
+                  : 'The site did not answer, so the variants below come from the current template.'}{' '}
+                The next save records them all in the document.
+              </AlertDescription>
+            </Alert>
+          )}
+          <section className='flex flex-col gap-4'>
+            <div>
+              <h2 className='text-lg font-semibold'>Template</h2>
+              <p className='text-muted-foreground text-sm'>
+                The look and a preset of variants. Picking one fills every feature below (its &quot;Off&quot; variants switch the feature off); you can
+                still adjust single rows before saving.
+              </p>
+            </div>
+            <div className='grid gap-4 sm:grid-cols-2 xl:grid-cols-4'>
+              {TEMPLATE_CATALOGUE.map(t => (
+                <TemplateCard key={t.key} template={t} selected={draft.template === t.key} saved={doc?.template === t.key} onSelect={() => pickTemplate(t.key)} />
+              ))}
+            </div>
+          </section>
+          {GROUPS.map(({ section, description, groups }) => {
+            const visible = groups.map(g => ({ ...g, shown: g.rows.filter(match) })).filter(g => g.shown.length > 0)
+
+            if (!visible.length) return null
+
+            return (
+              <section key={section} className='flex flex-col gap-4'>
+                <div>
+                  <h2 className='text-lg font-semibold'>{section}</h2>
+                  {description && <p className='text-muted-foreground text-sm'>{description}</p>}
+                </div>
+                <div className='grid items-start gap-4 lg:grid-cols-2'>
+                  {visible.map(g => {
+                    const value = (r: Row) => r.kind === 'policy' || (r.kind === 'feature' ? draft.features : draft.flags)[r.key] !== false
+
+
+                    // The reward currency's coin must itself be entitled (its coin flag; a crypto coin also the crypto master).
+                    const coinBlocked = (code: string) => {
+                      const k = code.toLowerCase()
+
+                      return draft.flags[k] === false || (!FIAT_COIN_FLAGS.has(k) && draft.flags.cryptocoin === false)
+                    }
+
+                    const on = g.rows.filter(value).length
+
+                    return (
+                      <Card key={g.id} className='gap-4 shadow-none'>
+                        <CardHeader>
+                          <CardTitle className='flex items-center gap-2'>
+                            {g.title}
+                            <Badge variant='outline' className='font-normal tabular-nums'>
+                              {on}/{g.rows.length}
+                            </Badge>
+                          </CardTitle>
+                          <CardDescription>{g.description}</CardDescription>
+                          {g.bulk !== false && (
+                            <CardAction className='flex gap-1'>
+                              <Button size='xs' variant='outline' onClick={() => set(g.shown, true)}>
+                                {g.shown[0]?.kind === 'flag' ? 'Allow all' : 'All on'}
+                              </Button>
+                              <Button size='xs' variant='outline' onClick={() => set(g.shown, false)}>
+                                {g.shown[0]?.kind === 'flag' ? 'Block all' : 'All off'}
+                              </Button>
+                            </CardAction>
+                          )}
+                        </CardHeader>
+                        <CardContent className='flex flex-col divide-y'>
+                          {g.shown.map(r => {
+                            const variant = r.kind === 'flag' ? null : draft.variants[r.key]
+                            const variantInfo = variant ? featureByKey(r.key)?.variants.find(v => v.key === variant) : undefined
+                            const canTurnOn = r.kind !== 'feature' || value(r) || !!firstVariant(r.key, draft.template)
+                            const rowKey = `${r.kind === 'policy' ? 'feature' : r.kind}:${r.key}`
+
+                            return (
+                              <div
+                                key={r.key}
+                                data-row={r.key}
+                                className={cn(
+                                  'flex flex-col gap-2 py-2.5 first:pt-0 last:pb-0 sm:flex-row sm:items-start sm:justify-between sm:gap-4',
+                                  (changed.has(rowKey) || changed.has(`variant:${r.key}`)) && 'bg-primary/5 -mx-2 rounded px-2'
+                                )}
+                              >
+                                <div className='min-w-0'>
+                                  <div className='flex flex-wrap items-center gap-2'>
+                                    <span className='text-sm font-medium'>{r.label}</span>
+                                    <span className='text-muted-foreground font-mono text-xs'>{r.key}</span>
+                                    {r.hint && <span className='text-muted-foreground text-xs'>· {r.hint}</span>}
+                                  </div>
+                                  <p className='text-muted-foreground mt-0.5 text-xs'>{r.kind === 'flag' ? r.description : (r.note ?? variantInfo?.description ?? r.description)}</p>
+                                  {r.kind === 'feature' && optionsOf(r.key).length > 0 && (
+                                    <div className='mt-2 flex flex-col gap-2 border-l pl-3' data-options={r.key}>
+                                      {optionsOf(r.key).map(o => (
+                                        <label
+                                          key={o.key}
+                                          data-option={`${r.key}.${o.key}`}
+                                          className={cn('flex items-start gap-3', changed.has(`option:${r.key}.${o.key}`) && 'bg-primary/5 -mx-1 rounded px-1')}
+                                        >
+                                          <Switch
+                                            size='sm'
+                                            checked={draft.options[r.key]?.[o.key] ?? o.default}
+                                            onCheckedChange={v => setOption(r.key, o.key, v)}
+                                            aria-label={o.label}
+                                          />
+                                          <span className='min-w-0'>
+                                            <span className='block text-xs font-medium'>{o.label}</span>
+                                            <span className='text-muted-foreground block text-xs'>{o.description}</span>
+                                          </span>
+                                        </label>
+                                      ))}
+                                    </div>
+                                  )}
+                                  {r.key === 'reward_currency' && variant && coinBlocked(variant) && (
+                                    <p className='text-destructive mt-0.5 text-xs' data-warning='reward-currency-coin-off'>
+                                      {variant} is not entitled under Site flags, so players cannot see that balance. Allow the coin or pick another reward currency.
+                                    </p>
+                                  )}
+                                </div>
+                                <div className='flex shrink-0 items-center gap-3'>
+                                  {r.kind !== 'flag' && variant && (
+                                    <VariantSelect feature={r.key} value={variant} label={r.label} onChange={v => setVariant(r, v)} />
+                                  )}
+                                  {r.kind !== 'policy' && (
+                                    <Switch
+                                      checked={value(r)}
+                                      disabled={!canTurnOn}
+                                      onCheckedChange={v => set([r], v)}
+                                      aria-label={r.kind === 'flag' ? `${r.label} entitled` : `${r.label} on`}
+                                    />
+                                  )}
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </CardContent>
+                      </Card>
+                    )
+                  })}
+                </div>
+              </section>
+            )
+          })}
+        </div>
+      )}
+
+      {changes.length > 0 && (
+        <div className='bg-card fixed inset-x-0 bottom-0 z-40 border-t shadow-lg'>
+          <div className='mx-auto flex max-w-360 items-center justify-between gap-4 px-4 py-3 sm:px-6'>
+            <p className='text-sm'>
+              <span className='font-semibold'>{changes.length}</span> unsaved change{changes.length === 1 ? '' : 's'}
+            </p>
+            <div className='flex gap-2'>
+              <Button variant='outline' onClick={() => setEdits(null)} disabled={save.isPending}>
+                Discard
+              </Button>
+              <Button onClick={() => setReviewing(true)}>Review and save</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <Dialog open={reviewing} onOpenChange={setReviewing}>
+        <DialogContent className='sm:max-w-2xl'>
+          <DialogHeader>
+            <DialogTitle>Save features &amp; plan</DialogTitle>
+            <DialogDescription>
+              Version {doc?.version} → {(doc?.version ?? 0) + 1}. The site picks this up within seconds.
+            </DialogDescription>
+          </DialogHeader>
+          <div className='max-h-[60vh] overflow-y-auto'>
+            <ChangeList changes={changes} labelOf={labelOf} />
+          </div>
+          <DialogFooter>
+            <Button variant='outline' onClick={() => setReviewing(false)} disabled={save.isPending}>
+              Cancel
+            </Button>
+            <Button
+              disabled={save.isPending}
+              onClick={() =>
+                save.mutate(undefined, {
+                  onError: e => {
+                    if (e instanceof ApiError && e.code === 'VERSION_CONFLICT') {
+                      toast.info('Reloaded the latest version; your edits are kept on top of it.')
+                      void refetch()
+                    }
+                  }
+                })
+              }
+            >
+              {save.isPending && <Loader2Icon className='animate-spin' />} Save {changes.length} change{changes.length === 1 ? '' : 's'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
+export default Entitlements

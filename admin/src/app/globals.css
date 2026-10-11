@@ -1,0 +1,275 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-8: var(--chart-8);
+  --color-chart-7: var(--chart-7);
+  --color-chart-6: var(--chart-6);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.01 268);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  /* ── the one accent ───────────────────────────────────────────────
+     Indigo, and only here: an operator panel is a reading surface, so
+     colour means something — the current page, a primary action, a
+     focus ring. Everything else is ink on paper. */
+  --primary: oklch(0.52 0.19 268);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.975 0.004 268);
+  --secondary-foreground: oklch(0.28 0.03 268);
+  --muted: oklch(0.975 0.003 268);
+  --muted-foreground: oklch(0.52 0.02 268);
+  --accent: oklch(0.96 0.02 268);
+  --accent-foreground: oklch(0.36 0.12 268);
+  --destructive: oklch(0.58 0.21 25);
+  /* Borders are a hair cooler than pure grey, so a table's lines sit
+     under the text rather than competing with it. */
+  --border: oklch(0.93 0.004 268);
+  --input: oklch(0.91 0.005 268);
+  --ring: oklch(0.52 0.19 268);
+
+  /* ── status ───────────────────────────────────────────────────────
+     Money states, named rather than picked per screen: the same green
+     is a credit here, an approved withdrawal there, a passed check in
+     the third. `-soft` is the background a badge sits on. */
+  --success: oklch(0.58 0.15 155);
+  --success-soft: oklch(0.95 0.05 155);
+  --warning: oklch(0.72 0.16 75);
+  --warning-soft: oklch(0.96 0.07 85);
+  --danger: oklch(0.58 0.21 25);
+  --danger-soft: oklch(0.96 0.04 25);
+  --info: oklch(0.6 0.13 240);
+  --info-soft: oklch(0.96 0.03 240);
+  /* Categorical series, in fixed order (never cycled). Validated for CVD separation on the
+     light card surface; the dark block below is the same hues stepped for the dark surface. */
+  --chart-1: #2a78d6;
+  --chart-2: #eb6834;
+  --chart-3: #1baf7a;
+  --chart-4: #eda100;
+  --chart-5: #e87ba4;
+  --chart-6: #008300;
+  --chart-7: #6250d6;
+  --chart-8: #e34948;
+  --radius: 0.625rem;
+  /* The rail is a shade off the page, not a slab of colour: it frames
+     the work without asking to be looked at. */
+  --sidebar: oklch(0.985 0.003 268);
+  --sidebar-foreground: oklch(0.32 0.02 268);
+  --sidebar-primary: oklch(0.52 0.19 268);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(0.955 0.02 268);
+  --sidebar-accent-foreground: oklch(0.36 0.12 268);
+  --sidebar-border: oklch(0.93 0.004 268);
+  --sidebar-ring: oklch(0.52 0.19 268);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.7 0.15 268);
+  --primary-foreground: oklch(0.16 0.02 268);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.7 0.19 22);
+
+  --success: oklch(0.72 0.15 155);
+  --success-soft: oklch(0.28 0.06 155);
+  --warning: oklch(0.8 0.15 80);
+  --warning-soft: oklch(0.3 0.07 80);
+  --danger: oklch(0.7 0.19 25);
+  --danger-soft: oklch(0.3 0.08 25);
+  --info: oklch(0.72 0.12 240);
+  --info-soft: oklch(0.28 0.06 240);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: #3987e5;
+  --chart-2: #d95926;
+  --chart-3: #199e70;
+  --chart-4: #c98500;
+  --chart-5: #d55181;
+  --chart-6: #008300;
+  --chart-7: #9085e9;
+  --chart-8: #e66767;
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+.input-default {
+  @apply h-9;
+}
+.input-lg {
+  @apply h-10;
+}
+.input-sm {
+  @apply h-8;
+}
+.input-size-lg {
+  @apply size-10;
+}
+
+[data-slot='button'].h-10:not(.px-6),
+button[data-slot='button'].h-10:not(.px-6),
+[data-slot='dropdown-menu-trigger'].h-10:not(.px-6),
+[data-slot='dialog-trigger'].h-10:not(.px-6),
+[data-slot='dialog-close'].h-10:not(.px-6),
+[data-slot='popover-trigger'].h-10:not(.px-6),
+a[data-slot='button'].h-10:not(.px-6) {
+  @apply px-4;
+}
+
+[data-slot='button'].h-9:not(.px-6),
+button[data-slot='button'].h-9:not(.px-6),
+[data-slot='dropdown-menu-trigger'].h-9:not(.px-6),
+[data-slot='dialog-trigger'].h-9:not(.px-6),
+[data-slot='dialog-close'].h-9:not(.px-6),
+[data-slot='dropdown-menu-trigger'].h-9:not(.px-6),
+[data-slot='popover-trigger'].h-9:not(.px-6),
+a[data-slot='button'].h-9:not(.px-6) {
+  @apply px-3;
+}
+
+/* For native button elements and elements with role="button", e.g., button, checkbox, radio, switch etc. */
+button:not(:disabled),
+[role='checkbox']:not(:disabled),
+[role='radio']:not(:disabled),
+[role='switch']:not(:disabled),
+[role='button']:not(:disabled) {
+  cursor: pointer;
+}
+
+/* For labels associated with form controls */
+label[for],
+label:has([role='checkbox']):not(:disabled),
+label:has([role='radio']):not(:disabled),
+label:has([role='switch']):not(:disabled) {
+  cursor: pointer;
+}
+
+/* For slider component */
+[role='slider']:not([data-disabled]),
+[data-slot='slider-track']:not([data-disabled]),
+[data-slot='slider-thumb']:not([data-disabled]) {
+  cursor: pointer;
+}
+
+/* For components with menuitems, e.g., dropdown, context menu, etc. */
+[role='menuitem']:not(:disabled),
+[role='menuitemcheckbox']:not(:disabled),
+[role='menuitemradio']:not(:disabled) {
+  cursor: pointer !important;
+}
+
+/* For components with options, e.g., combobox, command, select etc. */
+[role='option']:not(:disabled),
+select[data-slot='native-select']:not(:disabled) {
+  cursor: pointer !important;
+}
+
+/* For number input spin buttons */
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+  cursor: pointer;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+@theme inline {
+  --animate-heartbeat: heartbeat 2s infinite ease-in-out;
+
+  @keyframes heartbeat {
+    0% {
+      box-shadow: 0 0 0 0 var(--heartbeat-color, var(--primary));
+      transform: scale(1);
+    }
+    50% {
+      box-shadow: 0 0 0 6px transparent;
+      transform: scale(1.03);
+    }
+    100% {
+      box-shadow: 0 0 0 0 transparent;
+      transform: scale(1);
+    }
+  }
+}

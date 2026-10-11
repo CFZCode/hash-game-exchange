@@ -7,3 +7,16 @@ dist
 .DS_Store
 .ui-compare/
 *.log
+
+# backend / admin / owner panel (stack added from SmartBet)
+logs/
+storage/
+uploads/
+.run/
+coverage/
+e2e-results/
+*.tsbuildinfo
+backend/data/
+owner-panel/data/
+.demo-credentials.local.md
+credentials.md

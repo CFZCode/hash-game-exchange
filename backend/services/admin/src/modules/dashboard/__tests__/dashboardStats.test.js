@@ -1,0 +1,264 @@
+'use strict';
+
+const test = require('node:test');
+const assert = require('node:assert');
+
+const db = require('@ibitplay/db');
+const { createLogger } = require('@ibitplay/common');
+
+const { DashboardStatsService } = require('../dashboardStats.service');
+const v = require('../dashboardStats.validators');
+
+/**
+ * The dashboard's chart routes.
+ *
+ * What is worth proving: the window and the buckets are right, a sub-staff's
+ * figures cover their own tree and nothing else, the currency filter narrows
+ * rather than converts, and the validators keep the scan bounded.
+ */
+
+const TEST_DB = process.env.TEST_DB_NAME || 'ibitplay_test';
+
+let nextId = 470_000_000 + (process.pid % 100_000) * 1000;
+const newId = () => (nextId += 1);
+
+test('dashboard stats validators', async (t) => {
+  const ok = (q) => v.series.query.safeParse(q).success;
+
+  await t.test('a window is required and must be in order', () => {
+    assert.equal(ok({}), false);
+    assert.equal(ok({ from: '2026-01-02', to: '2026-01-01' }), false);
+    assert.equal(ok({ from: '2026-01-01', to: '2026-01-01' }), false);
+    assert.equal(ok({ from: '2026-01-01T00:00:00Z', to: '2026-01-31T00:00:00Z' }), true);
+  });
+
+  await t.test('the span is capped, daily buckets more tightly', () => {
+    assert.equal(ok({ from: '2024-01-01', to: '2025-06-01', granularity: 'day' }), false);
+    assert.equal(ok({ from: '2024-01-01', to: '2025-06-01', granularity: 'week' }), true);
+    assert.equal(ok({ from: '2022-01-01', to: '2025-06-01', granularity: 'month' }), false);
+  });
+
+  await t.test('unknown keys and odd granularities are refused', () => {
+    assert.equal(ok({ from: '2026-01-01', to: '2026-01-02', nonsense: '1' }), false);
+    assert.equal(ok({ from: '2026-01-01', to: '2026-01-02', granularity: 'hour' }), false);
+    assert.equal(ok({ from: '2026-01-01', to: '2026-01-02', currency: "INR'; --" }), false);
+    assert.equal(v.series.query.parse({ from: '2026-01-01', to: '2026-01-02', currency: 'inr' }).currency, 'INR');
+  });
+
+  await t.test('top has a page ceiling', () => {
+    assert.equal(v.top.query.safeParse({ from: '2026-01-01', to: '2026-01-02', limit: '500' }).success, false);
+    assert.equal(v.top.query.parse({ from: '2026-01-01', to: '2026-01-02' }).limit, 10);
+  });
+});
+
+test('withdrawn is one rule: bank Approved or Paid, crypto Sent', () => {
+  const dash = require('../dashboard.constants').WITHDRAWAL_DONE;
+  const audience = require('../../reports/audienceStats.constants').WITHDRAWAL_DONE;
+  // The stats share the dashboard's lists rather than keeping a copy.
+  assert.equal(audience.fiat_withdrawals, dash.fiat_withdrawals);
+  assert.equal(audience.withdrawals, dash.withdrawals);
+  for (const list of [dash.fiat_withdrawals, audience.fiat_withdrawals]) {
+    assert.ok(list.includes('approved'), 'legacy bank rows stop at Approved');
+    assert.ok(list.includes('paid'), 'the new flow ends at Paid');
+  }
+  for (const list of [dash.withdrawals, audience.withdrawals]) {
+    assert.ok(list.includes('sent'));
+    assert.ok(!list.includes('approved'), 'a crypto Approved is not broadcast yet');
+  }
+  for (const list of [dash.withdrawals, dash.fiat_withdrawals]) {
+    assert.ok(!list.includes('in queue') && !list.includes('rejected'));
+    assert.ok(list.every((st) => st === st.toLowerCase()), 'readers compare LOWER(status)');
+  }
+  // user-service's deposit reports keep a copy; it must say the same thing.
+  const { FIAT_WITHDRAWN } = require('../../../../../user/src/modules/deposit-reports/depositReports.constants');
+  assert.deepEqual([...FIAT_WITHDRAWN], [...dash.fiat_withdrawals]);
+});
+
+test('dashboard stats against a database', async (t) => {
+  const logger = createLogger({ name: 'dashboard-stats-test', level: 'silent' });
+  let connection;
+
+  try {
+    connection = await db.connect({
+      config: {
+        DB_HOST: process.env.DB_HOST || '127.0.0.1',
+        DB_PORT: Number(process.env.DB_PORT || 5432),
+        DB_NAME: TEST_DB,
+        DB_USER: process.env.DB_USER || 'postgres',
+        DB_PASSWORD: process.env.DB_PASSWORD || 'postgres',
+        DB_SCHEMA: 'public',
+      },
+      logger,
+      service: 'admin-service',
+    });
+    await connection.ping();
+  } catch (error) {
+    t.skip(`No test database reachable (${error.message})`);
+    return;
+  }
+
+  const { models, sequelize } = connection;
+  const agentRoleId = (await models.Roles.findOne({ where: { level: 6 }, raw: true }))?.id;
+  assert.ok(agentRoleId, 'the test database needs a level-6 (agent) role');
+
+  const ownerId = newId();
+  const agentId = newId();
+  const playerA = newId(); // under the agent
+  const playerB = newId(); // a direct signup — the owner's only
+  const COIN = `T${String(process.pid % 100_000).padStart(5, '0')}`.slice(0, 8);
+  const GIS_COIN = `G${COIN.slice(1)}`;
+  const service = new DashboardStatsService({ models, db: connection, logger, config: { ROOT_STAFF_ID: ownerId } });
+
+  // A quiet stretch of the past, so other tests' rows cannot land in the window.
+  const day = (d) => new Date(`2001-03-${d}T10:00:00.000Z`);
+  const window = { from: '2001-03-01T00:00:00.000Z', to: '2001-04-01T00:00:00.000Z' };
+
+  const cleanup = async () => {
+    await models.FiatDeposits.destroy({ where: { user_id: [String(playerA), String(playerB)] } });
+    await models.FiatWithdrawals.destroy({ where: { uid: [playerA, playerB] } });
+    await sequelize.query('DELETE FROM "SportsBet" WHERE user_id IN (:ids)', { replacements: { ids: [playerA, playerB] } });
+    await sequelize.query('DELETE FROM bets WHERE uid IN (:ids)', { replacements: { ids: [playerA, playerB] } });
+    await sequelize.query('DELETE FROM gis_transactions WHERE user_id IN (:ids)', { replacements: { ids: [playerA, playerB] } });
+    await models.Users.destroy({ where: { id: [playerA, playerB] } });
+    await models.Staff.destroy({ where: { id: [agentId, ownerId] } });
+    await models.Exchangerate.destroy({ where: { currency: [COIN, GIS_COIN] } });
+  };
+
+  t.before(async () => {
+    await cleanup();
+    await models.Staff.create({ id: ownerId, name: `s-owner-${ownerId}`, email: `o${ownerId}@t.test`, password: 'x', role_id: agentRoleId, parent_id: null });
+    await models.Staff.create({ id: agentId, name: `s-agent-${agentId}`, email: `a${agentId}@t.test`, password: 'x', role_id: agentRoleId, parent_id: ownerId });
+    await models.Users.create({ id: playerA, name: `sa-${playerA}`, password: 'x', status: 'active', parent_staff_id: agentId, created: day('03') });
+    await models.Users.create({ id: playerB, name: `sb-${playerB}`, password: 'x', status: 'active', parent_staff_id: null, created: day('20') });
+    await models.Exchangerate.create({ currency: COIN, usd_rate: '2' });
+    await models.Exchangerate.create({ currency: GIS_COIN, usd_rate: '1' });
+
+    const deposit = (user, amount, at, status = 'approved') => ({
+      user_id: String(user), amount, currency: COIN, status, account_holder_name: 'Test', created_at: at,
+    });
+    await models.FiatDeposits.bulkCreate([
+      deposit(playerA, '100', day('03')),
+      deposit(playerA, '50', day('04')),
+      deposit(playerB, '1000', day('20')),
+      // Already USD: counted 1:1 even though `exchangerate` has no USD row.
+      { ...deposit(playerA, '3', day('03')), currency: 'USD' },
+      // Not a success — not money that arrived.
+      deposit(playerA, '777', day('04'), 'pending'),
+    ]);
+    await models.FiatWithdrawals.create({ uid: playerA, amount: '30', currency: COIN, status: 'done', date: day('04'), account_holder_name: 'Test' });
+    // The live bank-withdrawal vocabulary: Approved (legacy rows stop there) and Paid both count;
+    // In Queue and Rejected do not.
+    await models.FiatWithdrawals.create({ uid: playerA, amount: '7', currency: COIN, status: 'Paid', date: day('04'), account_holder_name: 'Test' });
+    await models.FiatWithdrawals.create({ uid: playerA, amount: '500', currency: COIN, status: 'Approved', date: day('04'), account_holder_name: 'Test' });
+    await models.FiatWithdrawals.create({ uid: playerA, amount: '11', currency: COIN, status: 'In Queue', date: day('04'), account_holder_name: 'Test' });
+    await models.FiatWithdrawals.create({ uid: playerA, amount: '13', currency: COIN, status: 'Rejected', date: day('04'), account_holder_name: 'Test' });
+
+    await sequelize.query(
+      `INSERT INTO "SportsBet" (user_id, game_type, sport_id, stake_amount, original_currency, status, result_status, created_at, updated_at)
+       VALUES (:a, 'MO', '4', 40, :coin, 'open', NULL, :at, :at), (:a, 'MO', '4', 999, :coin, 'void', NULL, :at, :at),
+              -- How settlement writes a refund: closed, with the refund in result_status.
+              (:a, 'FAN', '4', 555, :coin, 'closed', 'refund', :at, :at)`,
+      { replacements: { a: playerA, coin: COIN, at: day('05') } }
+    );
+    await sequelize.query(
+      `INSERT INTO bets (uid, gid, game, coin, amount, profit, created, result)
+       VALUES (:a, :a, 'dice', :coin, 10, 5, :at, NULL), (:b, :b, 'dice', :coin, 20, 0, :at2, NULL),
+              -- A bot/QA round: not turnover, as the casino service and the wager reports rule.
+              (:a, :a, 'fake-sim', :coin, 5000, 900, :at, '{"fake": true}')`,
+      { replacements: { a: playerA, b: playerB, coin: COIN, at: day('05'), at2: day('20') } }
+    );
+    // Slotegrator rows, in their own currency so the figures above are untouched. As
+    // `gis.service.js` writes them: a bet is a debit (negative), a win a credit. The
+    // last bet is an older row that stored the stake as a magnitude.
+    await sequelize.query(
+      `INSERT INTO gis_transactions (user_id, transaction_id, action, amount, currency, game_uuid, balance_after, created_at)
+       VALUES (:a, :t1, 'bet', -25, :coin, 'g-slot', 0, :at), (:a, :t2, 'win', 40, :coin, 'g-slot', 0, :at),
+              (:a, :t3, 'bet', 5, :coin, 'g-slot', 0, :at)`,
+      { replacements: { a: playerA, coin: GIS_COIN, at: day('06'), t1: `dst-${playerA}-1`, t2: `dst-${playerA}-2`, t3: `dst-${playerA}-3` } }
+    );
+  });
+
+  t.after(async () => {
+    await cleanup();
+    await connection.close?.();
+  });
+
+  await t.test('the root sees the whole site, bucketed by day, in the asked currency', async () => {
+    const r = await service.series({ actor: { id: ownerId }, ...window, granularity: 'day', currency: COIN });
+
+    assert.equal(r.converted, false);
+    assert.equal(r.totals.deposits, '1150.00000000');
+    assert.equal(r.totals.depositCount, 3);
+    assert.equal(r.totals.withdrawals, '537.00000000', 'done 30 + Paid 7 + Approved 500, each once');
+    assert.equal(r.totals.withdrawalCount, 3);
+    assert.equal(r.totals.registrations, 2);
+    assert.equal(r.totals.sportsStaked, '40.00000000', 'void and refunded sports bets are not turnover');
+    assert.equal(r.totals.casinoWagered, '30.00000000');
+    // Stakes 10 + 20, one win paying stake + profit = 15.
+    assert.equal(r.totals.casinoGgr, '15.00000000');
+
+    const d4 = r.buckets.find((b) => b.bucket === '2001-03-04');
+    assert.equal(d4.deposits, '50.00000000');
+    assert.equal(d4.net, '-487.00000000');
+  });
+
+  await t.test('a sub-staff sees their own tree and nothing else', async () => {
+    const r = await service.series({ actor: { id: agentId }, ...window, granularity: 'month', currency: COIN });
+
+    assert.equal(r.buckets.length, 1);
+    assert.equal(r.buckets[0].bucket, '2001-03-01');
+    assert.equal(r.totals.deposits, '150.00000000');
+    assert.equal(r.totals.registrations, 1);
+    assert.equal(r.totals.casinoWagered, '10.00000000');
+  });
+
+  await t.test('without a currency the figures are converted to USD at the current rate', async () => {
+    const r = await service.series({ actor: { id: agentId }, ...window, granularity: 'week' });
+
+    assert.equal(r.converted, true);
+    assert.equal(r.currency, 'USD');
+    assert.equal(r.totals.deposits, '303.00000000', '150 COIN at 2, plus 3 USD at 1');
+    assert.equal(r.unconverted.length, 0);
+    // 2001-03-03 is a Saturday: its ISO week starts on Monday the 26th of February.
+    assert.equal(r.buckets[0].bucket, '2001-02-26');
+  });
+
+  await t.test('a currency filter narrows rather than converts', async () => {
+    const r = await service.series({ actor: { id: ownerId }, ...window, currency: 'ZZQ' });
+    assert.equal(r.totals.deposits, '0.00000000');
+    assert.equal(r.totals.casinoWagered, '0.00000000');
+    // Registrations have no currency, so they are not narrowed by one.
+    assert.equal(r.totals.registrations, 2);
+    assert.ok(r.buckets.every((b) => b.deposits === '0.00000000'));
+  });
+
+  await t.test('no actor is an empty scope, never everything', async () => {
+    const r = await service.series({ actor: null, ...window, currency: COIN });
+    assert.equal(r.totals.depositCount, 0);
+    const top = await service.top({ actor: null, ...window, currency: COIN });
+    assert.deepEqual(top.games, []);
+  });
+
+  await t.test('top games and sports, scoped', async () => {
+    const owner = await service.top({ actor: { id: ownerId }, ...window, currency: COIN, limit: 5 });
+    assert.equal(owner.games[0].key, 'inhouse:dice');
+    assert.ok(!owner.games.some((g) => g.key === 'inhouse:fake-sim'), 'a fake bot round is not a top game');
+    assert.equal(owner.games[0].wagered, '30.00000000');
+    assert.equal(owner.games[0].bets, 2);
+    assert.deepEqual(owner.sports.map((s) => [s.key, s.name, s.wagered]), [['4', 'Cricket', '40.00000000']], 'by sport, not by market');
+
+    const agent = await service.top({ actor: { id: agentId }, ...window, currency: COIN });
+    assert.equal(agent.games[0].wagered, '10.00000000');
+  });
+
+  await t.test('Slotegrator stakes are read whatever their sign (the handler stores bets negative)', async () => {
+    const r = await service.series({ actor: { id: ownerId }, ...window, currency: GIS_COIN });
+    assert.equal(r.totals.casinoWagered, '30.00000000');
+    assert.equal(r.totals.casinoBets, 2);
+    assert.equal(r.totals.casinoWon, '40.00000000');
+    assert.equal(r.totals.casinoGgr, '-10.00000000');
+
+    const top = await service.top({ actor: { id: ownerId }, ...window, currency: GIS_COIN });
+    assert.deepEqual(top.games.map((g) => [g.key, g.wagered, g.bets]), [['gis:g-slot', '30.00000000', 2]]);
+  });
+});

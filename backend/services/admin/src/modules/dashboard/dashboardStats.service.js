@@ -1,0 +1,550 @@
+'use strict';
+
+const { money } = require('@ibitplay/common');
+
+const { visibleStaffIds } = require('../staff-directory/staffDirectory.service');
+const { COIN_IDS, DEPOSIT_SUCCESS, WITHDRAWAL_DONE, VALUATION_NOTE, SPORT_NAMES, SPORTS_REFUNDED_RESULTS } = require('./dashboard.constants');
+const { gisKindSql, gisSideAmountSql, gisBetCountSql, gisPlayFilterSql } = require('../statements/statements.constants');
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * THE DASHBOARD'S TIME SERIES
+ *
+ * The headline routes answer "how much, in this window". These answer "how
+ * much, per day/week/month of this window" — deposits and withdrawals,
+ * registrations, casino and sports turnover and GGR — plus the top games and
+ * sports over the same window, for the dashboard's charts.
+ *
+ * ── WHAT EACH FIGURE READS ───────────────────────────────────────────────
+ *
+ *   deposits     the same four tables and success statuses as the headline
+ *                totals (`#depositTotals`): ccdeposit, fiat_deposits,
+ *                apaydeposits, pay_in_transactions
+ *   withdrawals  withdrawals + fiat_withdrawals, withdrawn statuses (bank
+ *                Approved or Paid, crypto Sent — WITHDRAWAL_DONE)
+ *   casino       the four casino sources as `bet-history/profileStats.js`
+ *                defines them: in-house `bets` (not refunded), Slotegrator
+ *                `gis_transactions` (bet, win, refund, rollback — see
+ *                `statements.constants.js` gisKindSql: a refund or rollback
+ *                that returned a stake takes it off turnover, one that took a
+ *                win back takes it off wins, so GGR is the reports'
+ *                `#tradingPnlFor` figure), jsGames v1 and v2. A Slotegrator
+ *                game whose catalogue type says "sport" is the partner
+ *                sportsbook, so it is counted under SPORTS.
+ *                GGR = stakes − wins.
+ *   sports       turnover: `SportsBet.stake_amount` by placement time, voided
+ *                and refunded bets excluded (by `status` AND `result_status`) (+ the partner sportsbook's
+ *                stakes). GGR: the house side of the sports settlement ledger
+ *                (−SUM(credits_ledger.netamount) over the settlement reasons,
+ *                by ledger time — the statements module's P&L) + the partner
+ *                sportsbook's stakes − wins.
+ *
+ * ── WHOSE FIGURES ────────────────────────────────────────────────────────
+ *
+ * The caller's tree, decided exactly as the dashboard's other routes decide
+ * it: `visibleStaffIds`, and a tree containing the platform root sees the
+ * whole site. Anyone else sees the players whose `parent_staff_id` is in
+ * their tree. Applied as a sub-select on `users` inside each query rather
+ * than a list of ids pulled into memory.
+ *
+ * ── CURRENCY ─────────────────────────────────────────────────────────────
+ *
+ * With no `currency`, every amount is converted to USD at the CURRENT rate —
+ * the same health warning as the headline (`VALUATION_NOTE`) — and what had
+ * no rate is reported under `unconverted`, never dropped. With a `currency`,
+ * only rows in that currency are read and the figures stay in it.
+ *
+ * ── SQL ──────────────────────────────────────────────────────────────────
+ *
+ * Every value is a bound replacement. The only text spliced into the SQL is
+ * table and column names fixed in this file. Each window is a plain
+ * `col >= from AND col < to` on the raw column, so a date index can serve it;
+ * the bucketing function is applied in the SELECT only.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+
+/**
+ * `gis_transactions.amount` is SIGNED from the wallet's side: the GIS handler
+ * (`casino/.../gis/gis.service.js`) writes a `bet` as a debit (negative) and a
+ * `win` or `refund` as a credit (positive); a `rollback` is + when it reverses
+ * a bet and − when it reverses a win or refund. Older rows may hold the bet as
+ * a magnitude, so a bet is read through `ABS(amount)` and everything else as
+ * stored (`statements.constants.js` gisSideAmountSql), with `amount <> 0` — an
+ * `amount > 0` filter would drop every real stake.
+ *
+ * `gis_transactions.currency` says 'PKR' for this platform's INR wallet — see
+ * `statements.constants.js` (CASINO_INR_CURRENCIES). Folded into INR here so a
+ * casino round is not reported in a currency the site does not run.
+ */
+const GIS_CURRENCY_ALIASES = Object.freeze({ PKR: 'INR' });
+
+/**
+ * In-house rounds that QA tooling and bots write straight into `bets` carry
+ * `result = {"fake": true, …}`. They are not turnover — the casino service's
+ * rule (`bet-history/betHistory.service.js`), which the wager reports follow
+ * too, so the dashboard and those reports agree.
+ */
+const NOT_FAKE = `(b.result->>'fake') IS DISTINCT FROM 'true'`;
+
+/** Sports settlement reasons in `credits_ledger` — the statements module's list. */
+const SPORTS_LEDGER_REASONS = Object.freeze([
+  'BET_STAKE',
+  'BET_PAYOUT',
+  'BET_REFUND',
+  'BET_ROLLBACK',
+  'VOID_AFTER_SETTLEMENT',
+  'VOID_SINGLE_BET_AFTER_SETTLEMENT',
+]);
+
+/** A sports bet in one of these never took a stake that stayed taken. */
+const SPORTS_NOT_TURNOVER = Object.freeze(['void', 'voided', 'refund', 'refunded', 'cancelled', 'canceled', 'rejected', 'failed']);
+
+/** How many games per currency the top-games query ranks before merging in USD. */
+const TOP_PER_CURRENCY = 50;
+
+/** Every series a bucket carries. Money keys are decimal strings, the rest counts. */
+const MONEY_KEYS = Object.freeze([
+  'deposits', 'withdrawals', 'casinoWagered', 'casinoWon', 'casinoGgr', 'sportsStaked', 'sportsGgr',
+]);
+const COUNT_KEYS = Object.freeze(['depositCount', 'withdrawalCount', 'registrations', 'casinoBets', 'sportsBets']);
+
+/** One deposit/withdrawal source: its table, date column (all timestamptz since 083), owner, amount, currency. */
+const MONEY_SOURCES = Object.freeze([
+  { side: 'deposit', table: 'ccdeposit', date: 'created_at', owner: 'userid', ownerIsText: true, amount: 'price', coinId: 'coinid', statuses: DEPOSIT_SUCCESS.ccdeposit },
+  { side: 'deposit', table: 'fiat_deposits', date: 'created_at', owner: 'user_id', amount: 'amount', currency: 'currency', statuses: DEPOSIT_SUCCESS.fiat_deposits },
+  { side: 'deposit', table: 'apaydeposits', date: 'created_at', owner: 'user_id', amount: 'amount', currency: 'currency', statuses: DEPOSIT_SUCCESS.apaydeposits },
+  { side: 'deposit', table: 'pay_in_transactions', date: 'created_at', owner: 'user_id', amount: 'amount', currency: 'currency', statuses: DEPOSIT_SUCCESS.pay_in_transactions, statusIsNumber: true },
+  { side: 'withdrawal', table: 'withdrawals', date: 'date', owner: 'uid', amount: 'amount', currency: 'coin', statuses: WITHDRAWAL_DONE.withdrawals },
+  { side: 'withdrawal', table: 'fiat_withdrawals', date: 'date', owner: 'uid', amount: 'amount', currency: 'currency', statuses: WITHDRAWAL_DONE.fiat_withdrawals },
+]);
+
+/** 'Cricket' for '4'; "Sport 99" for an id the map does not know; 'Other' when the bet has none. */
+const sportName = (id) => (id === 'other' ? 'Other' : SPORT_NAMES[id] ?? `Sport ${id}`);
+
+class DashboardStatsService {
+  constructor({ models, db, logger, config }) {
+    this.models = models;
+    this.db = db;
+    this.logger = logger;
+    this.config = config;
+  }
+
+  /**
+   * Per-bucket figures over `[from, to)`.
+   *
+   * Only buckets with activity come back; the screen lays them over the full
+   * list of buckets itself, so the payload does not carry a year of zeros.
+   */
+  async series({ actor, from, to, granularity = 'day', currency }) {
+    const scope = await this.#scope(actor);
+    const ctx = this.#context({ from, to, granularity, currency, scope });
+    const rates = currency ? null : await this.#rates();
+
+    const [moneyRows, registrations, gamingRows] = scope.empty
+      ? [[], [], []]
+      : await Promise.all([this.#moneyRows(ctx), this.#registrationRows(ctx), this.#gamingRows(ctx)]);
+
+    const acc = new Map();
+    const unconverted = new Map();
+    const bucketOf = (key) => {
+      if (!acc.has(key)) {
+        acc.set(key, {
+          bucket: key,
+          ...Object.fromEntries(MONEY_KEYS.map((k) => [k, 0n])),
+          ...Object.fromEntries(COUNT_KEYS.map((k) => [k, 0])),
+        });
+      }
+      return acc.get(key);
+    };
+
+    /** Add `amount` (in `cur`) to `metric` (`sign` −1 subtracts), converting when no currency was asked for. */
+    const add = (row, metric, amount, cur, sign = 1n) => {
+      const value = this.#value(amount, cur, rates);
+      const minor = value === null ? null : value * sign;
+      if (minor === null) {
+        const k = `${metric}|${cur || '?'}`;
+        const prev = unconverted.get(k) ?? { metric, currency: cur || null, amount: 0n };
+        prev.amount += money.toMinorQuantised(String(amount ?? '0')) * sign;
+        unconverted.set(k, prev);
+        return;
+      }
+      row[metric] += minor;
+    };
+
+    for (const r of moneyRows) {
+      const row = bucketOf(r.bucket);
+      const cur = this.#currencyOf(r.currency);
+      if (r.side === 'deposit') {
+        add(row, 'deposits', r.total, cur);
+        row.depositCount += Number(r.n) || 0;
+      } else {
+        add(row, 'withdrawals', r.total, cur);
+        row.withdrawalCount += Number(r.n) || 0;
+      }
+    }
+
+    for (const r of registrations) bucketOf(r.bucket).registrations += Number(r.n) || 0;
+
+    for (const r of gamingRows) {
+      const row = bucketOf(r.bucket);
+      const cur = this.#currencyOf(r.currency);
+      const n = Number(r.n) || 0;
+      if (r.section === 'casino') {
+        if (r.kind === 'stake') {
+          add(row, 'casinoWagered', r.total, cur);
+          add(row, 'casinoGgr', r.total, cur);
+          row.casinoBets += n;
+        } else {
+          add(row, 'casinoWon', r.total, cur);
+          add(row, 'casinoGgr', r.total, cur, -1n);
+        }
+      } else if (r.kind === 'stake') {
+        add(row, 'sportsStaked', r.total, cur);
+        row.sportsBets += n;
+        if (r.source === 'partner') add(row, 'sportsGgr', r.total, cur);
+      } else if (r.kind === 'win') {
+        add(row, 'sportsGgr', r.total, cur, -1n);
+      } else if (r.kind === 'house') {
+        add(row, 'sportsGgr', r.total, cur);
+      }
+    }
+
+    const buckets = [...acc.values()].sort((a, b) => (a.bucket < b.bucket ? -1 : 1)).map((b) => this.#finish(b));
+    const totals = this.#finish(
+      [...acc.values()].reduce(
+        (t, b) => {
+          for (const k of MONEY_KEYS) t[k] += b[k];
+          for (const k of COUNT_KEYS) t[k] += b[k];
+          return t;
+        },
+        { ...Object.fromEntries(MONEY_KEYS.map((k) => [k, 0n])), ...Object.fromEntries(COUNT_KEYS.map((k) => [k, 0])) }
+      )
+    );
+    delete totals.bucket;
+
+    return {
+      range: { from: ctx.from.toISOString(), to: ctx.to.toISOString() },
+      granularity,
+      currency: currency ?? 'USD',
+      converted: !currency,
+      valuation: currency ? null : { note: VALUATION_NOTE, ratesAsOf: rates.asOf },
+      buckets,
+      totals,
+      /** Non-empty means the USD figures above are short by these native amounts. */
+      unconverted: [...unconverted.values()].map((u) => ({ ...u, amount: money.toDecimalString(u.amount) })),
+    };
+  }
+
+  /** The most-played casino games and sports over `[from, to)`, by turnover. */
+  async top({ actor, from, to, currency, limit = 10 }) {
+    const scope = await this.#scope(actor);
+    const ctx = this.#context({ from, to, granularity: 'day', currency, scope });
+    const rates = currency ? null : await this.#rates();
+
+    const [gameRows, sportRows] = scope.empty ? [[], []] : await Promise.all([this.#topGameRows(ctx), this.#topSportRows(ctx)]);
+
+    const merge = (rows, keyOf, extra) => {
+      const map = new Map();
+      for (const r of rows) {
+        const minor = this.#value(r.total, this.#currencyOf(r.currency), rates);
+        if (minor === null) continue;
+        const key = keyOf(r);
+        const entry = map.get(key) ?? { key, ...extra(r), wagered: 0n, bets: 0 };
+        entry.wagered += minor;
+        entry.bets += Number(r.n) || 0;
+        map.set(key, entry);
+      }
+      return [...map.values()]
+        .sort((a, b) => (b.wagered > a.wagered ? 1 : b.wagered < a.wagered ? -1 : 0))
+        .slice(0, limit)
+        .map((e) => ({ ...e, wagered: money.toDecimalString(e.wagered) }));
+    };
+
+    return {
+      range: { from: ctx.from.toISOString(), to: ctx.to.toISOString() },
+      currency: currency ?? 'USD',
+      converted: !currency,
+      games: merge(gameRows, (r) => r.game_key, (r) => ({ name: r.name || r.game_key, provider: r.provider ?? null })),
+      // By sport (`sport_id`), not `game_type` — MO/BM/FAN are market families, not sports.
+      sports: merge(sportRows, (r) => r.sport, (r) => ({ name: sportName(r.sport) })),
+    };
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
+  //  Queries
+  // ══════════════════════════════════════════════════════════════════════
+
+  async #moneyRows(ctx) {
+    const parts = [];
+    const replacements = { ...ctx.replacements };
+
+    MONEY_SOURCES.forEach((s, i) => {
+      const statusKey = `st${i}`;
+      replacements[statusKey] = s.statuses;
+      const status = s.statusIsNumber ? `status IN (:${statusKey})` : `LOWER(status) IN (:${statusKey})`;
+      const currencyExpr = s.coinId ? `'#' || ${s.coinId}::text` : `UPPER(${s.currency})`;
+      let currencyFilter = '';
+      if (ctx.currency) {
+        if (s.coinId) {
+          const ids = Object.entries(COIN_IDS).filter(([, sym]) => sym === ctx.currency).map(([id]) => Number(id));
+          replacements[`coin${i}`] = ids.length ? ids : [-1];
+          currencyFilter = `AND ${s.coinId} IN (:coin${i})`;
+        } else {
+          currencyFilter = `AND UPPER(${s.currency}) = :currency`;
+        }
+      }
+      parts.push(`
+        SELECT ${this.#bucket(s.date)} AS bucket, '${s.side}' AS side, ${currencyExpr} AS currency,
+               COALESCE(SUM(${s.amount}), 0)::text AS total, COUNT(*) AS n
+          FROM ${s.table}
+         WHERE ${status} AND ${this.#window(s.date)} ${currencyFilter} ${this.#owned(ctx, s.owner, s.ownerIsText)}
+         GROUP BY 1, 3`);
+    });
+
+    return this.#query(parts.join(' UNION ALL '), replacements);
+  }
+
+  async #registrationRows(ctx) {
+    const scope = ctx.scope.all ? '' : 'AND parent_staff_id IN (:staffIds)';
+    return this.#query(
+      `SELECT ${this.#bucket('created')} AS bucket, COUNT(*) AS n
+         FROM users
+        WHERE ${this.#window('created')} ${scope}
+        GROUP BY 1`,
+      ctx.replacements
+    );
+  }
+
+  /**
+   * Casino and sports movements, one row per (bucket, section, kind, currency).
+   *
+   * `source` separates the partner sportsbook's own stakes (whose GGR is
+   * stakes − wins) from the in-house sportsbook's (whose GGR comes from the
+   * settlement ledger instead).
+   */
+  async #gamingRows(ctx) {
+    const r = { ...ctx.replacements, ledgerReasons: SPORTS_LEDGER_REASONS, notTurnover: SPORTS_NOT_TURNOVER, refundedResults: SPORTS_REFUNDED_RESULTS };
+    const cur = (col) => (ctx.currency ? `AND UPPER(${col}) = :currency` : '');
+    const gisCurrency = this.#gisCurrencyExpr('g.currency');
+
+    const sql = `
+      SELECT bucket, section, kind, source, currency, SUM(total)::text AS total, SUM(n) AS n FROM (
+        SELECT ${this.#bucket('b.created')} AS bucket, 'casino' AS section, 'stake' AS kind, 'house' AS source,
+               UPPER(b.coin) AS currency, SUM(b.amount) AS total, COUNT(*) AS n
+          FROM bets b
+         WHERE b.amount > 0 AND (b.result IS NULL OR b.result::text <> '"refunded"') AND ${NOT_FAKE}
+           AND ${this.#window('b.created')} ${cur('b.coin')} ${this.#owned(ctx, 'b.uid')}
+         GROUP BY 1, 5
+        UNION ALL
+        SELECT ${this.#bucket('b.created')}, 'casino', 'win', 'house', UPPER(b.coin), SUM(b.amount + b.profit), COUNT(*)
+          FROM bets b
+         WHERE b.profit > 0 AND ${NOT_FAKE}
+           AND ${this.#window('b.created')} ${cur('b.coin')} ${this.#owned(ctx, 'b.uid')}
+         GROUP BY 1, 5
+        UNION ALL
+        SELECT ${this.#bucket('g.created_at')},
+               CASE WHEN LOWER(COALESCE(gg.type, '')) LIKE '%sport%' THEN 'sports' ELSE 'casino' END,
+               ${gisKindSql('g')},
+               'partner', ${gisCurrency}, SUM(${gisSideAmountSql('g')}), SUM(${gisBetCountSql('g')})
+          FROM gis_transactions g
+          LEFT JOIN gis_games gg ON gg.uuid = g.game_uuid
+         WHERE ${gisPlayFilterSql('g')}
+           AND ${this.#window('g.created_at')} ${ctx.currency ? `AND ${gisCurrency} = :currency` : ''} ${this.#owned(ctx, 'g.user_id')}
+         GROUP BY 1, 2, 3, 5
+        UNION ALL
+        SELECT ${this.#bucket('j.timestamp')}, 'casino',
+               CASE WHEN LOWER(j.transaction_type) = 'win' THEN 'win' ELSE 'stake' END,
+               'house', UPPER(j.currency), SUM(ABS(j.amount)), COUNT(*)
+          FROM js_game_transactions j
+         WHERE j.amount <> 0 AND LOWER(j.transaction_type) IN ('bet', 'settle', 'win')
+           AND LOWER(j.transaction_status) = 'completed'
+           AND ${this.#window('j.timestamp')} ${cur('j.currency')} ${this.#owned(ctx, 'j.user_id')}
+         GROUP BY 1, 3, 5
+        UNION ALL
+        SELECT ${this.#bucket('v.created_at')}, 'casino',
+               CASE WHEN LOWER(v.transaction_type) = 'win' THEN 'win' ELSE 'stake' END,
+               'house', UPPER(v.currency), SUM(ABS(v.amount)), COUNT(*)
+          FROM game_transactions v
+         WHERE v.amount <> 0 AND LOWER(v.transaction_type) IN ('bet', 'loss', 'win')
+           AND ${this.#window('v.created_at')} ${cur('v.currency')} ${this.#owned(ctx, 'v.user_id')}
+         GROUP BY 1, 3, 5
+        UNION ALL
+        SELECT ${this.#bucket('s.created_at')}, 'sports', 'stake', 'house',
+               UPPER(COALESCE(NULLIF(s.original_currency, ''), 'INR')), SUM(s.stake_amount), COUNT(*)
+          FROM "SportsBet" s
+         WHERE s.stake_amount > 0 AND LOWER(COALESCE(s.status, '')) NOT IN (:notTurnover)
+           AND LOWER(COALESCE(s.result_status, '')) NOT IN (:refundedResults)
+           AND ${this.#window('s.created_at')}
+           ${ctx.currency ? `AND UPPER(COALESCE(NULLIF(s.original_currency, ''), 'INR')) = :currency` : ''}
+           ${this.#owned(ctx, 's.user_id')}
+         GROUP BY 1, 5
+        UNION ALL
+        SELECT ${this.#bucket('l.created_at')}, 'sports', 'house', 'house', UPPER(l.currency), -SUM(l.netamount), 0
+          FROM credits_ledger l
+         WHERE l.reason IN (:ledgerReasons)
+           AND ${this.#window('l.created_at')} ${cur('l.currency')} ${this.#owned(ctx, 'l.user_id', true)}
+         GROUP BY 1, 5
+      ) x
+      GROUP BY 1, 2, 3, 4, 5`;
+
+    return this.#query(sql, r);
+  }
+
+  async #topGameRows(ctx) {
+    const cur = (col) => (ctx.currency ? `AND UPPER(${col}) = :currency` : '');
+    const gisCurrency = this.#gisCurrencyExpr('g.currency');
+    const sql = `
+      SELECT game_key, currency, name, provider, total::text AS total, n FROM (
+        SELECT game_key, currency, MAX(name) AS name, MAX(provider) AS provider, SUM(amount) AS total, SUM(bets) AS n,
+               ROW_NUMBER() OVER (PARTITION BY currency ORDER BY SUM(amount) DESC) AS rank
+          FROM (
+            SELECT 'inhouse:' || b.game AS game_key, UPPER(b.coin) AS currency, b.game AS name, NULL::text AS provider, b.amount, 1 AS bets
+              FROM bets b
+             WHERE b.amount > 0 AND (b.result IS NULL OR b.result::text <> '"refunded"') AND ${NOT_FAKE}
+               AND ${this.#window('b.created')} ${cur('b.coin')} ${this.#owned(ctx, 'b.uid')}
+            UNION ALL
+            -- Stakes less the refunds / rollbacks that returned them, as in the series.
+            SELECT 'gis:' || COALESCE(g.game_uuid, ''), ${gisCurrency}, COALESCE(gg.name, g.game_uuid), gg.provider,
+                   ${gisSideAmountSql('g')}, ${gisBetCountSql('g')}
+              FROM gis_transactions g
+              LEFT JOIN gis_games gg ON gg.uuid = g.game_uuid
+             WHERE ${gisPlayFilterSql('g')} AND ${gisKindSql('g')} = 'stake' AND LOWER(COALESCE(gg.type, '')) NOT LIKE '%sport%'
+               AND ${this.#window('g.created_at')} ${ctx.currency ? `AND ${gisCurrency} = :currency` : ''} ${this.#owned(ctx, 'g.user_id')}
+            UNION ALL
+            SELECT 'js:' || COALESCE(j.game_uid, ''), UPPER(j.currency), COALESCE(jg.game_name, j.game_uid), jg.vendor, ABS(j.amount), 1
+              FROM js_game_transactions j
+              LEFT JOIN js_games jg ON jg.game_uid = j.game_uid
+             WHERE j.amount <> 0 AND LOWER(j.transaction_type) IN ('bet', 'settle') AND LOWER(j.transaction_status) = 'completed'
+               AND ${this.#window('j.timestamp')} ${cur('j.currency')} ${this.#owned(ctx, 'j.user_id')}
+            UNION ALL
+            SELECT 'js:' || COALESCE(v.game_uid, ''), UPPER(v.currency), COALESCE(jg2.game_name, v.game_name, v.game_uid), jg2.vendor, ABS(v.amount), 1
+              FROM game_transactions v
+              LEFT JOIN js_games jg2 ON jg2.game_uid = v.game_uid
+             WHERE v.amount <> 0 AND LOWER(v.transaction_type) IN ('bet', 'loss')
+               AND ${this.#window('v.created_at')} ${cur('v.currency')} ${this.#owned(ctx, 'v.user_id')}
+          ) stakes
+         GROUP BY game_key, currency
+      ) ranked
+      WHERE rank <= :perCurrency`;
+
+    return this.#query(sql, { ...ctx.replacements, perCurrency: TOP_PER_CURRENCY });
+  }
+
+  async #topSportRows(ctx) {
+    const curExpr = `UPPER(COALESCE(NULLIF(s.original_currency, ''), 'INR'))`;
+    return this.#query(
+      `SELECT COALESCE(NULLIF(s.sport_id, ''), 'other') AS sport, ${curExpr} AS currency,
+              SUM(s.stake_amount)::text AS total, COUNT(*) AS n
+         FROM "SportsBet" s
+        WHERE s.stake_amount > 0 AND LOWER(COALESCE(s.status, '')) NOT IN (:notTurnover)
+          AND LOWER(COALESCE(s.result_status, '')) NOT IN (:refundedResults)
+          AND ${this.#window('s.created_at')}
+          ${ctx.currency ? `AND ${curExpr} = :currency` : ''}
+          ${this.#owned(ctx, 's.user_id')}
+        GROUP BY 1, 2`,
+      { ...ctx.replacements, notTurnover: SPORTS_NOT_TURNOVER, refundedResults: SPORTS_REFUNDED_RESULTS }
+    );
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
+  //  Fragments — fixed column names only; every value is a replacement
+  // ══════════════════════════════════════════════════════════════════════
+
+  #context({ from, to, granularity, currency, scope }) {
+    const f = new Date(from);
+    const t = new Date(to);
+    return {
+      from: f,
+      to: t,
+      currency: currency || null,
+      scope,
+      replacements: {
+        unit: granularity,
+        fromTz: f.toISOString(),
+        toTz: t.toISOString(),
+        ...(currency ? { currency } : {}),
+        ...(scope.all ? {} : { staffIds: scope.staffIds }),
+      },
+    };
+  }
+
+  /** The bucket a row falls in, as its first day ('YYYY-MM-DD'), in UTC. */
+  #bucket(column) {
+    return `to_char(date_trunc(:unit, ${column} AT TIME ZONE 'UTC'), 'YYYY-MM-DD')`;
+  }
+
+  /** Half-open window on the raw column. */
+  #window(column) {
+    return `${column} >= CAST(:fromTz AS timestamptz) AND ${column} < CAST(:toTz AS timestamptz)`;
+  }
+
+  /** The owner column inside the caller's tree, or nothing for the root. */
+  #owned(ctx, column, isText = false) {
+    if (ctx.scope.all) return '';
+    return isText
+      ? `AND ${column} IN (SELECT u.id::text FROM users u WHERE u.parent_staff_id IN (:staffIds))`
+      : `AND ${column} IN (SELECT u.id FROM users u WHERE u.parent_staff_id IN (:staffIds))`;
+  }
+
+  #gisCurrencyExpr(column) {
+    const cases = Object.entries(GIS_CURRENCY_ALIASES)
+      .map(([from, to]) => `WHEN UPPER(${column}) = '${from}' THEN '${to}'`)
+      .join(' ');
+    return `(CASE ${cases} ELSE UPPER(COALESCE(${column}, '')) END)`;
+  }
+
+  #query(sql, replacements) {
+    return this.db.sequelize.query(sql, { replacements, type: this.db.QueryTypes.SELECT });
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
+  //  Values
+  // ══════════════════════════════════════════════════════════════════════
+
+  /** `#1155` (a ccdeposit coin id) → 'BTC'; anything else upper-cased. */
+  #currencyOf(raw) {
+    const s = String(raw ?? '');
+    if (s.startsWith('#')) return COIN_IDS[s.slice(1)] ?? null;
+    return s.toUpperCase() || null;
+  }
+
+  /** Minor units of `amount`, in USD when `rates` is given; `null` when no rate covers it. */
+  #value(amount, currency, rates) {
+    const minor = money.toMinorQuantised(String(amount ?? '0'));
+    if (!rates) return minor;
+    const rate = currency ? rates.map.get(currency) : null;
+    if (rate == null) return minor === 0n ? 0n : null;
+    return (minor * money.toMinor(rate)) / 100_000_000n;
+  }
+
+  #finish(b) {
+    const out = { bucket: b.bucket };
+    for (const k of MONEY_KEYS) out[k] = money.toDecimalString(b[k]);
+    for (const k of COUNT_KEYS) out[k] = b[k];
+    out.net = money.toDecimalString(b.deposits - b.withdrawals);
+    return out;
+  }
+
+  async #rates() {
+    const rows = await this.models.Exchangerate.findAll({ raw: true });
+    return {
+      // USD is the reporting currency: 1:1 even when `exchangerate` has no row for it.
+      map: new Map([['USD', '1'], ...rows.map((r) => [String(r.currency ?? '').toUpperCase(), r.usd_rate])]),
+      asOf: rows.reduce((latest, r) => (r.updated_at && (!latest || r.updated_at > latest) ? r.updated_at : latest), null),
+    };
+  }
+
+  /**
+   * The players this caller's figures cover — the dashboard's rule (see
+   * `DashboardService#scope`). No actor is an empty scope, never everything.
+   */
+  async #scope(actor) {
+    if (!actor?.id) return { all: false, empty: true, staffIds: [] };
+    const staffIds = (await visibleStaffIds(this.models, actor.id, { logger: this.logger })).map(Number);
+    const root = Number(this.config?.ROOT_STAFF_ID ?? 1);
+    if (staffIds.includes(root)) return { all: true, empty: false, staffIds: [] };
+    return { all: false, empty: staffIds.length === 0, staffIds };
+  }
+}
+
+module.exports = { DashboardStatsService, SPORTS_LEDGER_REASONS, SPORTS_NOT_TURNOVER };
