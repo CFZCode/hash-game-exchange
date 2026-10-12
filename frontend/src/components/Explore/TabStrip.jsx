@@ -1,6 +1,7 @@
 import ScrollTabs, { ACTIVE } from '../shared/ScrollTabs';
 import { TABS } from './catalogue';
 import { useSettings } from '../../context/settings';
+import { useGates } from '../../context/gates';
 
 /* `ye` in index-BChnjnW3.js wrapped in `fe` (the ScrollTabs of index-DrTwTnbT.js).
  *
@@ -17,10 +18,11 @@ import { useSettings } from '../../context/settings';
 
 export default function TabStrip({ tab, setTab }) {
   const { darken } = useSettings();
+  const gates = useGates();
 
   return (
     <ScrollTabs>
-      {TABS.map(({ label, value, Icon }) => {
+      {TABS.filter(({ value }) => value !== 'original' || gates.on('originals')).map(({ label, value, Icon }) => {
         const selected = value === tab;
         return (
           <button

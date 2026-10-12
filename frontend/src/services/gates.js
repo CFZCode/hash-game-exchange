@@ -58,6 +58,10 @@ export const GATES = {
   sports: { flag: 'sports' },
   notifications: { feature: 'notifications' },
   kyc: { feature: 'kyc' },
+  // BC Originals = the platform's in-house games (js_games vendor `in-house`). The owner's
+  // "Originals (in-house)" flag, masked onto site-config/public by the backend, which also refuses
+  // the in-house list and launch (casino gameEntitlement.js).
+  originals: { flag: 'originals' },
 };
 
 /** Path prefix → gate, most specific first. History routes (transaction, rollover, bet history,
@@ -83,6 +87,10 @@ export const ROUTES = [
   ['/sports', 'sports'],
   ['/notification', 'notifications'],
   ['/settings/verify', 'kyc'],
+  // The sidebar's BC Originals entry and the casino page's Originals tag page.
+  ['/casino/brand', 'originals'],
+  ['/gamelist/brand', 'originals'],
+  ['/section/originals', 'originals'],
 ];
 
 /** The section an href belongs to, if any (`/wallet/swap?x=1` → swap). */
@@ -145,8 +153,30 @@ export function makeGates({ flags, features, capabilities, ready = true } = {}) 
 
 export const ALL_ON = makeGates();
 
-/** The two public reads. Never throws; a failed read is `null` (= everything on). */
-export async function loadPublicGates() {
+/* The last public read, shared with the services that must not even ASK for a switched-off
+   section (services/originals.js): one read per page load, refreshed whenever the provider
+   re-reads. */
+let lastPublic = null;
+let lastAt = 0;
+
+/** The current public gates for a non-React caller. Fixtures: `ALL_ON`. Never throws. */
+export async function publicGates() {
+  if (USE_FIXTURES) return ALL_ON;
+  return makeGates(await (lastPublic ?? loadPublicGates()));
+}
+
+/** The two public reads. Never throws; a failed read is `null` (= everything on). A read started
+ *  in the last second is shared rather than repeated (the page's first services and the provider
+ *  both ask on mount). */
+export function loadPublicGates() {
+  if (!lastPublic || Date.now() - lastAt > 1000) {
+    lastAt = Date.now();
+    lastPublic = readPublicGates();
+  }
+  return lastPublic;
+}
+
+async function readPublicGates() {
   if (USE_FIXTURES) return { flags: null, features: null };
   const [features, flags] = await Promise.all([
     Promise.resolve(request(FEATURES_PUBLIC, { live: true, fixture: null })).catch(() => null),

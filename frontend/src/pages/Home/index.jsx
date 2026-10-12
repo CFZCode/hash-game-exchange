@@ -10,6 +10,7 @@ import LotteryDraws from './LotteryDraws';
 import LatestBets from './LatestBets';
 import { getHomeSections } from '../../services/home';
 import { useResource } from '../../hooks/useResource';
+import { useGates } from '../../context/gates';
 import useScrollReveal from '../../hooks/useScrollReveal';
 import './Home.css';
 
@@ -22,6 +23,7 @@ export default function Home() {
      render, and once it is not, each row falls to `games={undefined}` — which is where the
      section's skeleton will go when it is transcribed. */
   const { data: sections } = useResource(getHomeSections);
+  const gates = useGates();
 
   /* Each card below the hero plays the site's own entrance as it reaches the fold — the
      trigger is this build's addition, the motion is `.game-tile-animate`'s; the rules and the
@@ -125,7 +127,7 @@ export default function Home() {
       <RecentFavorites />
       <RecentBigWins />
       <CategoryCards />
-      <GameSection title="BC Originals" {...section('originals')} />
+      {gates.on('originals') && <GameSection title="BC Originals" {...section('originals')} />}
       <GameSection title="Hot Games" {...section('hotGames')} />
       <Highlights />
       <GameSection title="BC Exclusive" {...section('exclusive')} />

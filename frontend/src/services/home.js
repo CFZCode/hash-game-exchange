@@ -2,6 +2,7 @@ import { request, USE_FIXTURES } from './client';
 import ENDPOINTS, { PLATFORM } from './endpoints';
 import { toBetRow } from './betHistory';
 import { getOriginals, slugFor } from './originals';
+import { publicGates } from './gates';
 import { getCasinoSet, toCatalogGame } from './catalog';
 import { assetExact } from '../utils/gameArt';
 import { HIDDEN_NAME } from '../context/account';
@@ -205,9 +206,15 @@ export const getRecentBigWins = ({ tab = 0 } = {}) => {
      is the site's hidden name with no tier, and the amount is the real profit in its own coin
      rather than the capture's USD figure. */
   if (tab !== 0 && tab !== 1) return Promise.resolve([]);
-  return Promise.resolve(
-    request(PLATFORM.casino.topWins, { live: true, params: { limit: 20 }, fixture: [] }),
-  ).then((rows) => (rows ?? []).map(toBigWin));
+  /* Every row of this feed is an in-house round, so with BC Originals switched off it has
+     nothing to show (and nothing to link to). */
+  return publicGates().then((gates) =>
+    gates.on('originals')
+      ? Promise.resolve(
+          request(PLATFORM.casino.topWins, { live: true, params: { limit: 20 }, fixture: [] }),
+        ).then((rows) => (rows ?? []).map(toBigWin))
+      : [],
+  );
 };
 
 const toBigWin = (row) => {

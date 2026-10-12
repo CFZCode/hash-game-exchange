@@ -15,6 +15,7 @@ import {
 } from '../../components/Explore/icons';
 import { TABS } from './catalogue';
 import { useSettings } from '../../context/settings';
+import { useGates } from '../../context/gates';
 import './Casino.css';
 
 /* The casino page's tab strip.
@@ -89,6 +90,7 @@ function TabIcon({ tab, selected }) {
 }
 
 export default function CasinoTabStrip({ active, compact = false, tight = false, linkTab = false }) {
+  const gates = useGates();
   return (
     /* mb-2 is the strip's own, NOT the first section header's. Measured at a matched 1530px
        viewport against the reference: header-to-header pitch is 262px here and 262.5px there,
@@ -261,7 +263,7 @@ export default function CasinoTabStrip({ active, compact = false, tight = false,
          strip back to `useDragScroll`. The two are mutually exclusive there by construction —
          see the note at the top of that component. */
     >
-      {TABS.map(({ label, tab }) => {
+      {TABS.filter(({ tab }) => tab !== 'brand' || gates.on('originals')).map(({ label, tab }) => {
         const selected = tab === active;
         return (
           <NavLink

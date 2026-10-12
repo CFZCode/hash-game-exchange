@@ -1,5 +1,6 @@
 import { request, USE_FIXTURES } from './client';
 import ENDPOINTS, { PLATFORM } from './endpoints';
+import { publicGates } from './gates';
 import { ORIGINAL_GAMES } from '../pages/Casino/originalGames';
 
 /* BC Originals, against the platform's own in-house catalogue.
@@ -103,6 +104,12 @@ export function toOriginals(rows) {
 
 export function getOriginals() {
   if (USE_FIXTURES) return request(ENDPOINTS.games, { fixture: ORIGINAL_GAMES });
+  /* Originals switched off (the owner's plan or the site admin's flag): not even asked for — the
+     backend would refuse it anyway — and every surface reads an empty list. */
+  return publicGates().then((gates) => (gates.on('originals') ? readLive() : []));
+}
+
+function readLive() {
   return Promise.resolve(
     /* The SmartBet backend keeps the imported provider catalogue in the same `js_games` table
        (paged 20 at a time), so ask for the house's own rows only, all of them on one page. */

@@ -1,5 +1,7 @@
 import { request, USE_FIXTURES, getAccessToken } from './client';
-import { getOriginals } from './originals';
+import { getOriginals, slugFor } from './originals';
+import { publicGates } from './gates';
+import { ORIGINAL_GAMES } from '../pages/Casino/originalGames';
 import { getLiveGame } from './catalog';
 
 const AGGREGATOR_LAUNCH = '/api/v1/casino/js-games/v2/launch';
@@ -46,6 +48,10 @@ export function getGame(gameUnique) {
    aggregator catalogue by page slug or uuid (`services/catalog.js`). `ref` and `source` are what
    the favourite store and the launch key on; `launch` names the route. */
 async function readLiveGame(gameUnique) {
+  /* BC Originals switched off: an in-house game's page (a bookmark, an old link) is "not in the
+     catalogue", never a lookup elsewhere that could dress it up as another game. The backend
+     refuses its launch too. */
+  if (!(await publicGates()).on('originals') && isHouseGame(gameUnique)) return null;
   const originals = await Promise.resolve(getOriginals()).catch(() => []);
   const house = (originals ?? []).find((game) => game.slug === gameUnique || game.uid === gameUnique);
   if (house) {
@@ -61,6 +67,13 @@ async function readLiveGame(gameUnique) {
    The provider is INR-only upstream. Signed out there is nothing to launch, so no call is made.
    A refusal (`JSGAMES_NOT_CONFIGURED` 503 on this delivery) rejects, and the page renders its own
    "not available" state. */
+/* An in-house game by this build's slug or the platform's uid (`mine`, `classic_dice`). */
+const HOUSE_SLUGS = new Set([
+  ...GAMES.filter((game) => game.provider === 'BC Originals').map((game) => game.slug),
+  ...ORIGINAL_GAMES.filter((game) => !game.slug.endsWith('-by-croco-gaming')).map((game) => game.slug),
+]);
+const isHouseGame = (ref) => HOUSE_SLUGS.has(ref) || HOUSE_SLUGS.has(slugFor(ref));
+
 export function launchGame(gameUnique, { currencyCode = 'INR', game = null } = {}) {
   if (!USE_FIXTURES && !getAccessToken()) return null;
   const aggregator = game?.launch === 'aggregator';

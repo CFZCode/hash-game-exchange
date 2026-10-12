@@ -5,6 +5,7 @@ import HelpIcon from './icons';
 import { TOPICS, ROUTE_IDS, DEFAULT_TOPIC, FAIRNESS_DOC } from './topics';
 import { getOriginals, validateLinkFor } from '../../services/help';
 import { useResource } from '../../hooks/useResource';
+import { useGates } from '../../context/gates';
 import './Help.css';
 import Loading from '../../components/shared/Loading';
 import * as globMaps from './index.globs.js';
@@ -60,6 +61,9 @@ const topicHtml = (element) => {
 /* ------------------------------------------------------------------ the Provably Fair pane */
 function ProvablyFair() {
   const { data: games } = useResource(getOriginals);
+  /* BC Originals switched off: no in-house game to pick, so the picker goes and the pane shows the
+     general fairness document. */
+  const picker = useGates().on('originals');
   const [game, setGame] = React.useState(null);
 
   /* The chunk seeds the Select with the first row of the feed the moment it arrives
@@ -72,7 +76,7 @@ function ProvablyFair() {
   /* The Select's value IS the feed's first row, so until `/game/home/recommend/selection/` lands
      there is no game chosen and therefore no fairness document to show — the pane is one read
      from top to bottom. `h-96` rather than the document's own height, which varies by game. */
-  if (!selected) {
+  if (!selected && picker) {
     return (
       <div className="center h-96 p-4">
         <Loading />
@@ -82,11 +86,12 @@ function ProvablyFair() {
 
   /* `F[gameUnique] || "general"` — the chunk's own fallback, so a game with no document of its
      own gets the generic fairness page rather than an empty pane. */
-  const html = docFor(FAIRNESS_DOC[selected.value] ?? 'general');
-  const validate = validateLinkFor(selected.value);
+  const html = docFor((selected && FAIRNESS_DOC[selected.value]) ?? 'general');
+  const validate = selected ? validateLinkFor(selected.value) : null;
 
   return (
     <div className="p-4 pb-8" id="game2-provably-fair">
+      {picker && (
       <section className="flex gap-6 sm:w-80 items-center">
         <p className="!text-primary font-extrabold">Game</p>
         {/* 257.33 x 40. Neither number is set here and neither should be: the height is
@@ -111,6 +116,7 @@ function ProvablyFair() {
           {(option) => <span className="font-extrabold">{option.label}</span>}
         </Select>
       </section>
+      )}
 
       <p className="my-4 !text-primary font-extrabold">Fairness</p>
 

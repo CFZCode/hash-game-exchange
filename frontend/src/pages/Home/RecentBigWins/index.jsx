@@ -2,6 +2,7 @@ import React from 'react';
 import VipTierIcon from './VipTierIcon';
 import { getRecentBigWins } from '../../../services/home';
 import { useResource } from '../../../hooks/useResource';
+import { useGates } from '../../../context/gates';
 import './RecentBigWins.css';
 import Skeleton from '../../../components/shared/Skeleton';
 
@@ -145,6 +146,7 @@ function WinCardSkeleton() {
 
 export default function RecentBigWins() {
   const [tab, setTab] = React.useState(0);
+  const gates = useGates();
   /* ONE READ PER TAB — see services/home.js. `useResource` reads once per distinct reader, so
      the reader is re-keyed on the tab; each tab has its own twenty rows, and filtering a single
      list is what left BC Originals showing three of them. */
@@ -185,7 +187,8 @@ export default function RecentBigWins() {
           </div>
           <div>Recent Big Wins</div>
           <div className="ml-2 hidden gap-2 lg:!flex">
-            {TABS.map(({ tab: value, title }) => (
+            {/* BC Originals switched off: its tab goes. */}
+            {TABS.filter(({ tab: value }) => value !== 1 || gates.on('originals')).map(({ tab: value, title }) => (
               <TabButton
                 key={value}
                 title={title}

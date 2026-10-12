@@ -3,6 +3,7 @@ import useResource from '../../hooks/useResource';
 import { getOriginals } from '../../services/originals';
 import { getCasinoPage, getCasinoSets, getLiveProviders, isLiveSet } from '../../services/catalog';
 import { USE_FIXTURES } from '../../services/client';
+import { useGates } from '../../context/gates';
 import { useParams } from 'react-router-dom';
 import RecentFavorites from '../Home/RecentFavorites';
 import Hero from '../Home/Hero';
@@ -118,6 +119,7 @@ function SearchBar({ query, setQuery }) {
    empty state under its own header is the site's behaviour and the only honest thing to show
    for New Releases, whose selection the mirror never captured. */
 function Lobby({ originals, live, providerRow }) {
+  const gates = useGates();
   return [
     /* THE SAME BLOCK THE HOME PAGE CARRIES, and the casino page really does mount it — its
        chunk imports it by name. `index-DTOmRFSX.js` (off `hash.game/assets/`, not in the
@@ -132,7 +134,8 @@ function Lobby({ originals, live, providerRow }) {
        own login and empty-list gates, so it renders nothing here for a visitor with neither
        favourites nor history. */
     <RecentFavorites key="recent-favorites" />,
-    ...ROWS.map((row) => {
+    /* BC Originals switched off: its row goes, nothing in its place. */
+    ...ROWS.filter((row) => row.key !== 'brand' || gates.on('originals')).map((row) => {
     if (row.type === 'providers') return <ProviderRow key="providers" providers={providerRow} />;
     if (row.type === 'themes') return <ThemeRow key="themes" themes={THEMES} />;
 
