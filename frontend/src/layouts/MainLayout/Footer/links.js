@@ -41,7 +41,6 @@ export const COLUMNS = [
       { label: 'VIP Club', href: '/vip' },
       { label: 'Referral', href: '/referral' },
       { label: 'Promotions', href: '/promotions/promotion' },
-      { label: 'Lottery', href: '/lottery' },
       /* A button (it opens the share dialog, not a page), but it belongs to the referral
          section — the `href` is read only by the footer's gate filter, so an account or site
          with affiliate off does not get the entry. */
@@ -72,7 +71,8 @@ export const COLUMNS = [
   {
     title: 'About Us',
     links: [
-      { label: 'News', href: 'https://blog.bc.game/', external: true },
+      /* The blog — gated by name (`gate`), since an external href has no route gate. */
+      { label: 'News', href: 'https://blog.bc.game/', external: true, gate: 'blog' },
       { label: 'Business Contacts', button: true },
       { label: 'Help Desk', href: 'https://help.bc.support/en/', external: true },
       { label: 'Verify Representative', href: '/verify_representative' },

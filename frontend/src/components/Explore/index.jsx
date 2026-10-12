@@ -28,8 +28,10 @@ import './Explore.css';
  *
  * What is NOT built: the Sports and Lottery panels. `he` searches the sportsbook's fixtures
  * and `ze` the lottery draws, and the mirror captured neither feed — three Highlights matches
- * and twenty upcoming draws is not a searchable corpus. Both options stay in the dropdown,
- * because they are on the original, and both render the site's own empty state.
+ * and twenty upcoming draws is not a searchable corpus. Sports stays in the dropdown, because
+ * it is on the original, and renders the site's own empty state. LOTTERY IS REMOVED, a
+ * deliberate departure on the user's request (this platform has no lottery): the original's
+ * third option is gone, and `/explore?type=lottery` falls to Casino like any unknown type.
  */
 
 /* `g()` in `ur`. Sports is present only when `config.betby_brand_id` is set — it defaults to
@@ -38,7 +40,6 @@ import './Explore.css';
 const TYPES = [
   { label: 'Casino', value: 'casino' },
   { label: 'Sports', value: 'sports' },
-  { label: 'Lottery', value: 'lottery' },
 ];
 
 /* The search box, the type dropdown and whatever the type selects — `ur`.
@@ -214,9 +215,6 @@ export function ExplorePanel({ initialType, autoFocus = false }) {
       {type.value === 'casino' && <CasinoExplore query={query} />}
       {type.value === 'sports' && (
         <Empty className="mt-4">Sports search is not wired up in this build.</Empty>
-      )}
-      {type.value === 'lottery' && (
-        <Empty className="mt-4">Lottery search is not wired up in this build.</Empty>
       )}
     </div>
   );

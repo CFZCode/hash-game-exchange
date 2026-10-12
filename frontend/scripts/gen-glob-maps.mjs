@@ -46,8 +46,6 @@ export const GLOBS = [
   { caller: 'src/pages/Referral/index.jsx', name: 'art', pattern: '../../assets/referral/*.png' },
   { caller: 'src/pages/Promotions/index.jsx', name: 'art', pattern: '../../assets/promotions/*.{png,avif,jpg}' },
   { caller: 'src/pages/Home/PayYourWay/index.jsx', name: 'coinIcons', pattern: '../../../assets/coins/*.png' },
-  { caller: 'src/pages/Home/LotteryDraws/draws.js', name: 'backgrounds', pattern: '../../../assets/lottery/bg-*.png' },
-  { caller: 'src/pages/Home/LotteryDraws/draws.js', name: 'balls', pattern: '../../../assets/lottery/ball-*.png' },
   { caller: 'src/pages/Home/LatestBets/bets.js', name: 'icons', pattern: '../../../assets/gameicons/*.png' },
   { caller: 'src/pages/Home/LatestBets/bets.js', name: 'coins', pattern: '../../../assets/coins/*.png' },
   { caller: 'src/pages/Home/Highlights/matches.js', name: 'flags', pattern: '../../../assets/sports/flag-*.svg' },

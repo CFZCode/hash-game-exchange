@@ -6,7 +6,6 @@ import CategoryCards from './CategoryCards';
 import GameSection from './GameSection';
 import PayYourWay from './PayYourWay';
 import Highlights from './Highlights';
-import LotteryDraws from './LotteryDraws';
 import LatestBets from './LatestBets';
 import { getHomeSections } from '../../services/home';
 import { useResource } from '../../hooks/useResource';
@@ -16,7 +15,9 @@ import './Home.css';
 
 /* Section order is the original's default `og()` ordering, [0, 9, 1, 2, 3, 4, 5, 6, 7, 8]
    applied to its section array — Originals, Hot Games, Highlights, Exclusive, Slots,
-   Upcoming Lottery Draw, Live Casino, Pay Your Way, Bingo, Latest round & Race. */
+   Upcoming Lottery Draw, Live Casino, Pay Your Way, Bingo, Latest round & Race. Upcoming Lottery
+   Draw is removed on the user's request (a deliberate departure; this platform has no lottery),
+   so Slots is followed directly by Live Casino. */
 export default function Home() {
   /* One call for all six game rows, which is how `recommend/batch/selections/` returns them.
      `?? {}` rather than a loading branch: while fixtures are on this is populated on the first
@@ -132,7 +133,6 @@ export default function Home() {
       <Highlights />
       <GameSection title="BC Exclusive" {...section('exclusive')} />
       <GameSection title="Slots" {...section('slots')} />
-      <LotteryDraws />
       <GameSection title="Live Casino" {...section('liveCasino')} />
       <PayYourWay />
       {/* compact: this row sits under Pay Your Way's fixed-height panel, which leaves empty
