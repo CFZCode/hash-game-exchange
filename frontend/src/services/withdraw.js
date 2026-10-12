@@ -1,4 +1,4 @@
-import { request } from './client';
+import { request, USE_FIXTURES, ApiError } from './client';
 import ENDPOINTS from './endpoints';
 import { CURRENCY_TOKENS, tokensFor, defaultToken, lowestWithdrawLimit } from '../data/currencyTokens';
 
@@ -146,3 +146,65 @@ export const allTokensUnavailable = (currencyName) => {
 };
 
 export { CURRENCY_TOKENS };
+
+/* ══ THE SUBMIT ═══════════════════════════════════════════════════════════════════════════════
+ *
+ * `oe.withdraw(u)` in WithdrawConfirm-CIsgiYKs.js — `POST /payment/withdraw/create/` on bc.game,
+ * with `{currencyName, withdrawAddress, withdrawAddressMemo, amount, fee, useFeeDeduct,
+ * verifyFlowId, chain}`. It answers `{orderId}`, and the dialog then pushes the order's result
+ * card.
+ *
+ * THE PLATFORM HAS NO HTTP ROUTE FOR THIS, checked 2026-10-12 against
+ * `services/user/src/modules/crypto-withdraw` and docs/API-ROUTES.md: the user router carries
+ * only `GET /` and `GET /summary`; the player's submit is the `SUBMIT_NEW_WITHDRAWL` socket
+ * event, and this build has no socket client. So:
+ *
+ *   fixtures on   the submit settles to a processing order, so the confirm dialog and its
+ *                 result card are reachable and can be compared;
+ *   fixtures off  `CRYPTO_WITHDRAW_AVAILABLE` is false and the pane never shows the form at
+ *                 all (the "not available" notice — see WithdrawPanels). The submit still
+ *                 refuses rather than pretend, in case anything ever calls it.
+ *
+ * The original's `new-verify` step (WITHDRAW_ONE_STEP / TWO_STEPS, 2FA or e-mail) is NOT
+ * reproduced: nothing on the platform's HTTP side asks for a verify flow id. */
+export const CRYPTO_WITHDRAW_AVAILABLE = USE_FIXTURES;
+
+let fixtureOrder = 1000;
+
+export function submitCryptoWithdraw({ currencyName, address, memo, amount, fee, chain }) {
+  if (!CRYPTO_WITHDRAW_AVAILABLE) {
+    return Promise.reject(
+      new ApiError('Crypto withdrawals are not currently available.', {
+        code: 'CRYPTO_WITHDRAW_UNAVAILABLE',
+      }),
+    );
+  }
+  fixtureOrder += 1;
+  return Promise.resolve(
+    request(ENDPOINTS.withdraw.create, {
+      fixture: {
+        orderId: String(fixtureOrder),
+        commonData: {
+          status: 0,
+          amount: String(amount),
+          currencyName,
+          withdrawAddress: address,
+          withdrawAddressMemo: memo || '',
+          chain,
+          fee: String(fee),
+          txId: null,
+        },
+      },
+    }),
+  );
+}
+
+/* THE ERROR SLOT PRINTS THE PLATFORM'S OWN SENTENCE. API-ROUTES.md §5 says the message is for a
+   human, so it is shown as sent; the code only decides what else the dialog offers. Both rails'
+   codes are listed so the day a rail is wired its refusals already read correctly:
+   KYC_REQUIRED, BELOW_MINIMUM, INSUFFICIENT_BALANCE, WITHDRAW_COOLDOWN (per rail),
+   WITHDRAW_BLOCKED, SITE_POLICY_CHANNEL_CLOSED and BONUS_FORFEIT_REQUIRED. The original has
+   no forfeit-confirm step (no such string in the i18n bundle), so none is drawn. */
+
+export const withdrawErrorMessage = (error) =>
+  error?.message || 'Something went wrong. Please try again later.';

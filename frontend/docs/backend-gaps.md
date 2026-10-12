@@ -130,7 +130,7 @@ These pages show real data from the backend right now.
 | Deposit → Fiat tab → channels | none, deliberately (2026-10-12). Live mode shows the original's out-of-channels state instead of bc.game's six UPI channels: every PSP answers `503 PAYORDER_PROVIDER_DISABLED`, and the manual bank rail (`/user/bank-details/:coin` + `POST /user/deposits/fiat`) needs a bank reference and a screenshot this form has no fields for |
 
 **Wallet area, checked against SmartBet 2026-10-12 and still not wired, with the reason:**
-crypto deposit address and crypto withdraw submit (CCPayment unconfigured: `/user/crypto/chains`
+crypto deposit address and crypto withdraw submit (the withdraw pane now shows a "not available" notice live, and its confirm dialog runs on fixtures only; CCPayment unconfigured: `/user/crypto/chains`
 answers `503 CRYPTO_NOT_CONFIGURED`, and the player's crypto withdrawal is a socket event, not an
 HTTP route); the fiat withdraw arm (`POST /user/withdrawals/fiat` + `/user/bank-accounts` work,
 but this build has no fiat withdraw form); Buy Crypto (no on-ramp route at all); the Swap and

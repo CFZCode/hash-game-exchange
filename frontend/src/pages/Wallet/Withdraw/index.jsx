@@ -3,13 +3,19 @@ import Select from '../../../components/shared/Select';
 import PageCard from '../../../components/shared/PageCard';
 import Notice from '../../../components/shared/Notice';
 import CwalletRow, { OrDivider } from '../../../components/shared/CwalletRow';
-import { IconArrow, IconAddressBook, IconSearch, IconClose } from '../../../components/shared/icons';
+import { IconArrow, IconAddressBook, IconSearch, IconClose, IconInform } from '../../../components/shared/icons';
+import { useNavigate } from 'react-router-dom';
 import { useSession } from '../../../context/session';
 import { getCurrency } from '../../../data/currencies';
 import { getAlias, printCurrency } from '../../../utils/currency';
 import { coinIcon } from '../../../utils/coinArt';
 import { tokensFor } from '../../../data/currencyTokens';
-import { getWithdrawFee, getUnlockedBalance } from '../../../services/withdraw';
+import {
+  getWithdrawFee,
+  getUnlockedBalance,
+  CRYPTO_WITHDRAW_AVAILABLE,
+} from '../../../services/withdraw';
+import { WithdrawConfirm, WithdrawResult } from './Confirm';
 import { withdrawNotices } from './withdraw.jsx';
 import { useIsDialog } from '../../../context/dialogRoute';
 import useResource from '../../../hooks/useResource';
@@ -60,8 +66,9 @@ import Loading from '../../../components/shared/Loading';
  *   the address book       the button in the field's trailing square. Needs
  *                          `/payment/withdraw/address/list/`.
  *   "Fee-free withdrawal"  the VIP 8+ checkbox, behind `/payment/withdraw/fee/deduction/`.
- *   Preview                submits to `/wallet/withdraw/confirm`, a second dialog
- *                          (`WithdrawConfirm-CIsgiYKs.js`, recovered but not built).
+ *   Preview                BUILT: opens the confirm dialog (`WithdrawConfirm-CIsgiYKs.js`,
+ *                          see Confirm.jsx). Live, the form is replaced by a "not available"
+ *                          notice — the platform files a crypto withdrawal only over a socket.
  *   the fiat and SATS arms `Wa` and `hr` in the same chunk, reached by a fiat wallet or by
  *                          picking SATS. Both render the crypto arm here.
  */
@@ -458,7 +465,12 @@ function BreakdownRow({ title, amount, currencyName, brand }) {
  * than reproduced as five components that each render their only child.
  */
 export function WithdrawPanels() {
-  const { session, balances } = useSession();
+  const { session, balances, updateBalance } = useSession();
+  const navigate = useNavigate();
+  /* The confirm dialog's state — the original's router `state` for `/wallet/withdraw/confirm` —
+     and the order its submit returned, which swaps the confirm for the result card. */
+  const [confirm, setConfirm] = React.useState(null);
+  const [placed, setPlaced] = React.useState(null);
 
   /* `a = () => e.currencyName ?? W.state.cryptoCurrency` — the wallet store's crypto selection,
      seeded from the account's own currency. A fiat wallet would take the fiat arm, which is not
@@ -622,14 +634,38 @@ export function WithdrawPanels() {
           </div>
         ) : token && !token.canWithdraw ? (
           <div className="mt-5 py-10 text-center text-secondary">Under Maintenance</div>
+        ) : !CRYPTO_WITHDRAW_AVAILABLE ? (
+          /* LIVE MODE: NO RAIL TO SUBMIT TO. The platform files a player's crypto withdrawal only
+             through the `SUBMIT_NEW_WITHDRAWL` socket event (no HTTP route — checked against
+             crypto-withdraw/routes/user.routes.js and API-ROUTES.md), this build has no socket
+             client, and CCPayment answers 503 CRYPTO_NOT_CONFIGURED besides. So the address and
+             amount are not offered at all: the crypto deposit tab's own unavailable box, same
+             markup, in their place. */
+          <div className="my-4 flex rounded-xl bg-warning/10 p-2 text-secondary">
+            <IconInform className="icon -mt-0.5 mr-1.5 size-6 flex-none fill-warning" />
+            <div>
+              Sorry, crypto withdrawals are not currently available. Please try again later or
+              contact support.
+            </div>
+          </div>
         ) : (
           <form
             onSubmit={(event) => {
-              /* `ht`'s handler navigates to `/wallet/withdraw/confirm` with the whole form as
-                 router state. That dialog is `WithdrawConfirm-CIsgiYKs.js`, recovered but not
-                 built, so the submit is stopped here rather than sent somewhere that does not
-                 exist. The button is disabled in every state this fixture can reach anyway. */
+              /* `ht`'s handler: navigate to `/wallet/withdraw/confirm` with the whole form as
+                 router state — `{address, amount, showAmount, fee, memo, checked, currencyName,
+                 receiveAmount, token}`. `showAmount` is what was typed, `amount` what is sent. */
               event.preventDefault();
+              if (!clearsMinimum || shownAmount < minWithdraw || !address.trim()) return;
+              setConfirm({
+                address: address.trim(),
+                amount: shownAmount,
+                showAmount: shownAmount,
+                fee: effectiveFee,
+                memo,
+                currencyName: currency,
+                receiveAmount: receive,
+                token,
+              });
             }}
           >
             <AddressField currencyName={currency} value={address} onChange={setAddress} />
@@ -735,6 +771,40 @@ export function WithdrawPanels() {
           for; the unlinked row is what both captures show. */}
       <OrDivider />
       <CwalletRow />
+
+      {confirm && !placed && (
+        <WithdrawConfirm
+          order={confirm}
+          onClose={() => setConfirm(null)}
+          onSubmitted={(result) => {
+            /* `k.emit("withdraw-submit-reset")` clears the form; the held amount leaves the
+               withdrawable balance at once, which is the platform's own behaviour (the fiat rail
+               debits on request). Only the fixture path reaches here — see services/withdraw.js. */
+            const row = balances.find((coin) => coin.currencyName === confirm.currencyName);
+            if (row) {
+              updateBalance(confirm.currencyName, {
+                amount: Math.max(Number(row.amount) - confirm.amount, 0),
+                generalAmount: Math.max(Number(row.generalAmount) - confirm.amount, 0),
+              });
+            }
+            setAddress('');
+            setMemo('');
+            setAmount(null);
+            setPlaced(result);
+          }}
+        />
+      )}
+      {placed && (
+        <WithdrawResult
+          order={placed}
+          onDone={() => {
+            /* `B.pop(), l("/wallet/transaction?type=withdraw")` — Done goes to the history. */
+            setPlaced(null);
+            setConfirm(null);
+            navigate('/wallet/transaction?type=withdraw');
+          }}
+        />
+      )}
     </>
   );
 }
