@@ -126,50 +126,82 @@ export const getInvitationCode = () => {
  * AUTH-GATED LIKE EVERY `/agent/` ROUTE, and it costs nothing here for the reason the bonus page
  * documents: the request module declares the object the store falls back to, and that object is
  * exactly what the capture renders. See `DASHBOARD` in pages/Referral/referral.js. */
-/* TWO OF TEN FIGURES ARE REAL AND THE OTHER EIGHT KEEP THE DECLARED DEFAULT, which is the honest
- * shape of what the platform knows rather than a shortfall in the wiring.
- *
- * bc.game's `/agent/affiliate/dashboard/` answers a ten-field card — commission today, commission
- * total, wager today, the ratio and its cap, two available balances, two remaining. The platform
- * has no equivalent: `affiliate` is a code and a link, and the only numbers anywhere in the module
- * are a member COUNT on `team` and a reward TOTAL on `rewards`. So those two are read and mapped:
- *
- *   friendNumber       ← team.total
- *   availableRewardUsd ← rewards.totalAmount
- *
- * The other eight stay at `DASHBOARD`'s own zeros, which is what `servers-O8_t7p5g.js` declares as
- * the store's fallback and exactly what the reference capture renders. Filling them from the two
- * that exist — deriving "today" from a total, say — would put figures on the card that no endpoint
- * anywhere holds, which is the failure mode this whole wiring has been avoiding.
- *
- * `ratio`/`maxRatio` are the tempting ones and are deliberately left: the Rate & Rules pane states
- * 25% from its own hardcoded table, and a zero here does not contradict it — the card reads the
- * account's EARNED ratio, which is genuinely unknown.
- *
- * Both reads in one `Promise.all`, because neither depends on the other and the card draws once.
+/* SIX OF TEN FIGURES ARE REAL (wired 2026-10-12 against SmartBet). bc.game's ten-field card is
+ * filled from `team`, `rewards`, `rewards?filter=today` and `rewards/unclaimed`; see the mapping in
+ * the function. `ratio`/`maxRatio`, `todayWagerUsd` and `remainingRewardUsd` have no source on the
+ * platform and keep `DASHBOARD`'s declared zeros rather than a derived guess.
  */
 /* `reloads` is not read — it is part of the reader's identity so a claim can re-run this. See
    `pages/Referral/MyRewards.jsx`. */
 // eslint-disable-next-line no-unused-vars
 export const getAffiliateDashboard = ({ reloads } = {}) => {
   const team = request(PLATFORM.user.affiliate.team, { live: true, fixture: null });
-  const rewards = request(PLATFORM.user.affiliate.rewards, { live: true, fixture: null });
 
   if (!team || typeof team.then !== 'function') return DASHBOARD_INFO;
 
-  return Promise.all([team, rewards]).then(([members, earned]) => ({
-    ...DASHBOARD_INFO,
-    dashboard: {
-      ...DASHBOARD_INFO.dashboard,
-      friendNumber: Number(members?.total) || 0,
-      availableRewardUsd: String(earned?.totalAmount ?? '0'),
+  return Promise.all([team, readRewards(), readUnclaimed(), readTodayRewards()]).then(
+    ([members, earned, open, today]) => {
+      const { tier, commission } = splitUnclaimed(open);
+      /* Commission ever credited (claimed or not) is `rewards.totalAmount`; what is still open is
+         the unclaimed list's `commission` rows; so what was already paid out is the difference.
+         `claimedTotal` is tier + commission paid, so tier paid is what is left of it. Tier rows
+         are the referral (joining / wager-tier) rewards bc.game calls "Referral Rewards". */
+      const commissionEarned = num(earned?.totalAmount);
+      const commissionPaid = Math.max(0, commissionEarned - commission);
+      const tierPaid = Math.max(0, num(open?.claimedTotal) - commissionPaid);
+      return {
+        ...DASHBOARD_INFO,
+        dashboard: {
+          ...DASHBOARD_INFO.dashboard,
+          friendNumber: Number(members?.total) || 0,
+          availableCommissionUsd: String(commission),
+          availableRewardUsd: String(tier),
+          commissionUsd: String(commissionEarned),
+          rewardUsd: String(tier + tierPaid),
+          todayCommissionUsd: String(num(today?.totalAmount)),
+          /* `ratio`/`maxRatio`, `todayWagerUsd` and `remainingRewardUsd` (locked rewards) have no
+             source on the platform and keep the declared zeros. */
+        },
+        /* Rewards Activities: one Commission Rewards line per credited commission, newest first. */
+        topCommissions: (earned?.rows ?? []).map((row) => ({ commissionUsd: String(num(row.amount)) })),
+      };
     },
-    /* `topCommissions` drives the Rewards Activities list. The platform's `rewards.rows` is the
-       nearest thing and carries a different row shape — the list is left empty rather than fed
-       rows its renderer has never seen, which is the same call the four unbuilt transaction lists
-       get. It is empty on this account either way. */
-  }));
+  );
 };
+
+/* ── The platform's affiliate reads, shared by the dashboard and the three My Rewards tables. ──
+ *
+ * `rewards` is every commission credited to this account (`{total, totalAmount, rows:[{member,
+ * amount, coin, referredAmount, createdAt}]}`); `rewards/unclaimed` is what is still claimable,
+ * tier unlocks (`kind: 'tier'`) and commission (`kind: 'commission'`) together; `team` is the
+ * referred players. The reward coin is the operator's reward currency (USDT on this delivery), so
+ * the amounts are read as USD the way bc.game's `*Usd` fields are. */
+const REWARDS_TODAY = { params: { filter: 'today' } };
+const num = (value) => Number(value) || 0;
+const readRewards = () =>
+  Promise.resolve(request(PLATFORM.user.affiliate.rewards, { live: true, fixture: null })).catch(() => null);
+const readTodayRewards = () =>
+  Promise.resolve(
+    request(PLATFORM.user.affiliate.rewards, { live: true, fixture: null, ...REWARDS_TODAY }),
+  ).catch(() => null);
+const readUnclaimed = () =>
+  Promise.resolve(request(PLATFORM.user.affiliate.unclaimed, { live: true, fixture: null })).catch(() => null);
+const readTeam = () =>
+  Promise.resolve(request(PLATFORM.user.affiliate.team, { live: true, fixture: null })).catch(() => null);
+
+function splitUnclaimed(open) {
+  let tier = 0;
+  let commission = 0;
+  for (const row of open?.rows ?? []) {
+    if (row.kind === 'commission') commission += num(row.amount);
+    else tier += num(row.amount);
+  }
+  return { tier, commission };
+}
+
+/* The tables print `createDate` as text; bc.game's own is the en-US short date. */
+const shortDate = (iso) => (iso ? new Date(iso).toLocaleDateString('en-US') : '');
+const usd2 = (value) => (Math.floor(num(value) * 100) / 100).toFixed(2);
 
 /* ------------------------------------------------------------------- the My Rewards tab
  *
@@ -190,7 +222,24 @@ export const getAffiliateDashboard = ({ reloads } = {}) => {
 /* `g` in servers-O8_t7p5g.js — Commission by Currency. One row per coin the account has earned
    in, and the page ALSO folds `availableRewardUsd` into a synthetic USDT row when that figure is
    non-zero. It is zero here, so the list stays empty. */
-export const getCommissionList = () => request(ENDPOINTS.referral.commission, { fixture: [] });
+export const getCommissionList = () => {
+  if (USE_FIXTURES) return request(ENDPOINTS.referral.commission, { fixture: [] });
+  /* One row per reward coin: Available is what is still claimable in it (tier + commission —
+     which is the page's own fold of the referral rewards into the coin's row), Total Received is
+     every commission credited in it. */
+  return Promise.all([readRewards(), readUnclaimed()]).then(([earned, open]) => {
+    const byCoin = new Map();
+    const at = (code) => {
+      if (!byCoin.has(code)) byCoin.set(code, { currencyName: code, availableUsd: 0, commissionUsd: 0 });
+      return byCoin.get(code);
+    };
+    for (const row of earned?.rows ?? []) if (row.coin) at(row.coin).commissionUsd += num(row.amount);
+    for (const row of open?.rows ?? []) if (row.currency) at(row.currency).availableUsd += num(row.amount);
+    return [...byCoin.values()]
+      .filter((row) => row.availableUsd > 0 || row.commissionUsd > 0)
+      .map((row) => ({ ...row, availableUsd: String(row.availableUsd), commissionUsd: String(row.commissionUsd) }));
+  });
+};
 
 /* Stamped once at module load — see the `createTime` note below. */
 const CREATED_AT = Date.now();
@@ -200,8 +249,35 @@ const CREATED_AT = Date.now();
 const EMPTY_PAGE = { list: [], page: 0, pageSize: 10, total: 0, totalPage: 0 };
 
 /* `Ut`'s own `POST /agent/information/list/` — Commission by Friends. */
-export const getFriendCommissions = () =>
-  request(ENDPOINTS.referral.friendList, { method: 'POST', fixture: EMPTY_PAGE });
+export const getFriendCommissions = () => {
+  if (USE_FIXTURES) return request(ENDPOINTS.referral.friendList, { method: 'POST', fixture: EMPTY_PAGE });
+  /* One row per referred player, off `team.members`, with that player's commission summed from
+     `rewards.rows`. The rate is what the platform actually paid on them (commission over the
+     wager it was paid on). The platform sends no user id and no deposit figure for a team member,
+     so those two cells print a dash rather than a number nobody sent. */
+  return Promise.all([readTeam(), readRewards()]).then(([team, earned]) => {
+    const paid = new Map();
+    for (const row of earned?.rows ?? []) {
+      const entry = paid.get(row.member) ?? { amount: 0, referred: 0 };
+      entry.amount += num(row.amount);
+      entry.referred += num(row.referredAmount);
+      paid.set(row.member, entry);
+    }
+    const list = (team?.members ?? []).map((member) => {
+      const entry = paid.get(member.name) ?? { amount: 0, referred: 0 };
+      return {
+        id: member.name,
+        userName: member.name,
+        userId: '-',
+        commissionRate: entry.referred > 0 ? Math.round((entry.amount / entry.referred) * 10000) / 10000 : 0,
+        day7TotalDeposits: '-',
+        createDate: shortDate(member.joinedAt),
+        commissionUsd: usd2(entry.amount),
+      };
+    });
+    return { ...EMPTY_PAGE, list, page: 1, total: list.length, totalPage: list.length ? 1 : 0 };
+  });
+};
 
 /* `Rt` / `R` — `/agent/invitation/code/list/`, and the ONE `/agent/` payload here that is not
  * empty, because its contents are already known from somewhere else.
@@ -271,8 +347,32 @@ export const getInviteCodes = () => {
 };
 
 /* `xt`'s own `POST /agent/information/referral-rewards/list/` — Level Up Rewards. */
-export const getReferralRewards = () =>
-  request(ENDPOINTS.referral.referralRewards, { method: 'POST', fixture: EMPTY_PAGE });
+export const getReferralRewards = () => {
+  if (USE_FIXTURES) {
+    return request(ENDPOINTS.referral.referralRewards, { method: 'POST', fixture: EMPTY_PAGE });
+  }
+  /* Level Up Rewards are the platform's tier unlocks (`kind: 'tier'` in `rewards/unclaimed`),
+     joined to the team member for the registration date, VIP level and code. Only UNCLAIMED tier
+     rows are readable — the platform has no player route listing claimed ones — so a claimed
+     reward leaves this table. */
+  return Promise.all([readUnclaimed(), readTeam()]).then(([open, team]) => {
+    const members = new Map((team?.members ?? []).map((m) => [m.name, m]));
+    const list = (open?.rows ?? [])
+      .filter((row) => row.kind === 'tier')
+      .map((row) => {
+        const member = members.get(row.member);
+        return {
+          id: `tier-${row.id}`,
+          userName: row.member ?? '',
+          createDate: shortDate(member?.joinedAt),
+          userLevel: member?.level ?? '',
+          aliasCode: member?.campaign ?? '',
+          rewardUsd: usd2(row.amount),
+        };
+      });
+    return { ...EMPTY_PAGE, list, page: 1, total: list.length, totalPage: list.length ? 1 : 0 };
+  });
+};
 
 /* ── THE AFFILIATE REWARD CLAIMS ───────────────────────────────────────────────────────────────
  *
