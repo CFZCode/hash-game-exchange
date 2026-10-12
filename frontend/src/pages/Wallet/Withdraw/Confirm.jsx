@@ -85,7 +85,7 @@ function Address({ address, className = '' }) {
         className="button absolute right-0 top-1/2 -mt-2.5 h-auto"
         onClick={() => {
           navigator.clipboard?.writeText(address).then(
-            () => showToast('Copied', { type: 'success' }),
+            () => showToast('Copied'),
             () => {},
           );
         }}
