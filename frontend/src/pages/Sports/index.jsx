@@ -9,6 +9,8 @@ import SportFilter from './SportFilter';
 import EventGrid from './EventGrid';
 import BetSlip from './BetSlip';
 import LobbyFooter from './LobbyFooter';
+import useResource from '../../hooks/useResource';
+import { launchSportsbook } from '../../services/sports';
 /* `.sports-dont` — the middot between a fixture's category and its tournament — is a global
    helper lifted verbatim from the original's own stylesheet (index-DxOqNczA.css) and it lives
    in Highlights.css because that is where it was first needed. Imported rather than restated,
@@ -70,6 +72,11 @@ export default function Sports() {
      LOGIN to a signed-in visitor for ever. It is the only session-dependent thing on the page —
      everything else here is presentational, because there is no sports feed behind it. */
   const { session } = useSession();
+  /* The SmartBet sportsbook, framed when the backend hands back a URL (services/sports.js).
+     Until it does — fixtures on, signed out, or the book not configured — the lobby below is
+     what renders, exactly as before. */
+  const readBook = React.useCallback(() => (session.login ? launchSportsbook() : null), [session.login]);
+  const { data: bookUrl } = useResource(readBook);
   /* All three are presentational. Nothing on this page is wired to a feed — there is no sports
      feed in the mirror to wire it to — so these drive the selected treatment and the pager and
      nothing else. They are still worth having: the selected/unselected states are half of what
@@ -113,6 +120,16 @@ export default function Sports() {
   return (
     <div className="px-4 sm:px-0">
       <div className="!my-0 -mx-4 min-h-[70vh] sm:mx-0">
+        {bookUrl ? (
+          <iframe
+            src={bookUrl}
+            title="Sports"
+            allow="autoplay; fullscreen; clipboard-write; encrypted-media; payment"
+            allowFullScreen
+            referrerPolicy="origin"
+            style={{ width: '100%', minHeight: '70vh', border: 0, display: 'block' }}
+          />
+        ) : (
         <div className="sports-lobby">
           {/* THE EXPANDED NAVBAR IS A DROPDOWN, SO IT HANGS OFF THE RAIL RATHER THAN SITTING IN
               THE COLUMN. Both live inside one positioned dock: the panel is `top: 100%` of it, so
@@ -136,6 +153,7 @@ export default function Sports() {
           />
           <LobbyFooter />
         </div>
+        )}
       </div>
       {/* Outside `.sports-lobby`, because it is `position: fixed` and the lobby's own
           `> * + *` margin rule would otherwise count it as another block in the column. On the

@@ -1,4 +1,5 @@
-import { request } from './client';
+import { request, USE_FIXTURES } from './client';
+import { getOriginals as getHouseGames } from './originals';
 import ENDPOINTS from './endpoints';
 import { GAMES } from '../data/games';
 
@@ -24,8 +25,12 @@ import { GAMES } from '../data/games';
 
 const isOriginal = (game) => /^BC(\s|$)|originals?$/i.test(game.provider ?? '');
 
+/* LIVE (fixtures off): the platform's own in-house games (services/originals.js), the games a
+   provably-fair check applies to. */
 export const getOriginals = () =>
-  request(ENDPOINTS.homeSelection, {
+  !USE_FIXTURES
+    ? Promise.resolve(getHouseGames()).then((games) => (games ?? []).map((g) => ({ label: g.name, value: g.slug })))
+    : request(ENDPOINTS.homeSelection, {
     fixture: GAMES.filter(isOriginal)
       .filter((g) => !g.slug.includes('trenball') && !g.name.includes(':'))
       .map((g) => ({ label: g.name, value: g.slug })),

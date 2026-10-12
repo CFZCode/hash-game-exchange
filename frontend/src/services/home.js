@@ -222,7 +222,10 @@ const toBigWin = (row) => {
   };
 };
 
-export const getLotteryDraws = () => request(ENDPOINTS.lotteryUpcoming, { fixture: draws });
+/* LIVE: no lottery and no BetBy feed exist on the SmartBet backend, so both rows render empty
+   rather than the captured draws and matches. */
+export const getLotteryDraws = () =>
+  USE_FIXTURES ? request(ENDPOINTS.lotteryUpcoming, { fixture: draws }) : [];
 
 /* Highlights is BetBy's, not bc.game's — its real source is the top-events feed on BetBy's own
    host, which needs a brand id, a country, a currency and a language. None of those are known
@@ -234,4 +237,4 @@ export const getHighlights = ({
   currency = 'USD',
   lang = 'en',
 } = {}) =>
-  request(ENDPOINTS.betby.topEvents(brand, country, currency, lang), { fixture: matches });
+  USE_FIXTURES ? request(ENDPOINTS.betby.topEvents(brand, country, currency, lang), { fixture: matches }) : [];

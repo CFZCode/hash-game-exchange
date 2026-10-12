@@ -1,4 +1,4 @@
-import { request } from './client';
+import { request, USE_FIXTURES, getAccessToken } from './client';
 import ENDPOINTS from './endpoints';
 import {
   RAIL_ACTIONS,
@@ -79,8 +79,11 @@ export const getFeatured = ({ brand = BRAND, lang = 'en' } = {}) =>
     fixture: SHOW_FEATURED_PROMO ? FEATURED : { slides: [], activeIndex: 0 },
   });
 
+/* LIVE (fixtures off): the lobby's tickets and events are BetBy's feed, which the SmartBet
+   backend does not have (its sportsbook is an iframe, below). So the live path renders the
+   lobby's own empty states rather than the captured tickets and matches. */
 export const getBetsFeed = ({ brand = BRAND, lang = 'en' } = {}) =>
-  request(ENDPOINTS.betby.feed('bets', brand, lang, ''), { fixture: BETS_FEED });
+  USE_FIXTURES ? request(ENDPOINTS.betby.feed('bets', brand, lang, ''), { fixture: BETS_FEED }) : [];
 
 export const getSportFilters = () =>
   request(ENDPOINTS.betby.feed('sports', BRAND, 'en', ''), { fixture: SPORT_FILTERS });
@@ -88,7 +91,7 @@ export const getSportFilters = () =>
 /* Paged. The fixture only has page one — the pager's own readout says "1 - 12 of 15" — so
    anything past it comes back empty rather than repeating page one. */
 export const getLobbyEvents = ({ page = 1, brand = BRAND, lang = 'en' } = {}) =>
-  request(ENDPOINTS.betby.feed('events', brand, lang, `page/${page}`), {
+  !USE_FIXTURES ? { events: [], page, pageSize: PAGE_SIZE, total: 0 } : request(ENDPOINTS.betby.feed('events', brand, lang, `page/${page}`), {
     fixture: {
       events: page === 1 ? EVENTS : [],
       page,
@@ -123,9 +126,72 @@ export const placeBet = ({ selections = [], stake = 0 } = {}) => {
       id, team: team ?? outcome, market, event, value,
     })),
   };
+  if (!USE_FIXTURES) {
+    return Promise.reject(new Error('The sportsbook is not available on this site yet.'));
+  }
   return request(ENDPOINTS.betby.placeBet, {
     method: 'POST',
     body: JSON.stringify({ stake, selections: selections.map((pick) => pick.id) }),
     fixture: receipt,
   });
 };
+
+/* ── THE SPORTSBOOK LAUNCH ─────────────────────────────────────────────────────────────────────
+ *
+ * SmartBet's sportsbook is an iframe: `GET /casino/sportsbook` lists the books (public) and
+ * `POST /casino/sportsbook/init {sportsbookUuid, currency, returnUrl?}` answers `{sessionId, url,
+ * token}`. A second init answers 409 `SPORTSBOOK_SESSION_ALREADY_OPEN` with the open session's
+ * id, which `refresh` turns into a fresh URL. When the book is not configured (503
+ * `SPORTSBOOK_NOT_CONFIGURED`, as on this delivery) it falls back to the catalogue's LuckySports
+ * row through `POST /casino/js-games/v2/launch`. Resolves to a URL, or `null` when neither is
+ * available (or signed out, or fixtures on) — and the page then keeps its own lobby.
+ */
+const SPORTSBOOK = {
+  list: '/api/v1/casino/sportsbook',
+  init: '/api/v1/casino/sportsbook/init',
+  refresh: '/api/v1/casino/sportsbook/refresh',
+  jsGamesLaunch: '/api/v1/casino/js-games/v2/launch',
+};
+const LUCKY_SPORTS_UID = '92b24e4c25107367a80e0fe1a97c24e4';
+
+async function slotegratorUrl(currency) {
+  const books = await request(SPORTSBOOK.list, { live: true, fixture: [] });
+  const list = Array.isArray(books) ? books : books?.items ?? books?.rows ?? [];
+  const uuid = list[0]?.uuid ?? list[0]?.id;
+  if (!uuid) return null;
+  try {
+    const opened = await request(SPORTSBOOK.init, {
+      live: true,
+      method: 'POST',
+      json: { sportsbookUuid: String(uuid), currency },
+      fixture: null,
+    });
+    return opened?.url ?? null;
+  } catch (error) {
+    const sessionId = error?.details?.sessionId;
+    if (error?.code !== 'SPORTSBOOK_SESSION_ALREADY_OPEN' || !sessionId) throw error;
+    const again = await request(SPORTSBOOK.refresh, { live: true, method: 'POST', json: { sessionId }, fixture: null });
+    return again?.url ?? null;
+  }
+}
+
+export async function launchSportsbook({ currency = 'INR' } = {}) {
+  if (USE_FIXTURES || !getAccessToken()) return null;
+  try {
+    const url = await slotegratorUrl(currency);
+    if (url) return url;
+  } catch (error) {
+    if (error?.code !== 'SPORTSBOOK_NOT_CONFIGURED') return null;
+  }
+  try {
+    const launched = await request(SPORTSBOOK.jsGamesLaunch, {
+      live: true,
+      method: 'POST',
+      json: { gameUid: LUCKY_SPORTS_UID, currencyCode: 'INR' },
+      fixture: null,
+    });
+    return launched?.gameLaunchUrl ?? null;
+  } catch {
+    return null;
+  }
+}
