@@ -1,4 +1,4 @@
-import { request } from './client';
+import { request, USE_FIXTURES } from './client';
 import ENDPOINTS from './endpoints';
 import { EARN_METHODS, FAQ, JACKPOT, PRIZE_LADDER, RULES } from '../pages/WeeklyRaffle/raffle';
 import { DRAW_TOTALS, ROUND, TICKER, WINNERS } from '../pages/WeeklyRaffle/winners';
@@ -48,6 +48,25 @@ export const getRaffle = (now = Date.now()) => {
   /* The picker lists finished draws, newest first. `pages` is how many pages of winners the
      captured draw had; the count of past draws offered is this project's own choice. */
   const history = Array.from({ length: 8 }, (_, i) => drawId(previous - i * WEEK));
+
+  /* NO-BACKEND: the SmartBet platform has no raffle (backend-gaps.md gap 6). With fixtures off
+     the page keeps its copy (jackpot, rules, ladder, FAQ) and the draw clock, but the captured
+     ACTIVITY — the ticker, the tickets-sent count and the past draws — is bc.game's, so the live
+     path renders those empty rather than as this site's own. */
+  if (!USE_FIXTURES) {
+    return Promise.resolve({
+      currentId: drawId(next),
+      drawsAt: next,
+      jackpot: JACKPOT,
+      ticketsSent: 0,
+      ticker: [],
+      earnMethods: EARN_METHODS,
+      rules: RULES,
+      prizeLadder: PRIZE_LADDER,
+      faq: FAQ,
+      history: [],
+    });
+  }
 
   return request(ENDPOINTS.raffle.current, {
     fixture: {

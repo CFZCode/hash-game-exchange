@@ -1,4 +1,4 @@
-import { request } from './client';
+import { request, USE_FIXTURES } from './client';
 import ENDPOINTS from './endpoints';
 import { QUEST_LIST, COMPLETED_QUESTS, EXPIRED_QUESTS } from '../pages/Quests/quests';
 
@@ -19,11 +19,20 @@ import { QUEST_LIST, COMPLETED_QUESTS, EXPIRED_QUESTS } from '../pages/Quests/qu
  * verification quest makes, and that handler is not built.
  */
 
-export const getQuests = () => request(ENDPOINTS.quest.list, { fixture: QUEST_LIST });
+/* NO-BACKEND: the SmartBet platform has no quests (backend-gaps.md gap 5). With fixtures off the
+   three reads answer the service's own logged-out fallbacks — the empty object and two empty
+   arrays — so the page renders its empty states instead of bc.game's captured quests. */
+export const getQuests = () =>
+  USE_FIXTURES ? request(ENDPOINTS.quest.list, { fixture: QUEST_LIST }) : Promise.resolve({});
 
 export const getCompletedQuests = () =>
-  request(ENDPOINTS.quest.completed, { fixture: COMPLETED_QUESTS });
+  USE_FIXTURES
+    ? request(ENDPOINTS.quest.completed, { fixture: COMPLETED_QUESTS })
+    : Promise.resolve([]);
 
-export const getExpiredQuests = () => request(ENDPOINTS.quest.expired, { fixture: EXPIRED_QUESTS });
+export const getExpiredQuests = () =>
+  USE_FIXTURES
+    ? request(ENDPOINTS.quest.expired, { fixture: EXPIRED_QUESTS })
+    : Promise.resolve([]);
 
 export default getQuests;

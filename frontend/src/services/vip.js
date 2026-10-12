@@ -1,5 +1,5 @@
-import { request } from './client';
-import ENDPOINTS from './endpoints';
+import { request, USE_FIXTURES, getAccessToken } from './client';
+import ENDPOINTS, { PLATFORM } from './endpoints';
 import {
   ACCESS,
   ENGAGE,
@@ -57,5 +57,35 @@ export const getVipClub = () =>
       faq: { title: FAQ_TITLE, tabs: FAQ_TABS },
     },
   });
+
+/* ── LIVE: THE PLAYER'S OWN STANDING, FOR THE LEVEL CARD ON /bonus ─────────────────────────────
+ *
+ * `GET /user/vip` answers `{level, name, card, wager, nextLevel, nextName, wagerToNextLevel,
+ * progressPct, ladder, totalLevels}` off the PLATFORM's ladder (41 levels, Wood to Diamond),
+ * which is not bc.game's captured one in data/vipConfig.js. The card's name, percentage and
+ * "… XP to <next>" line are therefore taken from this answer on the live path; looking the
+ * level number up in the captured ladder would print bc.game's tier for it. XP here is the
+ * platform's wager, the unit its ladder is measured in.
+ *
+ * Null in fixture mode and without a session, which tells the card to keep reading the account
+ * exactly as it always has. A failed read is null too: the card then falls back the same way. */
+export function toVipStanding(row) {
+  if (!row) return null;
+  return {
+    level: Number(row.level) || 0,
+    name: row.name ?? '',
+    /* The glyph family the card's icon map keys on (`gold` -> Gold); a family it has no glyph
+       for (Wood, Unranked) falls back to Beginner, as the captured ladder's odd rows do. */
+    family: row.card ? row.card[0].toUpperCase() + row.card.slice(1) : '',
+    nextName: row.nextName ?? null,
+    percent: Math.min(100, Math.max(0, Number(row.progressPct) || 0)),
+    toNext: row.nextLevel == null ? 0 : Number(row.wagerToNextLevel) || 0,
+  };
+}
+
+export const getVipStanding = () =>
+  USE_FIXTURES || !getAccessToken()
+    ? null
+    : request(PLATFORM.user.vip.standing, { live: true }).then(toVipStanding, () => null);
 
 export default getVipClub;

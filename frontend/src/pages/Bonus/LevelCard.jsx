@@ -3,6 +3,8 @@ import { Card } from '../../components/shared/SectionGroup';
 import { IconArrow } from '../../components/shared/icons';
 import { VIP_LEVELS, vipTier, tierColor } from '../../data/vipConfig';
 import * as tiers from './icons';
+import { useResource } from '../../hooks/useResource';
+import { getVipStanding } from '../../services/vip';
 
 /* `L` in fx-B6Xikin5.js (`D` before minification) — the Level card at the top of the Rewards
  * panel, and the same component the /vip-detail page would use for its signed-in level widget.
@@ -65,16 +67,31 @@ export default function LevelCard({ session }) {
 
   const span = session.levelEndXP - session.levelStartXP;
   const done = session.currXP - session.levelStartXP;
-  const percent = done > 0 && span > 0 ? Math.min(100, parseFloat(((done / span) * 100).toFixed(2))) : 0;
+  let percent = done > 0 && span > 0 ? Math.min(100, parseFloat(((done / span) * 100).toFixed(2))) : 0;
 
   const remaining = session.levelEndXP - session.currXP;
   const nextRow = VIP_LEVELS.find((r) => r.minXp === session.levelEndXP);
-  const toNext =
+  let toNext =
     remaining <= 0
       ? ''
       : nextRow
         ? `${compactXp(remaining)} XP to ${vipTier(nextRow.level).fullName}`
         : '--';
+
+  /* LIVE: the platform's own standing replaces the three printed values — see
+     services/vip.js. Null in fixture mode, so the lines above are what renders there. */
+  const { data: standing } = useResource(getVipStanding);
+  let fullName = tier.fullName;
+  let family = tier.base;
+  if (standing) {
+    fullName = standing.name;
+    family = standing.family;
+    percent = standing.percent;
+    toNext =
+      standing.toNext > 0 && standing.nextName
+        ? `${compactXp(Math.ceil(standing.toNext))} XP to ${standing.nextName}`
+        : '';
+  }
 
   return (
     /* TWO DELIBERATE DEPARTURES FROM THE CHUNK, both on request and both shared with the Total
@@ -103,14 +120,14 @@ export default function LevelCard({ session }) {
 
           <IconBox className="mt-0.5 border border-brand bg-layer3 p-1">
             <div className="center size-full rounded-lg bg-brand/5">
-              <TierIcon name={tier.base} className="icon size-6 !text-brand" />
+              <TierIcon name={family} className="icon size-6 !text-brand" />
             </div>
           </IconBox>
 
           <div className="flex min-w-0 flex-1 flex-col">
             <span className="text-sm font-semibold leading-snug text-tertiary">Level</span>
             <span className="mt-0.5 truncate text-base font-extrabold leading-tight text-primary">
-              {tier.fullName}
+              {fullName}
             </span>
           </div>
         </div>

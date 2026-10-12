@@ -252,6 +252,23 @@ would put something untrue on the screen.
 
 ---
 
+### Rewards area, 2026-10-12
+
+| Screen | Route(s) | State |
+|---|---|---|
+| `/bonus` rows, Total Claimable, Claim, Redeem | `GET /user/bonus`, `/user/rakeback`, `POST /user/bonus/claim/:type`, `/user/rakeback/claim`, `/user/bonus/redeem` | Already wired (see above). Level-up and other bc.game reward types have no platform route and keep the declared default |
+| `/bonus` level card | `GET /user/vip` | **Wired.** Name, percentage and "… XP to <next>" now come off the PLATFORM ladder (41 levels, Wood to Diamond); before, the level number was looked up in bc.game's captured ladder and printed bc.game's tier name. `services/vip.js` `getVipStanding` |
+| `/vip-detail` | — | Marketing copy, no data to wire. `GET /user/vip/levels` still has no screen |
+| `/promotions/daily-contest`, Home → Wager Contest | `GET /user/race`, `/user/race/daily/leaderboard`, `/user/race/history` | **Wired** (`services/contest.js`). Both races are `enabled: false` on this delivery, so the board answers 404 `RACE_NOT_RUNNING` and the widget renders its idle form: configured pool, Ended, 00:00:00, empty table. Running-race mapping checked against the service's own field names |
+| `/promotions` + Archived | `GET /admin/promotions` (public) | **Wired** (`services/promotions.js`). Feed is empty on this delivery, so the page's Empty state renders. Tabs cut to All + Casino (`segment`); archived = `promoStatus: ended` or past `endsAt` |
+| `/deposit-offer`, fiat tab bonus chips | `GET /user/bonus/first-deposit` | **Wired** (`services/bonus.js`). `enabled: false` here, so no offer and no chip bonus |
+| `/free-plays` | `GET /casino/gis/freespins/mine` | Already wired; free bets have no provider |
+| `/quests` | — | No backend (gap 5). Live mode now renders the empty states instead of bc.game's captured quests |
+| `/promotions/weekly-raffle` | — | No backend (gap 6). Live mode keeps the copy but empties the ticker, tickets-sent count and past draws |
+| Spin wheel | `/user/spin-wheel/*` | Backend complete, no screen in this UI |
+
+Note: `GET /user/race/rewards` answers 403 `PROMOTIONS_NOT_FOR_AGENT_USERS` for agent-tree players such as `demo_player01`. That is by design and is not read by any screen.
+
 ## Part 2 — The backend has it, we are not using it yet
 
 No backend work needed. Listed so nobody builds these twice.

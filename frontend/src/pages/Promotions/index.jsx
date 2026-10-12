@@ -61,7 +61,8 @@ const ChevronIcon = ({ className }) => (
 /* Exported for ./Archived.jsx, which renders the identical card — `le`, the list, is one
    component on the original and the archived popup passes it `inProgress: false`. */
 export function PromotionCard({ promo }) {
-  const image = artFor(promo.image);
+  /* `imageUrl` is the live feed's own art (services/promotions.js); the fixture never sets it. */
+  const image = artFor(promo.image) || promo.imageUrl;
 
   return (
     <article className="relative flex h-44 w-full cursor-pointer flex-col overflow-hidden rounded-xl border border-fourth/10 bg-alw_white pb-2 pl-5 pr-4 pt-5 sm:rounded-2xl dark:bg-card_dark">
