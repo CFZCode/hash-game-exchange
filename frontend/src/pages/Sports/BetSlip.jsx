@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { BetbyIcon, ChevronIcon, SportIcon } from './icons';
 import { hasSportIcon } from './sportArt';
 import { placeBet } from '../../services/sports';
-import { siteLogo, siteTitle } from '../../services/siteBranding';
+import { siteName, siteTitle, useSiteLogo } from '../../services/siteBranding';
 import logoImg from '../../assets/logo.png';
 
 /* The bet slip.
@@ -103,6 +103,8 @@ export default function BetSlip({
   signedIn = false,
   currencyName = '',
 }) {
+  /* The owner panel's logo (live mode); else the original wordmark. Same 22px-high slot. */
+  const brandLogo = useSiteLogo({ own: 'hash-games' });
   const navigate = useNavigate();
   const [open, setOpen] = React.useState(false);
   const [quickBet, setQuickBet] = React.useState(false);
@@ -296,7 +298,7 @@ export default function BetSlip({
                 ))}
               </div>
 
-              <img className="sports-betslip-logo" src={siteLogo({ own: 'hash-games' }) ?? logoImg} alt={siteTitle() ?? 'BC.GAME'} />
+              <img className="sports-betslip-logo" src={brandLogo ?? logoImg} alt={siteName() ?? siteTitle() ?? 'BC.GAME'} />
 
               <div className="sports-betslip-chips">
                 {STAKE_CHIPS.map((amount) => (

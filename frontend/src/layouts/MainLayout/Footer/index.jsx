@@ -10,7 +10,7 @@ import { COLUMNS, SEO, FEEDBACK, LEGAL } from './links';
 import { AWARDS, PARTNERS } from './badges';
 import { useSettings } from '../../../context/settings';
 import { useGates } from '../../../context/gates';
-import { siteLogo } from '../../../services/siteBranding';
+import { siteName, useSiteLogo } from '../../../services/siteBranding';
 import './Footer.css';
 
 /* The site footer, from the live DOM.
@@ -133,6 +133,8 @@ export default function Footer() {
      strip (`d-*` / `l-*`) and the wordmark (`logo_pure` / `logo_pure_w`). Both pairs are the
      original's own; see badges.js for how the first was recovered. */
   const { darken } = useSettings();
+  /* The owner panel's logo (live mode) in the original's 288x64-at-h-8 box; else the pair. */
+  const brandLogo = useSiteLogo({ own: 'hash-games' });
   /* Keyed on the path rather than a prop because the footer is mounted once by MainLayout,
      OUTSIDE <Routes>; there is no page above it to hand it a flag. Everything below this band —
      awards, partners, link columns, licence — is unchanged on every route. */
@@ -327,7 +329,11 @@ export default function Footer() {
           style={{ gridTemplateRows: '1fr' }}
         >
           <div className="flex min-h-15 items-center gap-4">
-            <img className="h-8" alt="logo" src={siteLogo({ own: 'hash-games' }) ?? (darken ? logoPureImg : logoPureLightImg)} />
+            <img
+              className={brandLogo ? 'h-8 w-36 object-contain object-left' : 'h-8'}
+              alt={(brandLogo && siteName()) || 'logo'}
+              src={brandLogo ?? (darken ? logoPureImg : logoPureLightImg)}
+            />
           </div>
           {/* The Anjouan seal, structured as the vendor's own snippet builds it. It is sized by
               WIDTH — a `max-width: 48px` box (the `data-anj-image-size="48"`) holding an image

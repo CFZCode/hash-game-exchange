@@ -5,7 +5,7 @@ import logoLightImg from '../../../assets/logo_w.png';
 import LanguageCurrencyModal from '../../../components/modals/LanguageCurrencyModal';
 import { useSession } from '../../../context/session';
 import { useSettings } from '../../../context/settings';
-import { siteLogo } from '../../../services/siteBranding';
+import { siteName, useSiteLogo } from '../../../services/siteBranding';
 import AfterLogin, { MobileAfterLogin } from './AfterLogin';
 import './Header.css';
 
@@ -103,9 +103,12 @@ export default function Header({
      download both. Note `logo.small` is the SAME file on both sides of its tuple, so the square
      mark needs no twin and none was fetched. */
   const { darken } = useSettings();
-  /* The owner panel can name another brand's logo; asked for its own it answers null and the pair
-     above is drawn as before. */
-  const logo = siteLogo({ own: 'hash-games' }) ?? (darken ? logoImg : logoLightImg);
+  /* The owner panel's uploaded logo (live mode), or another brand's by name; nothing set answers
+     null and the pair above is drawn as before. A brand logo is fitted to the box the pair draws
+     in (288x64 at h-8 = 144x32), so only the picture changes. */
+  const brandLogo = useSiteLogo({ own: 'hash-games' });
+  const logo = brandLogo ?? (darken ? logoImg : logoLightImg);
+  const logoAlt = (brandLogo && siteName()) || 'logo';
 
   const [langModalOpen, setLangModalOpen] = React.useState(false);
   const [langModalTab, setLangModalTab] = React.useState('language');
@@ -142,7 +145,7 @@ export default function Header({
             {/* Logo container. */}
             <div className="center h-full w-40 flex-none text-[0] absolute left-16 top-0">
               <NavLink to="/">
-                <img alt="logo" className="h-8 w-auto object-contain" src={logo} />
+                <img alt={logoAlt} className={brandLogo ? 'h-8 w-36 object-contain' : 'h-8 w-auto object-contain'} src={logo} />
               </NavLink>
             </div>
           </div>
@@ -280,7 +283,7 @@ export default function Header({
         <div className="flex size-full items-center overflow-hidden px-4">
           <div className="text-[0] flex-none">
             <NavLink to="/">
-              <img alt="logo" className="mobile-logo-img object-contain" src={logo} />
+              <img alt={logoAlt} className="mobile-logo-img object-contain" src={logo} />
             </NavLink>
           </div>
           <button

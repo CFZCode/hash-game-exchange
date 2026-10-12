@@ -10,15 +10,17 @@ import { measureSpineRate } from '../../src/utils/spineRate.js';
 import { applyTheme, readTheme } from '../../src/context/settings.js';
 import { initPush } from '../../src/services/onesignal.js';
 import { API_BASE } from '../../src/services/client.js';
-import { applySiteBranding } from '../../src/services/siteBranding.js';
+import { applySiteBranding, loadSiteBranding } from '../../src/services/siteBranding.js';
 
 // Before the first render, so the initial paint is already at the right scale.
 if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
 
 watchRemScale();
 
-// The owner panel's title and description, when it set any; the layout's own otherwise.
+// The owner panel's branding (live mode: the cached copy now, the backend's answer when it comes;
+// fixture mode: the build-time title and description only); the layout's own otherwise.
 applySiteBranding();
+loadSiteBranding();
 
 applyTheme(readTheme());
 

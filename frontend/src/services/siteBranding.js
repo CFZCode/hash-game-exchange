@@ -1,25 +1,34 @@
 /**
- * Who this site says it is — the same file in every CFZ site.
+ * Who this site says it is: its name, page metadata and logo.
  *
- * GENERATED FROM admins/frontend-kit/siteBranding.js by agents/push-frontend-kit.mjs.
+ * Started as admins/frontend-kit/siteBranding.js (pushed by agents/push-frontend-kit.mjs); this
+ * copy adds the runtime source below — carry it back to the kit before the next push.
  *
- * The owner panel holds a title, a description and a logo NAME per site, and
- * the push writes them to `.env.local` as VITE_SITE_TITLE, VITE_SITE_DESCRIPTION
- * and VITE_SITE_LOGO (read here as NEXT_PUBLIC_SITE_*; next.config.mjs maps the VITE_ names). The logo is a name, never an upload: the images are
- * static files under `public/brand/`, shipped by the same push, and this module
- * picks one by name.
+ * TWO SOURCES, RUNTIME FIRST.
  *
- *   applySiteBranding()                 // document.title + <meta name="description">
- *   siteLogo({ own: 'stake-site' })     // '/brand/roobet.svg', or null → draw your own
- *   <img src={siteLogo({ own: 'stake-site' }) ?? ownLogo} alt={siteTitle() ?? 'Stake'} />
+ * 1. Runtime (live mode only): the owner panel's branding, read from
+ *    `GET /api/v1/admin/branding/public` (docs/OWNER-PANEL.md §8) — site name, title, title
+ *    template, description, keywords, Open Graph, theme colour, and the URLs of the uploaded
+ *    logo, square mark and OG image (`/api/v1/admin/branding/asset/<sha256>.<ext>`, immutable).
+ *    The last answer is kept in localStorage (`hge.branding`) so the next load draws the right
+ *    logo before the read answers, as the theme does (`hge.theme`).
+ * 2. Build time (the fallback, and the only source in fixture mode): NEXT_PUBLIC_SITE_TITLE,
+ *    NEXT_PUBLIC_SITE_DESCRIPTION and NEXT_PUBLIC_SITE_LOGO (a NAME of a file under
+ *    public/brand/), as the frontend-kit push writes them.
  *
- * `own` is this front end's own site key. Asked for its own logo, it gets
- * null — its imported images have light, dark and small variants that one file
- * under public/brand/ does not.
+ * Nothing set reads as null everywhere, so an unbranded site — and the fixture build, which is
+ * the pixel reference — keeps the title in app/layout and the logo its own code imports.
  *
- * Nothing set reads as null everywhere, so a site the owner never branded
- * keeps the title in its index.html and the logo its own code imports.
+ *   applySiteBranding()                 // document.title, meta, OG, theme colour, favicon, loader
+ *   loadSiteBranding()                  // live mode: read the backend, apply, notify
+ *   useSiteLogo({ own: 'hash-games' })  // in a component: the logo URL, or null → draw your own
+ *   useSiteMark()                       // the square mark URL, or null
+ *
+ * `own` is this front end's own site key. Asked by NAME for its own logo it gets null: its
+ * imported images have light, dark and small variants that one file under public/brand/ does not.
  */
+import { useSyncExternalStore } from 'react';
+import { API_BASE, BRANDING_PATH, BRANDING_STORAGE_KEY, LIVE, cleanBranding } from './siteBrandingCore.js';
 
 /**
  * The static images under public/brand/. The NAME IS THE SITE KEY, exactly as
@@ -42,10 +51,45 @@ const ENV = {
   NEXT_PUBLIC_SITE_LOGO: process.env.NEXT_PUBLIC_SITE_LOGO,
 };
 
+export { BRANDING_BOOT_SCRIPT, BRANDING_PATH, BRANDING_STORAGE_KEY, cleanBranding } from './siteBrandingCore.js';
+
 const env = (key) => {
   const value = ENV[key];
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 };
+
+const absolute = (path) => (path ? `${API_BASE}${path}` : null);
+
+function readCache() {
+  try {
+    const raw = localStorage.getItem(BRANDING_STORAGE_KEY);
+    return raw ? cleanBranding(JSON.parse(raw)) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeCache(value) {
+  try {
+    if (value) localStorage.setItem(BRANDING_STORAGE_KEY, JSON.stringify(value));
+    else localStorage.removeItem(BRANDING_STORAGE_KEY);
+  } catch {
+    /* private mode: the next load draws the UI's own logo until the read answers */
+  }
+}
+
+let runtime = LIVE && typeof window !== 'undefined' ? readCache() : null;
+const listeners = new Set();
+
+const subscribe = (fn) => {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+};
+const snapshot = () => runtime;
+const serverSnapshot = () => null;
+
+/** The runtime branding (live mode), or null. */
+export const runtimeBranding = () => runtime;
 
 const exact = (name) => (LOGOS[String(name ?? '').trim().toLowerCase()] ? String(name).trim().toLowerCase() : null);
 
@@ -60,13 +104,69 @@ export function logoFor(name, { own } = {}) {
   return `${base}brand/${LOGOS[key]}`;
 }
 
-export const siteTitle = () => env('NEXT_PUBLIC_SITE_TITLE');
-export const siteDescription = () => env('NEXT_PUBLIC_SITE_DESCRIPTION');
+/** The site's name (the logo's alt text), or null. */
+export const siteName = () => runtime?.siteName ?? null;
+export const siteTitle = () => runtime?.title ?? runtime?.siteName ?? env('NEXT_PUBLIC_SITE_TITLE');
+export const siteDescription = () => runtime?.description ?? env('NEXT_PUBLIC_SITE_DESCRIPTION');
 
-/** The logo the owner chose, by exact name. Nothing chosen is null: the site's own. */
-export const siteLogo = (options) => logoFor(env('NEXT_PUBLIC_SITE_LOGO'), options);
+/** The owner's uploaded logo, else the one chosen by exact name, else null: the site's own. */
+export const siteLogo = (options) => absolute(runtime?.logoUrl) ?? logoFor(env('NEXT_PUBLIC_SITE_LOGO'), options);
 
-/** Call once, before the first render. Leaves index.html's own values where nothing is set. */
+/** The owner's square mark (favicon, signed-in mobile header, loader), or null. */
+export const siteMark = () => absolute(runtime?.markUrl);
+
+/** Hooks: the same values, re-rendering when the runtime branding arrives or changes. */
+export function useSiteBranding() {
+  return useSyncExternalStore(subscribe, snapshot, serverSnapshot);
+}
+export function useSiteLogo(options) {
+  useSiteBranding();
+  return siteLogo(options);
+}
+export function useSiteMark() {
+  useSiteBranding();
+  return siteMark();
+}
+
+function setMeta(attr, key, content) {
+  let meta = document.head.querySelector(`meta[${attr}="${key}"]`);
+  if (!content) return;
+  if (!meta) {
+    meta = document.createElement('meta');
+    meta.setAttribute(attr, key);
+    document.head.appendChild(meta);
+  }
+  meta.setAttribute('content', content);
+}
+
+function setFavicon(url) {
+  if (!url) return;
+  const type = url.endsWith('.svg') ? 'image/svg+xml' : url.endsWith('.webp') ? 'image/webp' : 'image/png';
+  if (!document.head.querySelector('link[rel~="icon"]')) {
+    const link = document.createElement('link');
+    link.rel = 'icon';
+    document.head.appendChild(link);
+  }
+  for (const link of document.head.querySelectorAll('link[rel~="icon"]')) {
+    if (link.getAttribute('href') === url) continue;
+    link.setAttribute('href', url);
+    link.setAttribute('type', type);
+  }
+}
+
+/* The pre-boot loader (#start-up, app/boot-style.ts) draws the square mark in live mode. */
+function setLoaderMark(url) {
+  if (!url) return;
+  let style = document.getElementById('brand-loader');
+  if (!style) {
+    style = document.createElement('style');
+    style.id = 'brand-loader';
+    document.head.appendChild(style);
+  }
+  style.textContent = `#start-up,body.dark #start-up{background-image:url("${url}");background-repeat:no-repeat;background-position:center}`;
+}
+
+/** Puts the current branding on the document. Leaves the layout's own values where nothing is set. */
 export function applySiteBranding() {
   if (typeof document === 'undefined') return;
   const title = siteTitle();
@@ -82,4 +182,40 @@ export function applySiteBranding() {
     }
     meta.setAttribute('content', description);
   }
+  if (!runtime) return;
+
+  setMeta('name', 'keywords', runtime.keywords.length ? runtime.keywords.join(', ') : null);
+  setMeta('property', 'og:site_name', runtime.siteName);
+  setMeta('property', 'og:title', runtime.ogTitle ?? title);
+  setMeta('property', 'og:description', runtime.ogDescription ?? description);
+  setMeta('property', 'og:image', absolute(runtime.ogImageUrl));
+  setMeta('name', 'theme-color', runtime.themeColor);
+  setFavicon(siteMark());
+  setLoaderMark(siteMark());
+}
+
+let loading = null;
+
+/** Live mode: read the backend's branding, keep it, apply it, re-render the logos. Never throws. */
+export function loadSiteBranding() {
+  if (!LIVE || typeof window === 'undefined') return Promise.resolve(null);
+  if (loading) return loading;
+  loading = fetch(`${API_BASE}${BRANDING_PATH}`, { headers: { accept: 'application/json' }, cache: 'no-store' })
+    .then((res) => (res.ok ? res.json() : null))
+    .then((body) => {
+      if (!body || body.success === false) return runtime; // unreachable: keep the cached copy
+      const next = cleanBranding(body.data);
+      if (JSON.stringify(next) !== JSON.stringify(runtime)) {
+        runtime = next;
+        writeCache(next);
+        applySiteBranding();
+        for (const fn of listeners) fn();
+      }
+      return runtime;
+    })
+    .catch(() => runtime)
+    .finally(() => {
+      loading = null;
+    });
+  return loading;
 }

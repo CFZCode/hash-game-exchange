@@ -9,7 +9,7 @@ import SOCIALS, { IpIcon } from './icons';
 import { useSession } from '../../../context/session';
 import { useSettings } from '../../../context/settings';
 import useDialogScrollLock from '../../../hooks/useDialogScrollLock';
-import { siteLogo } from '../../../services/siteBranding';
+import { siteName, useSiteLogo } from '../../../services/siteBranding';
 import './RegionBlock.css';
 
 /* The geo-restriction modal shown on first load.
@@ -140,7 +140,7 @@ export default function RegionBlock({ onClose, region = null, dismissible = true
      same disappearing act the header's logo does. Same pair, picked the same way; see the note in
      layouts/MainLayout/Header/index.jsx. */
   const { darken } = useSettings();
-  const brandLogo = siteLogo({ own: 'hash-games' });
+  const brandLogo = useSiteLogo({ own: 'hash-games' });
 
   /* The page lock behind this dialog. It used to be a private effect here that wrote
      `body.style.overflow = 'hidden'` on mount and held it for the component's whole lifetime;
@@ -178,8 +178,8 @@ export default function RegionBlock({ onClose, region = null, dismissible = true
             {/* Another brand's file has its own proportions, so it is fitted to the height the pair
                 draws at (288x64 in w-40) rather than left at its intrinsic size. */}
             <img
-              alt="logo"
-              className={brandLogo ? 'mx-auto h-9 w-auto object-contain' : undefined}
+              alt={(brandLogo && siteName()) || 'logo'}
+              className={brandLogo ? 'mx-auto h-9 w-40 object-contain' : undefined}
               src={brandLogo ?? (darken ? logoImg : logoLightImg)}
             />
           </div>

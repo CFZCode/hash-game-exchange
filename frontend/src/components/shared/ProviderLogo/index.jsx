@@ -1,4 +1,5 @@
-import { providerLogo } from '../../../data/providers';
+import { canonicalProvider, providerLogo } from '../../../data/providers';
+import { useSiteLogo } from '../../../services/siteBranding';
 import { useSettings } from '../../../context/settings';
 
 /* One provider's mark.
@@ -28,7 +29,10 @@ export default function ProviderLogo({
      `<img src>` and not something a `dark:` utility can reach. Only BC.GAME has a second file —
      see the note in data/providers.js — so for every other studio this argument changes nothing. */
   const { darken } = useSettings();
-  const logo = providerLogo(name, darken);
+  /* The house studio's mark IS the site's wordmark (data/providers.js), so the owner panel's
+     logo (live mode) replaces it there, in the same box; every other studio is untouched. */
+  const brandLogo = useSiteLogo({ own: 'hash-games' });
+  const logo = (brandLogo && canonicalProvider(name) === 'BC.GAME' ? brandLogo : null) ?? providerLogo(name, darken);
 
   if (!logo) {
     return <span className="px-2 text-center text-sm font-semibold text-secondary">{name}</span>;

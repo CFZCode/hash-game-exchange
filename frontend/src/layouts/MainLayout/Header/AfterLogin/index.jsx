@@ -2,6 +2,7 @@ import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSession } from '../../../../context/session';
 import { useGates } from '../../../../context/gates';
+import { siteName, useSiteMark } from '../../../../services/siteBranding';
 import useResource from '../../../../hooks/useResource';
 import useMediaQuery from '../../../../hooks/useMediaQuery';
 import { getRewards } from '../../../../services/rewards';
@@ -515,11 +516,13 @@ export default function AfterLogin({ onToggleChat, onToggleNotice }) {
 export function MobileAfterLogin() {
   const navigate = useNavigate();
   const bonusOn = useGates().on('bonus');
+  /* The owner panel's square mark (live mode), in the same h-9 w-9 box; else the original. */
+  const mark = useSiteMark();
 
   return (
     <div className="flex size-full items-center justify-between px-3">
       <Link to="/" className="flex-none text-[0]">
-        <img alt="logo" className="h-9 w-9" src={logoSmall} />
+        <img alt={(mark && siteName()) || 'logo'} className={mark ? 'h-9 w-9 object-contain' : 'h-9 w-9'} src={mark ?? logoSmall} />
       </Link>
 
       <div className="flex items-center gap-2">
