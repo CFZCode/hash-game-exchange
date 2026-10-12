@@ -1,6 +1,6 @@
 'use client'
 
-import { BanknoteIcon, BanknoteXIcon } from 'lucide-react'
+import { BanknoteIcon, BanknoteXIcon, LockIcon } from 'lucide-react'
 
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import { Badge } from '@/components/ui/badge'
@@ -25,6 +25,18 @@ export const WithdrawBlockedBadge = ({ locks }: { locks?: AccountLocks }) =>
       <BanknoteXIcon /> Withdrawals blocked
     </Badge>
   ) : null
+
+/** The chip shown in a page header while casino and/or sports betting is locked. */
+export const BetLockedBadge = ({ locks }: { locks?: AccountLocks }) => {
+  if (!locks?.casino && !locks?.sports) return null
+  const what = locks.casino && locks.sports ? 'Bets locked' : locks.casino ? 'Casino bets locked' : 'Sports bets locked'
+
+  return (
+    <Badge variant='destructive'>
+      <LockIcon /> {what}
+    </Badge>
+  )
+}
 
 /**
  * Block / unblock withdrawals through the same `POST admin/locks` the other locks use

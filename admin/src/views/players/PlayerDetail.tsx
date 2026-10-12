@@ -33,7 +33,7 @@ import { PlayerBonusesTab } from '@/views/promotions/BonusBalances'
 import GeoAttribution from './GeoAttribution'
 import PlayerRiskTab from './PlayerRiskTab'
 import PlayerStatsTab from './PlayerStatsTab'
-import WithdrawBlockAction, { WithdrawBlockedBadge, type AccountLocks } from './WithdrawBlockAction'
+import WithdrawBlockAction, { BetLockedBadge, WithdrawBlockedBadge, type AccountLocks } from './WithdrawBlockAction'
 import type { PlayerRow } from './types'
 
 type Report = PlayerRow & { locks?: AccountLocks; wallets: Record<string, string>; createdAt: string; wagerCurrency?: string | null; referredBy?: { id: number | string; name: string | null } | null; email?: string; phone?: string; country?: string }
@@ -319,7 +319,9 @@ const PlayerDetail = ({ id }: { id: string }) => {
           p ? (
             <span className='flex flex-wrap items-center gap-2'>
               <span className='font-mono'>#{p.id}</span>
-              <StatusBadge value={p.status} />
+              {/* A system lock outranks the account's own status: it blocks sign-in and everything else. */}
+              <StatusBadge value={p.locks?.system ? 'Locked' : p.status} />
+              <BetLockedBadge locks={p.locks} />
               <WithdrawBlockedBadge locks={p.locks} />
               <Badge variant='outline'>{p.channel}{p.agentId ? ` · agent #${p.agentId}` : ''}</Badge>
               {p.referredBy && (
