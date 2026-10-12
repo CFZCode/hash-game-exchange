@@ -44,6 +44,8 @@ const { SwapService } = require('../swap/swap.service');
 
 const ok = (payload) => ({ status: true, ...payload });
 const refuse = (error) => ({ status: error.message, error: { code: error.code } });
+/** The wagering refusal carries what is left to wager, as the HTTP rails do (`details`). */
+const refuseWithDetails = (error) => ({ status: error.message, error: { code: error.code, details: error.details ?? null } });
 
 function register({ on, deps }) {
   const { models, logger } = deps;
@@ -65,7 +67,8 @@ function register({ on, deps }) {
    * (agent player, withdraw block, system lock, site policy), then checks the
    * password (the socket's own gate, kept from legacy) and hands the request to the
    * service: the guarded `WalletService.debit` WITHDRAWAL hold, the `In Queue`
-   * row, KYC, minimum, cooldown and idempotency the fiat rail already has.
+   * row, KYC and wagering (the owner's withdrawal requirements), minimum, cooldown and
+   * idempotency the fiat rail already has.
    * ─────────────────────────────────────────────────────────────────────
    */
   on(EVENTS.SUBMIT_NEW_WITHDRAWL, {
@@ -125,6 +128,7 @@ function register({ on, deps }) {
         ) {
           return refuse(error);
         }
+        if (error.code === 'WITHDRAW_WAGER_REQUIRED') return refuseWithDetails(error);
         throw error;
       }
     },

@@ -72,7 +72,7 @@ module.exports = defineErrors('CRYPTO_WITHDRAW', {
   /** The fiat rail's twin: the same `WITHDRAW_MINIMUM`, the same refusal. */
   BELOW_MINIMUM: { status: 422, message: 'The amount is below the minimum withdrawal' },
 
-  /** The fiat rail's twin: `WITHDRAW_REQUIRE_KYC` gates both rails, or it gates neither. */
+  /** The fiat rail's twin: the `withdrawal_requirements` policy (and WITHDRAW_REQUIRE_KYC) gate both rails, or neither. */
   KYC_REQUIRED: { status: 403, message: 'Verify your identity before withdrawing' },
 
   INSUFFICIENT_BALANCE: {

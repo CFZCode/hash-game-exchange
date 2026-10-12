@@ -83,6 +83,15 @@ every feature's VARIANT and ON/OFF) is managed only here.** The site admin shows
   fills every variant it names (its `none` = off, anything else = on); rows stay adjustable before
   saving. Review and save lists variant and policy changes as "Gift cards: Activate-then-claim cards →
   Off" (`claim_cards → none`); audit change kinds are `template`, `variant`, `feature`, `flag`.
+- `withdrawal_requirements` (policy, default `kyc` = the behaviour before it existed): `none` (nothing
+  required; NOT "closed"), `kyc` (KYC Verified), `wager` (all open wagering complete: the deposit
+  rollover of `/user/wager/tasks` and every active bonus; forfeiting a bonus clears its part),
+  `kyc_and_wager`. Enforced by user-service `modules/withdraw-requirements` on fiat, crypto (HTTP
+  service + `SUBMIT_NEW_WITHDRAWL` socket) and gateway payouts: KYC missing → the rail's own
+  `*_KYC_REQUIRED`; deposit rollover open → `403 WITHDRAW_WAGER_REQUIRED` `{ remaining, currency:'USD',
+  deposit, bonus, forfeitable }`; only bonus wagering open → the existing `409 BONUS_FORFEIT_REQUIRED`.
+  KYC also needs `WITHDRAW_REQUIRE_KYC` on (backend env, default on). Players read it at
+  `GET /api/v1/user/withdrawals/requirements`.
 - `region` (optional): `{ listType: 'blocklist'|'allowlist', countries: [ISO alpha-2] }`, the region
   restriction's list; its mode is the `region_restriction` policy (`none` = Off, `notice`, `block`).
   Missing = an empty blocklist. See `docs/region-restriction.md`.
@@ -243,7 +252,8 @@ restores the client's own choice.
   - the player routes of gift_cards, swap, vault, bonus, spin_wheel (also the public slices),
     races, vip, club_membership, affiliate, and `GET /admin/promotions` (promotions);
   - chat: the `ADD_CHAT` and `ADD_MESSAGES` socket events answer `{ status: false }` with that code.
-- Not guarded on purpose: KYC (`/user/kyc`). Fiat withdrawals require a verified KYC, so closing
+- Not guarded on purpose: KYC (`/user/kyc`). Withdrawals require a verified KYC (under the default
+  `withdrawal_requirements` policy), so closing
   KYC submission would strand a player's money; "not entitled" only hides the KYC screens.
 - `GET /api/v1/admin/entitlements` (`config:read`): `{ features, flags, template, version, fetchedAt,
   source: 'owner'|'cache'|'default' }` for the site admin. Never any secret.

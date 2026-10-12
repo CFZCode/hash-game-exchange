@@ -715,7 +715,32 @@ const REGION_RESTRICTION_POLICY = {
   ],
 };
 
-const FEATURES = Object.freeze([...POLICIES, REWARD_CURRENCY_POLICY, REGION_RESTRICTION_POLICY, ...GENERATED, TIPS, PUSH_NOTIFICATIONS, ANALYTICS]);
+/**
+ * Withdrawal requirements — what a player must have done before a withdrawal is accepted
+ * (services/user/src/modules/withdraw-requirements).
+ *
+ * A policy (always in force, the variant IS the rule, the owner alone sets it, staff see it
+ * read-only → `403 OWNER_MANAGED`). Here `none` is NOT "closed": it means nothing is required.
+ * The default `kyc` is the behaviour before this policy existed (KYC Verified on every rail).
+ * "Wagering complete" = no active bonus with unmet wagering AND the deposit rollover
+ * (`/user/wager/tasks`) complete. Enforced on fiat, crypto (HTTP + socket) and gateway payouts.
+ */
+const WITHDRAWAL_REQUIREMENTS_POLICY = {
+  key: 'withdrawal_requirements',
+  label: 'Withdrawal requirements',
+  category: 'business',
+  kind: 'policy',
+  flag: null,
+  defaultVariant: 'kyc',
+  variants: [
+    { key: 'none', label: 'No requirements', description: 'Neither KYC nor wagering is required to withdraw. An active bonus still has to be forfeited (the player confirms).' },
+    { key: 'kyc', label: 'KYC verified', description: 'The player\'s KYC must be Verified. Wagering is not checked. The default.' },
+    { key: 'wager', label: 'Wagering complete', description: 'Every open wagering requirement (deposit rollover and active bonuses) must be complete. KYC is not checked. Forfeiting a bonus clears its part.' },
+    { key: 'kyc_and_wager', label: 'KYC and wagering', description: 'KYC must be Verified and every open wagering requirement complete.' },
+  ],
+};
+
+const FEATURES = Object.freeze([...POLICIES, REWARD_CURRENCY_POLICY, REGION_RESTRICTION_POLICY, WITHDRAWAL_REQUIREMENTS_POLICY, ...GENERATED, TIPS, PUSH_NOTIFICATIONS, ANALYTICS]);
 
 /**
  * Site templates — the bundles the OWNER picks for a site (docs/OWNER-PANEL.md

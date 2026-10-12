@@ -143,6 +143,24 @@ const CATALOGUE: FeatureEntry[] = [
     ]
   },
   {
+    // Withdrawal requirements: a policy (always on, owner-only). `none` here means nothing is
+    // required, not "closed". Mirrors backend featureCatalogue.js; enforced by user-service
+    // modules/withdraw-requirements on every withdrawal rail.
+    key: 'withdrawal_requirements',
+    label: 'Withdrawal requirements',
+    category: 'business',
+    flag: null,
+    policy: true,
+    defaultVariant: 'kyc',
+    note: 'What a player must have done before a withdrawal is accepted. Wagering = the deposit rollover and every active bonus (forfeiting a bonus clears its part). Refusals: *_KYC_REQUIRED and 403 WITHDRAW_WAGER_REQUIRED.',
+    variants: [
+      { key: 'none', label: 'No requirements', description: 'Neither KYC nor wagering is required to withdraw. An active bonus still has to be forfeited (the player confirms).' },
+      { key: 'kyc', label: 'KYC verified', description: "The player's KYC must be Verified. Wagering is not checked. The default." },
+      { key: 'wager', label: 'Wagering complete', description: 'Every open wagering requirement (deposit rollover and active bonuses) must be complete. KYC is not checked. Forfeiting a bonus clears its part.' },
+      { key: 'kyc_and_wager', label: 'KYC and wagering', description: 'KYC must be Verified and every open wagering requirement complete.' }
+    ]
+  },
+  {
     key: 'vip',
     label: 'VIP club',
     category: 'engagement',

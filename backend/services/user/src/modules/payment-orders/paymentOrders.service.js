@@ -13,6 +13,7 @@ const { ccpaymentCoinId, ccpaymentTicker, formatEkqrDate } = require('./gateways
 const { WalletService } = require('../wallet/wallet.service');
 const { REASON } = require('../wallet/wallet.constants');
 const { PlayerBonusService } = require('../player-bonuses/playerBonus.service');
+const { createWithdrawRequirements } = require('../withdraw-requirements/withdrawRequirements');
 
 /**
  * Starting a payment — asking a provider to collect money from a player, or to
@@ -206,7 +207,11 @@ class PaymentOrdersService {
     }
 
     this.#assertWithinLimits(amount, currency, FLOW.PAY_OUT);
-    await this.#assertKycVerified(userId);
+    // KYC (PAYORDER_KYC_REQUIRED) and wagering (WITHDRAW_WAGER_REQUIRED), per the owner's policy.
+    await this.#requirements().assertMet(userId, {
+      forfeitBonus,
+      kycError: (status) => errors.KYC_REQUIRED({ status }),
+    });
 
     const paymentSystem = method || gateway.systemFor?.(currency, FLOW.PAY_OUT) || method;
 
@@ -459,6 +464,18 @@ class PaymentOrdersService {
   }
 
   /** A reference the provider will echo back. Unguessable on purpose. */
+  /**
+   * The owner's `withdrawal_requirements` (`../withdraw-requirements`), built on first use.
+   * KYC: a payout to an unverified identity is what AML rules exist to prevent; legacy checked
+   * nothing here. Also gated by `WITHDRAW_REQUIRE_KYC`, which defaults on.
+   */
+  #requirements() {
+    if (!this.withdrawRequirements) {
+      this.withdrawRequirements = this.deps.withdrawRequirements ?? createWithdrawRequirements({ ...this.deps, playerBonuses: this.#playerBonuses() });
+    }
+    return this.withdrawRequirements;
+  }
+
   /** The bonus balance (`../player-bonuses`), built on first use. */
   #playerBonuses() {
     if (!this.playerBonusService) {
@@ -483,26 +500,6 @@ class PaymentOrdersService {
     if (max && money.gt(amount, String(max))) throw errors.ABOVE_MAXIMUM({ maximum: String(max), currency });
   }
 
-  /**
-   * A payout to an unverified identity is what AML rules exist to prevent.
-   *
-   * Legacy checked nothing here. Controlled by `WITHDRAW_REQUIRE_KYC`, which
-   * defaults on — see the note in the service config.
-   */
-  async #assertKycVerified(userId) {
-    if (!this.config.WITHDRAW_REQUIRE_KYC) return;
-
-    const kyc = await this.models.UserKyc?.findOne({
-      // The column is VARCHAR, so a number comparison is a Postgres type error.
-      where: { user_id: String(userId) },
-      raw: true,
-    });
-
-    const status = String(kyc?.status ?? '').toLowerCase();
-    if (status !== 'approved' && status !== 'verified') {
-      throw errors.KYC_REQUIRED({ status: kyc?.status ?? 'none' });
-    }
-  }
 
   /**
    * Return a held balance.

@@ -57,7 +57,8 @@ const DEMO_POLICIES = {
   business_model: 'hybrid',
   deposit_mode: 'both',
   withdrawal_mode: 'both',
-  reward_currency: 'USDT'
+  reward_currency: 'USDT',
+  withdrawal_requirements: 'kyc'
 }
 
 const realVariants = f => f.variants.filter(v => v.key !== 'none').map(v => v.key)

@@ -13,6 +13,7 @@ const { BankAccountsService } = require('../bank-accounts/bankAccounts.service')
 const { notifyPlayer } = require('../notifications/notifyPlayer');
 const { withdrawalNotice } = require('../notifications/notices');
 const { PlayerBonusService } = require('../player-bonuses/playerBonus.service');
+const { createWithdrawRequirements } = require('../withdraw-requirements/withdrawRequirements');
 
 /** Thrown inside the request transaction to roll back a double submit's row. */
 class ReplayedRequest extends Error {}
@@ -52,7 +53,8 @@ class FiatWithdrawService {
     this.bankAccounts = new BankAccountsService(deps);
     this.playerBonuses = deps.playerBonuses ?? new PlayerBonusService({ ...deps, walletService: this.wallet });
     this.minimum = config.WITHDRAW_MINIMUM ?? '1';
-    this.requireKyc = config.WITHDRAW_REQUIRE_KYC !== false;
+    // The owner's `withdrawal_requirements` policy (KYC / wagering), with WITHDRAW_REQUIRE_KYC.
+    this.requirements = deps.withdrawRequirements ?? createWithdrawRequirements({ ...deps, playerBonuses: this.playerBonuses });
   }
 
   /**
@@ -76,7 +78,13 @@ class FiatWithdrawService {
        round trip instead of two, and it is also the cheaper read — a primary-key lookup against
        a scan of `user_kyc`. */
     await this.#assertNotCoolingDown(userId);
-    if (this.requireKyc) await this.#assertVerified(userId);
+    // KYC (FIAT_WITHDRAW_KYC_REQUIRED) and wagering (WITHDRAW_WAGER_REQUIRED), as the owner's
+    // policy says. A payout to an unverified identity is what AML rules exist to prevent, so the
+    // default policy is `kyc`; legacy performed no check at all.
+    await this.requirements.assertMet(userId, {
+      forfeitBonus,
+      kycError: (kycStatus) => errors.KYC_REQUIRED({ userId, kycStatus }),
+    });
 
     // A saved payout account: the details are read from the caller's own row
     // (another player's id answers BANK_ACCOUNTS_NOT_FOUND) and copied onto the
@@ -319,33 +327,12 @@ class FiatWithdrawService {
     return { ...this.#present(row), heldLedgerId: hold.id };
   }
 
-  /**
-   * A payout must go to a verified identity.
-   *
-   * This is a compliance control, not a product decision: paying out to an
-   * unverified account is what money-laundering rules exist to prevent, and
-   * legacy performed no check at all.
-   */
-  async #assertVerified(userId) {
-    const kyc = await this.models.UserKyc.findOne({
-      // user_kyc.user_id is VARCHAR(50) in the legacy schema, not an integer —
-      // comparing it against a number is a Postgres type error, not a miss.
-      where: { user_id: String(userId) },
-      order: [['id', 'DESC']],
-      attributes: ['status'],
-      raw: true,
-    });
-
-    if (kyc?.status !== 'Verified') {
-      throw errors.KYC_REQUIRED({ userId, kycStatus: kyc?.status ?? 'NotSubmitted' });
-    }
-  }
 
   /**
    * The 24-hour freeze after a password change — migration 040, written by
    * `AuthService.changePassword`.
    *
-   * NOT `requireKyc`-gated, unlike the check above it. That one is a
+   * NOT policy-gated, unlike the KYC check. That one is a
    * configurable compliance control; this one is the platform telling a player
    * something it then has to honour, and an operator switch over it would put
    * the dialog's promise back to being a lie on some deployments.

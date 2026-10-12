@@ -15,6 +15,7 @@ const { notifyPlayer } = require('../notifications/notifyPlayer');
 const { withdrawalNotice } = require('../notifications/notices');
 const { networksFor } = require('../crypto/crypto.networks');
 const { PlayerBonusService } = require('../player-bonuses/playerBonus.service');
+const { createWithdrawRequirements } = require('../withdraw-requirements/withdrawRequirements');
 
 /** Thrown inside the request transaction to roll back a double submit's row. */
 class ReplayedRequest extends Error {}
@@ -39,7 +40,8 @@ class CryptoWithdrawService {
     this.playerBonuses = deps.playerBonuses ?? new PlayerBonusService({ ...deps, walletService: this.wallet });
     // The fiat rail's policy, read from the same keys: one minimum, one KYC switch.
     this.minimum = config?.WITHDRAW_MINIMUM ?? '1';
-    this.requireKyc = config?.WITHDRAW_REQUIRE_KYC !== false;
+    // The owner's `withdrawal_requirements` policy (KYC / wagering), with WITHDRAW_REQUIRE_KYC.
+    this.requirements = deps.withdrawRequirements ?? createWithdrawRequirements({ ...deps, playerBonuses: this.playerBonuses });
   }
 
   // ══════════════════════════════════════════════════════════════════════
@@ -111,7 +113,11 @@ class CryptoWithdrawService {
 
     // Cooldown before KYC, as on the fiat rail: the temporary blocker first.
     await this.#assertMayWithdraw(userId);
-    if (this.requireKyc) await this.#assertVerified(userId);
+    // KYC (CRYPTO_WITHDRAW_KYC_REQUIRED) and wagering (WITHDRAW_WAGER_REQUIRED), per the policy.
+    await this.requirements.assertMet(userId, {
+      forfeitBonus,
+      kycError: (kycStatus) => errors.KYC_REQUIRED({ userId, kycStatus }),
+    });
 
     // Cash only; an unwagered bonus needs the player's confirmation (BONUS_FORFEIT_REQUIRED).
     await this.playerBonuses.beforeWithdrawal(userId, { forfeitBonus });
@@ -501,19 +507,6 @@ class CryptoWithdrawService {
     }
   }
 
-  /** The fiat rail's KYC check: the player's latest `user_kyc` row is Verified. */
-  async #assertVerified(userId) {
-    const kyc = await this.models.UserKyc.findOne({
-      // user_kyc.user_id is VARCHAR(50) in the legacy schema.
-      where: { user_id: String(userId) },
-      order: [['id', 'DESC']],
-      attributes: ['status'],
-      raw: true,
-    });
-    if (kyc?.status !== 'Verified') {
-      throw errors.KYC_REQUIRED({ userId, kycStatus: kyc?.status ?? 'NotSubmitted' });
-    }
-  }
 
   async #namesFor(ids) {
     if (!ids.length) return new Map();

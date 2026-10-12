@@ -461,6 +461,31 @@ class PlayerBonusService {
     });
   }
 
+  /**
+   * The player's active bonuses with their wagering still open, for the withdrawal
+   * requirements (`../withdraw-requirements`). Expires due ones first, as every read does.
+   * A bonus with nothing left to wager is not listed (it is released on the next stake).
+   */
+  async openWagering(userId) {
+    await this.expireDue({ userId });
+    const active = await this.models.PlayerBonus.findAll({
+      where: { user_id: userId, status: STATUS.ACTIVE },
+      order: [['granted_at', 'ASC'], ['id', 'ASC']],
+      raw: true,
+    });
+    return active
+      .map((b) => ({
+        id: String(b.id),
+        source: b.source,
+        currency: b.currency,
+        amount: D(b.amount),
+        requiredWager: D(b.required_wager),
+        wagered: D(b.wagered),
+        remaining: remainingOf(b),
+      }))
+      .filter((b) => money.gt(b.remaining, '0'));
+  }
+
   /** A staff forfeit of one bonus (the route writes the audit row). */
   async forfeit({ bonusId, staff, reason }) {
     const row = await this.models.PlayerBonus.findByPk(bonusId, { raw: true });

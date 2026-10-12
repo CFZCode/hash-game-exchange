@@ -37,6 +37,9 @@ const POLICY_DEFAULTS = Object.freeze({
   business_model: 'hybrid',
   deposit_mode: 'both',
   withdrawal_mode: 'both',
+  // Not a channel switch: which checks a withdrawal must pass (modules/withdraw-requirements).
+  // The default is the behaviour before the policy existed — KYC Verified, no wagering check.
+  withdrawal_requirements: 'kyc',
 });
 
 /** For each policy, which stored variants allow each channel. */
@@ -52,6 +55,12 @@ const ALLOWS = Object.freeze({
   withdrawal_mode: {
     manual: ['manual', 'both'],
     automatic: ['automatic', 'both'],
+  },
+  // "Channel" = a requirement: which stored variants REQUIRE it. Read with `allows`, never
+  // `assertAllowed` (a requirement in force is not a refusal of the withdrawal channel).
+  withdrawal_requirements: {
+    kyc: ['kyc', 'kyc_and_wager'],
+    wager: ['wager', 'kyc_and_wager'],
   },
 });
 
