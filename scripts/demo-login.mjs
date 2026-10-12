@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
- * Sign a demo player in through the gateway WITHOUT ever showing a password.
+ * Sign a demo player or demo staff account in through the gateway WITHOUT ever showing a password.
  *
  *   node scripts/demo-login.mjs <login>            prints {"login","accessToken"} as JSON
  *   node scripts/demo-login.mjs <login> --check    prints OK or FAIL only
- *   node scripts/demo-login.mjs --list             prints the demo player logins (no passwords)
+ *   node scripts/demo-login.mjs --list             prints every demo login and its kind (no passwords)
  *
  * Reads backend/.demo-credentials.local.md (gitignored) itself. Agents and scripts must use this
  * instead of opening that file: never cat, grep, head or sed it.
@@ -30,15 +30,25 @@ function rows() {
 const [arg, flag] = process.argv.slice(2);
 if (!arg) { console.error('usage: node scripts/demo-login.mjs <login> [--check] | --list'); process.exit(2); }
 if (arg === '--list') {
-  for (const r of rows()) if (r.kind && r.kind.toLowerCase().includes('player')) console.log(r.login);
+  for (const r of rows()) if (r.login) console.log(`${r.login}\t${r.kind}`);
   process.exit(0);
 }
 const row = rows().find((r) => r.login === arg);
 if (!row) { console.error(`no demo account ${arg}`); process.exit(2); }
-const res = await fetch(`${GATEWAY}/api/v1/user/auth/login`, {
+/* Staff rows sign in to the admin API by e-mail. The site admin keeps that token in the
+   `cfz_sa_token` cookie (SESSION_COOKIE_NAME), so a browser test can set it directly. */
+const staff = row.kind && !row.kind.toLowerCase().includes('player');
+const email = staff ? staffEmail(arg) : null;
+function staffEmail(login) {
+  const lines = fs.readFileSync(FILE, 'utf8').split('\n').filter((l) => l.startsWith('|'));
+  const head = lines[0].split('|').map((c) => c.trim());
+  const hit = lines.slice(2).map((l) => l.split('|').map((x) => x.trim().replace(/^`|`$/g, ''))).find((c) => c[head.indexOf('login')] === login);
+  return hit?.[head.indexOf('email')];
+}
+const res = await fetch(`${GATEWAY}/api/v1/${staff ? 'admin' : 'user'}/auth/login`, {
   method: 'POST',
   headers: { 'content-type': 'application/json' },
-  body: JSON.stringify({ identifier: row.login, password: row.password }),
+  body: JSON.stringify(staff ? { email, password: row.password } : { identifier: row.login, password: row.password }),
 });
 const body = await res.json().catch(() => ({}));
 const token = body?.data?.accessToken ?? body?.data?.tokens?.accessToken ?? body?.data?.token;
