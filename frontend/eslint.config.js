@@ -16,7 +16,7 @@ export default defineConfig([
   // meant to be linted from here, they want their own flat-config block scoped to their files
   // rather than this one. Same rule the note at the foot of CLAUDE.md states for the mirrors:
   // anything that walks the project needs the exclusions.
-  globalIgnores(['dist', 'bc.game', 'bc images', 'backend', 'backend copy']),
+  globalIgnores(['dist', '.next', 'bc.game', 'bc images', 'backend', 'backend copy']),
   {
     files: ['**/*.{js,jsx}'],
     extends: [
@@ -25,7 +25,8 @@ export default defineConfig([
       reactRefresh.configs.vite,
     ],
     languageOptions: {
-      globals: globals.browser,
+      // `process.env.NEXT_PUBLIC_*` is inlined by Next at build time.
+      globals: { ...globals.browser, process: 'readonly' },
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
   },
