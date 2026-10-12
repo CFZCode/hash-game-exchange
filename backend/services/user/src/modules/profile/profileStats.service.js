@@ -137,6 +137,11 @@ function buildProfileStats({ casino, sports, rates, asOf }) {
   };
   let firstBetAt = null;
   let lastBetAt = null;
+  /* Net result (payouts - stakes) over casino-service's rows, in USD; a currency
+     with no rate is left out, as everywhere here. Read by the profile medals
+     (Chicken Dinner). Sports-service reports stakes but not returns, so its
+     bets are not in it. */
+  let casinoNetUsd = 0n;
 
   const addCurrency = (code, amount, usd, bets) => {
     const entry = currencies.get(code) ?? { amount: 0n, usd: 0n, rated: true, bets: 0 };
@@ -152,6 +157,10 @@ function buildProfileStats({ casino, sports, rates, asOf }) {
   for (const row of casino?.byCurrency ?? []) {
     const usd = toUsd(row.wagered, row.currency, rates);
     addCurrency(row.currency, row.wagered, usd, row.bets);
+    if (row.won !== undefined) {
+      const wonUsd = toUsd(row.won, row.currency, rates);
+      if (usd !== null && wonUsd !== null) casinoNetUsd += wonUsd - usd;
+    }
     const section = sections[row.section === 'sports' ? 'sports' : 'casino'];
     section.bets += row.bets;
     section.wins += row.wins;
@@ -233,6 +242,9 @@ function buildProfileStats({ casino, sports, rates, asOf }) {
       .map((p) => ({ name: p.name, wageredUsd: dec(p.usd), bets: p.bets })),
     firstBetAt,
     lastBetAt,
+    casinoNetUsd: dec(casinoNetUsd),
+    /* Best in-house round's payout / stake, or null. */
+    maxMultiplier: casino?.maxMultiplier ?? null,
   };
 }
 

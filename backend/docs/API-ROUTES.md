@@ -601,9 +601,9 @@ attaches and the shape the handler answers with. Regenerate with
 
 | | |
 | --- | ---: |
-| Routes mounted | 764 |
-| Modules | 80 |
-| Answering outside the envelope | 60 |
+| Routes mounted | 769 |
+| Modules | 82 |
+| Answering outside the envelope | 61 |
 
 **Guard** is the audience the loader mounted the router under, plus anything
 the route adds. `public` carries no token. `player` and `staff` carry one.
@@ -625,7 +625,7 @@ listed per route: they are thrown from the service layer, so a module's whole
 error catalogue is reachable from every route in it, and the catalogues are at
 the end of this appendix.
 
-### admin-service — :4002 (213 routes)
+### admin-service — :4002 (216 routes)
 
 #### `access`
 
@@ -675,6 +675,14 @@ the end of this appendix.
 | `DELETE` | `/api/v1/admin/blogs/:id` | `staff` + `config:write` | `200` `service.remove(…)` |
 | `PATCH` | `/api/v1/admin/blogs/:id` | `staff` + `config:write` | `200` `service.update(…)` |
 | `DELETE` | `/api/v1/admin/blogs/slug/:slug` | `staff` + `config:write` | `200` `service.remove(…)` |
+
+#### `branding`
+
+| Method | Path | Guard | Response |
+|---|---|---|---|
+| `GET` | `/api/v1/admin/branding/asset/:file` | `public` | **raw** `Content-Type: image.contentType` · **raw** `res.end(…)` |
+| `GET` | `/api/v1/admin/branding/public` | `public` + rate-limited | `200` `store.view(…)` |
+| `GET` | `/api/v1/admin/branding` | `staff` + `config:read` | `200` `{ ...store.view(current.branding ?? null, , managedBy, source }` |
 
 #### `currencies`
 
@@ -894,7 +902,7 @@ the end of this appendix.
 | `GET` | `/api/v1/admin/staff/:staffId/whatsapp-ref` | `staff` + `staff:read` | `200` `service.whatsappRef(…)` |
 | `GET` | `/api/v1/admin/staff/analytics/:staffId` | `staff` + `staff:read` | `200` `service.analytics(…)` |
 | `POST` | `/api/v1/admin/staff/bulk-status` | `staff` + `staff:write` | `200` `service.bulkStatus(…)` |
-| `PATCH` | `/api/v1/admin/staff/password` | `staff` + `staff:read` | `200` `service.changePassword(…)` |
+| `PATCH` | `/api/v1/admin/staff/password` | `staff` | `200` `service.changePassword(…)` |
 | `GET` | `/api/v1/admin/staff/players` | `staff` + `staff:read` | `200` `[…]` + `meta.pagination` |
 | `GET` | `/api/v1/admin/staff/rollup/:staffId` | `staff` + `staff:read` | `200` `service.rollup(…)` |
 | `GET` | `/api/v1/admin/staff/transactions` | `staff` + `staff:read` | `200` `[…]` + `meta.pagination` |
@@ -1261,7 +1269,7 @@ the end of this appendix.
 | `GET` | `/internal/sports/wager/race-points` | `internal` | `200` `service.racePoints(…)` |
 | `GET` | `/internal/sports/wager/turnover/:userId` | `internal` | `200` `service.turnover(…)` |
 
-### user-service — :4001 (334 routes)
+### user-service — :4001 (336 routes)
 
 #### `affiliate`
 
@@ -1511,6 +1519,12 @@ the end of this appendix.
 | `GET` | `/api/v1/admin/user/kyc/documents/:kycId/:field` | `staff` + `wallet:read` | **raw** `Content-Type: contentType` · **raw** `res.send(…)` |
 | `PUT` | `/api/v1/admin/user/kyc/review` | `staff` + `users:write` | `200` `service.review(…)` |
 
+#### `medals`
+
+| Method | Path | Guard | Response |
+|---|---|---|---|
+| `GET` | `/api/v1/user/medals` | `player` | `200` `service.forPlayer(…)` |
+
 #### `notifications`
 
 | Method | Path | Guard | Response |
@@ -1596,6 +1610,7 @@ the end of this appendix.
 
 | Method | Path | Guard | Response |
 |---|---|---|---|
+| `GET` | `/api/v1/user/profile/:userId/medals` | `public` + rate-limited | `200` `medals.forPublic(…)` |
 | `GET` | `/api/v1/user/profile/:userId/public` | `public` + rate-limited | `200` `service.publicProfile(…)` |
 | `GET` | `/api/v1/user/profile/verify-referral/:referralCode` | `public` + rate-limited | `200` `service.verifyReferralCode(…)` |
 | `GET` | `/api/v1/user/profile` | `player` | `200` `service.get(…)` |
@@ -2269,6 +2284,12 @@ the service layer, so a code is reachable from any route in its module.
 | `400` | `MARKETING_BAD_RANGE` | `from` must be before `to` |
 | `400` | `MARKETING_RANGE_TOO_LARGE` |  |
 | `503` | `MARKETING_NO_EXCHANGE_RATES` | Exchange rates are unavailable, so deposit volume cannot be computed |
+
+#### `MEDALS` — user/medals (1)
+
+| Status | Code | Message |
+|---:|---|---|
+| `404` | `MEDALS_USER_NOT_FOUND` | Account not found |
 
 #### `NOTIFICATIONS` — admin/notifications (4)
 

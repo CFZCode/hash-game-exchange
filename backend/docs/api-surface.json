@@ -48,6 +48,18 @@
       "dir": "services/admin/src/modules/blogs"
     },
     {
+      "name": "branding",
+      "service": "admin",
+      "basePath": "/branding",
+      "audiences": [
+        "public",
+        "admin"
+      ],
+      "socketOnly": false,
+      "hasSockets": false,
+      "dir": "services/admin/src/modules/branding"
+    },
+    {
       "name": "currencies",
       "service": "admin",
       "basePath": "/currencies",
@@ -688,6 +700,17 @@
       "socketOnly": false,
       "hasSockets": false,
       "dir": "services/user/src/modules/kyc"
+    },
+    {
+      "name": "medals",
+      "service": "user",
+      "basePath": "/medals",
+      "audiences": [
+        "user"
+      ],
+      "socketOnly": false,
+      "hasSockets": false,
+      "dir": "services/user/src/modules/medals"
     },
     {
       "name": "notifications",
@@ -1814,6 +1837,101 @@
       "thrown": [],
       "resolved": true,
       "file": "services/admin/src/modules/blogs/routes/admin.routes.js"
+    },
+    {
+      "service": "admin",
+      "module": "branding",
+      "audience": "public",
+      "method": "GET",
+      "path": "/api/v1/admin/branding/asset/:file",
+      "routePath": "/asset/:file",
+      "handler": "asyncHandler",
+      "handlerSource": "public.routes.js",
+      "middleware": [
+        {
+          "type": "validate",
+          "value": ""
+        }
+      ],
+      "responses": [
+        {
+          "index": 159,
+          "kind": "header",
+          "status": null,
+          "shape": "Content-Type: image.contentType"
+        },
+        {
+          "index": 862,
+          "kind": "raw",
+          "status": 200,
+          "shape": "res.end(…)"
+        }
+      ],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/admin/src/modules/branding/routes/public.routes.js"
+    },
+    {
+      "service": "admin",
+      "module": "branding",
+      "audience": "public",
+      "method": "GET",
+      "path": "/api/v1/admin/branding/public",
+      "routePath": "/public",
+      "handler": "asyncHandler",
+      "handlerSource": "public.routes.js",
+      "middleware": [
+        {
+          "type": "rateLimit",
+          "value": "limiter"
+        },
+        {
+          "type": "validate",
+          "value": ""
+        }
+      ],
+      "responses": [
+        {
+          "index": 167,
+          "kind": "ok",
+          "status": 200,
+          "shape": "store.view(…)"
+        }
+      ],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/admin/src/modules/branding/routes/public.routes.js"
+    },
+    {
+      "service": "admin",
+      "module": "branding",
+      "audience": "admin",
+      "method": "GET",
+      "path": "/api/v1/admin/branding",
+      "routePath": "/",
+      "handler": "asyncHandler",
+      "handlerSource": "admin.routes.js",
+      "middleware": [
+        {
+          "type": "permission",
+          "value": "config:read"
+        },
+        {
+          "type": "validate",
+          "value": ""
+        }
+      ],
+      "responses": [
+        {
+          "index": 113,
+          "kind": "ok",
+          "status": 200,
+          "shape": "{ ...store.view(current.branding ?? null, , managedBy, source }"
+        }
+      ],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/admin/src/modules/branding/routes/admin.routes.js"
     },
     {
       "service": "admin",
@@ -6047,10 +6165,6 @@
       "handler": "changePassword",
       "handlerSource": "index.js",
       "middleware": [
-        {
-          "type": "permission",
-          "value": "staff:read"
-        },
         {
           "type": "validate",
           "value": "v.changePassword"
@@ -18044,6 +18158,28 @@
     },
     {
       "service": "user",
+      "module": "medals",
+      "audience": "user",
+      "method": "GET",
+      "path": "/api/v1/user/medals",
+      "routePath": "/",
+      "handler": "mine",
+      "handlerSource": "user.controller.js",
+      "middleware": [],
+      "responses": [
+        {
+          "index": 33,
+          "kind": "ok",
+          "status": 200,
+          "shape": "service.forPlayer(…)"
+        }
+      ],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/user/src/modules/medals/routes/user.routes.js"
+    },
+    {
+      "service": "user",
       "module": "notifications",
       "audience": "user",
       "method": "GET",
@@ -19544,6 +19680,37 @@
       "thrown": [],
       "resolved": true,
       "file": "services/user/src/modules/presence/routes/public.routes.js"
+    },
+    {
+      "service": "user",
+      "module": "profile",
+      "audience": "public",
+      "method": "GET",
+      "path": "/api/v1/user/profile/:userId/medals",
+      "routePath": "/:userId/medals",
+      "handler": "asyncHandler",
+      "handlerSource": "public.routes.js",
+      "middleware": [
+        {
+          "type": "rateLimit",
+          "value": "medalsLimiter"
+        },
+        {
+          "type": "validate",
+          "value": "medalsV.publicMedals"
+        }
+      ],
+      "responses": [
+        {
+          "index": 33,
+          "kind": "ok",
+          "status": 200,
+          "shape": "medals.forPublic(…)"
+        }
+      ],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/user/src/modules/profile/routes/public.routes.js"
     },
     {
       "service": "user",
@@ -25807,6 +25974,20 @@
       "file": "services/user/src/modules/kyc/kyc.errors.js",
       "service": "user",
       "module": "kyc"
+    },
+    {
+      "namespace": "MEDALS",
+      "codes": [
+        {
+          "key": "USER_NOT_FOUND",
+          "code": "MEDALS_USER_NOT_FOUND",
+          "status": 404,
+          "message": "Account not found"
+        }
+      ],
+      "file": "services/user/src/modules/medals/medals.errors.js",
+      "service": "user",
+      "module": "medals"
     },
     {
       "namespace": "P2P",

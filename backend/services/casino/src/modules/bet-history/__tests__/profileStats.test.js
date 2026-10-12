@@ -89,6 +89,10 @@ test('casino profile stats', async (t) => {
     assert.strictEqual(row('casino', 'INR').wagered, '340.00000000');
     assert.strictEqual(row('casino', 'INR').bets, 3);
     assert.strictEqual(row('casino', 'INR').wins, 2);
+    // Won: the in-house round's payout 150 (100 + 50) and the slot's 300.
+    assert.strictEqual(row('casino', 'INR').won, '450.00000000');
+    // Best in-house multiplier: 150 / 100.
+    assert.strictEqual(s.maxMultiplier, '1.5000');
     assert.strictEqual(row('casino', 'INR').firstAt, '2026-01-01T00:00:00.000Z');
     // The partner sportsbook is sports.
     assert.strictEqual(row('sports', 'INR').wagered, '60.00000000');
@@ -118,6 +122,7 @@ test('casino profile stats', async (t) => {
     const nobody = await casinoProfileStats(connection, UID + 50);
     assert.deepStrictEqual(nobody.byCurrency, []);
     assert.deepStrictEqual(nobody.games, []);
+    assert.strictEqual(nobody.maxMultiplier, null);
   } finally {
     await cleanup();
     await connection.close();

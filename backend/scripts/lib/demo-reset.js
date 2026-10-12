@@ -86,6 +86,7 @@ const USER_KEYED = [
   ['user_exposures', 'user_id'],
   ['user_transaction_stats', 'user_id'],
   ['user_favourite_games', 'user_id'],
+  ['user_medals', 'user_id'],
   ['tier_assignments', 'user_id'],
   ['club_memberships', 'user_id'],
   ['club_notification_status', 'user_id'],

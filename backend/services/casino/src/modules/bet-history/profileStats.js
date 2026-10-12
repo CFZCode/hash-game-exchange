@@ -82,6 +82,7 @@ const SQL = `
       SELECT COALESCE(json_agg(t), '[]'::json) FROM (
         SELECT section, currency,
                COALESCE(SUM(amount) FILTER (WHERE kind = 'stake'), 0)::text AS wagered,
+               COALESCE(SUM(amount) FILTER (WHERE kind = 'win'), 0)::text AS won,
                COUNT(*) FILTER (WHERE kind = 'stake') AS bets,
                COUNT(*) FILTER (WHERE kind = 'win') AS wins,
                MIN(at) FILTER (WHERE kind = 'stake') AS first_at,
@@ -101,7 +102,15 @@ const SQL = `
                ROW_NUMBER() OVER (PARTITION BY currency ORDER BY SUM(amount) DESC) AS rank
           FROM movements WHERE kind = 'stake' AND section = 'casino'
          GROUP BY game_key, currency
-      ) gm WHERE gm.rank <= :perCurrency)
+      ) gm WHERE gm.rank <= :perCurrency),
+    -- Best payout multiplier on one round. In-house rows only: a round there is
+    -- one row (stake + net profit), where an aggregator spin is a bet row and a
+    -- win row that nothing here pairs reliably. Read by the profile medals.
+    'maxMultiplier', (
+      SELECT ROUND(MAX((b.amount + b.profit) / b.amount), 4)::text
+        FROM bets b
+       WHERE b.uid = :userId AND b.amount > 0 AND b.profit > 0
+         AND (b.result IS NULL OR b.result::text <> '"refunded"'))
   ) AS stats`;
 
 /** How many games per currency come back. The caller ranks across currencies in USD. */
@@ -112,8 +121,14 @@ const dec = (v) => money.toDecimalString(money.toMinorQuantised(String(v ?? '0')
 const iso = (v) => (v ? new Date(v).toISOString() : null);
 
 /**
+ * `won` (per row) is the sum of payouts, so `won - wagered` is the net result
+ * in that currency. `maxMultiplier` is the best single in-house round's
+ * payout / stake, or null before a winning in-house round. Both were added for
+ * the profile medals (user-service `medals`), and are additive.
+ *
  * @returns {Promise<{
- *   byCurrency: Array<{section, currency, wagered, bets, wins, firstAt, lastAt}>,
+ *   byCurrency: Array<{section, currency, wagered, won, bets, wins, firstAt, lastAt}>,
+ *   maxMultiplier: string|null,
  *   biggestWins: Array<{currency, amount, game, at}>,
  *   games: Array<{key, currency, name, provider, wagered, bets}>
  * }>}
@@ -131,6 +146,7 @@ async function casinoProfileStats(db, userId) {
       section: t.section,
       currency: t.currency || 'UNKNOWN',
       wagered: dec(t.wagered),
+      won: dec(t.won),
       bets: Number(t.bets ?? 0),
       wins: Number(t.wins ?? 0),
       firstAt: iso(t.first_at),
@@ -142,6 +158,7 @@ async function casinoProfileStats(db, userId) {
       game: w.game ?? null,
       at: iso(w.at),
     })),
+    maxMultiplier: stats.maxMultiplier ?? null,
     games: (stats.games ?? []).map((g) => ({
       key: g.game_key,
       currency: g.currency || 'UNKNOWN',

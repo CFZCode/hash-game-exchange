@@ -126,3 +126,25 @@ test('profile stats: both sources down is a 503', async () => {
   const { service } = stubService({ casinoFails: true, sportsFails: true });
   await assert.rejects(service.forPlayer(10), (err) => err.statusCode === 503 || err.status === 503);
 });
+
+test('profile stats: casino net result and best multiplier (for the medals)', () => {
+  const casino = {
+    byCurrency: [
+      { section: 'casino', currency: 'INR', wagered: '10000', won: '4000', bets: 4, wins: 1, firstAt: null, lastAt: null },
+      { section: 'casino', currency: 'USDT', wagered: '10', won: '35', bets: 2, wins: 1, firstAt: null, lastAt: null },
+      // No rate: left out of the net, as it is left out of the wagered total.
+      { section: 'casino', currency: 'PKR', wagered: '1', won: '99999', bets: 1, wins: 1, firstAt: null, lastAt: null },
+    ],
+    biggestWins: [],
+    games: [],
+    maxMultiplier: '12.5000',
+  };
+  const s = buildProfileStats({ casino, sports: { byCurrency: [] }, rates: RATES, asOf: 'now' });
+  // INR: (4000 - 10000) * 0.012 = -72; USDT: +25.
+  assert.strictEqual(s.casinoNetUsd, '-47.00000000');
+  assert.strictEqual(s.maxMultiplier, '12.5000');
+
+  const none = buildProfileStats({ casino: null, sports: null, rates: RATES, asOf: 'now' });
+  assert.strictEqual(none.casinoNetUsd, '0.00000000');
+  assert.strictEqual(none.maxMultiplier, null);
+});
