@@ -89,6 +89,7 @@ test('game catalogue', async (t) => {
       has_lobby: attrs.has_lobby ?? false,
       has_freespins: attrs.has_freespins ?? false,
       technology: attrs.technology || 'html5',
+      image: attrs.image ?? null,
     });
     return uuid;
   };
@@ -191,6 +192,55 @@ test('game catalogue', async (t) => {
       unsorted.rows.map((g) => g.name),
       ['Delta curated', 'Alpha quiet', 'Bravo busy', 'Charlie single'],
       'no sort keeps the curated order, then name'
+    );
+  });
+
+  await t.test('the lobby order lists games with artwork first, by name, the same on every read', async () => {
+    const provider = `${TAG}-Artwork`;
+    const art = (n) => `https://cdn.example.com/${n}.png`;
+    // Two "Bravo" rows with art: equal names, so the uuid decides and a page edge never moves.
+    await seedGame({ uuid: `${TAG}-art-b2`, provider, name: 'Bravo', image: art('b2') });
+    await seedGame({ uuid: `${TAG}-art-b1`, provider, name: 'Bravo', image: art('b1') });
+    await seedGame({ uuid: `${TAG}-art-a0`, provider, name: 'Alpha bare' });
+    await seedGame({ uuid: `${TAG}-art-a1`, provider, name: 'Alpha empty', image: '' });
+    await seedGame({ uuid: `${TAG}-art-z1`, provider, name: 'Zulu', image: art('z1') });
+
+    const expected = [`${TAG}-art-b1`, `${TAG}-art-b2`, `${TAG}-art-z1`, `${TAG}-art-a0`, `${TAG}-art-a1`];
+    const all = await service.browse({ page: 1, limit: 10, provider });
+    assert.deepEqual(all.rows.map((g) => g.uuid), expected, 'art first (by name, then uuid), art-less after');
+    assert.equal(all.total, 5, 'an art-less game is still listed');
+
+    const paged = [];
+    for (let page = 1; page <= 3; page += 1) {
+      paged.push(...(await service.browse({ page, limit: 2, provider })).rows.map((g) => g.uuid));
+    }
+    assert.deepEqual(paged, expected, 'paging walks the same order, each game once');
+
+    const again = await service.browse({ page: 1, limit: 10, provider });
+    assert.deepEqual(again.rows.map((g) => g.uuid), expected, 'deterministic');
+
+    const az = await service.browse({ page: 1, limit: 10, provider, sort: 'az' });
+    assert.deepEqual(
+      az.rows.map((g) => g.name),
+      ['Alpha bare', 'Alpha empty', 'Bravo', 'Bravo', 'Zulu'],
+      'a chosen A–Z stays strictly alphabetical'
+    );
+
+    // A curated list keeps its order within each half.
+    await service.setCollection({
+      collection: 'hot',
+      uuids: [`${TAG}-art-a0`, `${TAG}-art-z1`, `${TAG}-art-a1`, `${TAG}-art-b2`],
+      actor: staff,
+    });
+    const hot = await service.collection({ collection: 'hot', page: 1, limit: 10 });
+    assert.deepEqual(hot.rows.map((g) => g.uuid), [`${TAG}-art-z1`, `${TAG}-art-b2`, `${TAG}-art-a0`, `${TAG}-art-a1`]);
+
+    // So does a vendor's priority block.
+    await service.setVendorPriority({ vendor: provider, uuids: [`${TAG}-art-a0`, `${TAG}-art-z1`], actor: staff });
+    const prioritized = await service.browse({ page: 1, limit: 10, provider });
+    assert.deepEqual(
+      prioritized.rows.map((g) => g.uuid),
+      [`${TAG}-art-z1`, `${TAG}-art-a0`, `${TAG}-art-b1`, `${TAG}-art-b2`, `${TAG}-art-a1`]
     );
   });
 

@@ -84,7 +84,7 @@ export function toCatalogGame(row) {
     players: 0,
     sections: [],
     tags: Array.isArray(row.tags) ? row.tags : [],
-    image: row.image || undefined,
+    image: row.image || (typeof row.images === 'string' ? row.images : Object.values(row.images || {}).map((i) => (typeof i === 'string' ? i : i?.url)).find(Boolean)) || undefined,
     uuid: row.uuid,
     source: 'aggregator',
   };

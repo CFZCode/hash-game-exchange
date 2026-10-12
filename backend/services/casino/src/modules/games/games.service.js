@@ -39,6 +39,10 @@ const SLUG_SQL = `${SLUG_PART_SQL('name')} || '-by-' || ${SLUG_PART_SQL('provide
 /** The suffix a colliding slug carries: the uuid's first eight letters and digits. */
 const SLUG_SUFFIX_SQL = `left(regexp_replace(lower("uuid"), '[^a-z0-9]', '', 'g'), 8)`;
 
+/** True for a row with no artwork: the lobby lists those after the rest (`#order`). */
+const NO_ART_SQL = `(coalesce("image", '') = '')`;
+const noArt = (row) => (row.image ? 0 : 1);
+
 /**
  * Two catalogue rows that would draw the same tile — same name, provider, type and art —
  * are one game listed twice by the provider (2j lists five such pairs). The lobby lists
@@ -291,7 +295,7 @@ class GamesService {
     });
 
     const rank = new Map(priorityIds.map((uuid, index) => [uuid, index]));
-    promoted.sort((a, b) => rank.get(a.uuid) - rank.get(b.uuid));
+    promoted.sort((a, b) => noArt(a) - noArt(b) || rank.get(a.uuid) - rank.get(b.uuid));
 
     const rows = promoted.slice(offset, offset + limit);
     if (rows.length === limit) return rows;
@@ -378,11 +382,22 @@ class GamesService {
     return where;
   }
 
-  /** `is_mobile` sorts, it does not filter. */
+  /**
+   * `is_mobile` sorts, it does not filter.
+   *
+   * The lobby's own order (no `sort`, or `popular`) puts the games with artwork first:
+   * 512 catalogue rows have no art a browser can draw, and a page of placeholder tiles
+   * above a page of pictures is the wrong way round. An art-less game is still listed, after the rest.
+   * A chosen A–Z / Z–A is the player's order and stays strictly alphabetical. `uuid`
+   * breaks ties between equal names so a page boundary never moves.
+   */
   #order(isMobile, sort) {
     const byName = ['name', sort === 'za' ? 'DESC' : 'ASC'];
-    if (isMobile === undefined) return [byName];
-    return [['is_mobile', isMobile ? 'DESC' : 'ASC'], byName];
+    const order = [];
+    if (isMobile !== undefined) order.push(['is_mobile', isMobile ? 'DESC' : 'ASC']);
+    if (sort !== 'az' && sort !== 'za') order.push([literal(NO_ART_SQL), 'ASC']);
+    order.push(byName, ['uuid', 'ASC']);
+    return order;
   }
 
   /**
@@ -455,8 +470,9 @@ class GamesService {
 
     // Curated ORDER is the point of a collection, so it is restored here rather
     // than left to whatever the database returns.
+    // Artwork first, curated order within each half (see `#order`).
     const rank = new Map(ids.map((uuid, index) => [uuid, index]));
-    games.sort((a, b) => rank.get(a.uuid) - rank.get(b.uuid));
+    games.sort((a, b) => noArt(a) - noArt(b) || rank.get(a.uuid) - rank.get(b.uuid));
 
     const offset = (page - 1) * limit;
     return { rows: await this.#withSlugs(games.slice(offset, offset + limit)), total: games.length };
