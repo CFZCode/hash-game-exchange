@@ -2,6 +2,8 @@ import React from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { useSession } from '../../../../context/session';
+import { useGates } from '../../../../context/gates';
+import { walletCoins } from '../../../../services/gates';
 import { getCurrency } from '../../../../data/currencies';
 import { printCurrency, getAlias, amount2usd } from '../../../../utils/currency';
 import { coinIcon } from '../../../../utils/coinArt';
@@ -392,6 +394,8 @@ function Footer({ settings, setSetting }) {
  * indicator measures onto its node. Unmounting is what the original does anyway. */
 function Panel({ onClose, onManageAssets }) {
   const { session, balances, setSetting, updateBalance } = useSession();
+  /* An agent's player picks from the agent currency only (services/gates.js `walletCoins`). */
+  const { agentPlayer } = useGates();
   const [search, setSearch] = React.useState('');
   const [focused, setFocused] = React.useState(false);
 
@@ -405,9 +409,9 @@ function Panel({ onClose, onManageAssets }) {
   const [shown, hidden] = React.useMemo(() => {
     const displayed = [];
     const rest = [];
-    balances.forEach((coin) => (coin.display ? displayed : rest).push(coin));
+    walletCoins(balances, agentPlayer).forEach((coin) => (coin.display ? displayed : rest).push(coin));
     return [displayed, rest];
-  }, [balances]);
+  }, [balances, agentPlayer]);
 
   /* `E = f() ? [...o, ["HIDE", a()]] : o`, where `f()` is `!isFiat && !!search`. THE HIDDEN
      COINS ONLY EXIST WHILE YOU ARE SEARCHING, under "Other Supported Coin(Click to add and use

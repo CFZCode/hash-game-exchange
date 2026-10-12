@@ -5,6 +5,7 @@ import EmptyPlaceholder from '../../shared/EmptyPlaceholder';
 import useResource from '../../../hooks/useResource';
 import { IconArrow } from '../../shared/icons';
 import { useSession } from '../../../context/session';
+import { useGates } from '../../../context/gates';
 import { printCurrency } from '../../../utils/currency';
 import { vipTier } from '../../../data/vipConfig';
 import { getUserProfile } from '../../../services/profile';
@@ -324,6 +325,9 @@ export default function Profile({ onClose, enter }) {
      reads "Beginner" — the same difference the Bonus page's level card documents. */
   const level = isMyself ? session.vipLevel : (profile?.level ?? 0);
   const tier = vipTier(level);
+  /* The VIP level pill is a promotion: gone where VIP is off — an agent's player, or every player
+     on a B2B site (services/gates.js). Always on with fixtures. */
+  const vipOn = useGates().on('vip');
 
   /* The dialog's shell is `DialogShell`'s and is mounted by the caller, so this returning nothing
      leaves a titled, closable card with an empty body — which is why the spinner goes here rather
@@ -348,9 +352,11 @@ export default function Profile({ onClose, enter }) {
         <div className="center relative h-16 w-16 cursor-pointer rounded-full border-2 border-solid border-layer4">
           <img className="absolute rounded-full sm:cursor-pointer" alt="avatar" src={avatarArt} />
         </div>
-        <LevelName level={level} className="z-10 -mt-2">
-          <span className="center h-full text-xs">{tier.fullName}</span>
-        </LevelName>
+        {vipOn && (
+          <LevelName level={level} className="z-10 -mt-2">
+            <span className="center h-full text-xs">{tier.fullName}</span>
+          </LevelName>
+        )}
         <div className="center mt-1 flex w-full">
           <p className="text-xl font-extrabold">{isMyself ? session.name : profile.name}</p>
         </div>

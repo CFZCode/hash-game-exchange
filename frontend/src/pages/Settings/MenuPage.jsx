@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { SETTINGS_MENU } from './menu';
+import { useGates } from '../../context/gates';
 import { useRedDot } from './strength';
 import Status from './Status';
 import { IconArrow } from './icons';
@@ -40,10 +41,11 @@ import { IconArrow } from './icons';
 export default function SettingsMenuPage() {
   const navigate = useNavigate();
   const [redDot] = useRedDot();
+  const { routeOn } = useGates();
 
   return (
     <div className="mt-4 rounded-lg bg-layer4 px-3 pb-1">
-      {SETTINGS_MENU.map((row) => (
+      {SETTINGS_MENU.filter((row) => routeOn(row.href)).map((row) => (
         <button
           key={row.key}
           type="button"

@@ -1,6 +1,7 @@
 import { Navigate, Outlet } from 'react-router-dom';
 import MenuPageLayout from '../../components/shared/MenuPageLayout';
 import { useSession } from '../../context/session';
+import { useGates } from '../../context/gates';
 import { useIsDesktop } from '../../hooks/useMediaQuery';
 import { SETTINGS_MENU } from './menu';
 import { useRedDot } from './strength';
@@ -57,6 +58,8 @@ export default function SettingsLayout() {
   const { session } = useSession();
   const isDesktop = useIsDesktop();
   const [redDot] = useRedDot();
+  /* A pane whose section is off (Personal Verification: KYC off, or an agent's player) is not listed. */
+  const { routeOn } = useGates();
 
   /* `guards: [ce]`. `App.jsx` raises the sign-in dialog over the page you came from, which is what
      the original's `"/login/signin?redirect=…"` does; this catches a sign-out performed while the
@@ -68,7 +71,7 @@ export default function SettingsLayout() {
   return (
     <MenuPageLayout
       title="Global Settings"
-      menu={SETTINGS_MENU.map((row) => ({
+      menu={SETTINGS_MENU.filter((row) => routeOn(row.href)).map((row) => ({
         key: row.key,
         href: row.href,
         title: (

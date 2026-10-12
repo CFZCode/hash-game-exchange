@@ -57,7 +57,9 @@ export const GATES = {
   // `sports` is the site admin's kill switch.
   sports: { flag: 'sports' },
   notifications: { feature: 'notifications' },
-  kyc: { feature: 'kyc' },
+  // KYC: the owner's feature, and never for an agent's player — the agent vouches for them
+  // (addaplay's `useAgentUser` rule: their personal-verification section is hidden).
+  kyc: { feature: 'kyc', notAgentPlayer: true },
   // BC Originals = the platform's in-house games (js_games vendor `in-house`). The owner's
   // "Originals (in-house)" flag, masked onto site-config/public by the backend, which also refuses
   // the in-house list and launch (casino gameEntitlement.js).
@@ -90,6 +92,7 @@ export const ROUTES = [
   ['/sports', 'sports'],
   ['/notification', 'notifications'],
   ['/settings/verify', 'kyc'],
+  ['/settings/verification', 'kyc'],
   // The sidebar's BC Originals entry and the casino page's Originals tag page.
   ['/casino/brand', 'originals'],
   ['/gamelist/brand', 'originals'],
@@ -104,6 +107,12 @@ export function gateOf(href) {
   const path = String(href ?? '').split(/[?#]/)[0];
   return ROUTES.find(([p]) => path === p || path.startsWith(`${p}/`))?.[1] ?? null;
 }
+
+/* The promotion sections. On a B2B site (`business_model: b2b`, agents only) every one of them is
+   off for EVERYONE — guests, direct players and agent players alike — and the backend refuses them
+   the same way (PROMOTIONS_DISABLED_B2B). hybrid and b2c keep the per-player rule (the
+   `promotions` capability). */
+const PROMO_GATES = new Set(['bonus', 'vip', 'affiliate', 'promotions', 'contest', 'raffle', 'quests', 'rewards']);
 
 /* The owner's policies when the site never chose one — the backend's own `POLICY_DEFAULTS`
    (packages/common/src/sitePolicy.js). */
@@ -133,6 +142,10 @@ export function makeGates({ flags, features, capabilities, ready = true } = {}) 
 
   const can = (cap) => capabilities?.[cap] !== false;
   const policy = (key) => byKey.get(key)?.variant ?? POLICY_DEFAULTS[key];
+  /* A player in an agent's tree. `/me` has no flag of its own for it, but `vault` and `deposit`
+     are switched off for nobody else (backend agentPlayers.js; b2b only takes `promotions`, a
+     withdraw lock only `withdraw`), so both off together is that player. */
+  const agentPlayer = capabilities?.vault === false && capabilities?.deposit === false;
   const blocked = (gate) => {
     const g = GATES[gate];
     if (!g) return null;
@@ -140,6 +153,8 @@ export function makeGates({ flags, features, capabilities, ready = true } = {}) 
     if (g.feature && list && !byKey.has(g.feature)) return 'site';
     if (g.rail && !railOpen(policy(g.rail[0]), g.rail[1])) return 'site';
     if (g.policy && !g.policy[1].includes(policy(g.policy[0]))) return 'site';
+    if (PROMO_GATES.has(gate) && policy('business_model') === 'b2b') return 'site';
+    if (g.notAgentPlayer && agentPlayer) return 'account';
     if (g.capability && !can(g.capability)) return 'account';
     return null;
   };
@@ -156,12 +171,25 @@ export function makeGates({ flags, features, capabilities, ready = true } = {}) 
       return !gate || on(gate);
     },
     policy,
+    /** The signed-in player belongs to an agent's tree (restricted UI: INR wallet, no KYC, no promotions). */
+    agentPlayer,
     /** Public self-registration: off on a B2B (agent-only) site. */
     canSignUp: () => policy('business_model') !== 'b2b',
   };
 }
 
 export const ALL_ON = makeGates();
+
+/* The agent tree's float currency (backend FLOAT_CURRENCY_ONLY: agent-tree money moves in INR). */
+const isAgentCoin = (coin) => coin?.currencyName === 'INRFIAT' || coin?.currencyName === 'INR' || coin?.aliasCurrencyName === 'INR';
+
+/** The wallet rows a player may pick: an agent's player sees only the agent currency (INR), as on
+ *  addaplay; everyone else, and a wallet with no INR row, gets the list unchanged. */
+export function walletCoins(balances, agentPlayer) {
+  if (!agentPlayer) return balances;
+  const inr = balances.filter(isAgentCoin);
+  return inr.length ? inr : balances;
+}
 
 /* The last public read, shared with the services that must not even ASK for a switched-off
    section (services/originals.js): one read per page load, refreshed whenever the provider

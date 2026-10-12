@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSession } from '../../../context/session';
 import { useGates } from '../../../context/gates';
+import { walletCoins } from '../../../services/gates';
 import { amount2usd, printCurrency } from '../../../utils/currency';
 import SelectCurrencyContent from './CurrencyList';
 import LocalAmountItem from '../../../components/shared/LocalAmountItem';
@@ -106,15 +107,15 @@ function HideZeroBalance({ on, onToggle }) {
 function CurrencyList() {
   const { session, balances, updateBalance, setSetting } = useSession();
   const navigate = useNavigate();
-  const { on } = useGates();
+  const { on, agentPlayer } = useGates();
   const [searching, setSearching] = React.useState(false);
 
   /* `X(Q(h, "sort"), U)` — `partition(orderBy(wallet, "sort"), c => c.display)`. The wallet holds
      a row for every currency the site supports; `display` is what the account has switched on.
      `L()` (the hidden half) is `[]` when the deploy is `isFiat`, which bc.game's is not. */
   const ordered = React.useMemo(
-    () => [...balances].sort((a, b) => a.sort - b.sort),
-    [balances],
+    () => [...walletCoins(balances, agentPlayer)].sort((a, b) => a.sort - b.sort),
+    [balances, agentPlayer],
   );
   const shown = React.useMemo(() => ordered.filter((coin) => coin.display), [ordered]);
   const hidden = React.useMemo(() => ordered.filter((coin) => !coin.display), [ordered]);
