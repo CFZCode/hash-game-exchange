@@ -254,11 +254,20 @@ async function send(url, path, { json, headers, ...init }) {
   return { res, body };
 }
 
+/* A 401 FROM AN AUTH ROUTE IS AN ANSWER, NOT AN EXPIRED TOKEN. Wrong password on login, a bad
+   2FA code, a spent reset link: each answers 401 about the CREDENTIALS IN THE BODY, and none of
+   them is helped by presenting a refresh token. Worse, a leftover pair in localStorage from an
+   earlier session would get rotated (or revoked as a replay) by a sign-in that merely failed,
+   and `notifyAuthExpired` would then sign out a tab that was never signed in by this attempt.
+   `refresh` is in the set for the obvious reason: refreshing a failed refresh is a loop. */
+export const NO_REFRESH_PATH =
+  /^\/api\/v1\/user\/(?:auth\/(?:login|register|refresh|forgot-password|reset-password)|2fa\/(?:verify|enable|setup-verify|disable))\/?$/;
+
 /* The 401 arm, shared by both readers. Answered ONCE: `retried` is what stops it being a loop,
    since a second 401 after a successful refresh means the new token is not the problem and the
    session really is over. */
 async function handle(res, body, path, retried, replay) {
-  if (res.status === 401 && !retried) {
+  if (res.status === 401 && !retried && !NO_REFRESH_PATH.test(path)) {
     const ok = await refreshSession();
     if (ok) return { replay: replay() };
     /* The refresh failed, so nothing this tab holds will authenticate again. Told to the
