@@ -1,8 +1,8 @@
 'use strict';
 
 const { Router } = require('express');
-const { validate, createActivityRecorder, noBody } = require('@ibitplay/common');
-const { PERMISSIONS } = require('@ibitplay/auth');
+const { validate, createActivityRecorder, noBody, UnauthorizedError } = require('@ibitplay/common');
+const { PERMISSIONS, markAuthorization } = require('@ibitplay/auth');
 
 const v = require('../staff.validators');
 const { StaffService } = require('../staff.service');
@@ -35,6 +35,20 @@ module.exports = function adminRoutes(deps) {
   const canRead = auth.requirePermission(PERMISSIONS.STAFF_READ);
   const canWrite = auth.requirePermission(PERMISSIONS.STAFF_WRITE);
   const audit = (action, describe) => withActivity({ action, describe });
+
+  /**
+   * `PATCH /password`: your OWN password needs only a staff session; resetting
+   * somebody else's needs `staff:write` (the service then checks authority over
+   * the target). This was `staff:read`, which an agent (level 6) does not hold —
+   * so a new agent, created with `must_change_password`, could never replace
+   * its temporary password and was locked out of the panel for good.
+   */
+  const canChangePassword = markAuthorization(function canChangePasswordMiddleware(req, res, next) {
+    if (!req.staff) return next(new UnauthorizedError('Staff authentication required'));
+    const targetId = req.body?.targetId;
+    const self = targetId === undefined || targetId === null || Number(targetId) === Number(req.staff.id);
+    return self ? next() : canWrite(req, res, next);
+  });
 
   // ── Literal paths first ─────────────────────────────────────────────
   router.get('/', canRead, validate(v.listStaff), ctrl.list);
@@ -78,7 +92,7 @@ module.exports = function adminRoutes(deps) {
 
   router.patch(
     '/password',
-    canRead,
+    canChangePassword,
     validate(v.changePassword),
     audit('staff.password.change', (req) => ({
       targetType: 'STAFF',
