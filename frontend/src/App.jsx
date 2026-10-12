@@ -61,6 +61,7 @@ import DailyContestDialog from './pages/DailyContest/Dialog';
 import PageDialog from './components/shared/PageDialog';
 import NotificationDialog from './components/Notification/Dialog';
 import Auth from './components/modals/Auth';
+import AgentPage from './pages/Agent';
 import FreePlay from './components/modals/FreePlay';
 import Profile from './components/modals/Profile';
 import ProfileMedals from './components/modals/Profile/Medals';
@@ -667,6 +668,10 @@ function AppShell() {
           {/* A provider's games, the Providers grid's own link. Live only: with fixtures on the path
               falls through to the catch-all exactly as before. */}
           {!USE_FIXTURES && <Route path="/provider/:name" element={<ProviderPage />} />}
+          {/* The agent entry (services/gates.js `agent`): open on a b2b or hybrid site, and
+              RouteGate sends it to `/` on b2c. Live only, like the provider page: with fixtures on
+              the path falls through to the catch-all exactly as before. */}
+          {!USE_FIXTURES && <Route path="/agent" element={<AgentPage />} />}
           <Route
             path="/favorite"
             element={collectionDialog || collectionNeedsAuth ? null : <Favorites />}

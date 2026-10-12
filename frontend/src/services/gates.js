@@ -62,6 +62,9 @@ export const GATES = {
   // "Originals (in-house)" flag, masked onto site-config/public by the backend, which also refuses
   // the in-house list and launch (casino gameEntitlement.js).
   originals: { flag: 'originals' },
+  // The agent entry (`/agent`, pages/Agent): only where the owner's business model has agents.
+  // `policy`: [policy key, the variants that leave it open] — sitePolicy.js `business_model`.
+  agent: { policy: ['business_model', ['b2b', 'hybrid']] },
 };
 
 /** Path prefix → gate, most specific first. History routes (transaction, rollover, bet history,
@@ -93,6 +96,7 @@ export const ROUTES = [
   ['/section/originals', 'originals'],
   ['/tagname/BC%20Originals', 'originals'],
   ['/tagname/BC Originals', 'originals'],
+  ['/agent', 'agent'],
 ];
 
 /** The section an href belongs to, if any (`/wallet/swap?x=1` → swap). */
@@ -113,6 +117,9 @@ const railOpen = (mode, channel) => mode === 'both' || mode === channel;
    shows whatever the server itself answered instead. */
 export const SIGNUP_CLOSED_MESSAGE = 'Sign-up is by invitation on this site. Ask your agent for an account.';
 
+/** The site admin's agent portal (its `/agent` sign-in), on the admin's own origin. */
+export const AGENT_PORTAL_URL = process.env.NEXT_PUBLIC_AGENT_PORTAL_URL || 'http://localhost:3080/agent';
+
 /**
  * The gate functions for one set of reads. `flags`/`features`/`capabilities` may each be
  * undefined (not answered, failed, signed out): what it would switch reads as on.
@@ -132,6 +139,7 @@ export function makeGates({ flags, features, capabilities, ready = true } = {}) 
     if (g.flag && flagMap?.[g.flag] === false) return 'site';
     if (g.feature && list && !byKey.has(g.feature)) return 'site';
     if (g.rail && !railOpen(policy(g.rail[0]), g.rail[1])) return 'site';
+    if (g.policy && !g.policy[1].includes(policy(g.policy[0]))) return 'site';
     if (g.capability && !can(g.capability)) return 'account';
     return null;
   };

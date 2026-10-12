@@ -49,6 +49,19 @@ skipped, never killed. The frontend is started with `next dev -p 5190` once its 
 
 None of these files is committed. Rotate every generated secret with `node scripts/make-env.mjs --rotate`.
 
+## Agent portal (b2b / hybrid)
+
+When the owner's `business_model` has agents (b2b or hybrid), both sides open an `/agent` entry:
+
+- player site `http://localhost:5190/agent`: an Agent page whose "Agent login" button goes to the site
+  admin's portal, `NEXT_PUBLIC_AGENT_PORTAL_URL` in `frontend/.env*` (default `http://localhost:3080/agent`).
+  On b2c it goes to `/` like any switched-off section (services/gates.js `agent`); with fixtures on it is not routed.
+- site admin `http://localhost:3080/agent`: the staff sign-in labelled "Agent portal". An agent-tree login
+  (levels 4–6) lands on `/agent-home`, its tree-scoped users list with quick actions; staff above that land
+  on `/dashboard`. On b2c it says "Agent portal is not available on this site". `/login` is unchanged.
+
+Both read the business model from `GET /api/v1/admin/features/public`.
+
 ## Before handover
 
 - [ ] `RATE_LIMIT_ENABLED=true` in the delivered `backend/.env` (the `make-env.mjs` default; a dev stack
