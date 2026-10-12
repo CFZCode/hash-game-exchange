@@ -190,7 +190,7 @@ The game page is in the federated `games` remote (rung 3 of the recovery ladder)
 
 ### What still needs keys
 
-`JSGAMES_V2_API_KEY` / `JSGAMES_V2_API_SECRET` for every catalogue game (the base URL is set); `JSGAMES_V1_AGENCY_UID` and a 32-byte `JSGAMES_V1_AES_KEY` for the in-house games, which this site also has switched off with the owner's `originals` flag (403 `NOT_ENTITLED`). Then `./run.sh restart casino`. For real money to settle, the provider also needs `JSGAMES_CALLBACK_URL` = `<public origin>/api/v1/casino/js-games/v2/bet-callback` reachable from the internet.
+Catalogue games are live since 2026-10-12 (v2 key, secret and `gamesv2.ibitplay.com` set; 101 Candies and the Evolution lobby framed at 1440 and 390, no bets placed). Still needed: `JSGAMES_V1_AGENCY_UID` and a 32-byte `JSGAMES_V1_AES_KEY` for the in-house games, which this site also has switched off with the owner's `originals` flag (403 `NOT_ENTITLED`). Then `./run.sh restart casino`. For real money to settle, the provider also needs `JSGAMES_CALLBACK_URL` = `<public origin>/api/v1/casino/js-games/v2/bet-callback` reachable from the internet.
 
 ### The sidebar's Favorites row (checked 2026-10-12, no change needed)
 
