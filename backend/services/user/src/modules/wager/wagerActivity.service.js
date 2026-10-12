@@ -385,8 +385,9 @@ class WagerActivityService {
       this.logger?.warn({ err: error, userId: String(userId), source, ref }, 'Bonus wagering progress failed — stake still counted');
     }
 
+    let syncedRate = null;
     try {
-      await this.vip.onWager({ userId, previousWager: previous, newWager: next });
+      syncedRate = (await this.vip.onWager({ userId, previousWager: previous, newWager: next }))?.rate ?? null;
     } catch (error) {
       this.logger?.warn({ err: error, userId: String(userId) }, 'VIP on-wager failed — stake still counted');
     }
@@ -397,7 +398,11 @@ class WagerActivityService {
       this.logger?.warn({ err: error, userId: String(userId) }, 'Affiliate on-wager failed — stake still counted');
     }
 
-    if (rakeback) {
+    /* `onWager` has just synced `users.rakeback` to the card this total is on. A rate of 0 is
+       the Unranked card, which earns no rakeback — `accrue` would read that 0 as "not synced
+       yet" and pay the Bronze default instead, so an Unranked stake out-earned a Wood one. */
+    const unrankedRate = syncedRate != null && !money.gt(String(syncedRate), '0');
+    if (rakeback && !unrankedRate) {
       try {
         await this.rakeback.accrue({ userId, stakeUsd: usd, source, ref: key });
       } catch (error) {
