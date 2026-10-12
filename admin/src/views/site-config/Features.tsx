@@ -251,6 +251,14 @@ const Features = () => {
                             {cur.region.countries.length ? cur.region.countries.join(', ') : 'no countries'}
                           </span>
                         )}
+                        {cur.withdrawalCap && (
+                          <span className='text-muted-foreground block text-xs' data-withdrawal-cap>
+                            Deposit cap:{' '}
+                            {cur.withdrawalCap.enabled
+                              ? `${cur.withdrawalCap.depositMultiplier}× deposits${cur.withdrawalCap.wagerBonus ? ` + wagering up to ${cur.withdrawalCap.wagerMultiplier}×` : ''}, per currency`
+                              : 'off'}
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <span className='flex items-center gap-2'>

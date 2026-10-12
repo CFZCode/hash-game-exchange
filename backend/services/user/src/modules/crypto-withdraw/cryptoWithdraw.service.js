@@ -113,10 +113,13 @@ class CryptoWithdrawService {
 
     // Cooldown before KYC, as on the fiat rail: the temporary blocker first.
     await this.#assertMayWithdraw(userId);
-    // KYC (CRYPTO_WITHDRAW_KYC_REQUIRED) and wagering (WITHDRAW_WAGER_REQUIRED), per the policy.
-    await this.requirements.assertMet(userId, {
+    // KYC (CRYPTO_WITHDRAW_KYC_REQUIRED), wagering (WITHDRAW_WAGER_REQUIRED) and the deposit
+    // cap (WITHDRAW_CAP_EXCEEDED), per the policy.
+    const applied = await this.requirements.assertMet(userId, {
       forfeitBonus,
       kycError: (kycStatus) => errors.KYC_REQUIRED({ userId, kycStatus }),
+      amount: decimal,
+      currency,
     });
 
     // Cash only; an unwagered bonus needs the player's confirmation (BONUS_FORFEIT_REQUIRED).
@@ -141,6 +144,9 @@ class CryptoWithdrawService {
           replacements: { key: idempotencyKey },
           transaction,
         });
+
+        // The deposit cap again, under a per-player lock: two requests at once cannot both fit.
+        await this.requirements.assertCapInTransaction(userId, { amount: decimal, currency, transaction, applied });
 
         // Confirmed: forfeit the active bonuses first (bonuses → wallet lock order).
         await this.playerBonuses.beforeWithdrawal(userId, { forfeitBonus, transaction });

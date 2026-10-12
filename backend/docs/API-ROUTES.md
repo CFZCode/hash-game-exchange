@@ -601,8 +601,8 @@ attaches and the shape the handler answers with. Regenerate with
 
 | | |
 | --- | ---: |
-| Routes mounted | 769 |
-| Modules | 82 |
+| Routes mounted | 770 |
+| Modules | 83 |
 | Answering outside the envelope | 61 |
 
 **Guard** is the audience the loader mounted the router under, plus anything
@@ -906,7 +906,7 @@ the end of this appendix.
 | `GET` | `/api/v1/admin/staff/players` | `staff` + `staff:read` | `200` `[…]` + `meta.pagination` |
 | `GET` | `/api/v1/admin/staff/rollup/:staffId` | `staff` + `staff:read` | `200` `service.rollup(…)` |
 | `GET` | `/api/v1/admin/staff/transactions` | `staff` + `staff:read` | `200` `[…]` + `meta.pagination` |
-| `POST` | `/api/v1/admin/staff/transfer` | `staff` + `wallet:adjust` | `201` `service.transfer(…)` |
+| `POST` | `/api/v1/admin/staff/transfer` | `staff` + `wallet:adjust | wallet:credit | wallet:debit` | `201` `service.transfer(…)` |
 | `GET` | `/api/v1/admin/staff/transfers` | `staff` + `staff:read` | `200` `[…]` + `meta.pagination` |
 | `GET` | `/api/v1/admin/staff/transfers/:staffId` | `staff` + `staff:read` | `200` `[…]` + `meta.pagination` |
 | `GET` | `/api/v1/admin/staff/transfers/summary` | `staff` + `staff:read` | `200` `service.transferSummary(…)` |
@@ -1269,7 +1269,7 @@ the end of this appendix.
 | `GET` | `/internal/sports/wager/race-points` | `internal` | `200` `service.racePoints(…)` |
 | `GET` | `/internal/sports/wager/turnover/:userId` | `internal` | `200` `service.turnover(…)` |
 
-### user-service — :4001 (336 routes)
+### user-service — :4001 (337 routes)
 
 #### `affiliate`
 
@@ -1791,6 +1791,12 @@ the end of this appendix.
 | `GET` | `/internal/user/wallet/reconcile/:userId` | `internal` | `200` `req.query.currency ? await service.reconcile(…` |
 | `POST` | `/internal/user/wallet/rollback` | `internal` | `200` `service.rollback(…)` |
 | `POST` | `/internal/user/wallet/transfer` | `internal` | `200` `service.transfer(…)` |
+
+#### `withdraw-requirements`
+
+| Method | Path | Guard | Response |
+|---|---|---|---|
+| `GET` | `/api/v1/user/withdrawals/requirements` | `player` | `200` `requirements.evaluate(…)` |
 
 #### `withdrawal-whitelist`
 

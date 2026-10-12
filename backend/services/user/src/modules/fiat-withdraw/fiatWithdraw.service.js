@@ -63,7 +63,9 @@ class FiatWithdrawService {
    * @legacy POST /createFiatWithdrawal
    */
   async create({ userId, details: input }) {
-    const { forfeitBonus = false, ...details } = input ?? {};
+    const { forfeitBonus = false, ...requested } = input ?? {};
+    // Reassigned below when the payout account is a saved one (`bankAccountId`).
+    let details = requested;
     await sitePolicy.assertAllowed(this.models, 'withdrawal_mode', 'manual', this.logger);
     // The operator's withdrawal block (migration 091) — WITHDRAW_BLOCKED before anything else.
     await withdrawBlock.assertWithdrawAllowed(this.models, { userId });
@@ -78,12 +80,14 @@ class FiatWithdrawService {
        round trip instead of two, and it is also the cheaper read — a primary-key lookup against
        a scan of `user_kyc`. */
     await this.#assertNotCoolingDown(userId);
-    // KYC (FIAT_WITHDRAW_KYC_REQUIRED) and wagering (WITHDRAW_WAGER_REQUIRED), as the owner's
-    // policy says. A payout to an unverified identity is what AML rules exist to prevent, so the
-    // default policy is `kyc`; legacy performed no check at all.
-    await this.requirements.assertMet(userId, {
+    // KYC (FIAT_WITHDRAW_KYC_REQUIRED), wagering (WITHDRAW_WAGER_REQUIRED) and the deposit cap
+    // (WITHDRAW_CAP_EXCEEDED), as the owner's policy says. A payout to an unverified identity is
+    // what AML rules exist to prevent, so the default policy is `kyc`; legacy checked nothing.
+    const applied = await this.requirements.assertMet(userId, {
       forfeitBonus,
       kycError: (kycStatus) => errors.KYC_REQUIRED({ userId, kycStatus }),
+      amount: details.amount,
+      currency: details.currency,
     });
 
     // A saved payout account: the details are read from the caller's own row
@@ -130,6 +134,11 @@ class FiatWithdrawService {
         await this.db.sequelize.query('SELECT pg_advisory_xact_lock(hashtext(:key))', {
           replacements: { key: idempotencyKey },
           transaction,
+        });
+
+        // The deposit cap again, under a per-player lock: two requests at once cannot both fit.
+        await this.requirements.assertCapInTransaction(userId, {
+          amount: details.amount, currency: details.currency, transaction, applied,
         });
 
         // Confirmed: the active bonuses are forfeited in this transaction, before the debit (lock

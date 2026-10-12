@@ -31,6 +31,15 @@ import { useApi, useApiMutation } from '@/hooks/use-api'
 import { api, ApiError } from '@/lib/api/client'
 import { buildDraft, isOwnerPick, type Draft } from '@/lib/entitlements/draft'
 import { COUNTRY_CODES, LIST_TYPES, parseCountries, REGION_FEATURE, regionProblem, type RegionListType, type RegionSetting } from '@/lib/entitlements/region'
+import {
+  DEFAULT_WITHDRAWAL_CAP,
+  isMultiplier,
+  MAX_MULTIPLIER,
+  switchesOf,
+  variantOfSwitches,
+  WITHDRAWAL_REQUIREMENTS,
+  type WithdrawalCap
+} from '@/lib/entitlements/withdrawalCap'
 import { diffDocs, type Change, type EditableDoc, type EntitlementsDoc, type ToggleChange } from '@/lib/entitlements/types'
 import { cn } from '@/lib/utils'
 import ChangeList from './ChangeList'
@@ -200,6 +209,130 @@ const RegionEditor = ({ value, onChange, changed }: { value: RegionSetting; onCh
   )
 }
 
+/** A multiplier typed by the owner: a positive number, at most 2 decimals, at most MAX_MULTIPLIER. */
+const MultiplierInput = ({ value, onChange, label, disabled }: { value: number; onChange: (n: number) => void; label: string; disabled?: boolean }) => {
+  const [text, setText] = useState<string | null>(null)
+  const shown = text ?? String(value)
+  const parsed = /^\d+(\.\d{1,2})?$/.test(shown.trim()) ? Number(shown.trim()) : NaN
+  const bad = !isMultiplier(parsed)
+
+  return (
+    <span className='inline-flex flex-col gap-0.5'>
+      <span className='inline-flex items-center gap-1'>
+        <Input
+          value={shown}
+          inputMode='decimal'
+          disabled={disabled}
+          aria-label={label}
+          aria-invalid={bad}
+          className='h-7 w-20'
+          onChange={e => {
+            setText(e.target.value)
+            const t = e.target.value.trim()
+            const n = /^\d+(\.\d{1,2})?$/.test(t) ? Number(t) : NaN
+
+            if (isMultiplier(n)) onChange(n)
+          }}
+          onBlur={() => !bad && setText(null)}
+        />
+        <span className='text-muted-foreground text-xs'>×</span>
+      </span>
+      {bad && !disabled && (
+        <span className='text-destructive text-xs' data-warning='withdrawal-cap-multiplier'>
+          Above 0, at most {MAX_MULTIPLIER}, 2 decimals
+        </span>
+      )}
+    </span>
+  )
+}
+
+/** One requirement switch with its label and what it means. */
+const RequirementSwitch = ({ label, description, checked, onChecked, name }: { label: string; description: string; checked: boolean; onChecked: (v: boolean) => void; name: string }) => (
+  <label className='flex items-start gap-3' data-requirement={name}>
+    <Switch size='sm' checked={checked} onCheckedChange={onChecked} aria-label={label} />
+    <span className='min-w-0'>
+      <span className='block text-xs font-medium'>{label}</span>
+      <span className='text-muted-foreground block text-xs'>{description}</span>
+    </span>
+  </label>
+)
+
+/**
+ * Withdrawal requirements as switches, any combination: KYC and wagering are the policy's variant
+ * (none / kyc / wager / kyc_and_wager), the deposit cap is the document's `withdrawalCap`.
+ */
+const WithdrawalRequirementsEditor = ({
+  variant,
+  cap,
+  onVariant,
+  onCap,
+  changedVariant,
+  changedCap
+}: {
+  variant: string
+  cap: WithdrawalCap
+  onVariant: (v: string) => void
+  onCap: (c: WithdrawalCap) => void
+  changedVariant: boolean
+  changedCap: boolean
+}) => {
+  const sw = switchesOf(variant)
+
+  return (
+    <div className='mt-2 flex flex-col gap-2 border-l pl-3' data-withdrawal-requirements>
+      <div className={cn('flex flex-col gap-2', changedVariant && 'bg-primary/5 -mx-1 rounded px-1')}>
+        <RequirementSwitch
+          name='kyc'
+          label='KYC required'
+          description="The player's KYC must be Verified."
+          checked={sw.kyc}
+          onChecked={v => onVariant(variantOfSwitches({ ...sw, kyc: v }))}
+        />
+        <RequirementSwitch
+          name='wager'
+          label='Wagering complete required'
+          description='The deposit rollover and every active bonus must be wagered (forfeiting a bonus clears its part).'
+          checked={sw.wager}
+          onChecked={v => onVariant(variantOfSwitches({ ...sw, wager: v }))}
+        />
+      </div>
+      <div className={cn('flex flex-col gap-2', changedCap && 'bg-primary/5 -mx-1 rounded px-1')} data-withdrawal-cap>
+        <RequirementSwitch
+          name='cap'
+          label='Deposit cap'
+          description='Per currency, a player can withdraw at most their deposits × the multiplier (+ what wagering unlocks), minus what they have already withdrawn (pending included).'
+          checked={cap.enabled}
+          onChecked={v => onCap({ ...cap, enabled: v })}
+        />
+        {cap.enabled && (
+          <div className='ml-12 flex flex-col gap-2'>
+            <div className='flex flex-wrap items-center gap-2'>
+              <span className='text-xs font-medium'>Deposit multiplier</span>
+              <MultiplierInput label='Deposit multiplier' value={cap.depositMultiplier} onChange={n => onCap({ ...cap, depositMultiplier: n })} />
+            </div>
+            <label className='flex items-center gap-2'>
+              <Switch size='sm' checked={cap.wagerBonus} onCheckedChange={v => onCap({ ...cap, wagerBonus: v })} aria-label='Wager bonus' />
+              <span className='text-xs font-medium'>Wager bonus</span>
+              <span className='text-muted-foreground text-xs'>adds the amount wagered, up to</span>
+              <MultiplierInput
+                label='Wager bonus multiplier'
+                value={cap.wagerMultiplier}
+                disabled={!cap.wagerBonus}
+                onChange={n => onCap({ ...cap, wagerMultiplier: n })}
+              />
+              <span className='text-muted-foreground text-xs'>deposits</span>
+            </label>
+            <p className='text-muted-foreground text-xs'>
+              Example: 1,000 deposited, 1,000 wagered → cap {(1000 * cap.depositMultiplier + (cap.wagerBonus ? Math.min(1000, 1000 * cap.wagerMultiplier) : 0)).toLocaleString('en-US')}.
+              Refused over it: 403 WITHDRAW_CAP_EXCEEDED.
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 const TemplateCard = ({ template, selected, saved, onSelect }: { template: TemplateEntry; selected: boolean; saved: boolean; onSelect: () => void }) => (
   <button
     type='button'
@@ -255,7 +388,8 @@ const Entitlements = () => {
         flags: { ...prev?.flags },
         variants: { ...prev?.variants },
         options: Object.fromEntries(Object.entries(prev?.options ?? {}).map(([f, v]) => [f, { ...v }])),
-        ...(prev?.region ? { region: { ...prev.region, countries: [...prev.region.countries] } } : {})
+        ...(prev?.region ? { region: { ...prev.region, countries: [...prev.region.countries] } } : {}),
+        ...(prev?.withdrawalCap ? { withdrawalCap: { ...prev.withdrawalCap } } : {})
       }
 
       fn(next)
@@ -312,7 +446,8 @@ const Entitlements = () => {
         flags: draft!.flags,
         variants: draft!.variants,
         options: draft!.options,
-        region: draft!.region
+        region: draft!.region,
+        withdrawalCap: draft!.withdrawalCap
       }),
     invalidate: [['api']],
     success: r =>
@@ -449,7 +584,7 @@ const Entitlements = () => {
                                 data-row={r.key}
                                 className={cn(
                                   'flex flex-col gap-2 py-2.5 first:pt-0 last:pb-0 sm:flex-row sm:items-start sm:justify-between sm:gap-4',
-                                  (changed.has(rowKey) || changed.has(`variant:${r.key}`)) && 'bg-primary/5 -mx-2 rounded px-2'
+                                  (changed.has(rowKey) || changed.has(`variant:${r.key}`) || (r.key === WITHDRAWAL_REQUIREMENTS && changed.has('withdrawal_cap:withdrawalCap'))) && 'bg-primary/5 -mx-2 rounded px-2'
                                 )}
                               >
                                 <div className='min-w-0'>
@@ -494,6 +629,16 @@ const Entitlements = () => {
                                       onChange={region => edit(next => void (next.region = region))}
                                     />
                                   )}
+                                  {r.key === WITHDRAWAL_REQUIREMENTS && variant && (
+                                    <WithdrawalRequirementsEditor
+                                      variant={variant}
+                                      cap={draft.withdrawalCap ?? DEFAULT_WITHDRAWAL_CAP}
+                                      changedVariant={changed.has(rowKey)}
+                                      changedCap={changed.has('withdrawal_cap:withdrawalCap')}
+                                      onVariant={v => setVariant(r, v)}
+                                      onCap={withdrawalCap => edit(next => void (next.withdrawalCap = withdrawalCap))}
+                                    />
+                                  )}
                                   {r.key === 'reward_currency' && variant && coinBlocked(variant) && (
                                     <p className='text-destructive mt-0.5 text-xs' data-warning='reward-currency-coin-off'>
                                       {variant} is not entitled under Site flags, so players cannot see that balance. Allow the coin or pick another reward currency.
@@ -501,7 +646,7 @@ const Entitlements = () => {
                                   )}
                                 </div>
                                 <div className='flex shrink-0 items-center gap-3'>
-                                  {r.kind === 'policy' && variant && (
+                                  {r.kind === 'policy' && variant && r.key !== WITHDRAWAL_REQUIREMENTS && (
                                     <VariantSelect feature={r.key} value={variant} label={r.label} onChange={v => setVariant(r, v)} />
                                   )}
                                   {status === 'toggle' && <Badge variant='outline' className='font-normal'>{UI_LABEL}</Badge>}

@@ -964,6 +964,17 @@
       "dir": "services/user/src/modules/wallet"
     },
     {
+      "name": "withdraw-requirements",
+      "service": "user",
+      "basePath": "/withdrawals/requirements",
+      "audiences": [
+        "user"
+      ],
+      "socketOnly": false,
+      "hasSockets": false,
+      "dir": "services/user/src/modules/withdraw-requirements"
+    },
+    {
       "name": "withdrawal-whitelist",
       "service": "user",
       "basePath": "/withdrawals/whitelist",
@@ -6287,7 +6298,7 @@
       "middleware": [
         {
           "type": "permission",
-          "value": "wallet:adjust"
+          "value": "wallet:adjust | wallet:credit | wallet:debit"
         },
         {
           "type": "validate",
@@ -23002,6 +23013,33 @@
       "thrown": [],
       "resolved": true,
       "file": "services/user/src/modules/wallet/routes/internal.routes.js"
+    },
+    {
+      "service": "user",
+      "module": "withdraw-requirements",
+      "audience": "user",
+      "method": "GET",
+      "path": "/api/v1/user/withdrawals/requirements",
+      "routePath": "/",
+      "handler": "asyncHandler",
+      "handlerSource": "user.routes.js",
+      "middleware": [
+        {
+          "type": "validate",
+          "value": "v.read"
+        }
+      ],
+      "responses": [
+        {
+          "index": 92,
+          "kind": "ok",
+          "status": 200,
+          "shape": "requirements.evaluate(…)"
+        }
+      ],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/user/src/modules/withdraw-requirements/routes/user.routes.js"
     },
     {
       "service": "user",

@@ -207,10 +207,13 @@ class PaymentOrdersService {
     }
 
     this.#assertWithinLimits(amount, currency, FLOW.PAY_OUT);
-    // KYC (PAYORDER_KYC_REQUIRED) and wagering (WITHDRAW_WAGER_REQUIRED), per the owner's policy.
-    await this.#requirements().assertMet(userId, {
+    // KYC (PAYORDER_KYC_REQUIRED), wagering (WITHDRAW_WAGER_REQUIRED) and the deposit cap
+    // (WITHDRAW_CAP_EXCEEDED), per the owner's policy.
+    const applied = await this.#requirements().assertMet(userId, {
       forfeitBonus,
       kycError: (status) => errors.KYC_REQUIRED({ status }),
+      amount,
+      currency,
     });
 
     const paymentSystem = method || gateway.systemFor?.(currency, FLOW.PAY_OUT) || method;
@@ -229,21 +232,30 @@ class PaymentOrdersService {
     const idempotencyKey = `payout:${providerName}:${reference}`;
 
     // ── 2. Hold the balance ───────────────────────────────────────────
+    // One transaction: the deposit cap re-checked under a per-player lock, the hold, and the
+    // pending row the cap counts — so two payouts at once cannot both fit under the cap.
     let movement;
     try {
-      movement = await this.wallet.debit(
-        {
-          userId,
-          currency,
-          amount,
-          reason: REASON.WITHDRAWAL,
-          idempotencyKey,
-          refType: `PAYOUT_${providerName.toUpperCase()}`,
-          refId: reference,
-          description: `${providerName} withdrawal ${reference}`,
-        },
-        { sourceService: 'user-service' }
-      );
+      movement = await this.db.transaction(async (transaction) => {
+        await this.#requirements().assertCapInTransaction(userId, { amount, currency, transaction, applied });
+        const held = await this.wallet.debit(
+          {
+            userId,
+            currency,
+            amount,
+            reason: REASON.WITHDRAWAL,
+            idempotencyKey,
+            refType: `PAYOUT_${providerName.toUpperCase()}`,
+            refId: reference,
+            description: `${providerName} withdrawal ${reference}`,
+          },
+          { sourceService: 'user-service', transaction }
+        );
+        await this.#recordPendingWithdrawal(providerName, {
+          reference, userId, currency, amount, paymentSystem, details: validation.value,
+        }, { transaction });
+        return held;
+      });
     } catch (error) {
       if (error?.code === 'WALLET_INSUFFICIENT_FUNDS') {
         throw errors.INSUFFICIENT_BALANCE({ currency, amount });
@@ -258,10 +270,6 @@ class PaymentOrdersService {
         this.logger?.error({ err: error, userId: String(userId), reference }, 'Withdrawal held but the active bonus was not forfeited');
       }
     }
-
-    await this.#recordPendingWithdrawal(providerName, {
-      reference, userId, currency, amount, paymentSystem, details: validation.value,
-    });
 
     // ── 3. Ask the gateway to pay ─────────────────────────────────────
     let result;
@@ -610,14 +618,14 @@ class PaymentOrdersService {
     });
   }
 
-  async #recordPendingWithdrawal(providerName, { reference, userId, currency, amount, paymentSystem, details }) {
+  async #recordPendingWithdrawal(providerName, { reference, userId, currency, amount, paymentSystem, details }, { transaction } = {}) {
     if (providerName === 'apay') {
       await this.models.Apaywithdrawals.create({
         // VARCHAR on this table, BIGINT on apaydeposits. Same integration.
         order_id: reference, user_id: userIdFor('Apaywithdrawals', userId), amount, currency,
         payment_system: paymentSystem, custom_transaction_id: reference,
         status: 'Pending', payout_details: details,
-      });
+      }, { transaction });
       return;
     }
     await this.models.PayOutTransactions.create({
@@ -626,7 +634,7 @@ class PaymentOrdersService {
       account: details.account_number ?? null,
       account_name: details.account_name ?? null,
       ifsc_code: details.bank_code ?? null,
-    });
+    }, { transaction });
   }
 
   /**

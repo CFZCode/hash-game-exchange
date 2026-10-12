@@ -65,6 +65,8 @@ const entitlements = require('./entitlements');
 const featureOptions = require('./featureOptions');
 /** Region restriction: the owner's mode, list type and countries (regionPolicy.js). */
 const regionPolicy = require('./regionPolicy');
+/** Withdrawal cap: the owner's deposit-cap switch of `withdrawal_requirements` (withdrawalCap.js). */
+const withdrawalCap = require('./withdrawalCap');
 const currencyRegistry = require('./currencyRegistry');
 /** What the operator set in the site admin, read by the services that act on it. */
 const { operatorSettings } = require('./operatorSettings');
@@ -116,6 +118,7 @@ module.exports = {
   entitlements,
   featureOptions,
   regionPolicy,
+  withdrawalCap,
   configureEntitlements: entitlements.configureEntitlements,
   currencyRegistry,
   configureCurrencyRegistry: currencyRegistry.configureCurrencyRegistry,

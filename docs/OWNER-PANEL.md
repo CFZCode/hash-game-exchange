@@ -92,6 +92,31 @@ every feature's VARIANT and ON/OFF) is managed only here.** The site admin shows
   deposit, bonus, forfeitable }`; only bonus wagering open → the existing `409 BONUS_FORFEIT_REQUIRED`.
   KYC also needs `WITHDRAW_REQUIRE_KYC` on (backend env, default on). Players read it at
   `GET /api/v1/user/withdrawals/requirements`.
+  **The owner screen shows it as three switches, any combination:** KYC required, Wagering complete
+  required (together = the variant above, so `none/kyc/wager/kyc_and_wager` are exactly the four
+  combinations and older documents and backends keep working), and **Deposit cap** = the document's
+  `withdrawalCap` block (next item).
+- `withdrawalCap` (optional): `{ enabled, depositMultiplier, wagerBonus, wagerMultiplier }`, default
+  `{ false, 3, true, 5 }` (missing = off). Multipliers: a number > 0, ≤ 100, at most 2 decimals (the
+  save answers `422 VALIDATION_ERROR` otherwise; the backend reads a bad value as its default). Audit
+  change kind `withdrawal_cap`. Rule, per currency and in that currency (never converted: the cap limits
+  money out of one wallet, so a rate move must not change it and a coin with no USD rate still has a
+  cap; this differs on purpose from the wagering requirement, which is in USD):
+  `cap = deposited × depositMultiplier + min(wagered, deposited × wagerMultiplier)` (second term only
+  with `wagerBonus`), `remaining = max(cap − withdrawn, 0)`. Deposited = credited deposits on every
+  rail (fiat, A-Pay, CricPay, UPI, WayPay pay-in, CCPayment) + staff/agent funding to the player
+  (`staff_transfers`, INR). Withdrawn = pending and paid on every rail (fiat, crypto, A-Pay, payout
+  orders) + agent collections; rejected / failed-and-refunded excluded. Wagered = in-house bets, GIS
+  (net of refunds/rollbacks), seamless, js-games v1/v2, x-casino, aggregators, and settled sports
+  bets at `LEAST(stake, liability)` (void/refund excluded). Code: `packages/common/src/withdrawalCap.js`,
+  user-service `modules/withdraw-requirements/withdrawCap.js`. Enforced on fiat, crypto (service +
+  socket) and payment-order payouts, after KYC and wagering and before the bonus forfeit, and again
+  inside the rail's transaction under a per-player lock (two requests at once cannot both fit):
+  `403 WITHDRAW_CAP_EXCEEDED` `{ cap, withdrawn, remaining, deposited, wagered, unlockedByWager,
+  wagerToRaise, currency }` with the message "You can withdraw up to X more (3× your total deposits + Y
+  unlocked by wagering). Wager Z more or deposit to raise your limit."; fails closed with
+  `503 WITHDRAW_CAP_CHECK_FAILED` when a figure cannot be read. The requirements read takes
+  `?currency=` (strict) and adds `cap`. Site admin: shown read-only under the policy.
 - `region` (optional): `{ listType: 'blocklist'|'allowlist', countries: [ISO alpha-2] }`, the region
   restriction's list; its mode is the `region_restriction` policy (`none` = Off, `notice`, `block`).
   Missing = an empty blocklist. See `docs/region-restriction.md`.

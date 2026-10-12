@@ -128,7 +128,8 @@ function register({ on, deps }) {
         ) {
           return refuse(error);
         }
-        if (error.code === 'WITHDRAW_WAGER_REQUIRED') return refuseWithDetails(error);
+        // Wagering left, or over the deposit cap (its figures), or the cap could not be checked.
+        if (['WITHDRAW_WAGER_REQUIRED', 'WITHDRAW_CAP_EXCEEDED', 'WITHDRAW_CAP_CHECK_FAILED'].includes(error.code)) return refuseWithDetails(error);
         throw error;
       }
     },

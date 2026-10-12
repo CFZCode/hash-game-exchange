@@ -6,6 +6,7 @@ import { nudgeBackend } from '@/lib/entitlements/nudge'
 import { readForEdit, saveEntitlements } from '@/lib/entitlements/store'
 import type { CoinDefinition } from '@/lib/entitlements/types'
 import type { RegionSetting } from '@/lib/entitlements/region'
+import type { WithdrawalCap } from '@/lib/entitlements/withdrawalCap'
 import type { Branding } from '@/lib/entitlements/branding'
 import { handler, HttpError, ok } from '@/lib/owner/guard'
 
@@ -70,6 +71,7 @@ export const PUT = handler(async (req: NextRequest) => {
     coins?: unknown
     options?: unknown
     region?: unknown
+    withdrawalCap?: unknown
     branding?: unknown
   } | null
 
@@ -95,6 +97,9 @@ export const PUT = handler(async (req: NextRequest) => {
 
       // Region restriction's list type + countries; validated in the store (bad code → 422).
       region: body.region === undefined ? undefined : (body.region as RegionSetting),
+
+      // Withdrawal requirements' deposit cap; validated strictly in the store (bad multiplier → 422).
+      withdrawalCap: body.withdrawalCap === undefined ? undefined : (body.withdrawalCap as WithdrawalCap),
 
       // Site name, metadata and logo files; validated strictly in the store (bad field → 422).
       branding: body.branding === undefined ? undefined : (body.branding as Partial<Branding>)

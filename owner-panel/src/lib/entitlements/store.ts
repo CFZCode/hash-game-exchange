@@ -13,6 +13,7 @@ import { brandingProblem, BRANDING_SLOTS, cleanBranding, type Branding } from '.
 import { assetExists } from './brandingAssets'
 import { cleanCoin, coinProblem, diffCoins, droppedCoins } from './coins'
 import { cleanRegion, regionProblem, type RegionSetting } from './region'
+import { cleanWithdrawalCap, withdrawalCapProblem, type WithdrawalCap } from './withdrawalCap'
 import { diffDocs, type AuditEntry, type Change, type CoinDefinition, type EditableDoc, type EntitlementsDoc, type VariantsSeed } from './types'
 
 /**
@@ -147,6 +148,9 @@ export async function readEntitlements(): Promise<EntitlementsDoc> {
     // Region restriction's list type + countries; absent = an empty blocklist (nobody restricted).
     ...(stored.region !== undefined ? { region: cleanRegion(stored.region) } : {}),
 
+    // Withdrawal requirements' deposit cap; absent = off (KYC / wagering are the policy's variant).
+    ...(stored.withdrawalCap !== undefined ? { withdrawalCap: cleanWithdrawalCap(stored.withdrawalCap) } : {}),
+
     // Site name, metadata and logo files (./branding); absent = not branded, the site keeps its own.
     ...(stored.branding !== undefined ? { branding: cleanBranding(stored.branding) } : {})
   }
@@ -197,9 +201,10 @@ export async function readForEdit(): Promise<EditableDoc> {
 
   const options = resolveOptions(doc.options)
   const region = cleanRegion(doc.region)
+  const withdrawalCap = cleanWithdrawalCap(doc.withdrawalCap)
   const branding = cleanBranding(doc.branding)
 
-  if (FEATURE_KEYS.every(key => key in stored)) return { ...doc, variants: { ...stored }, options, region, branding, seededFrom: null }
+  if (FEATURE_KEYS.every(key => key in stored)) return { ...doc, variants: { ...stored }, options, region, withdrawalCap, branding, seededFrom: null }
 
   const live = await liveVariants()
   const template = templateByKey(doc.template)
@@ -223,7 +228,7 @@ export async function readForEdit(): Promise<EditableDoc> {
     }
   }
 
-  return { ...doc, features: normalise(features, variants), variants, options, region, branding, seededFrom }
+  return { ...doc, features: normalise(features, variants), variants, options, region, withdrawalCap, branding, seededFrom }
 }
 
 // One save at a time inside this process; the version check guards against a stale screen.
@@ -239,6 +244,7 @@ export function saveEntitlements(
     coins?: CoinDefinition[]
     options?: Record<string, Record<string, boolean>>
     region?: RegionSetting
+    withdrawalCap?: WithdrawalCap
     branding?: Partial<Branding>
   },
   user: string
@@ -288,6 +294,15 @@ export function saveEntitlements(
 
     const region = input.region !== undefined ? cleanRegion(input.region) : current.region
 
+    // Withdrawal requirements' deposit cap: two switches and two multipliers (> 0, ≤ 100, 2 dp), exact.
+    if (input.withdrawalCap !== undefined) {
+      const problem = withdrawalCapProblem(input.withdrawalCap)
+
+      if (problem) throw new HttpError(422, 'VALIDATION_ERROR', problem)
+    }
+
+    const withdrawalCap = input.withdrawalCap !== undefined ? cleanWithdrawalCap(input.withdrawalCap) : current.withdrawalCap
+
     // Branding: strict (unknown field, bad text, bad colour → 422), and every image it names
     // must be one uploaded here — the document is what vouches for the bytes the site fetches.
     let branding = current.branding
@@ -316,6 +331,7 @@ export function saveEntitlements(
       variants: pinned.variants,
       options,
       region,
+      withdrawalCap,
       branding
     }
 

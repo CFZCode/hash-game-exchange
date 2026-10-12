@@ -1,10 +1,11 @@
 'use strict';
 
-const { money, sitePolicy, defineErrors } = require('@ibitplay/common');
+const { money, sitePolicy, defineErrors, entitlements, withdrawalCap } = require('@ibitplay/common');
 
 const { WagerService } = require('../wager/wager.service');
 const { PlayerBonusService } = require('../player-bonuses/playerBonus.service');
 const { createRewardMoney } = require('../../lib/rewardMoney');
+const { createCapFigures } = require('./withdrawCap');
 
 /**
  * Withdrawal requirements — the owner's `withdrawal_requirements` policy, checked in ONE place.
@@ -37,6 +38,20 @@ const { createRewardMoney } = require('../../lib/rewardMoney');
  * That keeps the confirm-and-forfeit flow exactly as it was. `remaining` in the refusal counts
  * the bonus part too unless the request already forfeits it.
  *
+ * ── THE DEPOSIT CAP (the third switch, `withdrawalCap` in the owner's document) ──────────
+ *
+ * Per currency, in that currency (packages/common/src/withdrawalCap.js, figures in
+ * ./withdrawCap.js): cap = deposited × multiplier + min(wagered, deposited × wager multiplier),
+ * remaining = cap − withdrawn (pending and paid). A withdrawal over `remaining` → 403
+ * WITHDRAW_CAP_EXCEEDED `{ cap, withdrawn, remaining, deposited, wagered, unlockedByWager,
+ * wagerToRaise, currency }`. Checked after KYC and wagering (so a bonus is never forfeited for
+ * a withdrawal that is refused anyway), and again inside the rail's transaction under a
+ * per-player lock (`assertCapInTransaction`), so two requests at once cannot both fit under it.
+ * FAILS CLOSED: a figure that cannot be read, or a rail that does not name amount and
+ * currency, refuses with 503 WITHDRAW_CAP_CHECK_FAILED.
+ *
+ * Any combination of the three switches; each refusal is its own code.
+ *
  * Agent-tree players never reach here: every rail refuses them first (WITHDRAW_NOT_FOR_AGENT_USERS).
  * ═════════════════════════════════════════════════════════════════════════
  */
@@ -51,6 +66,52 @@ const errors = defineErrors('WITHDRAW', {
     status: 403,
     message: 'Complete your wagering requirement before withdrawing',
   },
+  /**
+   * Over the deposit cap. Details `{ cap, withdrawn, remaining, deposited, wagered,
+   * unlockedByWager, wagerToRaise, currency }` (decimal strings); the message names the figures.
+   */
+  CAP_EXCEEDED: {
+    status: 403,
+    message: 'This withdrawal is over your withdrawal limit',
+  },
+  /** The cap could not be checked (a figure unreadable, or no amount / currency): refused. */
+  CAP_CHECK_FAILED: {
+    status: 503,
+    message: 'Unable to process withdrawal right now. Please try again later.',
+  },
+});
+
+/** "1,234.5" — at most 8 places, grouped, trailing zeros dropped. */
+function fmt(value) {
+  const [whole, fraction = ''] = String(value).split('.');
+  const neg = whole.startsWith('-');
+  const digits = (neg ? whole.slice(1) : whole).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  const frac = fraction.replace(/0+$/, '');
+  return `${neg ? '-' : ''}${digits}${frac ? `.${frac}` : ''}`;
+}
+
+/** The player-facing refusal, addaplay's wording. */
+function capMessage(c) {
+  const basis = c.wagerBonusEnabled
+    ? `${fmt(c.multiplier)}× your total deposits + ${fmt(c.unlockedByWager)} ${c.currency} unlocked by wagering`
+    : `${fmt(c.multiplier)}× your total deposits`;
+  const raise = money.gt(c.wagerToRaise, '0')
+    ? `Wager ${fmt(c.wagerToRaise)} ${c.currency} more or deposit to raise your limit.`
+    : 'Deposit more to raise your limit.';
+  return money.gt(c.remaining, '0')
+    ? `You can withdraw up to ${fmt(c.remaining)} ${c.currency} more (${basis}). ${raise}`
+    : `Withdrawal limit reached (${basis}). ${raise}`;
+}
+
+const capDetails = (c) => ({
+  cap: c.cap,
+  withdrawn: c.withdrawn,
+  remaining: c.remaining,
+  deposited: c.deposited,
+  wagered: c.wagered,
+  unlockedByWager: c.unlockedByWager,
+  wagerToRaise: c.wagerToRaise,
+  currency: c.currency,
 });
 
 const dec = (minor) => money.toDecimalString(minor);
@@ -62,12 +123,72 @@ function createWithdrawRequirements(deps) {
   const bonuses = deps.playerBonuses ?? new PlayerBonusService(deps);
   const rewardMoney = deps.rewardMoney ?? createRewardMoney(deps);
   const kycSwitch = config?.WITHDRAW_REQUIRE_KYC !== false;
+  const capFigures = deps.capFigures ?? createCapFigures(deps);
 
-  /** `{ policy, kyc, wager }` — which checks are in force now. Read on every call, no cache. */
+  /** The owner's deposit-cap settings (the signed document's `withdrawalCap`, defaults filled). */
+  async function capSettings() {
+    return withdrawalCap.cleanWithdrawalCap((await entitlements.getEntitlements()).withdrawalCap);
+  }
+
+  /**
+   * `{ policy, kyc, wager, cap }` — which checks are in force now. Read on every call, no cache.
+   * `cap` is the deposit cap's settings (`cap.enabled` = the switch).
+   */
   async function rules() {
-    const policy = await sitePolicy.readPolicy(models, POLICY);
+    const [policy, cap] = await Promise.all([sitePolicy.readPolicy(models, POLICY), capSettings()]);
     const requires = (what) => (sitePolicy.ALLOWS[POLICY][what] ?? []).includes(policy);
-    return { policy, kyc: requires('kyc') && kycSwitch, wager: requires('wager') };
+    return { policy, kyc: requires('kyc') && kycSwitch, wager: requires('wager'), cap };
+  }
+
+  /** The cap block for one currency. Throws on a DB error (callers decide: refuse or answer). */
+  async function capFor(userId, currency, settings, { transaction } = {}) {
+    const cur = String(currency).toUpperCase();
+    const f = await capFigures.figures(userId, cur, { transaction, wagered: settings.wagerBonus });
+    return withdrawalCap.computeCap({ currency: cur, ...f, settings });
+  }
+
+  /**
+   * Refuse a withdrawal of `amount` `currency` over the cap. Fails closed: no amount / currency,
+   * or a figure that cannot be read → 503 WITHDRAW_CAP_CHECK_FAILED.
+   */
+  async function checkCap(userId, { amount, currency, settings, transaction }) {
+    let requested;
+    try {
+      requested = money.toMinor(String(amount));
+    } catch {
+      requested = null;
+    }
+    if (!currency || requested == null || requested <= 0n) {
+      logger?.error({ userId: String(userId), currency }, 'Withdrawal cap: the rail named no amount / currency — refused');
+      throw errors.CAP_CHECK_FAILED();
+    }
+    let c;
+    try {
+      c = await capFor(userId, currency, settings, { transaction });
+    } catch (error) {
+      logger?.error({ err: error, userId: String(userId), currency }, 'Withdrawal cap could not be checked — refused');
+      throw errors.CAP_CHECK_FAILED();
+    }
+    if (requested > money.toMinor(c.remaining)) {
+      logger?.info({ userId: String(userId), amount: String(amount), ...capDetails(c) }, 'Withdrawal refused: over the deposit cap');
+      throw errors.CAP_EXCEEDED(capDetails(c), { message: capMessage(c) });
+    }
+    return c;
+  }
+
+  /**
+   * The cap again, INSIDE the rail's transaction, before its row and hold: a per-player
+   * transaction lock makes a second request wait for the first to commit, and then its read
+   * sees the first one's pending row. `applied` is what `assertMet` returned (no-op when the
+   * cap was off).
+   */
+  async function assertCapInTransaction(userId, { amount, currency, transaction, applied }) {
+    if (!applied?.cap?.enabled) return;
+    await deps.db.sequelize.query('SELECT pg_advisory_xact_lock(hashtext(:key))', {
+      replacements: { key: `withdraw-cap:${userId}` },
+      transaction,
+    });
+    await checkCap(userId, { amount, currency, settings: applied.cap, transaction });
   }
 
   /** The player's latest `user_kyc` row (user_id is VARCHAR in the legacy schema). */
@@ -119,13 +240,33 @@ function createWithdrawRequirements(deps) {
    * The full answer for a player — `GET /user/withdrawals/requirements`. Both checks are read
    * whatever the policy (a page can show progress), `required` says which are enforced.
    */
-  async function evaluate(userId) {
+  async function evaluate(userId, { currency } = {}) {
     const [r, kyc, open] = await Promise.all([rules(), kycStatus(userId), openWagering(userId)]);
     const remaining = sum([open.bonus.remaining, open.deposit.remaining]);
     const done = money.lte(remaining, '0');
     const missing = [];
     if (r.kyc && !kyc.verified) missing.push('kyc');
     if (r.wager && !done) missing.push('wager');
+
+    // The deposit cap: one block for `?currency=`, else one per currency the player has used.
+    // Figures only while the switch is on (null otherwise).
+    const capSettingsOut = { enabled: r.cap.enabled, multiplier: r.cap.depositMultiplier, wagerBonusEnabled: r.cap.wagerBonus, wagerMultiplier: r.cap.wagerMultiplier };
+    const capBlock = async (cur) => {
+      if (!r.cap.enabled) {
+        return { ...capSettingsOut, currency: cur, deposited: null, withdrawn: null, wagered: null, cap: null, remaining: null, wagerToRaise: null, unlockedByWager: null };
+      }
+      const c = await capFor(userId, cur, r.cap);
+      return { ...capSettingsOut, currency: c.currency, deposited: c.deposited, withdrawn: c.withdrawn, wagered: c.wagered, cap: c.cap, remaining: c.remaining, wagerToRaise: c.wagerToRaise, unlockedByWager: c.unlockedByWager };
+    };
+    let cap;
+    if (currency) {
+      cap = await capBlock(String(currency).toUpperCase());
+      if (cap.enabled && money.lte(cap.remaining, '0')) missing.push('cap');
+    } else {
+      const used = r.cap.enabled ? await capFigures.currencies(userId) : [];
+      cap = { ...capSettingsOut, currencies: await Promise.all(used.map(capBlock)) };
+    }
+
     return {
       policy: r.policy,
       ok: missing.length === 0,
@@ -144,6 +285,7 @@ function createWithdrawRequirements(deps) {
       // Any active bonus is forfeited by a withdrawal (409 BONUS_FORFEIT_REQUIRED, then
       // `forfeitBonus: true`), whatever the policy: bonus money is never cash.
       bonusForfeitRequired: open.bonus.bonuses.length > 0,
+      cap,
     };
   }
 
@@ -151,7 +293,7 @@ function createWithdrawRequirements(deps) {
    * The rail's check, after its cooldown and before the bonus forfeit. `kycError(status)` builds
    * the rail's own `*_KYC_REQUIRED`. Returns the rules applied.
    */
-  async function assertMet(userId, { forfeitBonus = false, kycError }) {
+  async function assertMet(userId, { forfeitBonus = false, kycError, amount, currency }) {
     const r = await rules();
     if (r.kyc) {
       const kyc = await kycStatus(userId);
@@ -173,10 +315,13 @@ function createWithdrawRequirements(deps) {
       // Only bonus wagering open: the rail's bonus check answers 409 BONUS_FORFEIT_REQUIRED,
       // and a confirmed forfeit clears it.
     }
+    // The deposit cap, before the bonus forfeit (never forfeit for a refused withdrawal). The
+    // rail checks it again under its lock (`assertCapInTransaction`).
+    if (r.cap.enabled) await checkCap(userId, { amount, currency, settings: r.cap });
     return r;
   }
 
-  return { rules, evaluate, assertMet, kycStatus };
+  return { rules, evaluate, assertMet, assertCapInTransaction, kycStatus, capFor };
 }
 
 module.exports = { createWithdrawRequirements, withdrawRequirementErrors: errors, POLICY };

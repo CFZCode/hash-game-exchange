@@ -1,5 +1,6 @@
 import { resolveOptions } from '@/configs/entitlementCatalogue'
 import { cleanRegion, type RegionSetting } from './region'
+import { diffWithdrawalCap, type WithdrawalCap } from './withdrawalCap'
 import { diffBranding, type Branding, type BrandingChange } from './branding'
 
 /** Shapes shared by the routes and the screens — contract §2. */
@@ -41,6 +42,12 @@ export type EntitlementsDoc = {
    * Absent in an older document = an empty blocklist.
    */
   region?: RegionSetting
+
+  /**
+   * Withdrawal requirements' deposit cap (./withdrawalCap). KYC and wagering are
+   * `variants.withdrawal_requirements`. Absent in an older document = the cap is off.
+   */
+  withdrawalCap?: WithdrawalCap
 
   /**
    * Site name, page metadata and logo files (./branding, contract §8). Absent in an older
@@ -86,7 +93,7 @@ export type SiteCoin = {
 export type VariantsSeed = 'backend' | 'template' | null
 
 /** What the owner screen edits: the document with a full `variants` map. */
-export type EditableDoc = EntitlementsDoc & { variants: Record<string, string>; options: Record<string, Record<string, boolean>>; region: RegionSetting; branding: Branding; seededFrom: VariantsSeed }
+export type EditableDoc = EntitlementsDoc & { variants: Record<string, string>; options: Record<string, Record<string, boolean>>; region: RegionSetting; withdrawalCap: WithdrawalCap; branding: Branding; seededFrom: VariantsSeed }
 
 export type ToggleChange = { kind: 'feature' | 'flag'; key: string; from: boolean; to: boolean }
 export type TemplateChange = { kind: 'template'; key: 'template'; from: string | null; to: string }
@@ -103,8 +110,11 @@ export type CoinChange = { kind: 'coin'; key: string; action: 'added' | 'edited'
 
 /** Region restriction's list type or countries changed (audit kind `region`). */
 export type RegionChange = { kind: 'region'; key: 'region'; from: RegionSetting; to: RegionSetting }
+
+/** Withdrawal requirements' deposit cap switched or re-set (audit kind `withdrawal_cap`). */
+export type WithdrawalCapChange = { kind: 'withdrawal_cap'; key: 'withdrawalCap'; from: WithdrawalCap; to: WithdrawalCap }
 export type { BrandingChange }
-export type Change = ToggleChange | TemplateChange | VariantChange | CoinsChange | CoinChange | OptionChange | RegionChange | BrandingChange
+export type Change = ToggleChange | TemplateChange | VariantChange | CoinsChange | CoinChange | OptionChange | RegionChange | WithdrawalCapChange | BrandingChange
 
 export type AuditEntry = { at: string; user: string; version: number; changes: Change[]; seededFrom?: Exclude<VariantsSeed, null> }
 
@@ -121,6 +131,7 @@ type Diffable = Pick<EntitlementsDoc, 'features' | 'flags'> & {
   variants?: Record<string, string>
   options?: Record<string, Record<string, boolean>>
   region?: RegionSetting
+  withdrawalCap?: WithdrawalCap
   branding?: Branding
 }
 
@@ -169,6 +180,11 @@ export function diffDocs(before: Diffable, after: Diffable) {
 
     if (JSON.stringify(from) !== JSON.stringify(to)) changes.push({ kind: 'region', key: 'region', from, to })
   }
+
+  // Withdrawal cap: compared cleaned, so an older document (no block) equals the cap off.
+  const capChange = after.withdrawalCap ? diffWithdrawalCap(before.withdrawalCap, after.withdrawalCap) : null
+
+  if (capChange) changes.push(capChange)
 
   // Branding: one change per field; an older document (no branding) equals an empty one.
   if (after.branding) changes.push(...diffBranding(before.branding, after.branding))

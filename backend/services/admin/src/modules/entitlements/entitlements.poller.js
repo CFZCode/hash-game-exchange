@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-const { featureCatalogue, featureOptions, regionPolicy } = require('@ibitplay/common');
+const { featureCatalogue, featureOptions, regionPolicy, withdrawalCap } = require('@ibitplay/common');
 const { cleanBranding } = require('../branding/branding.rules');
 
 /**
@@ -167,6 +167,8 @@ function normalise(data) {
     options: featureOptions.cleanOptions(data.options),
     // Region restriction's list type and countries (regionPolicy.js); the mode is the policy's variant.
     region: regionPolicy.cleanRegion(data.region),
+    // Withdrawal requirements' deposit cap (withdrawalCap.js); KYC / wagering are the policy's variant.
+    withdrawalCap: withdrawalCap.cleanWithdrawalCap(data.withdrawalCap),
     // Site name, metadata and logo file references (modules/branding); null = not branded.
     branding: cleanBranding(data.branding),
   };
@@ -298,7 +300,7 @@ function createEntitlementsPoller({ config, logger, filePath, onChange: initialO
 
   /** `{ features, flags, template, variants, version, fetchedAt, source }` — never a secret. */
   function current() {
-    if (!doc) return { features: {}, flags: {}, template: null, variants: null, coins: [], options: {}, region: regionPolicy.cleanRegion(null), branding: null, version: 0, fetchedAt: null, source: 'default' };
+    if (!doc) return { features: {}, flags: {}, template: null, variants: null, coins: [], options: {}, region: regionPolicy.cleanRegion(null), withdrawalCap: withdrawalCap.cleanWithdrawalCap(null), branding: null, version: 0, fetchedAt: null, source: 'default' };
     return {
       features: { ...doc.features },
       flags: { ...doc.flags },
@@ -307,6 +309,7 @@ function createEntitlementsPoller({ config, logger, filePath, onChange: initialO
       coins: (doc.coins ?? []).map((c) => ({ ...c })),
       options: JSON.parse(JSON.stringify(doc.options ?? {})),
       region: regionPolicy.cleanRegion(doc.region),
+      withdrawalCap: withdrawalCap.cleanWithdrawalCap(doc.withdrawalCap),
       branding: doc.branding ? JSON.parse(JSON.stringify(doc.branding)) : null,
       version: doc.version,
       fetchedAt,

@@ -6,6 +6,7 @@ import { templateLabel } from '@/configs/templateCatalogue'
 import { Badge } from '@/components/ui/badge'
 import type { Change, CoinChange, CoinDefinition, ToggleChange } from '@/lib/entitlements/types'
 import { regionLabel } from '@/lib/entitlements/region'
+import { withdrawalCapLabel } from '@/lib/entitlements/withdrawalCap'
 import { BRANDING_LABELS } from '@/lib/entitlements/branding'
 
 /** An image change shows its content hash, shortened; text shows quoted. */
@@ -84,6 +85,14 @@ const ChangeList = ({ changes, labelOf }: { changes: Change[]; labelOf: (c: Togg
           <span className='font-medium'>Region restriction countries</span>
           <span className='text-muted-foreground font-mono text-xs'>
             {regionLabel(c.from)} → {regionLabel(c.to)}
+          </span>
+        </li>
+      ) : c.kind === 'withdrawal_cap' ? (
+        <li key='withdrawal_cap' className='flex flex-wrap items-center gap-2 text-sm'>
+          <span className='text-muted-foreground w-14 text-xs uppercase'>policy</span>
+          <span className='font-medium'>Withdrawal requirements: deposit cap</span>
+          <span className='text-muted-foreground font-mono text-xs'>
+            {withdrawalCapLabel(c.from)} → {withdrawalCapLabel(c.to)}
           </span>
         </li>
       ) : c.kind === 'branding' ? (

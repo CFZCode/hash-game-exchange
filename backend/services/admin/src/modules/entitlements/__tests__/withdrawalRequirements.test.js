@@ -110,8 +110,48 @@ test('withdrawal requirements through the owner document', async (t) => {
     assert.equal(s.rows.get(KEY).variant, 'wager');
   });
 
+  await t.test('the deposit cap travels in the signed document, cleaned; staff see it and cannot change it', async () => {
+    const publishDoc = async (extra) => {
+      version += 1;
+      const data = { site: 'hash-game-exchange', version, updatedAt: new Date().toISOString(), features: {}, flags: {}, variants: { [KEY]: 'kyc' }, ...extra };
+      answer = { data, signature: sign(data, SECRET) };
+      return p.pollOnce();
+    };
+    // An older document: no block = the cap off, the defaults.
+    await publishDoc({});
+    assert.deepEqual(p.current().withdrawalCap, { enabled: false, depositMultiplier: 3, wagerBonus: true, wagerMultiplier: 5 });
+
+    await publishDoc({ withdrawalCap: { enabled: true, depositMultiplier: 2.5, wagerBonus: false, wagerMultiplier: 4 } });
+    assert.deepEqual(p.current().withdrawalCap, { enabled: true, depositMultiplier: 2.5, wagerBonus: false, wagerMultiplier: 4 });
+    assert.equal((await entitlements.getEntitlements()).withdrawalCap.enabled, true);
+    // KYC stays the variant: kyc + cap together.
+    assert.equal(s.rows.get(KEY).variant, 'kyc');
+
+    // A bad multiplier from a tampered or older panel never reaches the rails: its default.
+    await publishDoc({ withdrawalCap: { enabled: true, depositMultiplier: -1, wagerBonus: true, wagerMultiplier: 1000, extra: 1 } });
+    assert.deepEqual(p.current().withdrawalCap, { enabled: true, depositMultiplier: 3, wagerBonus: true, wagerMultiplier: 5 });
+
+    const svc = new FeaturesService(s.container);
+    const row = (await svc.list()).features.find((f) => f.feature === KEY);
+    assert.deepEqual(row.withdrawalCap, { enabled: true, depositMultiplier: 3, wagerBonus: true, wagerMultiplier: 5 });
+    assert.equal(row.managedBy, 'owner');
+
+    // Staff: no route writes it, and the feature route refuses it as config or as a variant change.
+    const before = s.writes.length;
+    await assert.rejects(
+      () => svc.update({ feature: KEY, patch: { config: { withdrawalCap: { enabled: false } } }, staff: { id: 1 } }),
+      (e) => e.status === 400 || e.status === 422
+    );
+    await assert.rejects(
+      () => svc.update({ feature: KEY, patch: { variant: 'none' }, staff: { id: 1 } }),
+      (e) => e.status === 403 && e.code === 'OWNER_MANAGED'
+    );
+    assert.equal(s.writes.length, before);
+    assert.equal(p.current().withdrawalCap.enabled, true);
+  });
+
   await t.test('players read it in features/public as a policy row', async () => {
     const pub = await new FeaturesService(s.container).publicList();
-    assert.deepEqual(pub.find((f) => f.feature === KEY), { feature: KEY, kind: 'policy', variant: 'wager' });
+    assert.deepEqual(pub.find((f) => f.feature === KEY), { feature: KEY, kind: 'policy', variant: 'kyc' });
   });
 });

@@ -33,6 +33,9 @@ export type SiteFeature = {
   /** Region restriction only: the platform's list type and countries (read-only here). */
   region?: { listType: 'blocklist' | 'allowlist'; countries: string[] }
 
+  /** Withdrawal requirements only: the platform's deposit cap (read-only here). */
+  withdrawalCap?: { enabled: boolean; depositMultiplier: number; wagerBonus: boolean; wagerMultiplier: number }
+
   /** Nothing stored — reading the permissive default. */
   isDefault: boolean
   flag: string | null

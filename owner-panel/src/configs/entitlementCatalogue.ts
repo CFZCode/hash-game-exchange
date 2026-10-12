@@ -145,14 +145,16 @@ const CATALOGUE: FeatureEntry[] = [
   {
     // Withdrawal requirements: a policy (always on, owner-only). `none` here means nothing is
     // required, not "closed". Mirrors backend featureCatalogue.js; enforced by user-service
-    // modules/withdraw-requirements on every withdrawal rail.
+    // modules/withdraw-requirements on every withdrawal rail. The screen shows it as switches:
+    // the variant = KYC × wagering (lib/entitlements/withdrawalCap.ts switchesOf), plus the
+    // document's `withdrawalCap` block for the deposit cap.
     key: 'withdrawal_requirements',
     label: 'Withdrawal requirements',
     category: 'business',
     flag: null,
     policy: true,
     defaultVariant: 'kyc',
-    note: 'What a player must have done before a withdrawal is accepted. Wagering = the deposit rollover and every active bonus (forfeiting a bonus clears its part). Refusals: *_KYC_REQUIRED and 403 WITHDRAW_WAGER_REQUIRED.',
+    note: 'What a player must have done before a withdrawal is accepted: any combination of the switches below. Wagering = the deposit rollover and every active bonus (forfeiting a bonus clears its part). Deposit cap = per currency, deposits × multiplier (+ wagering up to its own multiplier) minus what was already withdrawn. Refusals: *_KYC_REQUIRED, 403 WITHDRAW_WAGER_REQUIRED, 403 WITHDRAW_CAP_EXCEEDED.',
     variants: [
       { key: 'none', label: 'No requirements', description: 'Neither KYC nor wagering is required to withdraw. An active bonus still has to be forfeited (the player confirms).' },
       { key: 'kyc', label: 'KYC verified', description: "The player's KYC must be Verified. Wagering is not checked. The default." },
