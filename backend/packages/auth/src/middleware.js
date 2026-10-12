@@ -50,6 +50,19 @@ const VAULT_NOT_FOR_AGENTS = 'VAULT_NOT_FOR_AGENTS';
 /** The code a swap admin route (swap history) answers an agent-tree caller with. */
 const SWAP_NOT_FOR_AGENTS = 'SWAP_NOT_FOR_AGENTS';
 
+/**
+ * The code every player API answers once the account is locked (system or manual lock). It used to
+ * be the generic FORBIDDEN, so a client holding a live session could not tell "this account is
+ * locked, sign out" from any other refusal and kept a dead session on screen. Same code login uses.
+ */
+const ACCOUNT_LOCKED = 'ACCOUNT_LOCKED';
+
+const lockedError = (message) => {
+  const error = new ForbiddenError(message);
+  error.code = ACCOUNT_LOCKED;
+  return error;
+};
+
 /** The code every admin API answers while a staff password must be changed. */
 const PASSWORD_CHANGE_REQUIRED = 'PASSWORD_CHANGE_REQUIRED';
 
@@ -188,10 +201,10 @@ function createAuthMiddleware({ config, loadUser, loadStaff, cache = null }) {
         if (!record) throw new UnauthorizedError('Account no longer exists');
 
         if (record.system_locked) {
-          throw new ForbiddenError('This account has been locked by the system. Contact support.');
+          throw lockedError('This account has been locked by the system. Contact support.');
         }
         if (record.is_locked) {
-          throw new ForbiddenError('This account is locked. Contact support.');
+          throw lockedError('This account is locked. Contact support.');
         }
         if (record.status && !allowStatuses.includes(record.status)) {
           throw new ForbiddenError(`Account is ${record.status}`);
@@ -401,6 +414,7 @@ function createAuthMiddleware({ config, loadUser, loadStaff, cache = null }) {
 
 module.exports = {
   createAuthMiddleware,
+  ACCOUNT_LOCKED,
   PASSWORD_CHANGE_REQUIRED,
   PASSWORD_CHANGE_ALLOWED,
   passwordChangeAllows,

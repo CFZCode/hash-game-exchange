@@ -292,6 +292,15 @@ async function handle(res, body, path, retried, replay) {
     notifyAuthExpired();
   }
 
+  /* A LOCKED ACCOUNT ENDS THE SESSION TOO. The platform answers every player route with
+     `403 ACCOUNT_LOCKED` once staff lock the account, and no refresh can change that — so a tab
+     that was signed in when the lock landed is signed out here instead of staying on screen with
+     a header that can no longer read its own wallet. Login answers the same code about the
+     credentials in its body, which is why the auth routes are excluded, as for the 401 arm. */
+  if (res.status === 403 && body?.error?.code === 'ACCOUNT_LOCKED' && !NO_REFRESH_PATH.test(path)) {
+    notifyAuthExpired();
+  }
+
   if (!res.ok) {
     /* `unwrap` throws the platform's own error when the body carries one, which is what carries
        the stable code and the offending fields. The bare status is only the fallback for a

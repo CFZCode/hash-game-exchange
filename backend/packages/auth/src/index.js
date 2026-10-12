@@ -13,6 +13,7 @@ const {
   VAULT_NOT_FOR_AGENTS,
   SWAP_NOT_FOR_AGENTS,
   PASSWORD_CHANGE_REQUIRED,
+  ACCOUNT_LOCKED,
   passwordChangeAllows,
 } = require('./middleware');
 const { SecretBox, createSecretBox } = require('./secretBox');
@@ -35,6 +36,7 @@ module.exports = {
   VAULT_NOT_FOR_AGENTS,
   SWAP_NOT_FOR_AGENTS,
   PASSWORD_CHANGE_REQUIRED,
+  ACCOUNT_LOCKED,
   passwordChangeAllows,
   // Players owned by the agent tree: no promotions, vault, deposits, swap or withdrawals.
   ...agentPlayers,
