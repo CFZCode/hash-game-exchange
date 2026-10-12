@@ -17,6 +17,7 @@ import {
   depositNotice,
   readCryptoDepositAddress,
 } from './deposit';
+import { copyWithToast } from '../../utils/clipboard';
 
 /* `Ew` / `DepositCryptoPage` in index-C1xohM7W.js. Its body is four blocks in one card:
  *
@@ -112,18 +113,10 @@ function CoinTrigger({ currencyName }) {
   );
 }
 
-/* `fg` — the address box. Copy writes to the clipboard and flips the icon for a moment; the
-   original routes it through `clipboard-Bk_Cr50k.js`, which is `navigator.clipboard` with a
-   `document.execCommand` fallback for the insecure-origin case. Only the modern half is used
-   here, guarded, because a dev server is a secure origin and so is any deploy. */
+/* `fg` — the address box (`Address-C1AQxsEX.js`). Copy goes through `clipboard-Bk_Cr50k.js`,
+   which writes and raises a bare "Copied" toast. The icon does not change; an earlier pass here
+   flipped it green for 1.5s while there was no toast to confirm the copy. */
 function AddressBox({ address }) {
-  const [copied, setCopied] = React.useState(false);
-
-  React.useEffect(() => {
-    if (!copied) return undefined;
-    const id = setTimeout(() => setCopied(false), 1500);
-    return () => clearTimeout(id);
-  }, [copied]);
 
   return (
     <div className="mt-1 flex min-h-10 items-center break-all rounded-lg border border-input bg-input_bright p-2">
@@ -132,14 +125,9 @@ function AddressBox({ address }) {
         type="button"
         aria-label="Copy deposit address"
         className="ms-2 flex-none"
-        onClick={() => {
-          navigator.clipboard?.writeText(address).then(
-            () => setCopied(true),
-            () => {},
-          );
-        }}
+        onClick={() => copyWithToast(address)}
       >
-        <IconCopy className={`icon size-5 ${copied ? 'fill-brand' : 'fill-secondary'}`} />
+        <IconCopy className="icon size-5 fill-secondary" />
       </button>
     </div>
   );

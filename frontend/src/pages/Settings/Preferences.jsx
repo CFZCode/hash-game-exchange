@@ -7,7 +7,7 @@ import { useSettings } from '../../context/settings';
 import { useResource } from '../../hooks/useResource';
 import { getPrivacy, setRefuseTip, updatePreferences } from '../../services/settings';
 import { USE_FIXTURES } from '../../services/client';
-import { showToast } from '../../components/shared/Toast/toast';
+import { toast, toastError } from '../../components/shared/Toast/toast';
 import { getAlias } from '../../utils/currency';
 import { coinIcon } from '../../utils/coinArt';
 import { IconEdit, IconMoon, IconSun } from './icons';
@@ -157,17 +157,20 @@ function PrivacyRows() {
     setPrivacy({ refuseTip: serverRefuseTip });
   }, [serverRefuseTip, setPrivacy]);
 
+  /* `g(a)` and `.catch(g)` — a BARE toast for the confirmation, so it is error-typed with no icon
+     and each flip replaces the last, and the refusal itself handed to the same function, which
+     unwraps an Error into `.error(message)` with the server's own words. */
   const toggle = (row, next) => {
     setPrivacy({ [row.key]: next });
     if (row.key !== 'refuseTip' || USE_FIXTURES) {
-      showToast(next ? row.on : row.off, { type: `privacy:${row.key}` });
+      toast(next ? row.on : row.off);
       return;
     }
     Promise.resolve(setRefuseTip(next)).then(
-      () => showToast(next ? row.on : row.off, { type: `privacy:${row.key}` }),
+      () => toast(next ? row.on : row.off),
       (failure) => {
         setPrivacy({ [row.key]: !next });
-        showToast(failure?.message || 'Could not save this setting.', { type: `privacy:${row.key}` });
+        toastError(failure);
       },
     );
   };

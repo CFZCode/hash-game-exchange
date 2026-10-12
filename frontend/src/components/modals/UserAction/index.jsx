@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import RouteDialog from '../../shared/RouteDialog';
-import { showToast } from '../../shared/Toast/toast';
+import { toast, toastError } from '../../shared/Toast/toast';
 import Loading from '../../shared/Loading';
 import { useSession } from '../../../context/session';
 import { changePassword, requestEmailOtp, changeEmail } from '../../../services/auth';
@@ -120,12 +120,14 @@ function ChangePassword() {
 
     /* Both of these are the original's, in its order and its words — checked on the client
        before anything is sent, because the server's own messages are about its own rules. */
+    /* `return y.error(a("Passwords do not match. Please try again."))` and the same for a reused
+       password — TOASTS on the original, not lines under the field. */
     if (password !== confirm) {
-      setError('Passwords do not match. Please try again.');
+      toast.error('Passwords do not match. Please try again.');
       return;
     }
     if (password === oldPassword) {
-      setError('The old and new passwords cannot be the same.');
+      toast.error('The old and new passwords cannot be the same.');
       return;
     }
 
@@ -133,7 +135,7 @@ function ChangePassword() {
     setPending(true);
     try {
       await changePassword({ currentPassword: oldPassword, newPassword: password });
-      showToast('Password changed successfully.', { type: 'success' });
+      toast.success('Password changed successfully.');
       /* The original navigates to `/logout`, its own dialog route for the same act. There is
          none here and the session context owns the sign-out, so: sign out, then go home.
 
@@ -161,11 +163,10 @@ function ChangePassword() {
       const wrongOld =
         failure?.code === 'AUTH_CURRENT_PASSWORD_INCORRECT' ||
         failure?.code === 'CURRENT_PASSWORD_INCORRECT';
-      setError(
-        wrongOld
-          ? 'Sorry. Invalid old password, please try again.'
-          : failure?.message || 'Something went wrong. Please try again.',
-      );
+      /* `y(new Error(a("Sorry. Invalid old password, please try again.")))` and `catch (C) { y(C) }`
+         — both raised as error toasts carrying the words, the server's own for the second. */
+      if (wrongOld) toast.error('Sorry. Invalid old password, please try again.');
+      else toastError(failure, 'Something went wrong. Please try again.');
       if (wrongOld) setStep('old');
     }
   };
@@ -339,10 +340,24 @@ function TwoFactorBind() {
       /* `V({google2StepAuth:!0})` — the tile reads this, so the pane is correct the moment the
          dialog closes rather than after the next profile read. */
       setAccountField('google2StepAuth', true);
-      showToast('Your 2FA has been successfully enabled.');
+      /* `y.success(() => <span><Trans i18nKey="login.verification.twofa.bind.tip">…</Trans></span>)`
+         — the en-US value is "Your 2FA has been successfully enabled. To ensure you can recover
+         your account if you lose access, please complete <2>Advanced KYC</2>.", and slot 2 is
+         `<span class="cursor-pointer text-brand underline">` routing to /settings/verification. */
+      toast.success(
+        <span>
+          Your 2FA has been successfully enabled. To ensure you can recover your account if you lose
+          access, please complete{' '}
+          <span className="cursor-pointer text-brand underline" onClick={() => navigate('/settings/verification')}>
+            Advanced KYC
+          </span>
+          .
+        </span>,
+      );
       navigate(-1);
     } catch (failure) {
-      setError(failure?.message || 'That code was not accepted. Please try again.');
+      /* `catch (d) { y(d) }` — an error toast with the server's message. */
+      toastError(failure, 'That code was not accepted. Please try again.');
       setPending(false);
     }
   };
@@ -647,11 +662,11 @@ function EmailChange() {
          so the next `loadAccount` replaces both with the server's own answer. */
       setAccountField('email', email);
       setAccountField('emailVerified', true);
-      showToast('Your email address has changed!', { type: 'success' });
+      toast.success('Your email address has changed!');
       navigate(-1);
     } catch (failure) {
       setPending(false);
-      setError(failure?.message || 'That code was not accepted. Please try again.');
+      toastError(failure, 'That code was not accepted. Please try again.');
     }
   };
 

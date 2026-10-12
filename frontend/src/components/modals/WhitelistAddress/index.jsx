@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import RouteDialog from '../../shared/RouteDialog';
 import Input from '../../shared/Input';
 import Select from '../../shared/Select';
-import { showToast } from '../../shared/Toast/toast';
+import { toast, toastError } from '../../shared/Toast/toast';
 import { useSession } from '../../../context/session';
 import { useIsDesktop } from '../../../hooks/useMediaQuery';
 import { addWhitelistAddress, renameWhitelistAddress } from '../../../services/settings';
@@ -215,14 +215,15 @@ function AddAddress() {
          in that order and with the same event: the pane behind this dialog is a SIBLING of it,
          not a child, so the bus is what tells it to re-read. See context/appEvents. */
       emit(WHITELIST_CHANGED);
-      showToast('You have successfully added new address.', { type: 'success' });
+      /* `A(o("You have successfully added new address."))` — BARE, so no success icon. */
+      toast('You have successfully added new address.');
       navigate(-1);
     } catch (failure) {
       setPending(false);
       /* THE SERVER'S OWN MESSAGE. `ALREADY_WHITELISTED` and `TOO_MANY_ADDRESSES` both already
          read as something worth a visitor's time, and the auth dialog's note on `AUTH_MESSAGES`
          says why overriding one is a last resort rather than a habit. */
-      showToast(failure?.message || 'Something went wrong. Please try again.', { type: 'error' });
+      toastError(failure, 'Something went wrong. Please try again.');
     }
   };
 
@@ -313,11 +314,11 @@ function EditAddress() {
          resource is refetched by its own key; here a rename must reach the pane the same way an
          add does. */
       emit(WHITELIST_CHANGED);
-      showToast('Address Saved', { type: 'success' });
+      toast.success('Address Saved');
       navigate(-1);
     } catch (failure) {
       setPending(false);
-      showToast(failure?.message || 'Something went wrong. Please try again.', { type: 'error' });
+      toastError(failure, 'Something went wrong. Please try again.');
     }
   };
 

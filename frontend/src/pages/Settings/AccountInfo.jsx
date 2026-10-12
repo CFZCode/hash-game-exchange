@@ -20,6 +20,8 @@ import avatarArt from '../../assets/avatars/105522617.png';
    `/modules/account/assets/tips-BrCxPSw3.png`. Fetched under the plain name. Using `IconSuccess`
    instead would have been the obvious substitution and would have been a different drawing. */
 import tipsMark from '../../assets/settings/tips.png';
+import { toast } from '../../components/shared/Toast/toast';
+import { copyToClipboard } from '../../utils/clipboard';
 
 /* `/settings/account-info` — `index-baue7lPM.js`, 28 KB, and the rail's first row.
  *
@@ -184,12 +186,15 @@ export default function SettingsAccountInfo() {
             <p className="text-base">{session.name}</p>
             <p className="mt-1 text-secondary max-sm:font-semibold">
               <span>User ID:</span>
-              {/* Clicking the id copies it and raises a toast on the original; the clipboard write
-                  is here and the toast is the site's global one, which this build has no
-                  equivalent of — the same call the Refer dialog's Copy documents. */}
+              {/* `T = c => { try { h1.copyToClipboard(c ? c + "" : "-"), V.success("Copied") }
+                  catch {} }` in the account-info chunk — a SUCCESS toast here, unlike the bare
+                  "Copied." the profile dialog raises, and the string is untranslated. */}
               <span
                 className="ml-0.5 cursor-pointer"
-                onClick={() => navigator.clipboard?.writeText(String(session.userId))}
+                onClick={() => {
+                  copyToClipboard(session.userId ? String(session.userId) : '-');
+                  toast.success('Copied');
+                }}
               >
                 {session.userId || '-'}
               </span>

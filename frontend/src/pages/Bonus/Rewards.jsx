@@ -4,7 +4,7 @@ import { Card, SectionGroup } from '../../components/shared/SectionGroup';
 import { IconArrow } from '../../components/shared/icons';
 import { FormulaButton, Countdown } from '../Quests/QuestCard';
 import { redeemBonusCode, claimBonus, claimRakeback } from '../../services/rewards';
-import { showToast } from '../../components/shared/Toast/toast';
+import { showToast, bonusToast } from '../../components/shared/Toast/toast';
 import { useSession } from '../../context/session';
 import { printCurrency } from '../../utils/currency';
 import { coinIcon } from '../../utils/coinArt';
@@ -314,12 +314,10 @@ const trimAmount = (value) =>
 function Redeem() {
   const [code, setCode] = React.useState('');
   const [pending, setPending] = React.useState(false);
-  const [error, setError] = React.useState('');
 
   const submit = async () => {
     if (!code || pending) return;
     setPending(true);
-    setError('');
     try {
       const answer = await redeemBonusCode({ code });
       /* `REDEEMED!` is `_t`'s own heading. The amount is the platform's, which bc.game's screen
@@ -331,10 +329,11 @@ function Redeem() {
       );
       setCode('');
     } catch (failure) {
-      /* Both refusals carry the platform's own message — "That redeem code is not valid" and
-         "That redeem code has already been used or has expired" — so they are shown as they
-         come rather than restated. */
-      setError(failure?.message || 'That redeem code is not valid');
+      /* A REFUSAL IS A TOAST, not a line under the field. The result popup's `useCode` read sits
+         in an error boundary whose fallback is `n => (Te.error(n), m.pop(), null)` — the bonus
+         pages' `.error` (ring off, the gradient class), carrying the server's own message:
+         "That redeem code is not valid", "…has already been used or has expired". */
+      bonusToast.error(failure?.message || 'That redeem code is not valid');
     } finally {
       setPending(false);
     }
@@ -346,10 +345,7 @@ function Redeem() {
         <input
           className="input h-10 flex-1 !bg-input_darken text-sm font-semibold placeholder:text-quarterary"
           value={code}
-          onChange={(e) => {
-            setCode(e.target.value);
-            if (error) setError('');
-          }}
+          onChange={(e) => setCode(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') submit();
           }}
@@ -365,7 +361,6 @@ function Redeem() {
           Redeem
         </button>
       </div>
-      {error ? <p className="mt-2 text-xs text-error">{error}</p> : null}
     </div>
   );
 }

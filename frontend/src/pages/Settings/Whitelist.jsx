@@ -5,7 +5,7 @@ import Switch from '../../components/shared/Switch';
 import Loading from '../../components/shared/Loading';
 import EmptyPlaceholder from '../../components/shared/EmptyPlaceholder';
 import PopCenter from '../../components/shared/PopCenter';
-import { showToast } from '../../components/shared/Toast/toast';
+import { toast, toastError } from '../../components/shared/Toast/toast';
 import { useIsDesktop } from '../../hooks/useMediaQuery';
 import { useEventRevision, WHITELIST_CHANGED } from '../../context/appEvents';
 import { useResource } from '../../hooks/useResource';
@@ -74,11 +74,11 @@ function DeleteConfirm({ row, onCancel, onDeleted }) {
     try {
       await removeWhitelistAddress(row.id);
       /* `F.success(s("Delete Success"))` — the chunk's own string. */
-      showToast('Delete Success', { type: 'success' });
+      toast.success('Delete Success');
       onDeleted();
     } catch (failure) {
       setPending(false);
-      showToast(failure?.message || 'Something went wrong. Please try again.', { type: 'error' });
+      toastError(failure, 'Something went wrong. Please try again.');
     }
   };
 
@@ -461,12 +461,13 @@ export default function SettingsWhitelist() {
     setPending(true);
     try {
       await setWhitelistEnabled(next);
-      showToast('Success', { type: 'success' });
+      /* `t(s), I(l("Success"))` — a BARE toast, unlike the delete's `.success`. */
+      toast('Success');
     } catch (failure) {
       /* `WHITELIST_EMPTY_WHITELIST` lands here — arming against an empty list is refused, and its
          message ("Add an address before turning whitelist-only withdrawals on") is exactly what a
          visitor needs at that moment, so it is shown as the server words it. */
-      showToast(failure?.message || 'Something went wrong. Please try again.', { type: 'error' });
+      toastError(failure, 'Something went wrong. Please try again.');
     } finally {
       setPending(false);
       setConfirming(false);

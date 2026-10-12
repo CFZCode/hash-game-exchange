@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import Select from '../../../components/shared/Select';
-import { showToast } from '../../../components/shared/Toast/toast';
+import { toast } from '../../../components/shared/Toast/toast';
 import NumberInput from '../../../components/shared/NumberInput';
 import { Accordion, AccordionItem } from '../../../components/shared/Accordion';
 import { useSession } from '../../../context/session';
@@ -342,7 +342,6 @@ function TransferPanel({ rows, balances, settings, options }) {
   const [term, setTerm] = React.useState(null);
   const [deposit, setDeposit] = React.useState(null);
   const [submitting, setSubmitting] = React.useState(false);
-  const [transferError, setTransferError] = React.useState('');
   const [transfers, setTransfers] = React.useState(0);
 
   React.useEffect(() => {
@@ -362,7 +361,6 @@ function TransferPanel({ rows, balances, settings, options }) {
     const chosenTerm = term ?? terms[0];
     const chosenDeposit = deposit ?? deposits[0];
     setSubmitting(true);
-    setTransferError('');
     try {
       if (isTransferIn) {
         /* `lockPeriod` is the term's `value`. With no terms seeded the platform refuses with
@@ -372,12 +370,15 @@ function TransferPanel({ rows, balances, settings, options }) {
       } else {
         await vaultTransferOut(currency, amount, chosenDeposit?.depositId);
       }
-      showToast(isTransferIn ? 'Transferred to Vault Pro.' : 'Withdrawn to your wallet.');
+      /* `useVaultTransfer-DALUu4Bx.js`: `S(R("Transfer in successful"))` / `S(R("Transfer out
+         successful"))`, and every refusal `S(I.message ?? I)` — all BARE toasts, the refusal's
+         message as a plain string. */
+      toast(isTransferIn ? 'Transfer in successful' : 'Transfer out successful');
       setAmount(0);
       setDeposit(null);
       setTransfers((n) => n + 1);
     } catch (failure) {
-      setTransferError(failure?.message || 'That transfer could not be completed.');
+      toast(String(failure?.message || 'That transfer could not be completed.'));
     } finally {
       setSubmitting(false);
     }
@@ -551,7 +552,6 @@ function TransferPanel({ rows, balances, settings, options }) {
           >
             {isTransferIn ? 'Transfer to Vault Pro' : 'Withdraw to Wallet'}
           </button>
-          {transferError ? <p className="mt-2 text-xs text-error">{transferError}</p> : null}
         </div>
       </div>
     </div>

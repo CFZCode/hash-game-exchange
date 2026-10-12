@@ -1,7 +1,7 @@
 import React from 'react';
 import PopCenter from '../../shared/PopCenter';
 import Input from '../../shared/Input';
-import { showToast } from '../../shared/Toast/toast';
+import { toast, toastError } from '../../shared/Toast/toast';
 import { useIsDesktop } from '../../../hooks/useMediaQuery';
 import { useSession } from '../../../context/session';
 import { disableTwoFactor } from '../../../services/twoFactor';
@@ -81,14 +81,16 @@ export default function TwoFactorDisable({ onClose }) {
       await disableTwoFactor({ code, password });
       /* The chunk's own success line, and its own store write: `j({google2StepAuth: !1})`. */
       setAccountField('google2StepAuth', false);
-      showToast('Secondary authentication is disabled.', { type: 'success' });
+      /* `b(m("Secondary authentication is disabled."))` — a BARE toast, no success icon. */
+      toast('Secondary authentication is disabled.');
       onClose();
     } catch (failure) {
       setPending(false);
       /* THE SERVER'S OWN MESSAGE. Its two refusals here — a wrong code and a wrong password —
          both already read well, and the auth dialog's note on `AUTH_MESSAGES` records why
          overriding one is a last resort rather than a habit. */
-      setError(failure?.message || 'That did not work. Please try again.');
+      /* `catch (a) { b(a) }` — an error toast on the original, not a line in the form. */
+      toastError(failure, 'That did not work. Please try again.');
     }
   };
 

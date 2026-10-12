@@ -43,6 +43,8 @@ import { useSettings } from '../../context/settings';
 import avatarImg from '../../assets/avatars/105522617.png';
 import balanceCoin from '../../assets/user-enter/balance_coin.png';
 import referArt from '../../assets/user-enter/refer.png';
+import { toast } from '../../components/shared/Toast/toast';
+import { copyToClipboard } from '../../utils/clipboard';
 
 /* Everything inside `/user/enter`'s scroller. The dialog shell around it is index.jsx.
  *
@@ -91,7 +93,9 @@ function ProfileHeader() {
 
   const copyId = (event) => {
     event.stopPropagation();
-    navigator.clipboard?.writeText(String(session.userId)).catch(() => {});
+    /* `e = o => { y1.copyToClipboard(o + ""), p1(u("Copied.")) }` in Enter-BAdJ4xN2.js. */
+    copyToClipboard(String(session.userId));
+    toast('Copied.');
   };
 
   return (

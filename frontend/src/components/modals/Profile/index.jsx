@@ -26,6 +26,8 @@ import avatarArt from '../../../assets/avatars/105522617.png';
 import favouriteFallback from '../../../assets/profile/detail.png';
 import achieveBg from '../../../assets/profile/achieve_bg.png';
 import Loading from '../../shared/Loading';
+import { toast } from '../../shared/Toast/toast';
+import { copyToClipboard } from '../../../utils/clipboard';
 
 /* `/user/profile/:userId` — My Profile, and the first of three dialogs that make up this feature.
  * The other two are `/user/medals/:userId` (Master Medals) and `/user/statistics` (Statistics
@@ -97,24 +99,18 @@ import Loading from '../../shared/Loading';
 /* `x` — the User ID line copies on click and toasts "Copied.". This build has no toast system, so
    the confirmation lives on the element, which is the departure `components/modals/Refer` made
    first. Lift both the day a second thing needs to say something. */
+/* `C = u => { Pe.copyToClipboard(u + ""), z(g("Copied.")) }` — a bare toast, the account
+   remote's "Copied." with its full stop. The label no longer swaps to say it. */
 function UserIdLine({ userId }) {
-  const [copied, setCopied] = React.useState(false);
-
-  React.useEffect(() => {
-    if (!copied) return undefined;
-    const timer = setTimeout(() => setCopied(false), 1500);
-    return () => clearTimeout(timer);
-  }, [copied]);
-
   return (
     <p
       className="flex cursor-pointer items-center text-secondary"
       onClick={() => {
-        navigator.clipboard?.writeText(String(userId));
-        setCopied(true);
+        copyToClipboard(String(userId));
+        toast('Copied.');
       }}
     >
-      <span>{copied ? 'Copied.' : 'User ID:'}</span>
+      <span>User ID:</span>
       <span>{userId}</span>
     </p>
   );

@@ -6,6 +6,8 @@ import { getInvitationCode } from '../../../services/referral';
 import { printCurrency } from '../../../utils/currency';
 import referralArt from '../../../assets/refer.png';
 import Loading from '../../shared/Loading';
+import { toast } from '../../shared/Toast/toast';
+import { copyToClipboard } from '../../../utils/clipboard';
 
 /* The Refer and Earn dialog — what the sidebar's Refer row opens.
  *
@@ -44,9 +46,9 @@ import Loading from '../../shared/Loading';
  * account's display currency, so the same 1000 prints as the visitor's own currency the moment
  * `enableLocaleCurrency` points somewhere else. Passed `session.setting` for that reason.
  *
- * TWO THINGS ARE THIS BUILD'S, both flagged at their call sites below: the copy confirmation
- * (the original toasts `Copied`; there is no toast system here, so the button says it) and where
- * the logged-out branch lives.
+ * ONE THING IS THIS BUILD'S, flagged at its call site below: where the logged-out branch lives.
+ * The copy confirmation is the original's own toast again — it sat on the button while this
+ * build had no toast system.
  */
 
 /* `$1,000.00` — the `number` slot. `new I(1e3)` is a Decimal on the original; a plain 1000 is the
@@ -55,7 +57,6 @@ const REWARD = 1000;
 
 export default function Refer({ open, onClose }) {
   const { session } = useSession();
-  const [copied, setCopied] = React.useState(false);
 
   /* GATED ON `open`, because the original fetches from the dialog's own mount — `k(() => ...)`
      inside `Z`, which the popup manager only ever constructs on a push. This component stays
@@ -70,31 +71,13 @@ export default function Refer({ open, onClose }) {
 
   const link = data?.invitationUrl ?? '';
 
-  /* `r = () => { P(n()); m(o("Copied")) }` — clipboard write, then a toast. THE TOAST IS THE
-     DEPARTURE: `m` is the global notifier and nothing in this build has one yet, so the
-     confirmation goes on the button, which is the only other thing on the dialog that can carry
-     it. Lift it to a real toast the day a second thing needs to say something — the same rule
-     `Select`, `GameTile` and `PopCenter` were extracted under.
-
-     `navigator.clipboard` rejects on an insecure origin and when the document is not focused;
-     the original swallows that too (its `.catch(m)` is on the request, not on the copy), so a
-     failure here simply leaves the label alone rather than claiming a copy that did not
-     happen. */
+  /* `r = () => { P(n()); m(o("Copied")) }` — the clipboard write (`be`, which falls back to
+     `execCommand` when the async API refuses) and then a bare `F("Copied")`, unconditionally.
+     The button keeps saying "Copy link"; the toast is the confirmation. */
   const copy = () => {
-    if (!link) return;
-    navigator.clipboard
-      ?.writeText(link)
-      .then(() => setCopied(true))
-      .catch(() => {});
+    copyToClipboard(link);
+    toast('Copied');
   };
-
-  /* Back to "Copy link" on its own, so the dialog can be reopened without stale confirmation.
-     Cleared by a timer rather than on blur because the button keeps focus after a click. */
-  React.useEffect(() => {
-    if (!copied) return undefined;
-    const timer = setTimeout(() => setCopied(false), 2000);
-    return () => clearTimeout(timer);
-  }, [copied]);
 
   return (
     /* `type="bottom"` IS WHAT MAKES THIS A SHEET ON A PHONE, and it restores the original's own
@@ -149,7 +132,7 @@ export default function Refer({ open, onClose }) {
             `button-${size}` with `s = size || !mobile && "m"`, so every trigger on a desktop
             carries it. Written out here for the reason the account dropdown's rows write it. */}
         <button type="button" className="button button-brand button-m w-full" onClick={copy}>
-          {copied ? 'Copied' : 'Copy link'}
+          Copy link
         </button>
       </div>
     </PopCenter>

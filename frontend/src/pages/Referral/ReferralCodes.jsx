@@ -9,6 +9,8 @@ import Pagination from '../../components/shared/Pagination';
 import DataTable from './DataTable';
 import { IconArrow } from '../../layouts/MainLayout/Header/AfterLogin/icons';
 import { IconCopy } from '../../components/shared/icons';
+import { toast } from '../../components/shared/Toast/toast';
+import { copyToClipboard } from '../../utils/clipboard';
 
 /* The Referral Codes & Friends tab — `/referral/refer/:pane`, and the third of the four.
  *
@@ -29,14 +31,16 @@ import { IconCopy } from '../../components/shared/icons';
  *
  * NOT BUILT, each inert at its call site: the Create Code dialog's submit
  * (`POST agent/invitation/code/add/`, authenticated — the dialog itself is built because it is
- * three fields and the chunk carries all of them), the `/referral-code-detail` route behind the
- * Referrals arrow, and the toast each Copy raises, which is the site's global one.
+ * three fields and the chunk carries all of them) and the `/referral-code-detail` route behind
+ * the Referrals arrow. Each Copy raises the original's own toast.
  */
 
 /* `ie` — the Create Code dialog. Note the chunk posts the SAME value as both `invitationName` and
    `campaignName`, from one field; that is its own, not a transcription slip. On success it copies
    the new code's URL and raises one of two toasts depending on whether the clipboard write threw,
-   which is a level of care worth recording even though neither toast exists here. */
+   which is a level of care worth recording: "Referral code created and copied to clipboard." or
+   "Referral code created.", and a refusal toasts the server's `message`. The submit itself is not
+   wired, so none of the three can fire yet. */
 function CreateCodeDialog({ open, onClose }) {
   const [name, setName] = React.useState('');
 
@@ -73,9 +77,19 @@ const stamp = (value) => {
   );
 };
 
-const copy = (value) => {
+/* The two cells confirm differently, and both are bare `F` toasts:
+ *   Code:  `I(e.toString()), g(s("Copied"))`                                   — `be`, then "Copied"
+ *   Link:  `try { navigator.clipboard.writeText(e), g(s("Invitation URL copied to clipboard.")) }
+ *           catch {}`                                                         — the raw API */
+const copyCode = (value) => {
+  copyToClipboard(String(value));
+  toast('Copied');
+};
+
+const copyLink = (value) => {
   try {
-    navigator.clipboard?.writeText(String(value));
+    navigator.clipboard.writeText(value).catch(() => {});
+    toast('Invitation URL copied to clipboard.');
   } catch {
     /* the chunk's own empty catch */
   }
@@ -106,10 +120,10 @@ const copy = (value) => {
  * the gap does not read as cramped. */
 function CopyButton({ value, onIcon }) {
   return (
-    <button type="button" className="button button-m p-0" onClick={onIcon ? undefined : () => copy(value)}>
+    <button type="button" className="button button-m p-0" onClick={onIcon ? undefined : () => copyCode(value)}>
       <IconCopy
         className={`icon size-5 fill-secondary${onIcon ? ' cursor-pointer p-0' : ''}`}
-        onClick={onIcon ? () => copy(value) : undefined}
+        onClick={onIcon ? () => copyLink(value) : undefined}
       />
     </button>
   );

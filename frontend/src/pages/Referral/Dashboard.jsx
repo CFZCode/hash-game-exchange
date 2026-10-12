@@ -1,4 +1,3 @@
-import React from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { getReferral, getInvitationCode, getAffiliateDashboard } from '../../services/referral';
 import { useResource } from '../../hooks/useResource';
@@ -10,6 +9,8 @@ import { REFERRAL_AMOUNT, INVITE, DASHBOARD_COPY, TABS } from './referral';
 import { printCurrency, fill } from './format';
 import { LiveRewards, ProgramBand, Faq } from './blocks';
 import EmptyPlaceholder from '../../components/shared/EmptyPlaceholder';
+import { toast } from '../../components/shared/Toast/toast';
+import { copyToClipboard } from '../../utils/clipboard';
 import MyRewards from './MyRewards';
 import ReferralCodes from './ReferralCodes';
 import RateRules from './RateRules';
@@ -50,8 +51,7 @@ import './Referral.css';
  * of them a table over an auth-gated feed, so they route, light their tab and render the site's
  * empty state. See the note on `TABS` in referral.js.
  *
- * NOT BUILT inside the Dashboard, each inert at its call site: the Copy buttons write to the
- * clipboard but the toast that confirms it is the site's global one and is not built; the
+ * NOT BUILT inside the Dashboard, each inert at its call site: the
  * `/referral-terms` route the Terms link points at exists on the original and not here, so it
  * falls to the catch-all; and the share links open a real sharer with the invite URL, where the
  * original first shortens it through `POST /game/support/share/short-link/<platform>/` for
@@ -93,15 +93,12 @@ const TAB_ICON = {
  * interpolated into the sentence below it — so the two can never disagree. */
 function InviteCard({ invite, amount, size }) {
   const navigate = useNavigate();
-  const [copied, setCopied] = React.useState('');
-
-  const copy = (value, which) => {
-    /* `navigator.clipboard` is not available on an insecure origin, and the original wraps its
-       own write in a bare try/catch for the same reason. The toast it raises on success is the
-       site's global one and is not built, so the button's own label does the confirming. */
+  /* `try { W(value), Q(a("Copied")) } catch {}` — the clipboard write and a bare `F("Copied")`.
+     The button keeps saying "Copy"; the toast is the confirmation. */
+  const copy = (value) => {
     try {
-      navigator.clipboard?.writeText(value);
-      setCopied(which);
+      copyToClipboard(value);
+      toast('Copied');
     } catch {
       /* no-op, as the chunk's own empty catch is */
     }
@@ -139,9 +136,9 @@ function InviteCard({ invite, amount, size }) {
             <button
               type="button"
               className="button button-s not-full rounded-lg bg-layer6 font-extrabold"
-              onClick={() => copy(invite.url, 'link')}
+              onClick={() => copy(invite.url)}
             >
-              {copied === 'link' ? invite.copied : invite.copy}
+              {invite.copy}
             </button>
           </div>
         </div>
@@ -152,9 +149,9 @@ function InviteCard({ invite, amount, size }) {
             <button
               type="button"
               className="button button-s not-full rounded-lg bg-layer6 font-extrabold"
-              onClick={() => copy(invite.code, 'code')}
+              onClick={() => copy(invite.code)}
             >
-              {copied === 'code' ? invite.copied : invite.copy}
+              {invite.copy}
             </button>
           </div>
         </div>

@@ -1,4 +1,5 @@
-import React from 'react';
+import { toast } from '../Toast/toast';
+import { copyToClipboard } from '../../../utils/clipboard';
 
 /* `C` in `CopyInput-B_53zFi6.js` — a boxed read-only string with a Copy button on the right.
  *
@@ -28,15 +29,9 @@ import React from 'react';
  * arm of that variable is #373e3f, the same square `.dialog-close` paints; it has no token in
  * this project's `@theme` and is spelled out here as the original spells it.
  *
- * THE COPY CONFIRMATION IS THE DEPARTURE, and it is the same one the Refer dialog records:
- * `l` ends in `w(d("Copied."))`, a global toast, where this puts the confirmation on the button —
- * the only other thing in the box that can carry it.
- *
- * That note used to end "this build has no toast system". IT HAS ONE NOW — `shared/Toast`, which
- * arrived with the password-change dialog — so the reason is no longer absence but placement: the
- * button is where a visitor is already looking when they click it, and a toast for a copy is
- * louder than the original's own is at this size. Worth revisiting together with the Refer
- * dialog's identical departure rather than one at a time.
+ * THE COPY CONFIRMATION IS A TOAST, as on the original: `l = () => { y.copyToClipboard(t.value),
+ * w(c("Copied.")) }` — the account remote's copy, with its own full stop, and a bare `F`. The
+ * button keeps saying "Copy". It sat on the button while this build had no toast system.
  */
 
 /* The chunk's own splitter, verbatim. */
@@ -46,27 +41,11 @@ function split(value) {
 }
 
 export default function CopyInput({ value = '', className = '' }) {
-  const [copied, setCopied] = React.useState(false);
-
   const parts = split(value);
 
-  /* Cleared on a timer rather than on blur, because the button keeps focus after a click —
-     the same arrangement `components/modals/Refer` uses. */
-  React.useEffect(() => {
-    if (!copied) return undefined;
-    const timer = setTimeout(() => setCopied(false), 2000);
-    return () => clearTimeout(timer);
-  }, [copied]);
-
   const copy = () => {
-    if (!value) return;
-    /* `navigator.clipboard` rejects on an insecure origin and when the document is not focused.
-       Swallowed, so a failure leaves the label alone rather than claiming a copy that did not
-       happen. */
-    navigator.clipboard
-      ?.writeText(value)
-      .then(() => setCopied(true))
-      .catch(() => {});
+    copyToClipboard(value);
+    toast('Copied.');
   };
 
   return (
@@ -93,7 +72,7 @@ export default function CopyInput({ value = '', className = '' }) {
         className="btn-like ml-auto h-full flex-none rounded-lg px-2 pb-0.5 pt-0"
         style={{ background: '#373e3f' }}
       >
-        {copied ? 'Copied' : 'Copy'}
+        Copy
       </button>
     </div>
   );

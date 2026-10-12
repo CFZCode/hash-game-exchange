@@ -1,7 +1,7 @@
 import React from 'react';
 import RouteDialog from '../../shared/RouteDialog';
 import Input from '../../shared/Input';
-import { showToast } from '../../shared/Toast/toast';
+import { toast, toastError } from '../../shared/Toast/toast';
 import { useSession } from '../../../context/session';
 import { updateProfile } from '../../../services/auth';
 import avatarImg from '../../../assets/avatars/105522617.png';
@@ -99,10 +99,12 @@ export default function EditProfileDialog({ onClose, onBack, enter }) {
       /* `k({name: l()})` — the store is written from the value that was sent, and the response is
          preferred where it carries one, since the server trims. */
       setAccountField('name', answer?.username ?? name.trim());
-      showToast('Done!');
+      toast('Done!');
       onClose?.();
     } catch (failure) {
-      setError(failure?.message || 'That username was not accepted.');
+      /* `catch (t) { O(t) }` — the server's refusal is a toast on the original; only the shape
+         test above stays under the field. */
+      toastError(failure, 'That username was not accepted.');
       setPending(false);
     }
   };

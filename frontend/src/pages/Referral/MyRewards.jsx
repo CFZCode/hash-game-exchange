@@ -12,7 +12,7 @@ import {
   getReferralRewards,
   claimAllAffiliateRewards,
 } from '../../services/referral';
-import { showToast } from '../../components/shared/Toast/toast';
+import { toast } from '../../components/shared/Toast/toast';
 import { getAlias } from '../../utils/currency';
 import { coinIcon } from '../../utils/coinArt';
 import EmptyPlaceholder from '../../components/shared/EmptyPlaceholder';
@@ -342,7 +342,6 @@ export default function MyRewards() {
      gates this component with an early return, and a hook below that would not run on every
      render. */
   const [claiming, setClaiming] = React.useState(false);
-  const [claimError, setClaimError] = React.useState('');
   const { pathname } = useLocation();
   const isDesktop = useMediaQuery('(min-width: 640px)');
   const size = isDesktop ? ' button-m' : '';
@@ -407,16 +406,17 @@ export default function MyRewards() {
   const withdrawToWallet = async () => {
     if (idle || claiming) return;
     setClaiming(true);
-    setClaimError('');
     try {
-      const answer = await claimAllAffiliateRewards();
-      const moved = Number(answer?.claimed ?? answer?.count ?? 0);
-      showToast(moved ? `Claimed ${moved} reward${moved === 1 ? '' : 's'}.` : 'Rewards claimed.');
+      await claimAllAffiliateRewards();
+      /* `Withdraw-uCHTYWsY.js`: `.then(() => m(u("All rewards have been withdrawn to Wallet")))`
+         and `l => m(l.message)` — two BARE toasts, the refusal printing the server's message as
+         a plain string (so no error icon). */
+      toast('All rewards have been withdrawn to Wallet');
       /* The two figures above come from the dashboard read, so the page has to be re-read for
          them to fall to zero — the same re-key the bonus page uses after its claims. */
       onClaimed?.();
     } catch (failure) {
-      setClaimError(failure?.message || 'Those rewards could not be claimed.');
+      if (failure?.message) toast(String(failure.message));
     } finally {
       setClaiming(false);
     }
@@ -502,9 +502,6 @@ export default function MyRewards() {
             Withdraw to Wallet
           </button>
         </div>
-        {claimError ? (
-          <p className="mt-2 w-full text-xs text-error sm:mt-0 sm:basis-full">{claimError}</p>
-        ) : null}
       </section>
 
       <section className="relative rounded-xl bg-layer4 pt-2">
