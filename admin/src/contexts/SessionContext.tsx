@@ -144,6 +144,24 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     refetchOnWindowFocus: true
   })
 
+  // Without `config:read` (the agent tree, executives) the plan above is never read, and every
+  // feature used to read as entitled: their sidebar listed Tips, Gift cards, Spin wheel and Swap
+  // history on a site where those are off. The site's public feature list (what players get: only
+  // the features that are ON) answers the same question for them.
+  const liveFeatures = useQuery<Set<string> | null>({
+    queryKey: ['api', 'admin/features/public', null],
+    queryFn: () =>
+      api
+        .get<Array<{ feature: string }>>('admin/features/public')
+        .then(list => (Array.isArray(list) ? new Set(list.map(f => f.feature)) : null))
+        .catch(() => null),
+    enabled: !!me.data && !hasPermission(me.data.permissions, 'config:read'),
+    staleTime: ENTITLEMENTS_POLL_MS - 1_000,
+    refetchInterval: ENTITLEMENTS_POLL_MS * 4,
+    refetchOnWindowFocus: true,
+    retry: false
+  })
+
   // A new plan version (or a new template from the owner) changes what the per-row `entitled`
   // marks, the flag switches and the template card say, so every features / site-config read is
   // refetched (the open screen updates in place).
@@ -171,8 +189,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [version, qc])
 
   const featureEntitled = useCallback(
-    (key?: string | null) => !key || entitlements.data?.features[key] !== false,
-    [entitlements.data]
+    (key?: string | null) => {
+      if (!key) return true
+      if (entitlements.data) return entitlements.data.features[key] !== false
+
+      return liveFeatures.data ? liveFeatures.data.has(key) : true
+    },
+    [entitlements.data, liveFeatures.data]
   )
 
   const flagEntitled = useCallback(
