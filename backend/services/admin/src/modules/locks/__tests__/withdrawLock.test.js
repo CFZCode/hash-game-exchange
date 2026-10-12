@@ -166,7 +166,7 @@ test('withdraw lock against a database', async (t) => {
     await Promise.all(recorded.splice(0));
   };
 
-  const actor = { id: root, level: 6, permissions: ['*'] };
+  const actor = { id: root, level: 6, permissions: ['*'], canAdjustWallets: true };
   const staffService = new StaffService(deps);
   const lords = new LordsService(deps);
   const reports = new ReportsService(deps);

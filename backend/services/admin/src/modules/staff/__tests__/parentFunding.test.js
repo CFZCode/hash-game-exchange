@@ -1,0 +1,311 @@
+'use strict';
+
+const test = require('node:test');
+const assert = require('node:assert');
+
+const db = require('@ibitplay/db');
+const { createLogger, money } = require('@ibitplay/common');
+const { hashPassword } = require('@ibitplay/auth');
+
+const { StaffService } = require('../staff.service');
+const { createControllers } = require('../controllers');
+const { LordsService } = require('../../lords/lords.service');
+const { StatementsService } = require('../../statements/statements.service');
+
+/**
+ * Parent funding (the addaplay rule, `lordsController.transferFunds`).
+ *
+ *   - any staff level deposits to / withdraws from a DIRECT CHILD STAFF account
+ *     out of its own float, without `wallet:adjust`
+ *   - the transaction password is always required on that path
+ *   - a grandchild, a sibling or a parent reads as not in your tree
+ *   - no self-transfer, no player target (players keep their own route)
+ *   - every move is a `staff_transfers` row on the transfer and agent statements
+ *   - `wallet:adjust` (Super Admin / Admin) is unchanged: any account in scope,
+ *     and the owner still mints
+ */
+
+const TEST_DB = process.env.TEST_DB_NAME || 'ibitplay_test';
+
+let connection;
+
+let nextStaffId = 990_000 + (process.pid % 1000) * 50;
+const newStaffId = () => (nextStaffId += 1);
+
+let nextUid = 845_000_000 + Math.floor(process.pid % 100_000) * 1000;
+const newUid = () => (nextUid += 1);
+
+const TXN = 'parent funding txn password';
+
+test('parent funds its direct child staff', async (t) => {
+  const logger = createLogger({ name: 'parent-funding-test', level: 'silent' });
+
+  // ── The controller derives the flags from the session's grants ─────────
+  await t.test('the controller sets canAdjustWallets / canCredit / canDebit from the grants', async () => {
+    const seen = [];
+    const ctrl = createControllers({ service: { transfer: async (args) => (seen.push(args.actor), {}) } });
+    const res = { status() { return this; }, json() { return this; }, set() { return this; } };
+    const call = (permissions) =>
+      new Promise((resolve, reject) =>
+        ctrl.transfer({ staff: { id: 1, level: 5, permissions }, body: {} }, { ...res, json: () => resolve() }, reject)
+      );
+
+    await call(['wallet:credit', 'wallet:debit', 'staff:read']);
+    assert.equal(seen[0].canAdjustWallets, false);
+    assert.equal(seen[0].canCredit, true);
+    assert.equal(seen[0].canDebit, true);
+
+    await call(['*']);
+    assert.equal(seen[1].canAdjustWallets, true);
+  });
+
+  try {
+    connection = await db.connect({
+      config: {
+        DB_HOST: process.env.DB_HOST || '127.0.0.1',
+        DB_PORT: Number(process.env.DB_PORT || 5432),
+        DB_NAME: TEST_DB,
+        DB_USER: process.env.DB_USER || 'postgres',
+        DB_PASSWORD: process.env.DB_PASSWORD || 'postgres',
+        DB_SCHEMA: 'public',
+      },
+      logger,
+      service: 'admin-service',
+    });
+    await connection.ping();
+  } catch (error) {
+    t.skip(`No test database reachable (${error.message})`);
+    return;
+  }
+
+  t.after(async () => {
+    if (connection) await connection.close();
+  });
+
+  const { models } = connection;
+  const { Op } = require('sequelize');
+  const deps = { models, db: connection, logger, config: { SERVICE_NAME: 'admin-service', ADMIN_MAX_REFILL: '1000000' } };
+  const service = new StaffService(deps);
+  const lords = new LordsService(deps);
+  const statements = new StatementsService(deps);
+
+  // One test role per level, so level checks run against real rows.
+  // Its own range, upserted: a shared test database can hold these ids at another level.
+  const roleBase = 7400 + (process.pid % 40) * 5;
+  const roleFor = (level) => roleBase + level - 1;
+  for (const level of [2, 4, 5, 6]) {
+    await connection.sequelize.query(
+      'INSERT INTO roles (id, name, level) VALUES (:id, :name, :level) ON CONFLICT (id) DO UPDATE SET level = EXCLUDED.level',
+      { replacements: { id: roleFor(level), name: `parent-funding-${roleFor(level)}`, level } }
+    );
+  }
+
+  const seedStaff = async (level, { inr = '0', creditLimit = '0', parentId = null } = {}) => {
+    const id = newStaffId();
+    await models.StaffHierarchy.destroy({ where: { [Op.or]: [{ ancestor_id: id }, { descendant_id: id }] } });
+    await models.StaffTransfers.destroy({
+      where: { [Op.or]: [{ from_type: 'staff', from_id: id }, { to_type: 'staff', to_id: id }] },
+    });
+    await models.StaffBalances.destroy({ where: { staff_id: id } });
+    await models.Staff.destroy({ where: { id } });
+
+    await models.Staff.create({
+      id,
+      name: `parent-funding-${id}`,
+      email: `parent-funding-${id}@test.invalid`,
+      password: await hashPassword('login password', 4),
+      transaction_password: await hashPassword(TXN, 4),
+      role_id: roleFor(level),
+      parent_id: parentId,
+      status: 'active',
+    });
+    await models.StaffBalances.create({ staff_id: id, inr, credit_limit: creditLimit });
+
+    const rows = [{ ancestor_id: id, descendant_id: id, depth: 0 }];
+    if (parentId) {
+      const ancestors = await models.StaffHierarchy.findAll({ where: { descendant_id: parentId }, raw: true });
+      rows.push(...ancestors.map((a) => ({ ancestor_id: a.ancestor_id, descendant_id: id, depth: Number(a.depth) + 1 })));
+    }
+    await models.StaffHierarchy.bulkCreate(rows, { ignoreDuplicates: true });
+    return id;
+  };
+
+  const seedPlayer = async (staffId, inr = '0') => {
+    const uid = newUid();
+    await models.Credits.destroy({ where: { uid } });
+    await models.Users.destroy({ where: { id: uid } });
+    await models.Users.create({ id: uid, name: `parent-funding-player-${uid}`, password: 'x', status: 'active', parent_staff_id: staffId });
+    await models.Credits.create({ uid, inr });
+    return uid;
+  };
+
+  const floatOf = async (id) => {
+    const row = await models.StaffBalances.findOne({ where: { staff_id: id }, raw: true });
+    return money.toDecimalString(money.toMinorQuantised(row?.inr ?? '0'));
+  };
+
+  /** An agent-tree session: wallet:credit + wallet:debit, never wallet:adjust. */
+  const treeActor = (id, level) => ({
+    id, level, canIssueFunds: false, canAdjustWallets: false, canCredit: true, canDebit: true,
+  });
+  const adminActor = (id, extra = {}) => ({
+    id, level: 2, canIssueFunds: false, canAdjustWallets: true, canCredit: true, canDebit: true, ...extra,
+  });
+
+  const move = (actor, toId, amount, direction = 'deposit', extra = {}) =>
+    service.transfer({ actor, toType: 'staff', toId, amount, direction, transactionPassword: TXN, ...extra });
+
+  // A small tree: supermaster → master → agent A, agent B (siblings).
+  const sm = await seedStaff(4, { inr: '0' });
+  const master = await seedStaff(5, { inr: '100', parentId: sm });
+  const agentA = await seedStaff(6, { inr: '0', parentId: master });
+  const agentB = await seedStaff(6, { inr: '0', parentId: master });
+
+  await t.test('a master funds its agent from its own float, then withdraws it back', async () => {
+    const actor = treeActor(master, 5);
+
+    const out = await move(actor, agentA, '10');
+    assert.equal(await floatOf(master), '90.00000000');
+    assert.equal(await floatOf(agentA), '10.00000000');
+    assert.equal(out.direction, 'deposit');
+
+    const back = await move(actor, agentA, '10', 'withdraw');
+    assert.equal(await floatOf(master), '100.00000000');
+    assert.equal(await floatOf(agentA), '0.00000000');
+    assert.equal(back.direction, 'withdraw');
+
+    // The ledger: one row each way, the payer derived from the direction.
+    const rows = await models.StaffTransfers.findAll({
+      where: { id: [out.id, back.id] }, order: [['id', 'ASC']], raw: true,
+    });
+    assert.deepEqual(
+      rows.map((r) => [r.from_type, Number(r.from_id), r.to_type, Number(r.to_id), r.direction, r.transfer_type]),
+      [
+        ['staff', master, 'staff', agentA, 'deposit', 'transfer'],
+        ['staff', agentA, 'staff', master, 'withdraw', 'transfer'],
+      ]
+    );
+
+    // The transfer statement (both sides) and the agent statement show them.
+    const masterSide = await lords.transferStatement({ actor: { id: master, level: 5 } });
+    const ids = masterSide.rows.map((r) => Number(r.id));
+    assert.ok(ids.includes(Number(out.id)) && ids.includes(Number(back.id)), 'master transfer statement');
+
+    const agentSide = await lords.transferStatement({ actor: { id: agentA, level: 6 }, accountType: 'staff', accountId: agentA });
+    assert.equal(agentSide.total, 2, 'agent transfer statement');
+
+    const agentStatement = await statements.agentStatement({ staff: { id: master }, staffId: agentA });
+    assert.ok(agentStatement.rows.length >= 2, 'agent statement carries the moves');
+  });
+
+  await t.test('a supermaster funds its master the same way', async () => {
+    await models.StaffBalances.update({ inr: '50' }, { where: { staff_id: sm } });
+    await move(treeActor(sm, 4), master, '20');
+    assert.equal(await floatOf(sm), '30.00000000');
+    assert.equal(await floatOf(master), '120.00000000');
+    await move(treeActor(sm, 4), master, '20', 'withdraw');
+    assert.equal(await floatOf(master), '100.00000000');
+  });
+
+  await t.test('direct child only: sibling, grandchild and parent are not in your tree', async () => {
+    const notInTree = (err) => err.code === 'STAFF_NOT_IN_YOUR_TREE' && err.status === 404;
+    await models.StaffBalances.update({ inr: '100' }, { where: { staff_id: agentA } });
+
+    await assert.rejects(() => move(treeActor(agentA, 6), agentB, '5'), notInTree, 'sibling');
+    await assert.rejects(() => move(treeActor(agentA, 6), master, '5'), notInTree, 'parent');
+    await assert.rejects(() => move(treeActor(agentA, 6), agentB, '5', 'withdraw'), notInTree, 'sibling withdraw');
+    await assert.rejects(() => move(treeActor(sm, 4), agentA, '5'), notInTree, 'grandchild');
+    await assert.rejects(() => move(treeActor(sm, 4), agentA, '5', 'withdraw'), notInTree, 'grandchild withdraw');
+
+    assert.equal(await floatOf(agentA), '100.00000000');
+    assert.equal(await floatOf(agentB), '0.00000000');
+    await models.StaffBalances.update({ inr: '0' }, { where: { staff_id: agentA } });
+  });
+
+  await t.test('no self-transfer, no player target, and the wallet grant is needed', async () => {
+    await assert.rejects(() => move(treeActor(master, 5), master, '5'), (err) => err.code === 'STAFF_CANNOT_TRANSFER_TO_SELF');
+
+    const player = await seedPlayer(master, '0');
+    await assert.rejects(
+      () => service.transfer({ actor: treeActor(master, 5), toType: 'user', toId: player, amount: '5', direction: 'deposit', transactionPassword: TXN }),
+      (err) => err.code === 'STAFF_NOT_PERMITTED'
+    );
+
+    await assert.rejects(
+      () => move({ ...treeActor(master, 5), canCredit: false }, agentA, '5'),
+      (err) => err.code === 'STAFF_NOT_PERMITTED'
+    );
+    await assert.rejects(
+      () => move({ ...treeActor(master, 5), canDebit: false }, agentA, '5', 'withdraw'),
+      (err) => err.code === 'STAFF_NOT_PERMITTED'
+    );
+    assert.equal(await floatOf(master), '100.00000000');
+  });
+
+  await t.test('insufficient own balance is the 422 INSUFFICIENT_STAFF_BALANCE and moves nothing', async () => {
+    await assert.rejects(
+      () => move(treeActor(master, 5), agentA, '100.01'),
+      (err) => err.code === 'INSUFFICIENT_STAFF_BALANCE' && err.status === 422
+    );
+    // A credit line funds players, never another staff account.
+    await models.StaffBalances.update({ credit_limit: '500' }, { where: { staff_id: master } });
+    await assert.rejects(() => move(treeActor(master, 5), agentA, '150'), (err) => err.code === 'INSUFFICIENT_STAFF_BALANCE');
+    await models.StaffBalances.update({ credit_limit: '0' }, { where: { staff_id: master } });
+
+    // Pulling back more than the child holds is the child's shortfall.
+    await assert.rejects(
+      () => move(treeActor(master, 5), agentA, '1', 'withdraw'),
+      (err) => err.code === 'STAFF_INSUFFICIENT_FUNDS'
+    );
+
+    // Two at once cannot overdraw the float.
+    const results = await Promise.allSettled([move(treeActor(master, 5), agentA, '60'), move(treeActor(master, 5), agentB, '60')]);
+    assert.equal(results.filter((r) => r.status === 'fulfilled').length, 1);
+    assert.equal(await floatOf(master), '40.00000000');
+
+    // Put it back.
+    const funded = results.findIndex((r) => r.status === 'fulfilled') === 0 ? agentA : agentB;
+    await move(treeActor(master, 5), funded, '60', 'withdraw');
+    assert.equal(await floatOf(master), '100.00000000');
+  });
+
+  await t.test('the transaction password is always required, and must be right', async () => {
+    await assert.rejects(
+      () => move(treeActor(master, 5), agentA, '5', 'deposit', { transactionPassword: 'not it at all' }),
+      (err) => err.code === 'TXN_PASSWORD_INVALID'
+    );
+    await assert.rejects(
+      () => move(treeActor(master, 5), agentA, '5', 'deposit', { transactionPassword: undefined }),
+      (err) => err.code === 'TXN_PASSWORD_REQUIRED'
+    );
+    assert.equal(await floatOf(master), '100.00000000');
+    assert.equal(await floatOf(agentA), '0.00000000');
+  });
+
+  await t.test('wallet:adjust is unchanged: an admin reaches any account in scope; the owner mints', async () => {
+    const admin = await seedStaff(2, { inr: '100' });
+    const sMaster = await seedStaff(4, { parentId: admin });
+    const mMaster = await seedStaff(5, { parentId: sMaster });
+    const player = await seedPlayer(mMaster, '0');
+
+    // A grandchild and a player — beyond the direct-child rule.
+    await service.transfer({ actor: adminActor(admin), toType: 'staff', toId: mMaster, amount: '30', direction: 'deposit', transactionPassword: TXN });
+    await service.transfer({ actor: adminActor(admin), toType: 'user', toId: player, amount: '20', direction: 'deposit', transactionPassword: TXN });
+    assert.equal(await floatOf(admin), '50.00000000');
+    assert.equal(await floatOf(mMaster), '30.00000000');
+
+    // Its shortfall keeps the 402 it always had.
+    await assert.rejects(
+      () => service.transfer({ actor: adminActor(admin), toType: 'staff', toId: sMaster, amount: '1000', direction: 'deposit', transactionPassword: TXN }),
+      (err) => err.code === 'STAFF_INSUFFICIENT_FUNDS' && err.status === 402
+    );
+
+    // The owner issues funds without a balance to draw down.
+    await models.StaffBalances.update({ inr: '0' }, { where: { staff_id: admin } });
+    await service.transfer({
+      actor: adminActor(admin, { level: 1, canIssueFunds: true }), toType: 'staff', toId: sMaster, amount: '40', direction: 'deposit', transactionPassword: TXN,
+    });
+    assert.equal(await floatOf(admin), '0.00000000');
+    assert.equal(await floatOf(sMaster), '40.00000000');
+  });
+});

@@ -73,14 +73,19 @@ module.exports = function adminRoutes(deps) {
   /**
    * Moving money between accounts.
    *
-   * Needs `wallet:adjust`, not `staff:write` — this is the one endpoint in the
+   * A wallet grant, not `staff:write` — this is the one endpoint in the
    * module that changes a balance, and it should not be reachable by whoever
    * can rename an account. Legacy gated it on the same middleware as
    * everything else.
+   *
+   * `wallet:adjust` (Super Admin, Admin) reaches any account in scope.
+   * `wallet:credit` / `wallet:debit` alone reach only a DIRECT CHILD STAFF
+   * account, out of the caller's own float, with the transaction password —
+   * the service enforces that (`StaffService#assertParentFunding`).
    */
   router.post(
     '/transfer',
-    auth.requirePermission(PERMISSIONS.WALLET_ADJUST),
+    auth.requireAnyPermission(PERMISSIONS.WALLET_ADJUST, PERMISSIONS.WALLET_CREDIT, PERMISSIONS.WALLET_DEBIT),
     validate(v.transfer),
     audit('staff.transfer', (req) => ({
       targetType: req.body.toType === 'user' ? 'USER' : 'STAFF',

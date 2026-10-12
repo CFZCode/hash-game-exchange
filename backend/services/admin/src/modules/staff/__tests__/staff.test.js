@@ -274,7 +274,9 @@ test('admin staff', async (t) => {
   };
 
   const actorFor = (id, extra = {}) => ({
-    id, level: levels.get(id) ?? 3, canResetOthers: false, canIssueFunds: false, ...extra,
+    // `canAdjustWallets`: these transfer tests are the `wallet:adjust` path; the
+    // parent-to-direct-child path has its own file (parentFunding.test.js).
+    id, level: levels.get(id) ?? 3, canResetOthers: false, canIssueFunds: false, canAdjustWallets: true, ...extra,
   });
 
   await t.test('a transfer down the tree moves money and records it', async () => {

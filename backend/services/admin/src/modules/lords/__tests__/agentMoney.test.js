@@ -417,7 +417,7 @@ test('agent-tree money', async (t) => {
     const agent = await seedStaff(newStaffId(), { inr: '0', creditLimit: '100', parentId: master });
     const sub = await seedStaff(newStaffId(), { inr: '0', parentId: agent });
     const player = await seedPlayer(newUid(), agent, '0');
-    const actor = { id: agent, level: 5, canIssueFunds: false };
+    const actor = { id: agent, level: 5, canIssueFunds: false, canAdjustWallets: true };
 
     await assert.rejects(() => staffService.transfer({ actor, toType: 'user', toId: player, amount: '60', direction: 'deposit' }), (err) => err.code === 'TXN_PASSWORD_REQUIRED');
     await staffService.transfer({ actor, toType: 'user', toId: player, amount: '60', direction: 'deposit', transactionPassword: TXN_PASSWORD });

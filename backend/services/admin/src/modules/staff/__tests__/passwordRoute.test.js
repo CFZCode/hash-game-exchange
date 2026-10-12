@@ -75,6 +75,8 @@ test('staff password route against a database', async (t) => {
   const auth = {
     requirePermission: (perm) => (_req, _res, next) =>
       permissions.includes(perm) ? next() : next(new ForbiddenError(`Missing required permission: ${perm}`)),
+    requireAnyPermission: (...perms) => (_req, _res, next) =>
+      perms.some((p) => permissions.includes(p)) ? next() : next(new ForbiddenError(`Missing required permission: ${perms.join(' | ')}`)),
   };
   const deps = { models, db: connection, logger, config: { SERVICE_NAME: 'admin-service' }, clients: { admin: { post: async () => ({}) } }, auth };
 

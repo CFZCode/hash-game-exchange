@@ -22,6 +22,7 @@ import StatusBadge from '@/components/shared/StatusBadge'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useSession } from '@/contexts/SessionContext'
 import { useApi, useApiMutation, useListState, usePagedApi } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
 import { formatNumber } from '@/lib/format'
@@ -68,6 +69,18 @@ const StaffDetail = ({ id }: { id: string }) => {
   const { set, query } = useListState()
   const transfers = usePagedApi<Transfer>(`admin/staff/transfers/${id}`, { limit: query.limit, page: query.page })
   const s = staff.data
+  const { actor, can } = useSession()
+
+  /**
+   * `wallet:adjust` (Super Admin, Admin) moves money with any account in scope. Without it a
+   * parent still settles with its DIRECT child staff account out of its own float — the API
+   * checks the same thing (`StaffService#assertParentFunding`) and always asks for the
+   * transaction password on that path.
+   */
+  const canAdjust = can('wallet:adjust')
+  const isParent = Boolean(actor && s?.parentId != null && String(s.parentId) === String(actor.staffId))
+  const canTransfer = canAdjust || (isParent && can(['wallet:credit', 'wallet:debit']))
+  const txnRequired = agentTree || !canAdjust
 
   const [edit, setEdit] = useState({ name: '', phone: '', country: '', status: '', percentage: '' })
   const [transfer, setTransfer] = useState({ toType: 'staff', amount: '', direction: 'deposit', transactionPassword: '' })
@@ -138,7 +151,7 @@ const StaffDetail = ({ id }: { id: string }) => {
         actions={
           s && (
             <>
-              <Can permission='wallet:adjust'>
+              {canTransfer && (
                 <FormDialog
                   trigger={
                     <Button variant='outline'>
@@ -152,9 +165,9 @@ const StaffDetail = ({ id }: { id: string }) => {
                 >
                   <SelectField id='t-dir' label='Direction' value={transfer.direction} onChange={direction => setTransfer({ ...transfer, direction })} options={[{ value: 'deposit', label: 'Deposit to them' }, { value: 'withdraw', label: 'Withdraw from them' }]} />
                   <TextField id='t-amt' label='Amount' required placeholder='1000.00' value={transfer.amount} onChange={e => setTransfer({ ...transfer, amount: e.target.value })} />
-                  <TextField id='t-tp' label='Transaction password' type='password' required={agentTree} hint={agentTree ? 'Required for every balance move' : 'Required if your account has one set'} value={transfer.transactionPassword} onChange={e => setTransfer({ ...transfer, transactionPassword: e.target.value })} />
+                  <TextField id='t-tp' label='Transaction password' type='password' required={txnRequired} hint={txnRequired ? 'Required for every balance move' : 'Required if your account has one set'} value={transfer.transactionPassword} onChange={e => setTransfer({ ...transfer, transactionPassword: e.target.value })} />
                 </FormDialog>
-              </Can>
+              )}
               <Can permission='users:write'>
                 <WithdrawBlockAction target={{ kind: 'staff', id }} locks={s.locks} invalidate={[['api', `admin/staff/${id}`], ['paged', 'admin/reports/players']]} />
               </Can>

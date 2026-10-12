@@ -7,7 +7,7 @@ const { money, withdrawBlock } = require('@ibitplay/common');
 const errors = require('./staff.errors');
 const { TRANSFER_DIRECTION, TARGET_TYPE, BALANCE_CURRENCY, PASSWORD_ROUNDS } = require('./staff.constants');
 const { descendantIds, manageableStaffIds } = require('../staff-directory/staffDirectory.service');
-const { debitStaffFloat } = require('../lords/staffFloat');
+const { debitStaffFloat, insufficientStaffBalance } = require('../lords/staffFloat');
 const { assertTransactionPassword } = require('../staff-auth/transactionPassword');
 
 /**
@@ -490,13 +490,31 @@ class StaffService {
    */
   async transfer({ actor, toType, toId, amount, direction, transactionPassword }) {
     /**
+     * Two ways in.
+     *
+     *   `wallet:adjust` (Super Admin, Admin) — any account in the caller's
+     *     scope, staff or player, exactly as before.
+     *
+     *   everyone else — a PARENT settling with a DIRECT CHILD STAFF account
+     *     out of its own float (the addaplay rule). See `#assertParentFunding`.
+     *
+     * `canAdjustWallets` is set by the controller from the session's grants;
+     * an actor without it takes the narrow path (fail closed).
+     */
+    const parentFunding = !actor.canAdjustWallets;
+    if (parentFunding) this.#assertParentFunding(actor, toType, toId, direction);
+
+    /**
      * The second factor. Agent-tree staff (4–6) must have one and give it;
-     * house staff give it once they have set one.
+     * house staff give it once they have set one. A parent moving its own
+     * float without `wallet:adjust` always needs it.
      */
     await assertTransactionPassword(this.models, actor.id, transactionPassword, {
-      required: AGENT_TREE_LEVELS.includes(Number(actor.level)),
+      required: parentFunding || AGENT_TREE_LEVELS.includes(Number(actor.level)),
     });
-    const target = await this.#assertTransferTarget(actor, toType, toId);
+    const target = parentFunding
+      ? await this.#assertDirectChildStaff(actor, toId)
+      : await this.#assertTransferTarget(actor, toType, toId);
 
     // Who pays and who receives. A `withdraw` pulls money UP from the target;
     // a `deposit` pushes it DOWN from the actor.
@@ -525,7 +543,7 @@ class StaffService {
       // An agent funding a PLAYER may draw on its credit line; a transfer to
       // another staff account never does. See `lords/staffFloat.js`.
       const allowCredit = source.type === TARGET_TYPE.STAFF && destination.type === TARGET_TYPE.USER;
-      await this.#debit(source, amount, { actor, transaction, allowCredit });
+      await this.#debit(source, amount, { actor, transaction, allowCredit, ownFloatError: parentFunding });
       await this.#credit(destination, amount, { transaction });
 
       const row = await this.models.StaffTransfers.create(
@@ -806,7 +824,7 @@ class StaffService {
    * debited unconditionally — so two transfers issued at once both passed the
    * comparison and the account went negative.
    */
-  async #debit(party, amount, { actor, transaction, allowCredit = false }) {
+  async #debit(party, amount, { actor, transaction, allowCredit = false, ownFloatError = false }) {
     /**
      * The platform owner is the source of funds and has no balance to draw
      * down — legacy expressed this as `req.staff.level !== 0`, skipping the
@@ -836,7 +854,14 @@ class StaffService {
           }
         );
 
-    if (!affected) throw errors.INSUFFICIENT_FUNDS({ party: party.type, id: party.id, amount });
+    if (!affected) {
+      // A parent funding its child from its own float gets the same 422 the
+      // agent money dialogs already show; everything else keeps the 402.
+      if (ownFloatError && party.type === TARGET_TYPE.STAFF && Number(party.id) === Number(actor.id)) {
+        throw insufficientStaffBalance({ staffId: party.id, amount });
+      }
+      throw errors.INSUFFICIENT_FUNDS({ party: party.type, id: party.id, amount });
+    }
   }
 
   async #credit(party, amount, { transaction }) {
@@ -906,6 +931,41 @@ class StaffService {
   async #staffLevel(staffId) {
     const row = await this.models.Staff.findByPk(staffId, { attributes: ['id', 'role_id'], raw: true });
     return row ? this.#roleLevel(row.role_id) : null;
+  }
+
+  /**
+   * The non-`wallet:adjust` path: a parent and its DIRECT CHILD STAFF account.
+   *
+   * Players keep their own route (`admin/user/wallet/adjust`, forwarded to
+   * `lords.adjustPlayer`), so a player target is refused here as before. A
+   * deposit needs `wallet:credit`, a withdrawal `wallet:debit` — the same
+   * grants the player money dialogs use.
+   */
+  #assertParentFunding(actor, toType, toId, direction) {
+    if (toType !== TARGET_TYPE.STAFF) {
+      throw errors.NOT_PERMITTED({ reason: 'fund a player from the player wallet screen' });
+    }
+    const isWithdraw = direction === TRANSFER_DIRECTION.WITHDRAW;
+    if (isWithdraw ? !actor.canDebit : !actor.canCredit) {
+      throw errors.NOT_PERMITTED({ reason: `your role cannot ${isWithdraw ? 'withdraw from' : 'deposit to'} an account` });
+    }
+    if (Number(toId) === Number(actor.id)) throw errors.CANNOT_TRANSFER_TO_SELF();
+  }
+
+  /**
+   * One level only — `staff.parent_id` must be the caller. A grandchild is
+   * settled by its own parent, so every ledger in the chain stays complete
+   * (addaplay's `assertDirectChild`). Anything else reads as not found.
+   */
+  async #assertDirectChildStaff(actor, toId) {
+    const child = await this.models.Staff.findOne({
+      where: { id: toId, parent_id: actor.id },
+      attributes: ['id', 'role_id'],
+      raw: true,
+    });
+    if (!child) throw errors.NOT_IN_YOUR_TREE({ staffId: toId });
+    this.#assertCanActOn(actor, await this.#roleLevel(child.role_id), child.id);
+    return Number(child.id);
   }
 
   /** A transfer target must be a descendant account, or a player under one. */
