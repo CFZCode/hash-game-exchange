@@ -138,7 +138,11 @@ export default function FiatForm({ currencyName }) {
      changes, and the reader is keyed on this. */
   const [version, setVersion] = React.useState(0);
   const readAccounts = React.useCallback(() => getBankAccounts(version), [version]);
-  const readRequirements = React.useCallback(() => getWithdrawRequirements(version), [version]);
+  const bareCurrency = currencyName.replace(/FIAT$/, '');
+  const readRequirements = React.useCallback(
+    () => getWithdrawRequirements(bareCurrency, version),
+    [bareCurrency, version],
+  );
   const { data: accountsData } = useResource(readAccounts);
   const { data: requirements } = useResource(readRequirements);
 
@@ -167,7 +171,7 @@ export default function FiatForm({ currencyName }) {
     setError(null);
     submitFiatWithdraw({
       amount: String(shownAmount),
-      currency: currencyName.replace(/FIAT$/, ''),
+      currency: bareCurrency,
       ...destination,
       ...(forfeitBonus ? { forfeitBonus: true } : {}),
     })
@@ -239,6 +243,18 @@ export default function FiatForm({ currencyName }) {
         <RequirementNotice>
           Wager {Number(requirements?.wager?.remaining ?? 0).toFixed(2)}{' '}
           {requirements?.wager?.currency ?? 'USD'} more to withdraw.
+        </RequirementNotice>
+      )}
+
+      {/* The deposit cap (owner switch). Shown whenever it is on, since it bounds every
+          withdrawal — at 0 it is also in `missing`. `wagerToRaise` is how much play lifts it. */}
+      {requirements?.cap?.enabled && requirements.cap.remaining != null && (
+        <RequirementNotice>
+          You can withdraw up to {Number(requirements.cap.remaining).toFixed(2)}{' '}
+          {requirements.cap.currency ?? bareCurrency} more
+          {Number(requirements.cap.wagerToRaise) > 0 &&
+            ` — wager ${Number(requirements.cap.wagerToRaise).toFixed(2)} ${requirements.cap.currency ?? bareCurrency} to raise it`}
+          .
         </RequirementNotice>
       )}
 

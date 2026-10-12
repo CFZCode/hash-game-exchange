@@ -236,9 +236,15 @@ export function getBankAccounts() {
 
 const REQUIREMENTS_OK = { ok: true, missing: [], bonusForfeitRequired: false };
 
-export function getWithdrawRequirements() {
+/* `?currency=` adds the `cap` block (the deposit cap: `{enabled, remaining, wagerToRaise, …}`),
+   and `missing` then carries `'cap'` once `remaining` is 0. Bare code, `INR`. */
+export function getWithdrawRequirements(currency) {
   return Promise.resolve(
-    request(PLATFORM.user.withdrawals.requirements, { live: true, fixture: REQUIREMENTS_OK }),
+    request(PLATFORM.user.withdrawals.requirements, {
+      live: true,
+      params: currency ? { currency } : undefined,
+      fixture: REQUIREMENTS_OK,
+    }),
   ).catch(() => REQUIREMENTS_OK);
 }
 
