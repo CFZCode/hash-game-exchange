@@ -169,20 +169,33 @@ const CAPTURED_NOTICES = [
  * handles — `data` (the platform's arbitrary JSON payload) is deliberately NOT rendered, because
  * nothing on this side knows what any given producer put in it.
  */
-const TYPE_BY_NAME = {
-  deposit: NOTICE_TYPE.transaction,
-  withdrawal: NOTICE_TYPE.transaction,
-  bet: NOTICE_TYPE.transaction,
-  promotion: NOTICE_TYPE.promotion[0],
-  bonus: NOTICE_TYPE.promotion[0],
-  general: NOTICE_TYPE.system,
+/* SmartBet writes many more types than the six staff-send names (`deposit_approved`,
+   `withdrawal_rejected`, `tip_received`, `affiliate_commission`…), and its own panel grouping is
+   `categories.js` in the notifications module: `general` is System, the offer types are
+   Promotions, and EVERYTHING ELSE is Transactions. Mirrored exactly, so these tabs agree with the
+   server's `unread-count.byCategory`. */
+const SYSTEM_TYPES = ['general'];
+const PROMOTION_TYPES = [
+  'promotion',
+  'bonus',
+  'campaign',
+  'first_deposit_bonus',
+  'spin_wheel_bonus',
+  'bonus_unlocked',
+];
+
+const typeOf = (name) => {
+  const t = name ?? 'general';
+  if (SYSTEM_TYPES.includes(t)) return NOTICE_TYPE.system;
+  if (PROMOTION_TYPES.includes(t)) return NOTICE_TYPE.promotion[0];
+  return NOTICE_TYPE.transaction;
 };
 
 const toNotice = (row) => ({
   /* The id stays a STRING here and is compared as one downstream — it is a bigint on the wire
      and `Number()` on it is a silent precision bug waiting for a busy deployment. */
   afficheId: String(row.id),
-  type: TYPE_BY_NAME[row.type] ?? NOTICE_TYPE.system,
+  type: typeOf(row.type),
   /* No pinning on this platform — nothing marks a notification as sticky. */
   isTop: 0,
   isRead: row.read ? 1 : 0,
