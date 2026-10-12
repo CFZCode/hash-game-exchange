@@ -86,11 +86,17 @@ const EditPlayer = ({ player }: { player: Report }) => {
   )
 }
 
-const Locks = ({ userId }: { userId: string }) => {
-  const [locks, setLocks] = useState({ system: false, casino: false, sports: false })
+/**
+ * The three product locks. The player report carries the current state (`locks`), so the switches
+ * open on it: they used to open all-off, and turning on one lock silently lifted the others.
+ */
+const Locks = ({ userId, current, invalidate }: { userId: string; current?: AccountLocks; invalidate?: (string | null)[][] }) => {
+  const fromCurrent = () => ({ system: !!current?.system, casino: !!current?.casino, sports: !!current?.sports })
+  const [locks, setLocks] = useState(fromCurrent)
 
   const apply = useApiMutation({
     fn: () => api.post('admin/locks', { userId: Number(userId), ...locks }),
+    invalidate,
     success: 'Locks updated'
   })
 
@@ -102,9 +108,10 @@ const Locks = ({ userId }: { userId: string }) => {
         </Button>
       }
       title='User locks'
-      description='Turning a lock on blocks that product for this user immediately. The platform does not report current lock state on this screen; set all three deliberately.'
+      description='Turning a lock on blocks that product for this user immediately; turning it off lifts it. The switches show the current state.'
       submitLabel='Apply locks'
       onSubmit={() => apply.mutateAsync()}
+      onOpenChange={o => o && setLocks(fromCurrent())}
     >
       <SwitchField id='l-system' label='System lock' hint='Blocks sign-in and everything else' checked={locks.system} onChange={system => setLocks({ ...locks, system })} />
       <SwitchField id='l-casino' label='Casino lock' checked={locks.casino} onChange={casino => setLocks({ ...locks, casino })} />
@@ -347,7 +354,7 @@ const PlayerDetail = ({ id }: { id: string }) => {
                 />
               </Can>
               <Can permission='users:write'>
-                <Locks userId={id} />
+                <Locks userId={id} current={p.locks} invalidate={[['api', `admin/reports/players/${id}`], ['api', `admin/reports/players/${id}/status-stats`]]} />
                 <WithdrawBlockAction target={{ kind: 'user', id }} locks={p.locks} invalidate={[['api', `admin/reports/players/${id}`], ['api', `admin/reports/players/${id}/status-stats`]]} />
                 <EditPlayer player={p} />
                 <ConfirmDialog

@@ -3,6 +3,7 @@
 import { Coins } from 'lucide-react'
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { useSession } from '@/contexts/SessionContext'
 import { useApi } from '@/hooks/use-api'
 
 /**
@@ -20,15 +21,18 @@ type PublicConfig = { rewardCurrency?: string }
 export const DEFAULT_REWARD_CURRENCY = 'USDT'
 
 export function useRewardCurrency() {
-  const staff = useApi<Rewards>('admin/site-config/rewards', undefined, { retry: false, staleTime: 15_000 })
-  const pub = useApi<PublicConfig>(staff.isError ? 'admin/site-config/public' : null, undefined, { staleTime: 15_000 })
+  // Without `config:read` (agents, masters) the staff read can only 403, so go straight to the public one.
+  const canConfig = useSession().can('config:read')
+  const staff = useApi<Rewards>(canConfig ? 'admin/site-config/rewards' : null, undefined, { retry: false, staleTime: 15_000 })
+  const usePublic = !canConfig || staff.isError
+  const pub = useApi<PublicConfig>(usePublic ? 'admin/site-config/public' : null, undefined, { staleTime: 15_000 })
   const code = staff.data?.rewardCurrency ?? pub.data?.rewardCurrency ?? DEFAULT_REWARD_CURRENCY
 
   return {
     code,
     name: staff.data?.name ?? code,
     managedBy: staff.data?.managedBy ?? (pub.data ? 'owner' : null),
-    loading: staff.isLoading || (staff.isError && pub.isLoading)
+    loading: (canConfig && staff.isLoading) || (usePublic && pub.isLoading)
   }
 }
 

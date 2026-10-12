@@ -27,18 +27,37 @@ import { api } from '@/lib/api/client'
 import { formatNumber } from '@/lib/format'
 import { useIsAgentTree } from '@/views/finance/StaffFloat'
 import WithdrawBlockAction, { WithdrawBlockedBadge, type AccountLocks } from '@/views/players/WithdrawBlockAction'
+import type { StaffTransferRow } from '@/views/finance/types'
 import { ROLE_NAMES, STAFF_STATUSES, type StaffRow } from './types'
 
 type Staff = StaffRow & { locks?: AccountLocks; balance?: { inr: string; creditLimit: string; exposureLimit: string; currency: string } }
 type Rollup = { staffAccounts: number; players: number; balance: string; currency: string; includesSubtree: boolean }
-type Transfer = Record<string, unknown> & { id: number; direction?: string; amount?: string; currency?: string; fromId?: number; toId?: number; toType?: string; note?: string; createdAt?: string; created_at?: string }
 
-const transferColumns: Column<Transfer>[] = [
-  { key: 'at', header: 'When', cell: r => <DateTime value={r.createdAt ?? r.created_at} /> },
+/** `admin/staff/transfers/:id` rows: both parties as `{type, id, name}` (the Transfers screen's shape). */
+type Transfer = StaffTransferRow
+
+/** The other side of a transfer, seen from this staff account. */
+const counterparty = (r: Transfer, selfId: string) => (r.to.type === 'staff' && String(r.to.id) === selfId ? r.from : r.to)
+
+const transferColumns = (selfId: string): Column<Transfer>[] => [
+  { key: 'at', header: 'When', cell: r => <DateTime value={r.createdAt} /> },
   { key: 'dir', header: 'Direction', cell: r => <StatusBadge value={r.direction} /> },
-  { key: 'amount', header: 'Amount', align: 'right', cell: r => <Money value={r.amount} currency={r.currency} /> },
-  { key: 'to', header: 'Counterparty', cell: r => <span className='text-sm'>{r.toType} #{String(r.toId ?? r.fromId ?? '')}</span> },
-  { key: 'note', header: 'Note', cell: r => <span className='text-muted-foreground text-sm'>{String(r.note ?? '')}</span> }
+  { key: 'amount', header: 'Amount', align: 'right', cell: r => <Money value={r.amount} currency='INR' /> },
+  {
+    key: 'to',
+    header: 'Counterparty',
+    cell: r => {
+      const p = counterparty(r, selfId)
+
+      return (
+        <Link href={p.type === 'user' ? `/users/${p.id}` : `/staff/${p.id}`} className='text-sm hover:underline'>
+          {p.name ?? `${p.type} #${p.id}`}
+          <span className='text-muted-foreground ml-1 font-mono text-xs'>{p.type} #{p.id}</span>
+        </Link>
+      )
+    }
+  },
+  { key: 'type', header: 'Type', cell: r => <span className='text-muted-foreground text-sm'>{r.transferType ?? '—'}</span> }
 ]
 
 const StaffDetail = ({ id }: { id: string }) => {
@@ -208,7 +227,7 @@ const StaffDetail = ({ id }: { id: string }) => {
           <TabsTrigger value='risk'>Risk</TabsTrigger>
         </TabsList>
         <TabsContent value='transfers'>
-          <DataTable columns={transferColumns} rows={transfers.data?.rows} rowKey={r => r.id} loading={transfers.isLoading} error={transfers.error} pagination={transfers.data?.pagination} onPageChange={page => set({ page })} onLimitChange={limit => set({ limit })} dense />
+          <DataTable columns={transferColumns(id)} rows={transfers.data?.rows} rowKey={r => r.id} loading={transfers.isLoading} error={transfers.error} pagination={transfers.data?.pagination} onPageChange={page => set({ page })} onLimitChange={limit => set({ limit })} dense />
         </TabsContent>
         <TabsContent value='analytics'>
           <Raw path={`admin/staff/analytics/${id}`} query={{ days: 30 }} />
