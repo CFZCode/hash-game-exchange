@@ -54,7 +54,7 @@ const columns: Column<PlayerRow>[] = [
   { key: 'ref', header: 'Referral', cell: r => <span className='font-mono text-xs'>{r.referralCode}</span> }
 ]
 
-export const CreatePlayer = () => {
+const CreatePlayer = () => {
   const [form, setForm] = useState({ username: '', email: '', phone: '', country: '', password: '', initialBalance: '0' })
   const router = useRouter()
 

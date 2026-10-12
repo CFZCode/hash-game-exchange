@@ -7,9 +7,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 
 const COOKIE = process.env.SESSION_COOKIE_NAME ?? 'cfz_sa_token'
-// `/agent` is the agent portal's sign-in (app/(blank)/agent): it reads the business model and the
-// session itself, so it is public here. The agent home it lands on is `/agent-home`, a normal page.
-const PUBLIC = ['/login', '/agent', '/api/auth/login', '/api/auth/logout']
+const PUBLIC = ['/login', '/api/auth/login', '/api/auth/logout']
 
 function tokenLooksValid(token: string | undefined) {
   if (!token) return false

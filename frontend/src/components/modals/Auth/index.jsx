@@ -1,7 +1,8 @@
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useSession } from '../../../context/session';
 import { useGates } from '../../../context/gates';
+import { SIGNUP_CLOSED_MESSAGE } from '../../../services/gates';
 import useDialogScrollLock from '../../../hooks/useDialogScrollLock';
 import { useIsDesktop } from '../../../hooks/useMediaQuery';
 import Loading from '../../shared/Loading';
@@ -830,19 +831,6 @@ function TwoFactorStep({ onConfirm, onClose, pending, error, onClearError }) {
   );
 }
 
-/* The refusal above as the error slot prints it, with "Ask your agent" linking to the agent entry
-   (`/agent`, open on a b2b site — the only one where sign-up is closed). The slot is the Sign In
-   form's own `<p className="text-error">`, so the copy and its place are unchanged. */
-const SIGNUP_CLOSED_NOTICE = (
-  <>
-    Sign-up is by invitation on this site.{' '}
-    <Link to="/agent" className="underline">
-      Ask your agent
-    </Link>{' '}
-    for an account.
-  </>
-);
-
 export default function Auth({ mode: requested, onClose, enter = 'open' }) {
   const navigate = useNavigate();
   /* A B2B (agent-only) site has no public sign-up (services/gates.js `canSignUp`): Sign Up
@@ -1144,7 +1132,7 @@ export default function Auth({ mode: requested, onClose, enter = 'open' }) {
                       <SignInForm
                         onSubmit={submit}
                         pending={pending}
-                        error={error || (signUpClosed ? SIGNUP_CLOSED_NOTICE : '')}
+                        error={error || (signUpClosed ? SIGNUP_CLOSED_MESSAGE : '')}
                       />
                     )}
                     <div className="mt-auto px-6 sm:px-8" />

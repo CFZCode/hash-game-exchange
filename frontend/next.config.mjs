@@ -8,7 +8,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
    so each one falls back to its VITE_ twin. A NEXT_PUBLIC_ value, from the shell or an env file,
    wins. Unset stays unset: src/services/client.js keeps its own defaults (fixtures ON unless
    "false", no API base, a 400ms fixture delay). */
-const KEYS = ['API_BASE', 'USE_FIXTURES', 'FIXTURE_DELAY', 'SITE_TITLE', 'SITE_DESCRIPTION', 'SITE_LOGO', 'AGENT_PORTAL_URL'];
+const KEYS = ['API_BASE', 'USE_FIXTURES', 'FIXTURE_DELAY', 'SITE_TITLE', 'SITE_DESCRIPTION', 'SITE_LOGO'];
 const env = {};
 for (const key of KEYS) {
   const value = process.env[`NEXT_PUBLIC_${key}`] ?? process.env[`VITE_${key}`];

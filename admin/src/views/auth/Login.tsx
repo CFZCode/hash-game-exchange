@@ -27,20 +27,16 @@ import { siteConfig } from '@/configs/site'
 
 // Lib Imports
 import { ApiError, errorMessage, request } from '@/lib/api/client'
-import { AGENT_HOME, isAgentTreeLevel } from '@/lib/auth/agentPortal'
 
 // SVG Import
 import AuthBackgroundShape from '@/assets/svg/auth-background-shape'
 
 type Mode = 'staff' | 'executive'
 
-/**
- * `portal='agent'` is the agent portal's sign-in (`/agent`): the same staff sign-in, labelled for
- * agents, with no Executive tab. An agent-tree login lands on the agent home; anyone above the
- * agent tree lands on their normal dashboard. Without it this is `/login`, unchanged.
- */
-const Login = ({ portal }: { portal?: 'agent' } = {}) => {
-  const agentPortal = portal === 'agent'
+/** Staff levels 4–6 (SUPER_MASTER, MASTER, AGENT): the agent tree, the same test `/api/auth/me` makes. */
+const isAgentTreeLevel = (level: unknown) => Number(level) >= 4 && Number(level) <= 6
+
+const Login = () => {
   const qc = useQueryClient()
   const params = useSearchParams()
   const [mode, setMode] = useState<Mode>('staff')
@@ -101,11 +97,16 @@ const Login = ({ portal }: { portal?: 'agent' } = {}) => {
 
       // A password somebody else chose must be replaced before anything else opens.
       if (data?.mustChangePassword) return window.location.assign('/change-password')
-      if (!agentPortal) return window.location.assign(params.get('next') || '/dashboard')
 
+      const next = params.get('next')
+
+      if (next) return window.location.assign(next)
+
+      // An agent-tree login (levels 4–6) lands on its players: the Users list, which the platform
+      // scopes to the caller's tree. Everyone above it lands on the dashboard.
       const me = await request<{ level?: number }>('/api/auth/me', { raw: true }).catch(() => null)
 
-      window.location.assign(isAgentTreeLevel(me?.data?.level) ? AGENT_HOME : '/dashboard')
+      window.location.assign(isAgentTreeLevel(me?.data?.level) ? '/users' : '/dashboard')
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.is('TWO_FACTOR_REQUIRED')) {
@@ -141,26 +142,14 @@ const Login = ({ portal }: { portal?: 'agent' } = {}) => {
         <CardHeader className='gap-6 px-6'>
           <Logo className='gap-3' />
           <div>
-            {agentPortal ? (
-              <>
-                <CardTitle className='mb-2 text-2xl font-semibold'>Agent portal</CardTitle>
-                <CardDescription className='text-base'>
-                  Manage your players on {siteConfig.name} · {siteConfig.environment}
-                </CardDescription>
-              </>
-            ) : (
-              <>
-                <CardTitle className='mb-2 text-2xl font-semibold'>Sign in to {siteConfig.name}</CardTitle>
-                <CardDescription className='text-base'>
-                  Staff sign-in for <span className='font-mono'>{siteConfig.key}</span> · {siteConfig.environment}
-                </CardDescription>
-              </>
-            )}
+            <CardTitle className='mb-2 text-2xl font-semibold'>Sign in to {siteConfig.name}</CardTitle>
+            <CardDescription className='text-base'>
+              Staff sign-in for <span className='font-mono'>{siteConfig.key}</span> · {siteConfig.environment}
+            </CardDescription>
           </div>
         </CardHeader>
 
         <CardContent className='px-6'>
-          {!agentPortal && (
           <Tabs value={mode} onValueChange={v => setMode(v as Mode)} className='mb-6'>
             <TabsList className='w-full'>
               <TabsTrigger value='staff' className='flex-1'>
@@ -171,7 +160,6 @@ const Login = ({ portal }: { portal?: 'agent' } = {}) => {
               </TabsTrigger>
             </TabsList>
           </Tabs>
-          )}
 
           <form onSubmit={submit}>
             <FieldGroup className='gap-4'>
