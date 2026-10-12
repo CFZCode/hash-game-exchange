@@ -1,6 +1,13 @@
 import { CloseIcon } from './icons';
 import { GAMES } from '../../data/games';
 import { writeHistory } from './history';
+import useResource from '../../hooks/useResource';
+import { getCasinoSet } from '../../services/catalog';
+import { USE_FIXTURES } from '../../services/client';
+
+/* Fixtures off: the operator's Hot Games collection, by name. */
+const readSuggested = () =>
+  USE_FIXTURES ? null : Promise.resolve(getCasinoSet('hot', { limit: 10 })).then((games) => (games ?? []).map((game) => game.name));
 
 /* `ge` in index-DrTwTnbT.js - the panel that hangs under the search box while the query is
  * still too short to run. It is not a dropdown component; it is an absolutely positioned
@@ -20,6 +27,8 @@ const CHIP = 'flex h-5 items-center rounded-md bg-layer5 px-2 sm:cursor-pointer'
 const CHIP_TEXT = 'text-xs text-secondary hover:text-primary';
 
 export default function SearchHistory({ history, setHistory, onPick }) {
+  const { data: liveSuggested } = useResource(readSuggested);
+  const suggested = USE_FIXTURES ? SUGGESTED : liveSuggested ?? [];
   const remove = (value) => {
     const next = history.filter((item) => item !== value);
     setHistory(next);
@@ -69,7 +78,7 @@ export default function SearchHistory({ history, setHistory, onPick }) {
 
       <p className="mt-4 font-extrabold">Suggested</p>
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        {SUGGESTED.map((name) => (
+        {suggested.map((name) => (
           <div key={name} className={CHIP} onClick={() => onPick(name, 'recommed')}>
             <span className={CHIP_TEXT}>{name}</span>
           </div>

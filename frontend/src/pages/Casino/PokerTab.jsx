@@ -5,7 +5,7 @@ import FilterBar from '../../components/Explore/FilterBar';
 import ShowBlocked from './ShowBlocked';
 import { Controller } from '../Home/GameSection';
 import useDragScroll from '../../hooks/useDragScroll';
-import { POKER_PANELS } from './catalogue';
+import { pokerPanels } from './catalogue';
 
 /* The Poker tab.
  *
@@ -121,7 +121,7 @@ export default function PokerTab({ games, sort, setSort, providers, selectedProv
           heading's own `mt-5`. Where each panel's games come from is documented on
           POKER_PANELS. */}
       <div className="mt-4 grid w-full grid-cols-1 gap-x-3 gap-y-6 sm:grid-cols-2 lg:grid-cols-3">
-        {POKER_PANELS.map((panel) => (
+        {pokerPanels(games).map((panel) => (
           <VariantPanel key={panel.title} title={panel.title} games={panel.games} />
         ))}
       </div>

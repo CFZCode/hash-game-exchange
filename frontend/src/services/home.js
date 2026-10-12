@@ -1,6 +1,9 @@
 import { request, USE_FIXTURES } from './client';
 import ENDPOINTS, { PLATFORM } from './endpoints';
 import { toBetRow } from './betHistory';
+import { getOriginals, slugFor } from './originals';
+import { getCasinoSet, toCatalogGame } from './catalog';
+import { assetExact } from '../utils/gameArt';
 import { HIDDEN_NAME } from '../context/account';
 import { originals, originalsLink } from '../pages/Home/GameSection/originals';
 import {
@@ -16,7 +19,7 @@ import {
   bingoLink,
 } from '../pages/Home/GameSection/sections';
 import { bets } from '../pages/Home/LatestBets/bets';
-import { bigWinsByTab } from '../pages/Home/RecentBigWins/data';
+import { bigWinsByTab, vipTier, displayName } from '../pages/Home/RecentBigWins/data';
 import { draws } from '../pages/Home/LotteryDraws/draws';
 import { matches } from '../pages/Home/Highlights/matches';
 
@@ -48,8 +51,51 @@ const HOME_SECTIONS = {
   bingo: { games: bingo, link: bingoLink },
 };
 
-export const getHomeSections = () =>
-  request(ENDPOINTS.homeSelectionBatch, { fixture: HOME_SECTIONS });
+export const getHomeSections = () => {
+  if (USE_FIXTURES) return request(ENDPOINTS.homeSelectionBatch, { fixture: HOME_SECTIONS });
+  return readLiveSections();
+};
+
+/* LIVE: each row from the SmartBet catalogue (`services/catalog.js`), in the row shape
+   GameSection reads — `{slug, fullName, icon, onlineUsers}` — under the same links. BC Originals
+   is the in-house list; Hot Games, Slots and Live Casino are the operator's curated collections
+   (`hot`, `popular-slots`, `live-casino`); All Bingo Games is a name search. BC Exclusive has no
+   platform source and is empty. No row carries a player count, so `onlineUsers` is left out
+   and the tile omits it. A row that fails reads as empty rather than blanking the page. */
+const HOME_ROW = 10;
+const COLLECTION = (name) => `/api/v1/casino/games/collections/${name}`;
+
+const toHomeRow = (game) => ({ slug: game.slug, fullName: game.name, icon: game.image, onlineUsers: undefined });
+
+const liveList = (read) => Promise.resolve(read()).catch(() => []);
+
+function readLiveSections() {
+  const collection = (name) =>
+    liveList(() =>
+      Promise.resolve(request(COLLECTION(name), { live: true, params: { limit: HOME_ROW }, fixture: [] })).then(
+        (rows) => (rows ?? []).map(toCatalogGame).map(toHomeRow),
+      ),
+    );
+
+  return Promise.all([
+    liveList(() =>
+      Promise.resolve(getOriginals()).then((games) =>
+        (games ?? []).map((game) => ({ slug: game.slug, fullName: game.name, icon: assetExact(game.slug), onlineUsers: undefined })),
+      ),
+    ),
+    collection('hot'),
+    collection('popular-slots'),
+    collection('live-casino'),
+    liveList(() => Promise.resolve(getCasinoSet('bingo', { limit: HOME_ROW })).then((games) => (games ?? []).map(toHomeRow))),
+  ]).then(([originalsRow, hot, slotsRow, live, bingoRow]) => ({
+    originals: { games: originalsRow, link: originalsLink },
+    hotGames: { games: hot, link: hotGamesLink },
+    exclusive: { games: [], link: exclusiveLink },
+    slots: { games: slotsRow, link: slotsLink },
+    liveCasino: { games: live, link: liveCasinoLink },
+    bingo: { games: bingoRow, link: bingoLink },
+  }));
+}
 
 /* The component keeps 30 rows and shows 10 at a time (`[...r].reverse().slice(0, D)`, D = 30),
    so 30 is what is asked for. The platform's own cap on this route is 100. */
@@ -151,8 +197,30 @@ export function getHighRollers() {
  * `tab` is the `gameTypeId` itself (0 All, 1 BC Originals, 2 Slots, 3 Live Casino), so it goes
  * straight into the path the day this stops being a capture. Falls back to All for a tab with no
  * captured list rather than answering nothing. */
-export const getRecentBigWins = ({ tab = 0 } = {}) =>
-  request(ENDPOINTS.recentBigWins, { fixture: bigWinsByTab[tab] ?? bigWinsByTab[0] });
+export const getRecentBigWins = ({ tab = 0 } = {}) => {
+  if (USE_FIXTURES) return request(ENDPOINTS.recentBigWins, { fixture: bigWinsByTab[tab] ?? bigWinsByTab[0] });
+  /* LIVE: `GET /casino/bet-history/top-wins` (public, `profit > 0`, biggest first). It records
+     in-house rounds only, so All and BC Originals read it and Slots / Live Casino are empty
+     (no aggregator wins feed exists). It names nobody and carries no VIP level, so every card
+     is the site's hidden name with no tier, and the amount is the real profit in its own coin
+     rather than the capture's USD figure. */
+  if (tab !== 0 && tab !== 1) return Promise.resolve([]);
+  return Promise.resolve(
+    request(PLATFORM.casino.topWins, { live: true, params: { limit: 20 }, fixture: [] }),
+  ).then((rows) => (rows ?? []).map(toBigWin));
+};
+
+const toBigWin = (row) => {
+  const slug = slugFor(String(row.game ?? ''));
+  const profit = Number(row.profit ?? 0);
+  return {
+    gameUnique: slug,
+    icon: assetExact(slug),
+    tier: vipTier(-1),
+    name: displayName(HIDDEN_NAME),
+    amount: `${profit.toLocaleString('en-US', { maximumFractionDigits: 8 })} ${row.currency ?? ''}`.trim(),
+  };
+};
 
 export const getLotteryDraws = () => request(ENDPOINTS.lotteryUpcoming, { fixture: draws });
 

@@ -1,4 +1,8 @@
-import { request } from './client';
+import { request, USE_FIXTURES, getAccessToken } from './client';
+import { getOriginals } from './originals';
+import { getLiveGame } from './catalog';
+
+const AGGREGATOR_LAUNCH = '/api/v1/casino/js-games/v2/launch';
 import { GAME_DETAIL, PLATFORM } from './endpoints';
 import { GAMES } from '../data/games';
 
@@ -29,17 +33,41 @@ import { GAMES } from '../data/games';
  */
 export function getGame(gameUnique) {
   const row = GAMES.find((game) => game.slug === gameUnique) ?? null;
-  return request(GAME_DETAIL, {
-    params: { gameUnique },
-    fixture: row,
-  });
+  if (USE_FIXTURES) {
+    return request(GAME_DETAIL, {
+      params: { gameUnique },
+      fixture: row,
+    });
+  }
+  return readLiveGame(gameUnique);
 }
 
-export function launchGame(gameUnique, { currencyCode = 'INR' } = {}) {
-  return request(PLATFORM.casino.inHouseLaunch, {
+/* Live: an in-house game first (the twenty BC Originals, matched on this build's slug), then the
+   aggregator catalogue by page slug or uuid (`services/catalog.js`). `ref` and `source` are what
+   the favourite store and the launch key on; `launch` names the route. */
+async function readLiveGame(gameUnique) {
+  const originals = await Promise.resolve(getOriginals()).catch(() => []);
+  const house = (originals ?? []).find((game) => game.slug === gameUnique || game.uid === gameUnique);
+  if (house) {
+    return { ...house, provider: 'BC Originals', ref: house.uid ?? gameUnique, source: 'in-house', launch: 'in-house' };
+  }
+  const game = await getLiveGame(gameUnique);
+  return game ? { ...game, ref: game.uuid ?? gameUnique, launch: 'aggregator' } : null;
+}
+
+/* The launch. In-house games go to `POST /casino/js-games/v1/launch`, catalogue games to
+   `POST /casino/js-games/v2/launch` (the aggregator route that is live on SmartBet sites when its
+   keys are set); both take `{gameUid, currencyCode}` and answer `{gameLaunchUrl, sessionToken}`.
+   The provider is INR-only upstream. Signed out there is nothing to launch, so no call is made.
+   A refusal (`JSGAMES_NOT_CONFIGURED` 503 on this delivery) rejects, and the page renders its own
+   "not available" state. */
+export function launchGame(gameUnique, { currencyCode = 'INR', game = null } = {}) {
+  if (!USE_FIXTURES && !getAccessToken()) return null;
+  const aggregator = game?.launch === 'aggregator';
+  return request(aggregator ? AGGREGATOR_LAUNCH : PLATFORM.casino.inHouseLaunch, {
     live: true,
     method: 'POST',
-    json: { gameUid: gameUnique, currencyCode },
+    json: { gameUid: game?.ref ?? gameUnique, currencyCode },
     fixture: null,
   });
 }

@@ -1,4 +1,5 @@
 import { assetExact } from '../../utils/gameArt';
+import { isLiveSet } from '../../services/catalog';
 import { PROVIDER_NAMES } from '../../data/providers';
 import { POKER_GAMES, HOLDEM_ROW, TEEN_PATTI_ROW } from './pokerGames';
 import { ORIGINAL_GAMES, ORIGINALS_PAGE_SIZE } from './originalGames';
@@ -55,7 +56,7 @@ function toRow(games) {
   return games.slice(0, PAGE).map((game) => ({
     slug: game.slug,
     fullName: game.name,
-    icon: assetExact(game.slug),
+    icon: game.image ?? assetExact(game.slug),
     onlineUsers: game.players,
   }));
 }
@@ -176,8 +177,12 @@ export const GRID_PAGE_SIZE = ORIGINALS_PAGE_SIZE;
    see `services/originals.js` for why this is the only tab the platform can feed. `undefined`
    rather than an empty array is the pending state, and it must fall through to the transcription:
    an empty array is a real answer and would blank the tab. */
-export function gamesFor(tab, originals) {
+export function gamesFor(tab, originals, live) {
   if (tab === 'brand' && originals) return originals;
+  /* Fixtures off: every set but BC Originals is the SmartBet catalogue's answer, passed in by the
+     caller as `{[tab]: games}` (see services/catalog.js). Pending or unfed reads as empty, never
+     as the transcription. */
+  if (isLiveSet(tab)) return live?.[tab] ?? [];
   const set = SETS[tab];
   return set ? set() : [];
 }
@@ -200,8 +205,24 @@ export const ROWS = [
   { title: 'Table Games', key: 'table-game', href: '/casino/table-game' },
 ];
 
-export function rowGames(key, originals) {
-  return toRow(gamesFor(key, originals));
+export function rowGames(key, originals, live) {
+  /* `undefined` while a live row is in flight, which GameSection draws as its skeleton. */
+  if (isLiveSet(key) && live?.[key] === undefined) return undefined;
+  return toRow(gamesFor(key, originals, live));
+}
+
+/* The lobby's live rows, asked for in one go. */
+export const LOBBY_KEYS = ROWS.filter((row) => row.key && row.key !== 'brand').map((row) => row.key);
+
+/* The Poker tab's two panels. Fixtures: the transcription. Live: the tab's own games split by
+   name, since the platform has no variant feed. */
+export function pokerPanels(games) {
+  if (!isLiveSet('poker')) return POKER_PANELS;
+  const by = (re) => toRow((games ?? []).filter((game) => re.test(game.name)));
+  return [
+    { title: "Hold'em", games: by(/hold.?em/i) },
+    { title: 'Teen Patti', games: by(/teen ?patti/i) },
+  ];
 }
 
 /* The provider list and its order are the live site's, transcribed from its own rendered

@@ -13,6 +13,7 @@ import {
   sectionGames,
   tagGames,
   gamelistGames,
+  readLiveList,
 } from './catalogue';
 
 /* THE FOUR LIST PAGES — `/section/:section`, `/gamelist/:type`, `/tagname/:tag` and
@@ -120,11 +121,14 @@ export function SectionPage() {
   const section = useSegment('section');
   const [params] = useSearchParams();
   const key = decodeURIComponent(section);
+  /* Fixtures off: the SmartBet catalogue's list (`readLiveList`); `null` keeps the set below. */
+  const readLive = React.useCallback(() => readLiveList('section', key), [key]);
+  const { data: live } = useResource(readLive);
 
   return (
     <GameListPage
       title={params.get('label') ?? SECTION_TITLES[key] ?? key}
-      games={sectionGames(key)}
+      games={live === null ? sectionGames(key) : live ?? []}
     />
   );
 }
@@ -140,11 +144,13 @@ export function GameListRoute() {
      Every other type falls through to its transcribed set inside `gamelistGames`; see
      `services/originals.js`. */
   const { data: originals } = useResource(getOriginals);
+  const readLive = React.useCallback(() => readLiveList('gamelist', type), [type]);
+  const { data: live } = useResource(readLive);
 
   return (
     <GameListPage
       title={GAMELIST_TITLES[type] ?? 'Recommend'}
-      games={gamelistGames(type, originals)}
+      games={live === null ? gamelistGames(type, originals) : live ?? []}
     />
   );
 }
@@ -156,9 +162,14 @@ export function TagPage() {
   const tag = useSegment('tag');
   const [params] = useSearchParams();
   const key = decodeURIComponent(tag);
+  const readLive = React.useCallback(() => readLiveList('tag', key), [key]);
+  const { data: live } = useResource(readLive);
 
   return (
-    <GameListPage title={params.get('label') ?? TAG_TITLES[key] ?? key} games={tagGames(key)} />
+    <GameListPage
+      title={params.get('label') ?? TAG_TITLES[key] ?? key}
+      games={live === null ? tagGames(key) : live ?? []}
+    />
   );
 }
 

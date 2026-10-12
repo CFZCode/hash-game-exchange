@@ -88,6 +88,9 @@ function toGame(row) {
        no-art state rather than borrowing a neighbour's cover. */
     gameType: row.game_type,
     known: Boolean(known),
+    /* The platform's own id, which the launch and the favourite store key on (`mine`, not
+       `mines`). */
+    uid: row.game_uid,
   };
 }
 

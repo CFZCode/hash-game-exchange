@@ -100,7 +100,7 @@ export default function GamePage() {
      (the API)" only if the CALLER stops assuming a thenable. `services/collection.js` wraps
      every one of its reads this way for the same reason. */
   const readLaunch = React.useCallback(
-    () => (game ? Promise.resolve(launchGame(gameUnique)).catch(() => null) : null),
+    () => (game ? Promise.resolve(launchGame(gameUnique, { game })).catch(() => null) : null),
     [game, gameUnique],
   );
   const { data: launch } = useResource(readLaunch);
@@ -175,8 +175,8 @@ export default function GamePage() {
       /* `in-house` only where the platform's own catalogue agrees, which for this build's slugs
          means the twenty BC Originals. Everything else is honestly `unknown` — see the note on
          these two calls in `services/collection.js`. */
-      if (next) await addFavoriteGame(gameUnique, game?.provider === 'BC Originals' ? 'in-house' : 'unknown');
-      else await removeFavoriteGame(gameUnique);
+      if (next) await addFavoriteGame(game?.ref ?? gameUnique, game?.source ?? (game?.provider === 'BC Originals' ? 'in-house' : 'unknown'));
+      else await removeFavoriteGame(game?.ref ?? gameUnique);
     } catch {
       setFetched(!next);
     } finally {

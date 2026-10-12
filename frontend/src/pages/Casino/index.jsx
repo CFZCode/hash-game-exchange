@@ -1,6 +1,8 @@
 import React from 'react';
 import useResource from '../../hooks/useResource';
 import { getOriginals } from '../../services/originals';
+import { getCasinoSet, getCasinoSets, getLiveProviders } from '../../services/catalog';
+import { USE_FIXTURES } from '../../services/client';
 import { useParams } from 'react-router-dom';
 import RecentFavorites from '../Home/RecentFavorites';
 import Hero from '../Home/Hero';
@@ -28,6 +30,7 @@ import {
   GRID_PAGE_SIZE,
   gamesFor,
   rowGames,
+  LOBBY_KEYS,
 } from './catalogue';
 import './Casino.css';
 
@@ -114,7 +117,7 @@ function SearchBar({ query, setQuery }) {
 /* The lobby: the twelve rows of the default tab. A row with no games still renders — the
    empty state under its own header is the site's behaviour and the only honest thing to show
    for New Releases, whose selection the mirror never captured. */
-function Lobby({ originals }) {
+function Lobby({ originals, live, providerRow }) {
   return [
     /* THE SAME BLOCK THE HOME PAGE CARRIES, and the casino page really does mount it — its
        chunk imports it by name. `index-DTOmRFSX.js` (off `hash.game/assets/`, not in the
@@ -130,11 +133,11 @@ function Lobby({ originals }) {
        favourites nor history. */
     <RecentFavorites key="recent-favorites" />,
     ...ROWS.map((row) => {
-    if (row.type === 'providers') return <ProviderRow key="providers" providers={PROVIDERS} />;
+    if (row.type === 'providers') return <ProviderRow key="providers" providers={providerRow} />;
     if (row.type === 'themes') return <ThemeRow key="themes" themes={THEMES} />;
 
-    const games = rowGames(row.key, originals);
-    return games.length ? (
+    const games = rowGames(row.key, originals, live);
+    return games === undefined || games.length ? (
       <GameSection key={row.key} title={row.title} games={games} href={row.href} />
     ) : (
       <EmptyRow key={row.key} title={row.title} href={row.href} />
@@ -214,15 +217,42 @@ export default function Casino() {
   /* Searching narrows within the tab you are on, which is what the Explore panel does with
      its own tabs (`gt` in index-BChnjnW3.js). On the lobby there is no tab to narrow to, so
      it searches the whole catalogue. */
+  /* LIVE (fixtures off): the lobby's rows, the open tab's set and a search each read the SmartBet
+     catalogue — see services/catalog.js. Each reader answers `null` with fixtures on, so the
+     transcribed path below is untouched. A tab carrying the filter bar sends its provider and
+     sort to the server, so the hundred rows asked for are the right hundred. */
+  const readLobby = React.useCallback(() => (active ? null : getCasinoSets(LOBBY_KEYS, { limit: 10 })), [active]);
+  const { data: liveLobby } = useResource(readLobby);
+  const filterKey = FILTER_TABS.has(active) ? `${providers.join(',')}|${sort}` : '';
+  const readTab = React.useCallback(() => {
+    if (!active) return null;
+    const [chosen = '', order = ''] = filterKey.split('|');
+    return getCasinoSet(active, { providers: chosen ? chosen.split(',') : [], sort: order });
+  }, [active, filterKey]);
+  const { data: liveTab } = useResource(readTab);
+  const liveQuery = searching && !tooShort && active !== 'brand' ? query.trim() : '';
+  const readSearch = React.useCallback(
+    () => (liveQuery ? getCasinoSet(active || 'all', { search: liveQuery }) : null),
+    [active, liveQuery],
+  );
+  const { data: liveSearch } = useResource(readSearch);
+  const { data: liveProviders } = useResource(getLiveProviders);
+  const live = active ? { [active]: liveTab } : liveLobby;
+
   const results = React.useMemo(() => {
     if (!searching || tooShort) return [];
+    if (!USE_FIXTURES) {
+      if (active !== 'brand') return liveSearch ?? [];
+      const needle = query.trim().toLowerCase();
+      return gamesFor('brand', originals).filter((game) => game.name.toLowerCase().includes(needle));
+    }
     const found = searchGames(query);
     if (!active) return found;
     const inTab = new Set(gamesFor(active, originals).map((game) => game.slug));
     return found.filter((game) => inTab.has(game.slug));
-  }, [searching, tooShort, query, active, originals]);
+  }, [searching, tooShort, query, active, originals, liveSearch]);
 
-  const base = searching ? results : gamesFor(active, originals);
+  const base = searching ? results : gamesFor(active, originals, live);
 
   /* Only three tabs carry the Sort By / Providers bar — see FILTER_TABS. Everywhere else the
      grid shows the tab's set in feed order, so the sort and the provider selection are simply
@@ -233,7 +263,7 @@ export default function Casino() {
      current result set. That is what the live filter does — its rendered list is all
      forty-six, several of which have nothing under the tab you are on. It used to intersect
      against the tab's games, which is why the Poker tab's filter showed three. */
-  const available = ALL_PROVIDERS;
+  const available = USE_FIXTURES ? ALL_PROVIDERS : liveProviders ?? [];
 
   /* Provider comparison goes through `canonicalProvider` rather than Explore's
      `filterByProvider`, which compares the raw strings. The two lists spell the house studio
@@ -332,11 +362,11 @@ export default function Casino() {
       <CasinoTabStrip active={active} compact={!showLobby} tight={filtered} linkTab={linkTab} />
 
       {showLobby ? (
-        <Lobby originals={originals} />
+        <Lobby originals={originals} live={liveLobby} providerRow={USE_FIXTURES ? PROVIDERS : (liveProviders ?? []).slice(0, 8)} />
       ) : linkTab ? (
         <div className="mt-4 w-full px-4 sm:px-0">
           {active === 'provider' ? (
-            <ProviderGrid providers={ALL_PROVIDERS} />
+            <ProviderGrid providers={available} />
           ) : (
             <ThemeGrid themes={THEMES} />
           )}

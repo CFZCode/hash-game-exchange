@@ -5,6 +5,7 @@ import { favorites, recent } from '../pages/GameCollection/collection';
    file. `home.js` does not import this module, so the pair does not cycle. */
 import { getHomeSections } from './home';
 import { GAMES } from '../data/games';
+import { slugFor } from './originals';
 
 /* The Casino sidebar's two signed-in lists — `/favorite` and `/recent`.
  *
@@ -76,7 +77,10 @@ const toFavouriteGame = (row) => {
   const local = LOCAL.get(ref);
 
   return {
-    slug: ref,
+    /* The page slug the game's link and the game page's star compare on: the catalogue's own
+       `slug` for an aggregator game, this build's slug for an in-house uid (`mine` -> `mines`),
+       and the stored reference itself otherwise. */
+    slug: server?.slug || (server?.provider === 'in-house' ? slugFor(ref) : ref),
     fullName: server?.name || local?.name || ref,
     /* `undefined` rather than a URL means "use this build's own artwork", which is what the tile
        does with `assetExact(slug)`. The in-house rows carry `image: null` on this delivery. */
@@ -173,7 +177,7 @@ const toPlayedGame = (row) => {
   const game = row?.game;
   if (!game) return null;
   return {
-    slug: game.uuid ?? row.game_uuid,
+    slug: game.slug || (game.uuid ?? row.game_uuid),
     fullName: game.name ?? '',
     /* The tile falls back to `assetExact(slug)` when `icon` is undefined, so a remote URL passes
        straight through and a missing one lands on this build's own artwork lookup. */

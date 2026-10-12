@@ -1,4 +1,6 @@
 import { gamesFor } from '../Casino/catalogue';
+import { getCasinoSet } from '../../services/catalog';
+import { USE_FIXTURES } from '../../services/client';
 import { exclusive, bingo } from '../Home/GameSection/sections';
 
 /* The three list routes' titles and where each one's games come from.
@@ -159,4 +161,29 @@ export function gamelistGames(type, originals) {
   /* `originals` reaches `gamesFor` for the one type it can serve, which is `brand`; every other
      set ignores it. See the note at `gamesFor`. */
   return set ? gamesFor(set, originals) : [];
+}
+
+/* ── LIVE (fixtures off) ─────────────────────────────────────────────────────────────────────
+ *
+ * The same three routes read the SmartBet catalogue instead (services/catalog.js): a section or
+ * tag that names a casino set reads that set; `exclusive` has no platform source and is empty; a
+ * tag this file does not know is asked for as the platform's own `category` (the game page's tag
+ * chips are the platform's tags: `slots`, `live`, `crash`, `table`, ...). `null` means "not the
+ * live path": fixtures on, or `/gamelist/brand`, which keeps its in-house read. */
+export function readLiveList(kind, raw) {
+  if (USE_FIXTURES) return null;
+  if (kind === 'gamelist') {
+    const set = { slots: 'slots', live: 'live', editor: 'poker' }[raw];
+    if (raw === 'brand') return null;
+    return set ? getCasinoSet(set) : [];
+  }
+  if (kind === 'section') {
+    if (raw === 'originals') return null;
+    const set = raw === 'exclusive' ? 'exclusive' : raw === 'fishing' ? 'fishing' : SECTION_SETS[raw];
+    return set ? getCasinoSet(set) : [];
+  }
+  const key = normalise(raw);
+  if (key === 'exclusive' || key === 'bingo') return getCasinoSet(key);
+  if (TAG_SETS[key]) return getCasinoSet(TAG_SETS[key]);
+  return key ? getCasinoSet('all', { category: key }) : [];
 }

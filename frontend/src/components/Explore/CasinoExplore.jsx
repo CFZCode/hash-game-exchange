@@ -11,6 +11,35 @@ import {
   filterByProvider,
   PROVIDERS,
 } from './catalogue';
+import useResource from '../../hooks/useResource';
+import { getCasinoSet, getLiveProviders } from '../../services/catalog';
+import { getOriginals } from '../../services/originals';
+import { USE_FIXTURES } from '../../services/client';
+
+/* Fixtures off: each tab is a SmartBet catalogue set (services/catalog.js), and a search is the
+   same set with the platform's `search` — the first hundred rows, paged here. */
+const LIVE_TAB = {
+  allgames: 'all',
+  hot: 'hot',
+  slots: 'slots',
+  live: 'live',
+  table: 'table-game',
+  newreleases: 'new',
+  poker: 'poker',
+  feature: 'feature',
+};
+
+function readLiveTab(tab, query) {
+  if (USE_FIXTURES) return null;
+  if (tab === 'original') {
+    const needle = query.trim().toLowerCase();
+    return Promise.resolve(getOriginals()).then((games) =>
+      (games ?? []).filter((game) => !needle || game.name.toLowerCase().includes(needle)),
+    );
+  }
+  const set = LIVE_TAB[tab];
+  return set ? getCasinoSet(set, { search: query.trim() || undefined }) : [];
+}
 
 /* The Casino side of the panel — `wt` in index-BChnjnW3.js, which is really two components
  * sharing a tab strip:
@@ -62,18 +91,24 @@ export default function CasinoExplore({ query }) {
      letter — `ot`'s fallback, and the same threshold the history dropdown announces. */
   const tooShort = searching && query.trim().length < 2;
 
+  const liveQuery = searching && !tooShort ? query : '';
+  const readLive = React.useCallback(() => readLiveTab(tab, liveQuery), [tab, liveQuery]);
+  const { data: liveGames } = useResource(readLive);
+  const { data: liveProviders } = useResource(getLiveProviders);
+
   const games = React.useMemo(() => {
+    if (!USE_FIXTURES) return tooShort ? [] : liveGames ?? [];
     if (!searching) return browseTab(tab);
     if (tooShort) return [];
     return narrowResults(searchGames(query), tab);
-  }, [searching, tooShort, query, tab]);
+  }, [searching, tooShort, query, tab, liveGames]);
 
   /* The filter offers the providers actually present in the current result set, not all of
      them — `f` in `ot`, which intersects the results against the feed's provider list. */
   const available = React.useMemo(() => {
-    if (!searching) return PROVIDERS;
+    if (!searching) return USE_FIXTURES ? PROVIDERS : liveProviders ?? [];
     return [...new Set(games.map((game) => game.provider))].sort((a, b) => a.localeCompare(b));
-  }, [searching, games]);
+  }, [searching, games, liveProviders]);
 
   const shown = React.useMemo(
     () => sortGames(filterByProvider(games, providers), sort),
@@ -93,7 +128,7 @@ export default function CasinoExplore({ query }) {
 
       {tab === 'providers' ? (
         <div className="mt-4 w-full">
-          {searching ? <Empty /> : <ProviderGrid providers={PROVIDERS} />}
+          {searching ? <Empty /> : <ProviderGrid providers={USE_FIXTURES ? PROVIDERS : liveProviders ?? []} />}
         </div>
       ) : (
         <div className="w-full">

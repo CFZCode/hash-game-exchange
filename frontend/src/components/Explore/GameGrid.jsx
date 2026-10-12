@@ -58,7 +58,7 @@ export default function GameGrid({ games, exactArt = false }) {
           <GameTile
             slug={game.slug}
             name={game.name}
-            image={art(game.slug)}
+            image={game.image ?? art(game.slug)}
             players={game.players}
             index={i}
           />
