@@ -307,9 +307,9 @@ providers, about half of them with artwork. The paths are in `services/catalog.j
 | Home → Recent Big Wins | `bet-history/top-wins` (All and BC Originals tabs) | **Connected**. In-house wins only, with no player name or VIP tier, and the amount in its own coin. Slots and Live Casino are empty because there is no aggregator wins feed |
 | Home → Highlights, Lottery Draws | none (BetBy feed, bc.game lottery) | **Missing**: empty when live |
 | Home hero banners | `admin/banners` | Connected (already) |
-| `/casino` lobby rows and every tab | `games?category=slots\|live\|game-shows\|table\|blackjack\|roulette\|baccarat\|poker\|crash`, `collections/hot`; Slots, Live and Poker send `provider` and `sort` | **Connected**. Only the first 100 rows of each set are shown (the route's `limit` cap), paged client-side |
+| `/casino` lobby rows and every tab | `games?category=slots\|live\|game-shows\|table\|blackjack\|roulette\|baccarat\|poker\|crash`, `collections/hot`; Slots, Live and Poker send `provider` and `sort` | **Connected**. Paged on the server: the grid asks for the page it shows and the pager counts the real total (slots 1358, live 381, all 1975). `/casino/games` already holds every js_games provider row, so nothing is merged from `/js-games/v1/games` |
 | `/casino` New Releases, Feature Buy-in | none | **Missing**: empty state |
-| Providers row, Providers tab, provider filter | `games/providers` | **Connected**. Names only: `logoUrl` is null and no names match the local marks, so each chip shows the name as text. `/provider/:name` has no route in this build |
+| Providers row, Providers tab, provider filter | `games/providers` | **Connected**. Names only: `logoUrl` is null and no names match the local marks, so each chip shows the name as text. `/provider/:name` is a live-only list page (`games?provider=`), paged |
 | Casino search, `/explore` search and tabs, suggested searches | `games?search=…&category=…`, `collections/hot` | **Connected** |
 | `/gamelist/:type`, `/section/:section`, `/tagname/:tag` | the same sets; an unknown tag goes to `games?category=<tag>` | **Connected** |
 | `/game/:gameUnique` info | in-house list, then `games/slug/:slug`, then `games/detail/:uuid` | **Connected** |
