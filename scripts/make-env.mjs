@@ -9,6 +9,10 @@
  *
  *   node scripts/make-env.mjs            create what is missing; keep every secret already set
  *   node scripts/make-env.mjs --rotate   generate NEW values for every secret (sessions and 2FA enrolments die)
+ *   node scripts/make-env.mjs --dev-no-rate-limit
+ *                                        write RATE_LIMIT_ENABLED=false — LOCAL TESTING ONLY, for scripted
+ *                                        runs that send hundreds of logins from one address. The default
+ *                                        is true, which is what a handover must ship.
  *
  * Secrets are generated here with crypto.randomBytes and written straight to the files
  * (mode 600). NO VALUE IS EVER PRINTED — only variable names. Third-party provider keys
@@ -24,6 +28,9 @@ import { BROWSER_ORIGINS, DB_NAME, PORTS, SITE_KEY, SITE_NAME, SITE_TEMPLATE, UR
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const rotate = process.argv.includes('--rotate')
+/* Rate limiting is ON unless this flag is passed. Never pass it for an environment reachable
+   from the internet — see the "Before handover" checklist in README.md. */
+const devNoRateLimit = process.argv.includes('--dev-no-rate-limit')
 const hex = (n = 32) => crypto.randomBytes(n).toString('hex')
 /** A password a person can type: 24 url-safe chars plus a guaranteed upper/lower/digit/symbol. */
 const password = () => `${crypto.randomBytes(18).toString('base64url')}aZ9!`
@@ -107,9 +114,10 @@ apply(beEnv, {
   PUBLIC_BASE_URL: URLS.gateway,
   PUBLIC_SITE_URL: URLS.frontend,
   PUBLIC_ASSET_URL: `${URLS.gateway}/assets`,
-  // Local development only; both are refused by the platform's production guards.
+  // Local development only; refused by the platform's production guards.
   STAFF_2FA_REQUIRED_LEVEL: '0',
-  RATE_LIMIT_ENABLED: 'false',
+  // On by default. `--dev-no-rate-limit` turns it off for local scripted testing only.
+  RATE_LIMIT_ENABLED: devNoRateLimit ? 'false' : 'true',
   SITE_TEMPLATE,
   OWNER_PANEL_URL: URLS.ownerPanel,
   OWNER_POLL_SECONDS: '15',

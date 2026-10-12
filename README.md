@@ -49,6 +49,12 @@ skipped, never killed. The frontend is started with `next dev -p 5190` once its 
 
 None of these files is committed. Rotate every generated secret with `node scripts/make-env.mjs --rotate`.
 
+## Before handover
+
+- [ ] `RATE_LIMIT_ENABLED=true` in the delivered `backend/.env` (the `make-env.mjs` default; a dev stack
+      made with `--dev-no-rate-limit` has it `false` — check with `grep RATE_LIMIT_ENABLED backend/.env`
+      and restart the backend after changing it).
+
 ## Owner panel ↔ backend
 
 admin-service pulls `GET http://127.0.0.1:3085/api/entitlements` every 15 s (`OWNER_PANEL_URL`,
