@@ -61,6 +61,8 @@ Changes the user asked for, so the pixel check WILL show them against the refere
 - **Forum removed**: the sidebar bottom group's external row (`forum.hash.game`).
 - **Lottery removed**: the sidebar group and its five rows (`/lottery`, My bets, All lotteries, Favorites, BC Lottery, Popular), the home page's LOTTERY category card (the three remaining cards share the row, so a home diff shows the card row reflowing), the home page's "Upcoming Lottery Draw" section (everything below it moves up), the Explore panel's Lottery search type and the footer's Lottery link. No `/lottery` route existed; those URLs fall to the catch-all.
 
+- **`/sports` replaced by the native exchange** (2026-10-13): the BetBy widget lobby (`pages/Sports`, kept on disk, no longer routed) is replaced by the back/lay exchange in `pages/Exchange` — lobby, match page, My Bets, Statement. The look is kept to hash.game: same tokens, the BetBy rail bar (`.sports-rail`), BetBy's sport/chrome SVGs, the site's tabs, MenuPageLayout and dialogs. A pixel diff of any `/sports` route against the reference will differ throughout; judge it against the tokens and icons, not the BetBy layout.
+
 The sidebar is therefore shorter than the reference, so everything below the removed rows in the sidebar shifts up. Details are in `frontend/docs/architecture.md` under Sidebar. Left as they were on purpose: the Sports lobby's own Predictions tab (BetBy's), the Trading and Lottery options in the bet-history type filter, the slot theme tag "Lottery" in the casino catalogue's tag list, the footer's "Crypto trading is not gambling" licence line, and the `detrade:trading` game redirects in FreePlay and Profile.
 
 ## Next.js migration rules

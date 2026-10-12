@@ -327,6 +327,20 @@
      exactly, but the two are separate names on the original and diverge in the light theme, so
      they stay separate here for the reason `card_dark` and `alw_dark` do. */
   --color-mail: #D5E2E5;
+
+  /* ── Sports exchange back / lay (this build's, NOT bc.game's — the original has no exchange) ──
+     The conventional exchange pair (back ≈ #72bbef blue, lay ≈ #faa9ba pink), kept a touch
+     softer than the light-theme values so the cells do not glare on the carbon layers. Odds on
+     these cells are dark ink (`--color-exchange-ink`), as on every exchange. The muted pair is a
+     SUSPENDED / no-price cell: the hue mixed into the card layer, so it follows any owner
+     template's layer4 without a per-template copy (theme/palettes.css re-points layer4). */
+  --color-back: #72bbef;
+  --color-back-hover: #8ccaf5;
+  --color-lay: #f5a3b5;
+  --color-lay-hover: #f9bccb;
+  --color-back-muted: color-mix(in srgb, var(--color-back) 28%, var(--color-layer4));
+  --color-lay-muted: color-mix(in srgb, var(--color-lay) 28%, var(--color-layer4));
+  --color-exchange-ink: #10161a;
 }
 
 /* `.app-root.dark .bonus-scope` in index-DxOqNczA.css re-declares a handful of tokens, and this
@@ -385,6 +399,14 @@
   --color-layer3: #ffffff;
   --color-layer3_alt: #edf0f2;
   --color-layer4: #ffffff;
+  /* Exchange back / lay on white: the classic values, hover one step darker (see @theme). */
+  --color-back: #72bbef;
+  --color-back-hover: #5aaee9;
+  --color-lay: #faa9ba;
+  --color-lay-hover: #f68fa6;
+  --color-back-muted: color-mix(in srgb, var(--color-back) 30%, #ffffff);
+  --color-lay-muted: color-mix(in srgb, var(--color-lay) 30%, #ffffff);
+  --color-exchange-ink: #10161a;
   --layer3-rgb: 255 255 255;                        /* the triples above, in this theme */
   --layer4-rgb: 255 255 255;
   --color-layer4_alt: #e6e9eb;

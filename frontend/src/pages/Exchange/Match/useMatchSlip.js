@@ -1,0 +1,346 @@
+import React from 'react';
+import {
+  buildBetValue,
+  isOddsEditable,
+  prevalidateBet,
+  beginBetSubmit,
+  endBetSubmit,
+  betMarketKey,
+  buildPlaceRequest,
+  slipProfitLoss,
+  slipExposureRows,
+  calcPL,
+  showsZeroProfit,
+  getOddsFieldMode,
+  ODDS_FIELD,
+  namesOwnLine,
+  stepOdds,
+  stepKhadoLine,
+  computeCashoutClick,
+  BET_TOAST,
+} from '../../../utils/exchange';
+import {
+  placeBet,
+  savePendingBet,
+  clearPendingBet,
+  announceBetPlaced,
+  getSportsBufferSeconds,
+} from '../../../services/exchange';
+import { toast } from '../../../components/shared/Toast/toast';
+import { bestPrice, bookFor } from './shape';
+
+/* ─── The match page's one open bet slip ──────────────────────────────────────────────────
+ *
+ * TENEXCH GameDetails.handleBetClick + usePlaceBetPanel, reduced to what the kit's controlled
+ * BetSlipInline needs, with every decision delegated to utils/exchange:
+ *
+ *   click → buildBetValue → slip under the runner → stake / odds edits
+ *   Place → prevalidateBet → beginBetSubmit → buildPlaceRequest → savePendingBet → placeBet
+ *         (the SERVER holds the owner's buffer; the slip shows its seconds as a countdown)
+ *   ok    → close, toast BET_PLACED, clearPendingBet, announceBetPlaced (exposure + open bets refresh)
+ *   error → the server's message stays INLINE in the slip (the brief for this page — TENEXCH
+ *           closed the slip and toasted); endBetSubmit always.
+ *
+ * Differences from a plain click that the reference makes and this keeps:
+ *   - line markets (fancy2): the field shows the touched rung but the bet executes at that
+ *     side's LIVE main quote, read again at submit (feed sides inverted: No = feed back).
+ *   - khado: the field is a run line the punter names (stepKhadoLine), sent as-is, never "edited".
+ *   - Match Odds (gtype match): the stepper edits the price → manual path (isEdited, E vs X).
+ *   - cashout: prefilled hedge stake, price locked, no min-stake floor (TENEXCH minStake 0 for a
+ *     cashout — the computed hedge can be 99.02 on a min-100 market), never one-click.
+ */
+
+const lc = (v) => String(v || '').toLowerCase();
+
+/** Feed side a slip's price lives on. Line markets invert it (TENEXCH feedSideFor). */
+function feedSide(slip) {
+  const lay = slip.bv.betType === 'lay' || slip.bv.betType === 'no';
+  const inverted = slip.kind === 'line';
+  return (inverted ? !lay : lay) ? 'lay' : 'back';
+}
+
+function liveSection(markets, slip) {
+  const m = (markets || []).find((x) => String(x.mid) === String(slip.bv.market_id));
+  return m?.section?.find((s) => String(s.sid) === String(slip.bv.selectionId)) || null;
+}
+
+/** The price this bet would be placed at right now. */
+export function placementOdds(slip, markets) {
+  if (!slip) return 0;
+  if (slip.kind === 'line') {
+    const live = bestPrice(liveSection(markets, slip), feedSide(slip));
+    return Number(live) || Number(slip.bv.odds) || 0;
+  }
+  return Number(slip.display) || 0;
+}
+
+/** Manual-edit flag exactly as usePlaceBetPanel decides it (cashout / own line / locked never edit). */
+function isEditedSlip(slip) {
+  if (!slip || slip.bv.is_cashout || !slip.modified) return false;
+  if (namesOwnLine(slip.bv.gtype, slip.bv.marketType, slip.bv.mname)) return false;
+  if (!isOddsEditable(slip.bv)) return false;
+  return Math.abs(Number(slip.display) - Number(slip.bv.odds)) > 0.001;
+}
+
+/** Profit / liability the slip prints. Addaplay's pair where it shows one (MATCH_ODDS /
+ *  BOOKMAKER), TENEXCH's displayProfit everywhere else (line pays evens, session rows print 0). */
+export function slipFigures(slip, stake, odds) {
+  if (!slip) return { profit: 0, liability: 0 };
+  const { bv } = slip;
+  const pl = slipProfitLoss({ odds, stake, betType: bv.betType, mname: bv.mname });
+  if (pl.show) return { profit: pl.profit, liability: pl.loss };
+  const g = lc(bv.gtype);
+  const fancyFamily = ['fancy', 'fancy1', 'fancy2', 'khado', 'meter', 'normal', 'oddeven'].includes(g);
+  const mt = fancyFamily ? 'FANCY' : g === 'cricketcasino' ? 'CRICKET_CASINO' : bv.marketType;
+  const { profit, loss } = calcPL(stake, odds, bv.betType, mt);
+  const stakeNum = Number(stake) || 0;
+  const shown = slip.kind === 'line' ? stakeNum : showsZeroProfit(bv.mname, mt, bv.gtype) ? 0 : profit;
+  return { profit: shown, liability: loss };
+}
+
+/** Per-runner projection for the open slip's market: current book + this bet (Addaplay rows). */
+export function projectedBook(slip, stake, odds, market, book) {
+  if (!slip || slip.kind !== 'runner' || String(market?.mid) !== String(slip.bv.market_id)) return null;
+  if (!(Number(stake) > 0) || !(Number(odds) > 0)) return null;
+  const rows = slipExposureRows({
+    odds,
+    stake,
+    betType: slip.bv.betType,
+    mname: slip.bv.mname,
+    runners: (market.section || []).map((s) => s.nat || ''),
+    runnerName: slip.bv.runnerName,
+  });
+  if (!rows.length) return null;
+  const out = {};
+  for (const r of rows) out[r.name] = (bookFor(book, market.mid, r.name) ?? 0) + r.exposure;
+  return out;
+}
+
+function errorText(err) {
+  if (!err) return BET_TOAST.GENERIC_ERROR;
+  if (err.code === 'NETWORK' || /fetch|network/i.test(err.message || '')) return BET_TOAST.NETWORK_ERROR;
+  const msg = err.message || BET_TOAST.GENERIC_ERROR;
+  const code = err.code && !/^HTTP_/.test(String(err.code)) && !msg.includes(err.code) ? ` (${err.code})` : '';
+  return `${msg}${code}`;
+}
+
+/**
+ * @param {object} p
+ * @param {string|number} p.sid
+ * @param {string|number} p.gmid
+ * @param {object|null} p.match       header ({ gmid, ename, cname, stime })
+ * @param {() => object[]} p.getMarkets  the live market list (useMatchMarkets().getMarkets)
+ * @param {boolean} p.signedIn
+ */
+export function useMatchSlip({ sid, gmid, match, getMarkets, signedIn }) {
+  const [slip, setSlip] = React.useState(null);
+  const [stake, setStake] = React.useState('');
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState(null);
+  const [delaySeconds, setDelaySeconds] = React.useState(0);
+  const tokenRef = React.useRef(0);
+  const aliveRef = React.useRef(true);
+  React.useEffect(() => {
+    aliveRef.current = true;
+    return () => {
+      aliveRef.current = false;
+    };
+  }, []);
+
+  const matchInfo = React.useMemo(
+    () => ({ gmid, ename: match?.ename || '', cname: match?.cname || '', stime: match?.stime || '' }),
+    [gmid, match?.ename, match?.cname, match?.stime],
+  );
+
+  const close = React.useCallback(() => {
+    tokenRef.current += 1;
+    setSlip(null);
+    setStake('');
+    setError(null);
+    setLoading(false);
+  }, []);
+
+  /** The whole submit. `s` / `stakeStr` are passed in so one-click can place before state lands. */
+  const submit = React.useCallback(
+    async (s, stakeStr) => {
+      if (!s) return;
+      const token = tokenRef.current;
+      const live = getMarkets();
+      const odds = placementOdds(s, live);
+      const isEdited = isEditedSlip(s);
+      const bv = { ...s.bv };
+      const err = prevalidateBet({
+        bv,
+        stake: stakeStr,
+        odds,
+        originalOdds: s.kind === 'line' ? odds : bv.odds,
+        isUserModifiedOdds: isEdited,
+        match: matchInfo,
+        markets: live,
+        signedIn,
+      });
+      // A cashout's hedge stake is solved, not chosen: TENEXCH holds it to no minimum.
+      if (err && !(bv.is_cashout && err.code === 'BELOW_MIN' && Number(stakeStr) > 0)) {
+        setError(err.message);
+        return;
+      }
+      const key = betMarketKey(bv);
+      if (!beginBetSubmit(key)) {
+        setError(BET_TOAST.MULTIPLE_BET_NOT_ALLOWED);
+        return;
+      }
+      const { payload, clientRef } = buildPlaceRequest({ bv, odds, stake: stakeStr, isEdited, selectedOdds: bv.odds });
+      setError(null);
+      setLoading(true);
+      try {
+        let seconds = 0;
+        try {
+          seconds = await getSportsBufferSeconds(
+            sid,
+            { gtype: bv.gtype, mname: bv.mname, leagueName: matchInfo.cname },
+            { allowGlobalFallback: Boolean(payload.server_buffer?.live_tracked) },
+          );
+        } catch {
+          seconds = 0;
+        }
+        if (aliveRef.current && token === tokenRef.current) setDelaySeconds(seconds);
+        savePendingBet(clientRef);
+        await placeBet(payload);
+        clearPendingBet(clientRef);
+        announceBetPlaced();
+        toast.success(BET_TOAST.BET_PLACED);
+        if (aliveRef.current && token === tokenRef.current) {
+          tokenRef.current += 1;
+          setSlip(null);
+          setStake('');
+          setError(null);
+        }
+      } catch (e) {
+        // A network failure or a 409 (still deciding) may still book server-side — keep the ref so
+        // reconcilePendingBets reports it on the next load.
+        const keepPending = e?.pending || e?.code === 'NETWORK' || e?.status === 0;
+        if (!keepPending) clearPendingBet(clientRef);
+        if (aliveRef.current && token === tokenRef.current) setError(errorText(e));
+      } finally {
+        endBetSubmit(key);
+        if (aliveRef.current) setLoading(false);
+      }
+    },
+    [getMarkets, matchInfo, signedIn, sid],
+  );
+
+  /**
+   * A price cell was clicked.
+   * @param {object} spec { market, section, betType, odds, size, kind, rowId, kitSel, extra? }
+   * @param {number} [oneClickStake]  > 0 → place at once with this stake
+   */
+  const open = React.useCallback(
+    (spec, oneClickStake = 0) => {
+      if (loading) return;
+      if (!(Number(spec.odds) > 0)) return;
+      const bv = {
+        ...buildBetValue({
+          market: spec.market,
+          section: spec.section,
+          betType: spec.betType,
+          odds: spec.odds,
+          size: spec.size,
+          match: matchInfo,
+          sid,
+        }),
+        fancy_name: spec.section?.nat || '',
+        ...(spec.extra || {}),
+      };
+      tokenRef.current += 1;
+      const next = {
+        bv,
+        kind: spec.kind,
+        mid: spec.market.mid,
+        rowId: spec.rowId,
+        kitSel: spec.kitSel,
+        display: String(spec.odds),
+        modified: false,
+        fieldMode: getOddsFieldMode(lc(bv.gtype), bv.mname),
+      };
+      setSlip(next);
+      setError(null);
+      setLoading(false);
+      if (oneClickStake > 0) {
+        const s = String(oneClickStake);
+        setStake(s);
+        submit(next, s);
+      } else {
+        setStake('');
+      }
+    },
+    [loading, matchInfo, sid, submit],
+  );
+
+  /** Cashout: never one-click; opens the hedge prefilled. Returns an error string or null. */
+  const openCashout = React.useCallback(
+    (market, book) => {
+      if (loading) return null;
+      const res = computeCashoutClick({
+        market,
+        marketType: market.mname,
+        matchExposures: book,
+        matchId: gmid,
+        eventName: matchInfo.ename,
+      });
+      if (res.error) return res.error;
+      const c = res.betValue;
+      const section = (market.section || []).find((s) => String(s.sid) === String(c.selectionId)) || {};
+      const base = buildBetValue({ market, section, betType: c.betType, odds: c.odds, size: c.size, match: matchInfo, sid });
+      const bv = { ...base, ...c, sid: base.sid, sports: base.sports, league_name: base.league_name,
+        match_title: base.match_title, match_start_time: base.match_start_time, game_type: base.game_type,
+        min: undefined, max: base.max };
+      tokenRef.current += 1;
+      setSlip({
+        bv,
+        kind: 'runner',
+        mid: market.mid,
+        rowId: section.sid,
+        kitSel: { runnerId: section.sid, side: c.betType, level: 0 },
+        display: String(c.odds),
+        modified: false,
+        fieldMode: ODDS_FIELD.TEXT,
+      });
+      setStake(String(c.cashoutStake ?? ''));
+      setError(null);
+      return null;
+    },
+    [loading, gmid, matchInfo, sid],
+  );
+
+  const setPrice = React.useCallback((v) => {
+    setSlip((s) => (s ? { ...s, display: String(v), modified: true } : s));
+  }, []);
+
+  const stepPrice = React.useCallback(
+    (price, dir) => {
+      const own = slip && (namesOwnLine(slip.bv.gtype, slip.bv.marketType, slip.bv.mname) || slip.kind === 'line');
+      return Number(own ? stepKhadoLine(String(price), dir) : stepOdds(String(price), dir));
+    },
+    [slip],
+  );
+
+  const place = React.useCallback(() => submit(slip, stake), [submit, slip, stake]);
+
+  return {
+    slip,
+    stake,
+    setStake: (v) => {
+      setError(null);
+      setStake(v);
+    },
+    loading,
+    error,
+    delaySeconds,
+    open,
+    openCashout,
+    setPrice,
+    stepPrice,
+    place,
+    close,
+  };
+}

@@ -1,12 +1,16 @@
 import React, { useState } from 'react';
-import { Navigate, Route, Routes, useLocation, useNavigate, useNavigationType } from 'react-router-dom';
+import { Link, Navigate, Route, Routes, useLocation, useNavigate, useNavigationType } from 'react-router-dom';
 import MainLayout from './layouts/MainLayout/MainLayout';
 import Home from './pages/Home';
 import Casino from './pages/Casino';
 import GamePage from './pages/Game';
 import ExplorePage from './pages/Explore';
 import ChatPublicPage from './pages/ChatPublic';
-import Sports from './pages/Sports';
+/* `/sports` is the native sports EXCHANGE now (pages/Exchange) — a deliberate departure the user
+   asked for; the BetBy-style lobby in pages/Sports is no longer routed and its files stay. */
+import ExchangeLobby from './pages/Exchange/Lobby';
+import ExchangeMyBets from './pages/Exchange/MyBets';
+import ExchangeStatement from './pages/Exchange/Statement';
 import Promotions from './pages/Promotions';
 import DepositOffer from './pages/DepositOffer';
 import Deposit from './pages/Deposit';
@@ -73,6 +77,41 @@ import { SessionProvider } from './context/SessionContext';
 import { SettingsProvider } from './context/SettingsContext';
 import { GatesProvider, RouteGate } from './context/GatesContext';
 import { useSession } from './context/session';
+
+/* DEV ONLY — the exchange component kit's preview (`/dev/exchange-kit`). Lazy so the preview and
+   its sample data never enter the production bundle's main chunk; the route itself is only
+   registered outside production (see the <Route> above the catch-all). */
+const IS_DEV = process.env.NODE_ENV !== 'production';
+const ExchangeKitPreview = React.lazy(() => import('./components/exchange/preview/ExchangeKitPreview'));
+
+/* The match page is the heaviest exchange screen (markets, slip, polling at 300ms), so it is its
+   own chunk. A chunk that fails to load (deploy rotated it, network dropped) must not take the
+   shell down: the boundary below draws a way back to the lobby instead, and is keyed on the
+   path so moving to another match tries again. */
+const ExchangeMatch = React.lazy(() => import('./pages/Exchange/Match/index.jsx'));
+
+class LazyRouteBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { failed: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  render() {
+    if (!this.state.failed) return this.props.children;
+    return (
+      <div className="px-4 py-16 text-center sm:px-0">
+        <p className="text-sm text-secondary">This match could not be opened.</p>
+        <Link to="/sports" className="button button-m button-second mx-auto mt-4 inline-flex px-6">
+          Back to sports
+        </Link>
+      </div>
+    );
+  }
+}
 
 function AppShell() {
   const { session } = useSession();
@@ -227,6 +266,12 @@ function AppShell() {
   const collectionRoute = favoriteRoute || recentRoute;
   const collectionDialog = collectionRoute && !isDesktop && session.login;
   const collectionNeedsAuth = collectionRoute && !session.login;
+
+  /* The exchange's two account pages, `/sports/my-bets` and `/sports/statement`: signed out they
+     raise the SIGN-IN dialog over the page you came from, the `ce` shape `/favorite` takes above
+     (a page at every width signed in, so there is no sheet arm). */
+  const sportsAccountRoute = /^\/sports\/(my-bets|statement)\/?$/.test(pathname);
+  const sportsAccountNeedsAuth = sportsAccountRoute && !session.login;
 
   /* `/settings/*` — Global Settings, and the same `{ dialog: m.mobile, guards: [ce] }` pair the two
      rows above carry. The whole prefix matches rather than the bare path, because the six panes are
@@ -438,6 +483,7 @@ function AppShell() {
     responsibleDialog ||
     collectionDialog ||
     collectionNeedsAuth ||
+    sportsAccountNeedsAuth ||
     settingsDialog ||
     settingsNeedsAuth ||
     whitelistFormDialog ||
@@ -685,10 +731,28 @@ function AppShell() {
               because it depends on a live matchMedia subscription. Above `lg` the same panel is
               the right-hand drawer's `chat` arm instead. The tabbar's fifth button links here. */}
           <Route path="/chat-public" element={<ChatPublicPage />} />
-          {/* `path: "/sports/*"` on the original — one mounted widget covering everything
-              under the path, not a set of sibling pages, which is why the footer's
-              `/sports/live` link needs no route of its own. */}
-          <Route path="/sports/*" element={<Sports />} />
+          {/* THE SPORTS EXCHANGE (pages/Exchange, docs/exchange.md). The original's `/sports/*` was
+              one mounted BetBy widget; it is replaced, at the user's request, by the native
+              exchange — lobby, match page, My Bets, Statement — kept to hash.game's tokens and
+              sports icons. The `sports` gate still covers the whole prefix (RouteGate above).
+              `/sports/live` is the footer's link and lands on the lobby's In-Play view; any other
+              `/sports/...` keeps its URL and shows the lobby, the catch-all's own trade. */}
+          <Route path="/sports" element={<ExchangeLobby />} />
+          <Route path="/sports/live" element={<Navigate to="/sports?sport=inplay" replace />} />
+          <Route
+            path="/sports/match/:sid/:gmid"
+            element={
+              <LazyRouteBoundary key={location.pathname}>
+                <React.Suspense fallback={null}>
+                  <ExchangeMatch />
+                </React.Suspense>
+              </LazyRouteBoundary>
+            }
+          />
+          {/* Null while the sign-in dialog is up — see `sportsAccountNeedsAuth`. */}
+          <Route path="/sports/my-bets" element={sportsAccountNeedsAuth ? null : <ExchangeMyBets />} />
+          <Route path="/sports/statement" element={sportsAccountNeedsAuth ? null : <ExchangeStatement />} />
+          <Route path="/sports/*" element={<ExchangeLobby />} />
           {/* `/promotions/promotion` is the original's own path — it is what the footer links
               to. Its siblings there (`/promotions/daily-contest`, `/promotions/weekly-raffle`,
               `/promotions/exclusive-promo`, `/promotion/:id`) are the individual promotion
@@ -882,6 +946,16 @@ function AppShell() {
                 after it carries the previous response's `minDistributeId`. */}
             <Route path="bet-history" element={<BetHistory />} />
           </Route>
+          {IS_DEV && (
+            <Route
+              path="/dev/exchange-kit"
+              element={
+                <React.Suspense fallback={null}>
+                  <ExchangeKitPreview />
+                </React.Suspense>
+              }
+            />
+          )}
           <Route path="*" element={<Home />} />
         </Routes>
         </RouteGate>
@@ -898,6 +972,7 @@ function AppShell() {
         depositNeedsAuth ||
         userEnterNeedsAuth ||
         collectionNeedsAuth ||
+        sportsAccountNeedsAuth ||
         settingsNeedsAuth ||
         whitelistFormNeedsAuth ||
         phishingNeedsAuth ||
@@ -910,6 +985,7 @@ function AppShell() {
               ? 'regist'
               : userEnterNeedsAuth ||
                 collectionNeedsAuth ||
+                sportsAccountNeedsAuth ||
                 settingsNeedsAuth ||
                 whitelistFormNeedsAuth ||
                 phishingNeedsAuth ||

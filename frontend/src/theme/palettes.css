@@ -16,6 +16,11 @@
  * Icon sprites (sidebar, header, tabbar, category icons) are PNGs with the colours baked in; their
  * per-theme copies and rules are src/theme/sprites.css (tools/gen-theme-sprites.mjs).
  *
+ * Exchange back / lay (--color-back, --color-lay and their -hover) are deliberately NOT re-pointed
+ * per template: blue = back and pink = lay is the convention every exchange player reads, whatever
+ * the brand colour. Their -muted (suspended) variants are color-mix()es over --color-layer4 in
+ * src/index.css, so they already follow each template's layers through the mapping block below.
+ *
  * Not recoloured (baked into art or written as literals on purpose): game tiles, banners, promo
  * and VIP art, coin and provider logos (all raster), the federated /help remote (Help.css literals), the
  * DepositOffer striped rgba(36,238,137) bar, and layer hexes written as literals in a few page

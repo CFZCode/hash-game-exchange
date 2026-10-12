@@ -39,6 +39,7 @@ Three things are shells rather than pages and are documented where they are buil
 | `docs/bonus.md` | `/quests`, `/bonus`, `/free-plays` |
 | `docs/profile.md` | `/user/profile/:id` and its two stacked dialogs |
 | `docs/data-layer.md` | `services/`, the iBitPlay backend wiring, and every page's loading state |
+| `docs/exchange.md` | The sports exchange (mssports): its screens and routes, then the data + logic layer — endpoint → service → hook → shape, odds scales, money rules, and the Addaplay-vs-TENEXCH calculation choices |
 | `docs/architecture.md` | Layout shell, light theme, sidebar, icon sprites |
 | `docs/backend-gaps.md` | What the iBitPlay backend answers today, and what is missing and has to be built. **Update it in the same pass as any change that moves a feature between its four states** — see "Keep this file current" at the top of it |
 
@@ -131,7 +132,8 @@ client-only by `app/[[...slug]]` (see `.claude/skills/hash-ui-fidelity`). What k
   StrictMode is off as it was, and the empty top-level `pages/` stops Next reading `src/pages`
   as a Pages Router. Do not delete it.
 
-No test framework is configured — there is no `npm test`. What stands in for one is **seventeen**
+`npm test` runs **vitest**, scoped to `src/**/*.test.js` — today only the exchange logic
+(`src/utils/exchange`). Everything else is still checked by **seventeen**
 throwaway harnesses, none imported by `src/`. The full inventory and what each covers is in
 `docs/backend-gaps.md` under "How this was checked"; the ones run most:
 
@@ -198,7 +200,7 @@ Empty files and directories mark the next pieces to build (`src/layouts/GameLayo
 
 ### Routes
 
-Built, and all of them the original's own paths: `/` and `/casino` (both Home's pair), `/casino/:tab`, `/favorite`, `/recent`, `/section/:section`, `/gamelist/:type`, `/tagname/:tag`, `/game-related`, `/explore`, `/chat-public` (phone-only, the tabbar's chat button — see `docs/drawer.md`), `/sports/*`, `/promotions/promotion`, `/promotions/daily-contest`, `/promotions/weekly-raffle`, `/deposit-offer`, `/vip-detail` with `/vip` redirecting to it, `/quests`, `/bonus`, `/referral-exhibition` and `/referral` with `/referral/:section/*` and `/affiliate`, `/help/:helpId` with `/help` redirecting, `/responsible/:responsibleId`, `/wallet/*` as a layout route over its nine panes (balance, deposit, withdraw, buy, swap, vault, transaction, rollover, bet-history), and `/settings/*` as a second layout route over its six (account-info, security, preferences, verification, payment, whitelist).
+Built, and all of them the original's own paths: `/` and `/casino` (both Home's pair), `/casino/:tab`, `/favorite`, `/recent`, `/section/:section`, `/gamelist/:type`, `/tagname/:tag`, `/game-related`, `/explore`, `/chat-public` (phone-only, the tabbar's chat button — see `docs/drawer.md`), the sports exchange (`/sports`, `/sports/match/:sid/:gmid`, `/sports/my-bets`, `/sports/statement`, `/sports/live` → In-Play; any other `/sports/*` shows the lobby — replaces the BetBy page at the user's request, `docs/exchange.md`), `/promotions/promotion`, `/promotions/daily-contest`, `/promotions/weekly-raffle`, `/deposit-offer`, `/vip-detail` with `/vip` redirecting to it, `/quests`, `/bonus`, `/referral-exhibition` and `/referral` with `/referral/:section/*` and `/affiliate`, `/help/:helpId` with `/help` redirecting, `/responsible/:responsibleId`, `/wallet/*` as a layout route over its nine panes (balance, deposit, withdraw, buy, swap, vault, transaction, rollover, bet-history), and `/settings/*` as a second layout route over its six (account-info, security, preferences, verification, payment, whitelist).
 
 Dialog routes, matched on the pathname in `App.jsx` and mounted beside `<Routes>` rather than inside it: `/login/signin`, `/login/regist`, `/deposit`, `/user/enter`, `/free-plays`, `/user/profile/:id`, `/user/medals/:id`, `/user/statistics`, and — below `lg` only, where the original's `info.dialog` is a device test — `/wallet/withdraw`, `/referral*`, `/favorite`, `/recent`, `/settings*` and the four list pages.
 

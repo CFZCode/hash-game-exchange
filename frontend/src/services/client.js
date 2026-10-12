@@ -212,7 +212,7 @@ const REFRESH_PATH = '/api/v1/user/auth/refresh';
 
 let refreshing = null;
 
-function refreshSession() {
+export function refreshSession() {
   if (refreshing) return refreshing;
 
   const token = getRefreshToken();
