@@ -293,6 +293,32 @@ Still not wired, by reason:
 - **NO-UI:** `/user/bank-accounts` answers real rows but Settings → Payment draws no card tile (`rows.length > 0 ? null`); a 2FA-enabled account gets the server's "A two-factor code is required" on sign-in because the dialog has no code step; the `/login/forgot` page is not built.
 - **BLOCKED, chat:** chat is socket-only on SmartBet (`CHATS`/`ADD_CHAT` on user-service, encoded payloads), and the frontend has no socket.io client. Wiring it means adding `socket.io-client` and the `@ibitplay/socket` encode/decode; left for a separate change.
 
+## Part 1c — Casino, games and home on the SmartBet backend, 2026-10-12
+
+With `NEXT_PUBLIC_USE_FIXTURES=false` these read the SmartBet gateway. Fixture mode is unchanged.
+The aggregator catalogue is no longer empty here: `GET /casino/games` holds about 2000 games from 14
+providers, about half of them with artwork. The paths are in `services/catalog.js`.
+
+| Screen | Route(s) | State |
+| --- | --- | --- |
+| Home → BC Originals / Hot Games / Slots / Live Casino / All Bingo Games rows | `js-games/v1/games?vendor=in-house`, `games/collections/hot`, `/popular-slots`, `/live-casino`, `games?search=bingo` | **Connected** |
+| Home → BC Exclusive row | none | **Missing**: renders empty |
+| Home → Latest Bet / High Roller | `bet-history/live`, `/top-wins` | Connected (already) |
+| Home → Recent Big Wins | `bet-history/top-wins` (All and BC Originals tabs) | **Connected**. In-house wins only, with no player name or VIP tier, and the amount in its own coin. Slots and Live Casino are empty because there is no aggregator wins feed |
+| Home → Highlights, Lottery Draws | none (BetBy feed, bc.game lottery) | **Missing**: empty when live |
+| Home hero banners | `admin/banners` | Connected (already) |
+| `/casino` lobby rows and every tab | `games?category=slots\|live\|game-shows\|table\|blackjack\|roulette\|baccarat\|poker\|crash`, `collections/hot`; Slots, Live and Poker send `provider` and `sort` | **Connected**. Only the first 100 rows of each set are shown (the route's `limit` cap), paged client-side |
+| `/casino` New Releases, Feature Buy-in | none | **Missing**: empty state |
+| Providers row, Providers tab, provider filter | `games/providers` | **Connected**. Names only: `logoUrl` is null and no names match the local marks, so each chip shows the name as text. `/provider/:name` has no route in this build |
+| Casino search, `/explore` search and tabs, suggested searches | `games?search=…&category=…`, `collections/hot` | **Connected** |
+| `/gamelist/:type`, `/section/:section`, `/tagname/:tag` | the same sets; an unknown tag goes to `games?category=<tag>` | **Connected** |
+| `/game/:gameUnique` info | in-house list, then `games/slug/:slug`, then `games/detail/:uuid` | **Connected** |
+| `/game/:gameUnique` launch | in-house → `POST js-games/v1/launch`, catalogue → `POST js-games/v2/launch` (`{gameUid, currencyCode:'INR'}`) | **Switched off**. Both answer 503 `JSGAMES_NOT_CONFIGURED`, and the page shows its own "not available" state. Signed out, the page makes no launch call |
+| Favorites, the star on a game page | `games/favourites` (PUT by the platform's own id: the uuid, or the in-house `game_uid`) | Connected. A starred catalogue game now resolves, and its tile has the art and page slug |
+| `/sports` | `GET casino/sportsbook` + `POST /sportsbook/init` (`/refresh` on 409), with fallback `js-games/v2/launch` LuckySports | **Switched off** (`SPORTSBOOK_NOT_CONFIGURED`, `JSGAMES_NOT_CONFIGURED`). The page frames the URL when one comes back. Until then the lobby renders with empty events and bets, and bet placement refuses |
+| Help → provably-fair game picker | `js-games/v1/games?vendor=in-house` | Connected |
+| Blog | `admin/blogs` exists | **Ready**, but this UI has no blog page |
+
 ## Part 2 — The backend has it, we are not using it yet
 
 No backend work needed. Listed so nobody builds these twice.
