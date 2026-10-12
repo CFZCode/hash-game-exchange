@@ -1,3 +1,4 @@
+import * as globMaps from './matches.globs.js';
 /* The three Highlights matches.
  *
  * Unlike every other section on this page, there is NO captured response for this one —
@@ -14,10 +15,7 @@
  * an internal betby key that is not in the mirror or derivable from anything that is. Drop
  * a crest into src/assets/sports and set `image` on the competitor to switch one over.
  */
-const flags = import.meta.glob('../../../assets/sports/flag-*.svg', {
-  eager: true,
-  import: 'default',
-});
+const flags = globMaps.flags;
 
 /* ISO-3, not ISO-2 — the flag host 404s on `us.svg` and serves `USA.svg`. */
 export const flagFor = (code) => flags[`../../../assets/sports/flag-${code}.svg`];

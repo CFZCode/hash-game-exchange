@@ -1,3 +1,4 @@
+import * as globMaps from './card.globs.js';
 /* The banner card's shared parts, in their own module so the carousel and the deposit slide can
  * both have them without importing each other.
  *
@@ -11,10 +12,7 @@
 /* One glob per module, as everywhere else here. A banner row's `image` is the basename in
    src/assets/banners/ — for a feed row that is the CDN's own content hash, for a fallback row
    the deploy's own filename with its build hash stripped. Neither needs a lookup table. */
-const art = import.meta.glob('../../../../assets/banners/*.png', {
-  eager: true,
-  import: 'default',
-});
+const art = globMaps.art;
 
 export const artFor = (name) => art[`../../../../assets/banners/${name}.png`];
 

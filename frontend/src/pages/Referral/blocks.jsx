@@ -1,6 +1,7 @@
 import React from 'react';
 import { BUSINESS_EMAIL } from './referral';
 import { printCurrency, fill, SCROLL_SPEED } from './format';
+import * as globMaps from './blocks.globs.js';
 
 /* The three bands the referral pages SHARE — `Questions-dsRHzmFN.js`, whose `L`, `P` and `Q`
  * exports are Live Rewards, the affiliate-programme band and the FAQ.
@@ -12,10 +13,10 @@ import { printCurrency, fill, SCROLL_SPEED } from './format';
  * because both call sites are this page family — the rule is a second PAGE, not a second render.
  */
 
-const art = import.meta.glob('../../assets/referral/*.png', { eager: true, import: 'default' });
+const art = globMaps.art;
 const artFor = (name) => art[`../../assets/referral/${name}.png`];
 
-const coins = import.meta.glob('../../assets/coins/*.png', { eager: true, import: 'default' });
+const coins = globMaps.coins;
 const coinIcon = (currency) => coins[`../../assets/coins/${currency}.png`];
 
 /* The site's single chevron, rotated per state. `rotate-180` closed / `rotate-[270deg]` open,

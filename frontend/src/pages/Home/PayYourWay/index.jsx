@@ -3,6 +3,7 @@ import mastercard from '../../../assets/pay/mastercard.png';
 import visa from '../../../assets/pay/visa.png';
 import googlePay from '../../../assets/pay/google_pay.png';
 import picPay from '../../../assets/pay/pic_pay.png';
+import * as globMaps from './index.globs.js';
 
 /* `Ot` in bc.game/bc.game/assets/Enter-MsmOuq5R.js — the payment-methods strip.
  *
@@ -18,10 +19,7 @@ import picPay from '../../../assets/pay/pic_pay.png';
    wallet. Icons are the CDN's `.black` variants, the ones the dark theme uses. */
 const COINS = ['BTC', 'ETH', 'BNB', 'XRP', 'USDT', 'USDC', 'SOL', 'ADA', 'DOGE', 'MATIC', 'TRX'];
 
-const coinIcons = import.meta.glob('../../../assets/coins/*.png', {
-  eager: true,
-  import: 'default',
-});
+const coinIcons = globMaps.coinIcons;
 
 const CoinRow = ({ className }) =>
   COINS.map((symbol) => (

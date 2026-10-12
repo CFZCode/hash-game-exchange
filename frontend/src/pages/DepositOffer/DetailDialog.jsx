@@ -4,6 +4,7 @@ import PopCenter from "../../components/shared/PopCenter";
 import { useSession } from "../../context/session";
 import { stageMatch } from "./depositOffer";
 import { CloseIcon } from "./icons";
+import * as globMaps from "./DetailDialog.globs.js";
 
 /* The detail dialog behind the progress card's info icon and the promotion card's View Detail.
  *
@@ -50,20 +51,14 @@ import { CloseIcon } from "./icons";
  */
 
 /* The artwork, resolved by glob so the fixture's `image` field doubles as the basename. */
-const art = import.meta.glob("../../assets/deposit-offer/*.{png,avif,jpg}", {
-  eager: true,
-  import: "default",
-});
+const art = globMaps.art;
 
 const artFor = (name) =>
   art[`../../assets/deposit-offer/${name}.png`] ||
   art[`../../assets/deposit-offer/${name}.avif`] ||
   art[`../../assets/deposit-offer/${name}.jpg`];
 
-const coins = import.meta.glob("../../assets/coins/*.png", {
-  eager: true,
-  import: "default",
-});
+const coins = globMaps.coins;
 const coinIcon = (currency) => coins[`../../assets/coins/${currency}.png`];
 
 /* The white_alpha5 hairline the page and this dialog both draw with an inline `outline` rather

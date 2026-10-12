@@ -7,6 +7,7 @@ import useMediaQuery from '../../hooks/useMediaQuery';
 import { REFERRAL_AMOUNT } from './referral';
 import { printCurrency, fill } from './format';
 import { LiveRewards, ProgramBand, Faq, Segments } from './blocks';
+import * as globMaps from './index.globs.js';
 import './Referral.css';
 
 /* The referral programme's landing page — `/referral-exhibition`.
@@ -42,7 +43,7 @@ import './Referral.css';
 
 /* One glob for the page, as every other page here keeps one — `import.meta.glob` resolves
    relative to its own module, so it cannot be shared. */
-const art = import.meta.glob('../../assets/referral/*.png', { eager: true, import: 'default' });
+const art = globMaps.art;
 const artFor = (name) => art[`../../assets/referral/${name}.png`];
 
 

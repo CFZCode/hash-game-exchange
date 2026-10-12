@@ -1,3 +1,4 @@
+import * as globMaps from './coinArt.globs.js';
 /* The coin-image glob, in one module for the reason `utils/gameArt.js` is: `import.meta.glob`
  * resolves relative to the file it is written in, so a shared glob can only live in one place.
  *
@@ -19,7 +20,7 @@
  * ticker — still carry their own copy of this glob. They were left alone; this exists because
  * the header and its currency dropdown are two files that need the same one.
  */
-const coins = import.meta.glob('../assets/coins/*.png', { eager: true, import: 'default' });
+const coins = globMaps.coins;
 
 /* Undefined for a currency with no file, which is deliberate: an `<img>` with `src={undefined}`
    renders nothing, where a fallback image would put another coin's mark on the row.

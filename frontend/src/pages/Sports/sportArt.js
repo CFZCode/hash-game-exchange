@@ -1,3 +1,4 @@
+import * as globMaps from './sportArt.globs.js';
 /* BetBy's own SVG artwork, resolved by name.
  *
  * Its own module for two reasons, both of which this project has already run into:
@@ -45,11 +46,7 @@
  * way ProviderLogo falls back to a provider's name. Dropping a captured file in as
  * `src/assets/sports/sport-<id>.svg` lights it up with no other change.
  */
-const art = import.meta.glob('../../assets/sports/{sport,ic}-*.svg', {
-  eager: true,
-  query: '?raw',
-  import: 'default',
-});
+const art = globMaps.art;
 
 const at = (file) => art[`../../assets/sports/${file}.svg`];
 
@@ -57,10 +54,7 @@ const at = (file) => art[`../../assets/sports/${file}.svg`];
    inlined so CSS `fill` can reach them; a flag is full-colour artwork that carries its own
    fills, so it is an <img src> and only its URL is needed. Same convention and directory as
    `pages/Home/Highlights/matches.js`, which globs `flag-*.svg` the same way. */
-const flags = import.meta.glob('../../assets/sports/flag-*.svg', {
-  eager: true,
-  import: 'default',
-});
+const flags = globMaps.flags;
 
 export const flagArt = (code) =>
   code ? flags[`../../assets/sports/flag-${code}.svg`] : undefined;

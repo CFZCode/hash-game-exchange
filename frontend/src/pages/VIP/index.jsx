@@ -6,6 +6,7 @@ import { useSession } from '../../context/session';
 import useMediaQuery from '../../hooks/useMediaQuery';
 import { Accordion, AccordionItem } from '../../components/shared/Accordion';
 import Loading from '../../components/shared/Loading';
+import * as globMaps from './index.globs.js';
 
 /* The VIP Club — `/vip-detail`.
  *
@@ -46,7 +47,7 @@ import Loading from '../../components/shared/Loading';
 
 /* One glob for the page, as the promotions and deposit-offer pages each keep one: it has to
    live in the module it resolves relative to, so a shared helper is not an option. */
-const art = import.meta.glob('../../assets/vip/*.png', { eager: true, import: 'default' });
+const art = globMaps.art;
 const artFor = (name) => art[`../../assets/vip/${name}.png`];
 
 /* The gold button (`ge` in the chunk): a `.button.button-m` plus a left-running gradient and a

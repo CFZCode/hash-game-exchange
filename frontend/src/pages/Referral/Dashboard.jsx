@@ -21,6 +21,7 @@ import {
   IconRateRules,
 } from './icons';
 import { IconBuyCrypto } from '../../layouts/MainLayout/Header/AfterLogin/icons';
+import * as globMaps from './Dashboard.globs.js';
 import './Referral.css';
 
 /* The SIGNED-IN referral page — `/referral`, `AffiliatePage`, `index-CgFyS3aK.js` off
@@ -200,7 +201,7 @@ function InviteCard({ invite, amount, size }) {
   );
 }
 
-const art = import.meta.glob('../../assets/referral/*.png', { eager: true, import: 'default' });
+const art = globMaps.art;
 const socialBg = art['../../assets/referral/invite_bg.png'];
 const trophy = art['../../assets/referral/trophy.png'];
 const usehead = art['../../assets/referral/usehead.png'];

@@ -17,12 +17,10 @@
    45 of the icons were base64 in the bundle and are decoded into src/assets/gameicons;
    13 more live at /assets/*.png and are not in the mirror, so those slugs also fall back. */
 import iconMap from '../../../assets/gameicons/_map.json';
+import * as globMaps from './bets.globs.js';
 
-const icons = import.meta.glob('../../../assets/gameicons/*.png', {
-  eager: true,
-  import: 'default',
-});
-const coins = import.meta.glob('../../../assets/coins/*.png', { eager: true, import: 'default' });
+const icons = globMaps.icons;
+const coins = globMaps.coins;
 
 export const coinIcon = (currency) => coins[`../../../assets/coins/${currency}.png`];
 

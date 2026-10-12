@@ -1,3 +1,4 @@
+import * as globMaps from './draws.globs.js';
 /* Upcoming Lottery Draw.
  *
  * Data: bc.game/bc.game/api/platform-lottery/lottery-info/list-upcoming.html — a real
@@ -30,14 +31,8 @@ export const countryRow = (country) => COUNTRY_ROW[country] ?? 0;
 
 /* `H` in the component — six background/ball/border sets, picked by `index % 6`, so the
    palette repeats down a long list rather than being tied to a given lottery. */
-const backgrounds = import.meta.glob('../../../assets/lottery/bg-*.png', {
-  eager: true,
-  import: 'default',
-});
-const balls = import.meta.glob('../../../assets/lottery/ball-*.png', {
-  eager: true,
-  import: 'default',
-});
+const backgrounds = globMaps.backgrounds;
+const balls = globMaps.balls;
 
 const BORDERS = ['#887741', '#577D50', '#7C7D50', '#7D506B', '#50647D', '#577D50'];
 

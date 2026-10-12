@@ -1,3 +1,4 @@
+import * as globMaps from './gameArt.globs.js';
 /* The 3:4 game artwork, resolved by url slug.
  *
  * `import.meta.glob` loads all game cover images in `src/assets/games`.
@@ -10,10 +11,7 @@
    `Content-Type: image/jpeg` — same `.png` request path, JPEG bytes. Saving them as `.png`
    would have worked (browsers sniff images and ignore the declared type) but would have made
    the extension a lie; this keeps the file named for what it holds. */
-const art = import.meta.glob('../assets/games/*.{avif,png,jpg}', {
-  eager: true,
-  import: 'default',
-});
+const art = globMaps.art;
 
 const allKeys = Object.keys(art).filter((k) => !k.includes('gameViewAllCard'));
 

@@ -1,3 +1,4 @@
+import * as globMaps from './channelArt.globs.js';
 /* The fiat deposit channels' logos.
  *
  * A glob in its own module for the reason `gameArt.js` and `coinArt.js` are: `import.meta.glob`
@@ -17,10 +18,7 @@
  * Named by the fixture's `nightIcon` basename, so that field doubles as the lookup key with no
  * table in between — the arrangement `promotions.js`'s `image` and the deposit-offer card's
  * artwork both use. */
-const ART = import.meta.glob('../assets/deposit/channels/*.png', {
-  eager: true,
-  import: 'default',
-});
+const ART = globMaps.ART;
 
 const BY_NAME = Object.fromEntries(
   Object.entries(ART).map(([path, url]) => [path.split('/').pop().replace(/\.png$/, ''), url]),

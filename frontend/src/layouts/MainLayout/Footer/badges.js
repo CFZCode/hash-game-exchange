@@ -1,3 +1,4 @@
+import * as globMaps from './badges.globs.js';
 /* The two image strips.
  *
  * THESE ARE THE DEPLOY'S OWN FILES NOW, and the note that used to sit here — that the footer
@@ -24,17 +25,9 @@
  * enough. The declared widths below are the chunk's own.
  */
 
-const awardFiles = import.meta.glob('../../../assets/footer/awards/*.png', {
-  eager: true,
-  query: '?url',
-  import: 'default',
-});
+const awardFiles = globMaps.awardFiles;
 
-const partnerFiles = import.meta.glob('../../../assets/footer/partners/*.png', {
-  eager: true,
-  query: '?url',
-  import: 'default',
-});
+const partnerFiles = globMaps.partnerFiles;
 
 const award = (name) => awardFiles[`../../../assets/footer/awards/${name}.png`];
 const partner = (name) => partnerFiles[`../../../assets/footer/partners/${name}.png`];

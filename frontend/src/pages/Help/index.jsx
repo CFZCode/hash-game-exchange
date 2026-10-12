@@ -7,6 +7,7 @@ import { getOriginals, validateLinkFor } from '../../services/help';
 import { useResource } from '../../hooks/useResource';
 import './Help.css';
 import Loading from '../../components/shared/Loading';
+import * as globMaps from './index.globs.js';
 
 /* The Help Center — `/help/:helpId`, and `/help/provably-fair` in particular.
  *
@@ -31,21 +32,13 @@ import Loading from '../../components/shared/Loading';
 /* Every fairness document, extracted from the `games` remote's per-locale chunks into raw HTML.
    `?raw` rather than a JS module because they ARE documents — see Help.css, which styles them by
    element exactly as the original does, since they carry almost no classes. */
-const docs = import.meta.glob('./fairness/*.html', {
-  eager: true,
-  query: '?raw',
-  import: 'default',
-});
+const docs = globMaps.docs;
 const docFor = (name) => docs[`./fairness/${name}.html`];
 
 /* The other sixteen rail rows' documents — all 21 en-US files the `static` remote ships, pulled
    the same way and extracted out of their per-locale chunks. 454KB of the site's own legal and
    support copy. */
-const topicDocs = import.meta.glob('./topics/*.html', {
-  eager: true,
-  query: '?raw',
-  import: 'default',
-});
+const topicDocs = globMaps.topicDocs;
 
 /* `q()` in createHtmlFile-Bp8HPAMX.js — the documents ship with placeholders and the remote
    substitutes them at render. Missing this leaves raw `__BC_HOST__` in the middle of the terms

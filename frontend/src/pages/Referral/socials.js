@@ -1,3 +1,4 @@
+import * as globMaps from './socials.globs.js';
 /* The nine social marks on the dashboard’s invite card.
  *
  * THEY ARE BASE64 PNGs INLINED IN A CHUNK, not sprites — worth knowing before hunting for them
@@ -16,10 +17,7 @@
  * forbids a file that exports a component from exporting anything else.
  */
 
-const socialArt = import.meta.glob('../../assets/referral/socials/*.png', {
-  eager: true,
-  import: 'default',
-});
+const socialArt = globMaps.socialArt;
 
 /* Order and `icon` index are `ox`'s own; `url` is its base, which the original appends an
    encoded invite URL to. */

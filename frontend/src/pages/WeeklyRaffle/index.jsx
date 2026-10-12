@@ -22,6 +22,7 @@ import ticketCountArt from '../../assets/raffle/ticket-count.png';
 import statTickets from '../../assets/raffle/stat-tickets.png';
 import statHat from '../../assets/raffle/stat-hat.png';
 import statCoin from '../../assets/raffle/stat-coin.png';
+import * as globMaps from './index.globs.js';
 import './WeeklyRaffle.css';
 
 /* The weekly raffle — `/promotions/weekly-raffle`.
@@ -68,8 +69,8 @@ const money = (value) =>
 
 /* `import.meta.glob` resolves relative to the file it is written in, so the globs live here
    rather than beside the data that names them. */
-const art = import.meta.glob('../../assets/raffle/ticket-*.png', { eager: true, import: 'default' });
-const avatars = import.meta.glob('../../assets/raffle/avatars/*.png', { eager: true, import: 'default' });
+const art = globMaps.art;
+const avatars = globMaps.avatars;
 
 const artFor = (name) => art[`../../assets/raffle/${name}.png`];
 const avatarFor = (id) => avatars[`../../assets/raffle/avatars/${AVATAR_FILE[id] ?? id}.png`];

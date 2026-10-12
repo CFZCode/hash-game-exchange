@@ -10,6 +10,7 @@ import { useIsDialog } from '../../context/dialogRoute';
 import { useSettings } from '../../context/settings';
 import rgBadges from '../../assets/responsible/rg.png';
 import rgBadgesLight from '../../assets/responsible/rg_w.png';
+import * as globMaps from './index.globs.js';
 import '../Help/Help.css';
 
 /* Responsible Gambling — `/responsible/:responsibleId`, and `/responsible` bare.
@@ -37,11 +38,7 @@ import '../Help/Help.css';
  * presentation, which is why `toSections` is not reused here.
  */
 
-const docs = import.meta.glob('../Help/topics/*.html', {
-  eager: true,
-  query: '?raw',
-  import: 'default',
-});
+const docs = globMaps.docs;
 
 /* The remote's own substitution — see the note in pages/Help/index.jsx. */
 const ENV = {

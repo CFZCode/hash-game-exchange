@@ -5,6 +5,7 @@ import { getPromotions } from '../../services/promotions';
 import { useResource } from '../../hooks/useResource';
 import { useIsDialog } from '../../context/dialogRoute';
 import Skeleton from '../../components/shared/Skeleton';
+import * as globMaps from './index.globs.js';
 
 /* The promotions page — `/promotions/promotion`.
  *
@@ -35,10 +36,7 @@ import Skeleton from '../../components/shared/Skeleton';
  * before its art is fetched should render an empty 112px slot rather than a broken image, and
  * the slot keeps its size so the text column and card height stay honest either way.
  */
-const art = import.meta.glob('../../assets/promotions/*.{png,avif,jpg}', {
-  eager: true,
-  import: 'default',
-});
+const art = globMaps.art;
 
 const artFor = (name) =>
   art[`../../assets/promotions/${name}.png`] ||

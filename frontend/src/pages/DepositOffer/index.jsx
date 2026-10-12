@@ -14,6 +14,7 @@ import {
 } from "./icons";
 import "./DepositOffer.css";
 import Skeleton from '../../components/shared/Skeleton';
+import * as globMaps from './index.globs.js';
 
 /* The deposit-bonus page — `/deposit-offer`.
  *
@@ -62,10 +63,7 @@ import Skeleton from '../../components/shared/Skeleton';
    stays even though nothing hits it now: a promotion added before its art arrives should render
    an empty slot AT ITS REAL SIZE rather than a broken image, which keeps the card and the
    dialog header at their true heights either way. */
-const art = import.meta.glob("../../assets/deposit-offer/*.{png,avif,jpg}", {
-  eager: true,
-  import: "default",
-});
+const art = globMaps.art;
 
 const artFor = (name) =>
   art[`../../assets/deposit-offer/${name}.png`] ||

@@ -1,13 +1,8 @@
 import bcLogo from '../assets/logo.png';
 import bcLogoLight from '../assets/logo_w.png';
+import * as globMaps from './providers.globs.js';
 
-const logos = import.meta.glob(
-  '../assets/providers/*.{png,avif}',
-  {
-    eager: true,
-    import: 'default',
-  }
-);
+const logos = globMaps.logos;
 
 const mark = (hash) =>
   logos[`../assets/providers/${hash}.png`] ||

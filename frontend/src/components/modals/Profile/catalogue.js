@@ -1,3 +1,4 @@
+import * as globMaps from './catalogue.globs.js';
 /* The medal catalogue's view logic — `os`, `ss` and `cs` in the account remote's
  * `Tool-CuKFgBKm.js`. Kept beside the dialogs rather than in `services/`, because none of it is
  * data: it is names, an ordering and an image lookup, which is the same split `sortGames` and
@@ -81,10 +82,7 @@ export const visibleMedals = (rows) => rows.filter((row) => row.type !== 9);
  * `status` as "0" — see data/achievements.js — but it is fetched anyway rather than left as a hole,
  * for the reason the Free Plays row's provider marks are.
  */
-const art = import.meta.glob('../../../assets/profile/medal_*.png', {
-  eager: true,
-  import: 'default',
-});
+const art = globMaps.art;
 
 const COIN_SUBTYPES = ['ETH', 'BTC', 'DOGE', 'EOS'];
 
