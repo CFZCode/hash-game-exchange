@@ -73,7 +73,7 @@ const HeadphonesSvg = () => (
 // Games and Providers all land on the real page with the right tab lit. Sports lands on the
 // real sportsbook. Promotions' four rows were already real.
 //
-// It costs the honest 404. BC Exclusive, Bingo, the five Lottery rows and Provider BTi have no
+// It costs the honest 404. BC Exclusive, Bingo and Provider BTi have no
 // page here, so they keep their URL and render Home under it. Those
 // are the rows to give a real page next; the paths are already correct, so building the page is
 // the whole job. Quest Hub and Bonus were both on that list and are now built — `/quests` and
@@ -229,8 +229,8 @@ const SUBMENU_ROUTES = [
 /* `guard: { needLogin: !0 }` in the original's menu definition, which is
    `index-DuwOs_Mv.js` — a module that IS in the mirror and is the authority for every row in
    this sidebar. It used to be gated on a hardcoded `false` because there was no session; it is
-   now `session.login`, so Favorites and Recent appear under Casino, My bets and Favorites under
-   Lottery, and Refer & Earn under Promotions once you sign in.
+   now `session.login`, so Favorites and Recent appear under Casino and Refer & Earn under
+   Promotions once you sign in (Lottery's My bets and Favorites went with that group).
 
    The bottom group's two login-only rows are NOT expressed this way on the original — Bonus is
    `h.login && {…}`, spliced out of the array entirely, and Quest Hub is
@@ -401,20 +401,11 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
     },
     /* DELIBERATE DEPARTURE FROM THE ORIGINAL, on the user's request: bc.game's menu has a
        Predictions row here (`/predictions`) and a Crypto Futures group (`/trading/contract`,
-       High Low / Up Down / High Low Spread / Tap Trading) after Lottery. This platform offers
-       neither product, so both are gone rather than left pointing at the catch-all. The pixel
-       check expects the sidebar to be two rows shorter than the reference — see
+       High Low / Up Down / High Low Spread / Tap Trading) after a Lottery group (`/lottery`: My
+       bets, All lotteries, Favorites, BC Lottery, Popular). This platform offers none of the
+       three, so all are gone rather than left pointing at the catch-all. The pixel check expects
+       the sidebar to be three rows shorter than the reference — see
        .claude/skills/hash-ui-fidelity, "Deliberate departures". */
-    {
-      id: 'lottery', label: 'Lottery', colorIcon: 'lottery', hasArrow: true, href: '/lottery',
-      subItems: [
-        { label: 'My bets', menuIcon: 'my_bets', href: '/lottery/myBets', needLogin: true },
-        { label: 'All lotteries', menuIcon: 'alllotteries', href: '/lottery/allLotteries?sort=letter_asc' },
-        { label: 'Favorites', menuIcon: 'favorites1', href: '/lottery/favourite', needLogin: true },
-        { label: 'BC Lottery', menuIcon: 'bclottery', href: '/lottery/detail/0' },
-        { label: 'Popular', menuIcon: 'popular', href: '/lottery/allLotteries?sort=lottery_popular' },
-      ]
-    },
     {
       id: 'promotions', label: 'Promotions', colorIcon: 'promotion', hasArrow: true, href: '/promotions/promotion',
       subItems: [

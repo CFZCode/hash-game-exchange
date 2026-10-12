@@ -70,7 +70,7 @@ export default function ExplorePage() {
   return (
     <div className="px-4 pt-4 sm:px-0">
       {/* `t.type` and `t.autofocus` — `ur`'s own two query keys. `type` seeds the dropdown, so
-          `/explore?type=lottery` opens on Lottery; `autofocus=1` puts the caret in the field on
+          `/explore?type=sports` opens on Sports; `autofocus=1` puts the caret in the field on
           arrival, which is how a link that means "search now" differs from one that means "show
           me Explore". Neither is passed by the overlay, which is why both default. */}
       <ExplorePanel

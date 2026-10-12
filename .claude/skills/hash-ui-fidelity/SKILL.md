@@ -59,8 +59,9 @@ Changes the user asked for, so the pixel check WILL show them against the refere
 - **Predictions removed**: the sidebar group row (`/predictions`). No route existed.
 - **Crypto Futures removed**: the sidebar group and its four rows (`/trading/contract`, `/trading`, `/trading/up-down`, `/trading/spread`, `/trading/tap`) and the home page's UPDOWN category card (`/trading/up-down`). The four remaining cards share the row. On a home diff this shows as the card row reflowing.
 - **Forum removed**: the sidebar bottom group's external row (`forum.hash.game`).
+- **Lottery removed**: the sidebar group and its five rows (`/lottery`, My bets, All lotteries, Favorites, BC Lottery, Popular), the home page's LOTTERY category card (the three remaining cards share the row, so a home diff shows the card row reflowing), the home page's "Upcoming Lottery Draw" section (everything below it moves up), the Explore panel's Lottery search type and the footer's Lottery link. No `/lottery` route existed; those URLs fall to the catch-all.
 
-The sidebar is therefore shorter than the reference, so everything below the removed rows in the sidebar shifts up. Details are in `frontend/docs/architecture.md` under Sidebar. Left as they were on purpose: the Sports lobby's own Predictions tab (BetBy's), the Trading option in the bet-history type filter, the footer's "Crypto trading is not gambling" licence line, and the `detrade:trading` game redirects in FreePlay and Profile.
+The sidebar is therefore shorter than the reference, so everything below the removed rows in the sidebar shifts up. Details are in `frontend/docs/architecture.md` under Sidebar. Left as they were on purpose: the Sports lobby's own Predictions tab (BetBy's), the Trading and Lottery options in the bet-history type filter, the slot theme tag "Lottery" in the casino catalogue's tag list, the footer's "Crypto trading is not gambling" licence line, and the `detrade:trading` game redirects in FreePlay and Profile.
 
 ## Next.js migration rules
 

@@ -21,7 +21,6 @@ import {
 } from '../pages/Home/GameSection/sections';
 import { bets } from '../pages/Home/LatestBets/bets';
 import { bigWinsByTab, vipTier, displayName } from '../pages/Home/RecentBigWins/data';
-import { draws } from '../pages/Home/LotteryDraws/draws';
 import { matches } from '../pages/Home/Highlights/matches';
 
 /* The home page's data.
@@ -229,11 +228,9 @@ const toBigWin = (row) => {
   };
 };
 
-/* LIVE: no lottery and no BetBy feed exist on the SmartBet backend, so both rows render empty
-   rather than the captured draws and matches. */
-export const getLotteryDraws = () =>
-  USE_FIXTURES ? request(ENDPOINTS.lotteryUpcoming, { fixture: draws }) : [];
-
+/* LIVE: no BetBy feed exists on the SmartBet backend, so Highlights renders empty rather than
+   the captured matches. (Its neighbour, Upcoming Lottery Draw, is removed with the rest of
+   Lottery on the user's request — a deliberate departure.) */
 /* Highlights is BetBy's, not bc.game's — its real source is the top-events feed on BetBy's own
    host, which needs a brand id, a country, a currency and a language. None of those are known
    at rest here, so the path is built with the one captured brand flag and placeholders; see

@@ -7,7 +7,6 @@ import sportsImg from '../../../assets/sports.png';
 import pokerImg from '../../../assets/poker.png';
 import racingImg from '../../../assets/racing.png';
 import racingLightImg from '../../../assets/racing_w.png';
-import lotteryImg from '../../../assets/lottery.png';
 import bingoImg from '../../../assets/bingo.png';
 
 /* The category cards under Recent Big Wins — two feature panels over a row of four.
@@ -131,7 +130,8 @@ function CategoryCard({ src, icon, title, href, isWide }) {
 const CATEGORIES = [
   { key: 'poker', icon: 'bcpoker', title: 'POKER', src: pokerImg, href: '/casino/poker' },
   { key: 'racing', icon: 'racing', title: 'RACING', src: racingImg, href: '/racing' },
-  { key: 'lottery', icon: 'lottery', title: 'LOTTERY', src: lotteryImg, href: '/lottery' },
+  /* LOTTERY (`/lottery`) sat here on the original; removed on the user's request, a deliberate
+     departure — see .claude/skills/hash-ui-fidelity. The three remaining cards share the row. */
   { key: 'bingo', icon: 'bingo', title: 'BINGO', src: bingoImg, href: '/bingo' },
 ];
 
