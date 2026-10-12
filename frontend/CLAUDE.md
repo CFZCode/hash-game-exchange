@@ -107,11 +107,29 @@ Two structural traps that generalise: **a `useState` seeded from a read breaks t
 ## Commands
 
 ```bash
-npm run dev        # Vite dev server with HMR
-npm run build      # production build -> dist/
-npm run preview    # serve the built dist/
-npm run lint       # eslint (flat config, ignores dist/)
+npm run dev          # Next.js dev server (Turbopack) on :5190; regenerates the glob maps first
+npm run build        # next build -> .next/ (also regenerates the glob maps)
+npm run start        # serve the build on :5190
+npm run check:globs  # prove the glob maps match the asset folders (pass a Vite origin to match Vite too)
+npm run lint         # eslint (flat config, ignores dist/)
 ```
+
+### Next.js, and what it replaced
+
+The app moved from Vite to Next.js 16 with the UI unchanged; the React Router app is mounted
+client-only by `app/[[...slug]]` (see `.claude/skills/hash-ui-fidelity`). What keeps it identical:
+
+- **No `import.meta.glob`.** Each former glob is `globMaps.<name>` from a generated sibling
+  `<file>.globs.js` (`scripts/gen-glob-maps.mjs`, config at its top). Keys are exactly Vite's.
+  Adding an asset to a globbed folder needs `npm run gen:globs` (dev/build run it).
+- **An image import is still its URL string.** `scripts/asset-url-loader.cjs` tags src/'s image
+  imports with `?url` and `next.config.mjs` gives those the `asset` type; CSS `url()` keeps
+  Next's own handling. `?raw` (SVG/HTML) is still the file's text.
+- **Env is `process.env.NEXT_PUBLIC_*`** (`API_BASE`, `USE_FIXTURES`, `FIXTURE_DELAY`, `SITE_*`);
+  the `VITE_*` names below and in `docs/` are still honoured as fallbacks by `next.config.mjs`.
+- `turbopack.resolveExtensions` is Vite's order (`EditProfile/frames.js` beside `frames.jsx`),
+  StrictMode is off as it was, and the empty top-level `pages/` stops Next reading `src/pages`
+  as a Pages Router. Do not delete it.
 
 No test framework is configured — there is no `npm test`. What stands in for one is **seventeen**
 throwaway harnesses, none imported by `src/`. The full inventory and what each covers is in
@@ -204,7 +222,7 @@ Icons are not individual files. Three sprite sheets are positioned with `backgro
 
 ### Styling
 
-Tailwind v4 through `@tailwindcss/vite` — there is **no `tailwind.config.js`**. Theme tokens live in the `@theme` block in `src/index.css`, and each layout component ships its own plain CSS file next to it.
+Tailwind v4 through `@tailwindcss/postcss` (`postcss.config.mjs`) — there is **no `tailwind.config.js`**. Theme tokens live in the `@theme` block in `src/index.css`, and each layout component ships its own plain CSS file next to it.
 
 The `@theme` block is the single source of truth for colors — every `bg-`/`text-`/`fill-`/`border-` utility is generated from it. Do not redeclare a token's value as a hand-written class in component CSS; that split is what previously made the layer names contradict each other. **It holds the DARK values and the light theme overrides them** — see the Light theme section above before adding a token, because a colour added only to `@theme` is a colour that will not change when the theme does.
 

@@ -1,6 +1,6 @@
 # bc-games
 
-A React + Vite rebuild of the bc.game front-end UI, matched to the original layout at
+A React (Next.js) rebuild of the bc.game front-end UI, matched to the original layout at
 the pixel level across every target breakpoint.
 
 ## Getting started
@@ -14,9 +14,9 @@ npm run dev        # dev server with HMR
 
 | command | what it does |
 | --- | --- |
-| `npm run dev` | Vite dev server with HMR |
-| `npm run build` | production build into `dist/` |
-| `npm run preview` | serve the built `dist/` |
+| `npm run dev` | Next.js dev server with HMR on port 5190 |
+| `npm run build` | production build into `.next/` |
+| `npm run start` | serve the production build on port 5190 |
 | `npm run lint` | ESLint over the source (reference mirrors excluded) |
 
 There is no test suite yet.
