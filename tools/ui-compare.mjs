@@ -2,7 +2,11 @@
 /**
  * Pixel-compare two running copies of the frontend, route by route, at desktop and phone width.
  *
- *   node tools/ui-compare.mjs <baseA> <baseB> [outDir] [--routes /,/casino,...] [--max 0.5]
+ *   node tools/ui-compare.mjs <baseA> <baseB> [outDir] [--routes /,/casino,...] [--max 0.5] [--before <js>]
+ *
+ * --before runs a script in the page on both sides after it loads and before the shot, e.g.
+ * `--before "document.querySelector('.region-block-overlay [aria-label=Close]')?.click()"` to
+ * compare the desktop pages without the visitor's region dialog dimming them.
  *
  * baseA is the reference (the original hash-games frontend), baseB the build under test.
  * Drives the shared QA Chrome over CDP (http://127.0.0.1:9333; start it with
@@ -30,6 +34,7 @@ const ROUTES = flag('--routes', null)?.split(',') ?? ['/', '/casino', '/casino/s
   '/referral-exhibition', '/responsible', '/explore', '/favorite', '/recent', '/deposit-offer', '/settings',
   '/gamelist/slots', '/affiliate', '/sports'];
 const MAX = Number(flag('--max', '0.5'));
+const BEFORE = flag('--before', null);
 const [A, B, OUT = path.join(here, '../.ui-compare')] = args;
 if (!A || !B) { console.error('usage: node tools/ui-compare.mjs <baseA> <baseB> [outDir] [--routes a,b] [--max 0.5]'); process.exit(2); }
 fs.mkdirSync(OUT, { recursive: true });
@@ -58,6 +63,7 @@ async function shot(url, v) {
   await send('Emulation.setTouchEmulationEnabled', { enabled: v.m });
   await send('Page.navigate', { url });
   await sleep(4500);
+  if (BEFORE) { await send('Runtime.evaluate', { expression: BEFORE, awaitPromise: true }); await sleep(800); }
   await send('Runtime.evaluate', { expression: `(()=>{const s=document.createElement('style');s.textContent=${JSON.stringify(FREEZE)};document.head.appendChild(s);document.querySelectorAll('video').forEach(v=>{try{v.pause();v.currentTime=0}catch{}});window.scrollTo(0,0)})()` });
   await sleep(600);
   const r = await send('Page.captureScreenshot', { format: 'png' });
