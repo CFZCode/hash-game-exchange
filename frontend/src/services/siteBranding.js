@@ -5,7 +5,7 @@
  *
  * The owner panel holds a title, a description and a logo NAME per site, and
  * the push writes them to `.env.local` as VITE_SITE_TITLE, VITE_SITE_DESCRIPTION
- * and VITE_SITE_LOGO. The logo is a name, never an upload: the images are
+ * and VITE_SITE_LOGO (read here as NEXT_PUBLIC_SITE_*; next.config.mjs maps the VITE_ names). The logo is a name, never an upload: the images are
  * static files under `public/brand/`, shipped by the same push, and this module
  * picks one by name.
  *
@@ -34,8 +34,16 @@ const LOGOS = {
   roobet: 'roobet.svg',
 };
 
+/* Next inlines `process.env.NEXT_PUBLIC_*` only where it is written out literally, so the keys
+   are spelled out here rather than read by name. */
+const ENV = {
+  NEXT_PUBLIC_SITE_TITLE: process.env.NEXT_PUBLIC_SITE_TITLE,
+  NEXT_PUBLIC_SITE_DESCRIPTION: process.env.NEXT_PUBLIC_SITE_DESCRIPTION,
+  NEXT_PUBLIC_SITE_LOGO: process.env.NEXT_PUBLIC_SITE_LOGO,
+};
+
 const env = (key) => {
-  const value = import.meta.env?.[key];
+  const value = ENV[key];
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 };
 
@@ -48,15 +56,15 @@ const exact = (name) => (LOGOS[String(name ?? '').trim().toLowerCase()] ? String
 export function logoFor(name, { own } = {}) {
   const key = exact(name);
   if (!key || key === exact(own)) return null;
-  const base = String(import.meta.env?.BASE_URL ?? '/').replace(/\/*$/, '/');
+  const base = String(process.env.NEXT_PUBLIC_BASE_PATH ?? '/').replace(/\/*$/, '/');
   return `${base}brand/${LOGOS[key]}`;
 }
 
-export const siteTitle = () => env('VITE_SITE_TITLE');
-export const siteDescription = () => env('VITE_SITE_DESCRIPTION');
+export const siteTitle = () => env('NEXT_PUBLIC_SITE_TITLE');
+export const siteDescription = () => env('NEXT_PUBLIC_SITE_DESCRIPTION');
 
 /** The logo the owner chose, by exact name. Nothing chosen is null: the site's own. */
-export const siteLogo = (options) => logoFor(env('VITE_SITE_LOGO'), options);
+export const siteLogo = (options) => logoFor(env('NEXT_PUBLIC_SITE_LOGO'), options);
 
 /** Call once, before the first render. Leaves index.html's own values where nothing is set. */
 export function applySiteBranding() {

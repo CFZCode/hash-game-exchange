@@ -51,7 +51,7 @@ import {
  *
  * `useResource` accepts either a value or a Promise, so no call site cares which it gets.
  */
-const BASE = import.meta.env.VITE_API_BASE ?? '';
+const BASE = process.env.NEXT_PUBLIC_API_BASE ?? '';
 
 /* Exported because ONE consumer needs the origin rather than a fetch: a banner's artwork is
    served by the gateway (`/admin/banners/image/<type>`) and goes into a CSS `url()`, which no
@@ -61,15 +61,15 @@ export const API_BASE = BASE;
 
 /* Defaults to ON, so a checkout with no env file behaves exactly as the build does today.
    Compared against the string because Vite injects env values as strings. */
-export const USE_FIXTURES = String(import.meta.env.VITE_USE_FIXTURES ?? 'true') !== 'false';
+export const USE_FIXTURES = String(process.env.NEXT_PUBLIC_USE_FIXTURES ?? 'true') !== 'false';
 
 /* How long a fixture read pretends to take. See the note above; 0 restores the synchronous
    behaviour this file had before the loading states were built. `Number.isFinite` rather than a
    bare `Number(...) || 400`, so an explicit 0 is honoured instead of falling back to the
    default the way a falsy value would. */
-const configured = Number(import.meta.env.VITE_FIXTURE_DELAY ?? '');
+const configured = Number(process.env.NEXT_PUBLIC_FIXTURE_DELAY ?? '');
 export const FIXTURE_DELAY =
-  String(import.meta.env.VITE_FIXTURE_DELAY ?? '').trim() !== '' &&
+  String(process.env.NEXT_PUBLIC_FIXTURE_DELAY ?? '').trim() !== '' &&
   Number.isFinite(configured) &&
   configured >= 0
     ? configured
