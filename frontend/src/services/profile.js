@@ -47,6 +47,61 @@ const PROFILE_STATS = '/api/v1/user/profile/stats';
 const readOwnStats = () =>
   Promise.resolve(request(PROFILE_STATS, { live: true, fixture: null })).catch(() => null);
 
+/* ── MEDALS ON SMARTBET, gap 9 (live mode only) ──────────────────────────────────────────────
+ *
+ * `GET /user/medals` (own, signed in) answers all 23 medals with the reference's own keys —
+ * `type` + `subType` — so each row maps one for one onto the `achievement/all/` row this UI was
+ * built on: `unlocked` → `status` "1"/"0", `holders` → `count`, `unlockedAt` → `createTime` (ms),
+ * `progress {current, target}` → `progress {current, total}`. `medalCount` is the server's.
+ *
+ * `GET /user/profile/:userId/medals` (public) answers another player's UNLOCKED medals only, with
+ * no progress; the rest of the strip is the catalogue, locked.
+ *
+ * NO FAKE UNLOCKS AND NO BORROWED FIGURES. When the read fails (signed out, server down) the
+ * catalogue renders all locked with zero holders — never bc.game's captured holder counts, which
+ * are another site's players. A medal the platform has no rule for comes back locked from the
+ * server and stays locked here. The reward chests keep the declared unclaimed `bonusStatus`:
+ * medals are cosmetic on this platform and no chest claim exists.
+ */
+const lockedCatalogue = () =>
+  ACHIEVEMENTS.map((row) => ({ ...row, status: '0', count: 0, createTime: 0, progress: null }));
+
+const toAchievement = (medal) => ({
+  type: Number(medal.type),
+  subType: String(medal.subType ?? '0'),
+  status: medal.unlocked ? '1' : '0',
+  count: Number(medal.holders ?? 0),
+  createTime: medal.unlockedAt ? Date.parse(medal.unlockedAt) : 0,
+  progress: medal.progress
+    ? { total: Number(medal.progress.target), current: Number(medal.progress.current) }
+    : null,
+});
+
+const medalKey = (row) => `${row.type}_${row.subType}`;
+
+function readLiveMedals(userId, account) {
+  const self = !!account?.userId && Number(account.userId) === Number(userId);
+  if (self) {
+    return Promise.resolve(request(PLATFORM.user.medals, { live: true, fixture: null }))
+      .then((data) =>
+        Array.isArray(data?.medals)
+          ? { medalCount: Number(data.medalCount ?? 0), achievements: data.medals.map(toAchievement) }
+          : null,
+      )
+      .catch(() => null)
+      .then((live) => live ?? { medalCount: 0, achievements: lockedCatalogue() });
+  }
+  return Promise.resolve(request(PLATFORM.user.publicMedals(userId), { live: true, fixture: null }))
+    .then((data) => {
+      const earned = new Map((data?.medals ?? []).map((m) => [medalKey(toAchievement(m)), toAchievement(m)]));
+      return {
+        medalCount: earned.size,
+        achievements: lockedCatalogue().map((row) => earned.get(medalKey(row)) ?? row),
+      };
+    })
+    .catch(() => ({ medalCount: 0, achievements: lockedCatalogue() }));
+}
+
 const PROFILE_DEFAULT = {
   achievementType: 0,
   achievements: [],
@@ -106,10 +161,12 @@ export function getUserProfile(userId, account) {
         request(PLATFORM.user.publicProfile(userId), { live: true, fixture: null }),
       ).catch(() => null),
       self ? readOwnStats() : null,
+      readLiveMedals(userId, account),
     ])
-      .then(([row, stats]) => ({
+      .then(([row, stats, medals]) => ({
         ...PROFILE_DEFAULT,
-        achievements: ACHIEVEMENTS,
+        /* The strip and the "Medals N" heading: the platform's medals, see `readLiveMedals`. */
+        achievements: medals.achievements,
         userId: Number(userId) || account?.userId || 0,
         ...(row
           ? {
@@ -147,7 +204,12 @@ export function getUserProfile(userId, account) {
 
 /* `Da` — the medals dialog's own read, and the one that answers. `bonusStatus` is empty for a
    visitor and is reconstructed in data/achievements.js; see the note there. */
-export function getAllAchievements() {
+export function getAllAchievements(userId, account) {
+  /* SmartBet: the platform's medals for this id (own: full catalogue with progress; another
+     player: their unlocked ones over the locked catalogue). Fixture mode below is unchanged. */
+  if (!USE_FIXTURES) {
+    return readLiveMedals(userId, account).then((medals) => ({ ...medals, bonusStatus: BONUS_STATUS }));
+  }
   return request(ENDPOINTS.profile.achievementsAll, {
     fixture: {
       medalCount: MEDAL_COUNT,

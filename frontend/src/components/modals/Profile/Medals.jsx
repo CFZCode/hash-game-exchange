@@ -234,8 +234,12 @@ export default function Medals({ onClose, enter }) {
   const [expanded, setExpanded] = React.useState(false);
 
   /* Read off the pathname rather than with `useParams`, for the reason index.jsx records. */
-  const isMyself = session.userId === Number(pathname.split('/').pop() || '0');
-  const { data, loading } = useResource(getAllAchievements);
+  const userId = Number(pathname.split('/').pop() || '0');
+  const isMyself = session.userId === userId;
+  /* The id and session go to the read so live mode can ask for THIS player's medals (gap 9);
+     fixture mode ignores both and answers the captured catalogue as before. */
+  const read = React.useCallback(() => getAllAchievements(userId, session), [userId, session]);
+  const { data, loading } = useResource(read);
 
   const all = data?.achievements ?? [];
   /* `fe(Le(all))` — `orderMedals` over a lodash `cloneDeep`, then split by status. The clone is

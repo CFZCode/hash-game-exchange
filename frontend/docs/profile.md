@@ -66,4 +66,17 @@ Reproduced in `DialogShell.css` as keyframes (a keyframe cannot be a utility, an
 
 Not built, each inert at its call site: the **avatar popup** (`pt` — a `.pop-center` holding a 480px avatar over a Like button that POSTs `/game/support/system-like/like-event/`; it needs the shared popup stack), `/user/medals/item` (the single-medal detail, `Medal-DUbmmSLY.js`, recovered but not built — a tile still assembles the query it would carry), `/settings/edit-profile` behind the pencil, the **other-user pane** of Master Medals and the whole "not myself" half of the profile (nothing in this build links to another player), the reward-chest **claim** (authenticated, and its two refusal messages are recorded at the handler), the Rewards tooltip's **phone arm** (the same four lines as a pushed popup), the Wager Contest card, the `titles` name mark, and the `postMessage({type: "showProfile"})` the dialog fires at `window.top` for a native shell that a browser build has no consumer for.
 
+## Live mode: medals on SmartBet (gap 9, 2026-10-12)
+
+With fixtures off, the profile's Medals strip and count and the Master Medals dialog read the platform:
+`GET /user/medals` for your own id, `GET /user/profile/:userId/medals` for anyone else's
+(`services/profile.js` → `readLiveMedals`). The server uses the same 23 `type`/`subType` keys as
+`catalogue.js`, so each row maps onto the `achievement/all/` shape this markup was built on —
+`unlocked` → `status`, `holders` → `count`, `unlockedAt` → `createTime`, `progress {current, target}` →
+`progress {current, total}` — and no markup changed. Another player's dialog shows their unlocked medals
+over the locked catalogue (no progress, no holder counts: the public answer carries none). A failed or
+signed-out read renders everything locked with zero holders, never bc.game's captured counts. Thirteen
+medals have no rule on this platform and always come back locked; the rules are in
+`docs/backend-gaps.md` Part 4b.22. The chests keep the unclaimed default: medals are cosmetic here and
+there is no claim. `Medals.jsx` now passes the id and session into the read, which fixture mode ignores.
 

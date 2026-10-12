@@ -844,6 +844,14 @@ export const PLATFORM = {
        balance. `bets`/`wins` are `null` rather than 0 when casino-service could not be read. */
     publicProfile: (userId) => `/api/v1/user/profile/${userId}/public`,
 
+    /* ── Profile medals, gap 9 ───────────────────────────────────────────────────────────────
+       `medals` is the caller's own catalogue (every medal, locked or not, with progress and
+       holder counts; signed in). `publicMedals` is another player's UNLOCKED medals only, no
+       figures; public. Both carry `medalCount`. Keys are the reference's `type` + `subType`, so
+       the local artwork resolves unchanged. */
+    medals: '/api/v1/user/medals',
+    publicMedals: (userId) => `/api/v1/user/profile/${userId}/medals`,
+
     /* `profile` AND `auth/me` READ THE SAME ROW AND ANSWER DIFFERENTLY, which is worth knowing
        before picking one: `me` returns the raw columns (`two_fa_status`, `referalcode`,
        `created_estimated`) and `profile` returns them mapped (`twoFactorEnabled`,

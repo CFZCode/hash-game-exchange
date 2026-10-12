@@ -284,13 +284,14 @@ Wired against the SmartBet gateway (:4700); checked with the real services under
 | Notification drawer tabs | `GET /user/notifications` | Type → tab now mirrors the server's `categories.js` (`general` System, offer types Promotions, everything else Transactions). `withdrawal_rejected`, `tip_received` etc. were landing in System; tab counts now equal `/notifications/unread-count.byCategory` |
 | Profile → Total Wagered (own) and Statistics summary | `GET /user/profile/stats` | `wagered.usd` fills `betAmountUsd`; bets/wins now include sports. Another player's profile still has no money figure (the public route carries none) |
 | Referral → Live Rewards strip (exhibition + dashboard) | none (no feed of other players' rewards) | **NO-BACKEND.** Live mode now keeps the labels and empties the figures: total $0.00, no rows. It printed bc.game's captured four rows, sixteen invented filler rows and bc.game's $25.6M total |
+| Profile → Medals strip + count, Master Medals dialog | `GET /user/medals` (own), `GET /user/profile/:userId/medals` (another player) | **Wired 2026-10-12 (gap 9).** Own: every medal's locked/unlocked state, unlock date, holder count and progress (`progress {current,total}` on each row, read by the not-yet-built medal detail; the tile markup has no progress slot). Another player: their unlocked medals over the locked catalogue. A failed read renders all locked with zero holders, never bc.game's captured counts. Chests keep the unclaimed default (cosmetic, no claim) |
 | Settings → Preferences → Refuse tip from strangers | `GET`/`PATCH /user/tip/settings` `{enabled}` | `refuseTip = !enabled`; the flip is written, a refusal reverts it with the server's message. Hide gaming data / hide username have no route and stay local |
 
 Already wired and re-checked on SmartBet: sign in/out/refresh, register, forgot/reset (seam only), profile + edit, change password, sessions + remove, change e-mail (SMTP not configured → 502), 2FA enable/verify/disable, preferences, KYC status/documents/submit, whitelist read + four writes, public profile, invite code, claim-all.
 
 Still not wired, by reason:
 
-- **NO-BACKEND:** sign in with a one-time code (gap 12b, `login` has no OTP arm); notification delete (gap 10); comment replies; medals/achievements (gap 9); Account Connections, linked accounts, community links; anti-phishing code; the per-currency Statistics table (`/profile/stats.wagered.byCurrency` has no wins per currency, which the table prints).
+- **NO-BACKEND:** sign in with a one-time code (gap 12b, `login` has no OTP arm); notification delete (gap 10); comment replies; Account Connections, linked accounts, community links; anti-phishing code; the per-currency Statistics table (`/profile/stats.wagered.byCurrency` has no wins per currency, which the table prints).
 - **NO-UI:** `/user/bank-accounts` answers real rows but Settings → Payment draws no card tile (`rows.length > 0 ? null`); a 2FA-enabled account gets the server's "A two-factor code is required" on sign-in because the dialog has no code step; the `/login/forgot` page is not built.
 - **BLOCKED, chat:** chat is socket-only on SmartBet (`CHATS`/`ADD_CHAT` on user-service, encoded payloads), and the frontend has no socket.io client. Wiring it means adding `socket.io-client` and the `@ibitplay/socket` encode/decode; left for a separate change.
 
@@ -580,13 +581,20 @@ game page's toolbar, which had been drawn and inert since that page was built, i
   counter never moves, which is a staleness limit rather than a correctness one.
 - Page: `/free-plays`.
 
-### 9. Achievements and medals
+### 9. BUILT — Achievements and medals
 
 - **The page needs** the medal catalogue (name, picture, how to earn it, how many players have it)
   and which ones this player has.
 - **Today** there is nothing.
 - **Add** `GET /achievements` (catalogue) and `GET /user/:id/achievements`.
 - Pages: the profile dialog and the Master Medals dialog.
+- **DONE 2026-10-12 — Part 4b.22.** `GET /user/medals` (own, signed in: all 23 medals with rule,
+  progress, unlock date, holder count and `medalCount`) and `GET /user/profile/:userId/medals`
+  (public: unlocked only, no figures). Migration 093 (`user_medals`). Same 23 keys as the UI's
+  catalogue, so the artwork is unchanged. **Ten have a rule measured on platform data; thirteen
+  have none on this platform and stay locked** (no rain, no coin-catch game, no balance history,
+  no per-coin profit board, puzzle promotion, Roll King retired). Cosmetic only: the reference's
+  reward chests are not paid.
 
 ### 10. BUILT — Notifications for players
 
@@ -987,6 +995,59 @@ visitor already saw, except where seeing it was the point.
 
 **17 is front-end only** and is recorded here anyway, because it is what finally made 16's routes
 reachable and because it corrected two things this file had said about them.
+
+### 22. Profile medals — gap 9 (2026-10-12)
+
+**A `medals` module in user-service, migration 093, and two additive fields on casino-service's
+profile stats.** Routes: `GET /api/v1/user/medals` (player) and `GET /api/v1/user/profile/:userId/medals`
+(public, rate limited on its own 60 / 15 min budget, mounted by the `profile` module beside
+`/:userId/public`).
+
+**The catalogue is the UI's own 23 medals** (`type` + `subType`; type 9 dropped as every bc.game
+list drops it), titles verbatim, and each rule is the bc.game unlock text from the recovered
+`Medal-DUbmmSLY.js` (`descript1..21`) measured on what this platform really records:
+
+| key | medal | rule here | source |
+|---|---|---|---|
+| 1 | Talkative | chat on 200 different UTC days | `chat_global` + `chat_brazil` |
+| 4 | Highest Contributor | lifetime wager (USD) strictly above every other player's, and > 0 | `userwager` |
+| 5 | The Top Gun | reach the site VIP ladder's top level (41 on the platform ladder) | `userwager` → ladder |
+| 8 | Invincible Lucky Dog | one round paying 99,000x+ the stake | casino `bets` (in-house only) |
+| 12 | Chicken Dinner | casino profit (payouts − stakes, USD) ≥ 10,000 | casino profile stats |
+| 13 | Loyal Player | 10,000,000 bets (casino + sports) | profile stats |
+| 14 | Call Me 'Richman' | lifetime wager ≥ 1,000,000 USD | `userwager` |
+| 15 | The Old-Timer | account 365 days old (unlock date = the anniversary) | `users.created` |
+| 16 | The Boss | tipped 99 different players | `tips` |
+| 18 | Contest Master | top 3 of the daily race on 3 consecutive days | `race_rewards` + `races` |
+
+**No rule, always locked, each with its reason in the response:** 2 Fearless One (no cross-provider
+lifetime-loss ranking), 3 The Loaded King (no balance history), 6 and 11 (no Rain), 7 COCO Lover
+(no coin-catch game), 10 Roll King (retired on bc.game itself), 17 ×4 TOP 1 per coin (no per-coin
+all-time profit board), 19–21 Puzzle (a bc.game promotion). **KYC, 2FA, first deposit and referral
+milestones are NOT medals**: bc.game has no such medal and there is no artwork or title for one, so
+adding them would mean inventing UI.
+
+**Evaluated on read, recorded once, kept.** A read gathers the facts (one-player SQL plus the 60 s
+cached `ProfileStatsService` totals), and any met medal not yet held gets a `user_medals` row. A held
+medal stays held if its figure later drops. No hook on the wager or deposit paths: nothing is paid,
+so nothing is late. The public route runs only the database rules, so a visitor cannot drive
+casino/sports reads for any id; the three play-total medals appear there once the player's own read
+recorded them. A play source that is down gives `available: false` and no progress for its medals,
+never an unlock and never a 500.
+
+**Cosmetic, so not a promotion.** No `denyAgentPlayer`: agent-tree players earn medals like anyone.
+The bc.game reward chests (5/10/15/20 medals → $20/$800/$2,400/$10,000) are **not** paid: that is an
+owner decision (amounts, `reward-currency`, agent players) and a claim route through the wallet.
+
+**Privacy:** there is still no "hide gaming data" flag on the platform (gap 17's note), so there is
+nothing to honour; the public answer carries titles and dates only, no progress figures.
+
+**casino-service:** `/internal/casino/bet-history/player/:id/profile-stats` now also answers `won`
+per currency row and `maxMultiplier` (best in-house round); user-service folds them into
+`casinoNetUsd` and `maxMultiplier` on `GET /user/profile/stats`. Additive.
+
+**Data note:** a met rule on fake QA data (a test player's seeded wager) is recorded like any other
+unlock. Deleting the player removes its medals (FK cascade); `--reset-demo` also clears them.
 
 ### 21. Recent Big Wins had one capture doing the work of four
 
