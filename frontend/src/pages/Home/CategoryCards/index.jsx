@@ -8,10 +8,14 @@ import pokerImg from '../../../assets/poker.png';
 import racingImg from '../../../assets/racing.png';
 import racingLightImg from '../../../assets/racing_w.png';
 import lotteryImg from '../../../assets/lottery.png';
-import updownImg from '../../../assets/updown.png';
 import bingoImg from '../../../assets/bingo.png';
 
-/* The category cards under Recent Big Wins — two feature panels over a row of five.
+/* The category cards under Recent Big Wins — two feature panels over a row of four.
+ *
+ * DELIBERATE DEPARTURE: the original's row has five, with UPDOWN (`/trading/up-down`, a Crypto
+ * Futures product) fourth. This platform has no Crypto Futures, so the card is removed on the
+ * user's request and the other four share the row (`flex-1` each, so no gap is left). See
+ * .claude/skills/hash-ui-fidelity, "Deliberate departures".
  *
  * Source: `cu` in bc.game/bc.game/assets/Enter-MsmOuq5R.js (the fallback of `gu`, which is
  * what actually renders: `gu`'s two real children are both behind `when: false` for this
@@ -128,7 +132,6 @@ const CATEGORIES = [
   { key: 'poker', icon: 'bcpoker', title: 'POKER', src: pokerImg, href: '/casino/poker' },
   { key: 'racing', icon: 'racing', title: 'RACING', src: racingImg, href: '/racing' },
   { key: 'lottery', icon: 'lottery', title: 'LOTTERY', src: lotteryImg, href: '/lottery' },
-  { key: 'updown', icon: 'trading', title: 'UPDOWN', src: updownImg, href: '/trading/up-down' },
   { key: 'bingo', icon: 'bingo', title: 'BINGO', src: bingoImg, href: '/bingo' },
 ];
 
@@ -148,7 +151,7 @@ export default function CategoryCards() {
      ---------------------------------------------------------------------------------------
      `useScrollReveal` hides an item until its row crosses the fold, and the fold it tests is
      shrunk by `rootMargin: 0 0 -10% 0` so a row starts moving as it CLEARS the line rather than
-     as it touches it. The five category cards sit directly under the hero, which puts them at
+     as it touches it. The four category cards sit directly under the hero, which puts them at
      the bottom edge of the viewport on a first paint at most window heights — inside the
      viewport, but under that 10% line. So they stayed at opacity 0 with nothing left to trigger
      them, and the row only appeared once some later scroll moved it. A block that is on screen

@@ -52,6 +52,16 @@ Port 5174 on this machine is another project (PageBook admin), not hash-games. D
 - Copy and i18n strings.
 - Route paths and which routes open as dialogs.
 
+## Deliberate departures
+
+Changes the user asked for, so the pixel check WILL show them against the reference. Expect diffs only in these regions; anything else is still a bug.
+
+- **Predictions removed**: the sidebar group row (`/predictions`). No route existed.
+- **Crypto Futures removed**: the sidebar group and its four rows (`/trading/contract`, `/trading`, `/trading/up-down`, `/trading/spread`, `/trading/tap`) and the home page's UPDOWN category card (`/trading/up-down`). The four remaining cards share the row. On a home diff this shows as the card row reflowing.
+- **Forum removed**: the sidebar bottom group's external row (`forum.hash.game`).
+
+The sidebar is therefore shorter than the reference, so everything below the removed rows in the sidebar shifts up. Details are in `frontend/docs/architecture.md` under Sidebar. Left as they were on purpose: the Sports lobby's own Predictions tab (BetBy's), the Trading option in the bet-history type filter, the footer's "Crypto trading is not gambling" licence line, and the `detrade:trading` game redirects in FreePlay and Profile.
+
 ## Next.js migration rules
 
 1. **First make it run unchanged.** Mount the existing React Router app client-only in Next.js: an App Router optional catch-all `app/[[...slug]]/page.tsx` that renders the existing `<App/>` inside `BrowserRouter` with `ssr: false`, and the same global CSS imported once in `app/layout`. This is the official incremental path from Vite. Pass the pixel check before doing anything else.

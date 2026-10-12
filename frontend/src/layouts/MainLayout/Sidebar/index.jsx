@@ -73,8 +73,8 @@ const HeadphonesSvg = () => (
 // Games and Providers all land on the real page with the right tab lit. Sports lands on the
 // real sportsbook. Promotions' four rows were already real.
 //
-// It costs the honest 404. BC Exclusive, Bingo, the five Lottery rows, the four Crypto Futures
-// rows and Provider BTi have no page here, so they keep their URL and render Home under it. Those
+// It costs the honest 404. BC Exclusive, Bingo, the five Lottery rows and Provider BTi have no
+// page here, so they keep their URL and render Home under it. Those
 // are the rows to give a real page next; the paths are already correct, so building the page is
 // the whole job. Quest Hub and Bonus were both on that list and are now built — `/quests` and
 // `/bonus`, see pages/Quests and pages/Bonus — and so are this group's own two login-only rows,
@@ -245,12 +245,14 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
   const { session } = useSession();
   const [openMenus, setOpenMenus] = useState({});
   /* And the rows the site or the account has switched off (services/gates.js) — a section the
-     owner took out of the plan, or promotions for an agent's player. External links are never
-     gated; Refer and Earn has no href and follows the affiliate section. All on with fixtures. */
+     owner took out of the plan, or promotions for an agent's player. External links are gated
+     only by an explicit `gate` (Blog); Refer and Earn has no href and follows the affiliate section. All on with fixtures. */
   const gates = useGates();
   const shown = (items) =>
     visibleItems(items, session.login).filter((i) =>
-      i.action === 'refer' ? gates.on('affiliate') : !i.href || i.external || gates.routeOn(i.href),
+      i.action === 'refer' ? gates.on('affiliate')
+        : i.gate ? gates.on(i.gate)
+        : !i.href || i.external || gates.routeOn(i.href),
     );
 
   /* THE SECOND THEME CONTROL IN THE APP, and it reads the same store as the first. It was
@@ -397,11 +399,12 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
         // same as the Pachinko / Pachislot / Crash Games entries under Casino.
       ]
     },
-    /* The three group rows below had no `link` here and all three carry one in the menu
-       definition — `Yt`, `Ft` and `Dt` in index-DuwOs_Mv.js. Predictions is the only group in
-       the whole menu with `children: []`, so its row is the entire feature and going nowhere
-       made it inert rather than merely undecorated. */
-    { id: 'predictions', label: 'Predictions', colorIcon: 'predict', hasArrow: false, href: '/predictions' },
+    /* DELIBERATE DEPARTURE FROM THE ORIGINAL, on the user's request: bc.game's menu has a
+       Predictions row here (`/predictions`) and a Crypto Futures group (`/trading/contract`,
+       High Low / Up Down / High Low Spread / Tap Trading) after Lottery. This platform offers
+       neither product, so both are gone rather than left pointing at the catch-all. The pixel
+       check expects the sidebar to be two rows shorter than the reference — see
+       .claude/skills/hash-ui-fidelity, "Deliberate departures". */
     {
       id: 'lottery', label: 'Lottery', colorIcon: 'lottery', hasArrow: true, href: '/lottery',
       subItems: [
@@ -410,18 +413,6 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
         { label: 'Favorites', menuIcon: 'favorites1', href: '/lottery/favourite', needLogin: true },
         { label: 'BC Lottery', menuIcon: 'bclottery', href: '/lottery/detail/0' },
         { label: 'Popular', menuIcon: 'popular', href: '/lottery/allLotteries?sort=lottery_popular' },
-      ]
-    },
-    {
-      /* `/trading/contract`, which is NOT any of the four rows beneath it — the group row and
-         its High Low child go to different places (`/trading/contract` vs `/trading`), so this
-         is not a case where the parent can borrow the first child's path. */
-      id: 'crypto-futures', label: 'Crypto Futures', colorIcon: 'trading', hasArrow: true, href: '/trading/contract',
-      subItems: [
-        { label: 'High Low', menuIcon: 'futures', href: '/trading' },
-        { label: 'Up Down', menuIcon: 'up_down', href: '/trading/up-down' },
-        { label: 'High Low Spread', menuIcon: 'high_low_spread', href: '/trading/spread' },
-        { label: 'Tap Trading', menuIcon: 'tap_trading', href: '/trading/tap' },
       ]
     },
     {
@@ -492,7 +483,7 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
        it up without chasing a redirect. `/referral` is the signed-in dashboard and is not
        built — see the routes in App.jsx. */
     { id: 'referral',     label: 'Referral',              menuIcon: 'affiliate',      href: '/referral-exhibition' },
-    /* THE THREE EXTERNAL ROWS NOW CARRY THEIR REAL URL. They were `external: true` with no
+    /* THE EXTERNAL ROWS CARRY THEIR REAL URL. They were `external: true` with no
        href, which rendered `<a href="#" target="_blank">` — a row that opened a blank tab on
        the current page, which is worse than an inert one.
 
@@ -509,11 +500,14 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
 
        `t` on the last one is `["bn","uk","ru","pt","hi"].find(i => lang === i)` — a locale
        suffix for five languages only, `undefined` for en-US, which the `?? ""` turns into the
-       bare host. This build is en-US, so the empty arm is the only reachable one. */
-    { id: 'forum',        label: 'Forum',                 menuIcon: 'forum',          external: true, href: 'https://forum.hash.game/' },
+       bare host. This build is en-US, so the empty arm is the only reachable one.
+
+       Forum (between Referral and Provably Fair on the original) is removed on the user's
+       request — this platform has no forum. A deliberate departure; see the note over the
+       Predictions gap above. */
     { id: 'fair',         label: 'Provably Fair',         menuIcon: 'fair',           href: '/help/provably-fair' },
     { id: 'responsible',  label: 'Responsible Gambling',  menuIcon: 'account',        href: '/responsible/faq' },
-    { id: 'blog',         label: 'Blog',                  menuIcon: 'blog',           external: true, href: 'https://blog.bc.game/' },
+    { id: 'blog',         label: 'Blog',                  menuIcon: 'blog',           external: true, gate: 'blog', href: 'https://blog.bc.game/' },
     { id: 'betting',      label: 'Sport Betting Insights',menuIcon: 'betting_insights',external: true, href: 'https://betting.bc.game/' },
   ];
 
@@ -685,7 +679,7 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
               ))}
 
               {/* ============================================================ */}
-              {/* 4. BOTTOM GROUP (VIP, Referral, Forum, etc.)                 */}
+              {/* 4. BOTTOM GROUP (VIP, Referral, Provably Fair, etc.)        */}
               {/* ============================================================ */}
               {/* An item with an `href` is a built page and renders a router <Link> with the
                   active state, the same rule the submenu rows follow; the rest keep the inert
