@@ -91,6 +91,8 @@ export const ROUTES = [
   ['/casino/brand', 'originals'],
   ['/gamelist/brand', 'originals'],
   ['/section/originals', 'originals'],
+  ['/tagname/BC%20Originals', 'originals'],
+  ['/tagname/BC Originals', 'originals'],
 ];
 
 /** The section an href belongs to, if any (`/wallet/swap?x=1` → swap). */

@@ -118,6 +118,9 @@ function SearchBar({ query, setQuery }) {
 /* The lobby: the twelve rows of the default tab. A row with no games still renders — the
    empty state under its own header is the site's behaviour and the only honest thing to show
    for New Releases, whose selection the mirror never captured. */
+/* The Themes chips, less "BC Originals" when Originals is switched off. */
+const themesFor = (gates) => (gates.on('originals') ? THEMES : THEMES.filter((label) => label !== 'BC Originals'));
+
 function Lobby({ originals, live, providerRow }) {
   const gates = useGates();
   return [
@@ -137,7 +140,7 @@ function Lobby({ originals, live, providerRow }) {
     /* BC Originals switched off: its row goes, nothing in its place. */
     ...ROWS.filter((row) => row.key !== 'brand' || gates.on('originals')).map((row) => {
     if (row.type === 'providers') return <ProviderRow key="providers" providers={providerRow} />;
-    if (row.type === 'themes') return <ThemeRow key="themes" themes={THEMES} />;
+    if (row.type === 'themes') return <ThemeRow key="themes" themes={themesFor(gates)} />;
 
     const games = rowGames(row.key, originals, live);
     return games === undefined || games.length ? (
@@ -190,6 +193,7 @@ function EmptyRow({ title, href }) {
 
 export default function Casino() {
   const { tab = '' } = useParams();
+  const gates = useGates();
 
   /* BC ORIGINALS IS THE ONE TAB THE PLATFORM CAN FEED, and it feeds three surfaces from here: the
      lobby's own BC Originals row, the `/casino/brand` tab's grid, and the search's "narrow within
@@ -382,7 +386,7 @@ export default function Casino() {
           {active === 'provider' ? (
             <ProviderGrid providers={available} />
           ) : (
-            <ThemeGrid themes={THEMES} />
+            <ThemeGrid themes={themesFor(gates)} />
           )}
         </div>
       ) : active === 'poker' && !searching ? (

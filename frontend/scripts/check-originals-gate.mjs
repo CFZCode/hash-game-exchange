@@ -63,7 +63,7 @@ test('originals off: the gate, its routes, nothing else', () => {
   const gates = makeGates({ flags: siteFlags, features: FEATURES, capabilities: null });
   assert.equal(gates.on('originals'), false);
   assert.equal(gates.blocked('originals'), 'site');
-  for (const path of ['/casino/brand', '/gamelist/brand', '/section/originals']) {
+  for (const path of ['/casino/brand', '/gamelist/brand', '/section/originals', '/tagname/BC%20Originals']) {
     assert.equal(gateOf(path), 'originals', path);
     assert.equal(gates.routeOn(path), false, path);
   }
