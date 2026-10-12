@@ -66,6 +66,8 @@ import Profile from './components/modals/Profile';
 import ProfileMedals from './components/modals/Profile/Medals';
 import ProfileStatistics from './components/modals/Profile/Statistics';
 import RegionBlock from './components/modals/RegionBlock';
+import { getRegion } from './services/region';
+import { USE_FIXTURES } from './services/client';
 import useMediaQuery, { useIsDesktop } from './hooks/useMediaQuery';
 import { SessionProvider } from './context/SessionContext';
 import { SettingsProvider } from './context/SettingsContext';
@@ -83,7 +85,18 @@ function AppShell() {
 
      Initialiser form, not a plain value: the close button dismisses it for the session, so
      this must not re-derive on every render. */
-  const [blocked, setBlocked] = useState(() => session.showable && session.areaAlert);
+  const [blocked, setBlocked] = useState(() => USE_FIXTURES && session.showable && session.areaAlert);
+
+  /* Live: the owner panel's region restriction decides, per visitor (`services/region.js`).
+     Off by default, so nobody sees the dialog until the owner switches it on. */
+  const [region, setRegion] = useState(null);
+  React.useEffect(() => {
+    let alive = true;
+    getRegion().then((r) => {
+      if (alive && r?.restricted) { setRegion(r); setBlocked(true); }
+    });
+    return () => { alive = false; };
+  }, []);
 
   /* Desktop only, at the same 1024 line the rest of the project uses for the original's
      `m.mobile`. Gated in JS rather than with `hidden lg:*` so the dialog is not in the DOM at
@@ -1101,7 +1114,9 @@ function AppShell() {
           URL does not sit on a path that renders nothing — and `replace` so the back button does
           not walk straight into it again. */}
       {userEnterRoute && isDesktop && <Navigate to="/" replace />}
-      {blocked && isDesktop && <RegionBlock onClose={() => setBlocked(false)} />}
+      {blocked && isDesktop && (
+        <RegionBlock onClose={() => setBlocked(false)} region={region} dismissible={region?.mode !== 'block'} />
+      )}
     </>
   );
 }

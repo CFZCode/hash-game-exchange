@@ -118,7 +118,9 @@ const Globe = () => (
   </div>
 );
 
-export default function RegionBlock({ onClose }) {
+/* `region` is the live answer from `services/region.js` (country, IP, Ray ID); without it the
+   values come from the session as before. `dismissible={false}` is the owner's `block` mode. */
+export default function RegionBlock({ onClose, region = null, dismissible = true }) {
   const [revealed, setRevealed] = React.useState(false);
 
   /* Country chip, Ray ID and IP all come from the account the server hands back — the
@@ -132,7 +134,8 @@ export default function RegionBlock({ onClose }) {
      sessions, but only the API capture is part of the saved site and self-consistent with
      `areaAlert: true` — so the chip now reads US rather than NL, with that response's own Ray
      ID and IP. Pin them back in account.js if the NL capture is the one you want shown. */
-  const { session } = useSession();
+  const { session: account } = useSession();
+  const session = region ? { ...account, areaCode: region.areaCode, ip: region.ip, rayId: region.rayId } : account;
   /* The card is `bg-layer1`, which is #EEF1F4 in the light theme — near-white ink on it is the
      same disappearing act the header's logo does. Same pair, picked the same way; see the note in
      layouts/MainLayout/Header/index.jsx. */
@@ -158,14 +161,16 @@ export default function RegionBlock({ onClose }) {
         {/* `.pop-close` in index-DxOqNczA.css: 1.5rem square, top .75rem, right 1rem,
             radius-lg, and `.dark .pop-close` paints it #373E3F — a literal on the original,
             not one of the layer tokens (layer5 is #3A4142). Its svg is .875rem. */}
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close"
-          className="button absolute right-4 top-3 z-10 size-6 rounded-lg bg-[#373E3F] p-0"
-        >
-          <CloseIcon className="size-3.5 fill-secondary" />
-        </button>
+        {dismissible && (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="button absolute right-4 top-3 z-10 size-6 rounded-lg bg-[#373E3F] p-0"
+          >
+            <CloseIcon className="size-3.5 fill-secondary" />
+          </button>
+        )}
 
         {/* `Ce`'s card, isPop branch: `h-auto w-full` instead of the page variant's px-4. */}
         <div className="relative mx-auto flex h-auto w-full max-w-[428px] scale-100 flex-col items-center justify-center rounded-xl bg-layer1 px-10 py-8">
