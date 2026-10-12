@@ -65,6 +65,92 @@
   border: 0;
 }
 
+/* ── the original's slot launcher (index.jsx, "THE LAUNCH IS A PRESS") ──────────────────────
+   A third-party game: `.game-iframe-wrap` in SlotsGameLayout-D-fxtFdC.js is
+   `w-full relative overflow-hidden after:pt-[56.25%]` — a 16:9 box across the column, measured
+   1168x657 at 1440 on hash.game — and the live-players panel is the BC Originals client's, so it
+   is not drawn. Below `lg` the box keeps room for the overlay card (a 16:9 strip at 390 is
+   219px, shorter than the card), which is where the original hands over to "Zoom & Play". */
+@media (min-width: 1024px) {
+  .game-page.is-slots .game-frame {
+    min-height: 0;
+    aspect-ratio: 16 / 9;
+  }
+}
+
+.game-page.is-slots .game-side {
+  display: none;
+}
+
+/* The cover under the overlay: `De` with `blur-[1px]` and `animate-scale-opacity`, the game's
+   own `iconThreeFour`. Contained, centred, on the frame's own fill. */
+.game-frame-cover {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+  filter: blur(1px);
+}
+
+/* `w-[30rem]` on the original assumes a desktop; on a phone the card has to fit the frame. */
+.game-overlay-card {
+  max-width: calc(100% - 2rem);
+}
+
+/* The phone's "Zoom & Play": once a game is running below `lg`, the frame leaves the page and
+   fills the screen (`fixed inset-0 z-[9999]`, `ic` in Layout-DI8MpYIQ.js), with a bar to close
+   it. From `lg` up the bar is not drawn and the frame stays in the column. */
+.game-frame-zoombar {
+  display: none;
+}
+
+@media (max-width: 1023.98px) {
+  .game-frame.is-playing {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    min-height: 0;
+    aspect-ratio: auto;
+    flex-direction: column;
+    background-color: #000;
+  }
+
+  .game-frame.is-playing .game-frame-zoombar {
+    display: flex;
+    height: 2.75rem;
+    width: 100%;
+    flex: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding-inline: 1rem;
+    background-color: var(--color-layer3);
+    font-size: 0.875rem;
+    font-weight: 800;
+    color: var(--color-primary);
+  }
+
+  .game-frame.is-playing .game-frame-iframe {
+    position: relative;
+    inset: auto;
+    flex: 1 1 auto;
+    height: auto;
+  }
+}
+
+.game-frame-zoomclose {
+  display: flex;
+  height: 2rem;
+  width: 2rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  background-color: var(--color-layer4);
+  font-size: 1.25rem;
+  color: var(--color-secondary);
+}
+
 /* The state the live frame shows before its client is ready — a muted brand pill reading
    "Connecting..." — with a line under it saying why it stays that way here. */
 .game-frame-connecting {

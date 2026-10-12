@@ -914,7 +914,21 @@ class JsGamesService {
       return await call();
     } catch (error) {
       this.logger?.error({ err: error, status: error?.status }, 'jsGames upstream call failed');
-      if (error?.status >= 400 && error.status < 500) throw E.UPSTREAM_REJECTED({ status: error.status });
+      /*
+       * A REFUSAL IS A REFUSAL WHATEVER THE HTTP STATUS. v2 answers some refusals as
+       * HTTP 200 with `{success: false, error: {code, message}}` (`XGamesApiClient#call`
+       * throws those with `status: 200` and the provider's `upstreamCode`), and those
+       * fell through to UPSTREAM_FAILED — "could not be reached" — for a provider that
+       * had answered perfectly well. The provider's own code goes in `details` so the
+       * refusal can be told apart (10004 currency/launch, 20004 signature, 20001 key).
+       */
+      const refused = (error?.status >= 400 && error.status < 500) || error?.body?.success === false;
+      if (refused) {
+        throw E.UPSTREAM_REJECTED({
+          status: error.status,
+          ...(error.upstreamCode !== undefined ? { upstreamCode: error.upstreamCode } : {}),
+        });
+      }
       throw E.UPSTREAM_FAILED();
     }
   }

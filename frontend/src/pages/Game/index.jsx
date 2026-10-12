@@ -4,7 +4,11 @@ import EmptyPlaceholder from '../../components/shared/EmptyPlaceholder';
 import Loading from '../../components/shared/Loading';
 import { useResource } from '../../hooks/useResource';
 import { useSession } from '../../context/session';
-import { getGame, launchGame } from '../../services/game';
+import PopCenter from '../../components/shared/PopCenter';
+import Select from '../../components/shared/Select';
+import { toast } from '../../components/shared/Toast/toast';
+import { getGame, launchGame, launchCurrency } from '../../services/game';
+import { getAlias } from '../../utils/currency';
 import { addFavoriteGame, isFavoriteGame, removeFavoriteGame } from '../../services/collection';
 import { formatOnlineUsers } from '../../utils/gameArt';
 import './Game.css';
@@ -20,16 +24,17 @@ import './Game.css';
  * <provider>", the tags as `#` chips, and House Edge / RTP / Max Win / Stakes Range. Captured on
  * hash.game at 1280 and on a 390 phone, where the same blocks stack.
  *
- * The SHELL is what is built here. The game inside it is not, and cannot be from this side: for a
- * BC Original it is bc.game's own in-house client, and the platform this build is wired to relays
- * its launches from an external game-client host that is not configured (see `services/game.js`).
- * So the play area shows the frame's connecting state — the pill the live page itself shows while
- * its client is not ready — over a note saying why, and the four stats print the site's own `--`,
- * because no source here carries them. `launchGame` still runs, `live: true`, so the day the host
- * is configured the frame takes the URL that comes back and nothing else changes.
+ * The SHELL is built here, and the PLAY AREA is the original's slot launcher (`docs/casino.md`,
+ * "Opening a game"): nothing launches on arrival; the frame shows the game's cover under the
+ * original's overlay card — Sign in for a visitor, "Play With Deposit Balance" for a player —
+ * and Play POSTs the launch and frames the URL that comes back. Any failure opens the original's
+ * "Under Maintenance" dialog (`GameUnavailable` below). A third-party game takes the original's
+ * slot layout — a 16:9 frame and no live-players panel, which belongs to the BC Originals client.
  *
- * An unknown slug renders the site's empty state under the slug as its title, which is the list
- * pages' own fallback chain (`searchParams.label ?? MAP[key] ?? key`) one route over.
+ * An unknown slug (or a game an owner switched off, which reads the same) renders the site's
+ * empty state under the slug as its title — the list pages' own fallback chain
+ * (`searchParams.label ?? MAP[key] ?? key`) one route over — and opens the same dialog on arrival,
+ * which is where the original pushes it (`DISABLED_PLAYING` on the detail read).
  */
 
 /* `--` is what the original prints for a figure it does not have (the level card's next tier,
@@ -81,30 +86,253 @@ const IconStarOutline = ({ className = '' }) => (
   </svg>
 );
 
+/* `Start-DxpZl6gi.js` in the `games` remote — the play-circle every launcher button carries
+   (`size-4 mr-2`), Sign in included. */
+const IconStart = ({ className = '' }) => (
+  <svg viewBox="0 0 32 32" className={className} fill="currentColor" aria-hidden="true">
+    <path d="M16 2.5C8.544 2.5 2.5 8.544 2.5 16S8.544 29.5 16 29.5 29.5 23.456 29.5 16v-.007C29.492 8.542 23.452 2.504 16 2.5m0 24.684c-6.181 0-11.191-5.01-11.191-11.191S9.819 4.802 16 4.802s11.191 5.01 11.191 11.191c-.008 6.178-5.014 11.183-11.19 11.191z" />
+    <path d="m20.41 14.454-5.27-3.044a1.782 1.782 0 0 0-2.676 1.539v6.093a1.782 1.782 0 0 0 2.685 1.537l-.008.005 5.27-3.044a1.776 1.776 0 0 0 .008-3.081z" />
+  </svg>
+);
+
+/* The wrench, `oe` in `GamePageData-B2XkLpDN.js` — drawn in its own `#B1B9B9` (the
+   `text-warning` beside it is dead: the path's fill wins). */
+const IconWrench = ({ className = '' }) => (
+  <svg viewBox="0 0 48 48" className={className} fill="none" aria-hidden="true">
+    <path
+      d="M35.6049 37.3046C34.5491 37.3046 33.6946 36.4476 33.6946 35.3893C33.6946 34.331 34.5504 33.4728 35.6049 33.4728C36.6608 33.4728 37.5153 34.331 37.5153 35.3893C37.5153 36.4476 36.6595 37.3046 35.6049 37.3046ZM39.5429 31.5377C37.1362 29.3594 32.5906 25.1917 29.4788 22.333C30.9161 18.2098 29.9925 13.4419 26.704 10.1461C23.6415 7.07617 19.3046 6.06605 15.4 7.10705L15.1765 7.72201L21.4076 13.968L19.869 19.7237L14.1268 21.2661L7.787 14.9102L7.18685 15.13C6.01867 19.1174 7.00039 23.6049 10.1394 26.7501C13.418 30.0361 18.155 30.9672 22.2609 29.5422C25.032 32.5689 29.0712 36.9823 31.4792 39.62C33.5267 41.8613 37.2547 41.8934 39.706 39.3915C42.0683 36.9798 41.5953 33.3913 39.5442 31.5365L39.5429 31.5377Z"
+      fill="#B1B9B9"
+    />
+  </svg>
+);
+
+/* ── "UNDER MAINTENANCE", THE ORIGINAL'S ONE ANSWER TO A GAME THAT WILL NOT OPEN ─────────────
+ *
+ * `re` in `GamePageData-B2XkLpDN.js` (the `games` remote, rung 3 of the recovery ladder):
+ *
+ *   q({ title: E("Under Maintenance"), children:
+ *     <div class="flex flex-col">
+ *       <div class="flex-1 p-4"> <oe class="w-10 h-10 text-warning mx-auto mb-4"/>
+ *         <div class="text-center text-secondary text-sm">
+ *           E("This game is currently unavailable. Please try other games.")
+ *       <div class="flex gap-3 p-4 border-layer3">
+ *         <Button type="brand" class="flex-1" onClick={() => D.pop()}>OK
+ *
+ * `q` is the site's popup card — `PopCenter` here — so the cross is the card's own and, like OK,
+ * only POPS: the player stays on the page under it, exactly as the original leaves them. The
+ * original pushes it for `DISABLED_PLAYING` on the detail read; here it is every way a game can
+ * fail to open — no keys (503 `*_NOT_CONFIGURED`), a provider refusal (`JSGAMES_UPSTREAM_*`), a
+ * game the catalogue or the owner's plan does not hold, a network failure — because each of them
+ * is, to the player, a game that is currently unavailable. The reason goes to the console, not
+ * the screen: the rule for an explanation the original does not carry. Its sibling in the same
+ * remote, `M` in `checkGameAvailable` ("Game Under Maintenance", the long copy), is the PROVIDER's
+ * maintenance flag and has no source here. */
+function GameUnavailable({ open, onClose }) {
+  return (
+    <PopCenter open={open} onClose={onClose} title="Under Maintenance">
+      <div className="flex flex-col">
+        <div className="flex-1 p-4">
+          <IconWrench className="mx-auto mb-4 h-10 w-10 text-warning" />
+          <div className="text-center text-sm text-secondary">
+            This game is currently unavailable. Please try other games.
+          </div>
+        </div>
+        <div className="flex gap-3 border-layer3 p-4">
+          <button type="button" className="button button-m button-brand flex-1" onClick={onClose}>
+            OK
+          </button>
+        </div>
+      </div>
+    </PopCenter>
+  );
+}
+
+/* ── THE OVERLAY CARD OVER THE FRAME ───────────────────────────────────────────────────────────
+ *
+ * `ve` in the slots module `index-CxQFC9RQ.js` (the standard slot's `renderPCCurrencyOverlay`),
+ * over `qe`/`We` in `SlotsGameLayout-D-fxtFdC.js` for the signed-in body:
+ *
+ *   <div class="absolute inset-0 flex justify-center items-center z-20 bg-black/60">
+ *     <div class="w-[30rem] bg-layer3 p-8 rounded-xl">
+ *       signed out  "The selected currency will be displayed in <c>, and if you change currency
+ *                   while playing, the game will refresh and restart." + brand "Sign in"
+ *                   (+ second "Free Play" when the game supports demo)
+ *       signed in   "Play with balance in" <Select of wallets> + the status line, then a brand
+ *                   w-64 "Play With Deposit Balance" (+ second w-32 "Free Play" with demo)
+ *
+ * NO FREE PLAY, and that is the original's own rule rather than an omission: both Free Play
+ * buttons and the footer's Demo / Real Play switch render only when the game's `supportDemo` is
+ * true, and nothing here can make it true — js-games v2 has no demo launch (its validator refuses
+ * a `demo` key, checked against the live operator) and v1 has none either.
+ *
+ * The status line is `qe`'s: `auto` prints the currency sentence, `unwhitelistcurrency` prints
+ * "<c> isn't supported for this game right now.Please choose another currency to continue
+ * playing." (the missing space is the original's string) and disables Play — the arm a wallet
+ * this game's route cannot settle takes. The picker lists only the wallets it CAN settle, so the
+ * fix is one tap away; picking writes `setting.currencyName`, the header's own selection, as
+ * `We`'s `onChange` does. */
+function PlayOverlay({ game, login, currencyName, balances, launching, onPlay, onSignIn, onPickCurrency }) {
+  const code = launchCurrency(game, currencyName);
+  const alias = getAlias(currencyName || 'INRFIAT');
+  const choices = (balances ?? [])
+    .filter((row) => launchCurrency(game, row.currencyName))
+    .map((row) => row.currencyName);
+  const sentence = (shown) => (
+    <>
+      The selected currency will be displayed in <span className="text-brand">{shown}</span>, and if you change
+      currency while playing, the game will refresh and restart.
+    </>
+  );
+
+  return (
+    <div className="game-overlay absolute inset-0 z-20 flex items-center justify-center bg-black/60">
+      <div className="game-overlay-card w-[30rem] rounded-xl bg-layer3 p-8">
+        {login ? (
+          <>
+            <div className="items-left flex flex-col justify-center gap-2">
+              {choices.length ? (
+                <div className="sm:flex sm:flex-row sm:items-center sm:justify-center">
+                  <span className="text-sm font-extrabold text-primary">Play with balance in</span>
+                  <Select
+                    value={choices.includes(currencyName) ? currencyName : null}
+                    options={choices}
+                    onChange={onPickCurrency}
+                    title="Play with balance in"
+                    className="mt-2 w-full bg-layer5 p-0 sm:ml-2 sm:flex-1 md:mt-0"
+                    labelRender={() => (
+                      <span className="flex items-center justify-start p-1 text-sm font-extrabold whitespace-nowrap text-primary">
+                        {alias}
+                      </span>
+                    )}
+                  >
+                    {(option) => getAlias(option)}
+                  </Select>
+                </div>
+              ) : null}
+              <p className="mb-0 min-h-16 text-center text-xs font-semibold text-secondary sm:mt-5 sm:mb-7 sm:min-h-0">
+                {code ? (
+                  sentence(alias)
+                ) : (
+                  <>
+                    <span className="text-brand">{alias}</span> isn&apos;t supported for this game right now.Please
+                    choose another currency to continue playing.
+                  </>
+                )}
+              </p>
+            </div>
+            <div className="flex gap-x-4">
+              <button
+                type="button"
+                className="button button-m button-brand mx-auto w-64"
+                disabled={!code || launching}
+                aria-busy={launching}
+                onClick={onPlay}
+              >
+                <IconStart className="mr-2 size-4" />
+                Play With Deposit Balance
+              </button>
+            </div>
+          </>
+        ) : (
+          <div className="flex flex-col gap-4">
+            <div className="mb-4 text-center text-sm font-semibold text-secondary">{sentence('INR')}</div>
+            <div className="flex gap-x-4">
+              <button type="button" className="button button-m button-brand w-full" onClick={onSignIn}>
+                <IconStart className="mr-2 size-4" />
+                Sign in
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* `q` in the original's Logs chunk: Full Screen requests fullscreen on the `.game-iframe` itself,
+   and with no game running says so in a toast rather than doing nothing. */
+function enterFullscreen() {
+  const frame = document.querySelector('iframe.game-iframe');
+  if (!frame) {
+    toast.error('Please start the game before entering fullscreen.');
+    return;
+  }
+  const request = frame.requestFullscreen ?? frame.webkitRequestFullscreen;
+  Promise.resolve(request?.call(frame)).catch(() => {});
+}
+
 export default function GamePage() {
   const { gameUnique = '' } = useParams();
-  const { session } = useSession();
+  const { session, balances, setSetting } = useSession();
   const navigate = useNavigate();
 
   const readGame = React.useCallback(() => getGame(gameUnique), [gameUnique]);
   const { data: game, loading } = useResource(readGame);
 
-  /* The launch is attempted once the catalogue row is known, and only then — an unknown slug has
-     nothing to launch. `null` is both "fixtures on" and "the live host refused", and the frame
-     treats the two the same because they are the same: nothing to frame. */
-  /* `Promise.resolve(...)` AND NOT A BARE `.catch` — `services/client.js` answers a fixture
-     SYNCHRONOUSLY, and this one's fixture is `null`, so with `VITE_USE_FIXTURES=true` the call
-     returned `null` and `.catch` threw `Cannot read properties of null`. That is a white screen
-     on every game page in the fixture build, and it is the seam `useResource`'s own doc names:
-     a service "works whether the service answered synchronously (fixtures) or with a Promise
-     (the API)" only if the CALLER stops assuming a thenable. `services/collection.js` wraps
-     every one of its reads this way for the same reason. */
-  const readLaunch = React.useCallback(
-    () => (game ? Promise.resolve(launchGame(gameUnique, { game })).catch(() => null) : null),
-    [game, gameUnique],
-  );
-  const { data: launch } = useResource(readLaunch);
-  const frameUrl = launch?.gameLaunchUrl ?? null;
+  /* ── THE LAUNCH IS A PRESS, NOT AN ARRIVAL ────────────────────────────────────────────────────
+   *
+   * This page used to launch on mount. Every visit opened a provider session (and wrote a
+   * Recently Played row) whether or not the player meant to play, and a refusal had nowhere to
+   * go but a line of text under a "Connecting..." pill. The original's standard slot is
+   * `autoLaunch: "never"` (`Ht` in `SlotsGameLayout`): the cover and the overlay card first, and
+   * a launch only from its Play button. So `play` is the only caller of `launchGame`.
+   *
+   * The URL is held against the game it was launched FOR, so moving to another game (the route
+   * reuses this component) or signing out drops the frame during render — no effect, no stale
+   * game left playing behind the next page. `Promise.resolve(...)` because `services/client.js`
+   * can answer synchronously (the rule in CLAUDE.md); a `null` answer — fixtures, signed out, a
+   * success with no URL — is a failure like any other. */
+  const [launched, setLaunched] = React.useState(null);
+  const [launching, setLaunching] = React.useState(false);
+  const [failedFor, setFailedFor] = React.useState(null);
+  /* The original pushes the dialog when the DETAIL read says the game cannot be played. Here that
+     is a game the catalogue does not hold (or an owner switched off, which reads the same), and it
+     is opened once per slug: closing it must not reopen it on the next render. */
+  const [dismissedFor, setDismissedFor] = React.useState(null);
+  const frameUrl = session.login && launched?.for === gameUnique ? launched.url : null;
+  const missing = !loading && !game;
+  const unavailableOpen = failedFor === gameUnique || (missing && dismissedFor !== gameUnique);
+  const closeUnavailable = () => {
+    setFailedFor(null);
+    setDismissedFor(gameUnique);
+  };
+
+  const play = async () => {
+    if (!session.login) {
+      navigate(`/login/signin?redirect=${encodeURIComponent(`/game/${gameUnique}`)}`);
+      return;
+    }
+    if (!game || launching) return;
+    setLaunching(true);
+    const target = gameUnique;
+    try {
+      const url = await Promise.resolve(
+        launchGame(game, {
+          currencyName: session.setting?.currencyName,
+          language: session.setting?.lang ?? 'en',
+          /* v1 only: where the provider's own home button lands — this page, not the lobby. */
+          homeUrl: `${window.location.origin}/game/${gameUnique}`,
+        }),
+      );
+      if (url) setLaunched({ for: target, url });
+      else setFailedFor(target);
+    } catch (error) {
+      console.warn('[game] launch refused', error?.code ?? error?.status ?? error);
+      setFailedFor(target);
+    } finally {
+      setLaunching(false);
+    }
+  };
+
+  /* Third-party games take the original's SLOT layout (`index-CxQFC9RQ.js` -> `SlotsGameLayout`):
+     a 16:9 frame across the column and no live-players panel, which is the BC Originals client's.
+     Fixture rows carry no `launch`, so the provider stands in for it there. */
+  const isSlots = Boolean(game) && (game.launch ? game.launch === 'aggregator' : game.provider !== 'BC Originals');
+
+  /* Below `lg` the original's frame is a 16:9 card and Play is "Zoom & Play" — the frame goes
+     `fixed inset-0 z-[9999]` with a close bar (`ic` in Layout-DI8MpYIQ.js). Closing ends the
+     game, as its `onClose` does. */
+  const closeFrame = () => setLaunched(null);
 
   const title = game?.name ?? gameUnique;
 
@@ -185,29 +413,61 @@ export default function GamePage() {
   };
 
   return (
-    <div className="game-page px-4 sm:px-0">
+    <div className={`game-page px-4 sm:px-0${isSlots ? ' is-slots' : ''}`}>
       <div className="game-page-row">
         <section className="game-stage">
-          <div className="game-frame">
+          <div className={`game-frame${frameUrl ? ' is-playing' : ''}`}>
             {frameUrl ? (
-              <iframe className="game-frame-iframe" src={frameUrl} title={title} allowFullScreen />
+              <>
+                {/* The phone arm's close bar (`wo`'s onClose); hidden from `lg` up, where the
+                    frame stays in the column. */}
+                <div className="game-frame-zoombar">
+                  <span className="truncate">{title}</span>
+                  <button type="button" className="game-frame-zoomclose" aria-label="Close game" onClick={closeFrame}>
+                    &times;
+                  </button>
+                </div>
+                {/* `at` in SlotsGameLayout-D-fxtFdC.js, attribute for attribute: no `sandbox`
+                    (providers need scripts, storage and their own cashier pop-ups), the
+                    original's `allow` list and `allowfullscreen`. The URL goes in unchanged — it
+                    carries the provider's session. */}
+                <iframe
+                  className="game-frame-iframe game-iframe"
+                  src={frameUrl}
+                  title={title}
+                  allow="autoplay; geolocation; camera; microphone; clipboard-read; clipboard-write"
+                  allowFullScreen
+                />
+              </>
             ) : loading ? (
               <Loading />
+            ) : game ? (
+              <>
+                {game.image ? <img className="game-frame-cover" src={game.image} alt="" aria-hidden="true" /> : null}
+                <PlayOverlay
+                  game={game}
+                  login={session.login}
+                  currencyName={session.setting?.currencyName}
+                  balances={balances}
+                  launching={launching}
+                  onPlay={play}
+                  onSignIn={play}
+                  onPickCurrency={(name) => setSetting('currencyName', name)}
+                />
+              </>
             ) : (
               <div className="game-frame-connecting">
-                <span className="game-frame-pill">Connecting...</span>
-                <p className="game-frame-note">
-                  {game
-                    ? 'The game client is not available on this build.'
-                    : 'This game is not in the catalogue.'}
-                </p>
+                <p className="game-frame-note">This game is not in the catalogue.</p>
               </div>
             )}
           </div>
 
           {/* The toolbar under the frame: settings, favourite with its count, a swap and
-              fullscreen — the live row's four controls. THE STAR IS LIVE; the other three are
-              presentational, since each drives the game client this page cannot mount. */}
+              fullscreen. THE STAR AND FULL SCREEN ARE LIVE (Full Screen is the original's `q`:
+              fullscreen on the `.game-iframe`, a toast with no game running). Settings (whose
+              menu holds Like, Share and Movie Mode on the original) and the swap stay
+              presentational: nothing here backs Like/Share, and Movie Mode resizes the
+              original's own page container. */}
           <div className="game-toolbar">
             <button type="button" className="game-tool" aria-label="Game settings">
               <span className="game-tool-dot" />
@@ -239,7 +499,7 @@ export default function GamePage() {
                 <path d="M7 7h10l-2.5-2.5L15.9 3 21 8l-5.1 5-1.4-1.5L17 9H7zm10 10H7l2.5 2.5L8.1 21 3 16l5.1-5 1.4 1.5L7 15h10z" />
               </svg>
             </button>
-            <button type="button" className="game-tool" aria-label="Fullscreen">
+            <button type="button" className="game-tool" aria-label="Fullscreen" onClick={enterFullscreen}>
               <svg viewBox="0 0 24 24" className="game-tool-icon" aria-hidden="true">
                 <path d="M4 4h6v2H6v4H4zm10 0h6v6h-2V6h-4zM4 14h2v4h4v2H4zm14 0h2v6h-6v-2h4z" />
               </svg>
@@ -309,17 +569,10 @@ export default function GamePage() {
                 <EmptyPlaceholder className="w-full" />
               </div>
             )}
-            {!session.login && game ? (
-              <p className="game-info-signin">
-                <Link to="/login/signin" className="game-info-provider">
-                  Sign in
-                </Link>{' '}
-                to play for real.
-              </p>
-            ) : null}
           </>
         )}
       </section>
+      <GameUnavailable open={unavailableOpen} onClose={closeUnavailable} />
     </div>
   );
 }
