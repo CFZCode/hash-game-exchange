@@ -11,6 +11,7 @@ const E = require('./jsGames.errors');
  * newest N" delete, which is exactly how two lists drift apart.
  */
 const { GamesService } = require('../games/games.service');
+const { catalogueConditions, assertVendorEntitled } = require('../games/gameEntitlement');
 const {
   CODE,
   MESSAGE,
@@ -390,7 +391,12 @@ class JsGamesService {
 
   /** @legacy GET /jsGames/games */
   async listGamesV1({ vendor, page, per_page: perPage }) {
-    const where = { is_active: true, ...(vendor ? { vendor } : {}) };
+    // The owner's plan (games/gameEntitlement.js): a switched-off vendor asked
+    // for by name is refused; otherwise its rows (and a switched-off
+    // category's) are simply not in the list.
+    await assertVendorEntitled(vendor);
+    const plan = await catalogueConditions();
+    const where = { is_active: true, ...(vendor ? { vendor } : {}), ...(plan.length ? { [Op.and]: plan } : {}) };
 
     const priority = vendor ? await this.#vendorPriority(vendor) : [];
 
@@ -460,9 +466,12 @@ class JsGamesService {
   async searchGamesV1({ keyword, vendor, page, per_page: perPage }) {
     const term = String(keyword ?? '').trim();
 
+    await assertVendorEntitled(vendor);
+    const plan = await catalogueConditions();
     const where = {
       is_active: true,
       ...(vendor ? { vendor } : {}),
+      ...(plan.length ? { [Op.and]: plan } : {}),
       ...(term
         ? {
             [Op.or]: [

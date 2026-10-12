@@ -195,7 +195,7 @@ function register({ on, deps }) {
             amount,
           });
         } catch (error) {
-          if (error.code?.startsWith('INHOUSE_')) return refuse(error);
+          if (error.code?.startsWith('INHOUSE_') || error.code === 'NOT_ENTITLED') return refuse(error);
           throw error;
         }
 
@@ -264,7 +264,7 @@ function register({ on, deps }) {
               logger?.error({ err: refundError, betId: bet.betId }, 'Refund after a failed round ALSO failed')
             );
 
-          if (error.code?.startsWith('INHOUSE_')) return refuse(error);
+          if (error.code?.startsWith('INHOUSE_') || error.code === 'NOT_ENTITLED') return refuse(error);
           throw error;
         }
       },
@@ -418,7 +418,7 @@ function register({ on, deps }) {
 
           return { command: 'clicked', profit: stepped.profit, id: payload?.land ?? payload?.id, card: stepped.card };
         } catch (error) {
-          if (error.code?.startsWith('INHOUSE_')) return refuse(error);
+          if (error.code?.startsWith('INHOUSE_') || error.code === 'NOT_ENTITLED') return refuse(error);
           throw error;
         }
       },
@@ -458,7 +458,7 @@ function register({ on, deps }) {
         }
         return await crashLoop.join({ userId: context.userId, amount: payload?.amount, coin: payload?.coin });
       } catch (error) {
-        if (error.code?.startsWith('INHOUSE_')) return refuse(error);
+        if (error.code?.startsWith('INHOUSE_') || error.code === 'NOT_ENTITLED') return refuse(error);
         throw error;
       }
     },
@@ -507,7 +507,7 @@ function register({ on, deps }) {
           numbers: payload?.numbers,
         });
       } catch (error) {
-        if (error.code?.startsWith('INHOUSE_')) return refuse(error);
+        if (error.code?.startsWith('INHOUSE_') || error.code === 'NOT_ENTITLED') return refuse(error);
         throw error;
       }
     },

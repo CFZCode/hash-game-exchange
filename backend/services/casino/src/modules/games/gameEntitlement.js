@@ -1,5 +1,6 @@
 'use strict';
 
+const { Op, fn, col, where: sqlWhere } = require('sequelize');
 const { entitlements } = require('@ibitplay/common');
 
 const E = require('./games.errors');
@@ -65,6 +66,9 @@ const PROVIDER_FLAGS = {
   jili: ['jili', 'jilli'],
   jilli: ['jili', 'jilli'],
   netent: ['netent'],
+  // The house's own games (`js_games.vendor = 'in-house'`, played on the in-house
+  // engine): the Game categories group's "Originals (in-house)" row.
+  inhouse: ['originals'],
 };
 
 const SPORTS_PROVIDERS = new Set(['sports', 'esports']);
@@ -78,6 +82,9 @@ function categoryFlag(type) {
   if (t.includes('crash')) return 'crash';
   if (t.includes('live')) return 'livegames';
   if (t.includes('slot')) return 'slotsgames';
+  if (t.includes('lottery')) return 'lotterygames';
+  if (t.includes('india')) return 'indiangames';
+  if (t.includes('card')) return 'cards';
   return null;
 }
 
@@ -144,4 +151,99 @@ function requireGameEntitled({ models, config } = {}, pick) {
   };
 }
 
-module.exports = { requireGameEntitled, flagsFor, KNOWN_BOOK_UIDS };
+/* ══════════════════════════════════════════════════════════════════════════
+ * THE LISTS, NOT ONLY THE LAUNCH
+ *
+ * A game the launch refuses must not sit in the lobby either: the catalogue
+ * lists (`js-games/v1/games`, its search, the curated collections) drop every
+ * row whose provider or category flag the owner took out of the plan, and a
+ * list asked for BY a switched-off vendor (`?vendor=in-house` with Originals
+ * off) answers 403 NOT_ENTITLED like the launch. `casino` itself is not
+ * applied to the lists: the books are catalogue rows too and need only
+ * `sports`.
+ * ══════════════════════════════════════════════════════════════════════════ */
+
+/** Category flag → the `game_type` substrings `categoryFlag` reads it from. */
+const CATEGORY_PATTERNS = {
+  crash: ['crash'],
+  livegames: ['live'],
+  slotsgames: ['slot'],
+  lotterygames: ['lottery'],
+  indiangames: ['india'],
+  cards: ['card'],
+};
+
+/** The flags the owner switched off, from the document. */
+const offFlags = (doc) =>
+  new Set(Object.entries(doc?.flags ?? {}).filter(([, on]) => on === false).map(([key]) => key));
+
+/** Normalised vendor keys (`norm`) whose provider flag is off. */
+function blockedVendors(off) {
+  return Object.entries(PROVIDER_FLAGS)
+    .filter(([, flags]) => flags.some((flag) => off.has(flag)))
+    .map(([vendor]) => vendor);
+}
+
+/** Is this catalogue row (`{vendor, game_type}`) in the plan? Sync, for code holding the document. */
+function isRowEntitledIn(doc, row) {
+  const off = offFlags(doc);
+  if (!off.size) return true;
+  if (isSportsBook({ provider: row?.vendor, type: row?.game_type })) return !off.has('sports');
+  const flags = [...(PROVIDER_FLAGS[norm(row?.vendor)] ?? [])];
+  const category = categoryFlag(row?.game_type);
+  if (category) flags.push(category);
+  return !flags.some((flag) => off.has(flag));
+}
+
+/**
+ * Sequelize conditions (to AND into a `js_games` where) that drop the rows
+ * outside the plan; `[]` when nothing is off. Same mapping as the launch.
+ */
+async function catalogueConditions() {
+  const off = offFlags(await entitlements.getEntitlements());
+  if (!off.size) return [];
+  const conditions = [];
+  const vendors = blockedVendors(off);
+  if (vendors.length) {
+    conditions.push({
+      [Op.or]: [
+        { vendor: null },
+        sqlWhere(fn('lower', fn('regexp_replace', col('vendor'), '[^A-Za-z0-9]', '', 'g')), { [Op.notIn]: vendors }),
+      ],
+    });
+  }
+  for (const [flag, patterns] of Object.entries(CATEGORY_PATTERNS)) {
+    if (!off.has(flag)) continue;
+    for (const pattern of patterns) {
+      conditions.push({ [Op.or]: [{ game_type: null }, { game_type: { [Op.notILike]: `%${pattern}%` } }] });
+    }
+  }
+  return conditions;
+}
+
+/** A list filtered BY vendor: 403 NOT_ENTITLED when that provider is out of the plan. */
+async function assertVendorEntitled(vendor) {
+  if (!vendor) return;
+  for (const flag of PROVIDER_FLAGS[norm(vendor)] ?? []) await entitlements.assertFlagEntitled(flag);
+}
+
+/**
+ * The in-house engine's stake (sockets → `GameEngine.placeBet`): `casino`,
+ * `originals` and the game's category (crash). Open rounds still settle and
+ * cash out — only a NEW stake is refused, so nobody's money is stranded.
+ */
+async function assertInHouseEntitled(gameKey) {
+  for (const flag of flagsFor({ provider: 'in-house', type: gameKey }, new Set())) {
+    await entitlements.assertFlagEntitled(flag);
+  }
+}
+
+module.exports = {
+  requireGameEntitled,
+  flagsFor,
+  KNOWN_BOOK_UIDS,
+  isRowEntitledIn,
+  catalogueConditions,
+  assertVendorEntitled,
+  assertInHouseEntitled,
+};

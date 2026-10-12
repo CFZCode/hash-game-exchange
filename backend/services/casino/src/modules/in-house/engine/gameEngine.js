@@ -3,6 +3,7 @@
 const { Op, literal } = require('sequelize');
 const { money, assertCurrencySupportedFor } = require('@ibitplay/common');
 const { GamesService } = require('../../games/games.service');
+const { assertInHouseEntitled } = require('../../games/gameEntitlement');
 
 const errors = require('../inHouse.errors');
 const { HOUSE_EDGE_PERCENT, COIN_COLUMNS, PLAY_COIN_BLOCKED } = require('../inHouse.constants');
@@ -102,6 +103,10 @@ class GameEngine {
     const stake = money.toMinor(String(amount ?? '0'));
     // Legacy's four consecutive `bet <= 0` checks, which are one check.
     if (stake <= 0n) throw errors.INVALID_STAKE({ amount });
+
+    // The owner's plan: Originals (and casino, and crash for the crash games)
+    // must be in it before a stake is taken. 403 NOT_ENTITLED, nothing debited.
+    await assertInHouseEntitled(game);
 
     const decimal = money.toDecimalString(stake);
 

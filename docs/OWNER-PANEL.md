@@ -233,7 +233,13 @@ restores the client's own choice.
   - every game launch (`/casino/js-games/v1|v2/launch`, `/casino/gis/launch` and `launch-demo`,
     `/casino/catalogue/launch`, `/casino/x-casino/launch`, `/casino/seamless/launch`): a
     sportsbook or esports book needs `sports`; any other game needs `casino` plus its provider
-    flag and its category flag (crash / livegames / slotsgames) where the catalogue row names one;
+    flag and its category flag (crash / livegames / slotsgames / lotterygames / indiangames / cards)
+    where the catalogue row names one; in-house games (`vendor = 'in-house'`) need `originals`;
+  - the catalogue lists (`/casino/js-games/v1/games`, `/v1/games/search`, `/v1/collections/:c`)
+    drop rows whose provider or category flag is off, and a list asked for by a switched-off
+    vendor (`?vendor=in-house` with `originals` off) answers 403 (`games/gameEntitlement.js`);
+  - the in-house engine (`GameEngine.placeBet`, every socket stake): `casino` + `originals` (+
+    `crash` for the crash games); open rounds still settle and cash out;
   - the player routes of gift_cards, swap, vault, bonus, spin_wheel (also the public slices),
     races, vip, club_membership, affiliate, and `GET /admin/promotions` (promotions);
   - chat: the `ADD_CHAT` and `ADD_MESSAGES` socket events answer `{ status: false }` with that code.
