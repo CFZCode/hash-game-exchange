@@ -39,6 +39,7 @@ export default function PopCenter({
   label,
   className = '',
   type,
+  dismissible = true,
   children,
 }) {
   useDialogScrollLock(open);
@@ -75,7 +76,24 @@ export default function PopCenter({
          immediately reopened it. On click the event's target IS this overlayer, the handler
          runs here, and nothing beneath ever sees it. */
       onClick={(event) => {
-        if (event.target === event.currentTarget) onClose();
+        if (event.target !== event.currentTarget) return;
+        /* `pop.push(jsx, {close: false})` — the manager's own option, and the scrim handler is
+           `u.close ? Pt.pop() : c()`, where `c()` toggles `head-shake` on the topmost card for
+           one `animationend`. So a scrim click on a non-dismissible pop SHAKES it rather than
+           closing it; the cross in the title bar still closes it (`cl` renders that button
+           whatever `close` says). The sign-in 2FA step is the first caller to pass it. */
+        if (dismissible) {
+          onClose();
+          return;
+        }
+        const panel = panelRef.current;
+        if (!panel || panel.classList.contains('head-shake')) return;
+        const done = () => {
+          panel.classList.remove('head-shake');
+          panel.removeEventListener('animationend', done);
+        };
+        panel.classList.add('head-shake');
+        panel.addEventListener('animationend', done);
       }}
     >
       <div

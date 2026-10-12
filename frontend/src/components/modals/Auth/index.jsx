@@ -7,6 +7,8 @@ import useDialogScrollLock from '../../../hooks/useDialogScrollLock';
 import { useIsDesktop } from '../../../hooks/useMediaQuery';
 import Loading from '../../shared/Loading';
 import Input from '../../shared/Input';
+import PopCenter from '../../shared/PopCenter';
+import { IconTwoFactor } from '../../../pages/Settings/icons';
 import googleImg from '../../../assets/google.png';
 import {
   ArrowIcon,
@@ -93,6 +95,24 @@ const AUTH_MESSAGES = {
    own, so these move to Sign In and print the server's message in ITS slot. */
 const SIGNUP_REFUSALS = new Set(['SITE_POLICY_CHANNEL_CLOSED', 'REGION_RESTRICTED', 'NOT_ENTITLED']);
 
+/* The platform's answer to a password that was right for an account with 2FA on: a 401 with this
+   code, and nothing else happens until the same login is sent again with `twoFactorCode`. A wrong
+   code is `AUTH_TWO_FACTOR_INVALID` and reads well as the server words it, so it is not mapped. */
+const TWO_FACTOR_REQUIRED = 'AUTH_TWO_FACTOR_REQUIRED';
+
+/* One resolver for every refusal this dialog prints: our wording for a code we recognise, then —
+   for a 422 — the first offending field's own message, then the server's message, then a generic
+   only when it answered with neither (a network failure has no envelope to read).
+
+   The 422 arm is what makes a weak password readable: the envelope's top-level message is just
+   "Validation failed", and the sentence the visitor needs ("password must be at least 10
+   characters") is in `details.fields`, which `ApiError` already lifts onto `fields`. */
+const messageOf = (failure, fallback) =>
+  AUTH_MESSAGES[failure?.code] ||
+  (failure?.code === 'VALIDATION_ERROR' && failure?.fields?.[0]?.message) ||
+  failure?.message ||
+  fallback;
+
 /* The strip's indicator is positioned by two custom properties that the original computes in
  * JS from measured tab widths — the capture had `--tabs-width: 188px` with
  * `--tabs-indicator-position: 0px`, which is exactly half of that strip and no offset.
@@ -134,7 +154,7 @@ const Label = ({ className = 'mb-1 font-semibold', children }) => (
    extraction happened because the account remote's `PasswordInput` became the second call site,
    and on the original those two are already one component: both wrap the host's `Input`, which is
    why the class list here and the remote's agree to the character. */
-function Field({ type = 'text', value, onChange, trailing, className = '', autoFocus = false, autoComplete }) {
+function Field({ type = 'text', value, onChange, trailing, className = '', autoFocus = false, autoComplete, onFocus }) {
   return (
     <Input
       type={type}
@@ -144,6 +164,7 @@ function Field({ type = 'text', value, onChange, trailing, className = '', autoF
       className={`${FIELD_CLASS} ${className}`}
       autoFocus={autoFocus}
       autoComplete={autoComplete}
+      onFocus={onFocus}
     />
   );
 }
@@ -400,7 +421,7 @@ function SignInForm({ onSubmit, pending, error }) {
 }
 
 /* Transcribed from the live dialog's rendered DOM, like the Sign In tab. */
-function SignUpForm({ onSubmit }) {
+function SignUpForm({ onSubmit, error, onClearError }) {
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [revealed, setRevealed] = React.useState(false);
@@ -440,9 +461,34 @@ function SignUpForm({ onSubmit }) {
             validation popover anchors, and dropping them is a change, not a tidy-up. */}
         <div className="relative">
           <div className="relative">
-            <Field autoFocus type="email" value={email} onChange={setEmail} />
+            <Field
+              autoFocus
+              type="email"
+              value={email}
+              onChange={setEmail}
+              /* `J(t.errorMsg && "border-error", "!mt-0")` on the original's EmailPhoneInput: the
+                 box turns red while a refusal is showing, and focusing it clears the refusal —
+                 `onFocus: () => { …; t.errorMsg && t.setStore({errorMsg: ""}) }`. */
+              className={error ? 'border-error' : ''}
+              onFocus={error ? onClearError : undefined}
+            />
           </div>
         </div>
+
+        {/* THE SIGN UP FORM'S ERROR SLOT, and where it sits is the chunk's, not a choice.
+            ---------------------------------------------------------------------------------
+            `Enter-S9f2xlL8.js` (the account remote's sign-up, off `hash.game/modules/account/`)
+            inserts `ce = <p class="mt-1 text-xs text-error">` as the form's own child directly
+            after the email field's `div.relative` and before the `mt-6` password block, shown
+            under `<Show when={!!errorMsg}>`. Same element, same classes as the Sign In tab's slot
+            under the password box — the two forms were always one convention.
+
+            The original fills it from `te(code)` for its 4xxx account codes and ALSO toasts the
+            server's message (`x(a)`) for every failure. This platform's codes are strings, so
+            there is no 4xxx range to branch on: every refusal that keeps the visitor on this tab
+            prints here, through the same `messageOf` the Sign In tab uses, and no toast doubles
+            it. The three site-level refusals still move to Sign In (`SIGNUP_REFUSALS`). */}
+        {error ? <p className="mt-1 text-xs text-error">{error}</p> : null}
 
         <div className="mt-6">
           <Label>Password</Label>
@@ -630,6 +676,161 @@ function SignUpForm({ onSubmit }) {
   );
 }
 
+/* The original's code length, `_t` in the chunk — Confirm is armed at exactly this many digits. */
+const TWO_FACTOR_LENGTH = 6;
+
+/* THE SIGN-IN 2FA STEP, ported from the account remote's `Login-DOwjxTVG.js` (off
+ * `hash.game/modules/account/assets/`, under the hash the remote's manifest lists). The auth
+ * dialog was recorded as having "no chunk at all"; this one does — `DialogSignin2FA` resolves to
+ * that file's export `S`, and the in-dialog step is `xr` beside it.
+ *
+ * ── WHAT THE ORIGINAL DOES ────────────────────────────────────────────────────────────────────
+ *
+ * After a sign-in whose answer carries `twoStepVerifyTypes` including `google_2fa`, `Le()` calls
+ * `Pr()`, which is `pop.push(() => <xr …/>, {close: false})` — a POP stacked over the auth
+ * dialog, not a screen inside it. `xr` is
+ *
+ *   <Pop>                                    no title, so an empty title bar holding the cross
+ *     <div class="special-tabs-change w-full">
+ *       <Tabs value={stage}>                 three title-less TabItems: 2FA / phone / email
+ *         <TabItem><yr/></TabItem> …
+ *
+ * and `yr` hands `pr` the 2FA submit. `pr`, in order: the IconTwofactor mark (`size-8
+ * fill-secondary`) centred, "Enter the code generated by your Google Authenticator App.",
+ * an `input-label` "Verification Code", `PasteInput` with "6-digit verification code", `Tip2FA`
+ * ("Don't have access to these?"), a brand Confirm (`mt-4 h-12 w-full`, disabled until six
+ * digits), then the footer — a `mt-6` row of "Switch to phone / email" links, EMPTY when the
+ * account has neither, which is always the case here.
+ *
+ * `special-tabs-change` has no rule in either stylesheet (the deploy's or the remote's), so the
+ * host Tabs draws its strip as it always does: `.tabs-title` with three empty `.tabs-btn`s, the
+ * first raised, over a `.tabs-content` panel. Reproduced as the chunk renders it. The two other
+ * tabs are inert: phone and e-mail verification have no sender on this platform.
+ *
+ * ── WHAT IS THIS PLATFORM'S ───────────────────────────────────────────────────────────────────
+ *
+ * The original verifies the code with a second call (`/account/verify/verifyCodeForLogin/`
+ * keyed by a `verifyFlowId`). SmartBet has no flow id: `POST /user/auth/login` answers
+ * `AUTH_TWO_FACTOR_REQUIRED`, and the code goes back on THE SAME LOGIN REQUEST as
+ * `twoFactorCode`. So the parent keeps the credentials and resends them.
+ *
+ * A refusal is printed in the Sign In form's own error slot markup (`mt-1 text-xs text-error`)
+ * under the field, where the original toasts it. That is this build's — the toast would land
+ * over the pop and vanish, and a wrong code is a field-level refusal like a wrong password.
+ *
+ * `Tip2FA` is drawn and inert. On the original it opens the lost-2FA flows (an advanced-KYC ID
+ * check, or a confirm that says to e-mail a recovery address), and neither has a backend or an
+ * address here — a screen with no backend is drawn and says nothing (CLAUDE.md). */
+function TwoFactorStep({ onConfirm, onClose, pending, error, onClearError }) {
+  const isDesktop = useIsDesktop();
+  const [code, setCode] = React.useState('');
+  const ready = code.length === TWO_FACTOR_LENGTH && !pending;
+
+  /* `PasteInput`'s type defaults to "tel", and both of its writers strip non-digits:
+     `onChange: e => setValue(e.replace(/\D/g, ""))` and the Paste button's clipboard read. */
+  const update = (next) => {
+    setCode(next.replace(/\D/g, ''));
+    if (error) onClearError();
+  };
+
+  /* The host Button's own size rule, `size || !mobile && "m"` — same resolution as the other
+     ports that have no shared Button. */
+  const size = isDesktop ? 'button-m ' : '';
+
+  return (
+    /* `type="sheet"`: the pop is pushed with no `type`, and `cl` makes that a bottom sheet on a
+       phone (`mobile ? t.type : "center"`). `PopCenter` defaults the other way, see its note.
+       `dismissible={false}` is `{close: false}` on the push. */
+    <PopCenter open type="sheet" dismissible={false} label="Verify 2FA" onClose={onClose}>
+      <div className="special-tabs-change w-full">
+        <div
+          role="tablist"
+          className="scroll-x tabs-title hide-scroll"
+          style={indicatorVars(0, 3)}
+        >
+          <div className="tabs-btn-group">
+            {[0, 1, 2].map((index) => (
+              <button
+                key={index}
+                type="button"
+                role="tab"
+                className="tabs-btn btn-like"
+                aria-selected={index === 0 ? 'true' : undefined}
+              />
+            ))}
+          </div>
+          <div className="tabs-indicator test-indicator-tab" />
+        </div>
+
+        <div className="tabs-content">
+          <form
+            /* `PasteInput`'s `onKeyDown`: Enter submits whatever is typed (`t.value && submitFn`),
+               without the six-digit gate the button has — the server answers a short code. A
+               form is how this build gets Enter without a key handler on the shared Input. */
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (code && !pending) onConfirm(code);
+            }}
+          >
+            <div className="flex items-center justify-center">
+              <IconTwoFactor className="icon size-8 fill-secondary" />
+            </div>
+            <p className="mt-3 px-2 text-center text-secondary">
+              Enter the code generated by your Google Authenticator App.
+            </p>
+            <p className="mt-5 input-label">Verification Code</p>
+            {/* `PasteInput`: the host Input with `pl-3 pr-2 sm:pr-1 [&>input]:font-semibold`, and
+                a `button-s` Paste inside it carrying `px-2 py-0 text-xs fix-light-hover
+                bg-layer6` (its default `buttonClass`). */}
+            <Input
+              type="tel"
+              value={code}
+              onChange={update}
+              autoFocus
+              autoComplete="one-time-code"
+              placeholder="6-digit verification code"
+              className="pl-3 pr-2 sm:pr-1 [&>input]:font-semibold"
+              trailing={
+                <button
+                  type="button"
+                  className="button button-s fix-light-hover bg-layer6 px-2 py-0 text-xs"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    navigator.clipboard?.readText().then(update).catch(() => {});
+                  }}
+                >
+                  Paste
+                </button>
+              }
+            />
+            {error ? <p className="mt-1 text-xs text-error">{error}</p> : null}
+
+            {/* `Tip2FA` — `cr`, verbatim. Inert; see the note above. */}
+            <div className="center mt-4">
+              <p className="cursor-pointer font-extrabold text-secondary sm:cursor-pointer">
+                Don&apos;t have access to these?
+              </p>
+            </div>
+
+            <button
+              type="submit"
+              disabled={!ready}
+              className={`button button-brand ${size}mt-4 h-12 w-full`}
+            >
+              Confirm
+            </button>
+
+            {/* `yr`'s footer: the "Switch to phone / email" row, empty with neither, but the
+                element and its `mt-6` are still there. */}
+            <div className="mt-6 flex flex-row-reverse items-center justify-center" />
+          </form>
+        </div>
+      </div>
+    </PopCenter>
+  );
+}
+
 export default function Auth({ mode: requested, onClose, enter = 'open' }) {
   const navigate = useNavigate();
   /* A B2B (agent-only) site has no public sign-up (services/gates.js `canSignUp`): Sign Up
@@ -711,6 +912,40 @@ export default function Auth({ mode: requested, onClose, enter = 'open' }) {
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState('');
 
+  /* THE 2FA STEP'S STATE. `twoFactor` holds the credentials the platform accepted up to the
+     second factor — non-null is what raises the step — because the code is sent back on the same
+     login request rather than against a flow id. Its error is its own: the step sits over the
+     Sign In form, and a refusal printed in the form's slot behind the scrim would not be seen. */
+  const [twoFactor, setTwoFactor] = React.useState(null);
+  const [twoFactorError, setTwoFactorError] = React.useState('');
+  const [twoFactorPending, setTwoFactorPending] = React.useState(false);
+
+  /* The cross (or a phone's drag) on the step is `xr`'s `onCleanup(() => onSubmit(undefined))`:
+     the sign-in resolves as not signed in and the dialog stays on its form, password intact. */
+  const cancelTwoFactor = () => {
+    setTwoFactor(null);
+    setTwoFactorError('');
+    setTwoFactorPending(false);
+  };
+
+  const confirmTwoFactor = async (twoFactorCode) => {
+    if (!twoFactor || twoFactorPending) return;
+    setTwoFactorError('');
+    setTwoFactorPending(true);
+    try {
+      const session = await authenticate({ ...twoFactor, twoFactorCode });
+      /* `pop.pop()` then the sign-in's own exit, as `Pr` resolves before `Le` returns. */
+      setTwoFactor(null);
+      runClose(() => {
+        signIn(session);
+        dismiss();
+      });
+    } catch (failure) {
+      setTwoFactorPending(false);
+      setTwoFactorError(messageOf(failure, 'Could not sign in. Please try again.'));
+    }
+  };
+
   const submit = async (credentials) => {
     if (pending) return;
     setError('');
@@ -733,11 +968,7 @@ export default function Auth({ mode: requested, onClose, enter = 'open' }) {
         });
       } catch (failure) {
         setPending(false);
-        setError(
-          AUTH_MESSAGES[failure?.code] ||
-            failure?.message ||
-            'Could not create your account. Please try again.',
-        );
+        setError(messageOf(failure, 'Could not create your account. Please try again.'));
         if (SIGNUP_REFUSALS.has(failure?.code)) navigate('/login/signin', { replace: true });
       }
       return;
@@ -766,13 +997,15 @@ export default function Auth({ mode: requested, onClose, enter = 'open' }) {
       });
     } catch (failure) {
       setPending(false);
+      /* Right password, second factor on: not a refusal, so nothing goes in the slot — the
+         credentials are kept and the 2FA step is raised over the form. */
+      if (failure?.code === TWO_FACTOR_REQUIRED) {
+        setTwoFactor({ identifier: credentials.identifier, password: credentials.password });
+        return;
+      }
       /* Our wording for a code we recognise, the server's for one we do not, and a generic only
          when it answered with neither — a network failure has no envelope to read. */
-      setError(
-        AUTH_MESSAGES[failure?.code] ||
-          failure?.message ||
-          'Could not sign in. Please try again.',
-      );
+      setError(messageOf(failure, 'Could not sign in. Please try again.'));
     }
   };
 
@@ -865,7 +1098,14 @@ export default function Auth({ mode: requested, onClose, enter = 'open' }) {
                               role="tab"
                               className="tabs-btn btn-like"
                               aria-selected={active === index ? 'true' : undefined}
-                              onClick={() => navigate(tab.path, { replace: true })}
+                              /* The refusal belongs to the form it was raised on; carried across
+                                 a tab switch, a Sign Up error would print under the Sign In
+                                 password. The site-level refusals move tabs by `navigate`, not
+                                 here, so they keep theirs. */
+                              onClick={() => {
+                                setError('');
+                                navigate(tab.path, { replace: true });
+                              }}
                             >
                               <span className="text-sm font-extrabold">{tab.label}</span>
                             </button>
@@ -887,7 +1127,7 @@ export default function Auth({ mode: requested, onClose, enter = 'open' }) {
 
                   <div className="px-6 pt-14 sm:px-9 sm:pt-12">
                     {mode === SIGN_UP ? (
-                      <SignUpForm onSubmit={submit} />
+                      <SignUpForm onSubmit={submit} error={error} onClearError={() => setError('')} />
                     ) : (
                       <SignInForm
                         onSubmit={submit}
@@ -903,6 +1143,15 @@ export default function Auth({ mode: requested, onClose, enter = 'open' }) {
           </div>
         </div>
       </div>
+      {twoFactor ? (
+        <TwoFactorStep
+          onConfirm={confirmTwoFactor}
+          onClose={cancelTwoFactor}
+          pending={twoFactorPending}
+          error={twoFactorError}
+          onClearError={() => setTwoFactorError('')}
+        />
+      ) : null}
     </div>
   );
 }
