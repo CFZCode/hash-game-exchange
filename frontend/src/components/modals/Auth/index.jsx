@@ -1,8 +1,7 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useSession } from '../../../context/session';
 import { useGates } from '../../../context/gates';
-import { SIGNUP_CLOSED_MESSAGE } from '../../../services/gates';
 import useDialogScrollLock from '../../../hooks/useDialogScrollLock';
 import { useIsDesktop } from '../../../hooks/useMediaQuery';
 import Loading from '../../shared/Loading';
@@ -833,12 +832,16 @@ function TwoFactorStep({ onConfirm, onClose, pending, error, onClearError }) {
 
 export default function Auth({ mode: requested, onClose, enter = 'open' }) {
   const navigate = useNavigate();
-  /* A B2B (agent-only) site has no public sign-up (services/gates.js `canSignUp`): Sign Up
-     opens on the Sign In form with the backend's refusal in its error slot, and sign-in stays.
-     Always open with fixtures. */
+  /* A B2B (agent-only) site has no public sign-up (services/gates.js `canSignUp`): the dialog
+     has the Sign In tab alone, and `/login/regist` (or anything that asks for the Sign Up tab)
+     opens it on Sign In. Always open with fixtures. */
   const gates = useGates();
-  const signUpClosed = requested === SIGN_UP && gates.ready && !gates.canSignUp();
-  const mode = signUpClosed ? SIGN_IN : requested;
+  const signUpClosed = gates.ready && !gates.canSignUp();
+  const mode = signUpClosed && requested === SIGN_UP ? SIGN_IN : requested;
+  const { pathname } = useLocation();
+  React.useEffect(() => {
+    if (signUpClosed && pathname === '/login/regist') navigate('/login/signin', { replace: true });
+  }, [signUpClosed, pathname, navigate]);
   const { signIn, authenticate, signUp } = useSession();
   /* The manager's own `ee.mobile`, which decides WHICH animation this dialog gets rather than
      how big it is — see the note over the render. `lg` is the line this project maps that flag
@@ -849,7 +852,7 @@ export default function Auth({ mode: requested, onClose, enter = 'open' }) {
   const tabs = [
     { key: SIGN_IN, label: 'Sign In', path: '/login/signin' },
     { key: SIGN_UP, label: 'Sign Up', path: '/login/regist' },
-  ];
+  ].filter((tab) => !(signUpClosed && tab.key === SIGN_UP));
   const active = Math.max(
     0,
     tabs.findIndex((tab) => tab.key === mode),
@@ -1132,7 +1135,7 @@ export default function Auth({ mode: requested, onClose, enter = 'open' }) {
                       <SignInForm
                         onSubmit={submit}
                         pending={pending}
-                        error={error || (signUpClosed ? SIGNUP_CLOSED_MESSAGE : '')}
+                        error={error}
                       />
                     )}
                     <div className="mt-auto px-6 sm:px-8" />

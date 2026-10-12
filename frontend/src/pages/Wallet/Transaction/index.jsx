@@ -21,6 +21,7 @@ import {
   withdrawCodeFor,
 } from './status';
 import { useSession } from '../../../context/session';
+import { useGates } from '../../../context/gates';
 import WalletFilterProvider from '../../../context/WalletFilterProvider';
 import useResource from '../../../hooks/useResource';
 import { useWalletFilter as useFilter } from '../../../context/walletFilter';
@@ -100,6 +101,14 @@ const TYPE = {
 
 const STORAGE_KEY = 'wallet:tx-filter-v2';
 
+/* An agent's player has no deposit, withdraw, swap, buy or bonus of their own: every credit and
+   debit comes from their agent and is a Bill row (the ledger's TRANSFER_IN / TRANSFER_OUT,
+   "Credited by agent" / "Debited by agent"). So their Type filter is Bill alone, as addaplay's
+   history is the agent's transfers. */
+const AGENT_PLAYER_TYPES = new Set([TYPE.Bill]);
+/* …and Bill Type drops the categories they cannot have (Affiliate, Vault, Swap). */
+const AGENT_PLAYER_BILL_TYPES = new Set(['All', 'Game']);
+
 /* Every filter is `A` — the shared Select — over OPTION OBJECTS rather than strings, with the
    label behind a function so it stays translatable. `ellipsis w-0 flex-auto text-left` on the
    label div is what keeps a long currency name from pushing the chevron out of the trigger. */
@@ -113,16 +122,18 @@ const optionLabel = (option) => (
    "Vault" would silently narrow the Deposit list. */
 function TypeFilter() {
   const { get, setMany } = useFilter();
+  const { agentPlayer } = useGates();
   const options = React.useMemo(
-    () => [
-      { label: 'Bill', value: TYPE.Bill },
-      { label: 'Deposit', value: TYPE.Deposit },
-      { label: 'Withdraw', value: TYPE.Withdraw },
-      { label: 'Swap', value: TYPE.Swap },
-      { label: 'Buy Crypto', value: TYPE.Buy },
-      { label: 'Bonus', value: TYPE.Bonus },
-    ],
-    [],
+    () =>
+      [
+        { label: 'Bill', value: TYPE.Bill },
+        { label: 'Deposit', value: TYPE.Deposit },
+        { label: 'Withdraw', value: TYPE.Withdraw },
+        { label: 'Swap', value: TYPE.Swap },
+        { label: 'Buy Crypto', value: TYPE.Buy },
+        { label: 'Bonus', value: TYPE.Bonus },
+      ].filter((option) => !agentPlayer || AGENT_PLAYER_TYPES.has(option.value)),
+    [agentPlayer],
   );
   const value = options.find((o) => o.value === get('type')) ?? options[0];
 
@@ -152,15 +163,17 @@ const BILL_TYPES = [
 
 function BillTypeFilter() {
   const { get, set } = useFilter();
+  const { agentPlayer } = useGates();
   if (get('type') !== TYPE.Bill) return null;
 
-  const value = BILL_TYPES.find((o) => o.value === get('billType')) ?? BILL_TYPES[0];
+  const options = agentPlayer ? BILL_TYPES.filter((o) => AGENT_PLAYER_BILL_TYPES.has(o.value)) : BILL_TYPES;
+  const value = options.find((o) => o.value === get('billType')) ?? options[0];
   return (
     <Select
       className="text-base"
       title="Bill type"
       value={value}
-      options={BILL_TYPES}
+      options={options}
       onChange={(option) => set('billType', option.value)}
     >
       {optionLabel}
@@ -485,7 +498,16 @@ function WithdrawList({ settings }) {
 
 /* `Ye` — the switch. Note the FALLBACK is the Bill list, which is how Bonus is served. */
 function TransactionList({ settings }) {
-  const { get } = useFilter();
+  const { get, setMany } = useFilter();
+  const { agentPlayer } = useGates();
+  /* A remembered filter from before (session storage) may name a type an agent's player no longer
+     has: put it back on Bill rather than open a list they cannot use. */
+  const stale = agentPlayer && !AGENT_PLAYER_TYPES.has(get('type'));
+  React.useEffect(() => {
+    if (stale) setMany({ type: TYPE.Bill, status: '', billType: '' });
+  }, [stale, setMany]);
+  if (stale) return <BillList settings={settings} />;
+
   switch (get('type')) {
     case TYPE.Deposit:
       return <DepositList settings={settings} />;
@@ -539,6 +561,8 @@ export default function Transaction() {
   const { session } = useSession();
   const settings = session.setting;
   const [disputes, setDisputes] = React.useState(false);
+  /* No fiat deposits for an agent's player, so no deposit-disputes link either. */
+  const { agentPlayer } = useGates();
 
   const defaults = React.useMemo(
     () => ({ type: TYPE.Bill, time: defaultRange(), assets: '', status: '', billType: '' }),
@@ -567,14 +591,16 @@ export default function Transaction() {
 
         {/* `Qe` — gated on `page.transaction.hideFiatIssues`, which bc.game's profile does not
             set, so it always renders. */}
-        <button
-          type="button"
-          className="mb-3 flex cursor-pointer items-center text-secondary underline sm:mb-4"
-          onClick={() => setDisputes(true)}
-        >
-          <IconInform className="icon mr-1 size-4" />
-          Fiat deposit issues or disputes
-        </button>
+        {!agentPlayer && (
+          <button
+            type="button"
+            className="mb-3 flex cursor-pointer items-center text-secondary underline sm:mb-4"
+            onClick={() => setDisputes(true)}
+          >
+            <IconInform className="icon mr-1 size-4" />
+            Fiat deposit issues or disputes
+          </button>
+        )}
 
         <TransactionList settings={settings} />
       </div>

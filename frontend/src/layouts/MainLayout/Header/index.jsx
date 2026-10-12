@@ -4,6 +4,7 @@ import logoImg from '../../../assets/logo.png';
 import logoLightImg from '../../../assets/logo_w.png';
 import LanguageCurrencyModal from '../../../components/modals/LanguageCurrencyModal';
 import { useSession } from '../../../context/session';
+import { useCanSignUp } from '../../../context/gates';
 import { useSettings } from '../../../context/settings';
 import { siteName, useSiteLogo } from '../../../services/siteBranding';
 import AfterLogin, { MobileAfterLogin } from './AfterLogin';
@@ -91,6 +92,8 @@ export default function Header({
   const headerBgOpacity = useHeaderScrollOpacity();
   const navigate = useNavigate();
   const { session } = useSession();
+  /* Off on a B2B site (context/gates.js): Sign In stays, Sign Up is not rendered. */
+  const canSignUp = useCanSignUp();
 
   /* THE LOGO IS A PNG PAIR, NOT ONE FILE TINTED — `logo.png` is near-white ink (mean luminance 222
      over its opaque pixels) and disappears on the light theme's white header. The original keys
@@ -212,6 +215,7 @@ export default function Header({
                 Sign In
               </button>
 
+              {canSignUp && (
               <button
                 className="button button-brand button-m ml-1 h-10 min-w-24 rounded-lg px-4 text-base"
                 type="button"
@@ -219,6 +223,7 @@ export default function Header({
               >
                 Sign Up
               </button>
+              )}
 
               {/* Global Chat Button — and the SIGNED-OUT tree opens the same drawer, which is the
                   original's own wiring rather than an extension: `Se` hands its logged-out arm
@@ -293,6 +298,7 @@ export default function Header({
           >
             Sign In
           </button>
+          {canSignUp && (
           <button
             className="button button-brand mobile-header-btn mobile-signup-btn ml-1 break-all rounded-lg px-2 text-base !leading-none flex-none"
             type="button"
@@ -300,6 +306,7 @@ export default function Header({
           >
             Sign Up
           </button>
+          )}
         </div>
         )}
       </div>

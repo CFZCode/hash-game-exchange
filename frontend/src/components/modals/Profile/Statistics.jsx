@@ -7,6 +7,7 @@ import Pagination from '../../shared/Pagination';
 import useResource from '../../../hooks/useResource';
 import { IconArrow } from '../../shared/icons';
 import { useSession } from '../../../context/session';
+import { useGates } from '../../../context/gates';
 import { printCurrency, getAlias } from '../../../utils/currency';
 import { coinIcon } from '../../../utils/coinArt';
 import {
@@ -72,8 +73,11 @@ export default function Statistics({ onClose, enter }) {
   const [params] = useSearchParams();
   const { session } = useSession();
   const settings = session.setting;
+  const { agentPlayer } = useGates();
 
   const userId = Number(params.get('userId') || '0');
+  /* An agent's player sees no wagered figures on their own statistics (as on the profile card). */
+  const hideWagered = agentPlayer && userId === session.userId;
   const userName = params.get('userName') || '';
 
   const [game, setGame] = React.useState({ label: 'Global', value: 'Global' });
@@ -108,7 +112,7 @@ export default function Statistics({ onClose, enter }) {
       Icon: IconTotalWagered,
       count: printCurrency(summary?.betAmountUsd || '0', undefined, { settings }),
     },
-  ];
+  ].filter((cell) => !(hideWagered && cell.label === 'Total Wagered'));
 
   return (
     <DialogShell
@@ -186,7 +190,7 @@ export default function Statistics({ onClose, enter }) {
                 <th className="text-left">Currency</th>
                 <th className="text-center">Win</th>
                 <th className="text-center">Bet</th>
-                <th className="text-right">Wagered</th>
+                {!hideWagered && <th className="text-right">Wagered</th>}
               </tr>
             </thead>
             <tbody>
@@ -198,9 +202,11 @@ export default function Statistics({ onClose, enter }) {
                   </td>
                   <td className="text-center">{Number(row.winNum)}</td>
                   <td className="text-center">{Number(row.betNum)}</td>
-                  <td className="text-right">
-                    {printCurrency(row.betAmountUsd || '0', undefined, { settings })}
-                  </td>
+                  {!hideWagered && (
+                    <td className="text-right">
+                      {printCurrency(row.betAmountUsd || '0', undefined, { settings })}
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useSession } from '../../../context/session';
+import { useCanSignUp } from '../../../context/gates';
 import { useSettings } from '../../../context/settings';
 import Banner from './Banner';
 import bannerImg from '../../../assets/banner.png';
@@ -15,6 +16,9 @@ const HeroCopy = () => {
      and hangs `onClick: () => t("/login/regist")` on this button. The dialog is route-driven — App
      matches /login/* and renders Auth over the page — so navigating IS opening the form. */
   const navigate = useNavigate();
+  /* A B2B site has no sign-up (context/gates.js): the headline stays, the Sign Up button and the
+     "Or Register With" row are not rendered. */
+  const canSignUp = useCanSignUp();
 
   return (
     <div className="center relative z-[1] flex h-full w-1/2 min-w-[11.25rem] flex-col whitespace-nowrap">
@@ -23,6 +27,8 @@ const HeroCopy = () => {
           JOIN THE UNTAMED
         </h1>
       </div>
+      {canSignUp && (
+        <>
       <button
         className="button button-brand mt-3 h-8 w-[8.5rem] sm:mt-4 sm:h-10 sm:w-[248px] lg:rounded-lg"
         type="button"
@@ -55,6 +61,8 @@ const HeroCopy = () => {
           </div>
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 };

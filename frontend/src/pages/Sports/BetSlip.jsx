@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useCanSignUp } from '../../context/gates';
 import { BetbyIcon, ChevronIcon, SportIcon } from './icons';
 import { hasSportIcon } from './sportArt';
 import { placeBet } from '../../services/sports';
@@ -106,6 +107,8 @@ export default function BetSlip({
   /* The owner panel's logo (live mode); else the original wordmark. Same 22px-high slot. */
   const brandLogo = useSiteLogo({ own: 'hash-games' });
   const navigate = useNavigate();
+  /* No "Join Now!" on a B2B site, which has no sign-up (context/gates.js). */
+  const canSignUp = useCanSignUp();
   const [open, setOpen] = React.useState(false);
   const [quickBet, setQuickBet] = React.useState(false);
   const [stake, setStake] = React.useState('');
@@ -353,12 +356,14 @@ export default function BetSlip({
                   >
                     Login
                   </button>
+                  {canSignUp && (
                   <p className="sports-betslip-join">
                     <span>Don&apos;t you have an account?&nbsp;</span>
                     <button type="button" onClick={() => navigate('/login/regist')}>
                       Join Now!
                     </button>
                   </p>
+                  )}
                 </>
               )}
 

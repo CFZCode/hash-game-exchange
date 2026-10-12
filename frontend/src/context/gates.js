@@ -9,3 +9,12 @@ export const GatesContext = React.createContext(ALL_ON);
 export function useGates() {
   return React.useContext(GatesContext);
 }
+
+/** Whether to RENDER a sign-up entry (header, hero, bet slip, the auth dialog's tab). A B2B
+ *  (agent-only) site has none: its players are created by their agent, and everyone signs in
+ *  through the one Sign In. Shown once the owner's plan has answered, so a B2B site never flashes
+ *  one; a failed read counts as answered (fail open). Always on with fixtures. */
+export function useCanSignUp() {
+  const gates = React.useContext(GatesContext);
+  return gates.ready && gates.canSignUp();
+}

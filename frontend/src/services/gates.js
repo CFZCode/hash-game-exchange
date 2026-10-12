@@ -117,11 +117,6 @@ const POLICY_DEFAULTS = { business_model: 'hybrid', deposit_mode: 'both', withdr
 /* Which policy variants leave a channel open — backend sitePolicy.js ALLOWS. */
 const railOpen = (mode, channel) => mode === 'both' || mode === channel;
 
-/* The backend's wording for a B2B site's refused sign-up (sitePolicy.js REASONS
-   'business_model:public_signup'), shown before the visitor types anything. A submitted sign-up
-   shows whatever the server itself answered instead. */
-export const SIGNUP_CLOSED_MESSAGE = 'Sign-up is by invitation on this site. Ask your agent for an account.';
-
 /**
  * The gate functions for one set of reads. `flags`/`features`/`capabilities` may each be
  * undefined (not answered, failed, signed out): what it would switch reads as on.

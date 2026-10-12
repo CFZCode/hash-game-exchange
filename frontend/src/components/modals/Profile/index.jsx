@@ -176,7 +176,7 @@ function MedalsCard({ profile, userId }) {
 
 /* `rt` — the Statistics card. The three cells are also the Statistics dialog's; the labels differ
    by one word there ("Total Bets" against "Total Bet Counts") and the icons are the same four. */
-function StatisticsCard({ profile, userId, userName, settings }) {
+function StatisticsCard({ profile, userId, userName, settings, hideWagered }) {
   const navigate = useNavigate();
 
   const cells = [
@@ -187,7 +187,7 @@ function StatisticsCard({ profile, userId, userName, settings }) {
       Icon: IconTotalWagered,
       count: printCurrency(profile.betAmountUsd, undefined, { settings }),
     },
-  ];
+  ].filter((cell) => !(hideWagered && cell.label === 'Total Wagered'));
 
   return (
     <div className="mt-3 w-full rounded-lg bg-layer4 p-3">
@@ -234,7 +234,7 @@ function StatisticsCard({ profile, userId, userName, settings }) {
    out: no `iconThreeFour` at all, and one whose URL contains "common" — the CDN's own generic
    cover, which the site replaces rather than showing. `detail_ko` is the Korean twin and is
    deliberately not fetched, for the reason the VIP page's light backdrops are not. */
-function FavouriteGame({ item, settings }) {
+function FavouriteGame({ item, settings, hideWagered }) {
   const navigate = useNavigate();
 
   const href = () => {
@@ -262,18 +262,20 @@ function FavouriteGame({ item, settings }) {
       >
         {item.gameItem.fullName}
       </p>
-      <div className="ml-auto flex flex-col items-end">
-        <p className="text-xs font-semibold text-secondary">Wagered</p>
-        <p className="font-semibold">
-          {printCurrency(item.betAmountUsd, undefined, { settings })}
-        </p>
-      </div>
+      {!hideWagered && (
+        <div className="ml-auto flex flex-col items-end">
+          <p className="text-xs font-semibold text-secondary">Wagered</p>
+          <p className="font-semibold">
+            {printCurrency(item.betAmountUsd, undefined, { settings })}
+          </p>
+        </div>
+      )}
     </div>
   );
 }
 
 /* `it` — the Top 3 Favorite Games card. */
-function FavouritesCard({ favorite, settings }) {
+function FavouritesCard({ favorite, settings, hideWagered }) {
   const rows = favorite.filter((row) => !!row.gameItem);
 
   return (
@@ -284,7 +286,12 @@ function FavouritesCard({ favorite, settings }) {
       <div className="my-3 h-[1px] w-full bg-tertiary opacity-20" />
       {favorite.length > 0 ? (
         rows.map((row) => (
-          <FavouriteGame key={row.gameUnique ?? row.gameItem.fullName} item={row} settings={settings} />
+          <FavouriteGame
+            key={row.gameUnique ?? row.gameItem.fullName}
+            item={row}
+            settings={settings}
+            hideWagered={hideWagered}
+          />
         ))
       ) : (
         <div className="center h-80 w-full">
@@ -327,7 +334,12 @@ export default function Profile({ onClose, enter }) {
   const tier = vipTier(level);
   /* The VIP level pill is a promotion: gone where VIP is off — an agent's player, or every player
      on a B2B site (services/gates.js). Always on with fixtures. */
-  const vipOn = useGates().on('vip');
+  const gates = useGates();
+  const vipOn = gates.on('vip');
+  /* An agent's player sees no wagered / turnover figures on their own profile — addaplay's
+     ProfileModal rule (`!isAgentUser` around Turnover, Wagered and Average Wager): the agent keeps
+     those books. Bets and wins stay. Never with fixtures (ALL_ON has no agent player). */
+  const hideWagered = isMyself && gates.agentPlayer;
 
   /* The dialog's shell is `DialogShell`'s and is mounted by the caller, so this returning nothing
      leaves a titled, closable card with an empty body — which is why the spinner goes here rather
@@ -385,8 +397,9 @@ export default function Profile({ onClose, enter }) {
         userId={userId}
         userName={isMyself ? session.name : profile.name}
         settings={settings}
+        hideWagered={hideWagered}
       />
-      <FavouritesCard favorite={profile.favorite} settings={settings} />
+      <FavouritesCard favorite={profile.favorite} settings={settings} hideWagered={hideWagered} />
 
       <div className="center mb-6 mt-3 h-7 w-full text-secondary">
         <span className="px-1">Joined on</span>
