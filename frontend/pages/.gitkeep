@@ -1,0 +1,3 @@
+# Next.js looks for a Pages Router directory at ./pages, then ./src/pages. src/pages is the React
+# Router app's own page components, not routes; this empty folder sits beside app/ so Next stops
+# there and never treats src/pages as one. Keep it empty.

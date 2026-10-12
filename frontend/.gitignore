@@ -37,3 +37,8 @@ dist-ssr
 # Runtime uploads the backend writes (KYC documents, deposit screenshots). Created by running the
 # platform locally — test artefacts, not source.
 backend copy/services/*/storage/
+
+# Next.js
+/.next/
+next-env.d.ts
+*.tsbuildinfo
