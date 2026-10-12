@@ -21,7 +21,7 @@ import { Favorites, Recent } from './pages/GameCollection';
 import SettingsLayout from './pages/Settings';
 import SettingsMenuPage from './pages/Settings/MenuPage';
 import SettingsDialog from './pages/Settings/Dialog';
-import { SectionPage, GameListRoute, TagPage, RelatedPage } from './pages/GameList';
+import { SectionPage, GameListRoute, TagPage, RelatedPage, ProviderPage } from './pages/GameList';
 import GameListDialog from './pages/GameList/Dialog';
 import UserActionDialog from './components/modals/UserAction';
 import WhitelistAddressDialog from './components/modals/WhitelistAddress';
@@ -654,6 +654,9 @@ function AppShell() {
           <Route path="/gamelist/:type" element={listDialog ? null : <GameListRoute />} />
           <Route path="/tagname/:tag" element={listDialog ? null : <TagPage />} />
           <Route path="/game-related" element={listDialog ? null : <RelatedPage />} />
+          {/* A provider's games, the Providers grid's own link. Live only: with fixtures on the path
+              falls through to the catch-all exactly as before. */}
+          {!USE_FIXTURES && <Route path="/provider/:name" element={<ProviderPage />} />}
           <Route
             path="/favorite"
             element={collectionDialog || collectionNeedsAuth ? null : <Favorites />}
