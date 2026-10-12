@@ -39,6 +39,14 @@ import { GAMES } from '../data/games';
  * three zero statistics, an empty favourites list behind the crocodile, and no Wager Contest card
  * at all (that one is `<Show when={contest.length > 0}>`).
  */
+/* SmartBet's own-account statistics (`GET /user/profile/stats`, token-scoped): bets and wins across
+   casino AND sports, and — new on SmartBet — `wagered.usd`, every stake priced in USD at the
+   platform's rates (a currency with no rate is listed in `wagered.unrated` and left out of the sum
+   rather than added at 1:1). This is the "Total Wagered" figure the old backend could not give. */
+const PROFILE_STATS = '/api/v1/user/profile/stats';
+const readOwnStats = () =>
+  Promise.resolve(request(PROFILE_STATS, { live: true, fixture: null })).catch(() => null);
+
 const PROFILE_DEFAULT = {
   achievementType: 0,
   achievements: [],
@@ -92,11 +100,14 @@ const PROFILE_DEFAULT = {
  */
 export function getUserProfile(userId, account) {
   if (!USE_FIXTURES) {
-    return Promise.resolve(
-      request(PLATFORM.user.publicProfile(userId), { live: true, fixture: null }),
-    )
-      .catch(() => null)
-      .then((row) => ({
+    const self = !!account?.userId && Number(account.userId) === Number(userId);
+    return Promise.all([
+      Promise.resolve(
+        request(PLATFORM.user.publicProfile(userId), { live: true, fixture: null }),
+      ).catch(() => null),
+      self ? readOwnStats() : null,
+    ])
+      .then(([row, stats]) => ({
         ...PROFILE_DEFAULT,
         achievements: ACHIEVEMENTS,
         userId: Number(userId) || account?.userId || 0,
@@ -113,6 +124,8 @@ export function getUserProfile(userId, account) {
               winNum: row.wins ?? PROFILE_DEFAULT.winNum,
             }
           : {}),
+        /* Only your OWN wagered total is readable — the public profile carries no money. */
+        ...(stats?.wagered?.usd != null ? { betAmountUsd: String(stats.wagered.usd) } : {}),
       }));
   }
 
@@ -182,13 +195,23 @@ export function getGameSummary(userId, gameUrl) {
       fixture: EMPTY_SUMMARY,
     });
   }
-  return Promise.resolve(
-    request(PLATFORM.casino.betHistoryStats, { live: true, fixture: EMPTY_SUMMARY }),
-  ).then((stats) => ({
-    betNum: Number(stats?.bets ?? 0),
-    winNum: Number(stats?.wins ?? 0),
-    betAmountUsd: '0',
-  }));
+  /* SmartBet: `/user/profile/stats` gives bets, wins and the USD wagered total together (casino
+     and sports). Falls back to the casino-only counts if that read fails. */
+  return readOwnStats().then((stats) =>
+    stats
+      ? {
+          betNum: Number(stats.bets ?? 0),
+          winNum: Number(stats.wins ?? 0),
+          betAmountUsd: String(stats.wagered?.usd ?? '0'),
+        }
+      : Promise.resolve(
+          request(PLATFORM.casino.betHistoryStats, { live: true, fixture: EMPTY_SUMMARY }),
+        ).then((casino) => ({
+          betNum: Number(casino?.bets ?? 0),
+          winNum: Number(casino?.wins ?? 0),
+          betAmountUsd: '0',
+        })),
+  );
 }
 
 /* `L` — the per-currency table behind it. 403, so the list is empty and the pane renders the site's
