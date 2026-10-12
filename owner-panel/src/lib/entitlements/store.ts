@@ -6,6 +6,7 @@ import path from 'node:path'
 
 import { FEATURE_CATALOGUE, FEATURE_KEYS, FEATURE_OPTIONS, FLAG_KEYS, isPolicy, isVariantOf, resolveOptions } from '@/configs/entitlementCatalogue'
 import { serverConfig } from '@/configs/site'
+import { pinToUi } from '@/configs/siteUi'
 import { DEFAULT_TEMPLATE, resolveTemplateKey, templateByKey, TEMPLATE_KEYS } from '@/configs/templateCatalogue'
 import { HttpError } from '@/lib/owner/guard'
 import { cleanCoin, coinProblem, diffCoins, droppedCoins } from './coins'
@@ -280,11 +281,15 @@ export function saveEntitlements(
 
     const region = input.region !== undefined ? cleanRegion(input.region) : current.region
 
+    // This client's UI (configs/siteUi.ts): toggles keep the owner's ON/OFF on the one bc.game
+    // variant, fixed features stay on, features the UI does not have stay off.
+    const pinned = pinToUi(complete({ ...current.features, ...input.features }, FEATURE_KEYS), variants)
+
     const next = {
       template,
-      features: normalise(complete({ ...current.features, ...input.features }, FEATURE_KEYS), variants),
+      features: normalise(pinned.features, pinned.variants),
       flags: complete({ ...current.flags, ...input.flags }, FLAG_KEYS),
-      variants,
+      variants: pinned.variants,
       options,
       region
     }

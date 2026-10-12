@@ -729,6 +729,36 @@ const FEATURES = Object.freeze([...POLICIES, REWARD_CURRENCY_POLICY, REGION_REST
  * LEGACY_TEMPLATES below.
  */
 const TEMPLATES = Object.freeze({
+    // hash-game-exchange's own: the bc.game UI with its ORIGINAL colours (the theme changes
+    // nothing). Its variants are the one layout per feature that UI has; the owner panel pins
+    // every feature to them (owner-panel/src/configs/siteUi.ts).
+    "hash_game": {
+      "label": "Hash Game (original)",
+      "description": "Hash Game (original): this site's own UI in its original colours, no theme applied. VIP, bonus, referral, promotions, daily contest, weekly raffle, quests, vault, swap, notifications and KYC.",
+      "variants": {
+        "vip": "ring_panel",
+        "promotions": "event_list",
+        "spin_wheel": "none",
+        "gift_cards": "none",
+        "bonus": "reward_hub",
+        "affiliate": "referral_hub",
+        "races": "daily_contest",
+        "challenges": "quest_hub",
+        "raffles": "ticket_raffle",
+        "vault": "flat_balance",
+        "swap": "swap_page",
+        "tips": "none",
+        "chat": "none",
+        "notifications": "notice_centre",
+        "banners": "artwork_slides",
+        "blog": "none",
+        "casino_lobby": "tabbed_themes",
+        "club_membership": "none",
+        "kyc": "document_cockpit",
+        "push_notifications": "none",
+        "analytics": "none"
+      }
+    },
     "violet_night": {
       "label": "Violet Night",
       "description": "Violet Night: VIP program page, promotions tile grid, weekly race, flat vault, token lottery, KYC status in settings.",

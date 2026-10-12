@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { UI_LABEL, uiSupport } from '@/configs/siteUi'
 import { useSession } from '@/contexts/SessionContext'
 import { useApi, useApiMutation } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
@@ -145,10 +146,13 @@ const Features = () => {
     if (!catalogue.data || !current.data) return []
     const byKey = new Map(current.data.features.map(f => [f.feature, f]))
 
-    return CATEGORY_ORDER.map(cat => ({
+    // This site's UI (configs/siteUi.ts): features it has no screen for are listed together, last.
+    const absent = (key: string) => uiSupport(key)?.status === 'absent'
+
+    return [...CATEGORY_ORDER, 'not_in_ui'].map(cat => ({
       cat,
       items: catalogue
-        .data!.features.filter(f => f.category === cat)
+        .data!.features.filter(f => (cat === 'not_in_ui' ? absent(f.key) : f.category === cat && !absent(f.key)))
         .flatMap(spec => {
           const cur = byKey.get(spec.key)
 
@@ -197,7 +201,7 @@ const Features = () => {
           <Card key={cat} className='gap-0 py-0 shadow-none'>
             <CardHeader className='border-b py-3'>
               <CardTitle className='text-muted-foreground text-xs font-semibold tracking-wider uppercase'>
-                {CATEGORY_LABELS[cat] ?? cat}
+                {cat === 'not_in_ui' ? 'Not in this UI' : (CATEGORY_LABELS[cat] ?? cat)}
               </CardTitle>
             </CardHeader>
             <Table>
@@ -217,6 +221,7 @@ const Features = () => {
               <TableBody>
                 {items.map(({ spec, cur, entitled }) => {
                   const policy = spec.kind === 'policy'
+                  const ui = policy ? null : uiSupport(spec.key)
                   const on = policy ? cur.variant !== 'none' : cur.enabled && cur.variant !== 'none'
 
                   const configurable =
@@ -234,7 +239,11 @@ const Features = () => {
                           )}
                         </span>
                         <span className='text-muted-foreground block max-w-md truncate text-xs'>
-                          {spec.variants.find(v => v.key === cur.variant)?.description}
+                          {ui?.status === 'absent'
+                            ? ui.why
+                            : ui
+                              ? `${UI_LABEL}: ${ui.surfaces}.`
+                              : spec.variants.find(v => v.key === cur.variant)?.description}
                         </span>
                         {cur.region && cur.variant !== 'none' && (
                           <span className='text-muted-foreground block text-xs' data-region>
@@ -245,7 +254,15 @@ const Features = () => {
                       </TableCell>
                       <TableCell>
                         <span className='flex items-center gap-2'>
-                          <Badge variant={policy ? 'secondary' : 'outline'}>{variantLabel(spec, cur)}</Badge>
+                          <Badge variant={policy ? 'secondary' : 'outline'}>
+                            {ui?.status === 'absent'
+                              ? 'Not in this UI'
+                              : ui?.status === 'fixed'
+                                ? `${UI_LABEL} · always on`
+                                : ui
+                                  ? UI_LABEL
+                                  : variantLabel(spec, cur)}
+                          </Badge>
                           {configurable && <IntegrationSettings feature={spec} current={cur} />}
                         </span>
                       </TableCell>

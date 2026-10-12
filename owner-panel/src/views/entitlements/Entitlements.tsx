@@ -23,9 +23,9 @@ import {
   featureByKey,
   featureLabel,
   flagLabel,
-  optionsOf,
-  variantLabel
+  optionsOf
 } from '@/configs/entitlementCatalogue'
+import { HIDDEN_OPTIONS, pinToUi, UI_LABEL, uiSupport } from '@/configs/siteUi'
 import { TEMPLATE_CATALOGUE, type TemplateEntry } from '@/configs/templateCatalogue'
 import { useApi, useApiMutation } from '@/hooks/use-api'
 import { api, ApiError } from '@/lib/api/client'
@@ -59,18 +59,33 @@ const GROUPS: { section: string; description?: string; groups: Group[] }[] = [
   {
     section: 'Features',
     description: 'Each feature is ON or OFF for the site and runs one variant. The site admin shows them read-only; its staff can only key in integration settings.',
-    groups: FEATURE_CATEGORIES.map(cat => ({
+    groups: FEATURE_CATEGORIES.map((cat): Group => ({
       id: `feature:${cat.key}`,
       title: cat.title,
       description: 'Off: hidden from players and refused by the backend.',
-      rows: FEATURE_CATALOGUE.filter(f => f.category === cat.key && !f.policy).map(f => ({
+      rows: FEATURE_CATALOGUE.filter(f => f.category === cat.key && !f.policy && uiSupport(f.key)?.status !== 'absent').map(f => ({
         kind: 'feature' as const,
         key: f.key,
         label: f.label,
         description: f.description,
         hint: f.flag ? `flag ${f.flag}` : undefined
       }))
-    })).filter(g => g.rows.length > 0)
+    }))
+      .filter(g => g.rows.length > 0)
+      .concat([
+        {
+          id: 'feature:absent',
+          title: 'Not in this UI',
+          description: 'The bc.game UI has no screen for these, so they stay off and the backend refuses them.',
+          bulk: false,
+          rows: FEATURE_CATALOGUE.filter(f => !f.policy && uiSupport(f.key)?.status === 'absent').map(f => ({
+            kind: 'feature' as const,
+            key: f.key,
+            label: f.label,
+            description: (uiSupport(f.key) as { why: string }).why
+          }))
+        }
+      ])
   },
   {
     section: 'Site flags',
@@ -83,13 +98,10 @@ const GROUPS: { section: string; description?: string; groups: Group[] }[] = [
   }
 ]
 
-const labelOf = (c: ToggleChange) => (c.kind === 'feature' ? featureLabel(c.key) : flagLabel(c.key))
+/** A feature row's place in this client's UI (configs/siteUi.ts). */
+const statusOf = (r: Row) => (r.kind === 'feature' ? (uiSupport(r.key)?.status ?? 'toggle') : null)
 
-/** "Vault · Term locks with a period picker" for each feature the template switches on. */
-const switchedOn = (t: TemplateEntry) =>
-  Object.entries(t.variants)
-    .filter(([, variant]) => variant !== 'none')
-    .map(([feature, variant]) => ({ feature, label: featureLabel(feature), variant: variantLabel(feature, variant) }))
+const labelOf = (c: ToggleChange) => (c.kind === 'feature' ? featureLabel(c.key) : flagLabel(c.key))
 
 /** The variant a feature switched ON runs when its current one is `none`: the template's, else the first real one. */
 const firstVariant = (feature: string, template?: string) => {
@@ -215,14 +227,9 @@ const TemplateCard = ({ template, selected, saved, onSelect }: { template: Templ
         <span className='text-muted-foreground font-mono text-xs'>{template.key}</span>
       )}
     </div>
-    <p className='text-muted-foreground text-xs'>{template.description}</p>
-    <div className='flex flex-wrap gap-1'>
-      {switchedOn(template).map(f => (
-        <Badge key={f.feature} variant='outline' className='font-normal' title={f.variant}>
-          {f.label}
-        </Badge>
-      ))}
-    </div>
+    <p className='text-xs'>
+      <span className='font-medium'>On this UI:</span> {template.colours}
+    </p>
   </button>
 )
 
@@ -234,7 +241,8 @@ const Entitlements = () => {
   const [query, setQuery] = useState('')
   const [reviewing, setReviewing] = useState(false)
 
-  const draft: Draft | null = doc ? buildDraft(doc, edits) : null
+  // Pinned to this UI the way the save pins it (store.ts), so the screen shows what will be stored.
+  const draft: Draft | null = doc ? (d => ({ ...d, ...pinToUi(d.features, d.variants) }))(buildDraft(doc, edits)) : null
 
   const changes = doc && draft ? diffDocs(doc, draft) : []
   const changed = new Set(changes.map(c => `${c.kind === 'variant' ? 'feature' : c.kind}:${c.key}`))
@@ -289,18 +297,10 @@ const Entitlements = () => {
       if (r.kind === 'feature') next.features[r.key] = variant !== 'none'
     })
 
-  /** Fills every variant the template names, ON where it is not `none`; rows stay adjustable after. */
+  /** On this client a template is a colour theme only: it never switches a feature or a variant. */
   const pickTemplate = (key: string) =>
     edit(next => {
-      const template = TEMPLATE_CATALOGUE.find(t => t.key === key)
-
       next.template = key === doc?.template ? undefined : key
-
-      for (const [feature, variant] of Object.entries(template?.variants ?? {})) {
-        if (!featureByKey(feature)) continue
-        next.variants[feature] = variant
-        next.features[feature] = variant !== 'none'
-      }
     })
 
   const save = useApiMutation<void, { doc: EntitlementsDoc; changes: Change[]; live?: { live: boolean; reason?: string } }>({
@@ -378,8 +378,8 @@ const Entitlements = () => {
             <div>
               <h2 className='text-lg font-semibold'>Template</h2>
               <p className='text-muted-foreground text-sm'>
-                The look and a preset of variants. Picking one fills every feature below (its &quot;Off&quot; variants switch the feature off); you can
-                still adjust single rows before saving.
+                The site&apos;s colour theme. This site runs the {UI_LABEL}: a template recolours it (layout, fonts and art stay) and never changes
+                a feature below. Hash Game (original) keeps bc.game&apos;s own colours.
               </p>
             </div>
             <div className='grid gap-4 sm:grid-cols-2 xl:grid-cols-4'>
@@ -402,6 +402,7 @@ const Entitlements = () => {
                 <div className='grid items-start gap-4 lg:grid-cols-2'>
                   {visible.map(g => {
                     const value = (r: Row) => r.kind === 'policy' || (r.kind === 'feature' ? draft.features : draft.flags)[r.key] !== false
+                    const switchable = (r: Row) => statusOf(r) === null || statusOf(r) === 'toggle'
 
 
                     // The reward currency's coin must itself be entitled (its coin flag; a crypto coin also the crypto master).
@@ -425,10 +426,10 @@ const Entitlements = () => {
                           <CardDescription>{g.description}</CardDescription>
                           {g.bulk !== false && (
                             <CardAction className='flex gap-1'>
-                              <Button size='xs' variant='outline' onClick={() => set(g.shown, true)}>
+                              <Button size='xs' variant='outline' onClick={() => set(g.shown.filter(switchable), true)}>
                                 {g.shown[0]?.kind === 'flag' ? 'Allow all' : 'All on'}
                               </Button>
-                              <Button size='xs' variant='outline' onClick={() => set(g.shown, false)}>
+                              <Button size='xs' variant='outline' onClick={() => set(g.shown.filter(switchable), false)}>
                                 {g.shown[0]?.kind === 'flag' ? 'Block all' : 'All off'}
                               </Button>
                             </CardAction>
@@ -439,6 +440,7 @@ const Entitlements = () => {
                             const variant = r.kind === 'flag' ? null : draft.variants[r.key]
                             const variantInfo = variant ? featureByKey(r.key)?.variants.find(v => v.key === variant) : undefined
                             const canTurnOn = r.kind !== 'feature' || value(r) || !!firstVariant(r.key, draft.template)
+                            const status = statusOf(r)
                             const rowKey = `${r.kind === 'policy' ? 'feature' : r.kind}:${r.key}`
 
                             return (
@@ -456,10 +458,16 @@ const Entitlements = () => {
                                     <span className='text-muted-foreground font-mono text-xs'>{r.key}</span>
                                     {r.hint && <span className='text-muted-foreground text-xs'>· {r.hint}</span>}
                                   </div>
-                                  <p className='text-muted-foreground mt-0.5 text-xs'>{r.kind === 'flag' ? r.description : (r.note ?? variantInfo?.description ?? r.description)}</p>
-                                  {r.kind === 'feature' && optionsOf(r.key).length > 0 && (
+                                  <p className='text-muted-foreground mt-0.5 text-xs'>
+                                    {r.kind === 'flag' || status === 'absent'
+                                      ? r.description
+                                      : status
+                                        ? `${UI_LABEL}: ${(uiSupport(r.key) as { surfaces: string }).surfaces}.`
+                                        : (r.note ?? variantInfo?.description ?? r.description)}
+                                  </p>
+                                  {r.kind === 'feature' && status !== 'absent' && optionsOf(r.key).some(o => !HIDDEN_OPTIONS.has(`${r.key}.${o.key}`)) && (
                                     <div className='mt-2 flex flex-col gap-2 border-l pl-3' data-options={r.key}>
-                                      {optionsOf(r.key).map(o => (
+                                      {optionsOf(r.key).filter(o => !HIDDEN_OPTIONS.has(`${r.key}.${o.key}`)).map(o => (
                                         <label
                                           key={o.key}
                                           data-option={`${r.key}.${o.key}`}
@@ -493,13 +501,16 @@ const Entitlements = () => {
                                   )}
                                 </div>
                                 <div className='flex shrink-0 items-center gap-3'>
-                                  {r.kind !== 'flag' && variant && (
+                                  {r.kind === 'policy' && variant && (
                                     <VariantSelect feature={r.key} value={variant} label={r.label} onChange={v => setVariant(r, v)} />
                                   )}
+                                  {status === 'toggle' && <Badge variant='outline' className='font-normal'>{UI_LABEL}</Badge>}
+                                  {status === 'fixed' && <Badge variant='secondary' className='font-normal'>Always on in this UI</Badge>}
+                                  {status === 'absent' && <Badge variant='outline' className='text-muted-foreground font-normal'>Not in this UI</Badge>}
                                   {r.kind !== 'policy' && (
                                     <Switch
                                       checked={value(r)}
-                                      disabled={!canTurnOn}
+                                      disabled={!canTurnOn || !switchable(r)}
                                       onCheckedChange={v => set([r], v)}
                                       aria-label={r.kind === 'flag' ? `${r.label} entitled` : `${r.label} on`}
                                     />

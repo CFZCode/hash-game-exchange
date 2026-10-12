@@ -91,7 +91,8 @@ every feature's VARIANT and ON/OFF) is managed only here.** The site admin shows
 
   | key | label | look |
   |---|---|---|
-  | `carbon_gold` | Carbon Gold | hazard yellow on carbon black (this site's look) |
+  | `hash_game` | Hash Game (original) | the bc.game UI's own colours, unchanged. **This client's default** |
+  | `carbon_gold` | Carbon Gold | hazard yellow on carbon black |
   | `violet_night` | Violet Night | deep violet on dark |
   | `emerald_dark` | Emerald Dark | green on near-black |
   | `neon_navy` | Neon Navy | neon green on midnight navy |
@@ -101,6 +102,29 @@ every feature's VARIANT and ON/OFF) is managed only here.** The site admin shows
   field, a stored `_template` row (migration 059 rewrites it), `SITE_TEMPLATE`, the hub's sites.json.
   An unknown name is dropped (the rest of the document still applies). Missing or `null` = leave
   the site's template as it is.
+
+### 2.1 This client: the bc.game UI (hash-game-exchange)
+
+The frontend is the fixed bc.game UI with one layout per feature, so here:
+
+- **A template is a colour theme only.** `features/public` carries `{feature:'theme', variant:<key>}`;
+  `frontend/src/services/gates.js` puts it on `<html data-theme>` (`src/theme/applyTheme.js`, last
+  value cached in localStorage `hge.theme` and painted by a `<head>` script before first paint).
+  `src/theme/palettes.css` maps each SmartBet palette (casino-sportsbook `theme/brands.css`) onto the
+  bc tokens (`--color-layer1..6`, `brand`, `primary`, `secondary`…, dark mode only);
+  `src/theme/sprites.css` + `src/assets/themes/<key>/` are recoloured icon sprites
+  (`node tools/gen-theme-sprites.mjs`). `hash_game`, an unknown key and fixture mode change nothing.
+  Picking a template in the owner panel never changes a feature.
+- **Features** (`owner-panel/src/configs/siteUi.ts`, copied to `admin/src/configs/siteUi.ts`):
+  *toggle* (vip, promotions, bonus, affiliate, races, challenges, raffles, vault, swap,
+  notifications, kyc: ON/OFF only, variant pinned to the bc one); *fixed* (casino_lobby, banners:
+  always on); *absent* — "Not in this UI" (spin_wheel, gift_cards, tips, chat, club_membership,
+  push_notifications, analytics, blog: always off). The owner save pins the document to it
+  (`pinToUi` in `lib/entitlements/store.ts`).
+- **Cashier policies in the UI:** the only live deposit rail is Crypto (automatic) and the only
+  withdrawal the crypto request (manual), so `deposit_mode` manual/none hides Deposit and
+  `withdrawal_mode` automatic/none hides Withdraw (`GATES.deposit/withdraw.rail`). `reward_currency`
+  has no frontend surface; `region_restriction` is read by `services/region.js`.
 
 ## 3. Transport: the backend pulls
 

@@ -79,7 +79,7 @@ test('features', async (t) => {
         assert.equal(text.includes(banned), false, `"${banned}" is in the catalogue response`);
       }
       const { data } = JSON.parse(text);
-      assert.deepEqual(data.templates.map((x) => x.key).sort(), ['carbon_gold', 'emerald_dark', 'neon_navy', 'violet_night']);
+      assert.deepEqual(data.templates.map((x) => x.key).sort(), ['carbon_gold', 'emerald_dark', 'hash_game', 'neon_navy', 'violet_night']);
       const carbon = data.templates.find((x) => x.key === 'carbon_gold');
       assert.equal(carbon.label, 'carbon gold');
       assert.ok(carbon.description);

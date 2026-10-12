@@ -15,13 +15,54 @@ export type TemplateEntry = {
   description: string
   swatch: { accent: string; background: string }
 
+  /** What it does on THIS client's UI (the bc.game UI): its colours only, frontend/src/theme/palettes.css. */
+  colours: string
+
   /** feature key → variant key; 'none' = switched off by this template. */
   variants: Record<string, string>
 }
 
+/*
+ * ON THIS CLIENT a template is a COLOUR THEME. The frontend is the fixed bc.game UI: it maps the
+ * template's palette onto its own colour tokens (frontend/src/theme/palettes.css) and keeps its one
+ * layout per feature, so a template never switches a feature or a variant here
+ * (configs/siteUi.ts). `variants` stay for the backend's own catalogue (same keys there).
+ */
 export const TEMPLATE_CATALOGUE: TemplateEntry[] = [
   {
+    key: 'hash_game',
+    label: 'Hash Game (original)',
+    description: "The bc.game UI in its own colours: bc green on slate. This client's default.",
+    swatch: { accent: '#24EE89', background: '#232626' },
+    colours: 'Original bc.game colours, unchanged.',
+    // The one layout per feature the bc.game UI has (configs/siteUi.ts; same as the backend's hash_game).
+    variants: {
+      vip: 'ring_panel',
+      promotions: 'event_list',
+      spin_wheel: 'none',
+      gift_cards: 'none',
+      bonus: 'reward_hub',
+      affiliate: 'referral_hub',
+      races: 'daily_contest',
+      challenges: 'quest_hub',
+      raffles: 'ticket_raffle',
+      vault: 'flat_balance',
+      swap: 'swap_page',
+      tips: 'none',
+      chat: 'none',
+      notifications: 'notice_centre',
+      banners: 'artwork_slides',
+      blog: 'none',
+      casino_lobby: 'tabbed_themes',
+      club_membership: 'none',
+      kyc: 'document_cockpit',
+      push_notifications: 'none',
+      analytics: 'none'
+    }
+  },
+  {
     key: 'carbon_gold',
+    colours: 'Hazard yellow on carbon black.',
     label: 'Carbon Gold',
     description: 'Carbon Gold: races, spin wheel, gift cards, chat with presence, term-lock vault, category blog.',
     swatch: { accent: '#FCEE0A', background: '#0B0B0B' },
@@ -49,6 +90,7 @@ export const TEMPLATE_CATALOGUE: TemplateEntry[] = [
   },
   {
     key: 'violet_night',
+    colours: 'Soft violet on deep plum.',
     label: 'Violet Night',
     description:
       'Violet Night: VIP program page, promotions tile grid, weekly race, flat vault, token lottery, KYC status in settings.',
@@ -77,6 +119,7 @@ export const TEMPLATE_CATALOGUE: TemplateEntry[] = [
   },
   {
     key: 'emerald_dark',
+    colours: 'Emerald green on near-black green.',
     label: 'Emerald Dark',
     description:
       'Emerald Dark: 34-level VIP club, reward hub, quest hub, ticket raffle, drawer chat, full swap page, an external blog link.',
@@ -105,6 +148,7 @@ export const TEMPLATE_CATALOGUE: TemplateEntry[] = [
   },
   {
     key: 'neon_navy',
+    colours: 'Neon green on midnight navy.',
     label: 'Neon Navy',
     description:
       'Neon Navy: 75-level VIP ladder, spin wheel, gift cards, bonus centre, affiliate, wallet swap and category blog; no races, chat or vault.',
@@ -136,7 +180,7 @@ export const TEMPLATE_CATALOGUE: TemplateEntry[] = [
 export const TEMPLATE_KEYS = TEMPLATE_CATALOGUE.map(t => t.key)
 
 /** What a document without `template` runs today. Written on the next save, never on read. */
-export const DEFAULT_TEMPLATE = 'carbon_gold'
+export const DEFAULT_TEMPLATE = 'hash_game'
 
 /** Old template keys still found in stored documents, SITE_TEMPLATE values and hub sites.json. */
 const LEGACY_TEMPLATES: Record<string, string> = {
