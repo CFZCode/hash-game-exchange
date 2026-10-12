@@ -940,8 +940,10 @@ export default function WeeklyRaffle() {
                 </button>
 
                 <div className="max-sm:flex-1">
+                  {/* `?? ''`: live mode has no past draws (services/raffle.js), so `selected` is
+                      undefined and Select's default label would print the string "undefined". */}
                   <Select
-                    value={selected}
+                    value={selected ?? ''}
                     options={data.history}
                     onChange={pickDraw}
                     className="h-10 w-[10.238rem] gap-2 rounded-lg bg-input_bright bg-layer3 font-extrabold [&>div]:shrink-0"

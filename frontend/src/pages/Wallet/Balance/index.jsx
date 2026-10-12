@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSession } from '../../../context/session';
+import { useGates } from '../../../context/gates';
 import { amount2usd, printCurrency } from '../../../utils/currency';
 import SelectCurrencyContent from './CurrencyList';
 import LocalAmountItem from '../../../components/shared/LocalAmountItem';
@@ -105,6 +106,7 @@ function HideZeroBalance({ on, onToggle }) {
 function CurrencyList() {
   const { session, balances, updateBalance, setSetting } = useSession();
   const navigate = useNavigate();
+  const { on } = useGates();
   const [searching, setSearching] = React.useState(false);
 
   /* `X(Q(h, "sort"), U)` — `partition(orderBy(wallet, "sort"), c => c.display)`. The wallet holds
@@ -148,9 +150,12 @@ function CurrencyList() {
 
   /* `I` — the right-hand end of every row. The two buttons are `.button.button-m` with the row's
      own padding; both navigate, and neither destination is built. */
+  /* Gated like the header's Deposit button: an agent-tree player (or a closed cashier rail) gets
+     no Deposit / Withdraw on the rows, since both routes would only bounce to `/`. */
   const renderRight = (coin) => (
     <>
       <LocalAmountItem item={coin} settings={session.setting} />
+      {on('deposit') && (
       <button
         type="button"
         className="button button-m px-3 font-extrabold text-brand"
@@ -161,6 +166,8 @@ function CurrencyList() {
       >
         Deposit
       </button>
+      )}
+      {on('withdraw') && (
       <button
         type="button"
         className="button button-m px-3 font-extrabold text-brand"
@@ -171,6 +178,7 @@ function CurrencyList() {
       >
         Withdraw
       </button>
+      )}
     </>
   );
 

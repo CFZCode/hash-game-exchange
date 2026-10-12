@@ -62,7 +62,10 @@ export const getReferral = () =>
       cards: CARDS,
       program: PROGRAM,
       faq: { title: FAQ_TITLE, items: FAQ },
-      live: LIVE,
+      /* NO-BACKEND: the platform has no feed of other players' referral rewards. LIVE's rows are
+         bc.game's captured four plus invented filler and its total is bc.game's, so live mode
+         keeps the strip's labels and empties the figures, as the raffle ticker does. */
+      live: USE_FIXTURES ? LIVE : { ...LIVE, commissionUsd: '0', rewardUsd: '0', list: [] },
     },
   });
 

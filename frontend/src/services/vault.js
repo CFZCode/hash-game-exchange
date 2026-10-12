@@ -1,4 +1,4 @@
-import { request, USE_FIXTURES } from './client';
+import { emptyIfAgentBlocked, request, USE_FIXTURES } from './client';
 import ENDPOINTS, { PLATFORM } from './endpoints';
 import { convertCurrency } from '../utils/currency';
 
@@ -118,9 +118,12 @@ export function getVaultAmountList(balances = []) {
     });
   }
 
+  /* An agent-tree player's vault answers 403 `VAULT_NOT_FOR_AGENT_USERS`. The gate sends a direct
+     visit to `/`, but the pane mounts for a moment first; read that refusal as an empty vault so it
+     is not an uncaught rejection. */
   return Promise.all([
-    request(PLATFORM.user.vault.data, { live: true }),
-    request(PLATFORM.user.vault.lockOptions, { live: true }),
+    Promise.resolve(request(PLATFORM.user.vault.data, { live: true })).catch(emptyIfAgentBlocked(null)),
+    Promise.resolve(request(PLATFORM.user.vault.lockOptions, { live: true })).catch(emptyIfAgentBlocked([])),
     /* SmartBet DOES accrue now (a daily job writes `VaultInterestHistory`, one row per deposit per
        calendar day), so the two return columns are real: Total Return is every accrual row in the
        coin, Last Day Return the ones written in the last 24 hours. 200 is the validator's max. */

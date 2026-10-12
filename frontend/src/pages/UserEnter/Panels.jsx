@@ -5,6 +5,7 @@ import { useGates } from '../../context/gates';
 import { amount2usd, getAlias, printCurrency } from '../../utils/currency';
 import { VIP_LEVELS, vipTier, vipTypeNum } from '../../data/vipConfig';
 import { getInvitationCode } from '../../services/referral';
+import { getVipStanding } from '../../services/vip';
 import useResource from '../../hooks/useResource';
 import SOCIALS from '../../components/modals/RegionBlock/icons';
 import DisturbSetting from '../../layouts/MainLayout/Header/AfterLogin/DisturbSetting';
@@ -182,20 +183,36 @@ function VipCard() {
   /* `d()` verbatim, including the fact that it is NOT clamped: the original divides straight
      through and only substitutes 100 at the top of the ladder. */
   const span = session.levelEndXP - session.levelStartXP;
-  const percent = atMax ? 100 : ((session.currXP - session.levelStartXP) / span) * 100;
-  const width = `${percent.toFixed(2)}%`;
+  let percent = atMax ? 100 : ((session.currXP - session.levelStartXP) / span) * 100;
 
   /* The next tier's NAME comes from the ladder rather than from the account: the card looks up
      the row whose `minXp` equals this account's `levelEndXP`. See pages/Bonus/LevelCard.jsx —
      a mismatch there prints the original's own `--`, and the account fixture was corrected onto
      a real band because of it. */
   const nextRow = VIP_LEVELS.find((row) => row.minXp === session.levelEndXP);
+  let fullName = tier.fullName;
+  let showNext = !atMax;
+  let toNextXp = session.levelEndXP - session.currXP;
+  let nextName = nextRow ? vipTier(nextRow.level).fullName : '--';
+
+  /* LIVE: the platform's own ladder, as on the /bonus level card (pages/Bonus/LevelCard.jsx) —
+     looking the level up in the captured ladder printed bc.game's tier names. Null in fixture
+     mode, so the values above are what renders there. */
+  const { data: standing } = useResource(getVipStanding);
+  if (standing) {
+    fullName = standing.name;
+    percent = standing.percent;
+    showNext = standing.toNext > 0 && Boolean(standing.nextName);
+    toNextXp = Math.ceil(standing.toNext);
+    nextName = standing.nextName;
+  }
+  const width = `${percent.toFixed(2)}%`;
 
   return (
     <div className="relative z-[11] px-4">
       <div className={`relative rounded-xl bg-layer4 p-3 user-vip-${num}-bg`}>
         <div className="flex h-5 items-center">
-          <span className="mr-2 text-base font-extrabold uppercase">{tier.fullName}</span>
+          <span className="mr-2 text-base font-extrabold uppercase">{fullName}</span>
         </div>
 
         {/* THE XP LINE IS ON THE PROGRESS ROW, NOT UNDER THE TIER NAME. `t(u, <Show .../>, null)`
@@ -222,12 +239,12 @@ function VipCard() {
             </div>
           </div>
 
-          {!atMax && (
+          {showNext && (
             <div className="ml-2 flex h-5 flex-none items-center">
-              <span>{compactXp(session.levelEndXP - session.currXP)} XP</span>
+              <span>{compactXp(toNextXp)} XP</span>
               <span className="mx-1">to</span>
               <span className="uppercase text-secondary">
-                {nextRow ? vipTier(nextRow.level).fullName : '--'}
+                {nextName}
               </span>
             </div>
           )}
