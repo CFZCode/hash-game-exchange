@@ -179,15 +179,25 @@ async function descendantIds(models, staffId, { logger } = {}) {
  * A back-office role now reads the WHOLE tree, root included. Everyone else
  * gets what they got before. Use this for "which players may I see"; keep
  * `descendantIds` for "whose subtree is this" and for authority over staff.
+ *
+ * An EXECUTIVE staff row acts with its parent's authority (`resolveStaff`,
+ * `effectiveStaffLevel`), so it sees what its parent sees: an executive under
+ * an Admin reads the whole site, one under an agent reads that agent's players.
+ * Its own grants stay its own (read-only by default). Walking down from the
+ * executive's own row found nobody, so the role saw an empty Players screen.
  */
 
-async function visibleStaffIds(models, staffId, { logger } = {}) {
+async function visibleStaffIds(models, staffId, { logger, hops = 0 } = {}) {
   const own = await descendantIds(models, staffId, { logger });
   if (!own.length) return own;
 
-  const me = await models.Staff.findByPk(Number(staffId), { attributes: ['id', 'role_id'], raw: true });
+  const me = await models.Staff.findByPk(Number(staffId), { attributes: ['id', 'role_id', 'parent_id'], raw: true });
   const role = me?.role_id ? await models.Roles.findByPk(me.role_id, { attributes: ['level'], raw: true }) : null;
   const level = Number(role?.level);
+  if (level === STAFF_LEVELS.EXECUTIVE && me?.parent_id && hops < MAX_DEPTH) {
+    const parents = await visibleStaffIds(models, me.parent_id, { logger, hops: hops + 1 });
+    return [...new Set([...own, ...parents.map(Number)])];
+  }
   if (!Number.isFinite(level) || level > STAFF_LEVELS.SUB_ADMIN) return own;
 
   const roots = await models.Staff.findAll({ where: { parent_id: null }, attributes: ['id'], raw: true });
