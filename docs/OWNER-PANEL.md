@@ -337,3 +337,52 @@ player routers, `assertCurrencySupportedFor` in sockets): deposits (crypto, fiat
 orders), withdrawals (crypto, fiat, bank details), P2P, third-party and in-house games (the in-house
 engine settles on `credits` columns), sports. Agent-tree adjusts stay INR (`FLOAT_CURRENCY_ONLY`).
 The player wallet hides custom coins on the Deposit / Withdraw tabs.
+
+## 8. Branding (site name, metadata, logo)
+
+Owner screen `/branding`. Saved in the document as `branding` through the usual review → save
+→ audit (`kind: 'branding'`, one line per field; images by file name) → nudge. Absent = not
+branded: the site keeps the UI's own title and logo. Rules: `owner-panel/src/lib/entitlements/branding.ts`
+(tests: `scripts/branding.test.mjs`), mirrored by `backend/services/admin/src/modules/branding/branding.rules.js`.
+
+```json
+"branding": {
+  "siteName": "parker567", "title": "Parker567 — Casino & Sports", "titleTemplate": "%s · Parker567",
+  "description": "…", "keywords": ["…"], "ogTitle": "", "ogDescription": "", "themeColor": "",
+  "logo": { "file": "<sha256>.png", "type": "image/png", "bytes": 7959, "width": 576, "height": 128 },
+  "mark": { "file": "<sha256>.png", "type": "image/png", "bytes": 4786, "width": 256, "height": 256 },
+  "ogImage": null
+}
+```
+
+- Text: siteName ≤ 40 (required once anything is set), title ≤ 70, titleTemplate ≤ 80 with `%s`
+  exactly once, description ≤ 300, ogTitle ≤ 90, ogDescription ≤ 300, ≤ 20 keywords of ≤ 40; no
+  `<`, `>` or control characters. themeColor `#RRGGBB` or empty. A bad field on save → `422`.
+- **Uploads** `POST /api/owner/branding/upload?slot=logo|mark|ogImage` (session, multipart `file`):
+  PNG / WebP by magic bytes (never the name or declared type); JPEG / GIF refused; SVG only when
+  inert — XML declaration, comments and `<metadata>` are stripped, and anything with script,
+  `on*=` attributes, `javascript:`, `<foreignObject>`/embeds, DOCTYPE/ENTITY, CDATA, `@import` or
+  an `href`/`url()` other than `#id` or an inline `data:image` is **refused** (not rewritten).
+  Logo ≤ 256 KB and wider than tall (1.5:1 or more; 4.5:1 fills the original's 288x64 box), mark
+  ≤ 256 KB and square (0.8–1.25), OG image ≤ 1 MB, every side ≤ 4096. Stored as
+  `owner-panel/data/branding/<sha256>.<ext>` (never overwritten or deleted). A save may only name
+  files uploaded here (`422 BRANDING_FILE_MISSING`).
+- **Transport:** the signed document carries the hashes. On a new version (and at boot)
+  admin-service fetches each image it lacks from `GET <OWNER_PANEL_URL>/api/branding/asset/<file>`
+  (`x-owner-key`, same https-unless-this-host rule) and keeps it in `backend/data/branding/` only
+  when the bytes hash to the name and pass the same image checks (`branding.store.js`).
+- **Backend reads:** `GET /api/v1/admin/branding/public` (anyone, no query string; an image URL is
+  listed only once the file is here) → `{ version, branded, siteName, title, titleTemplate,
+  description, keywords, ogTitle, ogDescription, themeColor, logoUrl, markUrl, ogImageUrl }`;
+  `GET /api/v1/admin/branding/asset/<sha256>.<png|webp|svg>` (strict name, `immutable` one-year
+  cache, `nosniff`, `CSP sandbox`); `GET /api/v1/admin/branding` (staff, `config:read`) = the same
+  + `managedBy: 'owner'`. No write route. Site admin: Site config → Branding, read-only
+  ("Managed by the platform").
+- **Frontend (live mode only; fixture mode unchanged, the pixel reference):** `app/layout.tsx`
+  server-renders title (+ template), description, keywords, Open Graph, theme colour, the favicon
+  and the loader image (`#start-up`) from the public read; `services/siteBranding.js` reads it at
+  runtime (build-time `NEXT_PUBLIC_SITE_*` as the fallback), caches it in localStorage
+  `hge.branding` (painted by a `<head>` boot script before first paint), and swaps the logo in the
+  header (desktop and mobile), footer, region pop-up, sports bet slip and the house provider's
+  logo (`BC.GAME`), and the square mark in the signed-in mobile header — each in the original's
+  box. Logo sources: `branding/` at the repo root (`build-logo.py`, `render-png.mjs`).

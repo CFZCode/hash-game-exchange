@@ -338,6 +338,7 @@ export const navItems: NavItem[] = [
         permission: 'config:read',
         childItems: [
           { label: 'Features', href: '/site-config/features' },
+          { label: 'Branding', href: '/site-config/branding' },
           { label: 'Feature flags', href: '/site-config/flags' },
           { label: 'Limits and policy', href: '/site-config/limits' },
           { label: 'Affiliate rates', href: '/site-config/affiliate', feature: 'affiliate', promotions: true },

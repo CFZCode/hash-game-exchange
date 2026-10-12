@@ -6,6 +6,7 @@ import { nudgeBackend } from '@/lib/entitlements/nudge'
 import { readForEdit, saveEntitlements } from '@/lib/entitlements/store'
 import type { CoinDefinition } from '@/lib/entitlements/types'
 import type { RegionSetting } from '@/lib/entitlements/region'
+import type { Branding } from '@/lib/entitlements/branding'
 import { handler, HttpError, ok } from '@/lib/owner/guard'
 
 export const dynamic = 'force-dynamic'
@@ -69,6 +70,7 @@ export const PUT = handler(async (req: NextRequest) => {
     coins?: unknown
     options?: unknown
     region?: unknown
+    branding?: unknown
   } | null
 
   if (!body || !Number.isInteger(body.version)) throw new HttpError(400, 'VALIDATION_ERROR', 'version is required')
@@ -92,7 +94,10 @@ export const PUT = handler(async (req: NextRequest) => {
       options: body.options === undefined ? undefined : optionMap(body.options),
 
       // Region restriction's list type + countries; validated in the store (bad code → 422).
-      region: body.region === undefined ? undefined : (body.region as RegionSetting)
+      region: body.region === undefined ? undefined : (body.region as RegionSetting),
+
+      // Site name, metadata and logo files; validated strictly in the store (bad field → 422).
+      branding: body.branding === undefined ? undefined : (body.branding as Partial<Branding>)
     },
     serverConfig.ownerUsername
   )

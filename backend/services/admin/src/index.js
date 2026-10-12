@@ -8,6 +8,7 @@ const { buildApp } = require('./app');
 const { attachSockets } = require('./sockets');
 const { FeaturesService } = require('./modules/features/features.service');
 const { startPushScheduler } = require('./modules/push/push.scheduler');
+const { brandingStore } = require('./modules/branding/branding.store');
 
 /**
  * A fresh database becomes THIS site.
@@ -31,6 +32,8 @@ async function bootstrapSite(container) {
   }
   // The owner's document (variants + on/off; an older one: its template).
   await features.applyOwner(container.entitlementsPoller.current());
+  // The owner's branding images, fetched by content hash (a failed fetch is retried here).
+  brandingStore(container).sync(container.entitlementsPoller.current().branding);
 }
 
 async function main() {
@@ -43,7 +46,11 @@ async function main() {
    * public flags and features down the player sockets — the same `siteConfigUpdated` / `featuresUpdated` an operator's save sends.
    */
   container.entitlementsPoller.start({
-    onChange: (current) => new FeaturesService(container).onEntitlementsChange(current),
+    onChange: async (current) => {
+      await new FeaturesService(container).onEntitlementsChange(current);
+      // A new version may name new branding images: fetch them (by hash) before players ask.
+      await brandingStore(container).sync(current.branding);
+    },
   });
 
   await bootstrapSite(container);

@@ -9,6 +9,8 @@ import { serverConfig } from '@/configs/site'
 import { pinToUi } from '@/configs/siteUi'
 import { DEFAULT_TEMPLATE, resolveTemplateKey, templateByKey, TEMPLATE_KEYS } from '@/configs/templateCatalogue'
 import { HttpError } from '@/lib/owner/guard'
+import { brandingProblem, BRANDING_SLOTS, cleanBranding, type Branding } from './branding'
+import { assetExists } from './brandingAssets'
 import { cleanCoin, coinProblem, diffCoins, droppedCoins } from './coins'
 import { cleanRegion, regionProblem, type RegionSetting } from './region'
 import { diffDocs, type AuditEntry, type Change, type CoinDefinition, type EditableDoc, type EntitlementsDoc, type VariantsSeed } from './types'
@@ -143,7 +145,10 @@ export async function readEntitlements(): Promise<EntitlementsDoc> {
     ...(stored.options !== undefined ? { options: resolveOptions(stored.options) } : {}),
 
     // Region restriction's list type + countries; absent = an empty blocklist (nobody restricted).
-    ...(stored.region !== undefined ? { region: cleanRegion(stored.region) } : {})
+    ...(stored.region !== undefined ? { region: cleanRegion(stored.region) } : {}),
+
+    // Site name, metadata and logo files (./branding); absent = not branded, the site keeps its own.
+    ...(stored.branding !== undefined ? { branding: cleanBranding(stored.branding) } : {})
   }
 }
 
@@ -192,8 +197,9 @@ export async function readForEdit(): Promise<EditableDoc> {
 
   const options = resolveOptions(doc.options)
   const region = cleanRegion(doc.region)
+  const branding = cleanBranding(doc.branding)
 
-  if (FEATURE_KEYS.every(key => key in stored)) return { ...doc, variants: { ...stored }, options, region, seededFrom: null }
+  if (FEATURE_KEYS.every(key => key in stored)) return { ...doc, variants: { ...stored }, options, region, branding, seededFrom: null }
 
   const live = await liveVariants()
   const template = templateByKey(doc.template)
@@ -217,7 +223,7 @@ export async function readForEdit(): Promise<EditableDoc> {
     }
   }
 
-  return { ...doc, features: normalise(features, variants), variants, options, region, seededFrom }
+  return { ...doc, features: normalise(features, variants), variants, options, region, branding, seededFrom }
 }
 
 // One save at a time inside this process; the version check guards against a stale screen.
@@ -233,6 +239,7 @@ export function saveEntitlements(
     coins?: CoinDefinition[]
     options?: Record<string, Record<string, boolean>>
     region?: RegionSetting
+    branding?: Partial<Branding>
   },
   user: string
 ) {
@@ -281,6 +288,23 @@ export function saveEntitlements(
 
     const region = input.region !== undefined ? cleanRegion(input.region) : current.region
 
+    // Branding: strict (unknown field, bad text, bad colour → 422), and every image it names
+    // must be one uploaded here — the document is what vouches for the bytes the site fetches.
+    let branding = current.branding
+
+    if (input.branding !== undefined) {
+      const problem = brandingProblem(input.branding)
+
+      if (problem) throw new HttpError(422, 'VALIDATION_ERROR', problem)
+      branding = cleanBranding({ ...current.branding, ...input.branding })
+
+      for (const slot of BRANDING_SLOTS) {
+        const asset = branding[slot]
+
+        if (asset && !(await assetExists(asset.file))) throw new HttpError(422, 'BRANDING_FILE_MISSING', `${slot}: ${asset.file} was not uploaded here`)
+      }
+    }
+
     // This client's UI (configs/siteUi.ts): toggles keep the owner's ON/OFF on the one bc.game
     // variant, fixed features stay on, features the UI does not have stay off.
     const pinned = pinToUi(complete({ ...current.features, ...input.features }, FEATURE_KEYS), variants)
@@ -291,7 +315,8 @@ export function saveEntitlements(
       flags: complete({ ...current.flags, ...input.flags }, FLAG_KEYS),
       variants: pinned.variants,
       options,
-      region
+      region,
+      branding
     }
 
     const changes = diffDocs(current, next)

@@ -17,6 +17,7 @@ export const navItems: NavItem[] = [
     items: [
       { icon: 'ShieldCheck', label: 'Features & plan', href: '/entitlements' },
       { icon: 'Coins', label: 'Coins', href: '/coins' },
+      { icon: 'Palette', label: 'Branding', href: '/branding' },
       { icon: 'History', label: 'Audit log', href: '/audit' }
     ]
   }

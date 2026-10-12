@@ -6,6 +6,11 @@ import { templateLabel } from '@/configs/templateCatalogue'
 import { Badge } from '@/components/ui/badge'
 import type { Change, CoinChange, CoinDefinition, ToggleChange } from '@/lib/entitlements/types'
 import { regionLabel } from '@/lib/entitlements/region'
+import { BRANDING_LABELS } from '@/lib/entitlements/branding'
+
+/** An image change shows its content hash, shortened; text shows quoted. */
+const brandingValue = (key: string, v: string | null) =>
+  v === null ? '—' : ['logo', 'mark', 'ogImage'].includes(key) ? `image ${v.slice(0, 10)}…${v.slice(v.indexOf('.'))}` : `“${v.length > 60 ? `${v.slice(0, 57)}…` : v}”`
 
 const coinFacts = (c: CoinDefinition) =>
   `${c.kind}, ${c.decimals ?? 8} dp, $${c.usdRate ?? '?'}${c.networks?.length ? `, ${c.networks.map(n => n.key).join('/')}` : ''}${c.enabled === false ? ', off' : ''}`
@@ -79,6 +84,14 @@ const ChangeList = ({ changes, labelOf }: { changes: Change[]; labelOf: (c: Togg
           <span className='font-medium'>Region restriction countries</span>
           <span className='text-muted-foreground font-mono text-xs'>
             {regionLabel(c.from)} → {regionLabel(c.to)}
+          </span>
+        </li>
+      ) : c.kind === 'branding' ? (
+        <li key={`branding:${c.key}`} className='flex flex-wrap items-center gap-2 text-sm'>
+          <span className='text-muted-foreground w-14 text-xs uppercase'>brand</span>
+          <span className='font-medium'>{BRANDING_LABELS[c.key]}</span>
+          <span className='text-muted-foreground font-mono text-xs break-all'>
+            {brandingValue(c.key, c.from)} → {brandingValue(c.key, c.to)}
           </span>
         </li>
       ) : c.kind === 'coins' ? (

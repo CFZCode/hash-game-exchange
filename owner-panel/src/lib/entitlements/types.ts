@@ -1,5 +1,6 @@
 import { resolveOptions } from '@/configs/entitlementCatalogue'
 import { cleanRegion, type RegionSetting } from './region'
+import { diffBranding, type Branding, type BrandingChange } from './branding'
 
 /** Shapes shared by the routes and the screens — contract §2. */
 export type EntitlementsDoc = {
@@ -40,6 +41,12 @@ export type EntitlementsDoc = {
    * Absent in an older document = an empty blocklist.
    */
   region?: RegionSetting
+
+  /**
+   * Site name, page metadata and logo files (./branding, contract §8). Absent in an older
+   * document = not branded: the site keeps its own name and the UI's own logo.
+   */
+  branding?: Branding
 }
 
 /**
@@ -79,7 +86,7 @@ export type SiteCoin = {
 export type VariantsSeed = 'backend' | 'template' | null
 
 /** What the owner screen edits: the document with a full `variants` map. */
-export type EditableDoc = EntitlementsDoc & { variants: Record<string, string>; options: Record<string, Record<string, boolean>>; region: RegionSetting; seededFrom: VariantsSeed }
+export type EditableDoc = EntitlementsDoc & { variants: Record<string, string>; options: Record<string, Record<string, boolean>>; region: RegionSetting; branding: Branding; seededFrom: VariantsSeed }
 
 export type ToggleChange = { kind: 'feature' | 'flag'; key: string; from: boolean; to: boolean }
 export type TemplateChange = { kind: 'template'; key: 'template'; from: string | null; to: string }
@@ -96,7 +103,8 @@ export type CoinChange = { kind: 'coin'; key: string; action: 'added' | 'edited'
 
 /** Region restriction's list type or countries changed (audit kind `region`). */
 export type RegionChange = { kind: 'region'; key: 'region'; from: RegionSetting; to: RegionSetting }
-export type Change = ToggleChange | TemplateChange | VariantChange | CoinsChange | CoinChange | OptionChange | RegionChange
+export type { BrandingChange }
+export type Change = ToggleChange | TemplateChange | VariantChange | CoinsChange | CoinChange | OptionChange | RegionChange | BrandingChange
 
 export type AuditEntry = { at: string; user: string; version: number; changes: Change[]; seededFrom?: Exclude<VariantsSeed, null> }
 
@@ -113,6 +121,7 @@ type Diffable = Pick<EntitlementsDoc, 'features' | 'flags'> & {
   variants?: Record<string, string>
   options?: Record<string, Record<string, boolean>>
   region?: RegionSetting
+  branding?: Branding
 }
 
 /** The template (if it moved), every variant that moved, then every key the two maps disagree on, in catalogue order. */
@@ -160,6 +169,9 @@ export function diffDocs(before: Diffable, after: Diffable) {
 
     if (JSON.stringify(from) !== JSON.stringify(to)) changes.push({ kind: 'region', key: 'region', from, to })
   }
+
+  // Branding: one change per field; an older document (no branding) equals an empty one.
+  if (after.branding) changes.push(...diffBranding(before.branding, after.branding))
 
   return changes
 }
