@@ -236,6 +236,12 @@ const Features = () => {
                         <span className='text-muted-foreground block max-w-md truncate text-xs'>
                           {spec.variants.find(v => v.key === cur.variant)?.description}
                         </span>
+                        {cur.region && cur.variant !== 'none' && (
+                          <span className='text-muted-foreground block text-xs' data-region>
+                            {cur.region.listType === 'allowlist' ? 'Allowed only: ' : 'Restricted: '}
+                            {cur.region.countries.length ? cur.region.countries.join(', ') : 'no countries'}
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <span className='flex items-center gap-2'>

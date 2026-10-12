@@ -1,4 +1,5 @@
 import { resolveOptions } from '@/configs/entitlementCatalogue'
+import { cleanRegion, type RegionSetting } from './region'
 
 /** Shapes shared by the routes and the screens — contract §2. */
 export type EntitlementsDoc = {
@@ -33,6 +34,12 @@ export type EntitlementsDoc = {
    * spin wheel grants a spin. Absent in an older document = every default.
    */
   options?: Record<string, Record<string, boolean>>
+
+  /**
+   * Region restriction's list type and countries (./region). The mode is `variants.region_restriction`.
+   * Absent in an older document = an empty blocklist.
+   */
+  region?: RegionSetting
 }
 
 /**
@@ -72,7 +79,7 @@ export type SiteCoin = {
 export type VariantsSeed = 'backend' | 'template' | null
 
 /** What the owner screen edits: the document with a full `variants` map. */
-export type EditableDoc = EntitlementsDoc & { variants: Record<string, string>; options: Record<string, Record<string, boolean>>; seededFrom: VariantsSeed }
+export type EditableDoc = EntitlementsDoc & { variants: Record<string, string>; options: Record<string, Record<string, boolean>>; region: RegionSetting; seededFrom: VariantsSeed }
 
 export type ToggleChange = { kind: 'feature' | 'flag'; key: string; from: boolean; to: boolean }
 export type TemplateChange = { kind: 'template'; key: 'template'; from: string | null; to: string }
@@ -86,7 +93,10 @@ export type CoinsChange = { kind: 'coins'; key: 'coins'; from: string[]; to: str
 
 /** One custom coin added, edited, switched on or switched off (audit kind `coin`). */
 export type CoinChange = { kind: 'coin'; key: string; action: 'added' | 'edited' | 'enabled' | 'disabled'; from: CoinDefinition | null; to: CoinDefinition }
-export type Change = ToggleChange | TemplateChange | VariantChange | CoinsChange | CoinChange | OptionChange
+
+/** Region restriction's list type or countries changed (audit kind `region`). */
+export type RegionChange = { kind: 'region'; key: 'region'; from: RegionSetting; to: RegionSetting }
+export type Change = ToggleChange | TemplateChange | VariantChange | CoinsChange | CoinChange | OptionChange | RegionChange
 
 export type AuditEntry = { at: string; user: string; version: number; changes: Change[]; seededFrom?: Exclude<VariantsSeed, null> }
 
@@ -102,6 +112,7 @@ type Diffable = Pick<EntitlementsDoc, 'features' | 'flags'> & {
   template?: string | null
   variants?: Record<string, string>
   options?: Record<string, Record<string, boolean>>
+  region?: RegionSetting
 }
 
 /** The template (if it moved), every variant that moved, then every key the two maps disagree on, in catalogue order. */
@@ -140,6 +151,14 @@ export function diffDocs(before: Diffable, after: Diffable) {
 
       if (from !== to) changes.push({ kind: 'option', key: `${feature}.${option}`, from: !!from, to })
     }
+  }
+
+  // Region: compared cleaned, so an older document (no region) equals an empty blocklist.
+  if (after.region) {
+    const from = cleanRegion(before.region)
+    const to = cleanRegion(after.region)
+
+    if (JSON.stringify(from) !== JSON.stringify(to)) changes.push({ kind: 'region', key: 'region', from, to })
   }
 
   return changes

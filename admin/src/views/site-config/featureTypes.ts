@@ -30,6 +30,9 @@ export type SiteFeature = {
   category: string
   kind: 'feature' | 'policy'
 
+  /** Region restriction only: the platform's list type and countries (read-only here). */
+  region?: { listType: 'blocklist' | 'allowlist'; countries: string[] }
+
   /** Nothing stored — reading the permissive default. */
   isDefault: boolean
   flag: string | null

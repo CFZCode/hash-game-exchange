@@ -1,6 +1,6 @@
 'use strict';
 
-const { featureCatalogue, entitlements, featureOptions } = require('@ibitplay/common');
+const { featureCatalogue, entitlements, featureOptions, regionPolicy } = require('@ibitplay/common');
 const { createSecretBox } = require('@ibitplay/auth');
 
 const errors = require('./features.errors');
@@ -145,6 +145,8 @@ class FeaturesService {
           secretsSet: Object.fromEntries((spec?.secretFields ?? []).map((s) => [s.key, Boolean(row?.secrets?.[s.key])])),
           updatedBy: row?.updated_by ?? null,
           updatedAt: row?.updated_at ?? null,
+          // Region restriction: the owner's list type and countries, shown read-only beside the mode.
+          ...(f.key === regionPolicy.FEATURE_KEY ? { region: regionPolicy.cleanRegion(plan.region) } : {}),
         };
       }),
     };

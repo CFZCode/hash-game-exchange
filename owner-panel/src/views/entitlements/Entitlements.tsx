@@ -30,6 +30,7 @@ import { TEMPLATE_CATALOGUE, type TemplateEntry } from '@/configs/templateCatalo
 import { useApi, useApiMutation } from '@/hooks/use-api'
 import { api, ApiError } from '@/lib/api/client'
 import { buildDraft, isOwnerPick, type Draft } from '@/lib/entitlements/draft'
+import { COUNTRY_CODES, LIST_TYPES, parseCountries, REGION_FEATURE, regionProblem, type RegionListType, type RegionSetting } from '@/lib/entitlements/region'
 import { diffDocs, type Change, type EditableDoc, type EntitlementsDoc, type ToggleChange } from '@/lib/entitlements/types'
 import { cn } from '@/lib/utils'
 import ChangeList from './ChangeList'
@@ -122,6 +123,71 @@ const VariantSelect = ({ feature, value, onChange, label }: { feature: string; v
   )
 }
 
+/**
+ * Region restriction's list type and countries, under its mode dropdown. Codes are typed as text
+ * ("US, GB"); an unknown code is named here and refused by the save (422).
+ */
+const RegionEditor = ({ value, onChange, changed }: { value: RegionSetting; onChange: (r: RegionSetting) => void; changed: boolean }) => {
+  const [text, setText] = useState<string | null>(null)
+  const shown = text ?? value.countries.join(', ')
+  const parsed = parseCountries(shown)
+  const problem = regionProblem({ listType: value.listType, countries: parsed })
+
+  return (
+    <div className={cn('mt-2 flex flex-col gap-2 border-l pl-3', changed && 'bg-primary/5 -mx-1 rounded px-1')} data-region-editor>
+      <div className='flex flex-wrap items-center gap-2'>
+        <span className='text-xs font-medium'>List type</span>
+        <Select
+          items={LIST_TYPES.map(l => ({ value: l.key, label: l.label }))}
+          value={value.listType}
+          autoComplete='off'
+          onValueChange={(v, details) => v && isOwnerPick(details.reason) && onChange({ ...value, listType: v as RegionListType })}
+        >
+          <SelectTrigger size='sm' className='w-40' aria-label='Region list type'>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {LIST_TYPES.map(l => (
+              <SelectItem key={l.key} value={l.key}>
+                {l.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <span className='text-muted-foreground text-xs'>{LIST_TYPES.find(l => l.key === value.listType)?.description}</span>
+      </div>
+      <label className='flex flex-col gap-1'>
+        <span className='text-xs font-medium'>Countries (ISO 3166-1 alpha-2, comma separated)</span>
+        <Input
+          value={shown}
+          placeholder='e.g. US, GB'
+          aria-label='Region countries'
+          aria-invalid={!!problem}
+          onChange={e => {
+            setText(e.target.value)
+            const countries = parseCountries(e.target.value)
+
+            if (countries.every(c => COUNTRY_CODES.includes(c))) onChange({ ...value, countries: [...countries].sort() })
+          }}
+          onBlur={() => !problem && setText(null)}
+        />
+      </label>
+      {problem ? (
+        <p className='text-destructive text-xs' data-warning='region-countries'>
+          {problem}
+        </p>
+      ) : (
+        <p className='text-muted-foreground text-xs'>
+          {value.countries.length
+            ? `${value.listType === 'allowlist' ? 'Only' : 'Restricted:'} ${value.countries.join(', ')}${value.listType === 'allowlist' ? ' allowed.' : '.'}`
+            : 'No countries: nobody is restricted.'}{' '}
+          Unknown and private addresses are never restricted.
+        </p>
+      )}
+    </div>
+  )
+}
+
 const TemplateCard = ({ template, selected, saved, onSelect }: { template: TemplateEntry; selected: boolean; saved: boolean; onSelect: () => void }) => (
   <button
     type='button'
@@ -180,7 +246,8 @@ const Entitlements = () => {
         features: { ...prev?.features },
         flags: { ...prev?.flags },
         variants: { ...prev?.variants },
-        options: Object.fromEntries(Object.entries(prev?.options ?? {}).map(([f, v]) => [f, { ...v }]))
+        options: Object.fromEntries(Object.entries(prev?.options ?? {}).map(([f, v]) => [f, { ...v }])),
+        ...(prev?.region ? { region: { ...prev.region, countries: [...prev.region.countries] } } : {})
       }
 
       fn(next)
@@ -244,7 +311,8 @@ const Entitlements = () => {
         features: draft!.features,
         flags: draft!.flags,
         variants: draft!.variants,
-        options: draft!.options
+        options: draft!.options,
+        region: draft!.region
       }),
     invalidate: [['api']],
     success: r =>
@@ -410,6 +478,13 @@ const Entitlements = () => {
                                         </label>
                                       ))}
                                     </div>
+                                  )}
+                                  {r.key === REGION_FEATURE && (
+                                    <RegionEditor
+                                      value={draft.region ?? { listType: 'blocklist', countries: [] }}
+                                      changed={changed.has('region:region')}
+                                      onChange={region => edit(next => void (next.region = region))}
+                                    />
                                   )}
                                   {r.key === 'reward_currency' && variant && coinBlocked(variant) && (
                                     <p className='text-destructive mt-0.5 text-xs' data-warning='reward-currency-coin-off'>

@@ -333,7 +333,8 @@ test('features', async (t) => {
     const push = pub.find((f) => f.feature === 'push_notifications');
     assert.deepEqual(push, { feature: 'push_notifications', variant: 'onesignal', config: { appId: APP_ID } });
     assert.equal(JSON.stringify(pub).includes(API_KEY), false);
-    const off = (await service.list()).features.filter((f) => !f.enabled).map((f) => f.feature);
+    // Policies are always published (a closed one as `none`); this is about switched-off features.
+    const off = (await service.list()).features.filter((f) => !f.enabled && f.kind !== 'policy').map((f) => f.feature);
     assert.ok(off.length > 0);
     assert.equal(pub.some((f) => off.includes(f.feature)), false, 'switched-off features are not listed');
   });

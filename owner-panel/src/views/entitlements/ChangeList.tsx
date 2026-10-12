@@ -5,6 +5,7 @@ import { featureLabel, isPolicy, optionLabel, variantLabel } from '@/configs/ent
 import { templateLabel } from '@/configs/templateCatalogue'
 import { Badge } from '@/components/ui/badge'
 import type { Change, CoinChange, CoinDefinition, ToggleChange } from '@/lib/entitlements/types'
+import { regionLabel } from '@/lib/entitlements/region'
 
 const coinFacts = (c: CoinDefinition) =>
   `${c.kind}, ${c.decimals ?? 8} dp, $${c.usdRate ?? '?'}${c.networks?.length ? `, ${c.networks.map(n => n.key).join('/')}` : ''}${c.enabled === false ? ', off' : ''}`
@@ -71,6 +72,14 @@ const ChangeList = ({ changes, labelOf }: { changes: Change[]; labelOf: (c: Togg
           <StatusBadge value={c.from ? 'enabled' : 'disabled'} />
           <ArrowRightIcon className='text-muted-foreground size-3.5' />
           <StatusBadge value={c.to ? 'enabled' : 'disabled'} />
+        </li>
+      ) : c.kind === 'region' ? (
+        <li key='region' className='flex flex-wrap items-center gap-2 text-sm'>
+          <span className='text-muted-foreground w-14 text-xs uppercase'>policy</span>
+          <span className='font-medium'>Region restriction countries</span>
+          <span className='text-muted-foreground font-mono text-xs'>
+            {regionLabel(c.from)} → {regionLabel(c.to)}
+          </span>
         </li>
       ) : c.kind === 'coins' ? (
         <li key='coins' className='flex flex-wrap items-center gap-2 text-sm'>

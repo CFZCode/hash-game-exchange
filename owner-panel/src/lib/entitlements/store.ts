@@ -9,6 +9,7 @@ import { serverConfig } from '@/configs/site'
 import { DEFAULT_TEMPLATE, resolveTemplateKey, templateByKey, TEMPLATE_KEYS } from '@/configs/templateCatalogue'
 import { HttpError } from '@/lib/owner/guard'
 import { cleanCoin, coinProblem, diffCoins, droppedCoins } from './coins'
+import { cleanRegion, regionProblem, type RegionSetting } from './region'
 import { diffDocs, type AuditEntry, type Change, type CoinDefinition, type EditableDoc, type EntitlementsDoc, type VariantsSeed } from './types'
 
 /**
@@ -138,7 +139,10 @@ export async function readEntitlements(): Promise<EntitlementsDoc> {
     ...(stored.coins !== undefined ? { coins: knownCoins(stored.coins) } : {}),
 
     // Owner-only feature options; absent = every default (the backend fills them the same way).
-    ...(stored.options !== undefined ? { options: resolveOptions(stored.options) } : {})
+    ...(stored.options !== undefined ? { options: resolveOptions(stored.options) } : {}),
+
+    // Region restriction's list type + countries; absent = an empty blocklist (nobody restricted).
+    ...(stored.region !== undefined ? { region: cleanRegion(stored.region) } : {})
   }
 }
 
@@ -186,8 +190,9 @@ export async function readForEdit(): Promise<EditableDoc> {
   const stored = doc.variants ?? {}
 
   const options = resolveOptions(doc.options)
+  const region = cleanRegion(doc.region)
 
-  if (FEATURE_KEYS.every(key => key in stored)) return { ...doc, variants: { ...stored }, options, seededFrom: null }
+  if (FEATURE_KEYS.every(key => key in stored)) return { ...doc, variants: { ...stored }, options, region, seededFrom: null }
 
   const live = await liveVariants()
   const template = templateByKey(doc.template)
@@ -211,7 +216,7 @@ export async function readForEdit(): Promise<EditableDoc> {
     }
   }
 
-  return { ...doc, features: normalise(features, variants), variants, options, seededFrom }
+  return { ...doc, features: normalise(features, variants), variants, options, region, seededFrom }
 }
 
 // One save at a time inside this process; the version check guards against a stale screen.
@@ -226,6 +231,7 @@ export function saveEntitlements(
     variants?: Record<string, string>
     coins?: CoinDefinition[]
     options?: Record<string, Record<string, boolean>>
+    region?: RegionSetting
   },
   user: string
 ) {
@@ -265,12 +271,22 @@ export function saveEntitlements(
       Object.fromEntries(Object.keys(FEATURE_OPTIONS).map(f => [f, { ...current.options[f], ...input.options?.[f] }]))
     )
 
+    // Region restriction: list type + ISO codes, exact. A bad code is 422 (well-formed, not acceptable).
+    if (input.region !== undefined) {
+      const problem = regionProblem(input.region)
+
+      if (problem) throw new HttpError(422, 'VALIDATION_ERROR', problem)
+    }
+
+    const region = input.region !== undefined ? cleanRegion(input.region) : current.region
+
     const next = {
       template,
       features: normalise(complete({ ...current.features, ...input.features }, FEATURE_KEYS), variants),
       flags: complete({ ...current.flags, ...input.flags }, FLAG_KEYS),
       variants,
-      options
+      options,
+      region
     }
 
     const changes = diffDocs(current, next)

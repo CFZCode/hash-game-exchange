@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-const { featureCatalogue, featureOptions } = require('@ibitplay/common');
+const { featureCatalogue, featureOptions, regionPolicy } = require('@ibitplay/common');
 
 /**
  * The owner's entitlements, pulled from the owner panel.
@@ -164,6 +164,8 @@ function normalise(data) {
     coins: coinsOf(data.coins),
     // Owner-only feature options (featureOptions.js); unknown keys dropped, defaults applied by readers.
     options: featureOptions.cleanOptions(data.options),
+    // Region restriction's list type and countries (regionPolicy.js); the mode is the policy's variant.
+    region: regionPolicy.cleanRegion(data.region),
   };
 }
 
@@ -293,7 +295,7 @@ function createEntitlementsPoller({ config, logger, filePath, onChange: initialO
 
   /** `{ features, flags, template, variants, version, fetchedAt, source }` — never a secret. */
   function current() {
-    if (!doc) return { features: {}, flags: {}, template: null, variants: null, coins: [], options: {}, version: 0, fetchedAt: null, source: 'default' };
+    if (!doc) return { features: {}, flags: {}, template: null, variants: null, coins: [], options: {}, region: regionPolicy.cleanRegion(null), version: 0, fetchedAt: null, source: 'default' };
     return {
       features: { ...doc.features },
       flags: { ...doc.flags },
@@ -301,6 +303,7 @@ function createEntitlementsPoller({ config, logger, filePath, onChange: initialO
       variants: doc.variants ? { ...doc.variants } : null,
       coins: (doc.coins ?? []).map((c) => ({ ...c })),
       options: JSON.parse(JSON.stringify(doc.options ?? {})),
+      region: regionPolicy.cleanRegion(doc.region),
       version: doc.version,
       fetchedAt,
       source,

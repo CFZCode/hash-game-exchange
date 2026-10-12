@@ -63,6 +63,8 @@ const withdrawBlock = require('./withdrawBlock');
 const entitlements = require('./entitlements');
 /** Owner-only ON/OFF options of a feature (e.g. when the spin wheel grants a spin). */
 const featureOptions = require('./featureOptions');
+/** Region restriction: the owner's mode, list type and countries (regionPolicy.js). */
+const regionPolicy = require('./regionPolicy');
 const currencyRegistry = require('./currencyRegistry');
 /** What the operator set in the site admin, read by the services that act on it. */
 const { operatorSettings } = require('./operatorSettings');
@@ -113,6 +115,7 @@ module.exports = {
   withdrawBlock,
   entitlements,
   featureOptions,
+  regionPolicy,
   configureEntitlements: entitlements.configureEntitlements,
   currencyRegistry,
   configureCurrencyRegistry: currencyRegistry.configureCurrencyRegistry,

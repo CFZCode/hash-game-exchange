@@ -134,7 +134,7 @@ function register({ on, deps }) {
            */
           return { status: '2fa' };
         }
-        if (error.code?.startsWith('AUTH_')) return refuse(error);
+        if (error.code?.startsWith('AUTH_') || error.code === 'REGION_RESTRICTED') return refuse(error);
         throw error;
       }
     },
@@ -319,7 +319,7 @@ function register({ on, deps }) {
         // No password in the reply.
         return ok({ uid: String(created.id), name: created.name, error: false });
       } catch (error) {
-        if (error.code?.startsWith('AUTH_')) return { ...refuse(error), error: error.message };
+        if (error.code?.startsWith('AUTH_') || error.code === 'REGION_RESTRICTED') return { ...refuse(error), error: error.message };
         throw error;
       }
     },
@@ -388,7 +388,7 @@ function register({ on, deps }) {
         );
         return ok({ revokedSessions: result.revokedSessions });
       } catch (error) {
-        if (error.code?.startsWith('AUTH_')) return refuse(error);
+        if (error.code?.startsWith('AUTH_') || error.code === 'REGION_RESTRICTED') return refuse(error);
         throw error;
       }
     },

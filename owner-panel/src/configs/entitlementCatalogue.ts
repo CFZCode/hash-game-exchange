@@ -127,6 +127,22 @@ const CATALOGUE: FeatureEntry[] = [
     }))
   },
   {
+    // Region restriction: a policy (always on, owner-only) whose variant is the mode. The list type
+    // and countries are the document's `region` (src/lib/entitlements/region.ts).
+    key: 'region_restriction',
+    label: 'Region restriction',
+    category: 'business',
+    flag: null,
+    policy: true,
+    defaultVariant: 'none',
+    note: 'Which countries the site serves. Notice shows the region popup; Block also refuses sign-up and login (403 REGION_RESTRICTED). Staff login is never affected.',
+    variants: [
+      { key: 'none', label: 'Off', description: 'Players from every country may visit, sign up and log in. The default.' },
+      { key: 'notice', label: 'Notice only', description: 'Visitors from a restricted country see the region notice, which they can dismiss. Sign-up and login stay open.' },
+      { key: 'block', label: 'Block', description: 'Visitors from a restricted country see the region notice, and the backend refuses their sign-up and login (403 REGION_RESTRICTED). Staff login is not affected.' }
+    ]
+  },
+  {
     key: 'vip',
     label: 'VIP club',
     category: 'engagement',

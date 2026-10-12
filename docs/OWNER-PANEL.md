@@ -83,6 +83,9 @@ every feature's VARIANT and ON/OFF) is managed only here.** The site admin shows
   fills every variant it names (its `none` = off, anything else = on); rows stay adjustable before
   saving. Review and save lists variant and policy changes as "Gift cards: Activate-then-claim cards →
   Off" (`claim_cards → none`); audit change kinds are `template`, `variant`, `feature`, `flag`.
+- `region` (optional): `{ listType: 'blocklist'|'allowlist', countries: [ISO alpha-2] }`, the region
+  restriction's list; its mode is the `region_restriction` policy (`none` = Off, `notice`, `block`).
+  Missing = an empty blocklist. See `docs/region-restriction.md`.
 - `template` (optional): the site template, **the owner's choice alone**. One of the catalogue's
   template keys, named for a colour theme, never for another site:
 

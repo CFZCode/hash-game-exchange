@@ -5,6 +5,7 @@ import { coinProblem } from '@/lib/entitlements/coins'
 import { nudgeBackend } from '@/lib/entitlements/nudge'
 import { readForEdit, saveEntitlements } from '@/lib/entitlements/store'
 import type { CoinDefinition } from '@/lib/entitlements/types'
+import type { RegionSetting } from '@/lib/entitlements/region'
 import { handler, HttpError, ok } from '@/lib/owner/guard'
 
 export const dynamic = 'force-dynamic'
@@ -67,6 +68,7 @@ export const PUT = handler(async (req: NextRequest) => {
     variants?: unknown
     coins?: unknown
     options?: unknown
+    region?: unknown
   } | null
 
   if (!body || !Number.isInteger(body.version)) throw new HttpError(400, 'VALIDATION_ERROR', 'version is required')
@@ -87,7 +89,10 @@ export const PUT = handler(async (req: NextRequest) => {
       coins: body.coins === undefined ? undefined : coinList(body.coins),
 
       // Owner-only feature options (e.g. when the spin wheel grants a spin).
-      options: body.options === undefined ? undefined : optionMap(body.options)
+      options: body.options === undefined ? undefined : optionMap(body.options),
+
+      // Region restriction's list type + countries; validated in the store (bad code → 422).
+      region: body.region === undefined ? undefined : (body.region as RegionSetting)
     },
     serverConfig.ownerUsername
   )

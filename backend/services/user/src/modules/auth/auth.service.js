@@ -17,6 +17,7 @@ const {
 const errors = require('./auth.errors');
 const { sharedIpLocator } = require('./geo/ipLocation');
 const { sitePolicy } = require('@ibitplay/common');
+const { RegionService } = require('../region/region.service');
 /* Registration is where a referral becomes a team. Safe to require here —
    the affiliate module does not reach back into auth. */
 const { AffiliateService } = require('../affiliate/affiliate.service');
@@ -78,7 +79,7 @@ const redactEmail = (address) => {
 };
 
 class AuthService {
-  constructor({ models, db, config, logger, mailer, clients }) {
+  constructor({ models, db, config, logger, mailer, clients, lookupCountry }) {
     this.models = models;
     this.db = db;
     this.config = config;
@@ -92,6 +93,9 @@ class AuthService {
     // `users.two_fa` holds an encrypted secret now, so the login path needs the
     // same box the twofa module writes with.
     this.secrets = createSecretBox({ config, logger });
+    // The owner's region restriction: in `block` mode, login and sign-up from a restricted
+    // country answer 403 REGION_RESTRICTED (packages/common/src/regionPolicy.js).
+    this.region = new RegionService({ models, logger, lookupCountry });
   }
 
   /**
@@ -104,6 +108,8 @@ class AuthService {
   async login({ identifier, password, twoFactorCode, deviceLabel }, context = {}) {
     const { ip, userAgent } = context;
 
+    // Before anything about the account: a restricted region learns nothing about it.
+    await this.region.assertAllowed(ip);
     await this.#assertNotThrottled(identifier, ip);
 
     const user = await this.models.Users.findOne({
@@ -412,6 +418,7 @@ class AuthService {
     // write their own row and never reach this, so a B2B site's agents can
     // still open accounts while the public cannot.
     await sitePolicy.assertAllowed(this.models, 'business_model', 'public_signup', this.logger);
+    await this.region.assertAllowed(context.ip);
 
     const clash = await this.models.Users.findOne({
       where: { [Op.or]: [{ name: username }, ...(email ? [{ email }] : [])] },

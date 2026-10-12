@@ -694,7 +694,28 @@ const REWARD_CURRENCY_POLICY = {
   })),
 };
 
-const FEATURES = Object.freeze([...POLICIES, REWARD_CURRENCY_POLICY, ...GENERATED, TIPS, PUSH_NOTIFICATIONS, ANALYTICS]);
+/**
+ * Region restriction — which countries the site serves (packages/common/src/regionPolicy.js).
+ *
+ * A policy (always in force, the variant IS the mode, the owner alone sets it, staff see it
+ * read-only → `403 OWNER_MANAGED`). `none` is Off, the default: nobody is restricted. The
+ * list type and the countries travel beside it in the owner's document (`region`).
+ */
+const REGION_RESTRICTION_POLICY = {
+  key: 'region_restriction',
+  label: 'Region restriction',
+  category: 'business',
+  kind: 'policy',
+  flag: null,
+  defaultVariant: 'none',
+  variants: [
+    { key: 'none', label: 'Off', description: 'Players from every country may visit, sign up and log in. The default.' },
+    { key: 'notice', label: 'Notice only', description: 'Visitors from a restricted country see the region notice, which they can dismiss. Sign-up and login stay open.' },
+    { key: 'block', label: 'Block', description: 'Visitors from a restricted country see the region notice, and the backend refuses their sign-up and login (403 REGION_RESTRICTED). Staff login is not affected.' },
+  ],
+};
+
+const FEATURES = Object.freeze([...POLICIES, REWARD_CURRENCY_POLICY, REGION_RESTRICTION_POLICY, ...GENERATED, TIPS, PUSH_NOTIFICATIONS, ANALYTICS]);
 
 /**
  * Site templates — the bundles the OWNER picks for a site (docs/OWNER-PANEL.md

@@ -2,7 +2,10 @@
  * The owner screen's working copy: the loaded document plus the owner's edits. With no edits the
  * draft IS the document, so a fresh load lists no changes and saving it changes nothing.
  */
+import type { RegionSetting } from './region'
+
 export type Draft = {
+  region?: RegionSetting
   template?: string
   features: Record<string, boolean>
   flags: Record<string, boolean>
@@ -11,6 +14,7 @@ export type Draft = {
 }
 
 type Loaded = {
+  region?: RegionSetting
   template: string
   features: Record<string, boolean>
   flags: Record<string, boolean>
@@ -24,7 +28,8 @@ export function buildDraft(doc: Loaded, edits: Partial<Draft> | null): Draft {
     features: { ...doc.features, ...edits?.features },
     flags: { ...doc.flags, ...edits?.flags },
     variants: { ...doc.variants, ...edits?.variants },
-    options: Object.fromEntries(Object.entries(doc.options).map(([f, v]) => [f, { ...v, ...edits?.options?.[f] }]))
+    options: Object.fromEntries(Object.entries(doc.options).map(([f, v]) => [f, { ...v, ...edits?.options?.[f] }])),
+    ...(edits?.region ?? doc.region ? { region: edits?.region ?? doc.region } : {})
   }
 }
 
