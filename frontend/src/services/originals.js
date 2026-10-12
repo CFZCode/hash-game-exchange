@@ -101,7 +101,9 @@ export function toOriginals(rows) {
 export function getOriginals() {
   if (USE_FIXTURES) return request(ENDPOINTS.games, { fixture: ORIGINAL_GAMES });
   return Promise.resolve(
-    request(PLATFORM.casino.inHouseGames, { live: true, fixture: [] }),
+    /* The SmartBet backend keeps the imported provider catalogue in the same `js_games` table
+       (paged 20 at a time), so ask for the house's own rows only, all of them on one page. */
+    request(PLATFORM.casino.inHouseGames, { live: true, fixture: [], params: { vendor: 'in-house', per_page: 100 } }),
   ).then(toOriginals);
 }
 
