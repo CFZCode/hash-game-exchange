@@ -989,7 +989,15 @@ export const PLATFORM = {
     withdrawals: {
       fiat: '/api/v1/user/withdrawals/fiat',
       crypto: '/api/v1/user/withdrawals/crypto',
+      /* `{policy, ok, missing, kyc, wager, bonusForfeitRequired}` — what still stands between this
+         player and a withdrawal; read before the fiat form. */
+      requirements: '/api/v1/user/withdrawals/requirements',
     },
+
+    /* The player's saved payout accounts — `{id, method: 'bank'|'upi', accountHolderName,
+       bankName, accountNumberMasked, ifscCode, upiId, isDefault}`. The fiat withdraw form's
+       "Withdraw With" select; `id` goes back as `bankAccountId`. */
+    bankAccounts: '/api/v1/user/bank-accounts',
 
     fiatDeposits: {
       list: '/api/v1/user/deposits/fiat',

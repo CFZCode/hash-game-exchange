@@ -132,8 +132,8 @@ These pages show real data from the backend right now.
 **Wallet area, checked against SmartBet 2026-10-12 and still not wired, with the reason:**
 crypto deposit address and crypto withdraw submit (the withdraw pane now shows a "not available" notice live, and its confirm dialog runs on fixtures only; CCPayment unconfigured: `/user/crypto/chains`
 answers `503 CRYPTO_NOT_CONFIGURED`, and the player's crypto withdrawal is a socket event, not an
-HTTP route); the fiat withdraw arm (`POST /user/withdrawals/fiat` + `/user/bank-accounts` work,
-but this build has no fiat withdraw form); Buy Crypto (no on-ramp route at all); the Swap and
+HTTP route); the fiat withdraw arm is now WIRED (`POST /user/withdrawals/fiat`, `/user/bank-accounts`,
+`/user/withdrawals/requirements` — see docs/wallet.md); Buy Crypto (no on-ramp route at all); the Swap and
 Vault rows in Transaction (`/user/swap/history`, `/user/vault/transactions` answer, but the pane
 has no row renderer for those types); one bet's details (`GET /casino/bet-history/:betId` works,
 `/game-detail/:id` is not a route here); Rollover detail/cancel/types (no route); Manage Assets'

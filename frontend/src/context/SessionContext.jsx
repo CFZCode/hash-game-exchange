@@ -297,6 +297,20 @@ export function SessionProvider({ children }) {
          only caller: picking a coin out of a search marks it `displayStatus: 1`, and picking a
          hidden one flips `display` true. Takes a patch rather than a key/value pair, since the
          row applies both in the same gesture. Not persisted — see the note above. */
+      /* Re-read the account and wallet from the server — after something the server changed,
+         like a withdrawal hold. Fixture mode has nothing to re-read, so it is a no-op there and
+         the caller patches the row itself. Failure keeps what is on screen. */
+      refreshBalances: () =>
+        account.login && !USE_FIXTURES
+          ? loadAccount(account).then(
+              (next) => {
+                setAccount(next.account);
+                setBalances(next.balances);
+              },
+              () => {},
+            )
+          : Promise.resolve(),
+
       updateBalance: (currencyName, patch) =>
         setBalances((current) =>
           current.map((entry) =>

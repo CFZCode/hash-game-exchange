@@ -16,6 +16,7 @@ import {
   CRYPTO_WITHDRAW_AVAILABLE,
 } from '../../../services/withdraw';
 import { WithdrawConfirm, WithdrawResult } from './Confirm';
+import FiatForm from './FiatForm';
 import { withdrawNotices } from './withdraw.jsx';
 import { useIsDialog } from '../../../context/dialogRoute';
 import useResource from '../../../hooks/useResource';
@@ -69,8 +70,8 @@ import Loading from '../../../components/shared/Loading';
  *   Preview                BUILT: opens the confirm dialog (`WithdrawConfirm-CIsgiYKs.js`,
  *                          see Confirm.jsx). Live, the form is replaced by a "not available"
  *                          notice — the platform files a crypto withdrawal only over a socket.
- *   the fiat and SATS arms `Wa` and `hr` in the same chunk, reached by a fiat wallet or by
- *                          picking SATS. Both render the crypto arm here.
+ *   the SATS arm           `hr` in the same chunk, reached by picking SATS; renders the crypto
+ *                          arm here. The FIAT arm `Wa` IS built — FiatForm.jsx.
  */
 
 /* `xa` — the Currency block. `wa` is `mb-1 text-secondary`, and note that is `mb-1` where the
@@ -351,7 +352,7 @@ function MemoField({ currencyName, tagName, value, onChange }) {
  *                                                    and collapsing it hides the intent.
  *   25% / 50%  never go below `lowest`, so on a short balance all four buttons agree.
  */
-function AmountField({ amount, onAmount, min, balance, currency, precision }) {
+export function AmountField({ amount, onAmount, min, balance, currency, precision }) {
   const below = balance < min;
   const lowest = below ? balance : min;
   const highest = below ? balance : Math.min(balance, Math.max(balance, min));
@@ -423,7 +424,7 @@ function AmountField({ amount, onAmount, min, balance, currency, precision }) {
 /* `ut` over `Sr` — the Available row. The `@container` / `@[420px]:` pair is the original's own
    and lays the row out horizontally once the CARD is 420px wide, which on this pane it always is.
    `hasAlias: !1` is why the figure prints bare — "Available: 0", not "Available: 0 BCD". */
-function AvailableRow({ currencyName, unlocked, className = '' }) {
+export function AvailableRow({ currencyName, unlocked, className = '' }) {
   return (
     <div className={`@container ${className}`}>
       <div className="flex flex-col items-end gap-y-1 @[420px]:flex-row @[420px]:items-center @[420px]:justify-between @[420px]:gap-x-2 @[420px]:gap-y-0">
@@ -473,13 +474,12 @@ export function WithdrawPanels() {
   const [placed, setPlaced] = React.useState(null);
 
   /* `a = () => e.currencyName ?? W.state.cryptoCurrency` — the wallet store's crypto selection,
-     seeded from the account's own currency. A fiat wallet would take the fiat arm, which is not
-     built, so it falls back to the first withdrawable coin rather than rendering an empty form. */
+     seeded from the account's own currency. A FIAT wallet takes the fiat arm (`tl` picks `Wa`
+     on `W.state.isFiat`) — see FiatForm.jsx. A coin with no withdraw tokens falls back to BTC. */
   const walletCurrency = session.setting.currencyName;
+  const isFiatName = (name) => getCurrency(name)?.currencyType === 'FIAT';
   const initial =
-    getCurrency(walletCurrency)?.currencyType === 'FIAT' || tokensFor(walletCurrency).length === 0
-      ? 'BTC'
-      : walletCurrency;
+    isFiatName(walletCurrency) || tokensFor(walletCurrency).length > 0 ? walletCurrency : 'BTC';
 
   const [currency, setCurrency] = React.useState(initial);
   const tokens = tokensFor(currency);
@@ -581,8 +581,9 @@ export function WithdrawPanels() {
      half — a coin whose tokens are all unavailable stays in the list and renders the
      not-supported state inside the form, which is the original's arrangement. */
   const options = balances
-    .filter((coin) => tokensFor(coin.currencyName).length > 0)
+    .filter((coin) => tokensFor(coin.currencyName).length > 0 || isFiatName(coin.currencyName))
     .map((coin) => coin.currencyName);
+  const fiat = isFiatName(currency);
 
   const allUnavailable = tokens.length > 0 && tokens.every((row) => !row.canWithdraw);
 
@@ -607,7 +608,9 @@ export function WithdrawPanels() {
         {/* `Fn`'s suspense fallback. The Currency select stays above it — on the original it is
             outside the boundary too, since changing the coin is what triggers the next read and
             a control you cannot reach while its own result loads would be a trap. */}
-        {pending ? (
+        {fiat ? (
+          <FiatForm key={currency} currencyName={currency} />
+        ) : pending ? (
           <div className="center h-80">
             <Loading />
           </div>
@@ -754,6 +757,14 @@ export function WithdrawPanels() {
           portal: the notice is computed from the token, and the token is already state up here.
           The id is kept because it is the original's markup and because the portal is the only
           reason the notice sits outside the card at all. */}
+      {fiat ? (
+        /* `Wa`'s two empty slots — the Cwallet fiat band and `zr`'s per-channel notice, which
+           has a row for none of this platform's methods. */
+        <>
+          <div id="cwallet-withdraw-fiat" />
+          <div className="mt-4" id="withdraw-fiat-notice" />
+        </>
+      ) : (
       <div id="withdraw-crypto-notice">
         {/* THE MARGIN BELONGS TO THE WRAPPER AND IS UNCONDITIONAL. `BottomNotice` builds
             `pn` = `<div class="mt-4 space-y-2">` around a bare `<Notice type="info">`, so the
@@ -765,6 +776,7 @@ export function WithdrawPanels() {
           <Notice>{notices.bottom}</Notice>
         </div>
       </div>
+      )}
 
       {/* `da` — the divider is the withdraw wrapper's, not the row's. The second arm (withdraw
           straight to a linked Cwallet) needs a `cwallet.state.cwalletId` this build has no feed

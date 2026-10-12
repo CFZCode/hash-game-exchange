@@ -1,5 +1,5 @@
 import { request, USE_FIXTURES, ApiError } from './client';
-import ENDPOINTS from './endpoints';
+import ENDPOINTS, { PLATFORM } from './endpoints';
 import { CURRENCY_TOKENS, tokensFor, defaultToken, lowestWithdrawLimit } from '../data/currencyTokens';
 
 /* `/wallet/withdraw` — the crypto withdraw form.
@@ -208,3 +208,48 @@ export function submitCryptoWithdraw({ currencyName, address, memo, amount, fee,
 
 export const withdrawErrorMessage = (error) =>
   error?.message || 'Something went wrong. Please try again later.';
+
+/* ══ THE FIAT RAIL ════════════════════════════════════════════════════════════════════════════
+ *
+ * `Wa` -> `oa` -> `ca` -> `qe` -> `ua` in index-B3pypdyg.js. On bc.game the method list is
+ * `/payment/withdraw/fiat/<cur>/methods/` and each method's form is a server-sent `kycItem` list;
+ * here the platform has one manual rail with two destinations, so the two methods (bank, UPI) and
+ * their fields are this build's, and the payout accounts are `GET /user/bank-accounts`.
+ *
+ * `POST /user/withdrawals/fiat` takes EITHER `bankAccountId` OR the details, never both (422).
+ * The amount is held at once; staff approve or reject (a reject refunds).
+ *
+ * The minimum is the platform's `WITHDRAW_MINIMUM` default, `1`. No route publishes it, so it is
+ * written here for the Min figure only; the server's refusal (BELOW_MINIMUM) is the authority. */
+export const FIAT_WITHDRAW_MINIMUM = 1;
+
+export const FIAT_METHODS = [
+  { method: 'upi', name: 'UPI' },
+  { method: 'bank', name: 'Bank Transfer' },
+];
+
+export function getBankAccounts() {
+  return Promise.resolve(request(PLATFORM.user.bankAccounts, { live: true, fixture: [] })).then(
+    (rows) => (Array.isArray(rows) ? rows : []),
+  );
+}
+
+const REQUIREMENTS_OK = { ok: true, missing: [], bonusForfeitRequired: false };
+
+export function getWithdrawRequirements() {
+  return Promise.resolve(
+    request(PLATFORM.user.withdrawals.requirements, { live: true, fixture: REQUIREMENTS_OK }),
+  ).catch(() => REQUIREMENTS_OK);
+}
+
+/** `ae.withdraw({...})` -> `POST /user/withdrawals/fiat`. `currency` is the bare code (`INR`). */
+export function submitFiatWithdraw(body) {
+  return Promise.resolve(
+    request(PLATFORM.user.withdrawals.fiat, {
+      live: true,
+      method: 'POST',
+      json: body,
+      fixture: { withdrawalId: 1, status: 'In Queue', amount: body.amount, currency: body.currency },
+    }),
+  );
+}
