@@ -27,6 +27,7 @@ import { rechargeBonusConfigNow } from '../../services/bonus';
 import { getCurrency } from '../../data/currencies';
 import { tokensFor } from '../../data/currencyTokens';
 import { convertCurrency } from '../../utils/currency';
+import { USE_FIXTURES } from '../../services/client';
 
 /* ── RECOVERED ─────────────────────────────────────────────────────────────────────────────
  *
@@ -251,7 +252,13 @@ export const FIAT_CHANNELS = {
 /* `[...list].sort((a, b) => a.sort - b.sort)` — `ID`'s own ordering, which is also what decides
    which channel is selected on arrival (`r[0]`). */
 export const channelsFor = (currencyName) =>
-  [...(FIAT_CHANNELS[currencyName] || [])].sort((a, b) => a.sort - b.sort);
+  [...((USE_FIXTURES && FIAT_CHANNELS[currencyName]) || [])].sort((a, b) => a.sort - b.sort);
+/* LIVE: NO CHANNELS. `FIAT_CHANNELS` is bc.game's payment-provider grid (UPI, PhonePe, …) and the
+   SmartBet backend has none of them: every PSP answers `503 PAYORDER_PROVIDER_DISABLED`. Its one
+   fiat rail is a MANUAL bank transfer (`GET /user/bank-details/:coin` + `POST /user/deposits/fiat`)
+   whose body requires `transactionId` (the bank reference) and takes a screenshot — fields this
+   form does not have. So the live tab renders the original's own out-of-channels state rather
+   than six channels whose submit could never reach anything. */
 
 /* ── RECOVERED: utils-BRLjIBPE.js, whole ───────────────────────────────────────────────────
  *

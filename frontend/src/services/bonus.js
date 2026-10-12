@@ -1,6 +1,94 @@
-import { request } from './client';
+import { request, USE_FIXTURES } from './client';
 import ENDPOINTS from './endpoints';
 import { BONUSES } from '../pages/DepositOffer/depositOffer';
+
+/* ── LIVE: THE PLATFORM HAS ONE DEPOSIT BONUS, NOT bc.game's FOUR ────────────────────────────
+ *
+ * `GET /user/bonus/first-deposit` (public, optional session) answers the operator's first-deposit
+ * terms: `{enabled, eligible, currency, tiers: [{minDeposit, percent, maxBonus}], wagerMultiplier,
+ * expiryDays, wageringLock, claimed}`. Tiers are AMOUNT bands for ONE deposit in the site's reward
+ * currency, lowest minimum first; `maxBonus` "0" means no cap.
+ *
+ * Both reads below are built from it on the live path, and the bc.game payloads stay the fixture:
+ *
+ *   /deposit-offer        `enabled` false (this delivery) -> no bonuses, so the page renders its
+ *                         two headings over nothing rather than bc.game's monthly 4-stage offer.
+ *                         Enabled -> one bonus whose stages are the tiers.
+ *   the fiat tab's chips  the recharge config the chips and "Extra +…" read; null unless the
+ *                         bonus is enabled AND this account is still eligible for it.
+ *
+ * The path lives here rather than in endpoints.js because this module is its only caller. */
+const FIRST_DEPOSIT = '/api/v1/user/bonus/first-deposit';
+
+const readFirstDeposit = () => request(FIRST_DEPOSIT, { live: true, fixture: null });
+
+const liveTiers = (terms) =>
+  terms?.enabled && Array.isArray(terms.tiers) ? terms.tiers.filter((t) => Number(t?.percent) > 0) : [];
+
+/** The first-deposit terms in the shape /deposit-offer renders. Copy is the fixture's where it
+    describes the mechanics both share (deposit, claim, wager, collect) and the terms' own numbers
+    everywhere else; the monthly/4-chance wording is bc.game's and is not carried over. */
+export function toDepositOffer(terms, now = new Date()) {
+  const tiers = liveTiers(terms);
+  if (!tiers.length) return { bonuses: [], resetAt: 0 };
+
+  const [template] = BONUSES;
+  const currency = String(terms.currency ?? 'USDT');
+  const top = Math.max(...tiers.map((t) => Number(t.percent)));
+  const expiry = Number(terms.expiryDays) || 0;
+
+  return {
+    bonuses: [
+      {
+        ...template,
+        id: 'first-deposit-bonus',
+        title: 'First Deposit Bonus',
+        description: `Up to ${top}% bonus on your first deposit.`,
+        tags: [template.tags[0]],
+        currentStage: 1,
+        progress: terms.claimed ? 100 : 0,
+        stages: tiers.map((t, i) => ({
+          label: `TIER ${i + 1}`,
+          bonus: Number(t.percent),
+          rakeback: 0,
+          minDeposit: Number(t.minDeposit),
+        })),
+        minDepositCurrency: currency,
+        overview:
+          `Get up to ${top}% on your first deposit.` +
+          (terms.wagerMultiplier ? ` The bonus must be wagered ${terms.wagerMultiplier}x before it can be withdrawn.` : '') +
+          (expiry ? ` It expires ${expiry} days after it is credited.` : ''),
+      },
+    ],
+    resetAt: expiry ? now.getTime() + expiry * 864e5 : 0,
+  };
+}
+
+/** The first-deposit terms as the recharge config `pages/Deposit/deposit.js` reads (`xg`'s shape),
+    or null when there is nothing this account can get. The lowest tier is what a chip offers. */
+export function toRechargeConfig(terms) {
+  const tiers = liveTiers(terms);
+  if (!tiers.length || !terms.eligible) return null;
+  const [low] = tiers;
+  return {
+    depositBonusType: 'FIRST_DEPOSIT',
+    selected: false,
+    supportCurrencyRule: [{ type: 'all', list: [] }],
+    currentUseConfigs: [
+      {
+        seq: 1,
+        selectedBonusType: null,
+        currency: String(terms.currency ?? 'USDT'),
+        minDeposit: Number(low.minDeposit),
+        maxDeposit: null,
+        bonusRatio: Number(low.percent) / 100,
+        extraBonusRatio: null,
+        maxBonus: Number(low.maxBonus) > 0 ? Number(low.maxBonus) : null,
+        fiatRechargeV2: null,
+      },
+    ],
+  };
+}
 
 /* The deposit-bonus feed behind /deposit-offer.
  *
@@ -25,6 +113,11 @@ function endOfMonthUtc(now = new Date()) {
 }
 
 export const getDepositBonuses = () =>
+  USE_FIXTURES
+    ? depositBonusesFixture()
+    : readFirstDeposit().then((terms) => toDepositOffer(terms));
+
+const depositBonusesFixture = () =>
   request(ENDPOINTS.bonus.timesDeposit, {
     fixture: {
       bonuses: BONUSES,
@@ -95,6 +188,11 @@ export const getRechargeBonusConfig = () => {
 };
 
 const rechargeBonusConfig = () =>
+  USE_FIXTURES
+    ? rechargeBonusConfigFixture()
+    : readFirstDeposit().then(toRechargeConfig, () => null);
+
+const rechargeBonusConfigFixture = () =>
   request(ENDPOINTS.bonus.rechargeConfig, {
     fixture: {
       depositBonusType: 'MONTHLY',

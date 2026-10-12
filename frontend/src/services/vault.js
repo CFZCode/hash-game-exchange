@@ -72,13 +72,10 @@ export const VAULT_APR = 0.05;
  *                    "APR 0%" is what is genuinely available. The capture's 5% was one account's
  *                    reading of a different operator's table.
  *
- *   yesterdayReturn  BOTH STAY ZERO, AND NOT FOR WANT OF AN ENDPOINT.
- *   accumulated…     `GET /user/vault/interest` is the accrual ledger and answers fine — it just
- *                    answers empty for good: `VaultInterestHistory` is read in three places in
- *                    `vault.service.js` and written in NONE, and a grep of the whole delivery
- *                    finds no accrual job. A read that can only ever return `[]` is a request per
- *                    pane load buying nothing, so it is declared in `endpoints.js` and not
- *                    called. Add the sum here the day something credits interest.
+ *   yesterdayReturn  `GET /user/vault/interest`, summed per coin (all rows / last 24 hours).
+ *   accumulated…     The old backend had no accrual job and this read answered `[]` for good;
+ *                    SmartBet writes one row per deposit per day, so it is read now. See
+ *                    `vaultReturns`.
  *
  *   bonusAmount      no bonus/general split on their wallet at all; `toWalletRows` records it.
  *
@@ -88,13 +85,29 @@ export const VAULT_APR = 0.05;
  * Both buttons already stop at the original's own disabled gate, which is a better place to stop
  * than at a write that can only fail.
  */
+/** `GET /user/vault/interest` rows `{coin, interest, createdAt}` -> `{[coin]: {total, lastDay}}`. */
+export function vaultReturns(rows, now = Date.now()) {
+  const out = {};
+  for (const r of Array.isArray(rows) ? rows : []) {
+    const coin = String(r?.coin ?? '');
+    const value = Number(r?.interest) || 0;
+    if (!coin) continue;
+    const acc = (out[coin] ??= { total: 0, lastDay: 0 });
+    acc.total += value;
+    if (now - Date.parse(r.createdAt) <= 864e5) acc.lastDay += value;
+  }
+  for (const k of Object.keys(out))
+    out[k] = { total: out[k].total.toFixed(8), lastDay: out[k].lastDay.toFixed(8) };
+  return out;
+}
+
 export function getVaultAmountList(balances = []) {
   const shown = balances.filter((coin) => coin.display);
-  const row = (coin, amount, returnRatio) => ({
+  const row = (coin, amount, returnRatio, returns = {}) => ({
     currencyName: coin.currencyName,
     amount,
-    yesterdayReturn: '0',
-    accumulatedReturn: '0',
+    yesterdayReturn: returns.lastDay ?? '0',
+    accumulatedReturn: returns.total ?? '0',
     returnRatio,
     bonusAmount: '0',
   });
@@ -108,12 +121,19 @@ export function getVaultAmountList(balances = []) {
   return Promise.all([
     request(PLATFORM.user.vault.data, { live: true }),
     request(PLATFORM.user.vault.lockOptions, { live: true }),
-  ]).then(([vault, options]) => {
+    /* SmartBet DOES accrue now (a daily job writes `VaultInterestHistory`, one row per deposit per
+       calendar day), so the two return columns are real: Total Return is every accrual row in the
+       coin, Last Day Return the ones written in the last 24 hours. 200 is the validator's max. */
+    Promise.resolve(
+      request(PLATFORM.user.vault.interest, { live: true, params: { limit: 200 }, fixture: [] }),
+    ).catch(() => []),
+  ]).then(([vault, options, interest]) => {
     const totals = vault?.totals ?? {};
     const shortest = (Array.isArray(options) ? options : [])[0];
     const returnRatio = String((Number(shortest?.rate) || 0) / 100);
+    const returns = vaultReturns(interest);
     return shown.map((coin) =>
-      row(coin, String(totals[coin.aliasCurrencyName] ?? '0'), returnRatio)
+      row(coin, String(totals[coin.aliasCurrencyName] ?? '0'), returnRatio, returns[coin.aliasCurrencyName])
     );
   });
 }

@@ -125,6 +125,19 @@ These pages show real data from the backend right now.
 | Home → the Continue Playing / Favorites block | `GET /casino/games/favourites` + `/casino/games/recently-played`. The original's `recent-and-like` batch read, composed from the two routes this platform has. **Renders as Favorites alone** — the history arm answers empty (gap 2) and an empty list gates its tab away; see `docs/casino.md` |
 | `/favorite` — Favorites, and the star on a game page | `GET /casino/games/favourites`, `PUT`/`DELETE .../:gameRef`. **The first feature here whose backend had to be built** — there was no table, no route and no column, on this platform or in the legacy one it came from. Gap 1, closed; see Part 4b.7 |
 | Settings → Account Info → Edit → Avatar Frame | none, and that is the finding. The ten-cell grid, its order, templates, "In use" pill and padlock are all in the original's chunk and are ported; what no route carries is which frames an account OWNS. Every ring renders locked, which is both a fresh account's state and the only truthful one here — see `docs/settings.md` |
+| Wallet → Vault → Last Day Return / Total Return | `GET /user/vault/interest` (SmartBet, 2026-10-12). The old backend never wrote that table; SmartBet accrues daily, so the two columns are summed per coin from it (`vaultReturns` in `services/vault.js`) |
+| `/deposit-offer` and the fiat tab's bonus chips | `GET /user/bonus/first-deposit` (SmartBet, 2026-10-12). One first-deposit bonus with amount tiers, not bc.game's four monthly stages. **`enabled: false` on this delivery**, so the live page shows its headings over no cards and the chips carry no bonus tag. Enabled + eligible → one card whose stages are the tiers, and the lowest tier feeds the chips |
+| Deposit → Fiat tab → channels | none, deliberately (2026-10-12). Live mode shows the original's out-of-channels state instead of bc.game's six UPI channels: every PSP answers `503 PAYORDER_PROVIDER_DISABLED`, and the manual bank rail (`/user/bank-details/:coin` + `POST /user/deposits/fiat`) needs a bank reference and a screenshot this form has no fields for |
+
+**Wallet area, checked against SmartBet 2026-10-12 and still not wired, with the reason:**
+crypto deposit address and crypto withdraw submit (CCPayment unconfigured: `/user/crypto/chains`
+answers `503 CRYPTO_NOT_CONFIGURED`, and the player's crypto withdrawal is a socket event, not an
+HTTP route); the fiat withdraw arm (`POST /user/withdrawals/fiat` + `/user/bank-accounts` work,
+but this build has no fiat withdraw form); Buy Crypto (no on-ramp route at all); the Swap and
+Vault rows in Transaction (`/user/swap/history`, `/user/vault/transactions` answer, but the pane
+has no row renderer for those types); one bet's details (`GET /casino/bet-history/:betId` works,
+`/game-detail/:id` is not a route here); Rollover detail/cancel/types (no route); Manage Assets'
+show/hide (no per-currency display setting on the backend).
 
 Everything else on the site is still showing saved sample data.
 
