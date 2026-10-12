@@ -1,7 +1,7 @@
 'use strict';
 
 const { money, entitlements } = require('@ibitplay/common');
-const { isAgentPlayer } = require('@ibitplay/auth');
+const { promotionsBlocked } = require('@ibitplay/auth');
 
 const { WalletService } = require('../wallet/wallet.service');
 const { createRewardMoney } = require('../../lib/rewardMoney');
@@ -103,7 +103,7 @@ class SpinWheelBonusService {
     if (!isFirstDeposit && !options.bonus_on_later_deposits) return { ok: false, reason: 'NOT_ON_LATER_DEPOSITS' };
     if (!(Number(code.bonus_pct) > 0)) return { ok: false, reason: 'NO_PERCENTAGE' };
 
-    if (await isAgentPlayer(userId)) return { ok: false, reason: 'AGENT_TREE_PLAYER' };
+    if (await promotionsBlocked(userId)) return { ok: false, reason: 'AGENT_TREE_PLAYER' };
 
     const from = String(currency).toUpperCase();
     const deposited = money.toDecimalString(money.toMinor(amount));

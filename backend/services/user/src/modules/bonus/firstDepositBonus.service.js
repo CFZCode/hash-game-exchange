@@ -2,7 +2,7 @@
 
 const { Op } = require('sequelize');
 const { money } = require('@ibitplay/common');
-const { isAgentPlayer } = require('@ibitplay/auth');
+const { promotionsBlocked } = require('@ibitplay/auth');
 
 const { WalletService } = require('../wallet/wallet.service');
 const { REASON } = require('../wallet/wallet.constants');
@@ -167,7 +167,7 @@ class FirstDepositBonusService {
 
     let agent = true;
     try {
-      agent = await isAgentPlayer(userId);
+      agent = await promotionsBlocked(userId);
     } catch (error) {
       this.logger?.warn({ err: error, userId: String(userId) }, 'First deposit bonus: agent-tree check failed — reporting not eligible');
     }
@@ -295,7 +295,7 @@ class FirstDepositBonusService {
       return { paid: false, reason: 'NO_DEPOSIT' };
     }
 
-    if (await isAgentPlayer(userId)) {
+    if (await promotionsBlocked(userId)) {
       this.logger?.info({ userId: String(userId) }, 'First deposit bonus skipped: agent-tree player');
       return { paid: false, reason: 'AGENT_TREE_PLAYER' };
     }

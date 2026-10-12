@@ -4,7 +4,7 @@
    `referrerResolver.js`, shared with signup and the public code check. */
 const { Op, fn, col, QueryTypes } = require('sequelize');
 const { money, creditableCurrency } = require('@ibitplay/common');
-const { isAgentPlayer, assertPlayerCapability } = require('@ibitplay/auth');
+const { promotionsBlocked, assertPlayerCapability } = require('@ibitplay/auth');
 
 const errors = require('./affiliate.errors');
 const { UNLOCK_TIERS, REWARD_CURRENCY } = require('./affiliate.constants');
@@ -80,7 +80,7 @@ class AffiliateService {
 
     /* The referrer earns nothing when they are an agent-tree player (owner at
        staff level 4–6): no tier unlock, no commission. */
-    if (await this.#ownerIsAgentPlayer(team.ownername)) {
+    if (await this.#ownerHasNoPromotions(team.ownername)) {
       this.logger?.info({ owner: team.ownername, member: member.name }, 'Affiliate earnings skipped: agent-tree referrer');
       return { onTeam: true, unlock: { unlocked: false }, commissionRecorded: false, skipped: 'AGENT_TREE_PLAYER' };
     }
@@ -225,7 +225,7 @@ class AffiliateService {
     const results = { registerBonus: false, affiliateBonus: false };
 
     // Agent-tree players are funded by their agent only: no registration bonus.
-    const agentMember = await isAgentPlayer(userId);
+    const agentMember = await promotionsBlocked(userId);
     if (agentMember) {
       this.logger?.info({ userId: String(userId) }, 'Registration bonus skipped: agent-tree player');
     }
@@ -287,7 +287,7 @@ class AffiliateService {
       const settings = await this.settings.read();
       if (settings.affiliateBonusRequiresDeposit === false) return { booked: false, reason: 'NOT_DEPOSIT_GATED' };
       if (!money.gt(settings.affiliateBonus, '0')) return { booked: false, reason: 'NO_BONUS' };
-      if (await isAgentPlayer(userId)) return { booked: false, reason: 'AGENT_TREE_PLAYER' };
+      if (await promotionsBlocked(userId)) return { booked: false, reason: 'AGENT_TREE_PLAYER' };
       const member = await this.#user(userId);
       const booked = await this.#bookJoiningBonus({ member, settings });
       return { booked, reason: booked ? undefined : 'NOT_ELIGIBLE_OR_ALREADY_BOOKED' };
@@ -306,7 +306,7 @@ class AffiliateService {
     if (!ownerId) return false;
     const owner = await this.models.Users.findByPk(ownerId, { attributes: ['id', 'name', 'referalcode'], raw: true });
     if (!owner || owner.name !== team.ownername) return false;
-    if (await isAgentPlayer(owner.id)) {
+    if (await promotionsBlocked(owner.id)) {
       this.logger?.info({ owner: owner.name }, 'Affiliate joining bonus skipped: agent-tree referrer');
       return false;
     }
@@ -1121,11 +1121,11 @@ class AffiliateService {
     return /^-?\d+(\.\d+)?$/.test(cleaned) ? cleaned : '0';
   }
 
-  /** Is the team owner named `ownerName` an agent-tree player? */
-  async #ownerIsAgentPlayer(ownerName) {
+  /** May the team owner named `ownerName` earn nothing (agent-tree player, or a B2B site)? */
+  async #ownerHasNoPromotions(ownerName) {
     if (!ownerName) return false;
     const owner = await this.models.Users.findOne({ where: { name: ownerName }, attributes: ['id'], raw: true });
-    return owner ? isAgentPlayer(owner.id) : false;
+    return owner ? promotionsBlocked(owner.id) : false;
   }
 
   async #user(userId) {

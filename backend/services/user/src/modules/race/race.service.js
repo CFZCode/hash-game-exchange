@@ -3,6 +3,7 @@
 const { createRewardMoney, USD_CODES } = require('../../lib/rewardMoney');
 const { Op } = require('sequelize');
 const { money, operatorSettings } = require('@ibitplay/common');
+const { siteHasNoPromotions } = require('@ibitplay/auth');
 
 const { WalletService } = require('../wallet/wallet.service');
 const errors = require('./race.errors');
@@ -478,8 +479,13 @@ class RaceService {
 
     const prizeByRank = new Map(config.rankPrizes.map((r) => [r.rank, r]));
 
+    /* A B2B site has no promotions for anybody: the window still closes (so the next one opens
+       on time) but writes no prizes. A read that fails counts as B2B — it pays nothing. */
+    const noPromotions = await siteHasNoPromotions().catch(() => true);
+    if (noPromotions) this.logger?.info({ raceId: race.id, type: race.type }, 'Race settled without prizes: promotions are off on a B2B site');
+
     const rewards = [];
-    for (let i = 0; i < payable.length; i += 1) {
+    for (let i = 0; i < (noPromotions ? 0 : payable.length); i += 1) {
       const prize = prizeByRank.get(i + 1);
       // A taper across hundreds of ranks reaches amounts below a cent. Those
       // rows cost a claim each and credit nothing.

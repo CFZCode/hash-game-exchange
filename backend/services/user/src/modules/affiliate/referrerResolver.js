@@ -1,7 +1,7 @@
 'use strict';
 
 const { fn, col, where } = require('sequelize');
-const { isAgentPlayer } = require('@ibitplay/auth');
+const { promotionsBlocked } = require('@ibitplay/auth');
 
 /**
  * THE ONE ANSWER TO "WHOSE REFERRAL CODE IS THIS?"
@@ -38,7 +38,7 @@ const { isAgentPlayer } = require('@ibitplay/auth');
 async function resolveReferrerOwner(models, rawInput) {
   const owner = await findReferrerCandidate(models, rawInput);
   if (!owner) return null;
-  if (await isAgentPlayer(owner.id)) return null;
+  if (await promotionsBlocked(owner.id)) return null;
   return owner;
 }
 

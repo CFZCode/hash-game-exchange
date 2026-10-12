@@ -1,6 +1,6 @@
 'use strict';
 
-const { createLogger, ServiceClient, Mailer, resolveInternalKey, configureEntitlements, configureCurrencyRegistry } = require('@ibitplay/common');
+const { createLogger, ServiceClient, Mailer, resolveInternalKey, configureEntitlements, configureCurrencyRegistry, sitePolicy } = require('@ibitplay/common');
 const { createAuthMiddleware, configureAgentPlayers } = require('@ibitplay/auth');
 const db = require('@ibitplay/db');
 
@@ -101,6 +101,8 @@ async function createContainer({ logger: injectedLogger } = {}) {
       return row?.parent_staff_id ?? null;
     },
     loadStaff: (staffId) => clients.admin.get(`/internal/admin/staff-directory/staff/${staffId}`),
+    // The owner's business model, read live: on b2b no player gets promotions (agentPlayers.js).
+    loadBusinessModel: () => sitePolicy.readPolicy(connection.models, 'business_model'),
   });
 
   const container = {

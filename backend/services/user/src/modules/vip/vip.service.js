@@ -2,7 +2,7 @@
 
 const { Op } = require('sequelize');
 const { resolveVipLadder, vipRewards, money } = require('@ibitplay/common');
-const { isAgentPlayer } = require('@ibitplay/auth');
+const { promotionsBlocked } = require('@ibitplay/auth');
 
 const { WalletService } = require('../wallet/wallet.service');
 const { REASON } = require('../wallet/wallet.constants');
@@ -261,7 +261,7 @@ class VipService {
 
     /* Agent-tree players (owner at staff level 4–6) have no promotions: the
        level still moves, nothing is credited. `packages/auth/src/agentPlayers.js`. */
-    if (await isAgentPlayer(userId)) {
+    if (await promotionsBlocked(userId)) {
       this.logger?.info(
         { userId: String(userId), skipped: due.map((d) => d.idempotencyKey) },
         'VIP progression not credited: agent-tree player'
@@ -409,7 +409,7 @@ class VipService {
     if (!vip?.card) return { awarded: 0, rows: [] };
 
     // No recurring VIP awards for agent-tree players (no promotions).
-    if (await isAgentPlayer(userId)) return { awarded: 0, rows: [] };
+    if (await promotionsBlocked(userId)) return { awarded: 0, rows: [] };
 
     const rows = [];
     const now = Date.now();

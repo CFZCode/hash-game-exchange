@@ -2,7 +2,7 @@
 
 const { Op } = require('sequelize');
 const { money, entitlements } = require('@ibitplay/common');
-const { isAgentPlayer } = require('@ibitplay/auth');
+const { promotionsBlocked } = require('@ibitplay/auth');
 
 const { WalletService } = require('../wallet/wallet.service');
 const { REASON } = require('../wallet/wallet.constants');
@@ -118,7 +118,7 @@ class PlayerBonusService {
     const code = String(currency).toUpperCase();
     if (!money.gt(amount, '0')) return { paid: false, reason: 'ZERO_BONUS' };
 
-    if (await isAgentPlayer(userId)) return { paid: false, reason: 'AGENT_TREE_PLAYER' };
+    if (await promotionsBlocked(userId)) return { paid: false, reason: 'AGENT_TREE_PLAYER' };
 
     const multiplier = Number(wagerMultiplier) > 0 ? Number(wagerMultiplier) : 0;
     const requiredWager = money.toDecimalString(money.multiply(amount, String(multiplier)));

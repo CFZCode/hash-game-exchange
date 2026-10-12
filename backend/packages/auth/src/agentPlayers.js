@@ -192,13 +192,69 @@ function createAgentPlayerResolver({
  */
 let active = null;
 
+/**
+ * The owner's business model, read live (`sitePolicy.readPolicy(models, 'business_model')`).
+ * On a B2B site — agents only — there are NO promotions for anybody: not for the agent's
+ * players and not for a direct player either (one can still exist: created by house staff, or
+ * from before the switch). Null (unconfigured) reads as "not b2b".
+ */
+let loadBusinessModel = null;
+/* The last answer, kept 2 s: a sweep asks once per player, and a switch must still take effect
+   at once in human terms. */
+let modelCache = { value: undefined, at: 0 };
+const MODEL_TTL_MS = 2_000;
+
+/** The refusal every player gets for a promotion on a B2B site. */
+const PROMOTIONS_B2B = Object.freeze({
+  code: 'PROMOTIONS_DISABLED_B2B',
+  message: 'Promotions are not offered on this site',
+});
+
 function configureAgentPlayers(options) {
   active = options && typeof options.isAgentPlayer === 'function' ? options : createAgentPlayerResolver(options);
+  loadBusinessModel = typeof options?.loadBusinessModel === 'function' ? options.loadBusinessModel : null;
+  modelCache = { value: undefined, at: 0 };
   return active;
 }
 
 function resetAgentPlayers() {
   active = null;
+  loadBusinessModel = null;
+  modelCache = { value: undefined, at: 0 };
+}
+
+/**
+ * Is this a B2B site, where promotions are off for everyone?
+ *
+ * A failed read THROWS: a guarded route then fails closed with the error (as sign-up does on
+ * the same read), and `promotionsBlocked` — the payout paths' question — treats it as blocked.
+ */
+async function siteHasNoPromotions() {
+  if (!loadBusinessModel) return false;
+  if (modelCache.value === undefined || Date.now() - modelCache.at > MODEL_TTL_MS) {
+    modelCache = { value: await loadBusinessModel(), at: Date.now() };
+  }
+  return modelCache.value === 'b2b';
+}
+
+/**
+ * May this player be paid or shown a promotion? False on a B2B site (everyone) and for an
+ * agent-tree player (any site). The question every award, accrual and settlement asks.
+ * Fails closed: a read that cannot answer pays nothing.
+ */
+async function promotionsBlocked(userId) {
+  try {
+    if (await siteHasNoPromotions()) return true;
+  } catch {
+    return true;
+  }
+  return isAgentPlayer(userId);
+}
+
+function promotionsB2bError() {
+  const error = new ForbiddenError(PROMOTIONS_B2B.message);
+  error.code = PROMOTIONS_B2B.code;
+  return error;
 }
 
 /**
@@ -214,12 +270,17 @@ async function isAgentPlayer(userId) {
 }
 
 async function playerCapabilities(userId) {
-  return capabilitiesFor(await isAgentPlayer(userId));
+  const caps = capabilitiesFor(await isAgentPlayer(userId));
+  // A B2B site has no promotions for anybody; a failed read leaves them as the account says
+  // (the routes still refuse for themselves).
+  if (caps.promotions && (await siteHasNoPromotions().catch(() => false))) caps.promotions = false;
+  return caps;
 }
 
 /** Throw the 403 when an agent-tree player asks for a capability they lack. */
 async function assertPlayerCapability(userId, capability) {
   if (!AGENT_PLAYER_RESTRICTIONS[capability]) throw new Error(`Unknown player capability "${capability}"`);
+  if (capability === 'promotions' && (await siteHasNoPromotions())) throw promotionsB2bError();
   if (await isAgentPlayer(userId)) throw agentPlayerError(capability);
 }
 
@@ -252,6 +313,9 @@ module.exports = {
   createAgentPlayerResolver,
   configureAgentPlayers,
   resetAgentPlayers,
+  PROMOTIONS_B2B,
+  siteHasNoPromotions,
+  promotionsBlocked,
   isAgentPlayer,
   playerCapabilities,
   assertPlayerCapability,

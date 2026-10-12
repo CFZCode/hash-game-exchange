@@ -2,6 +2,7 @@
 
 const { Op } = require('sequelize');
 const { money } = require('@ibitplay/common');
+const { promotionsBlocked } = require('@ibitplay/auth');
 
 const { WalletService } = require('../wallet/wallet.service');
 const errors = require('./rakeback.errors');
@@ -146,6 +147,13 @@ class RakebackService {
    * stake to USD, this service owns the loyalty rate).
    */
   async accrue({ userId, amount, stakeUsd, source, ref }) {
+    /* Rakeback is a promotion: nothing accrues on a B2B site (for anybody) or for an agent-tree
+       player (packages/auth/src/agentPlayers.js `promotionsBlocked`, fails closed). A no-op, not
+       an error — the stake itself still counts, and a retry must not see a failure. */
+    if (await promotionsBlocked(userId)) {
+      return { accrued: null, amount: '0.00000000', currency: 'USD', duplicate: false, skipped: 'PROMOTIONS_BLOCKED' };
+    }
+
     let value;
 
     if (amount != null) {
