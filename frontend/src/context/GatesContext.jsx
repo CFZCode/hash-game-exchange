@@ -63,7 +63,10 @@ function LiveGates({ children }) {
     };
   }, [readPublic, readCaps]);
 
-  const capsKnown = !signedIn || caps.userId === userId;
+  /* `userId` is 0 while a restored session's account is still pending (signed in, profile not
+     read yet). That must read as UNKNOWN, not as "caps 0 answered null" — the latter failed open
+     and mounted the header's bonus gift for an agent player, which then called /user/bonus. */
+  const capsKnown = !signedIn || (Boolean(userId) && caps.userId === userId);
   const capabilities = !signedIn ? null : capsKnown ? caps.value : UNKNOWN_CAPS;
   const ready = pub !== null && capsKnown;
 

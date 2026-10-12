@@ -1,4 +1,4 @@
-import { request, USE_FIXTURES } from './client';
+import { emptyIfAgentBlocked, isAgentBlocked, request, USE_FIXTURES } from './client';
 import ENDPOINTS from './endpoints';
 import { CONTEST as HOME_CONTEST, STANDINGS as HOME_STANDINGS } from '../pages/Home/LatestBets/contest';
 import { CONTEST as DAILY_CONTEST, STANDINGS as DAILY_STANDINGS } from '../pages/DailyContest/contest';
@@ -95,14 +95,14 @@ export function toContest({ title, config, board, history }) {
 
 function readBoard(type) {
   return request(RACE.leaderboard(type), { live: true }).catch((error) => {
-    if (idle(error)) return null;
+    if (idle(error) || isAgentBlocked(error)) return null;
     throw error;
   });
 }
 
 function liveContest(title, type = 'daily') {
   return Promise.all([
-    request(RACE.configs, { live: true }),
+    request(RACE.configs, { live: true }).catch(emptyIfAgentBlocked([])),
     readBoard(type),
     request(RACE.history, { live: true, params: { type, limit: 1 } }).catch(() => []),
   ]).then(([configs, board, history]) =>

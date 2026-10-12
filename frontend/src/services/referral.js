@@ -1,4 +1,4 @@
-import { request, USE_FIXTURES } from './client';
+import { emptyIfAgentBlocked, request, USE_FIXTURES } from './client';
 import ENDPOINTS, { PLATFORM } from './endpoints';
 import { HERO, CARDS, PROGRAM, FAQ, FAQ_TITLE, LIVE, DASHBOARD_INFO } from '../pages/Referral/referral';
 import { SIGNED_IN } from '../context/account';
@@ -112,7 +112,7 @@ export const getInvitationCode = () => {
      whether a Promise came back rather than on inspecting the object. */
   if (!answer || typeof answer.then !== 'function') return answer;
 
-  return answer.then((data) => ({
+  return answer.catch(emptyIfAgentBlocked(null)).then((data) => ({
     invitationCode: data?.referralCode ?? '',
     aliasCode: data?.referralCode ?? '',
     invitationUrl: data?.referralCode ? inviteUrl(data.referralCode) : '',
@@ -139,7 +139,7 @@ export const getAffiliateDashboard = ({ reloads } = {}) => {
 
   if (!team || typeof team.then !== 'function') return DASHBOARD_INFO;
 
-  return Promise.all([team, readRewards(), readUnclaimed(), readTodayRewards()]).then(
+  return Promise.all([team.catch(emptyIfAgentBlocked(null)), readRewards(), readUnclaimed(), readTodayRewards()]).then(
     ([members, earned, open, today]) => {
       const { tier, commission } = splitUnclaimed(open);
       /* Commission ever credited (claimed or not) is `rewards.totalAmount`; what is still open is
@@ -339,7 +339,10 @@ export const getInviteCodes = () => {
 
   const team = request(PLATFORM.user.affiliate.team, { live: true, fixture: null });
 
-  return Promise.all([summary, team]).then(([info, members]) => ({
+  return Promise.all([
+    summary.catch(emptyIfAgentBlocked(null)),
+    team.catch(emptyIfAgentBlocked(null)),
+  ]).then(([info, members]) => ({
     list: info?.referralCode ? [codeRow(info.referralCode, Number(members?.total) || 0)] : [],
     totalCodeNum: 20,
     createdNum: info?.referralCode ? 1 : 0,

@@ -1,4 +1,4 @@
-import { request, USE_FIXTURES } from './client';
+import { emptyIfAgentBlocked, request, USE_FIXTURES } from './client';
 import ENDPOINTS from './endpoints';
 import { BONUSES } from '../pages/DepositOffer/depositOffer';
 
@@ -20,7 +20,8 @@ import { BONUSES } from '../pages/DepositOffer/depositOffer';
  * The path lives here rather than in endpoints.js because this module is its only caller. */
 const FIRST_DEPOSIT = '/api/v1/user/bonus/first-deposit';
 
-const readFirstDeposit = () => request(FIRST_DEPOSIT, { live: true, fixture: null });
+const readFirstDeposit = () =>
+  Promise.resolve(request(FIRST_DEPOSIT, { live: true, fixture: null })).catch(emptyIfAgentBlocked(null));
 
 const liveTiers = (terms) =>
   terms?.enabled && Array.isArray(terms.tiers) ? terms.tiers.filter((t) => Number(t?.percent) > 0) : [];

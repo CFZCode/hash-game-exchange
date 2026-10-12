@@ -127,6 +127,22 @@ export class ApiError extends Error {
   }
 }
 
+/* AN AGENT-TREE PLAYER'S REFUSAL IS AN EMPTY SECTION, NOT A FAILURE. A player under an agent
+   gets `403 PROMOTIONS_NOT_FOR_AGENT_USERS` (or VAULT_/DEPOSIT_/… — @ibitplay/auth
+   `agentPlayers.js`) from every route of a section the gates already hide from them; a read that
+   still fires (the header's gift badge, a gated page in the instant before its redirect) must
+   render as "nothing there" rather than throw an uncaught ApiError. Anything else re-throws.
+
+     request(PLATFORM.user.bonus.summary, { live: true }).catch(emptyIfAgentBlocked(null))
+*/
+export const isAgentBlocked = (error) =>
+  error instanceof ApiError && error.status === 403 && /_NOT_FOR_AGENT_USERS$/.test(String(error.code ?? ''));
+
+export const emptyIfAgentBlocked = (empty) => (error) => {
+  if (isAgentBlocked(error)) return empty;
+  throw error;
+};
+
 function unwrap(body, path, status) {
   if (!body || typeof body !== 'object') return body;
 

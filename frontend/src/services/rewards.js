@@ -1,4 +1,4 @@
-import { request, USE_FIXTURES } from './client';
+import { emptyIfAgentBlocked, request, USE_FIXTURES } from './client';
 import ENDPOINTS, { PLATFORM } from './endpoints';
 import { buildRewards } from '../pages/Bonus/bonus';
 import RewardType from '../pages/Bonus/rewardTypes';
@@ -143,8 +143,8 @@ export function getRewards({ now, reloads } = {}) {
   if (USE_FIXTURES) return request(ENDPOINTS.bonus.rewards, { fixture: payload });
 
   return Promise.all([
-    request(PLATFORM.user.bonus.summary, { live: true }),
-    request(PLATFORM.user.rakeback.summary, { live: true }),
+    request(PLATFORM.user.bonus.summary, { live: true }).catch(emptyIfAgentBlocked(null)),
+    request(PLATFORM.user.rakeback.summary, { live: true }).catch(emptyIfAgentBlocked(null)),
   ]).then(([summary, rakeback]) => merge(payload, summary, rakeback));
 }
 
