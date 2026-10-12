@@ -192,18 +192,59 @@ async function visibleStaffIds(models, staffId, { logger, hops = 0 } = {}) {
   if (!own.length) return own;
 
   const me = await models.Staff.findByPk(Number(staffId), { attributes: ['id', 'role_id', 'parent_id'], raw: true });
-  const role = me?.role_id ? await models.Roles.findByPk(me.role_id, { attributes: ['level'], raw: true }) : null;
-  const level = Number(role?.level);
+  const level = await levelOfRole(models, me?.role_id);
   if (level === STAFF_LEVELS.EXECUTIVE && me?.parent_id && hops < MAX_DEPTH) {
     const parents = await visibleStaffIds(models, me.parent_id, { logger, hops: hops + 1 });
     return [...new Set([...own, ...parents.map(Number)])];
   }
   if (!Number.isFinite(level) || level > STAFF_LEVELS.SUB_ADMIN) return own;
 
+  return everyTree(models, own, { logger });
+}
+
+/**
+ * The staff accounts this staff member may SEE AND MANAGE as staff — the
+ * staff list and tree, staff detail, status, locks, limits and transfers.
+ *
+ * A Super Admin (level 1) is the site's owner: every staff tree on the site,
+ * whatever row it hangs from. Walking down from their own row is not that —
+ * the bootstrap Super Admin and a seeded `demo_superadmin` are both roots
+ * (`parent_id` NULL), so each saw only its own tree and the bootstrap account
+ * listed none of the demo staff.
+ *
+ * Every other level, Admin and Sub Admin included, keeps its own subtree:
+ * authority over a staff account still means being above it in the tree.
+ * (Which PLAYERS a back-office role may read is `visibleStaffIds`.)
+ *
+ * `level` is the caller's resolved session level (`req.staff.level`, read from
+ * the current row by `resolveStaff`); without it the row's role is looked up.
+ */
+async function manageableStaffIds(models, staffId, { logger, level } = {}) {
+  const own = await descendantIds(models, staffId, { logger });
+  if (!own.length) return own;
+
+  let actorLevel = level == null ? NaN : Number(level);
+  if (level == null) {
+    const me = await models.Staff.findByPk(Number(staffId), { attributes: ['id', 'role_id'], raw: true });
+    actorLevel = await levelOfRole(models, me?.role_id);
+  }
+  if (actorLevel !== STAFF_LEVELS.SUPER_ADMIN) return own;
+
+  return everyTree(models, own, { logger });
+}
+
+async function levelOfRole(models, roleId) {
+  if (roleId == null) return NaN;
+  const role = await models.Roles.findByPk(roleId, { attributes: ['level'], raw: true });
+  return Number(role?.level);
+}
+
+/** `own` plus every staff account under every root (`parent_id` NULL) on the site. */
+async function everyTree(models, own, { logger } = {}) {
   const roots = await models.Staff.findAll({ where: { parent_id: null }, attributes: ['id'], raw: true });
-  const all = new Set(own);
+  const all = new Set(own.map(Number));
   for (const { id } of roots) {
-    for (const found of await descendantIds(models, id, { logger })) all.add(found);
+    for (const found of await descendantIds(models, id, { logger })) all.add(Number(found));
   }
   return [...all];
 }
@@ -411,12 +452,13 @@ async function betLockState(models, staffId, { logger } = {}) {
 /**
  * The staff accounts this caller may lock, with their current state.
  *
- * Scoped to the caller's own subtree — legacy returned whatever
+ * Scoped to the staff the caller manages (`manageableStaffIds`: their own
+ * subtree, or the whole site for a Super Admin) — legacy returned whatever
  * `visibleStaffIds(req.headers['x-staff-id'])` produced, and that header is
  * set by the caller.
  */
 async function betLockList(models, staffId, { logger } = {}) {
-  const ids = await descendantIds(models, staffId, { logger });
+  const ids = await manageableStaffIds(models, staffId, { logger });
 
   const rows = await models.Staff.findAll({
     where: { id: ids },
@@ -449,7 +491,7 @@ async function setBetLock(models, { staffId, locked, actorStaffId }, { logger } 
     return { ok: false, reason: 'an account cannot change its own bet lock' };
   }
 
-  const visible = await descendantIds(models, actorStaffId, { logger });
+  const visible = await manageableStaffIds(models, actorStaffId, { logger });
   if (!visible.map(Number).includes(Number(staffId))) {
     return { ok: false, reason: 'that account is not in your hierarchy' };
   }
@@ -531,6 +573,7 @@ module.exports = {
   resolveStaff,
   descendantIds,
   visibleStaffIds,
+  manageableStaffIds,
   normalisePermissions,
   verifyTransactionPassword,
   MAX_DEPTH,

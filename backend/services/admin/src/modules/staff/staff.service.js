@@ -6,7 +6,7 @@ const { money, withdrawBlock } = require('@ibitplay/common');
 
 const errors = require('./staff.errors');
 const { TRANSFER_DIRECTION, TARGET_TYPE, BALANCE_CURRENCY, PASSWORD_ROUNDS } = require('./staff.constants');
-const { descendantIds } = require('../staff-directory/staffDirectory.service');
+const { descendantIds, manageableStaffIds } = require('../staff-directory/staffDirectory.service');
 const { debitStaffFloat } = require('../lords/staffFloat');
 const { assertTransactionPassword } = require('../staff-auth/transactionPassword');
 
@@ -857,9 +857,9 @@ class StaffService {
     }
   }
 
-  /** Self plus every descendant, from the closure table. */
+  /** Self plus every descendant — or every staff tree on the site for a Super Admin. */
   async #visibleStaffIds(actor) {
-    return descendantIds(this.models, actor.id, { logger: this.logger });
+    return manageableStaffIds(this.models, actor.id, { logger: this.logger, level: actor.level });
   }
 
   async #assertVisible(actor, staffId) {

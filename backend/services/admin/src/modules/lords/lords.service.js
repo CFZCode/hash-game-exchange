@@ -6,7 +6,7 @@ const { hashPassword } = require('@ibitplay/auth');
 
 const errors = require('./lords.errors');
 const { ACCOUNT_TYPE, PASSWORD_ROUNDS } = require('./lords.constants');
-const { descendantIds, verifyTransactionPassword } = require('../staff-directory/staffDirectory.service');
+const { manageableStaffIds, verifyTransactionPassword } = require('../staff-directory/staffDirectory.service');
 const { directSources } = require('../locks/lockSources');
 const {
   assertTransactionPassword,
@@ -513,7 +513,7 @@ class LordsService {
 
   /** @legacy GET /lords/transfer/statement */
   async transferStatement({ actor, accountType, accountId, from, to, limit = 50, offset = 0 }) {
-    const staffIds = await descendantIds(this.models, actor.id, { logger: this.logger });
+    const staffIds = await manageableStaffIds(this.models, actor.id, { logger: this.logger, level: actor.level });
 
     const scope = accountId
       ? { type: accountType ?? ACCOUNT_TYPE.USER, id: await this.#assertInTree(actor, accountType ?? ACCOUNT_TYPE.USER, accountId) }
@@ -606,7 +606,7 @@ class LordsService {
    * against. See the sign note on `#rollupPnl` before touching a P&L field.
    */
   async allDetails({ actor, search, limit = 50, offset = 0, parentId }) {
-    const visible = (await descendantIds(this.models, actor.id, { logger: this.logger })).map(Number);
+    const visible = (await manageableStaffIds(this.models, actor.id, { logger: this.logger, level: actor.level })).map(Number);
     const rootId = parentId != null ? Number(parentId) : Number(actor.id);
     if (!visible.includes(rootId)) throw errors.NOT_IN_YOUR_TREE({ accountId: rootId });
 
@@ -870,10 +870,10 @@ class LordsService {
    * NOT_IN_YOUR_TREE with a right, wrong or missing password alike.
    */
   async #assertInTree(actor, accountType, accountId, { excludeSelf = null } = {}) {
-    const staffIds = (await descendantIds(this.models, actor.id, { logger: this.logger })).map(Number);
+    const staffIds = (await manageableStaffIds(this.models, actor.id, { logger: this.logger, level: actor.level })).map(Number);
 
     if (accountType === ACCOUNT_TYPE.STAFF) {
-      // `descendantIds` includes the caller. Settings that would let an
+      // `manageableStaffIds` includes the caller. Settings that would let an
       // account raise its own limits or reset its own password pass a reason
       // here and act only on accounts strictly below.
       if (excludeSelf && Number(accountId) === Number(actor.id)) {
