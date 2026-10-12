@@ -197,8 +197,26 @@ export const updatePreferences = (patch) =>
     fixture: null,
   });
 
-export const getPrivacy = (uid) =>
-  request(ENDPOINTS.settings.privacy(uid), { fixture: PRIVACY });
+/* ── Privacy: ONE of the three rows has a platform equivalent ──────────────────────────────
+ *
+ * `GET/PATCH /user/tip/settings` `{enabled}` — whether this account accepts tips. bc.game's
+ * "Refuse tip from strangers" is its inverse, so `refuseTip = !enabled`. Hide-gaming-data and
+ * hide-username have no route on SmartBet and stay the local store's (see context/settings.js). */
+const TIP_SETTINGS = '/api/v1/user/tip/settings';
+
+export const getPrivacy = (uid) => {
+  if (USE_FIXTURES) return request(ENDPOINTS.settings.privacy(uid), { fixture: PRIVACY });
+  return Promise.resolve(request(TIP_SETTINGS, { live: true, fixture: null })).then((tips) => ({
+    ...PRIVACY,
+    refuseTip: tips?.enabled === false,
+  }));
+};
+
+/** Write the one server-backed privacy row. Live only; with fixtures on the switch stays local. */
+export const setRefuseTip = (refuse) =>
+  USE_FIXTURES
+    ? Promise.resolve(null)
+    : request(TIP_SETTINGS, { live: true, method: 'PATCH', json: { enabled: !refuse }, fixture: null });
 
 /* ── KYC ───────────────────────────────────────────────────────────────────────────────────
  *

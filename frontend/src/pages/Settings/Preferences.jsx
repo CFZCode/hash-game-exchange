@@ -5,7 +5,8 @@ import { languageName } from '../../components/modals/LanguageCurrencyModal/lang
 import { useSession } from '../../context/session';
 import { useSettings } from '../../context/settings';
 import { useResource } from '../../hooks/useResource';
-import { getPrivacy, updatePreferences } from '../../services/settings';
+import { getPrivacy, setRefuseTip, updatePreferences } from '../../services/settings';
+import { USE_FIXTURES } from '../../services/client';
 import { showToast } from '../../components/shared/Toast/toast';
 import { getAlias } from '../../utils/currency';
 import { coinIcon } from '../../utils/coinArt';
@@ -141,7 +142,35 @@ function PrivacyRows() {
      store, which is what a visitor last set — see the note in `context/settings.js` for why that
      is a divergence worth taking over a control that does not move. */
   const read = React.useCallback(() => getPrivacy(session.uid), [session.uid]);
-  useResource(read);
+  const { data: served } = useResource(read);
+
+  /* Live, `refuseTip` IS server state (SmartBet's tip settings), so the switch adopts the server's
+     answer once it lands, and a flip is written there before the toast — the original's
+     write-then-toast order. A refusal flips it back and shows the server's message. */
+  /* Applied ONCE per served value: `setPrivacy` changes identity with every privacy change, so
+     without the guard the effect would re-apply the served value after each flip and undo it. */
+  const serverRefuseTip = served?.refuseTip;
+  const applied = React.useRef(null);
+  React.useEffect(() => {
+    if (USE_FIXTURES || typeof serverRefuseTip !== 'boolean' || applied.current === serverRefuseTip) return;
+    applied.current = serverRefuseTip;
+    setPrivacy({ refuseTip: serverRefuseTip });
+  }, [serverRefuseTip, setPrivacy]);
+
+  const toggle = (row, next) => {
+    setPrivacy({ [row.key]: next });
+    if (row.key !== 'refuseTip' || USE_FIXTURES) {
+      showToast(next ? row.on : row.off, { type: `privacy:${row.key}` });
+      return;
+    }
+    Promise.resolve(setRefuseTip(next)).then(
+      () => showToast(next ? row.on : row.off, { type: `privacy:${row.key}` }),
+      (failure) => {
+        setPrivacy({ [row.key]: !next });
+        showToast(failure?.message || 'Could not save this setting.', { type: `privacy:${row.key}` });
+      },
+    );
+  };
 
   return (
     <>
@@ -150,10 +179,7 @@ function PrivacyRows() {
           <Switch
             size="small"
             value={privacy[row.key]}
-            onChange={(next) => {
-              setPrivacy({ [row.key]: next });
-              showToast(next ? row.on : row.off, { type: `privacy:${row.key}` });
-            }}
+            onChange={(next) => toggle(row, next)}
           />
         </Row>
       ))}
