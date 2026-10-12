@@ -591,12 +591,21 @@ function AppShell() {
      it bit hardest in development, where an edit triggers a full reload on whatever dialog you
      happen to have open).
 
-     `history.length > 1` is the test — the browser's own count, standing in for `navDepth()`,
+     React Router's `history.state.idx > 0` is the test (see below), standing in for `navDepth()`,
      which is what the original clamps its jump by and which a reload likewise resets. Note the
      original clamps to `max(navDepth, 0)`, so a refreshed dialog's arrow there does nothing at
      all; going back one is the better answer here, and `/` stays as the answer when there is
      genuinely nothing behind (a link opened in a fresh tab). */
-  const historyFallback = () => (window.history.length > 1 ? navigate(-1) : navigate('/'));
+  /* `history.length` COUNTS ENTRIES THAT ARE NOT THIS APP'S, and that sent visitors off-site.
+     A tab opened straight on `/login/signin` (a new tab, an external link, a test harness's
+     `about:blank`) has length 2, so a successful sign-in closed the dialog with `navigate(-1)`
+     and the tab went back to the page BEFORE the app: about:blank ~300ms after sign-in, the
+     dialog's exit timer. React Router keeps its own position in `history.state.idx` — 0 on the
+     first entry this app wrote, and it survives a reload with the entry — so `idx > 0` is
+     exactly "there is a page of ours behind this one". The hash-games reference has the same
+     bug; this is a deliberate behavioural divergence, no pixel moves. */
+  const historyFallback = () =>
+    (window.history.state?.idx ?? 0) > 0 ? navigate(-1) : navigate('/');
 
   const closeOverlay = () =>
     pageLocation === location ? historyFallback() : navigate(-Math.max(1, depth));
