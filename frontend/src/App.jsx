@@ -71,6 +71,7 @@ import { USE_FIXTURES } from './services/client';
 import useMediaQuery, { useIsDesktop } from './hooks/useMediaQuery';
 import { SessionProvider } from './context/SessionContext';
 import { SettingsProvider } from './context/SettingsContext';
+import { GatesProvider } from './context/GatesContext';
 import { useSession } from './context/session';
 
 function AppShell() {
@@ -1132,7 +1133,9 @@ function App() {
        the session tree and never the reverse. Signing out must not reset the theme. */
     <SettingsProvider>
       <SessionProvider>
-        <AppShell />
+        <GatesProvider>
+          <AppShell />
+        </GatesProvider>
       </SessionProvider>
     </SettingsProvider>
   );

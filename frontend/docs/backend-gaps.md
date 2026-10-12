@@ -319,6 +319,30 @@ providers, about half of them with artwork. The paths are in `services/catalog.j
 | Help → provably-fair game picker | `js-games/v1/games?vendor=in-house` | Connected |
 | Blog | `admin/blogs` exists | **Ready**, but this UI has no blog page |
 
+## Part 1d — Gating: owner plan, admin switches and agent players, 2026-10-12
+
+The SmartBet rules (`siteGates.ts` / `siteFeatures.tsx`), ported in `services/gates.js` and
+`context/GatesContext.jsx` (`useGates()` → `on(gate)`, `routeOn(path)`, `can(capability)`,
+`canSignUp()`). With fixtures on everything is on and nothing is read.
+
+| Source | Route | State |
+| --- | --- | --- |
+| Owner plan (feature listed = on, plus `business_model`) | `GET admin/features/public` | **Connected**, read on load and again on focus (at most every 10 s). SmartBet re-reads on the `featuresUpdated` socket push; this build has no socket client |
+| Site admin switches (`bonus`, `vipclub`, `affiliate`, `lotto`, `sports`) | `GET admin/site-config/public` | **Connected**, same timing |
+| Player capabilities (agent-tree players: all false) | `GET user/auth/me` → `capabilities` | **Connected**. Unknown while it loads, so capability rows stay hidden until it answers (SmartBet's rule) |
+
+What is hidden: the wallet rail, the account dropdown, the mobile account page, the sidebar, the
+footer columns, the header Deposit button and gift. A direct visit to a switched-off route goes to `/`.
+The gate table is `GATES` / `ROUTES` in `services/gates.js`. History (transaction, rollover, bet
+history, deposit and withdrawal details) is never gated.
+
+Sign-up: a B2B site opens Sign Up on the Sign In form, with the backend's refusal in its error slot.
+A refused sign-up (`SITE_POLICY_CHANNEL_CLOSED`, `REGION_RESTRICTED`, `NOT_ENTITLED`) moves to Sign In
+and shows the server's message there. A staff login on the player route is refused by the backend
+with `401 AUTH_INVALID_CREDENTIALS` (staff are a separate table), which the dialog already shows.
+Not gated yet: chat and notification buttons (hiding one breaks the shared button group's
+divider) and the home hero's deposit slide.
+
 ## Part 2 — The backend has it, we are not using it yet
 
 No backend work needed. Listed so nobody builds these twice.

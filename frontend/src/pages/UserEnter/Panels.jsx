@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSession } from '../../context/session';
+import { useGates } from '../../context/gates';
 import { amount2usd, getAlias, printCurrency } from '../../utils/currency';
 import { VIP_LEVELS, vipTier, vipTypeNum } from '../../data/vipConfig';
 import { getInvitationCode } from '../../services/referral';
@@ -264,6 +265,11 @@ const TILES = [
 function BalanceCard() {
   const { session, balances } = useSession();
   const navigate = useNavigate();
+  /* What the site and account have on (services/gates.js): an agent's player has no deposit or
+     withdraw rail, so neither button, and only the history tiles. All on with fixtures. */
+  const { on, routeOn } = useGates();
+  const depositOn = on('deposit');
+  const withdrawOn = on('withdraw');
 
   /* `Object.values(x1).reduce((g, a) => g.add(convertCurrency(a.amount, a.currencyName)))` —
      the whole wallet converted coin by coin and then summed, which is the same figure the
@@ -284,6 +290,7 @@ function BalanceCard() {
       </div>
 
       <div className="rounded-lg bg-layer4 p-3">
+        {(depositOn || withdrawOn) && (
         <div className="flex w-full items-center justify-between gap-3">
           {/* `size: "m"` is passed EXPLICITLY on these two, and that matters on this page: `ot`
               derives it as `size || !mobile && "m"`, so on a phone — which is the only place
@@ -295,6 +302,7 @@ function BalanceCard() {
               `button_bright` text — so the mark always matches the label beside it. The `icon`
               class has to be written at the call site here because this project's icon
               components are the bare <svg> without the original's wrapper. */}
+          {depositOn && (
           <button
             type="button"
             className="button button-m button-brand flex-1"
@@ -303,6 +311,8 @@ function BalanceCard() {
             <IconDeposit className="icon size-6" />
             <span className="ml-2 font-semibold">Deposit</span>
           </button>
+          )}
+          {withdrawOn && (
           <button
             type="button"
             className="button button-m button-second flex-1"
@@ -311,10 +321,12 @@ function BalanceCard() {
             <IconWithdraw className="icon size-6" />
             <span className="ml-2 font-semibold">Withdraw</span>
           </button>
+          )}
         </div>
+        )}
 
         <div className="mt-1 flex w-full flex-wrap">
-          {TILES.filter((tile) => tile.show).map(({ label, Icon, link }) => (
+          {TILES.filter((tile) => tile.show && routeOn(tile.link)).map(({ label, Icon, link }) => (
             <button
               key={label}
               type="button"
@@ -364,7 +376,7 @@ const RowLabel = ({ children }) => (
  * carries that value as `warning`. */
 const SecurityStatus = () => <IconAttention className="size-5 fill-warning" />;
 
-function SettingsCards({ onRefer, onLanguage, onCurrency, confirm }) {
+function SettingsCards({ onRefer, onLanguage, onCurrency, confirm, affiliateOn = true }) {
   const { session } = useSession();
 
   /* `O.langs[R.lang]?.[0] ?? "English"`. There is no language store in this build — the
@@ -410,6 +422,7 @@ function SettingsCards({ onRefer, onLanguage, onCurrency, confirm }) {
 
         {/* `J.emit("open-refer")` — the same event the sidebar's Refer and Earn row emits, and
             the same dialog it opens. */}
+        {affiliateOn && (
         <div
           className="btn-like mt-1 flex h-11 w-full items-center px-3"
           onClick={onRefer}
@@ -418,14 +431,17 @@ function SettingsCards({ onRefer, onLanguage, onCurrency, confirm }) {
           <RowLabel>Refer and Earn</RowLabel>
           <Chevron className="ml-auto" />
         </div>
+        )}
 
         {/* `/referral` and NOT `/referral-exhibition`: this row can only be reached signed in,
             which is the side of that pair the dashboard serves. */}
+        {affiliateOn && (
         <Link to="/referral" className="btn-like mt-1 flex h-11 w-full items-center px-3">
           <IconReferral className="size-6 fill-secondary" />
           <RowLabel>Referral</RowLabel>
           <Chevron className="ml-auto" />
         </Link>
+        )}
       </div>
 
       <div className="mt-3 w-full rounded-lg bg-layer4 py-2">
@@ -643,6 +659,9 @@ function SupportBlock({ onSignOut }) {
 }
 
 export default function UserEnterPanels(props) {
+  /* VIP and the referral programme are promotions: gone when the site or the account has them
+     off (an agent's player). services/gates.js; all on with fixtures. */
+  const { on } = useGates();
   return (
     <>
       <ProfileHeader />
@@ -652,10 +671,10 @@ export default function UserEnterPanels(props) {
           It was bumped to `pt-6` while the 24px of phantom space was still there and the two were
           being read as one number. */}
       <div className="bg-layer2 pt-4">
-        <VipCard />
+        {on('vip') && <VipCard />}
         <BalanceCard />
-        <SettingsCards {...props} />
-        <ReferBanner />
+        <SettingsCards {...props} affiliateOn={on('affiliate')} />
+        {on('affiliate') && <ReferBanner />}
         <SupportBlock {...props} />
       </div>
     </>

@@ -1,6 +1,8 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSession } from '../../../context/session';
+import { useGates } from '../../../context/gates';
+import { SIGNUP_CLOSED_MESSAGE } from '../../../services/gates';
 import useDialogScrollLock from '../../../hooks/useDialogScrollLock';
 import { useIsDesktop } from '../../../hooks/useMediaQuery';
 import Loading from '../../shared/Loading';
@@ -84,6 +86,12 @@ const AUTH_MESSAGES = {
   AUTH_ALREADY_REGISTERED: 'That email or username is already registered.',
   TOO_MANY_REQUESTS: 'Too many attempts. Please try again later.',
 };
+
+/* The site itself refusing a sign-up rather than the form's values: a B2B (agent-only) site
+   (`SITE_POLICY_CHANNEL_CLOSED`, backend sitePolicy.js), the owner's region block
+   (`REGION_RESTRICTED`), or the plan (`NOT_ENTITLED`). The Sign Up tab has no error slot of its
+   own, so these move to Sign In and print the server's message in ITS slot. */
+const SIGNUP_REFUSALS = new Set(['SITE_POLICY_CHANNEL_CLOSED', 'REGION_RESTRICTED', 'NOT_ENTITLED']);
 
 /* The strip's indicator is positioned by two custom properties that the original computes in
  * JS from measured tab widths — the capture had `--tabs-width: 188px` with
@@ -622,8 +630,14 @@ function SignUpForm({ onSubmit }) {
   );
 }
 
-export default function Auth({ mode, onClose, enter = 'open' }) {
+export default function Auth({ mode: requested, onClose, enter = 'open' }) {
   const navigate = useNavigate();
+  /* A B2B (agent-only) site has no public sign-up (services/gates.js `canSignUp`): Sign Up
+     opens on the Sign In form with the backend's refusal in its error slot, and sign-in stays.
+     Always open with fixtures. */
+  const gates = useGates();
+  const signUpClosed = requested === SIGN_UP && gates.ready && !gates.canSignUp();
+  const mode = signUpClosed ? SIGN_IN : requested;
   const { signIn, authenticate, signUp } = useSession();
   /* The manager's own `ee.mobile`, which decides WHICH animation this dialog gets rather than
      how big it is — see the note over the render. `lg` is the line this project maps that flag
@@ -724,6 +738,7 @@ export default function Auth({ mode, onClose, enter = 'open' }) {
             failure?.message ||
             'Could not create your account. Please try again.',
         );
+        if (SIGNUP_REFUSALS.has(failure?.code)) navigate('/login/signin', { replace: true });
       }
       return;
     }
@@ -874,7 +889,11 @@ export default function Auth({ mode, onClose, enter = 'open' }) {
                     {mode === SIGN_UP ? (
                       <SignUpForm onSubmit={submit} />
                     ) : (
-                      <SignInForm onSubmit={submit} pending={pending} error={error} />
+                      <SignInForm
+                        onSubmit={submit}
+                        pending={pending}
+                        error={error || (signUpClosed ? SIGNUP_CLOSED_MESSAGE : '')}
+                      />
                     )}
                     <div className="mt-auto px-6 sm:px-8" />
                   </div>

@@ -9,6 +9,7 @@ import { CommunityItem, GlobalIcon } from '../../../components/shared/CommunityI
 import { COLUMNS, SEO, FEEDBACK, LEGAL } from './links';
 import { AWARDS, PARTNERS } from './badges';
 import { useSettings } from '../../../context/settings';
+import { useGates } from '../../../context/gates';
 import { siteLogo } from '../../../services/siteBranding';
 import './Footer.css';
 
@@ -126,6 +127,8 @@ const PartnerLogo = ({ src, alt, width, href, internal }) => (
 const BLURB_SHOWN_ON = ['/'];
 
 export default function Footer() {
+  /* A link into a section the site or the account has off is not drawn (services/gates.js). */
+  const { routeOn } = useGates();
   /* Two things in this footer are per-theme FILES rather than per-theme colours: the awards
      strip (`d-*` / `l-*`) and the wordmark (`logo_pure` / `logo_pure_w`). Both pairs are the
      original's own; see badges.js for how the first was recovered. */
@@ -254,7 +257,7 @@ export default function Footer() {
           <div key={column.title}>
             <h4 className="mb-5 text-base font-extrabold text-primary">{column.title}</h4>
             <ul className="flex flex-col gap-y-3">
-              {column.links.map((link) => (
+              {column.links.filter((link) => link.external || routeOn(link.href)).map((link) => (
                 <li key={link.label}>
                   <NavLink {...link} />
                 </li>

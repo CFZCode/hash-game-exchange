@@ -6,6 +6,7 @@ import { FLYOUTS } from './originals';
 import SOCIALS from '../../../components/modals/RegionBlock/icons';
 import { CommunityItem, GlobalIcon } from '../../../components/shared/CommunityItem';
 import { useSession } from '../../../context/session';
+import { useGates } from '../../../context/gates';
 import { useSettings } from '../../../context/settings';
 import './Sidebar.css';
 import bcTokenLogo from '../../../assets/bc_token_logo.png';
@@ -243,6 +244,14 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
      threaded down from MainLayout — the sidebar is the only consumer. */
   const { session } = useSession();
   const [openMenus, setOpenMenus] = useState({});
+  /* And the rows the site or the account has switched off (services/gates.js) — a section the
+     owner took out of the plan, or promotions for an agent's player. External links are never
+     gated; Refer and Earn has no href and follows the affiliate section. All on with fixtures. */
+  const gates = useGates();
+  const shown = (items) =>
+    visibleItems(items, session.login).filter((i) =>
+      i.action === 'refer' ? gates.on('affiliate') : !i.href || i.external || gates.routeOn(i.href),
+    );
 
   /* THE SECOND THEME CONTROL IN THE APP, and it reads the same store as the first. It was
      `useState(true)` — a purely visual toggle that moved its own pill and told nothing — which is
@@ -630,7 +639,7 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
               {/* ============================================================ */}
               {/* 3. MAIN NAV ITEMS (color_icon_img sprite)                     */}
               {/* ============================================================ */}
-              {mainNavItems.map(item => (
+              {mainNavItems.filter((item) => gates.routeOn(item.href)).map(item => (
                 <div key={item.id} className="Sidebar-Unit_bg mt-1 overflow-hidden rounded-lg">
                   {/* Header row */}
                   <div
@@ -659,7 +668,7 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
                     <div className="overflow-hidden">
                       <div className="h-0 w-full border-t border-third"></div>
                       <div className="px-1.5 pb-1">
-                        {visibleItems(item.subItems, session.login).map((sub, idx) => (
+                        {shown(item.subItems).map((sub, idx) => (
                           <SubNavLink
                             key={idx}
                             item={sub}
@@ -683,7 +692,7 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
                   `href="#"` and the `inactive` marker they had, because sending an unbuilt page
                   to the catch-all would silently show Home. VIP Club is the only one so far. */}
               <div className="Sidebar-Unit_bg relative my-3 w-full rounded-lg px-0 pb-2 pt-1 lg:my-2 lg:p-0">
-                {visibleItems(bottomItems, session.login).map(item => {
+                {shown(bottomItems).map(item => {
                   const active = Boolean(item.href) && pathname === item.href;
                   const className = `nav-link-item relative flex h-10 w-full cursor-pointer items-center rounded-lg px-3 lg:pl-0 lg:pr-2 overflow-hidden mt-1 ${
                     active ? 'nav-link-active' : 'inactive'

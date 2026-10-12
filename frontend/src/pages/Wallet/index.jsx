@@ -2,6 +2,7 @@ import { NavLink, Outlet } from 'react-router-dom';
 import useMediaQuery from '../../hooks/useMediaQuery';
 import MenuPageLayout, { Sticky } from '../../components/shared/MenuPageLayout';
 import { WALLET_MENU } from './menu';
+import { useGates } from '../../context/gates';
 import './Wallet.css';
 
 /* `/wallet` — `WalletLayout`, `index-nvcIJcIg.js`, recovered from `hash.game/assets/`. Neither it
@@ -94,6 +95,12 @@ export default function WalletLayout() {
      DOM. Reproduced the same way. */
   const title = 'wallet'.toUpperCase();
 
+  /* The rail filtered by what this site and account have on (services/gates.js) — the same
+     `.filter` the original runs over its deploy profile. An agent's player keeps Balance and the
+     three history rows. Everything is on with fixtures. */
+  const { routeOn } = useGates();
+  const rows = WALLET_MENU.filter((row) => routeOn(row.href));
+
   if (!wide) {
     return (
       /* `-mt-6` on the outer box and `pt-6` back on the heading: the shell pulls itself up under
@@ -109,7 +116,7 @@ export default function WalletLayout() {
             {/* `pan="x"` is the original's touch-scroll wrapper; `hide-scroll` is already in
                 index.css. `light-layer2-tabs` is a light-theme-only rule and is inert here. */}
             <div className="page-menu light-layer2-tabs hide-scroll flex size-full flex-none flex-nowrap whitespace-nowrap rounded-xl bg-layer4 p-1">
-              {WALLET_MENU.map((row) => (
+              {rows.map((row) => (
                 <RailLink
                   key={row.key}
                   row={row}
@@ -139,7 +146,7 @@ export default function WalletLayout() {
   return (
     <MenuPageLayout
       title={title}
-      menu={WALLET_MENU.map((row) => ({
+      menu={rows.map((row) => ({
         key: row.key,
         href: row.href,
         title: <RailLabel icon={row.icon} title={row.title} />,

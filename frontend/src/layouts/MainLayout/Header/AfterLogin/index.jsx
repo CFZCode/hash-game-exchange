@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSession } from '../../../../context/session';
+import { useGates } from '../../../../context/gates';
 import useResource from '../../../../hooks/useResource';
 import useMediaQuery from '../../../../hooks/useMediaQuery';
 import { getRewards } from '../../../../services/rewards';
@@ -208,6 +209,7 @@ const BonusNotifications = () => {
  */
 function Wallet({ mobile = false }) {
   const { session, balances } = useSession();
+  const depositOn = useGates().on('deposit');
   const navigate = useNavigate();
   const [open, setOpen] = React.useState(false);
   /* The Manage Assets sheet is opened FROM the dropdown and outlives it — the `+` closes the
@@ -266,7 +268,9 @@ function Wallet({ mobile = false }) {
           <IconArrow className="size-5 -rotate-90 fill-secondary" />
         </div>
 
-        {/* `not-full` is the same dead class the referral page's Send Now button carries. */}
+        {/* `not-full` is the same dead class the referral page's Send Now button carries.
+            Not drawn for an account with no deposit rail (an agent's player) — services/gates.js. */}
+        {depositOn && (
         <button
           type="button"
           className="button button-brand not-full ml-auto h-8 flex-none rounded-md !bg-brand bg-none shadow-none"
@@ -278,6 +282,7 @@ function Wallet({ mobile = false }) {
         >
           {mobile ? <IconAdd className="size-4 fill-current" /> : 'Deposit'}
         </button>
+        )}
       </div>
 
       <CurrencySelect
@@ -331,7 +336,11 @@ function AccountMenu() {
     return () => document.removeEventListener('click', onDocClick, true);
   }, [open]);
 
-  const rows = ACCOUNT_MENU;
+  /* The original's own `.filter(t => !!t)` over deployment flags, here over the site's and the
+     account's gates (services/gates.js): an agent's player loses Withdraw, Buy Crypto, VIP Club,
+     Vault Pro and Referral. Every row stays with fixtures. */
+  const { routeOn } = useGates();
+  const rows = ACCOUNT_MENU.filter((row) => !row.link || routeOn(row.link));
   const panelHeight = (rows.length + 1) * 44 + 8;
 
   /* CALLED HERE AND NOT IN THE ROW, deliberately — the panel below is conditional and this
@@ -428,10 +437,13 @@ const SpriteIcon = ({ name }) => (
    wired, which is the original's arrangement: `Se` hands its logged-out arm the identical setter,
    so the room is readable without an account. See components/Chat and components/RightDrawer. */
 export default function AfterLogin({ onToggleChat, onToggleNotice }) {
+  /* The gift is the bonus section's door: gone when the site or the account has no bonus. */
+  const bonusOn = useGates().on('bonus');
   return (
     <div className="ml-3 flex items-center">
       <Wallet />
 
+      {bonusOn && (
       <div className="button center relative ml-3 h-auto rounded-lg bg-layer5 p-0 text-secondary">
         {/* No handler on the Button — `insert(n, Button(class="center relative size-10 p-0",
             Suspense(BonusNotifications)))`. The click is inside; see BonusNotifications above. */}
@@ -439,6 +451,7 @@ export default function AfterLogin({ onToggleChat, onToggleNotice }) {
           <BonusNotifications />
         </button>
       </div>
+      )}
 
       {/* `w-30` IS DROPPED, and it is the one class on this page that could not be kept.
           Tailwind v3 — which the original is on — has no `w-30` in its width scale, so the class
@@ -501,6 +514,7 @@ export default function AfterLogin({ onToggleChat, onToggleNotice }) {
  */
 export function MobileAfterLogin() {
   const navigate = useNavigate();
+  const bonusOn = useGates().on('bonus');
 
   return (
     <div className="flex size-full items-center justify-between px-3">
@@ -519,6 +533,7 @@ export function MobileAfterLogin() {
             The gift is the same component the desktop tree renders — `Cs` inserts the identical
             `Suspense(BonusNotifications)` into a Button with no handler, so a click here navigates
             to `/bonus` for exactly the same reason. */}
+        {bonusOn && (
         <button
           type="button"
           className="button center relative size-10 bg-alw_white p-0 dark:bg-white_alpha5"
@@ -526,6 +541,7 @@ export function MobileAfterLogin() {
         >
           <BonusNotifications />
         </button>
+        )}
 
         <div className="center relative rounded-lg bg-alw_white text-secondary dark:bg-white_alpha5">
           <button
