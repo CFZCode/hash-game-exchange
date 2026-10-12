@@ -1,4 +1,5 @@
 import { request } from './client';
+import { loadCapabilities } from './gates';
 import { getSiteConfig, isCurrencyEnabled } from './siteConfig';
 import { PLATFORM } from './endpoints';
 import { clearTokens, setTokens } from './tokens';
@@ -278,6 +279,17 @@ export async function login(credentials, previous) {
   return loadAccount(previous);
 }
 
+/* The bonus summary, read only for an account allowed promotions. An agent-tree player's
+   `/user/bonus` answers `403 PROMOTIONS_NOT_FOR_AGENT_USERS` on every load, so the account's
+   capabilities (`/user/auth/me`) are asked first and the read is skipped when promotions is
+   off. A failed capabilities read (`null`) still tries the summary, and an agent refusal is
+   swallowed as `null` either way — the summary only refines a figure that has a fallback. */
+async function readBonusSummary() {
+  const caps = await loadCapabilities().catch(() => null);
+  if (caps?.promotions === false) return null;
+  return Promise.resolve(request(PLATFORM.user.bonus.summary, { live: true, fixture: null })).catch(() => null);
+}
+
 /**
  * Read the signed-in account — the profile and the wallet, in one shape.
  *
@@ -300,7 +312,7 @@ export async function loadAccount(previous) {
        of the four that is allowed to fail: the other three each carry something the shell cannot
        render without, while this one refines a figure that already has an honest fallback, so a
        500 here must not cost a visitor their session. */
-    request(PLATFORM.user.bonus.summary, { live: true, fixture: null }).catch(() => null),
+    readBonusSummary(),
     /* THE FIFTH READ IS PUBLIC AND IS ALLOWED TO FAIL FOR THE SAME REASON THE FOURTH IS, but the
        failure means something stronger here: `isCurrencyEnabled` reads a missing map as "every
        currency on", so a 500 from site-config costs a visitor nothing at all — they get the

@@ -6,6 +6,7 @@ import { getHomeBanners, getFallbackBanners } from '../../../../services/banner'
 import DepositSlide from './DepositSlide';
 import { artFor, ARROW_PATH, SLIDE_PAD, CARD, CARD_BODY, CARD_TAG, CARD_BUTTON } from './card';
 import Skeleton from '../../../../components/shared/Skeleton';
+import { useGates } from '../../../../context/gates';
 import './Banner.css';
 
 /* The hero carousel the home page shows to a signed-in visitor.
@@ -422,12 +423,33 @@ function useDrag(move, setDragOffset, slideWidth) {
   };
 }
 
+/* Links into a promotion of any kind. `gateOf` (services/gates.js) knows `/promotions` and
+   `/vip` but not the per-event `/promotion-event/<slug>` or `/events/<slug>` pages the captured
+   feed points at, so those are read here as the `promotions` gate rather than as ungated. */
+const PROMO_LINK = /^\/(promotion-event|promotions|events|deposit-offer|bonus|vip|referral|free-plays|quests)(\/|$|\?)/;
+
+/* Whether a banner may be shown to this player: an agent-tree account (promotions capability
+   off) or a site with the section switched off gets no promotion bait. */
+const bannerAllowed = (gates, banner) => {
+  /* Not answered yet: the strip is showing its skeleton anyway (see `feedLoading`), and keeping
+     the slides counted keeps the early `!count` return from collapsing the box meanwhile. */
+  if (!gates.ready) return true;
+  const link = String(banner?.linkUrl ?? '');
+  if (PROMO_LINK.test(link) && !gates.on('promotions')) return false;
+  return gates.routeOn(link);
+};
+
 export default function Banner({ type = 'top' }) {
+  const gates = useGates();
   const [width, setWrapNode, wrapRef] = useElementWidth();
   const inView = useInView(wrapRef);
   const isDesktop = useIsDesktop();
 
-  const { data: feed, loading: feedLoading } = useResource(getHomeBanners);
+  const { data: feed, loading: feedFetching } = useResource(getHomeBanners);
+  /* Until the gates have answered, a signed-in player's capabilities read as closed — so the
+     strip holds its skeleton rather than painting slides it may then have to take away. Fixture
+     mode's gates are always ready, so nothing changes there. */
+  const feedLoading = feedFetching || !gates.ready;
 
   /* `from` is the position the strip is coming FROM, and it is state rather than a ref because
      it is read during render: it is the only way to know which slides are wrapping this move and
@@ -485,16 +507,20 @@ export default function Banner({ type = 'top' }) {
        becoming six, `loop` flipping, the dots renumbering. Empty until it lands; the skeleton
        below is what fills the box in the meantime. */
     const rows = feed ?? [];
-    const padded = feed && rows.length < 3 ? [...rows, ...getFallbackBanners()] : rows;
+    const padded = (feed && rows.length < 3 ? [...rows, ...getFallbackBanners()] : rows).filter((banner) =>
+      bannerAllowed(gates, banner),
+    );
+    /* The deposit slide is a deposit-bonus offer: promotions and bonus both have to be on. */
+    const depositSlide = type === 'top' && (!gates.ready || (gates.on('promotions') && gates.on('bonus') && gates.on('deposit')));
 
     return [
-      ...(type === 'top' ? [{ key: 'deposit', render: (style) => <DepositSlide style={style} /> }] : []),
+      ...(depositSlide ? [{ key: 'deposit', render: (style) => <DepositSlide style={style} /> }] : []),
       ...padded.map((banner) => ({
         key: String(banner.bannerId),
         render: (style) => <BannerCard banner={banner} style={style} />,
       })),
     ];
-  }, [type, feed]);
+  }, [type, feed, gates]);
 
   const count = slides.length;
   const loop = count > 3;
@@ -541,16 +567,18 @@ export default function Banner({ type = 'top' }) {
     [loop, count],
   );
 
-  if (!count) return null;
-
   /* `(container - spacing * (perView - 1)) / perView` — 384 at the 1168 container the live DOM
      was read at, 400 at the 1216 this build's desktop column is. On mobile, use percentage-based
      sizing to ensure slides fill the viewport properly. On desktop, use pixel-based sizing. */
   const slideWidth = width ? (width - spacing * (perView - 1)) / perView : 0;
   const size = isDesktop && slideWidth ? `${slideWidth}px` : `${100 / perView}%`;
 
-  /* eslint-disable-next-line react-hooks/rules-of-hooks -- count is stable after the early return */
   const drag = useDrag(move, setDragOffset, slideWidth || width || 300);
+
+  /* AFTER every hook, not before `useDrag`: the gates can take the strip from some slides to
+     none (an agent-tree player's promotions close once their capabilities land), and an early
+     return above a hook would then render fewer hooks than the frame before. */
+  if (!count) return null;
 
   return (
     <>

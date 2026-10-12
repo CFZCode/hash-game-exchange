@@ -1,7 +1,8 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { USE_FIXTURES } from '../services/client';
-import { ALL_ON, loadCapabilities, loadPublicGates, makeGates } from '../services/gates';
+import { ALL_ON, gateOf, loadCapabilities, loadPublicGates, makeGates } from '../services/gates';
+import { useGates } from './gates';
 import { GatesContext } from './gates';
 import { useSession } from './session';
 
@@ -83,4 +84,17 @@ function LiveGates({ children }) {
   }, [off, navigate]);
 
   return <GatesContext.Provider value={value}>{children}</GatesContext.Provider>;
+}
+
+/**
+ * Holds a GATED page back until the gates have answered, and keeps it unmounted when its
+ * section is off — so a page an agent-tree player cannot use never mounts and never fires its
+ * reads in the instant before the provider's redirect to `/`. Pages with no gate (`gateOf` is
+ * null) render straight through, and with fixtures on the gates are `ALL_ON` and always ready,
+ * so neither changes by a pixel.
+ */
+export function RouteGate({ pathname, children }) {
+  const gates = useGates();
+  if (gateOf(pathname) && (!gates.ready || !gates.routeOn(pathname))) return null;
+  return children;
 }

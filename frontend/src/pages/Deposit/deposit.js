@@ -27,7 +27,7 @@ import { rechargeBonusConfigNow } from '../../services/bonus';
 import { getCurrency } from '../../data/currencies';
 import { tokensFor } from '../../data/currencyTokens';
 import { convertCurrency } from '../../utils/currency';
-import { USE_FIXTURES } from '../../services/client';
+import { USE_FIXTURES, request } from '../../services/client';
 
 /* ── RECOVERED ─────────────────────────────────────────────────────────────────────────────
  *
@@ -122,6 +122,27 @@ export const networksFor = (currencyName) => {
  * `useAddress` call the day there is a backend. */
 export const placeholderAddress = (currencyName, chain) =>
   `not-a-real-address-${String(currencyName).toLowerCase()}-${String(chain).toLowerCase()}`;
+
+/* ── LIVE MODE NEVER PRINTS AN ADDRESS IT DID NOT RECEIVE ──────────────────────────────────
+ *
+ * The placeholder above is a fixture-mode device only. With fixtures off, the tab asks the
+ * platform's crypto provider for its chain list first — `GET /api/v1/user/crypto/chains`, which
+ * answers `503 CRYPTO_NOT_CONFIGURED` while CCPayment has no credentials — and any failure there
+ * means there is no address to show. And even when the chain list does answer, the platform has
+ * no HTTP route that issues a per-account deposit address (bc.game's is the `GET_ADDRESS` socket
+ * event), so there is still nothing real to print. Either way this resolves to `null`, and the
+ * tab shows its "not available" notice instead of an address and QR.
+ *
+ * Fixture mode answers `undefined` synchronously and the tab keeps its placeholder as before. */
+export const CRYPTO_CHAINS_PATH = '/api/v1/user/crypto/chains';
+
+export const readCryptoDepositAddress = () =>
+  USE_FIXTURES
+    ? undefined
+    : Promise.resolve(request(CRYPTO_CHAINS_PATH, { live: true })).then(
+        () => null,
+        () => null,
+      );
 
 /* ══ THE FIAT TAB ══════════════════════════════════════════════════════════════════════════
  *

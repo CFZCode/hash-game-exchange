@@ -42,7 +42,10 @@ export const COLUMNS = [
       { label: 'Referral', href: '/referral' },
       { label: 'Promotions', href: '/promotions/promotion' },
       { label: 'Lottery', href: '/lottery' },
-      { label: 'Refer a friend', button: true },
+      /* A button (it opens the share dialog, not a page), but it belongs to the referral
+         section — the `href` is read only by the footer's gate filter, so an account or site
+         with affiliate off does not get the entry. */
+      { label: 'Refer a friend', button: true, href: '/referral' },
     ],
   },
   {

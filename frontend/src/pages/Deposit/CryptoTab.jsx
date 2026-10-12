@@ -6,13 +6,16 @@ import { getAlias } from '../../utils/currency';
 import { coinIcon } from '../../utils/coinArt';
 import QrCode from './QrCode';
 import { useIsDialog } from '../../context/dialogRoute';
-import { IconCopy, IconArrow, IconSearch, IconClose } from '../../components/shared/icons';
+import { IconCopy, IconArrow, IconSearch, IconClose, IconInform } from '../../components/shared/icons';
+import useResource from '../../hooks/useResource';
+import { USE_FIXTURES } from '../../services/client';
 import Notice from '../../components/shared/Notice';
 import {
   DEFAULT_CURRENCIES,
   networksFor,
   placeholderAddress,
   depositNotice,
+  readCryptoDepositAddress,
 } from './deposit';
 
 /* `Ew` / `DepositCryptoPage` in index-C1xohM7W.js. Its body is four blocks in one card:
@@ -173,7 +176,11 @@ export default function CryptoTab() {
   };
 
   const network = networks.find((item) => item.chain === chain) || networks[0];
-  const address = placeholderAddress(currency, network.chain);
+  /* Fixture mode keeps its deliberately-fake placeholder. Live mode only ever shows an address
+     the platform issued — and it issues none yet, so the read settles to `null` and the tab
+     shows the unavailable notice instead (see `readCryptoDepositAddress`). */
+  const { data: liveAddress, loading: addressLoading } = useResource(readCryptoDepositAddress);
+  const address = USE_FIXTURES ? placeholderAddress(currency, network.chain) : liveAddress;
   const alias = getAlias(currency);
 
   /* Every depositable coin in the wallet, which is what the Currency select lists —
@@ -319,19 +326,34 @@ export default function CryptoTab() {
       {/* `k8` verbatim. The `@container` pair puts the QR beside the address from `@2xl` (672px)
           up — the dialog is 480 wide, so it never fires and the code stays centred above. Kept
           because the same component renders full-width on the wallet page. */}
-      <div className="mt-4 @container">
-        <div className="flex flex-col items-center @2xl:flex-row @2xl:items-center @2xl:gap-6">
-          <div className="flex-none rounded-xl bg-layer3_alt p-2">
-            <QrCode value={address} logo={coinIcon(currency)} className="block" />
+      {!address ? (
+        /* The fiat tab's own out-of-channels box (`NoChannels` in FiatTab.jsx), same markup —
+           shown once the live read has settled with no address. Nothing at all while it is
+           still in flight, so no placeholder ever flashes. */
+        !addressLoading && (
+          <div className="my-4 flex rounded-xl bg-warning/10 p-2 text-secondary">
+            <IconInform className="icon -mt-0.5 mr-1.5 size-6 flex-none fill-warning" />
+            <div>
+              Sorry, crypto deposits are not currently available. Please try again later or
+              contact support.
+            </div>
           </div>
-          <div className="mt-4 w-full @2xl:mt-0 @2xl:flex-1">
-            <div className="text-secondary">Deposit address</div>
-            <AddressBox address={address} />
+        )
+      ) : (
+        <div className="mt-4 @container">
+          <div className="flex flex-col items-center @2xl:flex-row @2xl:items-center @2xl:gap-6">
+            <div className="flex-none rounded-xl bg-layer3_alt p-2">
+              <QrCode value={address} logo={coinIcon(currency)} className="block" />
+            </div>
+            <div className="mt-4 w-full @2xl:mt-0 @2xl:flex-1">
+              <div className="text-secondary">Deposit address</div>
+              <AddressBox address={address} />
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
-      <Notice className="mt-4">{depositNotice(alias, network.minDeposit)}</Notice>
+      {address && <Notice className="mt-4">{depositNotice(alias, network.minDeposit)}</Notice>}
     </div>
   );
 }

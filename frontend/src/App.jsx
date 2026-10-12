@@ -71,7 +71,7 @@ import { USE_FIXTURES } from './services/client';
 import useMediaQuery, { useIsDesktop } from './hooks/useMediaQuery';
 import { SessionProvider } from './context/SessionContext';
 import { SettingsProvider } from './context/SettingsContext';
-import { GatesProvider } from './context/GatesContext';
+import { GatesProvider, RouteGate } from './context/GatesContext';
 import { useSession } from './context/session';
 
 function AppShell() {
@@ -638,6 +638,7 @@ function AppShell() {
           else would 404 the moment you touched the chrome. It renders Home and keeps the URL,
           so the header's route-dependent behaviour is still exercised. */}
       <MainLayout>
+        <RouteGate pathname={(isOverlayRoute ? pageLocation : location).pathname}>
         <Routes location={isOverlayRoute ? pageLocation : location}>
           <Route path="/" element={<Home />} />
           <Route path="/casino" element={<Casino />} />
@@ -883,6 +884,7 @@ function AppShell() {
           </Route>
           <Route path="*" element={<Home />} />
         </Routes>
+        </RouteGate>
       </MainLayout>
       {/* `/deposit`'s guard names the sign-up tab, `/user/enter`'s the sign-in one; on
           `/login/*` the path itself is the tab. */}

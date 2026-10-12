@@ -11,6 +11,7 @@ import { HIDDEN_NAME } from '../../../context/account';
    settled they really are identical. Only the payload stayed local, in ./contest.js. */
 import Contest from '../../../components/shared/Contest';
 import { getHomeContest } from '../../../services/contest';
+import { useGates } from '../../../context/gates';
 import './LatestBets.css';
 
 /* Latest round & Race.
@@ -21,6 +22,7 @@ import './LatestBets.css';
  */
 
 const TABS = ['Latest Bet', 'High Roller', 'Wager Contest'];
+const NO_CONTEST = () => null;
 
 /* Ten rows on screen at a time — `capacity: Ee` where Ee = 10. */
 const VISIBLE = 10;
@@ -326,8 +328,13 @@ export default function LatestBets() {
      about a different component. */
   const { data: bets, loading: betsLoading } = useResource(getLatestBets);
   const { data: rollers, loading: rollersLoading } = useResource(getHighRollers);
-  const { data: contest, loading: contestLoading } = useResource(getHomeContest);
-  const [tab, setTab] = React.useState(0);
+  /* The Wager Contest tab is a promotion: an account or site with the contest off gets neither
+     the tab nor its read (an agent-tree player's `/user/race/*` is refused). */
+  const contestOn = useGates().on('contest');
+  const { data: contest, loading: contestLoading } = useResource(contestOn ? getHomeContest : NO_CONTEST);
+  const [chosen, setTab] = React.useState(0);
+  const tabs = contestOn ? TABS : TABS.slice(0, 2);
+  const tab = chosen < tabs.length ? chosen : 0;
 
   const feed = tab === 1 ? rollers : bets;
   const feedLoading = tab === 1 ? rollersLoading : betsLoading;
@@ -354,7 +361,7 @@ export default function LatestBets() {
       <div className="px-4 sm:px-0">
         <div className="ml-auto mt-2 max-w-100 sm:!-mt-10">
           <div className="tabs-title hide-scroll" role="tablist">
-            {TABS.map((title, i) => (
+            {tabs.map((title, i) => (
               <button
                 key={title}
                 type="button"
