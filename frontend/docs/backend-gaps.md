@@ -269,6 +269,30 @@ would put something untrue on the screen.
 
 Note: `GET /user/race/rewards` answers 403 `PROMOTIONS_NOT_FOR_AGENT_USERS` for agent-tree players such as `demo_player01`. That is by design and is not read by any screen.
 
+## Part 1c — Account area on SmartBet, 2026-10-12
+
+Wired against the SmartBet gateway (:4700); checked with the real services under node against
+`demo_affiliate`, `demo_depositor`, `demo_notips`, `demo_kyc_rejected` and `demo_multicoin`.
+
+| Feature | Route | What changed |
+| --- | --- | --- |
+| Referral → Dashboard card | `GET /user/affiliate/team`, `/rewards`, `/rewards?filter=today`, `/rewards/unclaimed` | Six of ten figures real: friends, available commission (unclaimed `commission` rows), available referral rewards (unclaimed `tier` rows), commission total, referral rewards total (unclaimed tier + tier paid, derived from `claimedTotal`), today's commission. `ratio`, `maxRatio`, `todayWagerUsd`, `remainingRewardUsd` have no source and stay 0 |
+| Referral → Rewards Activities | `GET /user/affiliate/rewards` | One Commission Rewards line per credited commission |
+| My Rewards → Commission by Currency | `/rewards` + `/rewards/unclaimed` | One row per reward coin (USDT here) |
+| My Rewards → Commission by Friends | `/team` + `/rewards` | One row per referee; rate = commission ÷ referred wager actually paid. **No user id and no 7-day deposits on the platform**, so those cells print `-`. The filters stay inert as before |
+| My Rewards → Level Up Rewards | `/rewards/unclaimed` (`kind: 'tier'`) + `/team` | **Only unclaimed tier rows are readable**: no player route lists claimed ones, so a claimed reward leaves the table |
+| Notification drawer tabs | `GET /user/notifications` | Type → tab now mirrors the server's `categories.js` (`general` System, offer types Promotions, everything else Transactions). `withdrawal_rejected`, `tip_received` etc. were landing in System; tab counts now equal `/notifications/unread-count.byCategory` |
+| Profile → Total Wagered (own) and Statistics summary | `GET /user/profile/stats` | `wagered.usd` fills `betAmountUsd`; bets/wins now include sports. Another player's profile still has no money figure (the public route carries none) |
+| Settings → Preferences → Refuse tip from strangers | `GET`/`PATCH /user/tip/settings` `{enabled}` | `refuseTip = !enabled`; the flip is written, a refusal reverts it with the server's message. Hide gaming data / hide username have no route and stay local |
+
+Already wired and re-checked on SmartBet: sign in/out/refresh, register, forgot/reset (seam only), profile + edit, change password, sessions + remove, change e-mail (SMTP not configured → 502), 2FA enable/verify/disable, preferences, KYC status/documents/submit, whitelist read + four writes, public profile, invite code, claim-all.
+
+Still not wired, by reason:
+
+- **NO-BACKEND:** sign in with a one-time code (gap 12b, `login` has no OTP arm); notification delete (gap 10); comment replies; medals/achievements (gap 9); Account Connections, linked accounts, community links; anti-phishing code; the per-currency Statistics table (`/profile/stats.wagered.byCurrency` has no wins per currency, which the table prints).
+- **NO-UI:** `/user/bank-accounts` answers real rows but Settings → Payment draws no card tile (`rows.length > 0 ? null`); a 2FA-enabled account gets the server's "A two-factor code is required" on sign-in because the dialog has no code step; the `/login/forgot` page is not built.
+- **BLOCKED, chat:** chat is socket-only on SmartBet (`CHATS`/`ADD_CHAT` on user-service, encoded payloads), and the frontend has no socket.io client. Wiring it means adding `socket.io-client` and the `@ibitplay/socket` encode/decode; left for a separate change.
+
 ## Part 2 — The backend has it, we are not using it yet
 
 No backend work needed. Listed so nobody builds these twice.
