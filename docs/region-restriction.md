@@ -61,80 +61,11 @@ The country list itself is never sent to the visitor.
 already refuses) and email OTP mints no session, so there is no other login path. Not refused:
 token refresh of an existing session, and staff / admin login (admin-service `staff-auth`).
 
-## Frontend change (apply after the Next.js migration)
+## Frontend (done, commit 97c3b8f)
 
-The frontend is not edited by this change. Apply these three edits once the migration lands.
+- `frontend/src/services/region.js` `getRegion()` calls `GET /api/v1/user/region` once on load in live mode; with fixtures on it returns null.
+- `frontend/src/App.jsx`: in fixture mode the dialog keeps the captured visitor's `showable && areaAlert` gate (so the pixel check still sees the original); in live mode it opens only when the answer says `restricted`.
+- `frontend/src/components/modals/RegionBlock`: takes `region` (country, IP and Ray ID shown from the live answer) and `dismissible`. In `block` mode the close button is hidden, which is the one visual change; `notice` looks exactly like the original.
+- Desktop only, as before (the original shows it from 1024 up). In `block` mode the backend refuses sign-up and sign-in on every width anyway.
 
-### 1. `src/services/endpoints.js`: the path
-
-```js
-USER_REGION: '/api/v1/user/region',
-```
-
-(Use whatever key style the file has; the call site must not write the path out.)
-
-### 2. `src/context/account.js`: the fixture keeps `areaAlert` for fixture mode only
-
-`VISITOR` stays exactly as it is (`areaAlert: true`, `areaCode: 'US'`, the captured `ip` and
-`rayId`): that is the fixture-mode picture. Add one mapper beside it:
-
-```js
-/* GET /user/region → the four fields the region popup reads. Live mode only; the fixture keeps
-   VISITOR's captured values. `mode` rides along so the popup can tell notice from block. */
-export const regionFields = (r) => ({
-  areaAlert: Boolean(r?.restricted),
-  areaCode: r?.areaCode ?? '',
-  ip: r?.ip ?? '',
-  rayId: r?.rayId ?? '',
-  areaMode: r?.mode ?? 'off',
-});
-```
-
-And add `areaMode: 'off'` to `ACCOUNT_DEFAULTS` (next to `areaAlert: false`), so every account
-shape has it.
-
-### 3. Ask once on load, in live mode (`src/services/auth.js` or wherever the visitor session is built)
-
-```js
-import { request, USE_FIXTURES } from './client';
-import { ENDPOINTS } from './endpoints';
-import { VISITOR, regionFields } from '../context/account';
-
-/** Live: the backend decides. Fixture: VISITOR's captured values, untouched. */
-export async function loadRegion() {
-  if (USE_FIXTURES) return {};
-  try {
-    return regionFields(await request(ENDPOINTS.USER_REGION, { live: true, fixture: null }));
-  } catch {
-    return regionFields(null); // unreachable = not restricted, never a blocked site
-  }
-}
-```
-
-Call it once when the session provider mounts (one request per page load, not per render), and
-merge the result onto the account: `setSession(s => ({ ...s, account: { ...s.account, ...region } }))`.
-It applies to a signed-in account too: `SIGNED_IN` keeps `areaAlert: false` only in fixture mode.
-
-In live mode the account must start with `areaAlert: false` (not VISITOR's `true`) until the answer
-arrives, so a non-restricted visitor never sees the popup flash. Then `App.jsx` cannot read the gate
-once in a `useState` initialiser any more; open it when the answer arrives:
-
-```js
-const [dismissed, setDismissed] = useState(false);
-const blocked = session.showable && session.areaAlert && !dismissed;
-// …
-{blocked && isDesktop && (
-  <RegionBlock onClose={session.areaMode === 'block' ? undefined : () => setDismissed(true)} />
-)}
-```
-
-The popup itself (`src/components/modals/RegionBlock`) needs no change and stays visually identical:
-it already prints `areaCode`, `ip` and `rayId` from the session.
-
-### `block` mode: not dismissible
-
-This fits without a visual change in one way only: the close button stays where it is and does
-nothing (`onClose` undefined, as above; the button's `onClick={onClose}` is then a no-op). Hiding the
-X would be a visual change, so it is not done. If an inert X is unwanted, the alternative is to hide
-it in block mode, which changes the popup's look. The backend refuses sign-up and login in block mode
-either way, so dismissing the popup gains a restricted visitor nothing.
+Nobody is restricted until the offline GeoIP file is installed: `cd backend && npm run geoip:update`.
