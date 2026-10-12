@@ -123,6 +123,12 @@ module.exports = {
   /** @legacy GET /api/admin/user-risk/:userId */
   userRisk: {
     params: z.object({ userId }).strict(),
+    query: z.preprocess((value) => value ?? {}, z.object({}).strict()),
+  },
+
+  /** Players by registration country / city and by login country — no input. */
+  geoStats: {
+    query: z.preprocess((value) => value ?? {}, z.object({}).strict()),
   },
 
   /** The staff IP tracker — every login event the caller may see. */

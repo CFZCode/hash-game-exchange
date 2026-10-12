@@ -30,7 +30,8 @@ async function open(logger) {
   readers = (async () => {
     const load = async (file) => {
       if (!fs.existsSync(file)) { logger?.warn?.({ file }, 'GeoIP database missing; locations will be empty'); return null; }
-      return maxmind.open(file, { watchForUpdates: true });
+      // Non-persistent: the file watch must not keep the process (or a test run) alive.
+      return maxmind.open(file, { watchForUpdates: true, watchForUpdatesNonPersistent: true });
     };
     const [city, asn] = await Promise.all([load(CITY), load(ASN)]);
     return { city, asn };

@@ -601,8 +601,8 @@ attaches and the shape the handler answers with. Regenerate with
 
 | | |
 | --- | ---: |
-| Routes mounted | 762 |
-| Modules | 79 |
+| Routes mounted | 764 |
+| Modules | 80 |
 | Answering outside the envelope | 60 |
 
 **Guard** is the audience the loader mounted the router under, plus anything
@@ -625,7 +625,7 @@ listed per route: they are thrown from the service layer, so a module's whole
 error catalogue is reachable from every route in it, and the catalogues are at
 the end of this appendix.
 
-### admin-service — :4002 (212 routes)
+### admin-service — :4002 (213 routes)
 
 #### `access`
 
@@ -825,6 +825,7 @@ the end of this appendix.
 | `GET` | `/api/v1/admin/reports/agent-users` | `staff` + `reports:read` | `200` `service.agentUsers(…)` |
 | `GET` | `/api/v1/admin/reports/balance-sheet/:userId` | `staff` + `reports:read` | `200` `service.balanceSheet(…)` |
 | `GET` | `/api/v1/admin/reports/finance-stats` | `staff` + `reports:read` | `200` `finance.stats(…)` |
+| `GET` | `/api/v1/admin/reports/geo-stats` | `staff` + `reports:read` | `200` `service.geoStats(…)` |
 | `GET` | `/api/v1/admin/reports/ip-tracker` | `staff` + `reports:read` | `200` `[…]` + `meta.pagination` |
 | `GET` | `/api/v1/admin/reports/ip-tracker/shared` | `staff` + `reports:read` | `200` `[…]` + `meta.pagination` |
 | `GET` | `/api/v1/admin/reports/player-sheet/:uid` | `staff` + `reports:read` | **raw** `Content-Type: application/pdf` · **raw** `streamed to res` |
@@ -1260,7 +1261,7 @@ the end of this appendix.
 | `GET` | `/internal/sports/wager/race-points` | `internal` | `200` `service.racePoints(…)` |
 | `GET` | `/internal/sports/wager/turnover/:userId` | `internal` | `200` `service.turnover(…)` |
 
-### user-service — :4001 (333 routes)
+### user-service — :4001 (334 routes)
 
 #### `affiliate`
 
@@ -1642,6 +1643,12 @@ the end of this appendix.
 | `POST` | `/api/v1/user/rakeback/claim` | `player` + rate-limited | `200` `service.claim(…)` |
 | `POST` | `/internal/user/rakeback/accrue` | `internal` | `200` `service.accrue(…)` |
 
+#### `region`
+
+| Method | Path | Guard | Response |
+|---|---|---|---|
+| `GET` | `/api/v1/user/region` | `public` + rate-limited | `200` `service.visitor(…)` |
+
 #### `spin-wheel`
 
 | Method | Path | Guard | Response |
@@ -1760,13 +1767,13 @@ the end of this appendix.
 | `GET` | `/api/v1/user/wallet/ledger` | `player` | `200` `[…]` + `meta.pagination` |
 | `GET` | `/api/v1/admin/user/wallet/:userId/balances` | `staff` + `wallet:read` | `200` `{ userId, balances }` |
 | `GET` | `/api/v1/admin/user/wallet/:userId/history` | `staff` + `wallet:read` | **raw** `res.json({ history, count })` |
-| `GET` | `/api/v1/admin/user/wallet/:userId/reconcile` | `staff` + `wallet:adjust` | `200` `service.reconcile(…)` |
+| `GET` | `/api/v1/admin/user/wallet/:userId/reconcile` | `staff` + `wallet:adjust` | `200` `req.query.currency ? await service.reconcile(…` |
 | `POST` | `/api/v1/admin/user/wallet/adjust` | `staff` + `wallet:credit | wallet:debit` | `200` `service.agentAdjust(…)` · `200` `service.adminAdjust(…)` |
 | `GET` | `/api/v1/admin/user/wallet/balances` | `staff` + `wallet:read` | `200` `[…]` + `meta.pagination` |
 | `GET` | `/internal/user/wallet/balance/:userId` | `internal` | `200` `currency ? { userId, currency, balance: await…` |
 | `POST` | `/internal/user/wallet/credit` | `internal` | `200` `service.credit(…)` |
 | `POST` | `/internal/user/wallet/debit` | `internal` | `200` `service.debit(…)` |
-| `GET` | `/internal/user/wallet/reconcile/:userId` | `internal` | `200` `service.reconcile(…)` |
+| `GET` | `/internal/user/wallet/reconcile/:userId` | `internal` | `200` `req.query.currency ? await service.reconcile(…` |
 | `POST` | `/internal/user/wallet/rollback` | `internal` | `200` `service.rollback(…)` |
 | `POST` | `/internal/user/wallet/transfer` | `internal` | `200` `service.transfer(…)` |
 

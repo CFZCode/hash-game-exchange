@@ -53,3 +53,73 @@ export type SharedIpRow = {
   isp: string | null
   users: { id: string; name: string; logins: number; lastSeen: string }[]
 }
+
+/** `GET admin/reports/user-risk/:id` — the parts the Risk tab reads. */
+export type RiskIp = {
+  ipAddress: string
+  isPrivate: boolean
+  uses: number
+  country: string | null
+  city: string | null
+  isp: string | null
+  region?: string | null
+  firstSeen: string
+  lastSeen: string
+}
+export type RiskBet = {
+  id: string | number
+  ipAddress: string | null
+  createdAt: string
+  stakeAmount: string
+  currency: string
+  status: string | null
+  resultStatus: string | null
+}
+export type PlayerRisk = {
+  registration: {
+    ip: string | null
+    source: 'signup' | 'first_login' | null
+    isPrivate: boolean
+    countryCode: string | null
+    country: string | null
+    region: string | null
+    city: string | null
+    isp: string | null
+    registeredAt: string | null
+    declaredCountry: string | null
+  }
+  locks: { isLocked: boolean; lockTargetx: boolean; sportsBetlocked: boolean; casinoLocked: boolean }
+  financials: {
+    reward: {
+      currency: string
+      totalDeposit: string
+      totalWithdrawal: string
+      net: string
+      depositCount: number
+      withdrawalCount: number
+      unconverted: string[]
+    }
+  }
+  activity: {
+    distinctIpCount: number
+    publicIpCount: number
+    countries: { countryCode: string; country: string | null; logins: number }[]
+    ipBreakdown: RiskIp[]
+    recentBets: RiskBet[]
+  }
+  sharedIps: { total: number; accounts: { id: string; name: string; ips: string[]; lastSeen: string }[] }
+  riskFlags: Record<string, boolean>
+}
+
+/** `GET admin/reports/geo-stats`. */
+export type GeoStats = {
+  totalPlayers: number
+  registration: {
+    located: number
+    unknown: number
+    bySource: { signup: number; firstLogin: number }
+    countries: { countryCode: string; country: string; players: number }[]
+    cities: { city: string; countryCode: string; country: string; players: number }[]
+  }
+  login: { players: number; countries: { countryCode: string; country: string; players: number; logins: number }[] }
+}

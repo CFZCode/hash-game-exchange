@@ -15,7 +15,7 @@ const {
 } = require('@ibitplay/auth');
 
 const errors = require('./auth.errors');
-const { sharedIpLocator } = require('./geo/ipLocation');
+const { sharedIpLocator, normaliseIp } = require('./geo/ipLocation');
 const { sitePolicy } = require('@ibitplay/common');
 const { RegionService } = require('../region/region.service');
 /* Registration is where a referral becomes a team. Safe to require here —
@@ -27,6 +27,17 @@ const { resolveReferrerOwner } = require('../affiliate/referrerResolver');
  * so an operator-created account and a self-registered one are the same shape.
  */
 const { PLAYER_ROLE_ID, WALLET_SEED } = require('./registration.constants');
+
+/**
+ * One spelling per client address. Node reports an IPv4 client on a dual-stack
+ * socket as `::ffff:1.2.3.4`, and a forwarded header may carry a port or a
+ * list; stored raw, one player became two "distinct IPs" (and a shared-IP
+ * match was missed). Anything that is not an address is kept as given.
+ */
+function withClientIp(context = {}) {
+  const ip = normaliseIp(context.ip) ?? context.ip ?? null;
+  return ip === context.ip ? context : { ...context, ip };
+}
 
 /**
  * Player authentication.
@@ -106,7 +117,7 @@ class AuthService {
    * valid password from an invalid one.
    */
   async login({ identifier, password, twoFactorCode, deviceLabel }, context = {}) {
-    const { ip, userAgent } = context;
+    const { ip, userAgent } = withClientIp(context);
 
     // Before anything about the account: a restricted region learns nothing about it.
     await this.region.assertAllowed(ip);
@@ -418,6 +429,7 @@ class AuthService {
     // write their own row and never reach this, so a B2B site's agents can
     // still open accounts while the public cannot.
     await sitePolicy.assertAllowed(this.models, 'business_model', 'public_signup', this.logger);
+    context = withClientIp(context);
     await this.region.assertAllowed(context.ip);
 
     const clash = await this.models.Users.findOne({
@@ -575,7 +587,8 @@ class AuthService {
    * `register()` and then `login()` would send the password over a second
    * code path and re-run the rate limiter against a brand-new account.
    */
-  async registerAndSignIn(input, context = {}) {
+  async registerAndSignIn(input, rawContext = {}) {
+    const context = withClientIp(rawContext);
     const account = await this.register(input, context);
     const user = await this.models.Users.findByPk(account.id);
     return this.#issueSession(user, context);
@@ -861,6 +874,10 @@ class AuthService {
    * the IP and the time with the location left empty.
    */
   #trackLogin(userId, { ip, userAgent } = {}, source) {
+    // The moment of the sign-in, not of the lookup: the row used to be stamped
+    // when the (up to 2 s per provider) lookup returned, so a login with no
+    // lookup (a private address) could land BEFORE an earlier one that had one.
+    const at = new Date();
     const run = async () => {
       const geo = await sharedIpLocator({ models: this.models, config: this.config, logger: this.logger }).resolve(ip);
       await this.models.UserLoginHistory.create({
@@ -878,12 +895,13 @@ class AuthService {
         is_hosting: null,
         ip_location_id: geo?.id ?? null,
         source,
+        created_at: at,
       });
       const where = { where: { id: userId } };
       const latest = { last_country_code: geo?.country ?? null, last_country: geo?.country_name ?? null, last_city: geo?.city ?? null, last_isp: geo?.isp ?? null };
       await this.models.Users.update(
         source === 'register'
-          ? { ...latest, signup_ip: ip || null, signup_country_code: latest.last_country_code, signup_country: latest.last_country, signup_city: latest.last_city, signup_isp: latest.last_isp }
+          ? { ...latest, signup_ip: ip || null, signup_country_code: latest.last_country_code, signup_country: latest.last_country, signup_city: latest.last_city, signup_region: geo?.region_name ?? null, signup_isp: latest.last_isp }
           : latest,
         where
       );

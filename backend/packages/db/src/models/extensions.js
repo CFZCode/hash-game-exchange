@@ -80,6 +80,8 @@ const EXTENSIONS = {
     signup_country: { type: DataTypes.STRING(80), allowNull: true, field: 'signup_country' },
     signup_city: { type: DataTypes.STRING(120), allowNull: true, field: 'signup_city' },
     signup_isp: { type: DataTypes.STRING(160), allowNull: true, field: 'signup_isp' },
+    // migration 084-signup-region-ip-normalise
+    signup_region: { type: DataTypes.STRING(120), allowNull: true, field: 'signup_region' },
     // ── migration 062-agent-money ──────────────────────────────────────
     // Why each lock column is set: `{ <column>: { own, by: [staffId…] } }`.
     // See `services/admin/src/modules/locks/lockSources.js`.

@@ -26,4 +26,27 @@ function isPrivateIp(ip) {
   );
 }
 
-module.exports = { isPrivateIp };
+/**
+ * A user-agent as "Browser on OS" for the risk view's login list. Order
+ * matters: Edge and Opera also say Chrome, Chrome also says Safari, and
+ * Android also says Linux.
+ */
+function deviceFromUA(ua) {
+  if (!ua) return null;
+  const os =
+    /Windows/i.test(ua) ? 'Windows'
+      : /Android/i.test(ua) ? 'Android'
+        : /iPhone|iPad|iPod|iOS/i.test(ua) ? 'iOS'
+          : /Mac OS|Macintosh/i.test(ua) ? 'macOS'
+            : /Linux/i.test(ua) ? 'Linux' : null;
+  const browser =
+    /Edg\//i.test(ua) ? 'Edge'
+      : /OPR\/|Opera/i.test(ua) ? 'Opera'
+        : /Firefox\//i.test(ua) ? 'Firefox'
+          : /Chrome\/|CriOS\//i.test(ua) ? 'Chrome'
+            : /Safari\//i.test(ua) ? 'Safari' : null;
+  if (!os && !browser) return 'Other';
+  return `${browser ?? 'Browser'} on ${os ?? 'unknown OS'}`;
+}
+
+module.exports = { isPrivateIp, deviceFromUA };

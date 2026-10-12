@@ -31,6 +31,7 @@ import { formatNumber } from '@/lib/format'
 import { AdjustWalletDialog } from '@/views/finance/shared'
 import { PlayerBonusesTab } from '@/views/promotions/BonusBalances'
 import GeoAttribution from './GeoAttribution'
+import PlayerRiskTab from './PlayerRiskTab'
 import PlayerStatsTab from './PlayerStatsTab'
 import WithdrawBlockAction, { WithdrawBlockedBadge, type AccountLocks } from './WithdrawBlockAction'
 import type { PlayerRow } from './types'
@@ -132,7 +133,7 @@ const ledgerColumns: Column<Ledger>[] = [
 type Place = { countryCode?: string | null; country?: string | null; city?: string | null; isp?: string | null; ip?: string | null }
 type Login = {
   id: string | number; ipAddress: string | null; city: string | null; region: string | null; country: string | null; countryCode: string | null
-  isp: string | null; asn: string | null; isProxy: boolean | null; isHosting: boolean | null; source: string | null; userAgent: string | null; createdAt: string
+  isp: string | null; asn: string | null; isProxy: boolean | null; isHosting: boolean | null; source: string | null; userAgent: string | null; device?: string | null; createdAt: string
 }
 type RiskLogins = {
   user: { lastIp: string | null; lastLocation?: Place; signup?: Place }
@@ -178,7 +179,18 @@ const loginColumns: Column<Login>[] = [
         <span className='text-muted-foreground text-sm'>—</span>
       )
   },
-  { key: 'ua', header: 'Device', cell: r => <span className='text-muted-foreground line-clamp-2 max-w-72 text-xs'>{r.userAgent ?? '—'}</span> }
+  {
+    key: 'ua',
+    header: 'Device',
+    cell: r => (
+      <span className='max-w-72 text-sm'>
+        {r.device ?? '—'}
+        <span className='text-muted-foreground line-clamp-1 block text-xs' title={r.userAgent ?? undefined}>
+          {r.userAgent ?? ''}
+        </span>
+      </span>
+    )
+  }
 ]
 
 /** Where the user signs in from: latest and signup location, then every recent login with its IP's place and ISP. */
@@ -400,7 +412,7 @@ const PlayerDetail = ({ id }: { id: string }) => {
           </TabsContent>
         )}
         <TabsContent value='risk'>
-          <RawTab path={`admin/reports/user-risk/${id}`} />
+          <PlayerRiskTab userId={id} />
         </TabsContent>
         <TabsContent value='sheet'>
           <RawTab path={`admin/reports/balance-sheet/${id}`} />

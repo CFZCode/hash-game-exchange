@@ -1,7 +1,7 @@
 'use strict';
 
 const { Op, fn, col, literal, where: sqlWhere } = require('sequelize');
-const { money, resolveVipLadder } = require('@ibitplay/common');
+const { money, resolveVipLadder, rewardCurrencyOf } = require('@ibitplay/common');
 const { canManagePromotions } = require('@ibitplay/auth');
 
 const errors = require('./reports.errors');
@@ -18,8 +18,13 @@ const {
   RISK_IP_ROWS,
   RISK_BET_ROWS,
   SHARED_IP_USERS,
+  RISK_SHARED_ACCOUNTS,
+  GEO_TOP_N,
 } = require('./reports.constants');
-const { isPrivateIp } = require('./ipTracker');
+const { isPrivateIp, deviceFromUA } = require('./ipTracker');
+const { playerScope } = require('./audienceStats.helpers');
+const { COIN_IDS, DEPOSIT_SUCCESS } = require('../dashboard/dashboard.constants');
+const { WITHDRAWAL_DONE: STATS_WITHDRAWAL_DONE } = require('./audienceStats.constants');
 const { descendantIds, visibleStaffIds } = require('../staff-directory/staffDirectory.service');
 // transfer, refill, issuance, adjust — money handed over; never 'gt'/'casino'.
 const { PLAYER_FUNDING_TYPES } = require('../lords/lords.constants');
@@ -539,16 +544,19 @@ class ReportsService {
    */
   async userRisk({ staff, userId }) {
     const user = await this.#assertVisible(staff, userId);
+    const { sequelize } = this.models.UserLoginHistory;
+    const { QueryTypes } = sequelize.constructor;
+    const one = { replacements: { uid: user.id }, type: QueryTypes.SELECT };
 
-    const [full, agent, totals, logins, ipRows, bets] = await Promise.all([
+    const [full, agent, totals, logins, ipRows, [ipCounts], countryRows, firstLogin, bets, reward, shared] = await Promise.all([
       this.models.Users.findByPk(user.id, {
         attributes: [
           'id', 'name', 'email', 'country', 'phone', 'created', 'updated_at',
           'level', 'games_played', 'two_fa_status', 'parent_staff_id',
           'system_locked', 'lock_targetx', 'sports_betlocked', 'casino_locked',
-          // migration 058-login-geo
+          // migration 058-login-geo (+ signup_region, 084)
           'last_country_code', 'last_country', 'last_city', 'last_isp',
-          'signup_ip', 'signup_country_code', 'signup_country', 'signup_city', 'signup_isp',
+          'signup_ip', 'signup_country_code', 'signup_country', 'signup_region', 'signup_city', 'signup_isp',
         ],
         raw: true,
       }),
@@ -567,11 +575,9 @@ class ReportsService {
         raw: true,
       }),
       /**
-       * Grouped in the database, over ALL of a player's history.
-       *
-       * The distinct-IP count is a risk signal, and computing it from the last
-       * fifteen logins answers a different question than the one asked — a
-       * shared account looks single-IP for as long as one person is using it.
+       * The rows shown, grouped in the database. Capped at RISK_IP_ROWS — the
+       * COUNTS come from the next query, over all of history. They used to be
+       * `ipRows.length`, so a player with 40 addresses showed 25.
        */
       this.models.UserLoginHistory.findAll({
         where: { user_id: user.id, ip_address: { [Op.ne]: null } },
@@ -590,6 +596,33 @@ class ReportsService {
         limit: RISK_IP_ROWS,
         raw: true,
       }),
+      sequelize.query(
+        `SELECT ARRAY_REMOVE(ARRAY_AGG(DISTINCT ip_address), NULL) AS ips,
+                COUNT(DISTINCT country_code)::int AS countries,
+                COALESCE(BOOL_OR(is_proxy IS TRUE OR is_hosting IS TRUE), FALSE) AS proxy
+           FROM user_login_history WHERE user_id = :uid`,
+        one
+      ),
+      sequelize.query(
+        `SELECT country_code, MAX(country) AS country, COUNT(*)::int AS logins
+           FROM user_login_history
+          WHERE user_id = :uid AND country_code IS NOT NULL
+          GROUP BY country_code ORDER BY logins DESC`,
+        one
+      ),
+      // The registration fallback for accounts older than the signup columns,
+      // and for players an agent created (they never passed the signup form).
+      // The earliest PUBLIC address wins over a loopback one (a local test
+      // login before the real one); only if there is none is a private one shown.
+      this.models.UserLoginHistory.findAll({
+        where: { user_id: user.id, ip_address: { [Op.ne]: null } },
+        attributes: ['ip_address', 'source', 'country_code', 'country', 'region', 'city', 'isp', 'created_at'],
+        order: [['created_at', 'ASC'], ['id', 'ASC']],
+        limit: RISK_LOGIN_ROWS,
+        raw: true,
+      }).then((rows) => rows.find((r) => !isPrivateIp(r.ip_address)) ?? rows[0] ?? null),
+      // Only the in-house sports book records a bet's IP (`SportsBet.ip_address`);
+      // casino rounds (credits_ledger, provider tables) carry none.
       this.models.SportsBet.findAll({
         where: { user_id: user.id },
         attributes: ['id', 'ip_address', 'created_at', 'stake_amount', 'original_currency', 'status', 'result_status'],
@@ -597,6 +630,8 @@ class ReportsService {
         limit: RISK_BET_ROWS,
         raw: true,
       }),
+      this.#rewardTotalsFor(user.id),
+      this.#sharedWith(staff, user.id),
     ]);
 
     const lifetime = totals.get(String(user.id)) ?? { deposited: '0.00000000', withdrawn: '0.00000000' };
@@ -604,6 +639,35 @@ class ReportsService {
     const withdrawn = money.toMinor(lifetime.withdrawn);
     const lastLogin = logins[0] ?? null;
     const ips = ipRows.map((r) => r.ip_address);
+    const allIps = ipCounts?.ips ?? [];
+    // Loopback / private addresses (a dev box, an office NAT) say nothing about
+    // where a player is; they are listed, never counted toward "multiple IPs".
+    const publicIps = allIps.filter((ip) => !isPrivateIp(ip));
+
+    const registration = full.signup_ip
+      ? {
+          ip: full.signup_ip,
+          source: 'signup',
+          countryCode: full.signup_country_code ?? null,
+          country: full.signup_country ?? null,
+          region: full.signup_region ?? null,
+          city: full.signup_city ?? null,
+          isp: full.signup_isp ?? null,
+        }
+      : firstLogin
+        ? {
+            ip: firstLogin.ip_address,
+            source: 'first_login',
+            countryCode: firstLogin.country_code ?? null,
+            country: firstLogin.country ?? null,
+            region: firstLogin.region ?? null,
+            city: firstLogin.city ?? null,
+            isp: firstLogin.isp ?? null,
+          }
+        : { ip: null, source: null, countryCode: null, country: null, region: null, city: null, isp: null };
+    registration.isPrivate = isPrivateIp(registration.ip);
+    registration.registeredAt = full.created ?? null;
+    registration.declaredCountry = full.country || null;
 
     return {
       currency: 'INR',
@@ -635,10 +699,12 @@ class ReportsService {
           ip: full.signup_ip ?? null,
           countryCode: full.signup_country_code ?? null,
           country: full.signup_country ?? null,
+          region: full.signup_region ?? null,
           city: full.signup_city ?? null,
           isp: full.signup_isp ?? null,
         },
       },
+      registration,
       locks: {
         isLocked: Boolean(full.system_locked),
         lockTargetx: Boolean(full.lock_targetx),
@@ -649,12 +715,19 @@ class ReportsService {
         totalDeposit: lifetime.deposited,
         totalWithdrawal: lifetime.withdrawn,
         net: money.toDecimalString(deposited - withdrawn),
+        // Every deposit and withdrawal (fiat, gateway, crypto) in the site's
+        // reward currency at today's rates; the INR figures above are bank and
+        // gateway INR only. A currency with no rate is named, never counted as 0.
+        reward,
       },
       activity: {
-        distinctIpCount: ips.length,
+        distinctIpCount: allIps.length,
+        publicIpCount: publicIps.length,
         distinctIps: ips,
+        countries: countryRows.map((r) => ({ countryCode: r.country_code, country: r.country ?? null, logins: Number(r.logins) })),
         ipBreakdown: ipRows.map((r) => ({
           ipAddress: r.ip_address,
+          isPrivate: isPrivateIp(r.ip_address),
           uses: Number(r.uses),
           country: r.country ?? null,
           city: r.city ?? null,
@@ -665,6 +738,7 @@ class ReportsService {
         recentLogins: logins.map((r) => ({
           id: r.id,
           ipAddress: r.ip_address ?? null,
+          isPrivate: isPrivateIp(r.ip_address),
           city: r.city ?? null,
           region: r.region ?? null,
           country: r.country ?? null,
@@ -676,8 +750,10 @@ class ReportsService {
           isHosting: r.is_hosting ?? null,
           source: r.source ?? null,
           userAgent: r.user_agent ?? null,
+          device: deviceFromUA(r.user_agent),
           createdAt: r.created_at,
         })),
+        betIpSource: 'sports',
         recentBets: bets.map((b) => ({
           id: b.id,
           ipAddress: b.ip_address ?? null,
@@ -688,16 +764,239 @@ class ReportsService {
           resultStatus: b.result_status,
         })),
       },
+      sharedIps: shared,
       riskFlags: {
-        multipleIps: ips.length > 1,
-        // From the geo lookup on each login (migration 058-login-geo).
-        proxyOrHosting: logins.some((r) => r.is_proxy === true || r.is_hosting === true),
-        multipleCountries: new Set(logins.map((r) => r.country_code).filter(Boolean)).size > 1,
+        multipleIps: publicIps.length > 1,
+        // From the geo lookup on each login (migration 058-login-geo), over all of history.
+        proxyOrHosting: Boolean(ipCounts?.proxy),
+        multipleCountries: Number(ipCounts?.countries ?? 0) > 1,
+        sharedIp: shared.total > 0,
         twoFaDisabled: !full.two_fa_status,
         // Withdrawing nearly everything deposited is the shape of a pass-through
         // account. Guarded on a non-zero deposit — 0/0 is not a ratio.
         highWithdrawalRatio: deposited > 0n && withdrawn * 100n > deposited * 90n,
-        noActivity: ips.length === 0 && bets.length === 0,
+        noActivity: allIps.length === 0 && bets.length === 0,
+      },
+    };
+  }
+
+  /**
+   * Other players IN THE CALLER'S TREE who logged in from one of this player's
+   * public addresses. Private and loopback addresses are left out — everyone
+   * on a dev box or an office NAT would "share" them. Counted inside the tree
+   * only, for the same reason as `sharedIps`.
+   */
+  async #sharedWith(staff, userId) {
+    const scope = await this.#ipTrackerWhere(staff, {});
+    if (!scope) return { total: 0, accounts: [] };
+    const { sequelize } = this.models.UserLoginHistory;
+    const { QueryTypes } = sequelize.constructor;
+
+    const mine = await sequelize.query(
+      'SELECT DISTINCT ip_address FROM user_login_history WHERE user_id = :uid AND ip_address IS NOT NULL',
+      { replacements: { uid: userId }, type: QueryTypes.SELECT }
+    );
+    const ips = mine.map((r) => r.ip_address).filter((ip) => !isPrivateIp(ip));
+    if (!ips.length) return { total: 0, accounts: [] };
+
+    const rows = await sequelize.query(
+      `SELECT h.user_id, u.name AS user_name,
+              ARRAY_AGG(DISTINCT h.ip_address) AS ips, MAX(h.created_at) AS last_seen,
+              COUNT(*) OVER ()::int AS total
+         FROM user_login_history h
+         JOIN users u ON u.id = h.user_id
+        WHERE ${scope.sql} AND h.ip_address IN (:ips) AND h.user_id <> :uid
+        GROUP BY h.user_id, u.name
+        ORDER BY last_seen DESC
+        LIMIT :max`,
+      { replacements: { ...scope.replacements, ips, uid: userId, max: RISK_SHARED_ACCOUNTS }, type: QueryTypes.SELECT }
+    );
+    return {
+      total: rows[0]?.total ?? 0,
+      accounts: rows.map((r) => ({ id: String(r.user_id), name: r.user_name ?? '', ips: r.ips ?? [], lastSeen: r.last_seen })),
+    };
+  }
+
+  /**
+   * A player's lifetime deposits and withdrawals across every table and coin,
+   * valued in the site's reward currency (owner policy `reward_currency`) at
+   * today's `exchangerate` rates: amount × USD-per-unit ÷ reward USD-per-unit.
+   * USD and USDT are 1:1 without a lookup, as everywhere else.
+   */
+  async #rewardTotalsFor(userId) {
+    const { sequelize } = this.models.UserLoginHistory;
+    const { QueryTypes } = sequelize.constructor;
+    const replacements = {
+      uid: String(userId),
+      uidNum: Number(userId),
+      okFiat: DEPOSIT_SUCCESS.fiat_deposits,
+      okApay: DEPOSIT_SUCCESS.apaydeposits,
+      okPayIn: DEPOSIT_SUCCESS.pay_in_transactions,
+      okCc: DEPOSIT_SUCCESS.ccdeposit,
+      okCrypto: STATS_WITHDRAWAL_DONE.withdrawals,
+      okBank: STATS_WITHDRAWAL_DONE.fiat_withdrawals,
+      okGateway: STATS_WITHDRAWAL_DONE.apaywithdrawals,
+    };
+    const coinCase = Object.entries(COIN_IDS)
+      .map(([id, code], i) => {
+        replacements[`coinId${i}`] = Number(id);
+        replacements[`coinCode${i}`] = code;
+        return `WHEN :coinId${i} THEN :coinCode${i}`;
+      })
+      .join(' ');
+
+    const [rows, rateRows, rewardRow] = await Promise.all([
+      sequelize.query(
+        `SELECT side, cur, ROUND(SUM(amt), 8)::text AS amount, COUNT(*)::int AS n FROM (
+           SELECT 'deposit' AS side, UPPER(d.currency) AS cur, d.amount AS amt FROM fiat_deposits d
+            WHERE d.user_id = :uidNum AND LOWER(d.status) IN (:okFiat)
+           UNION ALL
+           SELECT 'deposit', UPPER(a.currency), a.amount FROM apaydeposits a
+            WHERE a.user_id = :uidNum AND LOWER(a.status) IN (:okApay)
+           UNION ALL
+           SELECT 'deposit', UPPER(p.currency), p.amount FROM pay_in_transactions p
+            WHERE p.user_id = :uidNum AND p.status IN (:okPayIn)
+           UNION ALL
+           SELECT 'deposit', (CASE c.coinid ${coinCase} ELSE NULL END), c.price FROM ccdeposit c
+            WHERE c.userid = :uid AND LOWER(c.status) IN (:okCc)
+           UNION ALL
+           SELECT 'withdraw', UPPER(w.coin), w.amount FROM withdrawals w
+            WHERE w.uid = :uidNum AND LOWER(w.status) IN (:okCrypto)
+           UNION ALL
+           SELECT 'withdraw', UPPER(f.currency), f.amount FROM fiat_withdrawals f
+            WHERE f.uid = :uidNum AND LOWER(f.status) IN (:okBank)
+           UNION ALL
+           SELECT 'withdraw', UPPER(g.currency), g.amount FROM apaywithdrawals g
+            WHERE g.user_id = :uid AND LOWER(g.status) IN (:okGateway) AND g.refunded IS NOT TRUE
+         ) m GROUP BY side, cur`,
+        { replacements, type: QueryTypes.SELECT }
+      ),
+      this.models.Exchangerate.findAll({ attributes: ['currency', 'usd_rate'], raw: true }),
+      this.models.SiteFeature?.findByPk
+        ? this.models.SiteFeature.findByPk('reward_currency', { attributes: ['variant'], raw: true }).catch(() => null)
+        : null,
+    ]);
+
+    const currency = rewardCurrencyOf(rewardRow?.variant);
+    const rates = new Map(rateRows.map((r) => [String(r.currency ?? '').toUpperCase(), r.usd_rate]));
+    rates.set('USD', '1');
+    if (!rates.has('USDT')) rates.set('USDT', '1');
+    const toMinor = (v) => {
+      try { return money.toMinorQuantised(String(v ?? '0') || '0'); } catch { return 0n; }
+    };
+    const target = toMinor(rates.get(currency));
+
+    const sums = { deposit: 0n, withdraw: 0n };
+    const counts = { deposit: 0, withdraw: 0 };
+    const unconverted = new Set();
+    for (const row of rows) {
+      counts[row.side] += Number(row.n);
+      const amount = toMinor(row.amount);
+      if (row.cur === currency) { sums[row.side] += amount; continue; }
+      const rate = rates.get(String(row.cur ?? ''));
+      if (rate == null || target === 0n) {
+        if (amount !== 0n) unconverted.add(row.cur || 'UNKNOWN');
+        continue;
+      }
+      sums[row.side] += (amount * toMinor(rate)) / target;
+    }
+
+    return {
+      currency,
+      totalDeposit: money.toDecimalString(sums.deposit),
+      totalWithdrawal: money.toDecimalString(sums.withdraw),
+      net: money.toDecimalString(sums.deposit - sums.withdraw),
+      depositCount: counts.deposit,
+      withdrawalCount: counts.withdraw,
+      unconverted: [...unconverted].sort(),
+    };
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
+  //  Geo stats
+  // ══════════════════════════════════════════════════════════════════════
+
+  /**
+   * Where the caller's players come from: registration country and city, and
+   * login country — each a count of PLAYERS, not of events, so a player who
+   * logged in 300 times from India is one Indian player, and the register row
+   * and the first login are never counted twice.
+   *
+   * Registration geo is the signup lookup (`users.signup_*`), falling back to
+   * the player's earliest located login for accounts older than the signup
+   * columns or created by an agent — the same fallback as the risk view.
+   * Players with no located address at all (only loopback/private logins, or
+   * none) are counted under `unknown`, never as a country.
+   */
+  async geoStats({ staff }) {
+    const scope = await playerScope(this.models, staff, { logger: this.logger });
+    const empty = {
+      totalPlayers: 0,
+      registration: { located: 0, unknown: 0, bySource: { signup: 0, firstLogin: 0 }, countries: [], cities: [] },
+      login: { players: 0, countries: [] },
+    };
+    if (scope.empty) return empty;
+
+    const { sequelize } = this.models.UserLoginHistory;
+    const { QueryTypes } = sequelize.constructor;
+    const q = (sql) => sequelize.query(sql, { replacements: { ...scope.replacements, top: GEO_TOP_N }, type: QueryTypes.SELECT });
+
+    const regGeo = `
+      SELECT u.id,
+             CASE WHEN u.signup_country_code IS NOT NULL THEN 'signup'
+                  WHEN f.country_code IS NOT NULL THEN 'first_login' END AS source,
+             COALESCE(u.signup_country_code, f.country_code) AS country_code,
+             CASE WHEN u.signup_country_code IS NOT NULL THEN u.signup_country ELSE f.country END AS country,
+             CASE WHEN u.signup_country_code IS NOT NULL THEN u.signup_city ELSE f.city END AS city
+        FROM users u
+        LEFT JOIN LATERAL (
+          SELECT h.country_code, h.country, h.city
+            FROM user_login_history h
+           WHERE h.user_id = u.id AND h.country_code IS NOT NULL
+           ORDER BY h.created_at ASC, h.id ASC
+           LIMIT 1
+        ) f ON u.signup_country_code IS NULL
+       WHERE ${scope.sql}`;
+
+    const [[totals], countries, cities, [loginTotals], loginCountries] = await Promise.all([
+      q(`SELECT COUNT(*)::int AS players,
+                COUNT(*) FILTER (WHERE source = 'signup')::int AS signup,
+                COUNT(*) FILTER (WHERE source = 'first_login')::int AS first_login
+           FROM (${regGeo}) r`),
+      q(`SELECT country_code, MAX(country) AS country, COUNT(*)::int AS players
+           FROM (${regGeo}) r WHERE country_code IS NOT NULL
+          GROUP BY country_code ORDER BY players DESC, country_code LIMIT :top`),
+      q(`SELECT city, country_code, MAX(country) AS country, COUNT(*)::int AS players
+           FROM (${regGeo}) r WHERE country_code IS NOT NULL AND city IS NOT NULL
+          GROUP BY city, country_code ORDER BY players DESC, city LIMIT :top`),
+      q(`SELECT COUNT(DISTINCT h.user_id)::int AS players
+           FROM user_login_history h JOIN users u ON u.id = h.user_id
+          WHERE ${scope.sql} AND h.country_code IS NOT NULL`),
+      q(`SELECT h.country_code, MAX(h.country) AS country,
+                COUNT(DISTINCT h.user_id)::int AS players, COUNT(*)::int AS logins
+           FROM user_login_history h JOIN users u ON u.id = h.user_id
+          WHERE ${scope.sql} AND h.country_code IS NOT NULL
+          GROUP BY h.country_code ORDER BY players DESC, logins DESC, h.country_code LIMIT :top`),
+    ]);
+
+    const located = Number(totals?.signup ?? 0) + Number(totals?.first_login ?? 0);
+    return {
+      totalPlayers: Number(totals?.players ?? 0),
+      registration: {
+        located,
+        unknown: Number(totals?.players ?? 0) - located,
+        bySource: { signup: Number(totals?.signup ?? 0), firstLogin: Number(totals?.first_login ?? 0) },
+        countries: countries.map((r) => ({ countryCode: r.country_code, country: r.country ?? r.country_code, players: Number(r.players) })),
+        cities: cities.map((r) => ({ city: r.city, countryCode: r.country_code, country: r.country ?? r.country_code, players: Number(r.players) })),
+      },
+      login: {
+        players: Number(loginTotals?.players ?? 0),
+        countries: loginCountries.map((r) => ({
+          countryCode: r.country_code,
+          country: r.country ?? r.country_code,
+          players: Number(r.players),
+          logins: Number(r.logins),
+        })),
       },
     };
   }

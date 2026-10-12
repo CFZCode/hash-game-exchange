@@ -68,6 +68,11 @@ function createControllers({ service, deps }) {
       response.ok(res, await service.userRisk({ staff: req.staff, ...req.params }))
     ),
 
+    /** Registration country / city and login country, players counted once. */
+    geoStats: asyncHandler(async (req, res) =>
+      response.ok(res, await service.geoStats({ staff: req.staff }))
+    ),
+
     ipTracker: asyncHandler(async (req, res) => {
       const result = await service.ipTracker({ staff: req.staff, ...req.query });
       return response.paginated(res, result.rows, { ...page(req.query), total: result.total });

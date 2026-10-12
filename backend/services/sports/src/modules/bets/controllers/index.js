@@ -32,8 +32,11 @@ function createControllers({ service }) {
           user_id: req.user.id,
           // @legacy req.headers['x-forwarded-for']?.split(',')[0]
           //           || req?.connection?.remoteAddress || req.ip
-          ip_address:
-            req.headers['x-forwarded-for']?.split(',')[0] || req.connection?.remoteAddress || req.ip,
+          // The LEFT-most forwarded entry is whatever the client typed: a bettor
+          // could put any address on their fraud-review row. `req.ip` is the
+          // address the trusted proxy chain (TRUST_PROXY) vouches for — the same
+          // one the login history records — with `::ffff:` dropped from IPv4.
+          ip_address: String(req.ip || '').replace(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/, '$1') || null,
         });
         return res.status(status).json(body);
       } catch (error) {

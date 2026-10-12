@@ -1,7 +1,7 @@
 'use strict';
 
 const { Router } = require('express');
-const { validate, createActivityRecorder } = require('@ibitplay/common');
+const { validate, noQuery, createActivityRecorder } = require('@ibitplay/common');
 const { PERMISSIONS, denyAgentTree, VAULT_NOT_FOR_AGENTS } = require('@ibitplay/auth');
 
 const v = require('../reports.validators');
@@ -90,6 +90,13 @@ module.exports = function adminRoutes(deps) {
    */
   router.get('/ip-tracker', canRead, validate(v.ipTracker), ctrl.ipTracker);
   router.get('/ip-tracker/shared', canRead, validate(v.sharedIps), ctrl.sharedIps);
+
+  /**
+   * Where the caller's players come from — registration country and city
+   * (signup lookup, else the first located login) and login country, each a
+   * count of players in the caller's tree. Takes no input.
+   */
+  router.get('/geo-stats', canRead, noQuery(), ctrl.geoStats);
 
   /** @legacy GET /reports/user/:userId */
   router.get('/players/:userId', canRead, validate(v.playerReport), ctrl.playerReport);

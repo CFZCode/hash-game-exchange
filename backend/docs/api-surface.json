@@ -810,6 +810,17 @@
       "dir": "services/user/src/modules/rakeback"
     },
     {
+      "name": "region",
+      "service": "user",
+      "basePath": "/region",
+      "audiences": [
+        "public"
+      ],
+      "socketOnly": false,
+      "hasSockets": false,
+      "dir": "services/user/src/modules/region"
+    },
+    {
       "name": "social",
       "service": "user",
       "basePath": "/social",
@@ -4328,6 +4339,33 @@
           "kind": "ok",
           "status": 200,
           "shape": "finance.stats(…)"
+        }
+      ],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/admin/src/modules/reports/routes/admin.routes.js"
+    },
+    {
+      "service": "admin",
+      "module": "reports",
+      "audience": "admin",
+      "method": "GET",
+      "path": "/api/v1/admin/reports/geo-stats",
+      "routePath": "/geo-stats",
+      "handler": "geoStats",
+      "handlerSource": "index.js",
+      "middleware": [
+        {
+          "type": "permission",
+          "value": "reports:read"
+        }
+      ],
+      "responses": [
+        {
+          "index": 39,
+          "kind": "ok",
+          "status": 200,
+          "shape": "service.geoStats(…)"
         }
       ],
       "thrown": [],
@@ -11398,13 +11436,13 @@
       ],
       "responses": [
         {
-          "index": 429,
+          "index": 725,
           "kind": "raw",
           "status": null,
           "shape": "res.json(…)"
         },
         {
-          "index": 573,
+          "index": 869,
           "kind": "raw",
           "status": 400,
           "shape": "res.json(…)"
@@ -20401,6 +20439,33 @@
     },
     {
       "service": "user",
+      "module": "region",
+      "audience": "public",
+      "method": "GET",
+      "path": "/api/v1/user/region",
+      "routePath": "/",
+      "handler": "asyncHandler",
+      "handlerSource": "public.routes.js",
+      "middleware": [
+        {
+          "type": "rateLimit",
+          "value": "limiter"
+        }
+      ],
+      "responses": [
+        {
+          "index": 92,
+          "kind": "ok",
+          "status": 200,
+          "shape": "service.visitor(…)"
+        }
+      ],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/user/src/modules/region/routes/public.routes.js"
+    },
+    {
+      "service": "user",
       "module": "spin-wheel",
       "audience": "public",
       "method": "GET",
@@ -22526,15 +22591,15 @@
         },
         {
           "type": "validate",
-          "value": "v.adminBalance"
+          "value": "v.adminReconcile"
         }
       ],
       "responses": [
         {
-          "index": 252,
+          "index": 412,
           "kind": "ok",
           "status": 200,
-          "shape": "service.reconcile(…)"
+          "shape": "req.query.currency ? await service.reconcile(…"
         }
       ],
       "thrown": [],
@@ -22707,10 +22772,10 @@
       ],
       "responses": [
         {
-          "index": 252,
+          "index": 412,
           "kind": "ok",
           "status": 200,
-          "shape": "service.reconcile(…)"
+          "shape": "req.query.currency ? await service.reconcile(…"
         }
       ],
       "thrown": [],

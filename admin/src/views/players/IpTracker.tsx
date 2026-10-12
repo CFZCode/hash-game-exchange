@@ -20,6 +20,7 @@ import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useListState, usePagedApi } from '@/hooks/use-api'
 import GeoAttribution from './GeoAttribution'
+import GeoStats from './GeoStats'
 import type { IpLoginRow, SharedIpRow } from './types'
 
 /**
@@ -143,7 +144,7 @@ const useDebounced = (value: string, apply: (next: string) => void) => {
 
 const IpTracker = () => {
   const { state, set, query } = useListState(['tab', 'ip', 'country', 'source', 'from', 'to', 'proxyOnly'])
-  const tab = state.tab === 'shared' ? 'shared' : 'logins'
+  const tab = state.tab === 'shared' ? 'shared' : state.tab === 'countries' ? 'countries' : 'logins'
   const [open, setOpen] = useState<Set<string>>(() => new Set())
 
   const [search, setSearch] = useDebounced(String(state.search ?? ''), v => set({ search: v }))
@@ -279,7 +280,7 @@ const IpTracker = () => {
       </div>
     ) : null
 
-  const active = tab === 'logins' ? logins : shared
+  const active = tab === 'shared' ? shared : logins
 
   return (
     <div>
@@ -288,12 +289,18 @@ const IpTracker = () => {
         description='Where your users sign in from, and which addresses several accounts share. Only users in your own tree are shown.'
       />
 
-      <Tabs value={tab} onValueChange={v => set({ tab: v === 'shared' ? 'shared' : '' })} className='mb-4'>
+      <Tabs value={tab} onValueChange={v => set({ tab: v === 'shared' || v === 'countries' ? v : '' })} className='mb-4'>
         <TabsList>
           <TabsTrigger value='logins'>All logins</TabsTrigger>
           <TabsTrigger value='shared'>Shared IPs</TabsTrigger>
+          <TabsTrigger value='countries'>Countries</TabsTrigger>
         </TabsList>
       </Tabs>
+
+      {tab === 'countries' && <GeoStats />}
+
+      {tab !== 'countries' && (
+        <>
 
       <div className='mb-4 flex flex-wrap items-center gap-3'>
         <div className='relative w-full sm:w-60'>
@@ -393,6 +400,8 @@ const IpTracker = () => {
         )}
         <GeoAttribution className='' />
       </div>
+        </>
+      )}
     </div>
   )
 }
