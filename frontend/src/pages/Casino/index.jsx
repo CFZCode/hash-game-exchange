@@ -1,7 +1,7 @@
 import React from 'react';
 import useResource from '../../hooks/useResource';
 import { getOriginals } from '../../services/originals';
-import { getCasinoSet, getCasinoSets, getLiveProviders } from '../../services/catalog';
+import { getCasinoPage, getCasinoSets, getLiveProviders, isLiveSet } from '../../services/catalog';
 import { USE_FIXTURES } from '../../services/client';
 import { useParams } from 'react-router-dom';
 import RecentFavorites from '../Home/RecentFavorites';
@@ -217,27 +217,36 @@ export default function Casino() {
   /* Searching narrows within the tab you are on, which is what the Explore panel does with
      its own tabs (`gt` in index-BChnjnW3.js). On the lobby there is no tab to narrow to, so
      it searches the whole catalogue. */
-  /* LIVE (fixtures off): the lobby's rows, the open tab's set and a search each read the SmartBet
-     catalogue — see services/catalog.js. Each reader answers `null` with fixtures on, so the
-     transcribed path below is untouched. A tab carrying the filter bar sends its provider and
-     sort to the server, so the hundred rows asked for are the right hundred. */
+  /* LIVE (fixtures off): the lobby's rows read the SmartBet catalogue (services/catalog.js), and
+     the browse grid, a tab or a search, asks the server for EXACTLY the page it shows, with the
+     real total behind the pager, so the whole catalogue is reachable. Each reader answers `null`
+     with fixtures on, so the transcribed path below is untouched. Tabs with the filter bar send
+     their provider and sort with it. BC Originals keeps its in-house read. */
+  const pageKey = `${active}|${query.trim()}|${sort}|${providers.join(',')}`;
+  const [pageBox, setPageBox] = React.useState({ key: pageKey, page: 1 });
+  const requestedPage = pageBox.key === pageKey ? pageBox.page : 1;
+
   const readLobby = React.useCallback(() => (active ? null : getCasinoSets(LOBBY_KEYS, { limit: 10 })), [active]);
   const { data: liveLobby } = useResource(readLobby);
-  const filterKey = FILTER_TABS.has(active) ? `${providers.join(',')}|${sort}` : '';
-  const readTab = React.useCallback(() => {
-    if (!active) return null;
-    const [chosen = '', order = ''] = filterKey.split('|');
-    return getCasinoSet(active, { providers: chosen ? chosen.split(',') : [], sort: order });
-  }, [active, filterKey]);
-  const { data: liveTab } = useResource(readTab);
-  const liveQuery = searching && !tooShort && active !== 'brand' ? query.trim() : '';
-  const readSearch = React.useCallback(
-    () => (liveQuery ? getCasinoSet(active || 'all', { search: liveQuery }) : null),
-    [active, liveQuery],
-  );
-  const { data: liveSearch } = useResource(readSearch);
+  const liveGrid = !USE_FIXTURES && active !== 'brand' && (searching ? !tooShort : isLiveSet(active));
+  const gridKey = liveGrid
+    ? JSON.stringify([
+        searching ? active || 'all' : active,
+        searching ? query.trim() : '',
+        FILTER_TABS.has(active) && !searching ? providers : [],
+        FILTER_TABS.has(active) && !searching ? sort : '',
+        requestedPage,
+      ])
+    : '';
+  const readGrid = React.useCallback(() => {
+    if (!gridKey) return null;
+    const [set, search, chosen, order, at] = JSON.parse(gridKey);
+    return getCasinoPage(set, { search: search || undefined, providers: chosen, sort: order, page: at, limit: GRID_PAGE_SIZE });
+  }, [gridKey]);
+  const { data: livePage } = useResource(readGrid);
   const { data: liveProviders } = useResource(getLiveProviders);
-  const live = active ? { [active]: liveTab } : liveLobby;
+  const live = active ? { [active]: livePage?.games } : liveLobby;
+  const liveSearch = livePage?.games;
 
   const results = React.useMemo(() => {
     if (!searching || tooShort) return [];
@@ -284,17 +293,19 @@ export default function Casino() {
      That reset is derived during render, keyed on those inputs, rather than done in an effect:
      `react-hooks/set-state-in-effect` forbids the effect, and the derived form has no
      intermediate frame showing the stale page. */
-  const pageKey = `${active}|${query.trim()}|${sort}|${providers.join(',')}`;
-  const [pageBox, setPageBox] = React.useState({ key: pageKey, page: 1 });
-  const pages = Math.max(1, Math.ceil(games.length / GRID_PAGE_SIZE));
+  /* Live, the grid already holds one server page: the pager counts the real total and nothing is
+     sliced. While a page is in flight the pager keeps the page asked for. */
+  const pages = liveGrid
+    ? Math.max(1, requestedPage, Math.ceil((livePage?.total ?? 0) / GRID_PAGE_SIZE))
+    : Math.max(1, Math.ceil(games.length / GRID_PAGE_SIZE));
   /* Clamped as well as reset: a set can shrink under the current page without the key moving
      (it cannot today, but the clamp is what makes that safe). */
-  const page = Math.min(pageBox.key === pageKey ? pageBox.page : 1, pages);
+  const page = Math.min(requestedPage, pages);
   const setPage = (next) => setPageBox({ key: pageKey, page: next });
 
   const pageGames = React.useMemo(
-    () => games.slice((page - 1) * GRID_PAGE_SIZE, page * GRID_PAGE_SIZE),
-    [games, page],
+    () => (liveGrid ? games : games.slice((page - 1) * GRID_PAGE_SIZE, page * GRID_PAGE_SIZE)),
+    [liveGrid, games, page],
   );
 
   /* Only the lobby, and only when nothing is being searched, shows the row layout. Everything

@@ -12,12 +12,13 @@ import {
   PROVIDERS,
 } from './catalogue';
 import useResource from '../../hooks/useResource';
-import { getCasinoSet, getLiveProviders } from '../../services/catalog';
+import { getCasinoPage, getLiveProviders } from '../../services/catalog';
 import { getOriginals } from '../../services/originals';
 import { USE_FIXTURES } from '../../services/client';
 
 /* Fixtures off: each tab is a SmartBet catalogue set (services/catalog.js), and a search is the
-   same set with the platform's `search` — the first hundred rows, paged here. */
+   same set with the platform's `search`. The server pages it: one page of PAGE_SIZE per read,
+   with the provider filter and sort sent along, and the pager counts the real total. */
 const LIVE_TAB = {
   allgames: 'all',
   hot: 'hot',
@@ -29,16 +30,19 @@ const LIVE_TAB = {
   feature: 'feature',
 };
 
-function readLiveTab(tab, query) {
+function readLiveTab(tab, query, page, providers, sort) {
   if (USE_FIXTURES) return null;
   if (tab === 'original') {
     const needle = query.trim().toLowerCase();
-    return Promise.resolve(getOriginals()).then((games) =>
-      (games ?? []).filter((game) => !needle || game.name.toLowerCase().includes(needle)),
-    );
+    return Promise.resolve(getOriginals()).then((games) => {
+      const found = (games ?? []).filter((game) => !needle || game.name.toLowerCase().includes(needle));
+      return { games: found.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), total: found.length };
+    });
   }
   const set = LIVE_TAB[tab];
-  return set ? getCasinoSet(set, { search: query.trim() || undefined }) : [];
+  return set
+    ? getCasinoPage(set, { search: query.trim() || undefined, page, limit: PAGE_SIZE, providers, sort })
+    : { games: [], total: 0 };
 }
 
 /* The Casino side of the panel — `wt` in index-BChnjnW3.js, which is really two components
@@ -92,8 +96,10 @@ export default function CasinoExplore({ query }) {
   const tooShort = searching && query.trim().length < 2;
 
   const liveQuery = searching && !tooShort ? query : '';
-  const readLive = React.useCallback(() => readLiveTab(tab, liveQuery), [tab, liveQuery]);
-  const { data: liveGames } = useResource(readLive);
+  const liveKey = JSON.stringify([tab, liveQuery, page, providers, sort]);
+  const readLive = React.useCallback(() => readLiveTab(...JSON.parse(liveKey)), [liveKey]);
+  const { data: livePage } = useResource(readLive);
+  const liveGames = livePage?.games;
   const { data: liveProviders } = useResource(getLiveProviders);
 
   const games = React.useMemo(() => {
@@ -118,9 +124,11 @@ export default function CasinoExplore({ query }) {
   /* Clamped rather than corrected: `page` only ever moves through the pager and the resets
      above, so the one way it can end up past the end is a list that shrank in the same commit
      that rendered it. Deriving the page in use costs nothing and keeps that out of an effect. */
-  const pages = Math.max(1, Math.ceil(shown.length / PAGE_SIZE));
+  const pages = USE_FIXTURES
+    ? Math.max(1, Math.ceil(shown.length / PAGE_SIZE))
+    : Math.max(1, page, Math.ceil((livePage?.total ?? 0) / PAGE_SIZE));
   const at = Math.min(page, pages);
-  const pageGames = shown.slice((at - 1) * PAGE_SIZE, at * PAGE_SIZE);
+  const pageGames = USE_FIXTURES ? shown.slice((at - 1) * PAGE_SIZE, at * PAGE_SIZE) : shown;
 
   return (
     <div className="casino-games-tab mt-4 w-full">

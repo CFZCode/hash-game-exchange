@@ -1,4 +1,4 @@
-import { request, USE_FIXTURES } from './client';
+import { request, requestPage, USE_FIXTURES } from './client';
 import ENDPOINTS from './endpoints';
 import { GAMES } from '../data/games';
 import { PROVIDERS } from '../data/providers';
@@ -92,28 +92,52 @@ export function toCatalogGame(row) {
 
 const toGames = (rows) => (Array.isArray(rows) ? rows : []).filter(Boolean).map(toCatalogGame);
 
-/* One set, live. `null` in fixture mode (the caller keeps its transcription), `[]` for a set the
-   platform cannot feed. `providers`, `sort` and `search` go to the server so the hundred rows
-   asked for are the right hundred; a curated collection takes none of them and keeps its order. */
-export function getCasinoSet(key, { limit = LIVE_LIMIT, providers = [], sort = '', search, category } = {}) {
-  if (USE_FIXTURES) return null;
+/* The query a set key asks for, or `null` when the platform cannot feed it. A curated
+   collection keeps its curated order and so takes no provider, sort, search or category. */
+function querySpec(key, { providers = [], sort = '', search, category } = {}) {
   const spec = SET_QUERY[key];
-  if (!spec) return [];
-
+  if (!spec) return null;
   if (spec.collection && !search && !category && !providers.length && !SORT_PARAM[sort]) {
-    return Promise.resolve(
-      request(API.collection(spec.collection), { live: true, params: { limit }, fixture: [] }),
-    ).then(toGames);
+    return { path: API.collection(spec.collection), params: {} };
   }
-
-  const params = {
-    limit,
-    category: category || spec.category,
-    search: search || spec.search,
-    provider: providers.length ? providers.join(',') : undefined,
-    sort: SORT_PARAM[sort],
+  return {
+    path: API.games,
+    params: {
+      category: category || spec.category,
+      search: search || spec.search,
+      provider: providers.length ? providers.join(',') : undefined,
+      sort: SORT_PARAM[sort],
+    },
   };
-  return Promise.resolve(request(API.games, { live: true, params, fixture: [] })).then(toGames);
+}
+
+/* ONE PAGE of a set, with the real total: `{games, total, page}`. Every paged grid (the casino
+   tabs, the list pages, the Explore panel and the searches) asks for exactly the page it shows,
+   so the whole catalogue is reachable through the grid's own pager. `null` in fixture mode, an
+   empty page for a set the platform cannot feed.
+
+   `/casino/games` already holds the js_games provider catalogue: every one of its 1980
+   non-house rows is there under the same uuid, except five that 2j and jili list twice (same
+   name, provider, type and art), which the lobby lists once on purpose. So nothing is merged
+   in from `/js-games/v1/games`; that would only double-list. */
+export function getCasinoPage(key, { page = 1, limit = LIVE_LIMIT, ...options } = {}) {
+  if (USE_FIXTURES) return null;
+  const spec = querySpec(key, options);
+  if (!spec) return { games: [], total: 0, page: 1 };
+  return Promise.resolve(
+    requestPage(spec.path, { live: true, params: { ...spec.params, page, limit }, fixture: [] }),
+  ).then(({ rows, pagination }) => {
+    const games = toGames(rows);
+    return { games, total: pagination?.total ?? games.length, page };
+  });
+}
+
+/* The first `limit` games of a set, as a plain list: the lobby and home rows. `null` in fixture
+   mode, `[]` for a set the platform cannot feed. */
+export function getCasinoSet(key, { limit = LIVE_LIMIT, ...options } = {}) {
+  if (USE_FIXTURES) return null;
+  const page = getCasinoPage(key, { limit, ...options });
+  return Promise.resolve(page).then((answer) => answer.games);
 }
 
 /* Several sets at once, as a map: the casino lobby's rows. A failed set reads as empty rather
@@ -125,13 +149,13 @@ export function getCasinoSets(keys, options) {
   ).then((lists) => Object.fromEntries(keys.map((key, i) => [key, lists[i] ?? []])));
 }
 
-/* The provider list, live: `{rows: [{name, displayName, logoUrl}]}` -> names, an operator's
-   display name winning. `null` in fixture mode. A name with no local mark renders as text
+/* The provider list, live: `{rows: [{name, displayName, logoUrl}]}` -> the catalogue names,
+   which are what the `provider` filter and `/provider/:name` match on. `null` in fixture mode. A name with no local mark renders as text
    (`ProviderLogo`'s own fallback). */
 export function getLiveProviders() {
   if (USE_FIXTURES) return null;
   return Promise.resolve(request(API.providers, { live: true, fixture: { rows: [] } })).then((data) =>
-    (data?.rows ?? []).map((row) => row.displayName || row.name).filter(Boolean),
+    (data?.rows ?? []).map((row) => row.name).filter(Boolean),
   );
 }
 

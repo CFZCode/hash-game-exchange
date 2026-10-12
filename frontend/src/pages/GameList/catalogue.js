@@ -1,5 +1,6 @@
 import { gamesFor } from '../Casino/catalogue';
-import { getCasinoSet } from '../../services/catalog';
+import { getCasinoPage } from '../../services/catalog';
+import { GRID_PAGE_SIZE as PAGE } from '../Casino/catalogue';
 import { USE_FIXTURES } from '../../services/client';
 import { exclusive, bingo } from '../Home/GameSection/sections';
 
@@ -170,20 +171,29 @@ export function gamelistGames(type, originals) {
  * tag this file does not know is asked for as the platform's own `category` (the game page's tag
  * chips are the platform's tags: `slots`, `live`, `crash`, `table`, ...). `null` means "not the
  * live path": fixtures on, or `/gamelist/brand`, which keeps its in-house read. */
-export function readLiveList(kind, raw) {
+export function readLiveList(kind, raw, page = 1) {
   if (USE_FIXTURES) return null;
+  const at = { page, limit: PAGE };
+  const none = { games: [], total: 0, page: 1 };
   if (kind === 'gamelist') {
     const set = { slots: 'slots', live: 'live', editor: 'poker' }[raw];
     if (raw === 'brand') return null;
-    return set ? getCasinoSet(set) : [];
+    return set ? getCasinoPage(set, at) : none;
   }
   if (kind === 'section') {
     if (raw === 'originals') return null;
     const set = raw === 'exclusive' ? 'exclusive' : raw === 'fishing' ? 'fishing' : SECTION_SETS[raw];
-    return set ? getCasinoSet(set) : [];
+    return set ? getCasinoPage(set, at) : none;
   }
   const key = normalise(raw);
-  if (key === 'exclusive' || key === 'bingo') return getCasinoSet(key);
-  if (TAG_SETS[key]) return getCasinoSet(TAG_SETS[key]);
-  return key ? getCasinoSet('all', { category: key }) : [];
+  if (key === 'exclusive' || key === 'bingo') return getCasinoPage(key, at);
+  if (TAG_SETS[key]) return getCasinoPage(TAG_SETS[key], at);
+  return key ? getCasinoPage('all', { ...at, category: key }) : none;
+}
+
+/* A provider's own page, `/provider/:name` (the Providers grid's links): every game the
+   platform lists under that provider, paged. Live only. */
+export function readProviderList(name, page = 1) {
+  if (USE_FIXTURES) return null;
+  return getCasinoPage('all', { page, limit: PAGE, providers: [name] });
 }

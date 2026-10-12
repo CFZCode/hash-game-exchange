@@ -14,6 +14,7 @@ import {
   tagGames,
   gamelistGames,
   readLiveList,
+  readProviderList,
 } from './catalogue';
 
 /* THE FOUR LIST PAGES — `/section/:section`, `/gamelist/:type`, `/tagname/:tag` and
@@ -55,7 +56,7 @@ import {
    the original pads above the title at all. With it moved, the heading's top edge is the column's
    own padding-top — the same place `/favorite` puts it, where the stack was measured against the
    capture to the pixel. */
-function GameListPage({ title, games }) {
+function GameListPage({ title, games, readLive }) {
   /* THE PAGE NUMBER RESETS WHEN THE LIST UNDER IT CHANGES, and it is tracked WITH the list rather
      than reset by an effect. A link from one section to another may not remount this component —
      `/section/slots` to `/section/new` is the same element with a different param — and landing on
@@ -74,8 +75,16 @@ function GameListPage({ title, games }) {
   const page = tracked.key === title ? tracked.page : 1;
   const setPage = (next) => setTracked({ key: title, page: next });
 
-  const pages = Math.max(1, Math.ceil(games.length / GRID_PAGE_SIZE));
-  const shown = games.slice((page - 1) * GRID_PAGE_SIZE, page * GRID_PAGE_SIZE);
+  /* LIVE (fixtures off): `readLive(page)` asks the SmartBet catalogue for exactly this page, and
+     the pager counts the real total. `null` from it (fixtures on, or BC Originals' own read)
+     keeps the list below, paged here as before. */
+  const readPage = React.useCallback(() => (readLive ? readLive(page) : null), [readLive, page]);
+  const { data: live } = useResource(readPage);
+  const serverPaged = live !== null;
+  const pages = serverPaged
+    ? Math.max(1, page, Math.ceil((live?.total ?? 0) / GRID_PAGE_SIZE))
+    : Math.max(1, Math.ceil(games.length / GRID_PAGE_SIZE));
+  const shown = serverPaged ? live?.games ?? [] : games.slice((page - 1) * GRID_PAGE_SIZE, page * GRID_PAGE_SIZE);
 
   return (
     /* `px-4 lg:px-0` for the reason `/favorite` documents: the page arm only renders from `lg` up,
@@ -121,14 +130,14 @@ export function SectionPage() {
   const section = useSegment('section');
   const [params] = useSearchParams();
   const key = decodeURIComponent(section);
-  /* Fixtures off: the SmartBet catalogue's list (`readLiveList`); `null` keeps the set below. */
-  const readLive = React.useCallback(() => readLiveList('section', key), [key]);
-  const { data: live } = useResource(readLive);
+  /* Fixtures off: the SmartBet catalogue, a page at a time (`readLiveList`). */
+  const readLive = React.useCallback((page) => readLiveList('section', key, page), [key]);
 
   return (
     <GameListPage
       title={params.get('label') ?? SECTION_TITLES[key] ?? key}
-      games={live === null ? sectionGames(key) : live ?? []}
+      games={sectionGames(key)}
+      readLive={readLive}
     />
   );
 }
@@ -144,13 +153,13 @@ export function GameListRoute() {
      Every other type falls through to its transcribed set inside `gamelistGames`; see
      `services/originals.js`. */
   const { data: originals } = useResource(getOriginals);
-  const readLive = React.useCallback(() => readLiveList('gamelist', type), [type]);
-  const { data: live } = useResource(readLive);
+  const readLive = React.useCallback((page) => readLiveList('gamelist', type, page), [type]);
 
   return (
     <GameListPage
       title={GAMELIST_TITLES[type] ?? 'Recommend'}
-      games={live === null ? gamelistGames(type, originals) : live ?? []}
+      games={gamelistGames(type, originals)}
+      readLive={readLive}
     />
   );
 }
@@ -162,13 +171,13 @@ export function TagPage() {
   const tag = useSegment('tag');
   const [params] = useSearchParams();
   const key = decodeURIComponent(tag);
-  const readLive = React.useCallback(() => readLiveList('tag', key), [key]);
-  const { data: live } = useResource(readLive);
+  const readLive = React.useCallback((page) => readLiveList('tag', key, page), [key]);
 
   return (
     <GameListPage
       title={params.get('label') ?? TAG_TITLES[key] ?? key}
-      games={live === null ? tagGames(key) : live ?? []}
+      games={tagGames(key)}
+      readLive={readLive}
     />
   );
 }
@@ -180,4 +189,12 @@ export function TagPage() {
    which is what the site shows for a related list with nothing in it. */
 export function RelatedPage() {
   return <GameListPage title="Related Games" games={[]} />;
+}
+
+/* `/provider/:name`, the Providers grid's link: every game the platform lists under that studio,
+   paged against the real total. Live only; with fixtures on the route is not mounted. */
+export function ProviderPage() {
+  const name = decodeURIComponent(useSegment('name'));
+  const readLive = React.useCallback((page) => readProviderList(name, page), [name]);
+  return <GameListPage title={name} games={[]} readLive={readLive} />;
 }
