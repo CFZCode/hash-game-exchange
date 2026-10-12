@@ -601,9 +601,9 @@ attaches and the shape the handler answers with. Regenerate with
 
 | | |
 | --- | ---: |
-| Routes mounted | 770 |
+| Routes mounted | 777 |
 | Modules | 83 |
-| Answering outside the envelope | 61 |
+| Answering outside the envelope | 49 |
 
 **Guard** is the audience the loader mounted the router under, plus anything
 the route adds. `public` carries no token. `player` and `staff` carry one.
@@ -1156,7 +1156,7 @@ the end of this appendix.
 | `GET` | `/api/v1/casino/x-gaming/games/search` | `public` | `200` `[…]` + `meta.pagination` |
 | `GET` | `/api/v1/casino/x-gaming/vendors` | `public` | `200` `service.vendors(…)` |
 
-### sports-service — :4004 (76 routes)
+### sports-service — :4004 (83 routes)
 
 #### `bet-admin`
 
@@ -1178,88 +1178,95 @@ the end of this appendix.
 
 | Method | Path | Guard | Response |
 |---|---|---|---|
-| `GET` | `/api/v1/sports/bets` | `player` | `200` `[…]` + `meta.pagination` |
-| `POST` | `/api/v1/sports/bets` | `player` | **raw** `res.json(…)` · **raw** `res.json(…)` |
-| `GET` | `/api/v1/sports/bets/exposures` | `player` | `200` `service.exposures(…)` |
-| `GET` | `/api/v1/sports/bets/open-count` | `player` | `200` `service.openCount(…)` |
-| `GET` | `/api/v1/sports/bets/open/:matchId` | `player` | `200` `service.openBets(…)` |
-| `GET` | `/api/v1/sports/bets/summary` | `player` | `200` `service.summary(…)` |
+| `GET` | `/api/v1/sports/user/bet-result/:client_ref` | `public` | — |
+| `POST` | `/api/v1/sports/user/cancel-bet` | `public` | — |
+| `GET` | `/api/v1/sports/user/cricket/matched-bets/all` | `public` | — |
+| `GET` | `/api/v1/sports/user/cricket/sports-bets/user` | `public` | — |
+| `GET` | `/api/v1/sports/user/cricket/user-open-bets` | `public` | — |
+| `GET` | `/api/v1/sports/user/cricket/user-open-bets-grouped` | `public` | — |
+| `GET` | `/api/v1/sports/user/fancy-bets` | `public` | — |
+| `POST` | `/api/v1/sports/user/matchexposures/match` | `public` | — |
+| `POST` | `/api/v1/sports/user/place` | `public` | — |
+| `POST` | `/api/v1/sports/user/place-combined` | `public` | — |
 
-#### `catalogue`
-
-| Method | Path | Guard | Response |
-|---|---|---|---|
-| `GET` | `/api/v1/sports/catalogue/sports` | `public` | `200` `service.listSports(…)` |
-| `GET` | `/api/v1/admin/sports/catalogue/fancy` | `staff` + `sports:read` | `200` `[…]` + `meta.pagination` |
-| `POST` | `/api/v1/admin/sports/catalogue/fancy` | `staff` + `sports:manage` | `200` `service.setFancyStatus(…)` |
-| `DELETE` | `/api/v1/admin/sports/catalogue/fancy/:marketId` | `staff` + `sports:manage` | `200` `service.removeFancyControl(…)` |
-| `POST` | `/api/v1/admin/sports/catalogue/fancy/bulk` | `staff` + `sports:manage` | `200` `service.bulkSetFancyStatus(…)` |
-| `GET` | `/api/v1/admin/sports/catalogue/fancy/event/:eventId` | `staff` + `sports:read` | `200` `service.fancyControlsForEvent(…)` |
-| `GET` | `/api/v1/admin/sports/catalogue/sports` | `staff` + `sports:read` | `200` `service.listSports(…)` |
-| `POST` | `/api/v1/admin/sports/catalogue/sports` | `staff` + `sports:manage` | `201` `service.addSport(…)` |
-| `DELETE` | `/api/v1/admin/sports/catalogue/sports/:id` | `staff` + `sports:manage` | `200` `service.removeSport(…)` |
-| `GET` | `/api/v1/admin/sports/catalogue/sports/:id` | `staff` + `sports:read` | `200` `service.getSport(…)` |
-| `PUT` | `/api/v1/admin/sports/catalogue/sports/:id` | `staff` + `sports:manage` | `200` `service.updateSport(…)` |
-
-#### `feed`
+#### `odds-events`
 
 | Method | Path | Guard | Response |
 |---|---|---|---|
-| `GET` | `/api/v1/sports/feed/events` | `public` | `200` `service.eventsBySport(…)` |
-| `GET` | `/api/v1/sports/feed/events/by-series` | `public` | `200` `service.eventsBySeries(…)` |
-| `GET` | `/api/v1/sports/feed/events/details` | `public` | `200` `service.eventDetails(…)` |
-| `GET` | `/api/v1/sports/feed/events/list` | `public` | `200` `service.eventList(…)` |
-| `GET` | `/api/v1/sports/feed/inplay` | `public` | `200` `service.inplay(…)` |
-| `GET` | `/api/v1/sports/feed/inplay/all` | `public` | `200` `service.allInplay(…)` |
-| `GET` | `/api/v1/sports/feed/inplay/game/:gameId` | `public` | `200` `service.inplayByGame(…)` |
-| `GET` | `/api/v1/sports/feed/live/data` | `public` | `200` `service.liveSportsData(…)` |
-| `GET` | `/api/v1/sports/feed/live/match` | `public` | `200` `service.liveSportsDataById(…)` |
-| `GET` | `/api/v1/sports/feed/live/result` | `public` | `200` `service.liveResult(…)` |
-| `GET` | `/api/v1/sports/feed/live/scorecard` | `public` | `200` `service.scorecard(…)` |
-| `GET` | `/api/v1/sports/feed/live/stream` | `public` | `200` `service.liveStream(…)` |
-| `GET` | `/api/v1/sports/feed/markets/details` | `public` | `200` `service.marketDetails(…)` |
-| `GET` | `/api/v1/sports/feed/markets/fancy` | `public` | `200` `service.bookmakerFancy(…)` |
-| `GET` | `/api/v1/sports/feed/markets/ids` | `public` | `200` `service.marketIdsV1(…)` |
-| `GET` | `/api/v1/sports/feed/markets/ids/v2` | `public` | `200` `service.marketIdsV2(…)` |
-| `GET` | `/api/v1/sports/feed/markets/line` | `public` | `200` `service.lineMarket(…)` |
-| `GET` | `/api/v1/sports/feed/markets/odds` | `public` | `200` `service.marketOdds(…)` |
-| `GET` | `/api/v1/sports/feed/matches` | `public` | `200` `service.allMatches(…)` |
-| `GET` | `/api/v1/sports/feed/matches/:gameId` | `public` | `200` `service.matchesByGame(…)` |
-| `GET` | `/api/v1/sports/feed/matches/date/:dateType` | `public` | `200` `service.matchesByDate(…)` |
-| `GET` | `/api/v1/sports/feed/matches/date/:dateType/:gameId` | `public` | `200` `service.matchesByDateAndGame(…)` |
-| `GET` | `/api/v1/sports/feed/results/event` | `public` | `200` `service.eventResult(…)` |
-| `GET` | `/api/v1/sports/feed/results/list` | `public` | `200` `service.eventListResult(…)` |
-| `GET` | `/api/v1/sports/feed/series` | `public` | `200` `service.series(…)` |
-| `GET` | `/api/v1/sports/feed/sports` | `public` | `200` `service.allSportIds(…)` |
-
-#### `results`
-
-| Method | Path | Guard | Response |
-|---|---|---|---|
-| `GET` | `/api/v1/sports/results/fancy` | `player` | `200` `[…]` + `meta.pagination` |
-| `GET` | `/api/v1/sports/results/markets` | `player` | `200` `[…]` + `meta.pagination` |
-| `GET` | `/api/v1/admin/sports/results/fancy` | `staff` + `sports:read` | `200` `[…]` + `meta.pagination` |
-| `GET` | `/api/v1/admin/sports/results/markets` | `staff` + `sports:read` | `200` `[…]` + `meta.pagination` |
-| `GET` | `/api/v1/admin/sports/results/markets/user/:userId` | `staff` + `sports:read` | `200` `[…]` + `meta.pagination` |
+| `GET` | `/api/v1/sports/user/all/sports/events` | `public` | — |
+| `GET` | `/api/v1/sports/user/all/sports/tree` | `public` | — |
+| `GET` | `/api/v1/sports/user/bet-limits/:event_id` | `public` | — |
+| `GET` | `/api/v1/sports/user/betting-config` | `public` | — |
+| `GET` | `/api/v1/sports/user/buttonlist` | `public` | — |
+| `POST` | `/api/v1/sports/user/cricket/all-data` | `public` | — |
+| `POST` | `/api/v1/sports/user/cricket/get-match-private-data` | `public` | — |
+| `POST` | `/api/v1/sports/user/cricket/get-sport-data-by-id` | `public` | — |
+| `POST` | `/api/v1/sports/user/cricket/market-list` | `public` | — |
+| `POST` | `/api/v1/sports/user/cricket/score-card` | `public` | — |
+| `GET` | `/api/v1/sports/user/cricket/score-url` | `public` | — |
+| `GET` | `/api/v1/sports/user/stake-button-values` | `public` | — |
+| `POST` | `/api/v1/sports/user/stake-button-values` | `public` | — |
+| `POST` | `/api/v1/sports/user/updatebuttonlist` | `public` | — |
+| `GET` | `/api/v1/sports/user/v1/sports-gamedetailPrivate` | `public` | — |
+| `GET` | `/api/v1/sports/user/v1/sports-get_latest_events` | `public` | — |
+| `GET` | `/api/v1/sports/user/virtual/cricketv-cards` | `public` | — |
+| `GET` | `/api/v1/sports/user/virtual/event-media` | `public` | — |
 
 #### `settlement`
 
 | Method | Path | Guard | Response |
 |---|---|---|---|
-| `GET` | `/api/v1/sports/settlement/my-settled-bets` | `player` | `200` `[…]` + `meta.pagination` |
-| `POST` | `/api/v1/admin/sports/settlement/declare-result` | `staff` + `sports:settle` | **raw** `res.json(…)` |
-| `GET` | `/api/v1/admin/sports/settlement/fancy-matches` | `staff` + `wallet:read` | **raw** `res.json({ success, data })` |
-| `GET` | `/api/v1/admin/sports/settlement/mo-matches` | `staff` + `wallet:read` | **raw** `res.json({ success, data })` |
-| `GET` | `/api/v1/admin/sports/settlement/open-bets` | `staff` + `wallet:read` | **raw** `res.json({ success, data })` |
-| `GET` | `/api/v1/admin/sports/settlement/settled-bets` | `staff` + `wallet:read` | **raw** `res.json({ success, data })` |
-| `GET` | `/api/v1/admin/sports/settlement/settled-markets` | `staff` + `wallet:read` | **raw** `res.json({ success, data })` |
-| `POST` | `/api/v1/admin/sports/settlement/void-bet` | `staff` + `sports:settle` | **raw** `res.json({ success, message, ...result })` |
-| `POST` | `/api/v1/admin/sports/settlement/void-bet/post-settlement` | `staff` + `sports:void-settled` | **raw** `res.json({ success, message, ...result })` |
-| `POST` | `/api/v1/admin/sports/settlement/void-market` | `staff` + `sports:settle` | **raw** `res.json({ success, message, count, ...result })` |
-| `POST` | `/api/v1/admin/sports/settlement/void-market/post-settlement` | `staff` + `sports:void-settled` | **raw** `res.json({ success, message, ...result })` |
-| `GET` | `/internal/sports/settlement/pending-markets` | `internal` | `200` `service.listMarketMatches(…)` |
-| `POST` | `/internal/sports/settlement/settle-market` | `internal` | `200` `service.declareResult(…)` |
-| `GET` | `/internal/sports/settlement/settled-markets` | `internal` | **raw** `res.json({ success, data })` |
+| `POST` | `/api/v1/admin/sports/internalsettle/declareresult` | `staff` + self-only | — |
+| `GET` | `/api/v1/admin/sports/internalsettle/fanmatches` | `staff` + self-only | — |
+| `GET` | `/api/v1/admin/sports/internalsettle/momatches` | `staff` + self-only | — |
+| `GET` | `/api/v1/admin/sports/internalsettle/open-bets` | `staff` + self-only | — |
+| `GET` | `/api/v1/admin/sports/internalsettle/settled-bets` | `staff` + self-only | — |
+| `GET` | `/api/v1/admin/sports/internalsettle/settled-markets` | `staff` + self-only | — |
+| `POST` | `/api/v1/admin/sports/internalsettle/void` | `staff` + self-only | — |
+| `POST` | `/api/v1/admin/sports/internalsettle/void-bet-after-settlement` | `staff` + self-only | — |
+| `POST` | `/api/v1/admin/sports/internalsettle/void-market-after-settlement` | `staff` + self-only | — |
+| `POST` | `/api/v1/admin/sports/internalsettle/void-single-bet` | `staff` + self-only | — |
+
+#### `sports-config`
+
+| Method | Path | Guard | Response |
+|---|---|---|---|
+| `POST` | `/api/v1/admin/sports/config/betlock/bulk-toggle-market-lock` | `staff` + self-only | — |
+| `GET` | `/api/v1/admin/sports/config/betlock/market-locks/:event_id` | `staff` + self-only | — |
+| `POST` | `/api/v1/admin/sports/config/betlock/toggle-market-lock` | `staff` + self-only | — |
+| `GET` | `/api/v1/admin/sports/config/betting-config/auto-void` | `staff` + self-only | — |
+| `PUT` | `/api/v1/admin/sports/config/betting-config/auto-void` | `staff` + self-only | — |
+| `GET` | `/api/v1/admin/sports/config/betting-config/auto-void/links` | `staff` + self-only | — |
+| `POST` | `/api/v1/admin/sports/config/betting-config/auto-void/links` | `staff` + self-only | — |
+| `DELETE` | `/api/v1/admin/sports/config/betting-config/auto-void/links/:id` | `staff` + self-only | — |
+| `PUT` | `/api/v1/admin/sports/config/betting-config/auto-void/links/:id` | `staff` + self-only | — |
+| `GET` | `/api/v1/admin/sports/config/betting-config/auto-void/tracker` | `staff` + self-only | — |
+| `POST` | `/api/v1/admin/sports/config/betting-config/bet-limits/event` | `staff` + self-only | — |
+| `GET` | `/api/v1/admin/sports/config/betting-config/bet-limits/event/:event_id` | `staff` + self-only | — |
+| `DELETE` | `/api/v1/admin/sports/config/betting-config/bet-limits/event/:id` | `staff` + self-only | — |
+| `GET` | `/api/v1/admin/sports/config/betting-config/bet-limits/inplay` | `staff` + self-only | — |
+| `DELETE` | `/api/v1/admin/sports/config/betting-config/buffer/sports` | `staff` + self-only | — |
+| `GET` | `/api/v1/admin/sports/config/betting-config/buffer/sports` | `staff` + self-only | — |
+| `POST` | `/api/v1/admin/sports/config/betting-config/buffer/sports` | `staff` + self-only | — |
+| `POST` | `/api/v1/admin/sports/config/betting-config/buffer/sports/bulk` | `staff` + self-only | — |
+| `DELETE` | `/api/v1/admin/sports/config/betting-config/max-odds/sports` | `staff` + self-only | — |
+| `GET` | `/api/v1/admin/sports/config/betting-config/max-odds/sports` | `staff` + self-only | — |
+| `POST` | `/api/v1/admin/sports/config/betting-config/max-odds/sports` | `staff` + self-only | — |
+| `GET` | `/api/v1/admin/sports/config/betting-config/virtual-limits` | `staff` + self-only | — |
+| `PUT` | `/api/v1/admin/sports/config/betting-config/virtual-limits` | `staff` + self-only | — |
+| `DELETE` | `/api/v1/admin/sports/config/commission-config/sports` | `staff` + self-only | — |
+| `GET` | `/api/v1/admin/sports/config/commission-config/sports` | `staff` + self-only | — |
+| `POST` | `/api/v1/admin/sports/config/commission-config/sports` | `staff` + self-only | — |
+| `POST` | `/api/v1/admin/sports/config/commission-config/sports/bulk` | `staff` + self-only | — |
+| `GET` | `/api/v1/admin/sports/config/sports-lock/get/:targetId` | `staff` + self-only | — |
+| `POST` | `/api/v1/admin/sports/config/sports-lock/update` | `staff` + self-only | — |
+
+#### `statement`
+
+| Method | Path | Guard | Response |
+|---|---|---|---|
+| `POST` | `/api/v1/sports/user/account-statement-v2` | `public` | — |
+| `POST` | `/api/v1/sports/user/account-statement-v2/bets` | `public` | — |
 
 #### `wager-report`
 
@@ -1920,19 +1927,6 @@ the service layer, so a code is reachable from any route in its module.
 | `404` | `BETHISTORY_BET_NOT_FOUND` | No such bet |
 | `404` | `BETHISTORY_PLAYER_NOT_IN_YOUR_TREE` | Player not found |
 
-#### `BETS` — sports/bets (8)
-
-| Status | Code | Message |
-|---:|---|---|
-| `403` | `BETS_BETTING_LOCKED` | Sports betting is not available on this account |
-| `404` | `BETS_MARKET_NOT_FOUND` | That market is not open for betting |
-| `422` | `BETS_SELECTION_NOT_IN_MARKET` | That selection is not part of this market |
-| `409` | `BETS_ODDS_REJECTED` | The price has changed — please review and place the bet again |
-| `422` | `BETS_STAKE_OUT_OF_RANGE` | That stake is outside the limits for this market |
-| `422` | `BETS_PAYOUT_TOO_LARGE` | That bet would exceed the maximum payout allowed on a single bet |
-| `402` | `BETS_INSUFFICIENT_FUNDS` | There is not enough in your balance to cover this bet |
-| `404` | `BETS_BET_NOT_FOUND` | Bet not found |
-
 #### `BLOGS` — admin/blogs (9)
 
 | Status | Code | Message |
@@ -1978,15 +1972,6 @@ the service layer, so a code is reachable from any route in its module.
 | `502` | `CATALOGUE_UPSTREAM_REFUSED` | The game provider refused that request |
 | `404` | `CATALOGUE_GAME_NOT_FOUND` | No such game |
 | `403` | `CATALOGUE_PLAYER_LOCKED` | That account cannot play casino games |
-
-#### `CATALOGUE` — sports/catalogue (4)
-
-| Status | Code | Message |
-|---:|---|---|
-| `404` | `CATALOGUE_SPORT_NOT_FOUND` | No such sport configuration |
-| `409` | `CATALOGUE_SPORT_EXISTS` | That sport is already configured |
-| `404` | `CATALOGUE_FANCY_CONTROL_NOT_FOUND` | No such fancy market control |
-| `422` | `CATALOGUE_NOTHING_TO_UPDATE` | Give at least one field to change |
 
 #### `CLUB` — user/club (15)
 
@@ -2121,16 +2106,6 @@ the service layer, so a code is reachable from any route in its module.
 | `409` | `FEATURES_NOT_ENABLED` | The feature is not switched on for this site |
 | `422` | `FEATURES_NOT_TESTABLE` | This feature has no connection test |
 | `502` | `FEATURES_PROVIDER_FAILED` | The provider refused the request |
-
-#### `FEED` — sports/feed (5)
-
-| Status | Code | Message |
-|---:|---|---|
-| `404` | `FEED_GAME_NOT_FOUND` | No data for that sport right now |
-| `422` | `FEED_INVALID_DATE_RANGE` | That is not a date range this endpoint understands |
-| `501` | `FEED_PROVIDER_NOT_CONFIGURED` | This feature needs a sports data provider that is not configured |
-| `502` | `FEED_UPSTREAM_ERROR` | The sports data provider rejected the request |
-| `504` | `FEED_UNREACHABLE` | The sports data provider did not respond |
 
 #### `FIAT_DEPOSIT` — user/fiat-deposit (8)
 
@@ -2476,32 +2451,6 @@ the service layer, so a code is reachable from any route in its module.
 | `400` | `REPORTS_RANGE_TOO_LARGE` | That date range is longer than a report may cover |
 | `400` | `REPORTS_UNSUPPORTED_CURRENCY` | No balance sheet is kept in that currency |
 | `413` | `REPORTS_EXPORT_TOO_LARGE` | That export covers more rows than one file may carry — narrow the range or filter |
-
-#### `RESULTS` — sports/results (2)
-
-| Status | Code | Message |
-|---:|---|---|
-| `503` | `RESULTS_VISIBILITY_UNAVAILABLE` | Could not determine which accounts you may report on |
-| `404` | `RESULTS_NOT_IN_YOUR_TREE` | Player not found |
-
-#### `SETTLEMENT` — sports/settlement (14)
-
-| Status | Code | Message |
-|---:|---|---|
-| `404` | `SETTLEMENT_MARKET_NOT_FOUND` | No market found for the given match and market type |
-| `404` | `SETTLEMENT_BET_NOT_FOUND` | Open bet not found — it may already have been settled or voided |
-| `404` | `SETTLEMENT_LEDGER_ENTRY_NOT_FOUND` | Settlement entry not found |
-| `404` | `SETTLEMENT_NO_SETTLED_ENTRIES` | No settled entries found for this market |
-| `409` | `SETTLEMENT_NO_OPEN_BETS` | This market has no open bets to settle |
-| `409` | `SETTLEMENT_MARKET_ALREADY_SETTLED` | This market has already been settled |
-| `409` | `SETTLEMENT_BET_ALREADY_CLOSED` | This bet is no longer open |
-| `409` | `SETTLEMENT_ALREADY_VOIDED` | This market has already been voided after settlement |
-| `409` | `SETTLEMENT_SETTLEMENT_IN_PROGRESS` | Settlement is already running for this market — retry in a moment |
-| `409` | `SETTLEMENT_VOID_WINDOW_EXPIRED` | The void window for this market has expired |
-| `422` | `SETTLEMENT_SELECTION_REQUIRED` | This market type settles per selection, so a selection name is required |
-| `422` | `SETTLEMENT_RESULT_REQUIRED` | A winner (market result) or a run value (fancy result) is required |
-| `422` | `SETTLEMENT_PAYOUT_EXCEEDS_LIMIT` | The calculated payout exceeds the configured maximum for a single market |
-| `502` | `SETTLEMENT_REFUND_FAILED` | The stake refund could not be completed — no balances were changed |
 
 #### `SITE_CONFIG` — admin/site-config (7)
 

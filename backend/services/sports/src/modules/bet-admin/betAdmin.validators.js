@@ -2,7 +2,7 @@
 
 const { z } = require('@ibitplay/common');
 
-const { GAME_TYPES, BET_STATUS } = require('../bets/bets.constants');
+const { GAME_TYPES, BET_STATUS } = require('./bets.constants');
 
 const id = z.coerce.number().int().positive();
 

@@ -49,6 +49,22 @@ skipped, never killed. The frontend is started with `next dev -p 5190` once its 
 
 None of these files is committed. Rotate every generated secret with `node scripts/make-env.mjs --rotate`.
 
+## Sportsbook (mssports)
+
+`backend/services/sports` runs the sports code exported from TENEXCH ("mssports"), moved in unchanged:
+its 69 API routes keep their TENEXCH paths through the gateway (`/api/user/place`, `/api/internalsettle/...`,
+`/api/admin/betting-config/...`), its tables live in Postgres schema `mssports` (migration 094), and the sports
+worker (:4705) runs its four workers — odds, events, results, settlement — one process each. Layout and rules:
+`backend/docs/STRUCTURE.md` §3a.
+
+- Odds/events need `AVRKHUB_SPORTS_BASE_URL` + `AVRKHUB_SPORTS_KEY` in `backend/.env`; without them every bet is
+  refused `FEED_UNAVAILABLE`.
+- Players and staff sign in as usual; their mssports account and wallet are made on the first sports call
+  (Super Admin = the mssports owner). The mssports wallet (`mssports."Wallets".cash`) is separate from the
+  platform balance and starts at 0.
+- Owner-only actions with a transaction password (void after settlement, market-lock toggles) check
+  `mssports."Owners".transaction_password` / `mssports.staff.transaction_password`, which start empty.
+
 ## Before handover
 
 - [ ] `RATE_LIMIT_ENABLED=true` in the delivered `backend/.env` (the `make-env.mjs` default; a dev stack

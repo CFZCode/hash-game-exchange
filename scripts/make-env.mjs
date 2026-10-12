@@ -122,9 +122,8 @@ apply(beEnv, {
   OWNER_PANEL_URL: URLS.ownerPanel,
   OWNER_POLL_SECONDS: '15',
   OWNER_SITE_KEY: SITE_KEY,
-  // sports-service refuses to boot on an empty feed key. This is a placeholder, not a key:
-  // put the real feed URL/key here to get a sportsbook.
-  SPORTS_FEED_KEY: be.SPORTS_FEED_KEY || 'replace-with-real-feed-key',
+  // The sportsbook (mssports) boots without its feed and refuses every bet until
+  // AVRKHUB_SPORTS_BASE_URL / AVRKHUB_SPORTS_KEY are filled in by hand.
   ...backendSecrets
 }, '# ── set by scripts/make-env.mjs ──')
 

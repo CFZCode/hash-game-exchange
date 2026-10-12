@@ -46,6 +46,10 @@ const LIST = process.argv.includes('--list');
 const AUDIENCES = ['public', 'user', 'admin'];
 const MUTATING = new Set(['post', 'put', 'patch', 'delete']);
 
+const MSSPORTS =
+  "the mssports sportsbook (TENEXCH's API, kept unchanged): its controllers read only the fields " +
+  'they use, and a strict validator would refuse requests TENEXCH clients send';
+
 /**
  * Routes deliberately left lenient. Key: `<service>/<module>:<audience>`, value:
  * `{ reason, paths? }` — `paths` (route paths inside the router, matched by
@@ -82,6 +86,12 @@ const LENIENT = {
     paths: ['/template'],
     reason: 'always answers 403 OWNER_ONLY before reading any input',
   },
+  // services/sports — docs/STRUCTURE.md §3a
+  'sports/odds-events:public': { reason: MSSPORTS },
+  'sports/bets:public': { reason: MSSPORTS },
+  'sports/statement:public': { reason: MSSPORTS },
+  'sports/settlement:admin': { reason: MSSPORTS },
+  'sports/sports-config:admin': { reason: MSSPORTS },
 };
 
 /**

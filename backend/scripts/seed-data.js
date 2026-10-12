@@ -85,14 +85,15 @@ const { DEFAULT_HISTORY_DAYS, MAX_HISTORY_DAYS, DEFAULT_HISTORY_SEED } = require
 const ROOT = path.resolve(__dirname, '..');
 
 /**
- * The sport ids, taken from the service rather than copied.
+ * The sport ids, taken from the sportsbook rather than copied.
  *
- * `sports_config.game_id` is compared against the feed's `etid`, so a copy here
- * that drifts from `SPORT_NAMES` would produce catalogue rows for sports the
- * board can never match — enabled in the admin panel, invisible to players,
- * with nothing to explain the difference.
+ * The sportsbook is mssports (services/sports); its sport list is
+ * `lib/constants/sportsList.mjs` — the feed's sport id (`sid` / `etid`) and
+ * name. `mssports.sports_config.game_id` is compared against that id, so a copy
+ * here that drifted would produce rows for sports the board can never match.
  */
-const { SPORT_NAMES } = require(path.join(ROOT, 'services/sports/src/modules/feed/feed.constants.js'));
+const { SPORTS_LIST } = require(path.join(ROOT, 'services/sports/src/lib/constants/sportsList.mjs'));
+const SPORT_NAMES = Object.fromEntries(SPORTS_LIST);
 
 // ══════════════════════════════════════════════════════════════════════════
 //  Output
@@ -382,13 +383,12 @@ DATASETS.push({
 /**
  * Which sports a fresh deployment shows.
  *
- * `sports_config.enabled` is the operator's switch for what PLAYERS SEE — a
- * separate question from `SPORTS_ACTIVE_EIDS`, which is what the deployment
- * pays the provider to fetch. Three on by default because that is what the
- * board actually trades; the other sixteen are catalogued so the admin panel
- * can list them, and switched off so nobody sees an empty tab.
+ * `mssports.sports_config.enabled` is the operator's switch for which sports the
+ * sportsbook's back-office config lists (buffers, commission). Three on by
+ * default because that is what the board actually trades; the rest are
+ * catalogued and switched off.
  */
-const DEFAULT_ENABLED_SPORTS = [4, 1, 2]; // Cricket, Soccer, Tennis
+const DEFAULT_ENABLED_SPORTS = [4, 1, 2]; // Cricket, Football, Tennis
 
 DATASETS.push({
   name: 'sports',
@@ -411,7 +411,7 @@ DATASETS.push({
       // same reason. ON CONFLICT is not available without the index.
       const existing = await one(
         sequelize,
-        'SELECT id FROM sports_config WHERE game_id = :gameId LIMIT 1',
+        'SELECT id FROM mssports.sports_config WHERE game_id = :gameId LIMIT 1',
         { gameId: Number(gameId) },
         transaction
       );
@@ -423,7 +423,7 @@ DATASETS.push({
 
       await exec(
         sequelize,
-        `INSERT INTO sports_config (game_id, game_name, enabled, created_at, updated_at)
+        `INSERT INTO mssports.sports_config (game_id, game_name, enabled, created_at, updated_at)
          VALUES (:gameId, :gameName, :enabled, now(), now())`,
         { gameId: Number(gameId), gameName, enabled: enabledIds.has(Number(gameId)) },
         transaction

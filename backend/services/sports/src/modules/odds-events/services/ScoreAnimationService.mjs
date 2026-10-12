@@ -1,0 +1,56 @@
+// services/ScoreAnimationService.js — mssports core, moved unchanged
+
+import dotenv4 from "dotenv";
+import axios2 from "axios";
+dotenv4.config();
+var HOST_URL = process.env.SCORECARD_HOST_URL || "https://scorecard.daimond-api.site/";
+var MAX_ATTEMPTS = 5;
+var TIMEOUT_MS = 8e3;
+var PROVIDER_RE = /https?:\/\/[a-z0-9.-]*animationprovider\.com\/[^"'\s]+/i;
+var isNotFoundPage = (html) => !html || html.length < 4e3 || /<title>\s*Page Not Found/i.test(html);
+async function fetchOnce(etid, gmid) {
+  const hostUrl = `${HOST_URL.replace(/\/+$/, "")}/?etid=${encodeURIComponent(etid)}&gmid=${encodeURIComponent(gmid)}`;
+  const host = await axios2.get(hostUrl, { timeout: TIMEOUT_MS, responseType: "text" });
+  const match = PROVIDER_RE.exec(String(host.data || ""));
+  if (!match) return { ok: false, reason: "no provider url in host page" };
+  const providerUrl = match[0];
+  const page = await axios2.get(providerUrl, {
+    timeout: TIMEOUT_MS,
+    responseType: "text",
+    // The provider answers 200 for its 404 page; never let axios throw on
+    // status, the body is the only signal that matters.
+    validateStatus: () => true
+  });
+  const html = String(page.data || "");
+  if (isNotFoundPage(html)) return { ok: false, reason: "dead token", providerUrl };
+  return { ok: true, html, providerUrl };
+}
+function withBase(html, providerUrl) {
+  const origin = new URL(providerUrl).origin;
+  const tag = `<base href="${origin}/">`;
+  return /<head[^>]*>/i.test(html) ? html.replace(/<head([^>]*)>/i, `<head$1>${tag}`) : `${tag}${html}`;
+}
+async function getScoreUrl(etid, gmid) {
+  const hostUrl = `${HOST_URL.replace(/\/+$/, "")}/?etid=${encodeURIComponent(etid)}&gmid=${encodeURIComponent(gmid)}`;
+  const host = await axios2.get(hostUrl, { timeout: TIMEOUT_MS, responseType: "text" });
+  const match = PROVIDER_RE.exec(String(host.data || ""));
+  return match ? match[0] : null;
+}
+async function getScoreAnimation(etid, gmid) {
+  let lastReason = "unknown";
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      const result = await fetchOnce(etid, gmid);
+      if (result.ok) {
+        return { ok: true, html: withBase(result.html, result.providerUrl), attempts: attempt };
+      }
+      lastReason = result.reason;
+    } catch (error) {
+      lastReason = error.message;
+    }
+  }
+  return { ok: false, attempts: MAX_ATTEMPTS, reason: lastReason };
+}
+var ScoreAnimationService_default = { getScoreAnimation, getScoreUrl };
+
+export { ScoreAnimationService_default };

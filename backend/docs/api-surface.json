@@ -430,61 +430,57 @@
     {
       "name": "bets",
       "service": "sports",
-      "basePath": "/bets",
-      "audiences": [
-        "user"
-      ],
-      "socketOnly": false,
-      "hasSockets": false,
-      "dir": "services/sports/src/modules/bets"
-    },
-    {
-      "name": "catalogue",
-      "service": "sports",
-      "basePath": "/catalogue",
-      "audiences": [
-        "public",
-        "admin"
-      ],
-      "socketOnly": false,
-      "hasSockets": false,
-      "dir": "services/sports/src/modules/catalogue"
-    },
-    {
-      "name": "feed",
-      "service": "sports",
-      "basePath": "/feed",
+      "basePath": "/user",
       "audiences": [
         "public"
       ],
       "socketOnly": false,
       "hasSockets": true,
-      "dir": "services/sports/src/modules/feed"
+      "dir": "services/sports/src/modules/bets"
     },
     {
-      "name": "results",
+      "name": "odds-events",
       "service": "sports",
-      "basePath": "/results",
+      "basePath": "/user",
       "audiences": [
-        "user",
-        "admin"
+        "public"
       ],
       "socketOnly": false,
       "hasSockets": false,
-      "dir": "services/sports/src/modules/results"
+      "dir": "services/sports/src/modules/odds-events"
     },
     {
       "name": "settlement",
       "service": "sports",
-      "basePath": "/settlement",
+      "basePath": "/internalsettle",
       "audiences": [
-        "user",
-        "admin",
-        "internal"
+        "admin"
       ],
       "socketOnly": false,
       "hasSockets": false,
       "dir": "services/sports/src/modules/settlement"
+    },
+    {
+      "name": "sports-config",
+      "service": "sports",
+      "basePath": "/config",
+      "audiences": [
+        "admin"
+      ],
+      "socketOnly": false,
+      "hasSockets": false,
+      "dir": "services/sports/src/modules/sports-config"
+    },
+    {
+      "name": "statement",
+      "service": "sports",
+      "basePath": "/user",
+      "audiences": [
+        "public"
+      ],
+      "socketOnly": false,
+      "hasSockets": false,
+      "dir": "services/sports/src/modules/statement"
     },
     {
       "name": "wager-report",
@@ -11520,1749 +11516,1388 @@
     {
       "service": "sports",
       "module": "bets",
-      "audience": "user",
-      "method": "GET",
-      "path": "/api/v1/sports/bets",
-      "routePath": "/",
-      "handler": "history",
-      "handlerSource": "index.js",
-      "middleware": [
-        {
-          "type": "validate",
-          "value": "v.history"
-        }
-      ],
-      "responses": [
-        {
-          "index": 131,
-          "kind": "paginated",
-          "status": 200,
-          "shape": "[ … ] + meta.pagination"
-        }
-      ],
-      "thrown": [],
-      "resolved": true,
-      "file": "services/sports/src/modules/bets/routes/user.routes.js"
-    },
-    {
-      "service": "sports",
-      "module": "bets",
-      "audience": "user",
-      "method": "POST",
-      "path": "/api/v1/sports/bets",
-      "routePath": "/",
-      "handler": "place",
-      "handlerSource": "index.js",
-      "middleware": [
-        {
-          "type": "validate",
-          "value": "v.place"
-        }
-      ],
-      "responses": [
-        {
-          "index": 725,
-          "kind": "raw",
-          "status": null,
-          "shape": "res.json(…)"
-        },
-        {
-          "index": 869,
-          "kind": "raw",
-          "status": 400,
-          "shape": "res.json(…)"
-        }
-      ],
-      "thrown": [],
-      "resolved": true,
-      "file": "services/sports/src/modules/bets/routes/user.routes.js"
-    },
-    {
-      "service": "sports",
-      "module": "bets",
-      "audience": "user",
-      "method": "GET",
-      "path": "/api/v1/sports/bets/exposures",
-      "routePath": "/exposures",
-      "handler": "exposures",
-      "handlerSource": "index.js",
-      "middleware": [
-        {
-          "type": "validate",
-          "value": "v.exposures"
-        }
-      ],
-      "responses": [
-        {
-          "index": 39,
-          "kind": "ok",
-          "status": 200,
-          "shape": "service.exposures(…)"
-        }
-      ],
-      "thrown": [],
-      "resolved": true,
-      "file": "services/sports/src/modules/bets/routes/user.routes.js"
-    },
-    {
-      "service": "sports",
-      "module": "bets",
-      "audience": "user",
-      "method": "GET",
-      "path": "/api/v1/sports/bets/open-count",
-      "routePath": "/open-count",
-      "handler": "openCount",
-      "handlerSource": "index.js",
-      "middleware": [],
-      "responses": [
-        {
-          "index": 39,
-          "kind": "ok",
-          "status": 200,
-          "shape": "service.openCount(…)"
-        }
-      ],
-      "thrown": [],
-      "resolved": true,
-      "file": "services/sports/src/modules/bets/routes/user.routes.js"
-    },
-    {
-      "service": "sports",
-      "module": "bets",
-      "audience": "user",
-      "method": "GET",
-      "path": "/api/v1/sports/bets/open/:matchId",
-      "routePath": "/open/:matchId",
-      "handler": "openBets",
-      "handlerSource": "index.js",
-      "middleware": [
-        {
-          "type": "validate",
-          "value": "v.matchParam"
-        }
-      ],
-      "responses": [
-        {
-          "index": 39,
-          "kind": "ok",
-          "status": 200,
-          "shape": "service.openBets(…)"
-        }
-      ],
-      "thrown": [],
-      "resolved": true,
-      "file": "services/sports/src/modules/bets/routes/user.routes.js"
-    },
-    {
-      "service": "sports",
-      "module": "bets",
-      "audience": "user",
-      "method": "GET",
-      "path": "/api/v1/sports/bets/summary",
-      "routePath": "/summary",
-      "handler": "summary",
-      "handlerSource": "index.js",
-      "middleware": [],
-      "responses": [
-        {
-          "index": 39,
-          "kind": "ok",
-          "status": 200,
-          "shape": "service.summary(…)"
-        }
-      ],
-      "thrown": [],
-      "resolved": true,
-      "file": "services/sports/src/modules/bets/routes/user.routes.js"
-    },
-    {
-      "service": "sports",
-      "module": "catalogue",
       "audience": "public",
       "method": "GET",
-      "path": "/api/v1/sports/catalogue/sports",
-      "routePath": "/sports",
-      "handler": "listSports",
-      "handlerSource": "index.js",
-      "middleware": [
-        {
-          "type": "validate",
-          "value": "v.listSports"
-        }
-      ],
-      "responses": [
-        {
-          "index": 33,
-          "kind": "ok",
-          "status": 200,
-          "shape": "service.listSports(…)"
-        }
-      ],
+      "path": "/api/v1/sports/user/bet-result/:client_ref",
+      "routePath": "/bet-result/:client_ref",
+      "handler": "lazy",
+      "handlerSource": "public.routes.js",
+      "middleware": [],
+      "responses": [],
       "thrown": [],
       "resolved": true,
-      "file": "services/sports/src/modules/catalogue/routes/public.routes.js"
+      "file": "services/sports/src/modules/bets/routes/public.routes.js"
     },
     {
       "service": "sports",
-      "module": "catalogue",
-      "audience": "admin",
+      "module": "bets",
+      "audience": "public",
+      "method": "POST",
+      "path": "/api/v1/sports/user/cancel-bet",
+      "routePath": "/cancel-bet",
+      "handler": "controller",
+      "handlerSource": "public.routes.js",
+      "middleware": [],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/bets/routes/public.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "bets",
+      "audience": "public",
       "method": "GET",
-      "path": "/api/v1/admin/sports/catalogue/fancy",
-      "routePath": "/fancy",
-      "handler": "listFancyControls",
-      "handlerSource": "index.js",
-      "middleware": [
-        {
-          "type": "permission",
-          "value": "sports:read"
-        },
-        {
-          "type": "validate",
-          "value": "v.listFancyControls"
-        }
-      ],
-      "responses": [
-        {
-          "index": 113,
-          "kind": "paginated",
-          "status": 200,
-          "shape": "[ … ] + meta.pagination"
-        }
-      ],
+      "path": "/api/v1/sports/user/cricket/matched-bets/all",
+      "routePath": "/cricket/matched-bets/all",
+      "handler": "Cricket",
+      "handlerSource": "public.routes.js",
+      "middleware": [],
+      "responses": [],
       "thrown": [],
       "resolved": true,
-      "file": "services/sports/src/modules/catalogue/routes/admin.routes.js"
+      "file": "services/sports/src/modules/bets/routes/public.routes.js"
     },
     {
       "service": "sports",
-      "module": "catalogue",
+      "module": "bets",
+      "audience": "public",
+      "method": "GET",
+      "path": "/api/v1/sports/user/cricket/sports-bets/user",
+      "routePath": "/cricket/sports-bets/user",
+      "handler": "Cricket",
+      "handlerSource": "public.routes.js",
+      "middleware": [],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/bets/routes/public.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "bets",
+      "audience": "public",
+      "method": "GET",
+      "path": "/api/v1/sports/user/cricket/user-open-bets",
+      "routePath": "/cricket/user-open-bets",
+      "handler": "Cricket",
+      "handlerSource": "public.routes.js",
+      "middleware": [],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/bets/routes/public.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "bets",
+      "audience": "public",
+      "method": "GET",
+      "path": "/api/v1/sports/user/cricket/user-open-bets-grouped",
+      "routePath": "/cricket/user-open-bets-grouped",
+      "handler": "Cricket",
+      "handlerSource": "public.routes.js",
+      "middleware": [],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/bets/routes/public.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "bets",
+      "audience": "public",
+      "method": "GET",
+      "path": "/api/v1/sports/user/fancy-bets",
+      "routePath": "/fancy-bets",
+      "handler": "controller",
+      "handlerSource": "public.routes.js",
+      "middleware": [],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/bets/routes/public.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "bets",
+      "audience": "public",
+      "method": "POST",
+      "path": "/api/v1/sports/user/matchexposures/match",
+      "routePath": "/matchexposures/match",
+      "handler": "Exposure",
+      "handlerSource": "public.routes.js",
+      "middleware": [],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/bets/routes/public.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "bets",
+      "audience": "public",
+      "method": "POST",
+      "path": "/api/v1/sports/user/place",
+      "routePath": "/place",
+      "handler": "lazy",
+      "handlerSource": "public.routes.js",
+      "middleware": [],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/bets/routes/public.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "bets",
+      "audience": "public",
+      "method": "POST",
+      "path": "/api/v1/sports/user/place-combined",
+      "routePath": "/place-combined",
+      "handler": "controller",
+      "handlerSource": "public.routes.js",
+      "middleware": [],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/bets/routes/public.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "odds-events",
+      "audience": "public",
+      "method": "GET",
+      "path": "/api/v1/sports/user/all/sports/events",
+      "routePath": "/all/sports/events",
+      "handler": "Cricket",
+      "handlerSource": "public.routes.js",
+      "middleware": [],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/odds-events/routes/public.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "odds-events",
+      "audience": "public",
+      "method": "GET",
+      "path": "/api/v1/sports/user/all/sports/tree",
+      "routePath": "/all/sports/tree",
+      "handler": "Cricket",
+      "handlerSource": "public.routes.js",
+      "middleware": [],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/odds-events/routes/public.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "odds-events",
+      "audience": "public",
+      "method": "GET",
+      "path": "/api/v1/sports/user/bet-limits/:event_id",
+      "routePath": "/bet-limits/:event_id",
+      "handler": "BettingConfig",
+      "handlerSource": "public.routes.js",
+      "middleware": [],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/odds-events/routes/public.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "odds-events",
+      "audience": "public",
+      "method": "GET",
+      "path": "/api/v1/sports/user/betting-config",
+      "routePath": "/betting-config",
+      "handler": "BettingConfig",
+      "handlerSource": "public.routes.js",
+      "middleware": [],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/odds-events/routes/public.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "odds-events",
+      "audience": "public",
+      "method": "GET",
+      "path": "/api/v1/sports/user/buttonlist",
+      "routePath": "/buttonlist",
+      "handler": "OneClickButtonList",
+      "handlerSource": "public.routes.js",
+      "middleware": [],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/odds-events/routes/public.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "odds-events",
+      "audience": "public",
+      "method": "POST",
+      "path": "/api/v1/sports/user/cricket/all-data",
+      "routePath": "/cricket/all-data",
+      "handler": "Cricket",
+      "handlerSource": "public.routes.js",
+      "middleware": [],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/odds-events/routes/public.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "odds-events",
+      "audience": "public",
+      "method": "POST",
+      "path": "/api/v1/sports/user/cricket/get-match-private-data",
+      "routePath": "/cricket/get-match-private-data",
+      "handler": "Cricket",
+      "handlerSource": "public.routes.js",
+      "middleware": [],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/odds-events/routes/public.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "odds-events",
+      "audience": "public",
+      "method": "POST",
+      "path": "/api/v1/sports/user/cricket/get-sport-data-by-id",
+      "routePath": "/cricket/get-sport-data-by-id",
+      "handler": "Cricket",
+      "handlerSource": "public.routes.js",
+      "middleware": [],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/odds-events/routes/public.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "odds-events",
+      "audience": "public",
+      "method": "POST",
+      "path": "/api/v1/sports/user/cricket/market-list",
+      "routePath": "/cricket/market-list",
+      "handler": "Cricket",
+      "handlerSource": "public.routes.js",
+      "middleware": [],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/odds-events/routes/public.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "odds-events",
+      "audience": "public",
+      "method": "POST",
+      "path": "/api/v1/sports/user/cricket/score-card",
+      "routePath": "/cricket/score-card",
+      "handler": "Cricket",
+      "handlerSource": "public.routes.js",
+      "middleware": [],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/odds-events/routes/public.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "odds-events",
+      "audience": "public",
+      "method": "GET",
+      "path": "/api/v1/sports/user/cricket/score-url",
+      "routePath": "/cricket/score-url",
+      "handler": "Cricket",
+      "handlerSource": "public.routes.js",
+      "middleware": [],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/odds-events/routes/public.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "odds-events",
+      "audience": "public",
+      "method": "GET",
+      "path": "/api/v1/sports/user/stake-button-values",
+      "routePath": "/stake-button-values",
+      "handler": "StakeButtonValue",
+      "handlerSource": "public.routes.js",
+      "middleware": [],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/odds-events/routes/public.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "odds-events",
+      "audience": "public",
+      "method": "POST",
+      "path": "/api/v1/sports/user/stake-button-values",
+      "routePath": "/stake-button-values",
+      "handler": "StakeButtonValue",
+      "handlerSource": "public.routes.js",
+      "middleware": [],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/odds-events/routes/public.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "odds-events",
+      "audience": "public",
+      "method": "POST",
+      "path": "/api/v1/sports/user/updatebuttonlist",
+      "routePath": "/updatebuttonlist",
+      "handler": "OneClickButtonList",
+      "handlerSource": "public.routes.js",
+      "middleware": [],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/odds-events/routes/public.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "odds-events",
+      "audience": "public",
+      "method": "GET",
+      "path": "/api/v1/sports/user/v1/sports-gamedetailPrivate",
+      "routePath": "/v1/sports-gamedetailPrivate",
+      "handler": "Cricket",
+      "handlerSource": "public.routes.js",
+      "middleware": [],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/odds-events/routes/public.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "odds-events",
+      "audience": "public",
+      "method": "GET",
+      "path": "/api/v1/sports/user/v1/sports-get_latest_events",
+      "routePath": "/v1/sports-get_latest_events",
+      "handler": "Cricket",
+      "handlerSource": "public.routes.js",
+      "middleware": [],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/odds-events/routes/public.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "odds-events",
+      "audience": "public",
+      "method": "GET",
+      "path": "/api/v1/sports/user/virtual/cricketv-cards",
+      "routePath": "/virtual/cricketv-cards",
+      "handler": "VirtualEvent",
+      "handlerSource": "public.routes.js",
+      "middleware": [],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/odds-events/routes/public.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "odds-events",
+      "audience": "public",
+      "method": "GET",
+      "path": "/api/v1/sports/user/virtual/event-media",
+      "routePath": "/virtual/event-media",
+      "handler": "VirtualEvent",
+      "handlerSource": "public.routes.js",
+      "middleware": [],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/odds-events/routes/public.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "settlement",
       "audience": "admin",
       "method": "POST",
-      "path": "/api/v1/admin/sports/catalogue/fancy",
-      "routePath": "/fancy",
-      "handler": "setFancyStatus",
-      "handlerSource": "index.js",
+      "path": "/api/v1/admin/sports/internalsettle/declareresult",
+      "routePath": "/declareresult",
+      "handler": "settle",
+      "handlerSource": "admin.routes.js",
       "middleware": [
         {
-          "type": "permission",
-          "value": "sports:manage"
+          "type": "selfOnly",
+          "value": "mssports authorizes each route itself: authMiddleware then requireOwner (the platform Super Admin), plus the transaction password on the two post-settlement voids"
         },
         {
-          "type": "validate",
-          "value": "v.setFancyStatus"
+          "type": "guard",
+          "value": "requireOwner"
         }
       ],
-      "responses": [
-        {
-          "index": 39,
-          "kind": "ok",
-          "status": 200,
-          "shape": "service.setFancyStatus(…)"
-        }
-      ],
+      "responses": [],
       "thrown": [],
       "resolved": true,
-      "file": "services/sports/src/modules/catalogue/routes/admin.routes.js"
+      "file": "services/sports/src/modules/settlement/routes/admin.routes.js"
     },
     {
       "service": "sports",
-      "module": "catalogue",
+      "module": "settlement",
       "audience": "admin",
-      "method": "DELETE",
-      "path": "/api/v1/admin/sports/catalogue/fancy/:marketId",
-      "routePath": "/fancy/:marketId",
-      "handler": "removeFancyControl",
-      "handlerSource": "index.js",
+      "method": "GET",
+      "path": "/api/v1/admin/sports/internalsettle/fanmatches",
+      "routePath": "/fanmatches",
+      "handler": "settle",
+      "handlerSource": "admin.routes.js",
       "middleware": [
         {
-          "type": "permission",
-          "value": "sports:manage"
+          "type": "selfOnly",
+          "value": "mssports authorizes each route itself: authMiddleware then requireOwner (the platform Super Admin), plus the transaction password on the two post-settlement voids"
         },
         {
-          "type": "validate",
-          "value": "v.marketParam"
+          "type": "guard",
+          "value": "requireOwner"
         }
       ],
-      "responses": [
-        {
-          "index": 39,
-          "kind": "ok",
-          "status": 200,
-          "shape": "service.removeFancyControl(…)"
-        }
-      ],
+      "responses": [],
       "thrown": [],
       "resolved": true,
-      "file": "services/sports/src/modules/catalogue/routes/admin.routes.js"
+      "file": "services/sports/src/modules/settlement/routes/admin.routes.js"
     },
     {
       "service": "sports",
-      "module": "catalogue",
+      "module": "settlement",
+      "audience": "admin",
+      "method": "GET",
+      "path": "/api/v1/admin/sports/internalsettle/momatches",
+      "routePath": "/momatches",
+      "handler": "settle",
+      "handlerSource": "admin.routes.js",
+      "middleware": [
+        {
+          "type": "selfOnly",
+          "value": "mssports authorizes each route itself: authMiddleware then requireOwner (the platform Super Admin), plus the transaction password on the two post-settlement voids"
+        },
+        {
+          "type": "guard",
+          "value": "requireOwner"
+        }
+      ],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/settlement/routes/admin.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "settlement",
+      "audience": "admin",
+      "method": "GET",
+      "path": "/api/v1/admin/sports/internalsettle/open-bets",
+      "routePath": "/open-bets",
+      "handler": "settle",
+      "handlerSource": "admin.routes.js",
+      "middleware": [
+        {
+          "type": "selfOnly",
+          "value": "mssports authorizes each route itself: authMiddleware then requireOwner (the platform Super Admin), plus the transaction password on the two post-settlement voids"
+        },
+        {
+          "type": "guard",
+          "value": "requireOwner"
+        }
+      ],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/settlement/routes/admin.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "settlement",
+      "audience": "admin",
+      "method": "GET",
+      "path": "/api/v1/admin/sports/internalsettle/settled-bets",
+      "routePath": "/settled-bets",
+      "handler": "settle",
+      "handlerSource": "admin.routes.js",
+      "middleware": [
+        {
+          "type": "selfOnly",
+          "value": "mssports authorizes each route itself: authMiddleware then requireOwner (the platform Super Admin), plus the transaction password on the two post-settlement voids"
+        },
+        {
+          "type": "guard",
+          "value": "requireOwner"
+        }
+      ],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/settlement/routes/admin.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "settlement",
+      "audience": "admin",
+      "method": "GET",
+      "path": "/api/v1/admin/sports/internalsettle/settled-markets",
+      "routePath": "/settled-markets",
+      "handler": "settle",
+      "handlerSource": "admin.routes.js",
+      "middleware": [
+        {
+          "type": "selfOnly",
+          "value": "mssports authorizes each route itself: authMiddleware then requireOwner (the platform Super Admin), plus the transaction password on the two post-settlement voids"
+        },
+        {
+          "type": "guard",
+          "value": "requireOwner"
+        }
+      ],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/settlement/routes/admin.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "settlement",
       "audience": "admin",
       "method": "POST",
-      "path": "/api/v1/admin/sports/catalogue/fancy/bulk",
-      "routePath": "/fancy/bulk",
-      "handler": "bulkSetFancyStatus",
-      "handlerSource": "index.js",
+      "path": "/api/v1/admin/sports/internalsettle/void",
+      "routePath": "/void",
+      "handler": "settle",
+      "handlerSource": "admin.routes.js",
       "middleware": [
         {
-          "type": "permission",
-          "value": "sports:manage"
+          "type": "selfOnly",
+          "value": "mssports authorizes each route itself: authMiddleware then requireOwner (the platform Super Admin), plus the transaction password on the two post-settlement voids"
         },
         {
-          "type": "validate",
-          "value": "v.bulkSetFancyStatus"
+          "type": "guard",
+          "value": "requireOwner"
         }
       ],
-      "responses": [
-        {
-          "index": 39,
-          "kind": "ok",
-          "status": 200,
-          "shape": "service.bulkSetFancyStatus(…)"
-        }
-      ],
+      "responses": [],
       "thrown": [],
       "resolved": true,
-      "file": "services/sports/src/modules/catalogue/routes/admin.routes.js"
+      "file": "services/sports/src/modules/settlement/routes/admin.routes.js"
     },
     {
       "service": "sports",
-      "module": "catalogue",
-      "audience": "admin",
-      "method": "GET",
-      "path": "/api/v1/admin/sports/catalogue/fancy/event/:eventId",
-      "routePath": "/fancy/event/:eventId",
-      "handler": "fancyControlsForEvent",
-      "handlerSource": "index.js",
-      "middleware": [
-        {
-          "type": "permission",
-          "value": "sports:read"
-        },
-        {
-          "type": "validate",
-          "value": "v.eventParam"
-        }
-      ],
-      "responses": [
-        {
-          "index": 39,
-          "kind": "ok",
-          "status": 200,
-          "shape": "service.fancyControlsForEvent(…)"
-        }
-      ],
-      "thrown": [],
-      "resolved": true,
-      "file": "services/sports/src/modules/catalogue/routes/admin.routes.js"
-    },
-    {
-      "service": "sports",
-      "module": "catalogue",
-      "audience": "admin",
-      "method": "GET",
-      "path": "/api/v1/admin/sports/catalogue/sports",
-      "routePath": "/sports",
-      "handler": "listSports",
-      "handlerSource": "index.js",
-      "middleware": [
-        {
-          "type": "permission",
-          "value": "sports:read"
-        },
-        {
-          "type": "validate",
-          "value": "v.listSports"
-        }
-      ],
-      "responses": [
-        {
-          "index": 33,
-          "kind": "ok",
-          "status": 200,
-          "shape": "service.listSports(…)"
-        }
-      ],
-      "thrown": [],
-      "resolved": true,
-      "file": "services/sports/src/modules/catalogue/routes/admin.routes.js"
-    },
-    {
-      "service": "sports",
-      "module": "catalogue",
+      "module": "settlement",
       "audience": "admin",
       "method": "POST",
-      "path": "/api/v1/admin/sports/catalogue/sports",
-      "routePath": "/sports",
-      "handler": "addSport",
-      "handlerSource": "index.js",
+      "path": "/api/v1/admin/sports/internalsettle/void-bet-after-settlement",
+      "routePath": "/void-bet-after-settlement",
+      "handler": "settle",
+      "handlerSource": "admin.routes.js",
       "middleware": [
         {
-          "type": "permission",
-          "value": "sports:manage"
+          "type": "selfOnly",
+          "value": "mssports authorizes each route itself: authMiddleware then requireOwner (the platform Super Admin), plus the transaction password on the two post-settlement voids"
         },
         {
-          "type": "validate",
-          "value": "v.addSport"
+          "type": "guard",
+          "value": "requireOwner"
         }
       ],
-      "responses": [
-        {
-          "index": 39,
-          "kind": "created",
-          "status": 201,
-          "shape": "service.addSport(…)"
-        }
-      ],
+      "responses": [],
       "thrown": [],
       "resolved": true,
-      "file": "services/sports/src/modules/catalogue/routes/admin.routes.js"
+      "file": "services/sports/src/modules/settlement/routes/admin.routes.js"
     },
     {
       "service": "sports",
-      "module": "catalogue",
+      "module": "settlement",
       "audience": "admin",
-      "method": "DELETE",
-      "path": "/api/v1/admin/sports/catalogue/sports/:id",
-      "routePath": "/sports/:id",
-      "handler": "removeSport",
-      "handlerSource": "index.js",
+      "method": "POST",
+      "path": "/api/v1/admin/sports/internalsettle/void-market-after-settlement",
+      "routePath": "/void-market-after-settlement",
+      "handler": "settle",
+      "handlerSource": "admin.routes.js",
       "middleware": [
         {
-          "type": "permission",
-          "value": "sports:manage"
+          "type": "selfOnly",
+          "value": "mssports authorizes each route itself: authMiddleware then requireOwner (the platform Super Admin), plus the transaction password on the two post-settlement voids"
         },
         {
-          "type": "validate",
-          "value": "v.sportParam"
+          "type": "guard",
+          "value": "requireOwner"
         }
       ],
-      "responses": [
-        {
-          "index": 39,
-          "kind": "ok",
-          "status": 200,
-          "shape": "service.removeSport(…)"
-        }
-      ],
+      "responses": [],
       "thrown": [],
       "resolved": true,
-      "file": "services/sports/src/modules/catalogue/routes/admin.routes.js"
+      "file": "services/sports/src/modules/settlement/routes/admin.routes.js"
     },
     {
       "service": "sports",
-      "module": "catalogue",
+      "module": "settlement",
+      "audience": "admin",
+      "method": "POST",
+      "path": "/api/v1/admin/sports/internalsettle/void-single-bet",
+      "routePath": "/void-single-bet",
+      "handler": "settle",
+      "handlerSource": "admin.routes.js",
+      "middleware": [
+        {
+          "type": "selfOnly",
+          "value": "mssports authorizes each route itself: authMiddleware then requireOwner (the platform Super Admin), plus the transaction password on the two post-settlement voids"
+        },
+        {
+          "type": "guard",
+          "value": "requireOwner"
+        }
+      ],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/settlement/routes/admin.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "sports-config",
+      "audience": "admin",
+      "method": "POST",
+      "path": "/api/v1/admin/sports/config/betlock/bulk-toggle-market-lock",
+      "routePath": "/betlock/bulk-toggle-market-lock",
+      "handler": "marketLocks",
+      "handlerSource": "admin.routes.js",
+      "middleware": [
+        {
+          "type": "selfOnly",
+          "value": "mssports authorizes each route itself: authMiddleware, then requireOwner (the platform Super Admin) or requireBackoffice + the transaction password on market-lock writes. The /sports-lock routes check only that the caller is signed in (staff, here) and that only the owner touches owner locks: there is no downline check, as in TENEXCH"
+        },
+        {
+          "type": "guard",
+          "value": "requireBackoffice"
+        },
+        {
+          "type": "guard",
+          "value": "requireTxnCode"
+        }
+      ],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/sports-config/routes/admin.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "sports-config",
       "audience": "admin",
       "method": "GET",
-      "path": "/api/v1/admin/sports/catalogue/sports/:id",
-      "routePath": "/sports/:id",
-      "handler": "getSport",
-      "handlerSource": "index.js",
+      "path": "/api/v1/admin/sports/config/betlock/market-locks/:event_id",
+      "routePath": "/betlock/market-locks/:event_id",
+      "handler": "marketLocks",
+      "handlerSource": "admin.routes.js",
       "middleware": [
         {
-          "type": "permission",
-          "value": "sports:read"
+          "type": "selfOnly",
+          "value": "mssports authorizes each route itself: authMiddleware, then requireOwner (the platform Super Admin) or requireBackoffice + the transaction password on market-lock writes. The /sports-lock routes check only that the caller is signed in (staff, here) and that only the owner touches owner locks: there is no downline check, as in TENEXCH"
         },
         {
-          "type": "validate",
-          "value": "v.sportParam"
+          "type": "guard",
+          "value": "requireBackoffice"
         }
       ],
-      "responses": [
-        {
-          "index": 33,
-          "kind": "ok",
-          "status": 200,
-          "shape": "service.getSport(…)"
-        }
-      ],
+      "responses": [],
       "thrown": [],
       "resolved": true,
-      "file": "services/sports/src/modules/catalogue/routes/admin.routes.js"
+      "file": "services/sports/src/modules/sports-config/routes/admin.routes.js"
     },
     {
       "service": "sports",
-      "module": "catalogue",
+      "module": "sports-config",
+      "audience": "admin",
+      "method": "POST",
+      "path": "/api/v1/admin/sports/config/betlock/toggle-market-lock",
+      "routePath": "/betlock/toggle-market-lock",
+      "handler": "marketLocks",
+      "handlerSource": "admin.routes.js",
+      "middleware": [
+        {
+          "type": "selfOnly",
+          "value": "mssports authorizes each route itself: authMiddleware, then requireOwner (the platform Super Admin) or requireBackoffice + the transaction password on market-lock writes. The /sports-lock routes check only that the caller is signed in (staff, here) and that only the owner touches owner locks: there is no downline check, as in TENEXCH"
+        },
+        {
+          "type": "guard",
+          "value": "requireBackoffice"
+        },
+        {
+          "type": "guard",
+          "value": "requireTxnCode"
+        }
+      ],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/sports-config/routes/admin.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "sports-config",
+      "audience": "admin",
+      "method": "GET",
+      "path": "/api/v1/admin/sports/config/betting-config/auto-void",
+      "routePath": "/betting-config/auto-void",
+      "handler": "BettingConfig",
+      "handlerSource": "admin.routes.js",
+      "middleware": [
+        {
+          "type": "selfOnly",
+          "value": "mssports authorizes each route itself: authMiddleware, then requireOwner (the platform Super Admin) or requireBackoffice + the transaction password on market-lock writes. The /sports-lock routes check only that the caller is signed in (staff, here) and that only the owner touches owner locks: there is no downline check, as in TENEXCH"
+        },
+        {
+          "type": "guard",
+          "value": "requireOwner"
+        }
+      ],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/sports-config/routes/admin.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "sports-config",
       "audience": "admin",
       "method": "PUT",
-      "path": "/api/v1/admin/sports/catalogue/sports/:id",
-      "routePath": "/sports/:id",
-      "handler": "updateSport",
-      "handlerSource": "index.js",
+      "path": "/api/v1/admin/sports/config/betting-config/auto-void",
+      "routePath": "/betting-config/auto-void",
+      "handler": "BettingConfig",
+      "handlerSource": "admin.routes.js",
       "middleware": [
         {
-          "type": "permission",
-          "value": "sports:manage"
+          "type": "selfOnly",
+          "value": "mssports authorizes each route itself: authMiddleware, then requireOwner (the platform Super Admin) or requireBackoffice + the transaction password on market-lock writes. The /sports-lock routes check only that the caller is signed in (staff, here) and that only the owner touches owner locks: there is no downline check, as in TENEXCH"
         },
         {
-          "type": "validate",
-          "value": "v.updateSport"
+          "type": "guard",
+          "value": "requireOwner"
         }
       ],
-      "responses": [
-        {
-          "index": 39,
-          "kind": "ok",
-          "status": 200,
-          "shape": "service.updateSport(…)"
-        }
-      ],
+      "responses": [],
       "thrown": [],
       "resolved": true,
-      "file": "services/sports/src/modules/catalogue/routes/admin.routes.js"
+      "file": "services/sports/src/modules/sports-config/routes/admin.routes.js"
     },
     {
       "service": "sports",
-      "module": "feed",
-      "audience": "public",
+      "module": "sports-config",
+      "audience": "admin",
       "method": "GET",
-      "path": "/api/v1/sports/feed/events",
-      "routePath": "/events",
-      "handler": "eventsBySport",
-      "handlerSource": "index.js",
+      "path": "/api/v1/admin/sports/config/betting-config/auto-void/links",
+      "routePath": "/betting-config/auto-void/links",
+      "handler": "BettingConfig",
+      "handlerSource": "admin.routes.js",
       "middleware": [
         {
-          "type": "validate",
-          "value": "v.bySport"
-        }
-      ],
-      "responses": [
+          "type": "selfOnly",
+          "value": "mssports authorizes each route itself: authMiddleware, then requireOwner (the platform Super Admin) or requireBackoffice + the transaction password on market-lock writes. The /sports-lock routes check only that the caller is signed in (staff, here) and that only the owner touches owner locks: there is no downline check, as in TENEXCH"
+        },
         {
-          "index": 95,
-          "kind": "ok",
-          "status": 200,
-          "shape": "service.eventsBySport(…)"
+          "type": "guard",
+          "value": "requireOwner"
         }
       ],
+      "responses": [],
       "thrown": [],
       "resolved": true,
-      "file": "services/sports/src/modules/feed/routes/public.routes.js"
+      "file": "services/sports/src/modules/sports-config/routes/admin.routes.js"
     },
     {
       "service": "sports",
-      "module": "feed",
-      "audience": "public",
-      "method": "GET",
-      "path": "/api/v1/sports/feed/events/by-series",
-      "routePath": "/events/by-series",
-      "handler": "eventsBySeries",
-      "handlerSource": "index.js",
+      "module": "sports-config",
+      "audience": "admin",
+      "method": "POST",
+      "path": "/api/v1/admin/sports/config/betting-config/auto-void/links",
+      "routePath": "/betting-config/auto-void/links",
+      "handler": "BettingConfig",
+      "handlerSource": "admin.routes.js",
       "middleware": [
         {
-          "type": "validate",
-          "value": "v.bySportAndSeries"
-        }
-      ],
-      "responses": [
+          "type": "selfOnly",
+          "value": "mssports authorizes each route itself: authMiddleware, then requireOwner (the platform Super Admin) or requireBackoffice + the transaction password on market-lock writes. The /sports-lock routes check only that the caller is signed in (staff, here) and that only the owner touches owner locks: there is no downline check, as in TENEXCH"
+        },
         {
-          "index": 96,
-          "kind": "ok",
-          "status": 200,
-          "shape": "service.eventsBySeries(…)"
+          "type": "guard",
+          "value": "requireOwner"
         }
       ],
+      "responses": [],
       "thrown": [],
       "resolved": true,
-      "file": "services/sports/src/modules/feed/routes/public.routes.js"
+      "file": "services/sports/src/modules/sports-config/routes/admin.routes.js"
     },
     {
       "service": "sports",
-      "module": "feed",
-      "audience": "public",
-      "method": "GET",
-      "path": "/api/v1/sports/feed/events/details",
-      "routePath": "/events/details",
-      "handler": "eventDetails",
-      "handlerSource": "index.js",
+      "module": "sports-config",
+      "audience": "admin",
+      "method": "DELETE",
+      "path": "/api/v1/admin/sports/config/betting-config/auto-void/links/:id",
+      "routePath": "/betting-config/auto-void/links/:id",
+      "handler": "BettingConfig",
+      "handlerSource": "admin.routes.js",
       "middleware": [
         {
-          "type": "validate",
-          "value": "v.byEvent"
-        }
-      ],
-      "responses": [
+          "type": "selfOnly",
+          "value": "mssports authorizes each route itself: authMiddleware, then requireOwner (the platform Super Admin) or requireBackoffice + the transaction password on market-lock writes. The /sports-lock routes check only that the caller is signed in (staff, here) and that only the owner touches owner locks: there is no downline check, as in TENEXCH"
+        },
         {
-          "index": 94,
-          "kind": "ok",
-          "status": 200,
-          "shape": "service.eventDetails(…)"
+          "type": "guard",
+          "value": "requireOwner"
         }
       ],
+      "responses": [],
       "thrown": [],
       "resolved": true,
-      "file": "services/sports/src/modules/feed/routes/public.routes.js"
+      "file": "services/sports/src/modules/sports-config/routes/admin.routes.js"
     },
     {
       "service": "sports",
-      "module": "feed",
-      "audience": "public",
-      "method": "GET",
-      "path": "/api/v1/sports/feed/events/list",
-      "routePath": "/events/list",
-      "handler": "eventList",
-      "handlerSource": "index.js",
+      "module": "sports-config",
+      "audience": "admin",
+      "method": "PUT",
+      "path": "/api/v1/admin/sports/config/betting-config/auto-void/links/:id",
+      "routePath": "/betting-config/auto-void/links/:id",
+      "handler": "BettingConfig",
+      "handlerSource": "admin.routes.js",
       "middleware": [
         {
-          "type": "validate",
-          "value": "v.bySeries"
-        }
-      ],
-      "responses": [
+          "type": "selfOnly",
+          "value": "mssports authorizes each route itself: authMiddleware, then requireOwner (the platform Super Admin) or requireBackoffice + the transaction password on market-lock writes. The /sports-lock routes check only that the caller is signed in (staff, here) and that only the owner touches owner locks: there is no downline check, as in TENEXCH"
+        },
         {
-          "index": 91,
-          "kind": "ok",
-          "status": 200,
-          "shape": "service.eventList(…)"
+          "type": "guard",
+          "value": "requireOwner"
         }
       ],
+      "responses": [],
       "thrown": [],
       "resolved": true,
-      "file": "services/sports/src/modules/feed/routes/public.routes.js"
+      "file": "services/sports/src/modules/sports-config/routes/admin.routes.js"
     },
     {
       "service": "sports",
-      "module": "feed",
-      "audience": "public",
+      "module": "sports-config",
+      "audience": "admin",
       "method": "GET",
-      "path": "/api/v1/sports/feed/inplay",
-      "routePath": "/inplay",
-      "handler": "inplay",
-      "handlerSource": "index.js",
+      "path": "/api/v1/admin/sports/config/betting-config/auto-void/tracker",
+      "routePath": "/betting-config/auto-void/tracker",
+      "handler": "BettingConfig",
+      "handlerSource": "admin.routes.js",
       "middleware": [
         {
-          "type": "validate",
-          "value": "v.inplay"
-        }
-      ],
-      "responses": [
+          "type": "selfOnly",
+          "value": "mssports authorizes each route itself: authMiddleware, then requireOwner (the platform Super Admin) or requireBackoffice + the transaction password on market-lock writes. The /sports-lock routes check only that the caller is signed in (staff, here) and that only the owner touches owner locks: there is no downline check, as in TENEXCH"
+        },
         {
-          "index": 88,
-          "kind": "ok",
-          "status": 200,
-          "shape": "service.inplay(…)"
+          "type": "guard",
+          "value": "requireOwner"
         }
       ],
+      "responses": [],
       "thrown": [],
       "resolved": true,
-      "file": "services/sports/src/modules/feed/routes/public.routes.js"
+      "file": "services/sports/src/modules/sports-config/routes/admin.routes.js"
     },
     {
       "service": "sports",
-      "module": "feed",
-      "audience": "public",
+      "module": "sports-config",
+      "audience": "admin",
+      "method": "POST",
+      "path": "/api/v1/admin/sports/config/betting-config/bet-limits/event",
+      "routePath": "/betting-config/bet-limits/event",
+      "handler": "BettingConfig",
+      "handlerSource": "admin.routes.js",
+      "middleware": [
+        {
+          "type": "selfOnly",
+          "value": "mssports authorizes each route itself: authMiddleware, then requireOwner (the platform Super Admin) or requireBackoffice + the transaction password on market-lock writes. The /sports-lock routes check only that the caller is signed in (staff, here) and that only the owner touches owner locks: there is no downline check, as in TENEXCH"
+        },
+        {
+          "type": "guard",
+          "value": "requireOwner"
+        }
+      ],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/sports-config/routes/admin.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "sports-config",
+      "audience": "admin",
       "method": "GET",
-      "path": "/api/v1/sports/feed/inplay/all",
-      "routePath": "/inplay/all",
-      "handler": "allInplay",
-      "handlerSource": "index.js",
+      "path": "/api/v1/admin/sports/config/betting-config/bet-limits/event/:event_id",
+      "routePath": "/betting-config/bet-limits/event/:event_id",
+      "handler": "BettingConfig",
+      "handlerSource": "admin.routes.js",
+      "middleware": [
+        {
+          "type": "selfOnly",
+          "value": "mssports authorizes each route itself: authMiddleware, then requireOwner (the platform Super Admin) or requireBackoffice + the transaction password on market-lock writes. The /sports-lock routes check only that the caller is signed in (staff, here) and that only the owner touches owner locks: there is no downline check, as in TENEXCH"
+        },
+        {
+          "type": "guard",
+          "value": "requireOwner"
+        }
+      ],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/sports-config/routes/admin.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "sports-config",
+      "audience": "admin",
+      "method": "DELETE",
+      "path": "/api/v1/admin/sports/config/betting-config/bet-limits/event/:id",
+      "routePath": "/betting-config/bet-limits/event/:id",
+      "handler": "BettingConfig",
+      "handlerSource": "admin.routes.js",
+      "middleware": [
+        {
+          "type": "selfOnly",
+          "value": "mssports authorizes each route itself: authMiddleware, then requireOwner (the platform Super Admin) or requireBackoffice + the transaction password on market-lock writes. The /sports-lock routes check only that the caller is signed in (staff, here) and that only the owner touches owner locks: there is no downline check, as in TENEXCH"
+        },
+        {
+          "type": "guard",
+          "value": "requireOwner"
+        }
+      ],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/sports-config/routes/admin.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "sports-config",
+      "audience": "admin",
+      "method": "GET",
+      "path": "/api/v1/admin/sports/config/betting-config/bet-limits/inplay",
+      "routePath": "/betting-config/bet-limits/inplay",
+      "handler": "BettingConfig",
+      "handlerSource": "admin.routes.js",
+      "middleware": [
+        {
+          "type": "selfOnly",
+          "value": "mssports authorizes each route itself: authMiddleware, then requireOwner (the platform Super Admin) or requireBackoffice + the transaction password on market-lock writes. The /sports-lock routes check only that the caller is signed in (staff, here) and that only the owner touches owner locks: there is no downline check, as in TENEXCH"
+        },
+        {
+          "type": "guard",
+          "value": "requireOwner"
+        }
+      ],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/sports-config/routes/admin.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "sports-config",
+      "audience": "admin",
+      "method": "DELETE",
+      "path": "/api/v1/admin/sports/config/betting-config/buffer/sports",
+      "routePath": "/betting-config/buffer/sports",
+      "handler": "BettingConfig",
+      "handlerSource": "admin.routes.js",
+      "middleware": [
+        {
+          "type": "selfOnly",
+          "value": "mssports authorizes each route itself: authMiddleware, then requireOwner (the platform Super Admin) or requireBackoffice + the transaction password on market-lock writes. The /sports-lock routes check only that the caller is signed in (staff, here) and that only the owner touches owner locks: there is no downline check, as in TENEXCH"
+        },
+        {
+          "type": "guard",
+          "value": "requireOwner"
+        }
+      ],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/sports-config/routes/admin.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "sports-config",
+      "audience": "admin",
+      "method": "GET",
+      "path": "/api/v1/admin/sports/config/betting-config/buffer/sports",
+      "routePath": "/betting-config/buffer/sports",
+      "handler": "BettingConfig",
+      "handlerSource": "admin.routes.js",
+      "middleware": [
+        {
+          "type": "selfOnly",
+          "value": "mssports authorizes each route itself: authMiddleware, then requireOwner (the platform Super Admin) or requireBackoffice + the transaction password on market-lock writes. The /sports-lock routes check only that the caller is signed in (staff, here) and that only the owner touches owner locks: there is no downline check, as in TENEXCH"
+        },
+        {
+          "type": "guard",
+          "value": "requireOwner"
+        }
+      ],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/sports-config/routes/admin.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "sports-config",
+      "audience": "admin",
+      "method": "POST",
+      "path": "/api/v1/admin/sports/config/betting-config/buffer/sports",
+      "routePath": "/betting-config/buffer/sports",
+      "handler": "BettingConfig",
+      "handlerSource": "admin.routes.js",
+      "middleware": [
+        {
+          "type": "selfOnly",
+          "value": "mssports authorizes each route itself: authMiddleware, then requireOwner (the platform Super Admin) or requireBackoffice + the transaction password on market-lock writes. The /sports-lock routes check only that the caller is signed in (staff, here) and that only the owner touches owner locks: there is no downline check, as in TENEXCH"
+        },
+        {
+          "type": "guard",
+          "value": "requireOwner"
+        }
+      ],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/sports-config/routes/admin.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "sports-config",
+      "audience": "admin",
+      "method": "POST",
+      "path": "/api/v1/admin/sports/config/betting-config/buffer/sports/bulk",
+      "routePath": "/betting-config/buffer/sports/bulk",
+      "handler": "BettingConfig",
+      "handlerSource": "admin.routes.js",
+      "middleware": [
+        {
+          "type": "selfOnly",
+          "value": "mssports authorizes each route itself: authMiddleware, then requireOwner (the platform Super Admin) or requireBackoffice + the transaction password on market-lock writes. The /sports-lock routes check only that the caller is signed in (staff, here) and that only the owner touches owner locks: there is no downline check, as in TENEXCH"
+        },
+        {
+          "type": "guard",
+          "value": "requireOwner"
+        }
+      ],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/sports-config/routes/admin.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "sports-config",
+      "audience": "admin",
+      "method": "DELETE",
+      "path": "/api/v1/admin/sports/config/betting-config/max-odds/sports",
+      "routePath": "/betting-config/max-odds/sports",
+      "handler": "BettingConfig",
+      "handlerSource": "admin.routes.js",
+      "middleware": [
+        {
+          "type": "selfOnly",
+          "value": "mssports authorizes each route itself: authMiddleware, then requireOwner (the platform Super Admin) or requireBackoffice + the transaction password on market-lock writes. The /sports-lock routes check only that the caller is signed in (staff, here) and that only the owner touches owner locks: there is no downline check, as in TENEXCH"
+        },
+        {
+          "type": "guard",
+          "value": "requireOwner"
+        }
+      ],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/sports-config/routes/admin.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "sports-config",
+      "audience": "admin",
+      "method": "GET",
+      "path": "/api/v1/admin/sports/config/betting-config/max-odds/sports",
+      "routePath": "/betting-config/max-odds/sports",
+      "handler": "BettingConfig",
+      "handlerSource": "admin.routes.js",
+      "middleware": [
+        {
+          "type": "selfOnly",
+          "value": "mssports authorizes each route itself: authMiddleware, then requireOwner (the platform Super Admin) or requireBackoffice + the transaction password on market-lock writes. The /sports-lock routes check only that the caller is signed in (staff, here) and that only the owner touches owner locks: there is no downline check, as in TENEXCH"
+        },
+        {
+          "type": "guard",
+          "value": "requireOwner"
+        }
+      ],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/sports-config/routes/admin.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "sports-config",
+      "audience": "admin",
+      "method": "POST",
+      "path": "/api/v1/admin/sports/config/betting-config/max-odds/sports",
+      "routePath": "/betting-config/max-odds/sports",
+      "handler": "BettingConfig",
+      "handlerSource": "admin.routes.js",
+      "middleware": [
+        {
+          "type": "selfOnly",
+          "value": "mssports authorizes each route itself: authMiddleware, then requireOwner (the platform Super Admin) or requireBackoffice + the transaction password on market-lock writes. The /sports-lock routes check only that the caller is signed in (staff, here) and that only the owner touches owner locks: there is no downline check, as in TENEXCH"
+        },
+        {
+          "type": "guard",
+          "value": "requireOwner"
+        }
+      ],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/sports-config/routes/admin.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "sports-config",
+      "audience": "admin",
+      "method": "GET",
+      "path": "/api/v1/admin/sports/config/betting-config/virtual-limits",
+      "routePath": "/betting-config/virtual-limits",
+      "handler": "BettingConfig",
+      "handlerSource": "admin.routes.js",
+      "middleware": [
+        {
+          "type": "selfOnly",
+          "value": "mssports authorizes each route itself: authMiddleware, then requireOwner (the platform Super Admin) or requireBackoffice + the transaction password on market-lock writes. The /sports-lock routes check only that the caller is signed in (staff, here) and that only the owner touches owner locks: there is no downline check, as in TENEXCH"
+        },
+        {
+          "type": "guard",
+          "value": "requireOwner"
+        }
+      ],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/sports-config/routes/admin.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "sports-config",
+      "audience": "admin",
+      "method": "PUT",
+      "path": "/api/v1/admin/sports/config/betting-config/virtual-limits",
+      "routePath": "/betting-config/virtual-limits",
+      "handler": "BettingConfig",
+      "handlerSource": "admin.routes.js",
+      "middleware": [
+        {
+          "type": "selfOnly",
+          "value": "mssports authorizes each route itself: authMiddleware, then requireOwner (the platform Super Admin) or requireBackoffice + the transaction password on market-lock writes. The /sports-lock routes check only that the caller is signed in (staff, here) and that only the owner touches owner locks: there is no downline check, as in TENEXCH"
+        },
+        {
+          "type": "guard",
+          "value": "requireOwner"
+        }
+      ],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/sports-config/routes/admin.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "sports-config",
+      "audience": "admin",
+      "method": "DELETE",
+      "path": "/api/v1/admin/sports/config/commission-config/sports",
+      "routePath": "/commission-config/sports",
+      "handler": "Commission",
+      "handlerSource": "admin.routes.js",
+      "middleware": [
+        {
+          "type": "selfOnly",
+          "value": "mssports authorizes each route itself: authMiddleware, then requireOwner (the platform Super Admin) or requireBackoffice + the transaction password on market-lock writes. The /sports-lock routes check only that the caller is signed in (staff, here) and that only the owner touches owner locks: there is no downline check, as in TENEXCH"
+        },
+        {
+          "type": "guard",
+          "value": "requireOwner"
+        }
+      ],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/sports-config/routes/admin.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "sports-config",
+      "audience": "admin",
+      "method": "GET",
+      "path": "/api/v1/admin/sports/config/commission-config/sports",
+      "routePath": "/commission-config/sports",
+      "handler": "Commission",
+      "handlerSource": "admin.routes.js",
+      "middleware": [
+        {
+          "type": "selfOnly",
+          "value": "mssports authorizes each route itself: authMiddleware, then requireOwner (the platform Super Admin) or requireBackoffice + the transaction password on market-lock writes. The /sports-lock routes check only that the caller is signed in (staff, here) and that only the owner touches owner locks: there is no downline check, as in TENEXCH"
+        },
+        {
+          "type": "guard",
+          "value": "requireOwner"
+        }
+      ],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/sports-config/routes/admin.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "sports-config",
+      "audience": "admin",
+      "method": "POST",
+      "path": "/api/v1/admin/sports/config/commission-config/sports",
+      "routePath": "/commission-config/sports",
+      "handler": "Commission",
+      "handlerSource": "admin.routes.js",
+      "middleware": [
+        {
+          "type": "selfOnly",
+          "value": "mssports authorizes each route itself: authMiddleware, then requireOwner (the platform Super Admin) or requireBackoffice + the transaction password on market-lock writes. The /sports-lock routes check only that the caller is signed in (staff, here) and that only the owner touches owner locks: there is no downline check, as in TENEXCH"
+        },
+        {
+          "type": "guard",
+          "value": "requireOwner"
+        }
+      ],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/sports-config/routes/admin.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "sports-config",
+      "audience": "admin",
+      "method": "POST",
+      "path": "/api/v1/admin/sports/config/commission-config/sports/bulk",
+      "routePath": "/commission-config/sports/bulk",
+      "handler": "Commission",
+      "handlerSource": "admin.routes.js",
+      "middleware": [
+        {
+          "type": "selfOnly",
+          "value": "mssports authorizes each route itself: authMiddleware, then requireOwner (the platform Super Admin) or requireBackoffice + the transaction password on market-lock writes. The /sports-lock routes check only that the caller is signed in (staff, here) and that only the owner touches owner locks: there is no downline check, as in TENEXCH"
+        },
+        {
+          "type": "guard",
+          "value": "requireOwner"
+        }
+      ],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/sports-config/routes/admin.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "sports-config",
+      "audience": "admin",
+      "method": "GET",
+      "path": "/api/v1/admin/sports/config/sports-lock/get/:targetId",
+      "routePath": "/sports-lock/get/:targetId",
+      "handler": "SportsLock",
+      "handlerSource": "admin.routes.js",
+      "middleware": [
+        {
+          "type": "selfOnly",
+          "value": "mssports authorizes each route itself: authMiddleware, then requireOwner (the platform Super Admin) or requireBackoffice + the transaction password on market-lock writes. The /sports-lock routes check only that the caller is signed in (staff, here) and that only the owner touches owner locks: there is no downline check, as in TENEXCH"
+        }
+      ],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/sports-config/routes/admin.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "sports-config",
+      "audience": "admin",
+      "method": "POST",
+      "path": "/api/v1/admin/sports/config/sports-lock/update",
+      "routePath": "/sports-lock/update",
+      "handler": "SportsLock",
+      "handlerSource": "admin.routes.js",
+      "middleware": [
+        {
+          "type": "selfOnly",
+          "value": "mssports authorizes each route itself: authMiddleware, then requireOwner (the platform Super Admin) or requireBackoffice + the transaction password on market-lock writes. The /sports-lock routes check only that the caller is signed in (staff, here) and that only the owner touches owner locks: there is no downline check, as in TENEXCH"
+        }
+      ],
+      "responses": [],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/sports/src/modules/sports-config/routes/admin.routes.js"
+    },
+    {
+      "service": "sports",
+      "module": "statement",
+      "audience": "public",
+      "method": "POST",
+      "path": "/api/v1/sports/user/account-statement-v2",
+      "routePath": "/account-statement-v2",
+      "handler": "Statement",
+      "handlerSource": "public.routes.js",
       "middleware": [],
-      "responses": [
-        {
-          "index": 79,
-          "kind": "ok",
-          "status": 200,
-          "shape": "service.allInplay(…)"
-        }
-      ],
+      "responses": [],
       "thrown": [],
       "resolved": true,
-      "file": "services/sports/src/modules/feed/routes/public.routes.js"
+      "file": "services/sports/src/modules/statement/routes/public.routes.js"
     },
     {
       "service": "sports",
-      "module": "feed",
+      "module": "statement",
       "audience": "public",
-      "method": "GET",
-      "path": "/api/v1/sports/feed/inplay/game/:gameId",
-      "routePath": "/inplay/game/:gameId",
-      "handler": "inplayByGame",
-      "handlerSource": "index.js",
-      "middleware": [
-        {
-          "type": "validate",
-          "value": "v.gameParam"
-        }
-      ],
-      "responses": [
-        {
-          "index": 95,
-          "kind": "ok",
-          "status": 200,
-          "shape": "service.inplayByGame(…)"
-        }
-      ],
-      "thrown": [],
-      "resolved": true,
-      "file": "services/sports/src/modules/feed/routes/public.routes.js"
-    },
-    {
-      "service": "sports",
-      "module": "feed",
-      "audience": "public",
-      "method": "GET",
-      "path": "/api/v1/sports/feed/live/data",
-      "routePath": "/live/data",
-      "handler": "liveSportsData",
-      "handlerSource": "index.js",
-      "middleware": [
-        {
-          "type": "validate",
-          "value": "v.liveData"
-        }
-      ],
-      "responses": [
-        {
-          "index": 96,
-          "kind": "ok",
-          "status": 200,
-          "shape": "service.liveSportsData(…)"
-        }
-      ],
-      "thrown": [],
-      "resolved": true,
-      "file": "services/sports/src/modules/feed/routes/public.routes.js"
-    },
-    {
-      "service": "sports",
-      "module": "feed",
-      "audience": "public",
-      "method": "GET",
-      "path": "/api/v1/sports/feed/live/match",
-      "routePath": "/live/match",
-      "handler": "liveSportsDataById",
-      "handlerSource": "index.js",
-      "middleware": [
-        {
-          "type": "validate",
-          "value": "v.liveMatch"
-        }
-      ],
-      "responses": [
-        {
-          "index": 100,
-          "kind": "ok",
-          "status": 200,
-          "shape": "service.liveSportsDataById(…)"
-        }
-      ],
-      "thrown": [],
-      "resolved": true,
-      "file": "services/sports/src/modules/feed/routes/public.routes.js"
-    },
-    {
-      "service": "sports",
-      "module": "feed",
-      "audience": "public",
-      "method": "GET",
-      "path": "/api/v1/sports/feed/live/result",
-      "routePath": "/live/result",
-      "handler": "liveResult",
-      "handlerSource": "index.js",
-      "middleware": [
-        {
-          "type": "validate",
-          "value": "v.liveResult"
-        }
-      ],
-      "responses": [
-        {
-          "index": 92,
-          "kind": "ok",
-          "status": 200,
-          "shape": "service.liveResult(…)"
-        }
-      ],
-      "thrown": [],
-      "resolved": true,
-      "file": "services/sports/src/modules/feed/routes/public.routes.js"
-    },
-    {
-      "service": "sports",
-      "module": "feed",
-      "audience": "public",
-      "method": "GET",
-      "path": "/api/v1/sports/feed/live/scorecard",
-      "routePath": "/live/scorecard",
-      "handler": "scorecard",
-      "handlerSource": "index.js",
-      "middleware": [
-        {
-          "type": "validate",
-          "value": "v.liveMatch"
-        }
-      ],
-      "responses": [
-        {
-          "index": 91,
-          "kind": "ok",
-          "status": 200,
-          "shape": "service.scorecard(…)"
-        }
-      ],
-      "thrown": [],
-      "resolved": true,
-      "file": "services/sports/src/modules/feed/routes/public.routes.js"
-    },
-    {
-      "service": "sports",
-      "module": "feed",
-      "audience": "public",
-      "method": "GET",
-      "path": "/api/v1/sports/feed/live/stream",
-      "routePath": "/live/stream",
-      "handler": "liveStream",
-      "handlerSource": "index.js",
-      "middleware": [
-        {
-          "type": "validate",
-          "value": "v.liveMatch"
-        }
-      ],
-      "responses": [
-        {
-          "index": 92,
-          "kind": "ok",
-          "status": 200,
-          "shape": "service.liveStream(…)"
-        }
-      ],
-      "thrown": [],
-      "resolved": true,
-      "file": "services/sports/src/modules/feed/routes/public.routes.js"
-    },
-    {
-      "service": "sports",
-      "module": "feed",
-      "audience": "public",
-      "method": "GET",
-      "path": "/api/v1/sports/feed/markets/details",
-      "routePath": "/markets/details",
-      "handler": "marketDetails",
-      "handlerSource": "index.js",
-      "middleware": [
-        {
-          "type": "validate",
-          "value": "v.byMarket"
-        }
-      ],
-      "responses": [
-        {
-          "index": 95,
-          "kind": "ok",
-          "status": 200,
-          "shape": "service.marketDetails(…)"
-        }
-      ],
-      "thrown": [],
-      "resolved": true,
-      "file": "services/sports/src/modules/feed/routes/public.routes.js"
-    },
-    {
-      "service": "sports",
-      "module": "feed",
-      "audience": "public",
-      "method": "GET",
-      "path": "/api/v1/sports/feed/markets/fancy",
-      "routePath": "/markets/fancy",
-      "handler": "bookmakerFancy",
-      "handlerSource": "index.js",
-      "middleware": [
-        {
-          "type": "validate",
-          "value": "v.byEvent"
-        }
-      ],
-      "responses": [
-        {
-          "index": 96,
-          "kind": "ok",
-          "status": 200,
-          "shape": "service.bookmakerFancy(…)"
-        }
-      ],
-      "thrown": [],
-      "resolved": true,
-      "file": "services/sports/src/modules/feed/routes/public.routes.js"
-    },
-    {
-      "service": "sports",
-      "module": "feed",
-      "audience": "public",
-      "method": "GET",
-      "path": "/api/v1/sports/feed/markets/ids",
-      "routePath": "/markets/ids",
-      "handler": "marketIdsV1",
-      "handlerSource": "index.js",
-      "middleware": [
-        {
-          "type": "validate",
-          "value": "v.byEvent"
-        }
-      ],
-      "responses": [
-        {
-          "index": 93,
-          "kind": "ok",
-          "status": 200,
-          "shape": "service.marketIdsV1(…)"
-        }
-      ],
-      "thrown": [],
-      "resolved": true,
-      "file": "services/sports/src/modules/feed/routes/public.routes.js"
-    },
-    {
-      "service": "sports",
-      "module": "feed",
-      "audience": "public",
-      "method": "GET",
-      "path": "/api/v1/sports/feed/markets/ids/v2",
-      "routePath": "/markets/ids/v2",
-      "handler": "marketIdsV2",
-      "handlerSource": "index.js",
-      "middleware": [
-        {
-          "type": "validate",
-          "value": "v.byMarket"
-        }
-      ],
-      "responses": [
-        {
-          "index": 93,
-          "kind": "ok",
-          "status": 200,
-          "shape": "service.marketIdsV2(…)"
-        }
-      ],
-      "thrown": [],
-      "resolved": true,
-      "file": "services/sports/src/modules/feed/routes/public.routes.js"
-    },
-    {
-      "service": "sports",
-      "module": "feed",
-      "audience": "public",
-      "method": "GET",
-      "path": "/api/v1/sports/feed/markets/line",
-      "routePath": "/markets/line",
-      "handler": "lineMarket",
-      "handlerSource": "index.js",
-      "middleware": [
-        {
-          "type": "validate",
-          "value": "v.byEvent"
-        }
-      ],
-      "responses": [
-        {
-          "index": 92,
-          "kind": "ok",
-          "status": 200,
-          "shape": "service.lineMarket(…)"
-        }
-      ],
-      "thrown": [],
-      "resolved": true,
-      "file": "services/sports/src/modules/feed/routes/public.routes.js"
-    },
-    {
-      "service": "sports",
-      "module": "feed",
-      "audience": "public",
-      "method": "GET",
-      "path": "/api/v1/sports/feed/markets/odds",
-      "routePath": "/markets/odds",
-      "handler": "marketOdds",
-      "handlerSource": "index.js",
-      "middleware": [
-        {
-          "type": "validate",
-          "value": "v.byMarket"
-        }
-      ],
-      "responses": [
-        {
-          "index": 92,
-          "kind": "ok",
-          "status": 200,
-          "shape": "service.marketOdds(…)"
-        }
-      ],
-      "thrown": [],
-      "resolved": true,
-      "file": "services/sports/src/modules/feed/routes/public.routes.js"
-    },
-    {
-      "service": "sports",
-      "module": "feed",
-      "audience": "public",
-      "method": "GET",
-      "path": "/api/v1/sports/feed/matches",
-      "routePath": "/matches",
-      "handler": "allMatches",
-      "handlerSource": "index.js",
+      "method": "POST",
+      "path": "/api/v1/sports/user/account-statement-v2/bets",
+      "routePath": "/account-statement-v2/bets",
+      "handler": "Statement",
+      "handlerSource": "public.routes.js",
       "middleware": [],
-      "responses": [
-        {
-          "index": 80,
-          "kind": "ok",
-          "status": 200,
-          "shape": "service.allMatches(…)"
-        }
-      ],
+      "responses": [],
       "thrown": [],
       "resolved": true,
-      "file": "services/sports/src/modules/feed/routes/public.routes.js"
-    },
-    {
-      "service": "sports",
-      "module": "feed",
-      "audience": "public",
-      "method": "GET",
-      "path": "/api/v1/sports/feed/matches/:gameId",
-      "routePath": "/matches/:gameId",
-      "handler": "matchesByGame",
-      "handlerSource": "index.js",
-      "middleware": [
-        {
-          "type": "validate",
-          "value": "v.gameParam"
-        }
-      ],
-      "responses": [
-        {
-          "index": 96,
-          "kind": "ok",
-          "status": 200,
-          "shape": "service.matchesByGame(…)"
-        }
-      ],
-      "thrown": [],
-      "resolved": true,
-      "file": "services/sports/src/modules/feed/routes/public.routes.js"
-    },
-    {
-      "service": "sports",
-      "module": "feed",
-      "audience": "public",
-      "method": "GET",
-      "path": "/api/v1/sports/feed/matches/date/:dateType",
-      "routePath": "/matches/date/:dateType",
-      "handler": "matchesByDate",
-      "handlerSource": "index.js",
-      "middleware": [
-        {
-          "type": "validate",
-          "value": "v.byDate"
-        }
-      ],
-      "responses": [
-        {
-          "index": 96,
-          "kind": "ok",
-          "status": 200,
-          "shape": "service.matchesByDate(…)"
-        }
-      ],
-      "thrown": [],
-      "resolved": true,
-      "file": "services/sports/src/modules/feed/routes/public.routes.js"
-    },
-    {
-      "service": "sports",
-      "module": "feed",
-      "audience": "public",
-      "method": "GET",
-      "path": "/api/v1/sports/feed/matches/date/:dateType/:gameId",
-      "routePath": "/matches/date/:dateType/:gameId",
-      "handler": "matchesByDateAndGame",
-      "handlerSource": "index.js",
-      "middleware": [
-        {
-          "type": "validate",
-          "value": "v.byDateAndGame"
-        }
-      ],
-      "responses": [
-        {
-          "index": 103,
-          "kind": "ok",
-          "status": 200,
-          "shape": "service.matchesByDateAndGame(…)"
-        }
-      ],
-      "thrown": [],
-      "resolved": true,
-      "file": "services/sports/src/modules/feed/routes/public.routes.js"
-    },
-    {
-      "service": "sports",
-      "module": "feed",
-      "audience": "public",
-      "method": "GET",
-      "path": "/api/v1/sports/feed/results/event",
-      "routePath": "/results/event",
-      "handler": "eventResult",
-      "handlerSource": "index.js",
-      "middleware": [
-        {
-          "type": "validate",
-          "value": "v.eventResult"
-        }
-      ],
-      "responses": [
-        {
-          "index": 93,
-          "kind": "ok",
-          "status": 200,
-          "shape": "service.eventResult(…)"
-        }
-      ],
-      "thrown": [],
-      "resolved": true,
-      "file": "services/sports/src/modules/feed/routes/public.routes.js"
-    },
-    {
-      "service": "sports",
-      "module": "feed",
-      "audience": "public",
-      "method": "GET",
-      "path": "/api/v1/sports/feed/results/list",
-      "routePath": "/results/list",
-      "handler": "eventListResult",
-      "handlerSource": "index.js",
-      "middleware": [
-        {
-          "type": "validate",
-          "value": "v.bySeries"
-        }
-      ],
-      "responses": [
-        {
-          "index": 97,
-          "kind": "ok",
-          "status": 200,
-          "shape": "service.eventListResult(…)"
-        }
-      ],
-      "thrown": [],
-      "resolved": true,
-      "file": "services/sports/src/modules/feed/routes/public.routes.js"
-    },
-    {
-      "service": "sports",
-      "module": "feed",
-      "audience": "public",
-      "method": "GET",
-      "path": "/api/v1/sports/feed/series",
-      "routePath": "/series",
-      "handler": "series",
-      "handlerSource": "index.js",
-      "middleware": [
-        {
-          "type": "validate",
-          "value": "v.bySport"
-        }
-      ],
-      "responses": [
-        {
-          "index": 88,
-          "kind": "ok",
-          "status": 200,
-          "shape": "service.series(…)"
-        }
-      ],
-      "thrown": [],
-      "resolved": true,
-      "file": "services/sports/src/modules/feed/routes/public.routes.js"
-    },
-    {
-      "service": "sports",
-      "module": "feed",
-      "audience": "public",
-      "method": "GET",
-      "path": "/api/v1/sports/feed/sports",
-      "routePath": "/sports",
-      "handler": "allSportIds",
-      "handlerSource": "index.js",
-      "middleware": [],
-      "responses": [
-        {
-          "index": 81,
-          "kind": "ok",
-          "status": 200,
-          "shape": "service.allSportIds(…)"
-        }
-      ],
-      "thrown": [],
-      "resolved": true,
-      "file": "services/sports/src/modules/feed/routes/public.routes.js"
-    },
-    {
-      "service": "sports",
-      "module": "results",
-      "audience": "user",
-      "method": "GET",
-      "path": "/api/v1/sports/results/fancy",
-      "routePath": "/fancy",
-      "handler": "myFancyResults",
-      "handlerSource": "index.js",
-      "middleware": [
-        {
-          "type": "validate",
-          "value": "v.mine"
-        }
-      ],
-      "responses": [
-        {
-          "index": 213,
-          "kind": "paginated",
-          "status": 200,
-          "shape": "[ … ] + meta.pagination"
-        }
-      ],
-      "thrown": [],
-      "resolved": true,
-      "file": "services/sports/src/modules/results/routes/user.routes.js"
-    },
-    {
-      "service": "sports",
-      "module": "results",
-      "audience": "user",
-      "method": "GET",
-      "path": "/api/v1/sports/results/markets",
-      "routePath": "/markets",
-      "handler": "myMarketResults",
-      "handlerSource": "index.js",
-      "middleware": [
-        {
-          "type": "validate",
-          "value": "v.mine"
-        }
-      ],
-      "responses": [
-        {
-          "index": 214,
-          "kind": "paginated",
-          "status": 200,
-          "shape": "[ … ] + meta.pagination"
-        }
-      ],
-      "thrown": [],
-      "resolved": true,
-      "file": "services/sports/src/modules/results/routes/user.routes.js"
-    },
-    {
-      "service": "sports",
-      "module": "results",
-      "audience": "admin",
-      "method": "GET",
-      "path": "/api/v1/admin/sports/results/fancy",
-      "routePath": "/fancy",
-      "handler": "listFancyResults",
-      "handlerSource": "index.js",
-      "middleware": [
-        {
-          "type": "permission",
-          "value": "sports:read"
-        },
-        {
-          "type": "validate",
-          "value": "v.listMarkets"
-        }
-      ],
-      "responses": [
-        {
-          "index": 214,
-          "kind": "paginated",
-          "status": 200,
-          "shape": "[ … ] + meta.pagination"
-        }
-      ],
-      "thrown": [],
-      "resolved": true,
-      "file": "services/sports/src/modules/results/routes/admin.routes.js"
-    },
-    {
-      "service": "sports",
-      "module": "results",
-      "audience": "admin",
-      "method": "GET",
-      "path": "/api/v1/admin/sports/results/markets",
-      "routePath": "/markets",
-      "handler": "listMarketResults",
-      "handlerSource": "index.js",
-      "middleware": [
-        {
-          "type": "permission",
-          "value": "sports:read"
-        },
-        {
-          "type": "validate",
-          "value": "v.listMarkets"
-        }
-      ],
-      "responses": [
-        {
-          "index": 215,
-          "kind": "paginated",
-          "status": 200,
-          "shape": "[ … ] + meta.pagination"
-        }
-      ],
-      "thrown": [],
-      "resolved": true,
-      "file": "services/sports/src/modules/results/routes/admin.routes.js"
-    },
-    {
-      "service": "sports",
-      "module": "results",
-      "audience": "admin",
-      "method": "GET",
-      "path": "/api/v1/admin/sports/results/markets/user/:userId",
-      "routePath": "/markets/user/:userId",
-      "handler": "marketResultsFor",
-      "handlerSource": "index.js",
-      "middleware": [
-        {
-          "type": "permission",
-          "value": "sports:read"
-        },
-        {
-          "type": "validate",
-          "value": "v.userParam"
-        }
-      ],
-      "responses": [
-        {
-          "index": 274,
-          "kind": "paginated",
-          "status": 200,
-          "shape": "[ … ] + meta.pagination"
-        }
-      ],
-      "thrown": [],
-      "resolved": true,
-      "file": "services/sports/src/modules/results/routes/admin.routes.js"
-    },
-    {
-      "service": "sports",
-      "module": "settlement",
-      "audience": "user",
-      "method": "GET",
-      "path": "/api/v1/sports/settlement/my-settled-bets",
-      "routePath": "/my-settled-bets",
-      "handler": "listMySettledBets",
-      "handlerSource": "user.controller.js",
-      "middleware": [
-        {
-          "type": "validate",
-          "value": "v.listMySettledBets"
-        }
-      ],
-      "responses": [
-        {
-          "index": 349,
-          "kind": "paginated",
-          "status": 200,
-          "shape": "[ … ] + meta.pagination"
-        }
-      ],
-      "thrown": [],
-      "resolved": true,
-      "file": "services/sports/src/modules/settlement/routes/user.routes.js"
-    },
-    {
-      "service": "sports",
-      "module": "settlement",
-      "audience": "admin",
-      "method": "POST",
-      "path": "/api/v1/admin/sports/settlement/declare-result",
-      "routePath": "/declare-result",
-      "handler": "declareResult",
-      "handlerSource": "admin.controller.js",
-      "middleware": [
-        {
-          "type": "permission",
-          "value": "sports:settle"
-        },
-        {
-          "type": "validate",
-          "value": "v.declareResult"
-        }
-      ],
-      "responses": [
-        {
-          "index": 131,
-          "kind": "raw",
-          "status": 200,
-          "shape": "res.json(…)"
-        }
-      ],
-      "thrown": [],
-      "resolved": true,
-      "file": "services/sports/src/modules/settlement/routes/admin.routes.js"
-    },
-    {
-      "service": "sports",
-      "module": "settlement",
-      "audience": "admin",
-      "method": "GET",
-      "path": "/api/v1/admin/sports/settlement/fancy-matches",
-      "routePath": "/fancy-matches",
-      "handler": "listFancyMatches",
-      "handlerSource": "admin.controller.js",
-      "middleware": [
-        {
-          "type": "permission",
-          "value": "wallet:read"
-        },
-        {
-          "type": "validate",
-          "value": "v.listFancyMatches"
-        }
-      ],
-      "responses": [
-        {
-          "index": 110,
-          "kind": "raw",
-          "status": null,
-          "shape": "res.json({ success, data })"
-        }
-      ],
-      "thrown": [],
-      "resolved": true,
-      "file": "services/sports/src/modules/settlement/routes/admin.routes.js"
-    },
-    {
-      "service": "sports",
-      "module": "settlement",
-      "audience": "admin",
-      "method": "GET",
-      "path": "/api/v1/admin/sports/settlement/mo-matches",
-      "routePath": "/mo-matches",
-      "handler": "listMarketMatches",
-      "handlerSource": "admin.controller.js",
-      "middleware": [
-        {
-          "type": "permission",
-          "value": "wallet:read"
-        },
-        {
-          "type": "validate",
-          "value": "v.listMarketMatches"
-        }
-      ],
-      "responses": [
-        {
-          "index": 111,
-          "kind": "raw",
-          "status": null,
-          "shape": "res.json({ success, data })"
-        }
-      ],
-      "thrown": [],
-      "resolved": true,
-      "file": "services/sports/src/modules/settlement/routes/admin.routes.js"
-    },
-    {
-      "service": "sports",
-      "module": "settlement",
-      "audience": "admin",
-      "method": "GET",
-      "path": "/api/v1/admin/sports/settlement/open-bets",
-      "routePath": "/open-bets",
-      "handler": "listOpenBets",
-      "handlerSource": "admin.controller.js",
-      "middleware": [
-        {
-          "type": "permission",
-          "value": "wallet:read"
-        },
-        {
-          "type": "validate",
-          "value": "v.listOpenBets"
-        }
-      ],
-      "responses": [
-        {
-          "index": 274,
-          "kind": "raw",
-          "status": null,
-          "shape": "res.json({ success, data })"
-        }
-      ],
-      "thrown": [],
-      "resolved": true,
-      "file": "services/sports/src/modules/settlement/routes/admin.routes.js"
-    },
-    {
-      "service": "sports",
-      "module": "settlement",
-      "audience": "admin",
-      "method": "GET",
-      "path": "/api/v1/admin/sports/settlement/settled-bets",
-      "routePath": "/settled-bets",
-      "handler": "listSettledBets",
-      "handlerSource": "admin.controller.js",
-      "middleware": [
-        {
-          "type": "permission",
-          "value": "wallet:read"
-        },
-        {
-          "type": "validate",
-          "value": "v.listSettledBets"
-        }
-      ],
-      "responses": [
-        {
-          "index": 189,
-          "kind": "raw",
-          "status": null,
-          "shape": "res.json({ success, data })"
-        }
-      ],
-      "thrown": [],
-      "resolved": true,
-      "file": "services/sports/src/modules/settlement/routes/admin.routes.js"
-    },
-    {
-      "service": "sports",
-      "module": "settlement",
-      "audience": "admin",
-      "method": "GET",
-      "path": "/api/v1/admin/sports/settlement/settled-markets",
-      "routePath": "/settled-markets",
-      "handler": "listSettledMarkets",
-      "handlerSource": "admin.controller.js",
-      "middleware": [
-        {
-          "type": "permission",
-          "value": "wallet:read"
-        },
-        {
-          "type": "validate",
-          "value": "v.listSettledMarkets"
-        }
-      ],
-      "responses": [
-        {
-          "index": 112,
-          "kind": "raw",
-          "status": null,
-          "shape": "res.json({ success, data })"
-        }
-      ],
-      "thrown": [],
-      "resolved": true,
-      "file": "services/sports/src/modules/settlement/routes/admin.routes.js"
-    },
-    {
-      "service": "sports",
-      "module": "settlement",
-      "audience": "admin",
-      "method": "POST",
-      "path": "/api/v1/admin/sports/settlement/void-bet",
-      "routePath": "/void-bet",
-      "handler": "voidBet",
-      "handlerSource": "admin.controller.js",
-      "middleware": [
-        {
-          "type": "permission",
-          "value": "sports:settle"
-        },
-        {
-          "type": "validate",
-          "value": "v.voidBet"
-        }
-      ],
-      "responses": [
-        {
-          "index": 108,
-          "kind": "raw",
-          "status": null,
-          "shape": "res.json({ success, message, ...result })"
-        }
-      ],
-      "thrown": [],
-      "resolved": true,
-      "file": "services/sports/src/modules/settlement/routes/admin.routes.js"
-    },
-    {
-      "service": "sports",
-      "module": "settlement",
-      "audience": "admin",
-      "method": "POST",
-      "path": "/api/v1/admin/sports/settlement/void-bet/post-settlement",
-      "routePath": "/void-bet/post-settlement",
-      "handler": "voidBetAfterSettlement",
-      "handlerSource": "admin.controller.js",
-      "middleware": [
-        {
-          "type": "permission",
-          "value": "sports:void-settled"
-        },
-        {
-          "type": "validate",
-          "value": "v.voidBetAfterSettlement"
-        }
-      ],
-      "responses": [
-        {
-          "index": 117,
-          "kind": "raw",
-          "status": null,
-          "shape": "res.json({ success, message, ...result })"
-        }
-      ],
-      "thrown": [],
-      "resolved": true,
-      "file": "services/sports/src/modules/settlement/routes/admin.routes.js"
-    },
-    {
-      "service": "sports",
-      "module": "settlement",
-      "audience": "admin",
-      "method": "POST",
-      "path": "/api/v1/admin/sports/settlement/void-market",
-      "routePath": "/void-market",
-      "handler": "voidMarket",
-      "handlerSource": "admin.controller.js",
-      "middleware": [
-        {
-          "type": "permission",
-          "value": "sports:settle"
-        },
-        {
-          "type": "validate",
-          "value": "v.voidMarket"
-        }
-      ],
-      "responses": [
-        {
-          "index": 105,
-          "kind": "raw",
-          "status": null,
-          "shape": "res.json({ success, message, count, ...result })"
-        }
-      ],
-      "thrown": [],
-      "resolved": true,
-      "file": "services/sports/src/modules/settlement/routes/admin.routes.js"
-    },
-    {
-      "service": "sports",
-      "module": "settlement",
-      "audience": "admin",
-      "method": "POST",
-      "path": "/api/v1/admin/sports/settlement/void-market/post-settlement",
-      "routePath": "/void-market/post-settlement",
-      "handler": "voidMarketAfterSettlement",
-      "handlerSource": "admin.controller.js",
-      "middleware": [
-        {
-          "type": "permission",
-          "value": "sports:void-settled"
-        },
-        {
-          "type": "validate",
-          "value": "v.voidMarketAfterSettlement"
-        }
-      ],
-      "responses": [
-        {
-          "index": 120,
-          "kind": "raw",
-          "status": null,
-          "shape": "res.json({ success, message, ...result })"
-        }
-      ],
-      "thrown": [],
-      "resolved": true,
-      "file": "services/sports/src/modules/settlement/routes/admin.routes.js"
-    },
-    {
-      "service": "sports",
-      "module": "settlement",
-      "audience": "internal",
-      "method": "GET",
-      "path": "/internal/sports/settlement/pending-markets",
-      "routePath": "/pending-markets",
-      "handler": "listPendingMarkets",
-      "handlerSource": "internal.controller.js",
-      "middleware": [
-        {
-          "type": "validate",
-          "value": "v.listMarketMatches"
-        }
-      ],
-      "responses": [
-        {
-          "index": 111,
-          "kind": "ok",
-          "status": 200,
-          "shape": "service.listMarketMatches(…)"
-        }
-      ],
-      "thrown": [],
-      "resolved": true,
-      "file": "services/sports/src/modules/settlement/routes/internal.routes.js"
-    },
-    {
-      "service": "sports",
-      "module": "settlement",
-      "audience": "internal",
-      "method": "POST",
-      "path": "/internal/sports/settlement/settle-market",
-      "routePath": "/settle-market",
-      "handler": "settleMarket",
-      "handlerSource": "internal.controller.js",
-      "middleware": [
-        {
-          "type": "validate",
-          "value": "v.settleMatchInternal"
-        }
-      ],
-      "responses": [
-        {
-          "index": 429,
-          "kind": "ok",
-          "status": 200,
-          "shape": "service.declareResult(…)"
-        }
-      ],
-      "thrown": [],
-      "resolved": true,
-      "file": "services/sports/src/modules/settlement/routes/internal.routes.js"
-    },
-    {
-      "service": "sports",
-      "module": "settlement",
-      "audience": "internal",
-      "method": "GET",
-      "path": "/internal/sports/settlement/settled-markets",
-      "routePath": "/settled-markets",
-      "handler": "listSettledMarkets",
-      "handlerSource": "admin.controller.js",
-      "middleware": [
-        {
-          "type": "validate",
-          "value": "v.listSettledMarkets"
-        }
-      ],
-      "responses": [
-        {
-          "index": 112,
-          "kind": "raw",
-          "status": null,
-          "shape": "res.json({ success, data })"
-        }
-      ],
-      "thrown": [],
-      "resolved": true,
-      "file": "services/sports/src/modules/settlement/routes/internal.routes.js"
+      "file": "services/sports/src/modules/statement/routes/public.routes.js"
     },
     {
       "service": "sports",
@@ -24794,244 +24429,6 @@
       "file": "services/sports/src/modules/bet-admin/betAdmin.errors.js",
       "service": "sports",
       "module": "bet-admin"
-    },
-    {
-      "namespace": "BETS",
-      "codes": [
-        {
-          "key": "BETTING_LOCKED",
-          "code": "BETS_BETTING_LOCKED",
-          "status": 403,
-          "message": "Sports betting is not available on this account"
-        },
-        {
-          "key": "MARKET_NOT_FOUND",
-          "code": "BETS_MARKET_NOT_FOUND",
-          "status": 404,
-          "message": "That market is not open for betting"
-        },
-        {
-          "key": "SELECTION_NOT_IN_MARKET",
-          "code": "BETS_SELECTION_NOT_IN_MARKET",
-          "status": 422,
-          "message": "That selection is not part of this market"
-        },
-        {
-          "key": "ODDS_REJECTED",
-          "code": "BETS_ODDS_REJECTED",
-          "status": 409,
-          "message": "The price has changed — please review and place the bet again"
-        },
-        {
-          "key": "STAKE_OUT_OF_RANGE",
-          "code": "BETS_STAKE_OUT_OF_RANGE",
-          "status": 422,
-          "message": "That stake is outside the limits for this market"
-        },
-        {
-          "key": "PAYOUT_TOO_LARGE",
-          "code": "BETS_PAYOUT_TOO_LARGE",
-          "status": 422,
-          "message": "That bet would exceed the maximum payout allowed on a single bet"
-        },
-        {
-          "key": "INSUFFICIENT_FUNDS",
-          "code": "BETS_INSUFFICIENT_FUNDS",
-          "status": 402,
-          "message": "There is not enough in your balance to cover this bet"
-        },
-        {
-          "key": "BET_NOT_FOUND",
-          "code": "BETS_BET_NOT_FOUND",
-          "status": 404,
-          "message": "Bet not found"
-        }
-      ],
-      "file": "services/sports/src/modules/bets/bets.errors.js",
-      "service": "sports",
-      "module": "bets"
-    },
-    {
-      "namespace": "CATALOGUE",
-      "codes": [
-        {
-          "key": "SPORT_NOT_FOUND",
-          "code": "CATALOGUE_SPORT_NOT_FOUND",
-          "status": 404,
-          "message": "No such sport configuration"
-        },
-        {
-          "key": "SPORT_EXISTS",
-          "code": "CATALOGUE_SPORT_EXISTS",
-          "status": 409,
-          "message": "That sport is already configured"
-        },
-        {
-          "key": "FANCY_CONTROL_NOT_FOUND",
-          "code": "CATALOGUE_FANCY_CONTROL_NOT_FOUND",
-          "status": 404,
-          "message": "No such fancy market control"
-        },
-        {
-          "key": "NOTHING_TO_UPDATE",
-          "code": "CATALOGUE_NOTHING_TO_UPDATE",
-          "status": 422,
-          "message": "Give at least one field to change"
-        }
-      ],
-      "file": "services/sports/src/modules/catalogue/catalogue.errors.js",
-      "service": "sports",
-      "module": "catalogue"
-    },
-    {
-      "namespace": "FEED",
-      "codes": [
-        {
-          "key": "GAME_NOT_FOUND",
-          "code": "FEED_GAME_NOT_FOUND",
-          "status": 404,
-          "message": "No data for that sport right now"
-        },
-        {
-          "key": "INVALID_DATE_RANGE",
-          "code": "FEED_INVALID_DATE_RANGE",
-          "status": 422,
-          "message": "That is not a date range this endpoint understands"
-        },
-        {
-          "key": "PROVIDER_NOT_CONFIGURED",
-          "code": "FEED_PROVIDER_NOT_CONFIGURED",
-          "status": 501,
-          "message": "This feature needs a sports data provider that is not configured"
-        },
-        {
-          "key": "UPSTREAM_ERROR",
-          "code": "FEED_UPSTREAM_ERROR",
-          "status": 502,
-          "message": "The sports data provider rejected the request"
-        },
-        {
-          "key": "UNREACHABLE",
-          "code": "FEED_UNREACHABLE",
-          "status": 504,
-          "message": "The sports data provider did not respond"
-        }
-      ],
-      "file": "services/sports/src/modules/feed/feed.errors.js",
-      "service": "sports",
-      "module": "feed"
-    },
-    {
-      "namespace": "RESULTS",
-      "codes": [
-        {
-          "key": "VISIBILITY_UNAVAILABLE",
-          "code": "RESULTS_VISIBILITY_UNAVAILABLE",
-          "status": 503,
-          "message": "Could not determine which accounts you may report on"
-        },
-        {
-          "key": "NOT_IN_YOUR_TREE",
-          "code": "RESULTS_NOT_IN_YOUR_TREE",
-          "status": 404,
-          "message": "Player not found"
-        }
-      ],
-      "file": "services/sports/src/modules/results/results.errors.js",
-      "service": "sports",
-      "module": "results"
-    },
-    {
-      "namespace": "SETTLEMENT",
-      "codes": [
-        {
-          "key": "MARKET_NOT_FOUND",
-          "code": "SETTLEMENT_MARKET_NOT_FOUND",
-          "status": 404,
-          "message": "No market found for the given match and market type"
-        },
-        {
-          "key": "BET_NOT_FOUND",
-          "code": "SETTLEMENT_BET_NOT_FOUND",
-          "status": 404,
-          "message": "Open bet not found — it may already have been settled or voided"
-        },
-        {
-          "key": "LEDGER_ENTRY_NOT_FOUND",
-          "code": "SETTLEMENT_LEDGER_ENTRY_NOT_FOUND",
-          "status": 404,
-          "message": "Settlement entry not found"
-        },
-        {
-          "key": "NO_SETTLED_ENTRIES",
-          "code": "SETTLEMENT_NO_SETTLED_ENTRIES",
-          "status": 404,
-          "message": "No settled entries found for this market"
-        },
-        {
-          "key": "NO_OPEN_BETS",
-          "code": "SETTLEMENT_NO_OPEN_BETS",
-          "status": 409,
-          "message": "This market has no open bets to settle"
-        },
-        {
-          "key": "MARKET_ALREADY_SETTLED",
-          "code": "SETTLEMENT_MARKET_ALREADY_SETTLED",
-          "status": 409,
-          "message": "This market has already been settled"
-        },
-        {
-          "key": "BET_ALREADY_CLOSED",
-          "code": "SETTLEMENT_BET_ALREADY_CLOSED",
-          "status": 409,
-          "message": "This bet is no longer open"
-        },
-        {
-          "key": "ALREADY_VOIDED",
-          "code": "SETTLEMENT_ALREADY_VOIDED",
-          "status": 409,
-          "message": "This market has already been voided after settlement"
-        },
-        {
-          "key": "SETTLEMENT_IN_PROGRESS",
-          "code": "SETTLEMENT_SETTLEMENT_IN_PROGRESS",
-          "status": 409,
-          "message": "Settlement is already running for this market — retry in a moment"
-        },
-        {
-          "key": "VOID_WINDOW_EXPIRED",
-          "code": "SETTLEMENT_VOID_WINDOW_EXPIRED",
-          "status": 409,
-          "message": "The void window for this market has expired"
-        },
-        {
-          "key": "SELECTION_REQUIRED",
-          "code": "SETTLEMENT_SELECTION_REQUIRED",
-          "status": 422,
-          "message": "This market type settles per selection, so a selection name is required"
-        },
-        {
-          "key": "RESULT_REQUIRED",
-          "code": "SETTLEMENT_RESULT_REQUIRED",
-          "status": 422,
-          "message": "A winner (market result) or a run value (fancy result) is required"
-        },
-        {
-          "key": "PAYOUT_EXCEEDS_LIMIT",
-          "code": "SETTLEMENT_PAYOUT_EXCEEDS_LIMIT",
-          "status": 422,
-          "message": "The calculated payout exceeds the configured maximum for a single market"
-        },
-        {
-          "key": "REFUND_FAILED",
-          "code": "SETTLEMENT_REFUND_FAILED",
-          "status": 502,
-          "message": "The stake refund could not be completed — no balances were changed"
-        }
-      ],
-      "file": "services/sports/src/modules/settlement/settlement.errors.js",
-      "service": "sports",
-      "module": "settlement"
     },
     {
       "namespace": "AFFILIATE",

@@ -4,8 +4,8 @@ const { Op, fn, col, literal } = require('sequelize');
 const { money } = require('@ibitplay/common');
 
 const errors = require('./betAdmin.errors');
-const { BET_STATUS } = require('../bets/bets.constants');
-const { worstCase } = require('../bets/exposure');
+const { BET_STATUS } = require('./bets.constants');
+const { worstCase } = require('./exposure');
 
 /**
  * Reporting on the book, and locking accounts out of it.

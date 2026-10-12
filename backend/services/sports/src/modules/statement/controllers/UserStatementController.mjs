@@ -1,0 +1,69 @@
+// controller/user/UserStatementController.js — mssports core, moved unchanged
+import { Wallet_default } from "../../../models/admin/Wallet.mjs";
+import { UserStatementService_default } from "../services/UserStatementService.mjs";
+
+var UserStatementController = {
+  getAccountStatementV2: async (req, res) => {
+    try {
+      console.log("\u{1F4DD} [UserStatementController] getAccountStatementV2 request:", req.body);
+      const id = req.user.user_id || req?.user?.account?.id;
+      if (!id) {
+        return res.status(401).json({ success: false, message: "User not authenticated or ID missing" });
+      }
+      const { reportType, fromDate, toDate, search, page, limit } = req.body || {};
+      const rt = String(reportType || "ALL").toUpperCase().trim();
+      if (!["ALL", "TRANSACTION", "SPORTS"].includes(rt)) {
+        return res.status(400).json({ success: false, message: "reportType must be ALL, TRANSACTION or SPORTS" });
+      }
+      const wallet = await Wallet_default.findOne({
+        where: { user_id: id },
+        attributes: ["wallet_id", "username", "createdAt"],
+        raw: true
+      });
+      if (!wallet) {
+        return res.status(404).json({ success: false, message: "Wallet not found" });
+      }
+      const target = {
+        id,
+        username: req.user.username,
+        walletId: wallet.wallet_id,
+        createdAt: wallet.createdAt,
+        isDemo: !!req.user.isDemo
+      };
+      const result = await UserStatementService_default.getAccountStatementV2(target, { reportType: rt, fromDate, toDate, search, page, limit });
+      return res.status(200).json(result);
+    } catch (error) {
+      console.error("\u274C [UserStatementController] getAccountStatementV2 Error:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  },
+  /**
+   * Result modal data for one SPORTS statement row:
+   * us market ke saare bets + winner.
+   * Input: matchId (= market/mid) + eventId (= match/gmid) — statement row se.
+   */
+  getStatementMarketBets: async (req, res) => {
+    try {
+      const id = req.user.user_id || req?.user?.account?.id;
+      if (!id) {
+        return res.status(401).json({ success: false, message: "User not authenticated or ID missing" });
+      }
+      const { matchId, eventId, fancyName } = req.body || {};
+      if (!matchId || !eventId) {
+        return res.status(400).json({ success: false, message: "matchId and eventId required" });
+      }
+      const result = await UserStatementService_default.getStatementMarketBets(
+        { id, username: req.user.username },
+        { matchId, eventId, fancyName }
+      );
+      if (!result?.success) return res.status(400).json(result);
+      return res.status(200).json(result);
+    } catch (error) {
+      console.error("\u274C [UserStatementController] getStatementMarketBets Error:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  }
+};
+var UserStatementController_default = UserStatementController;
+
+export { UserStatementController_default };

@@ -82,9 +82,11 @@ test('player guards', async (t) => {
   });
 
   await t.test('native sports bets: placing needs `sports`', async () => {
-    const call = await mount(t, 'sports/src/modules/bets/routes/user.routes');
+    // The mssports sportsbook: both placement routes, refused before its own auth runs.
+    const call = await mount(t, 'sports/src/modules/bets/routes/public.routes');
     plan({}, { sports: false });
-    refused(await call('POST', '/', {}), 'flag', 'sports');
+    refused(await call('POST', '/place', {}), 'flag', 'sports');
+    refused(await call('POST', '/place-combined', {}), 'flag', 'sports');
   });
 
   await t.test('game launch: books need `sports`, games need `casino` and their provider and category', async () => {

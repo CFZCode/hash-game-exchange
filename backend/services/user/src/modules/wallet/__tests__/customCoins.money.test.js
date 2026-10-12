@@ -353,7 +353,7 @@ test('custom coins are refused by deposits, withdrawals, games and sports', asyn
       'casino/src/modules/seamless/routes/user.routes.js': 'GAMES',
       'casino/src/modules/games/routes/user.routes.js': 'GAMES',
       'casino/src/modules/sportsbook/routes/user.routes.js': 'SPORTS',
-      'sports/src/modules/bets/routes/user.routes.js': 'SPORTS',
+      'sports/src/modules/bets/routes/public.routes.js': 'SPORTS',
     };
     for (const [file, feature] of Object.entries(expected)) {
       const src = fs.readFileSync(path.join(root, file), 'utf8');
