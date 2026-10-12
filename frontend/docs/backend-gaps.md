@@ -335,6 +335,10 @@ The SmartBet rules (`siteGates.ts` / `siteFeatures.tsx`), ported in `services/ga
 
 What is hidden: the wallet rail, the account dropdown, the mobile account page, the sidebar, the
 footer columns, the header Deposit button and gift. A direct visit to a switched-off route goes to `/`.
+The dialog routes (`/deposit`, `/free-plays`, and on a phone `/bonus`, `/referral`, `/vip-detail`,
+`/promotions/*`, `/quests`, `/deposit-offer`) are held by the same `RouteGate` as the pages: before
+2026-10-12's regression pass they mounted beside it and fired 403 `/user/bonus`, `/user/affiliate*`,
+`/user/vip`, `/user/rakeback` for an agent-tree player before the redirect.
 The gate table is `GATES` / `ROUTES` in `services/gates.js`. History (transaction, rollover, bet
 history, deposit and withdrawal details) is never gated.
 

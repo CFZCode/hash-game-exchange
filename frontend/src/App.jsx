@@ -886,6 +886,12 @@ function AppShell() {
         </Routes>
         </RouteGate>
       </MainLayout>
+      {/* The dialog routes are mounted beside <Routes>, so the page's RouteGate never sees them:
+          `/bonus`, `/referral`, `/deposit`, `/free-plays`… opened as dialogs (every phone, and
+          `/deposit` / `/free-plays` at any width) mounted for an agent-tree player and fired the
+          reads the backend refuses (403 /user/bonus, /user/affiliate…). Gated on the CURRENT path:
+          one dialog path matches at a time, and ungated ones (sign-in, profile) pass through. */}
+      <RouteGate pathname={pathname}>
       {/* `/deposit`'s guard names the sign-up tab, `/user/enter`'s the sign-in one; on
           `/login/*` the path itself is the tab. */}
       {(showAuth ||
@@ -1124,6 +1130,8 @@ function AppShell() {
           <Responsible />
         </PageDialog>
       )}
+
+      </RouteGate>
 
       {/* The desktop arm of `/user/enter`'s own guard. A redirect rather than a dialog, so the
           URL does not sit on a path that renders nothing — and `replace` so the back button does
