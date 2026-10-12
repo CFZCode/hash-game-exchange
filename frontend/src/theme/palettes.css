@@ -1,0 +1,181 @@
+/*
+ * OWNER TEMPLATE COLOUR THEMES on the bc.game UI.
+ *
+ * The owner panel's template (features/public → {feature:'theme', variant}) is put on
+ * <html data-theme="<key>"> by src/theme/applyTheme.js (early, from the last value in
+ * localStorage, then from the live read). `hash_game` — the default — and an unknown or missing
+ * key match NOTHING here, so the original bc.game colours stay pixel-identical.
+ *
+ * Only colours change: layout, spacing, fonts and art stay. Each block below sets the SmartBet
+ * palette's raw tokens (casino-sportsbook/frontend/src/theme/brands.css: --bg, --surface-1..3,
+ * --border, --text, --muted, --primary, --primary-ink, --accent, --live, --gold-hi/lo) as --p-*;
+ * the mapping block then re-points the bc UI's own @theme tokens (src/index.css) at them, with the
+ * same dark-to-light ladder the bc palette uses. Dark mode only: the light theme (`.app-root:not(.dark)`)
+ * is bc's own and keeps its colours.
+ *
+ * Icon sprites (sidebar, header, tabbar, category icons) are PNGs with the colours baked in; their
+ * per-theme copies and rules are src/theme/sprites.css (tools/gen-theme-sprites.mjs).
+ *
+ * Not recoloured (baked into art or written as literals on purpose): game tiles, banners, promo
+ * and VIP art, coin and provider logos (all raster), the federated /help remote (Help.css literals), the
+ * DepositOffer striped rgba(36,238,137) bar, and layer hexes written as literals in a few page
+ * stylesheets (Sidebar.css, UserEnter.css, Settings.css, WeeklyRaffle.css).
+ */
+
+html[data-theme='carbon_gold'] {
+  --p-bg: #0b0b0b;
+  --p-s1: #151515;
+  --p-s2: #1e1e1e;
+  --p-s3: #282828;
+  --p-border: #3a3a3a;
+  --p-text: #f5f5f0;
+  --p-muted: #9c9c94;
+  --p-primary: #fcee0a;
+  --p-ink: #0b0b0b;
+  --p-accent: #00f0ff;
+  --p-live: #ff003c;
+  --p-hi: #fff56b;
+  --p-lo: #e0a800;
+}
+
+html[data-theme='violet_night'] {
+  --p-bg: #0e0a17;
+  --p-s1: #171126;
+  --p-s2: #201834;
+  --p-s3: #2a2042;
+  --p-border: #43375e;
+  --p-text: #f4f0ff;
+  --p-muted: #a59cbd;
+  --p-primary: #a78bfa;
+  --p-ink: #140f1f;
+  --p-accent: #f0abfc;
+  --p-live: #ff4d6d;
+  --p-hi: #ddd6fe;
+  --p-lo: #7c3aed;
+}
+
+html[data-theme='emerald_dark'] {
+  --p-bg: #0a0f0c;
+  --p-s1: #111a15;
+  --p-s2: #17241d;
+  --p-s3: #1f3027;
+  --p-border: #2f4a3b;
+  --p-text: #eefcf3;
+  --p-muted: #94ad9f;
+  --p-primary: #22c55e;
+  --p-ink: #04140a;
+  --p-accent: #5eead4;
+  --p-live: #fb4f5f;
+  --p-hi: #86efac;
+  --p-lo: #15803d;
+}
+
+html[data-theme='neon_navy'] {
+  --p-bg: #0b0f1a;
+  --p-s1: #12172a;
+  --p-s2: #192036;
+  --p-s3: #212a44;
+  --p-border: #33405f;
+  --p-text: #eef2ff;
+  --p-muted: #98a2bf;
+  --p-primary: #1aff00;
+  --p-ink: #051003;
+  --p-accent: #38bdf8;
+  --p-live: #ff4d6d;
+  --p-hi: #8cff7a;
+  --p-lo: #0fa800;
+}
+
+/* The page behind the app before and around it (boot loader, overscroll). */
+html[data-theme='carbon_gold'],
+html[data-theme='violet_night'],
+html[data-theme='emerald_dark'],
+html[data-theme='neon_navy'] {
+  background-color: color-mix(in srgb, var(--p-bg) 50%, var(--p-s1));
+}
+
+/* bc token → palette. Unlayered, so it beats Tailwind's `@layer theme` like the light block does;
+   on <body> (.app-root.dark), where the light block declares too. */
+html[data-theme='carbon_gold'] .app-root.dark,
+html[data-theme='violet_night'] .app-root.dark,
+html[data-theme='emerald_dark'] .app-root.dark,
+html[data-theme='neon_navy'] .app-root.dark {
+  /* Surfaces, darkest → lightest, on bc's own ladder (#171A1A < #1E2121 < #232626 < #292D2E < #323738 < #3A4142 < #4A5354). */
+  --color-alw_dark: color-mix(in srgb, var(--p-bg) 80%, #000);
+  --color-card_dark: color-mix(in srgb, var(--p-bg) 80%, #000);
+  --color-layer1: var(--p-bg);
+  --color-card: var(--p-bg);
+  --color-input_darken: var(--p-bg);
+  --site-bg: color-mix(in srgb, var(--p-bg) 50%, var(--p-s1));
+  --color-layer2: color-mix(in srgb, var(--p-bg) 50%, var(--p-s1));
+  --color-tab_padding: color-mix(in srgb, var(--p-bg) 30%, var(--p-s1));
+  --color-layer3: var(--p-s1);
+  --color-layer3_alt: var(--p-s1);
+  --color-header-bg: var(--p-s1);
+  --color-input_bright: var(--p-s1);
+  --color-layer4: var(--p-s2);
+  --color-layer4_alt: var(--p-s2);
+  --color-tab_nopadding: var(--p-s2);
+  --color-layer5: var(--p-s3);
+  --color-layer5-table: var(--p-s3);
+  --color-tab_selected: var(--p-s3);
+  --color-input: var(--p-s3);
+  --color-input_button: var(--p-s3);
+  --color-layer6: var(--p-border);
+  --color-button_bright: color-mix(in srgb, var(--p-s3) 40%, var(--p-border));
+  --color-quinary: color-mix(in srgb, var(--p-border) 80%, var(--p-muted));
+
+  /* Text. */
+  --color-primary: var(--p-text);
+  --color-alw_white: var(--p-text);
+  --color-primary_alw: color-mix(in srgb, var(--p-text) 85%, var(--p-muted));
+  --color-mail: color-mix(in srgb, var(--p-text) 85%, var(--p-muted));
+  --color-fourth: color-mix(in srgb, var(--p-text) 92%, var(--p-muted));
+  --color-secondary: color-mix(in srgb, var(--p-text) 45%, var(--p-muted));
+  --color-quarterary: color-mix(in srgb, var(--p-text) 30%, var(--p-muted));
+  --color-tertiary: var(--p-muted);
+
+  /* Brand. */
+  --color-brand: var(--p-primary);
+  --color-accent-green: var(--p-primary);
+  --color-success: var(--p-primary);
+  --color-button-brand: color-mix(in srgb, var(--p-primary) 85%, var(--p-lo));
+  --color-brand_alt: var(--p-hi);
+  --color-primary_brand: var(--p-ink);
+  --color-secondary-light: var(--p-accent);
+  --color-error: var(--p-live);
+
+  /* Component tokens declared as literals in their own stylesheets (Sidebar.css, Toast.css). */
+  --Sidebar-Unit_bg: var(--p-s2);
+  --Sidebar-ListArrow-bg: var(--p-s3);
+  --toast-bg: color-mix(in srgb, var(--p-bg) 40%, var(--p-s1));
+
+  /* Inline SVG literals that read a variable with bc's value as the fallback (Swap's arrows). */
+  --theme-swap-arrow: var(--p-primary);
+  --theme-swap-line: color-mix(in srgb, var(--p-text) 80%, var(--p-muted));
+}
+
+/* `.bonus-scope` re-declares two tokens on the page wrapper (index.css); re-point them too. */
+html[data-theme='carbon_gold'] .app-root.dark .bonus-scope,
+html[data-theme='violet_night'] .app-root.dark .bonus-scope,
+html[data-theme='emerald_dark'] .app-root.dark .bonus-scope,
+html[data-theme='neon_navy'] .app-root.dark .bonus-scope {
+  --color-quarterary: color-mix(in srgb, var(--p-muted) 75%, var(--p-border));
+  --color-card: color-mix(in srgb, var(--p-bg) 80%, #000);
+}
+
+/* Tokens declared on an inner wrapper rather than on <body> (Footer.css, Settings.css). */
+html[data-theme='carbon_gold'] .app-root.dark .footer-bg,
+html[data-theme='violet_night'] .app-root.dark .footer-bg,
+html[data-theme='emerald_dark'] .app-root.dark .footer-bg,
+html[data-theme='neon_navy'] .app-root.dark .footer-bg {
+  --footer-bg: var(--p-bg);
+}
+
+html[data-theme='carbon_gold'] .dark .settings-page,
+html[data-theme='violet_night'] .dark .settings-page,
+html[data-theme='emerald_dark'] .dark .settings-page,
+html[data-theme='neon_navy'] .dark .settings-page {
+  --Chip-Group-Tab: var(--p-s3);
+  --Chip-Group-Button: color-mix(in srgb, var(--p-s3) 40%, var(--p-border));
+}

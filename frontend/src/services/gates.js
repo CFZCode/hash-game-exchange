@@ -1,6 +1,7 @@
 import { request, USE_FIXTURES } from './client';
 import { PLATFORM } from './endpoints';
 import { getSiteConfig } from './siteConfig';
+import { applyTheme, themeOf } from '../theme/applyTheme';
 
 /* What this site has switched on, and what THIS player's account may use — SmartBet's
  * `siteGates.ts` + `siteFeatures.tsx` (casino-sportsbook/frontend/src/lib), ported to this
@@ -32,10 +33,15 @@ const FEATURES_PUBLIC = '/api/v1/admin/features/public';
  */
 export const GATES = {
   // Every way of adding money: the wallet's Deposit tab, the header Deposit button, /deposit.
-  deposit: { capability: 'deposit' },
+  // `rail`: the owner's cashier policy (backend sitePolicy.js). This UI's only live deposit rail
+  // is the Crypto tab — an AUTOMATIC deposit (the Fiat tab has no live channel: the platform's
+  // manual transfer needs a reference + screenshot the form does not have) — and its only
+  // withdrawal is the crypto request, which the backend files as MANUAL (staff-reviewed). So a
+  // policy that closes that rail closes the whole entry.
+  deposit: { capability: 'deposit', rail: ['deposit_mode', 'automatic'] },
   // P2P / card buy is a deposit rail on the backend (`deposit` capability covers "P2P buy").
   buy: { capability: 'deposit' },
-  withdraw: { capability: 'withdraw' },
+  withdraw: { capability: 'withdraw', rail: ['withdrawal_mode', 'manual'] },
   swap: { feature: 'swap', capability: 'swap' },
   vault: { feature: 'vault', capability: 'vault' },
   bonus: { flag: 'bonus', feature: 'bonus', capability: 'promotions' },
@@ -89,6 +95,9 @@ export function gateOf(href) {
    (packages/common/src/sitePolicy.js). */
 const POLICY_DEFAULTS = { business_model: 'hybrid', deposit_mode: 'both', withdrawal_mode: 'both' };
 
+/* Which policy variants leave a channel open — backend sitePolicy.js ALLOWS. */
+const railOpen = (mode, channel) => mode === 'both' || mode === channel;
+
 /* The backend's wording for a B2B site's refused sign-up (sitePolicy.js REASONS
    'business_model:public_signup'), shown before the visitor types anything. A submitted sign-up
    shows whatever the server itself answered instead. */
@@ -106,16 +115,17 @@ export function makeGates({ flags, features, capabilities, ready = true } = {}) 
   const flagMap = flags && typeof flags === 'object' ? flags : null;
 
   const can = (cap) => capabilities?.[cap] !== false;
+  const policy = (key) => byKey.get(key)?.variant ?? POLICY_DEFAULTS[key];
   const blocked = (gate) => {
     const g = GATES[gate];
     if (!g) return null;
     if (g.flag && flagMap?.[g.flag] === false) return 'site';
     if (g.feature && list && !byKey.has(g.feature)) return 'site';
+    if (g.rail && !railOpen(policy(g.rail[0]), g.rail[1])) return 'site';
     if (g.capability && !can(g.capability)) return 'account';
     return null;
   };
   const on = (gate) => blocked(gate) === null;
-  const policy = (key) => byKey.get(key)?.variant ?? POLICY_DEFAULTS[key];
 
   return {
     ready,
@@ -142,6 +152,9 @@ export async function loadPublicGates() {
     Promise.resolve(request(FEATURES_PUBLIC, { live: true, fixture: null })).catch(() => null),
     getSiteConfig(),
   ]);
+  // The owner's template is this UI's colour theme (src/theme/palettes.css). A failed read keeps
+  // whatever is on screen.
+  if (Array.isArray(features)) applyTheme(themeOf(features));
   return { flags: flags ?? null, features: Array.isArray(features) ? features : null };
 }
 

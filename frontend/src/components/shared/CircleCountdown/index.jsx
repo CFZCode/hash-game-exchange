@@ -101,7 +101,7 @@ export default function CircleCountdown({
           strokeWidth="4"
           strokeLinecap="round"
           strokeDasharray={2 * Math.PI * 12}
-          style={{ transition: 'stroke-dashoffset 0.2s linear' }}
+          style={{ stroke: 'var(--color-brand, #24EE89)', transition: 'stroke-dashoffset 0.2s linear' }}
         />
       </svg>
     </div>
