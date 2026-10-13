@@ -1,6 +1,6 @@
 'use strict';
 
-const { REWARD_CURRENCY, REWARD_CURRENCY_CHOICES, REWARD_CURRENCY_NAMES } = require('./currencies');
+const { REWARD_CURRENCY, REWARD_CURRENCY_CHOICES, REWARD_CURRENCY_NAMES, DEFAULT_CURRENCY, DEFAULT_CURRENCY_CHOICES } = require('./currencies');
 
 /**
  * The feature catalogue — every feature a site can offer, the named ways it
@@ -716,6 +716,29 @@ const REWARD_CURRENCY_POLICY = {
 };
 
 /**
+ * The default coin — the currency every money screen opens on (site admin
+ * Finance filters, the player's deposit dialog and, for a player with no
+ * funded coin, the header balance chip). A policy like the reward currency
+ * (always in force, no `none`, owner-only → `403 OWNER_MANAGED`); variant
+ * keys are the coin codes (`DEFAULT_CURRENCY_CHOICES` in currencies.js).
+ * Read by admin-service `SiteConfigService.defaultCurrency()` and published
+ * as `defaultCurrency` on `GET /admin/site-config/public`.
+ */
+const DEFAULT_CURRENCY_POLICY = {
+  key: 'default_currency',
+  label: 'Default coin',
+  category: 'business',
+  kind: 'policy',
+  flag: null,
+  defaultVariant: DEFAULT_CURRENCY,
+  variants: DEFAULT_CURRENCY_CHOICES.map((code) => ({
+    key: code,
+    label: `${code} — ${REWARD_CURRENCY_NAMES[code] ?? code}`,
+    description: `Admin Finance screens open filtered to ${code}, and players see ${code} first in the deposit dialog.`,
+  })),
+};
+
+/**
  * Region restriction — which countries the site serves (packages/common/src/regionPolicy.js).
  *
  * A policy (always in force, the variant IS the mode, the owner alone sets it, staff see it
@@ -761,7 +784,7 @@ const WITHDRAWAL_REQUIREMENTS_POLICY = {
   ],
 };
 
-const FEATURES = Object.freeze([...POLICIES, REWARD_CURRENCY_POLICY, REGION_RESTRICTION_POLICY, WITHDRAWAL_REQUIREMENTS_POLICY, ...GENERATED, TIPS, P2P, PUSH_NOTIFICATIONS, ANALYTICS]);
+const FEATURES = Object.freeze([...POLICIES, REWARD_CURRENCY_POLICY, DEFAULT_CURRENCY_POLICY, REGION_RESTRICTION_POLICY, WITHDRAWAL_REQUIREMENTS_POLICY, ...GENERATED, TIPS, P2P, PUSH_NOTIFICATIONS, ANALYTICS]);
 
 /**
  * Site templates — the bundles the OWNER picks for a site (docs/OWNER-PANEL.md

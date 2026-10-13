@@ -135,7 +135,7 @@ class FinanceStatsService {
     this.config = config;
   }
 
-  async stats({ staff, kind, rail, currency, ...query }) {
+  async stats({ staff, kind, rail, currency, convertTo, ...query }) {
     const window = S.resolveWindow(query);
     const definition = SOURCES[kind][rail];
     const tables = definition.tables.filter((t) => !currency || !t.fixedCurrency || t.fixedCurrency === currency);
@@ -154,7 +154,7 @@ class FinanceStatsService {
       currency ? null : S.loadRates(this.models),
     ]);
 
-    return this.#fold({ window, kind, rail, definition, buckets, rows: grouped.flat(), uniqueUsers, rates, currency });
+    return this.#fold({ window, kind, rail, definition, buckets, rows: grouped.flat(), uniqueUsers, rates, currency, convertTo });
   }
 
   /** One table, grouped by bucket × currency × status × dimension. */
@@ -188,8 +188,8 @@ class FinanceStatsService {
     return Number(row?.n ?? 0);
   }
 
-  #fold({ window, kind, rail, definition, buckets, rows, uniqueUsers, rates, currency }) {
-    const converter = S.createConverter(rates, currency);
+  #fold({ window, kind, rail, definition, buckets, rows, uniqueUsers, rates, currency, convertTo }) {
+    const converter = S.createConverter(rates, currency, convertTo);
 
     const totals = { count: 0, amount: S.ZERO, byStatus: emptyStatuses() };
     const series = new Map(buckets.map((b) => [b, { count: 0, amount: S.ZERO, byStatus: emptyStatuses() }]));

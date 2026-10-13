@@ -10,7 +10,7 @@ export { default as ChartCard, ChartTable, seriesTable, categoryTable } from './
 export type { ChartTableData } from './ChartCard'
 export { default as KpiCard } from './KpiCard'
 export { default as FilterBar } from './FilterBar'
-export { useStatsFilters, toApiRange, PRESETS, MAX_RANGE_DAYS, MAX_DAY_SPAN } from './useStatsFilters'
+export { useStatsFilters, toApiRange, PRESETS, MAX_RANGE_DAYS, MAX_DAY_SPAN, ALL_CURRENCIES } from './useStatsFilters'
 export type { Preset, StatsFilters, StatsFilterPatch } from './useStatsFilters'
 export {
   bucketKeys,

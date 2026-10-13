@@ -585,6 +585,34 @@ test('entitlements', async (t) => {
     assert.equal(site.rows.get('reward_currency').variant, 'INR');
   });
 
+  await t.test('default coin: owner document → site_features → /site-config/public, separate from the reward currency', async () => {
+    const site = ownerSite([{ feature: 'default_currency', variant: 'USDT', enabled: true }, { feature: 'reward_currency', variant: 'USDT', enabled: true }]);
+    const panel = ownerPanel();
+    const p = poller(panel, tmpFile(), (current) => new FeaturesService(site.container).onEntitlementsChange(current));
+    entitlements.configureEntitlements({ read: () => p.current() });
+
+    panel.next = signed(doc(5, { features: {}, flags: {}, variants: { default_currency: 'INR' } }));
+    await p.pollOnce();
+    assert.equal(site.rows.get('default_currency').variant, 'INR');
+    assert.equal(site.rows.get('default_currency').enabled, true, 'a policy is always in force');
+    assert.equal(site.rows.get('default_currency').updated_by, 'owner');
+    assert.equal(site.rows.get('reward_currency').variant, 'USDT', 'the reward currency is a different policy');
+
+    const siteConfig = new SiteConfigService(site.container);
+    assert.equal(await siteConfig.defaultCurrency(), 'INR');
+    const pub = await new FeaturesService(site.container).publicList();
+    assert.deepEqual(pub.find((f) => f.feature === 'default_currency'), { feature: 'default_currency', kind: 'policy', variant: 'INR' });
+    assert.equal((await siteConfig.publicSettings()).defaultCurrency, 'INR');
+    assert.equal(site.pushes.at(-1).flags?.defaultCurrency, 'INR', 'the socket push carries it');
+
+    // Not a wallet coin → ignored, the current one kept; staff cannot change it.
+    const out = await new FeaturesService(site.container).applyOwnerDocument({ version: 6, features: {}, variants: { default_currency: 'BJB' } });
+    assert.deepEqual(out.ignored, [{ feature: 'default_currency', variant: 'BJB' }]);
+    assert.equal(site.rows.get('default_currency').variant, 'INR');
+    const refused = (error) => error.status === 403 && error.code === 'OWNER_MANAGED' && error.details.feature === 'default_currency';
+    await assert.rejects(() => new FeaturesService(site.container).update({ feature: 'default_currency', patch: { variant: 'USDT' }, staff: { id: 1 } }), refused);
+  });
+
   await t.test('owner document without variants: nothing switched, only the old template path', async () => {
     const site = ownerSite([{ feature: 'vip', variant: 'none', enabled: false }]);
     const service = new FeaturesService(site.container);

@@ -27,10 +27,12 @@ import { useApi, useApiMutation, useListState, usePagedApi } from '@/hooks/use-a
 import { api } from '@/lib/api/client'
 import { truncateId } from '@/lib/format'
 import { PSP_PROVIDERS, type PaymentOrderRow, type RailTransactionRow } from './types'
+import { CurrencySelect, useCurrencyChoices, useCurrencyParam } from './currencyFilter'
 
 /** `POST admin/user/payments/utr-repair { reference, utr }` — attaches a bank UTR to a provider order. */
 const UtrRepair = ({ reference: initial = '' }: { reference?: string }) => {
   const [form, setForm] = useState({ reference: initial, utr: '' })
+
   const repair = useApiMutation({
     fn: () => api.post('admin/user/payments/utr-repair', { reference: form.reference, utr: form.utr }),
     invalidate: [['paged']],
@@ -146,7 +148,11 @@ const railColumns: Column<RailTransactionRow>[] = [
 /** Every rail merged — `admin/user/history/deposits` or `/withdrawals` (limit, offset, from, to, currency, userId, status). */
 const AllRails = ({ kind }: { kind: 'deposits' | 'withdrawals' }) => {
   const { state, set, query } = useListState(['status', 'userId', 'from', 'to'])
-  const list = usePagedApi<RailTransactionRow>(`admin/user/history/${kind}`, { limit: query.limit, page: query.page, status: query.status, userId: query.userId, from: query.from, to: query.to })
+
+  // One currency at a time — the site's default coin until somebody picks another (in the URL).
+  const cur = useCurrencyParam()
+  const choices = useCurrencyChoices()
+  const list = usePagedApi<RailTransactionRow>(`admin/user/history/${kind}`, { limit: query.limit, page: query.page, status: query.status, userId: query.userId, from: query.from, to: query.to, currency: cur.currency })
 
   return (
     <DataTable
@@ -161,6 +167,7 @@ const AllRails = ({ kind }: { kind: 'deposits' | 'withdrawals' }) => {
       onLimitChange={limit => set({ limit })}
       toolbar={
         <>
+          <CurrencySelect filter={cur} currencies={choices.all} />
           <Input placeholder='Status (success, pending, failed…)' aria-label='Status' value={String(state.status ?? '')} onChange={e => set({ status: e.target.value })} className='w-56' />
           <Input placeholder='User id' aria-label='User id' inputMode='numeric' value={String(state.userId ?? '')} onChange={e => set({ userId: e.target.value.replace(/\D/g, '') })} className='w-28' />
           <DateRangePicker aria-label='Date range' from={String(state.from ?? '')} to={String(state.to ?? '')} onChange={set} />

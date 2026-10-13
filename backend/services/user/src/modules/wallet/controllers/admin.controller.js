@@ -51,10 +51,11 @@ function createAdminController({ service }) {
 
     /** @legacy GET /getwallet */
     list: asyncHandler(async (req, res) => {
-      const { search, limit, offset } = req.query;
+      const { search, heldCurrency, limit, offset } = req.query;
       const result = await service.listBalances({
         staffId: req.staff.id,
         search,
+        heldCurrency,
         limit,
         offset,
       });

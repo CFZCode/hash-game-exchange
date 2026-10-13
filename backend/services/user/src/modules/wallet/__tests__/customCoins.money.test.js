@@ -249,6 +249,33 @@ test('custom coins in the wallet', async (t) => {
     assert.equal(rows[0].balances[COIN_A], '3.00000000');
   });
 
+  await t.test('the staff listing filters to holders of one coin (heldCurrency)', async () => {
+    const holder = await player();
+    const other = await player();
+    const tag = `hc${SUFFIX}x`;
+    for (const [uid, n] of [[holder, 'a'], [other, 'b']]) {
+      await connection.models.Users.destroy({ where: { id: uid } });
+      await connection.models.Users.create({ id: uid, name: `${tag}${n}`, password: 'x', status: 'active', parent_staff_id: null });
+    }
+    try {
+      await credit(holder, '2', `hc-a-${holder}`);
+      await wallet.credit({ userId: holder, currency: 'USDT', amount: '5', reason: REASON.ADMIN_CREDIT, idempotencyKey: `hc-u-${holder}` });
+      await wallet.credit({ userId: other, currency: 'INR', amount: '7', reason: REASON.ADMIN_CREDIT, idempotencyKey: `hc-i-${other}` });
+      const scoped = new WalletService({ ...deps, config: { ...deps.config, ROOT_STAFF_ID: 1 }, clients: { admin: { get: async () => ({ ids: [1] }) } } });
+      const uidsFor = async (heldCurrency) =>
+        (await scoped.listBalances({ staffId: 1, search: tag, heldCurrency, limit: 10, offset: 0 })).rows.map((r) => r.uid).sort();
+      assert.deepEqual(await uidsFor(undefined), [holder, other].sort());
+      assert.deepEqual(await uidsFor('USDT'), [holder], 'built-in column');
+      assert.deepEqual(await uidsFor('INR'), [other]);
+      assert.deepEqual(await uidsFor(COIN_A), [holder], 'custom coin');
+      assert.deepEqual(await uidsFor('BTC'), []);
+      assert.equal(v.adminListBalances.query.safeParse({ heldCurrency: 'usdt' }).data?.heldCurrency, 'USDT');
+      assert.equal(v.adminListBalances.query.safeParse({ heldCurrency: 'btc; DROP' }).success, false);
+    } finally {
+      await connection.models.Users.destroy({ where: { id: [holder, other] } });
+    }
+  });
+
   await t.test('swap prices a custom coin through its USD rate, both directions', async () => {
     const uid = await player();
     await credit(uid, '1000', `cc-swap-${uid}`);

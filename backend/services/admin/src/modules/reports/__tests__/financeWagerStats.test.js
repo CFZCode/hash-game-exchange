@@ -64,6 +64,26 @@ test('the stats query is strict and bounded', async (t) => {
     assert.equal(v.wagerStats.query.safeParse({ area: 'casino', tz: "UTC'; DROP TABLE users; --" }).success, false);
   });
 
+  await t.test('convertTo is a currency code on finance stats only', () => {
+    assert.equal(v.financeStats.query.parse({ kind: 'deposits', rail: 'fiat', convertTo: 'usdt' }).convertTo, 'USDT');
+    assert.equal(v.financeStats.query.safeParse({ kind: 'deposits', rail: 'fiat', convertTo: "X' OR 1=1" }).success, false);
+    assert.equal(v.wagerStats.query.safeParse({ area: 'casino', convertTo: 'USDT' }).success, false);
+  });
+
+  await t.test('the converter values every row in convertTo, USD when it has no rate', () => {
+    const S = require('../stats.shared');
+    const rates = new Map([['USD', 10n ** 8n], ['INR', 1_200_000n], ['USDT', 10n ** 8n]]); // 1 INR = 0.012 USD
+    const inr = S.createConverter(rates, undefined, 'INR');
+    assert.equal(inr.currency, 'INR');
+    assert.equal(inr.convert(S.minor('12'), 'USDT'), S.minor('1000'), '12 USDT = 1000 INR');
+    assert.equal(inr.convert(S.minor('500'), 'INR'), S.minor('500'), 'already in it');
+    assert.equal(inr.convert(S.minor('1'), 'XYZ', 1), null);
+    assert.deepEqual(inr.unconverted(), [{ currency: 'XYZ', amount: '1.00000000', count: 1 }]);
+    const noRate = S.createConverter(rates, undefined, 'EUR');
+    assert.equal(noRate.currency, 'USD', 'no EUR rate → USD');
+    assert.equal(S.createConverter(rates, 'BTC', 'INR').currency, 'BTC', 'a filter wins');
+  });
+
   await t.test('a currency is a code, upper-cased', () => {
     assert.equal(v.wagerStats.query.parse({ area: 'casino', currency: 'inr' }).currency, 'INR');
     assert.equal(v.wagerStats.query.safeParse({ area: 'casino', currency: "INR' OR 1=1" }).success, false);
@@ -293,6 +313,16 @@ test('finance and wager stats against a database', async (t) => {
     const rates = Object.fromEntries((await models.Exchangerate.findAll({ where: { currency: ['BTC', 'USDT'] }, raw: true })).map((x) => [x.currency, Number(x.usd_rate)]));
     const all = await finance.stats({ staff: asA, kind: 'deposits', rail: 'crypto', ...q() });
     assert.equal(Number(all.totals.byStatus.success.amount), 0.001 * rates.BTC + 20 * rates.USDT);
+
+    // `convertTo` (the site's default coin): the same total valued in USDT; USDT rows stay as they are.
+    const inUsdt = await finance.stats({ staff: asA, kind: 'deposits', rail: 'crypto', convertTo: 'USDT', ...q() });
+    assert.equal(inUsdt.currency, 'USDT');
+    assert.equal(inUsdt.converted, true);
+    assert.ok(Math.abs(Number(inUsdt.totals.byStatus.success.amount) - ((0.001 * rates.BTC) / rates.USDT + 20)) < 1e-6);
+    // A filter wins over convertTo: rows in that coin, unconverted.
+    const filtered = await finance.stats({ staff: asA, kind: 'deposits', rail: 'crypto', convertTo: 'USDT', ...q({ currency: 'BTC' }) });
+    assert.equal(filtered.currency, 'BTC');
+    assert.equal(filtered.converted, false);
   });
 
   await t.test('a crypto deposit (ccdeposit, timestamptz since 083) buckets by its instant: UTC day 1, Kolkata day 2', async () => {

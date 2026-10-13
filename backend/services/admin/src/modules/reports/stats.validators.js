@@ -77,6 +77,9 @@ module.exports = {
           kind: z.enum(['deposits', 'withdrawals']),
           rail: z.enum(['fiat', 'crypto']),
           ...window,
+          // Without `currency`: the coin the cross-currency totals are valued in
+          // (the site's default coin). USD when absent or unpriced.
+          convertTo: currency.optional(),
         })
         .strict()
     ),

@@ -28,6 +28,7 @@ import Skeleton from '../../components/shared/Skeleton';
 import useResource from '../../hooks/useResource';
 import { getRechargeBonusConfig } from '../../services/bonus';
 import {
+  depositDefault,
   channelsFor,
   chipBonusConfig,
   depositNotes,
@@ -397,10 +398,14 @@ export default function FiatTab({ onDepositCrypto }) {
     .filter((coin) => getCurrency(coin.currencyName)?.currencyType === 'FIAT')
     .map((coin) => coin.currencyName);
 
+  /* A fiat site default coin comes first for a player who has not picked one (`depositDefault`). */
+  const siteDefault = depositDefault(session);
   const [currency, setCurrency] = React.useState(
-    getCurrency(session.setting.currencyName)?.currencyType === 'FIAT'
-      ? session.setting.currencyName
-      : (fiatOptions.find((name) => channelsFor(name).length > 0) ?? fiatOptions[0]),
+    siteDefault && getCurrency(siteDefault)?.currencyType === 'FIAT' && fiatOptions.includes(siteDefault)
+      ? siteDefault
+      : getCurrency(session.setting.currencyName)?.currencyType === 'FIAT'
+        ? session.setting.currencyName
+        : (fiatOptions.find((name) => channelsFor(name).length > 0) ?? fiatOptions[0]),
   );
 
   const channels = channelsFor(currency);

@@ -3,6 +3,9 @@ import CryptoTab from './CryptoTab';
 import FiatTab from './FiatTab';
 import CwalletRow, { OrDivider } from '../../components/shared/CwalletRow';
 import { useIsDialog } from '../../context/dialogRoute';
+import { useSession } from '../../context/session';
+import { getCurrency } from '../../data/currencies';
+import { depositDefault } from './deposit';
 
 /* `NN` in index-C1xohM7W.js — the DEFAULT deposit channel, which is what bc.game's own deploy
  * renders. `DialogChannelDeposit` (index-mhz6A6Ma.js) is only the switch in front of it, picking
@@ -55,7 +58,11 @@ export default function DepositPanels() {
      original, and switching tabs calls `wallet.switchCurrencyType`. That store is not built here
      (see the note in Wallet/Balance), so the strip owns the state instead. The visible behaviour
      is the same; what is lost is that the choice would survive leaving the page. */
-  const [tab, setTab] = React.useState(0);
+  /* Opens on the Fiat tab only when the site's default coin is a fiat one and the player has not
+     picked a coin themselves (`depositDefault`); otherwise Crypto, as before. */
+  const { session } = useSession();
+  const siteDefault = depositDefault(session);
+  const [tab, setTab] = React.useState(siteDefault && getCurrency(siteDefault)?.currencyType === 'FIAT' ? 1 : 0);
 
   return (
     <>

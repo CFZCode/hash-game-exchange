@@ -160,20 +160,30 @@ async function loadRates(models) {
  * Turns native per-currency amounts into the reporting currency.
  *
  * With a `currency` filter the rows are already in it and nothing converts.
- * Without one everything is reported in USD; a currency with no rate is
- * left OUT of the converted figures and listed under `unconverted`, so a total
- * that is missing something says so (the dashboard's rule).
+ * Without one everything is reported in USD — or, with `convertTo`, in that
+ * currency (the site's default coin on the finance screens): each row goes to
+ * USD at its own rate and then into `convertTo` at its rate. A `convertTo`
+ * with no rate falls back to USD, and the answer's `currency` says so. A row
+ * currency with no rate is left OUT of the converted figures and listed under
+ * `unconverted`, so a total that is missing something says so (the
+ * dashboard's rule).
  */
-function createConverter(rates, requested) {
+function createConverter(rates, requested, convertTo) {
   const unconverted = new Map();
+  const target = !requested && convertTo ? String(convertTo).toUpperCase() : 'USD';
+  const targetRate = target === 'USD' ? SCALE : rates?.get(target) ?? null;
+  const reportIn = targetRate ? target : 'USD';
+  const perUsd = targetRate ?? SCALE;
 
   return {
-    currency: requested || 'USD',
+    currency: requested || reportIn,
     converted: !requested,
     /** Minor units in the reporting currency, or null when unpriced. */
     convert(amountMinor, currency, count = 0) {
       if (requested) return amountMinor;
       const code = String(currency ?? '').toUpperCase();
+      // Already in the reporting currency: no round trip through USD.
+      if (code === reportIn) return amountMinor;
       const rate = rates?.get(code);
       if (rate == null) {
         const gap = unconverted.get(code) ?? { currency: code || null, amount: ZERO, count: 0 };
@@ -182,7 +192,7 @@ function createConverter(rates, requested) {
         unconverted.set(code, gap);
         return null;
       }
-      return (amountMinor * rate) / SCALE;
+      return (amountMinor * rate) / perUsd;
     },
     unconverted() {
       return [...unconverted.values()].map((g) => ({ currency: g.currency, amount: dec(g.amount), count: g.count }));

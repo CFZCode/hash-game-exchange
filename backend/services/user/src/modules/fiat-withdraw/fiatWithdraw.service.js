@@ -223,9 +223,9 @@ class FiatWithdrawService {
   }
 
   /** @legacy GET /getFiatWithdrawData */
-  async listAll({ status, userId, limit, offset }) {
+  async listAll({ status, userId, currency, limit, offset }) {
     const result = await this.models.FiatWithdrawals.findAndCountAll({
-      where: { ...(status ? { status } : {}), ...(userId ? { uid: userId } : {}) },
+      where: { ...(status ? { status } : {}), ...(userId ? { uid: userId } : {}), ...(currency ? { currency } : {}) },
       order: [['id', 'DESC']],
       limit,
       offset,

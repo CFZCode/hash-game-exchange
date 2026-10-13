@@ -139,4 +139,19 @@ test('deposit reports: crypto deposit list', async (t) => {
     assert.equal(configured.coin, 'BTC');
     assert.equal(configured.amountUsd, '120000.00000000');
   });
+
+  await t.test('a coin filter keeps that ticker only (the site admin currency filter)', async () => {
+    const uid = await seedPlayer();
+    await deposit(uid, { coinid: 1155, price: '0.001' });
+    await deposit(uid, { coinid: 1280, chain: 'TRC20', price: '20' });
+    await deposit(uid, { coinid: 99_992, price: '3' });
+
+    const coins = async (coin, config) => (await make(config).listCryptoDeposits({ staff, userId: uid, coin, limit: 50 })).rows.map((r) => r.coin).sort();
+    assert.deepEqual(await coins('USDT'), ['USDT']);
+    assert.deepEqual(await coins('btc'), ['BTC']);
+    assert.deepEqual(await coins('ETH'), [], 'no rows in it');
+    assert.deepEqual(await coins('NOPE'), [], 'a coin no id maps to matches nothing');
+    assert.deepEqual(await coins('USDT', { CCPAYMENT_COIN_IDS: JSON.stringify({ USDT: 99_992 }) }), ['USDT', 'USDT'], 'the configured id counts too');
+    assert.deepEqual(await coins(undefined), ['#99992', 'BTC', 'USDT']);
+  });
 });

@@ -50,3 +50,20 @@ test('every backend policy is in the owner catalogue', () => {
 
   assert.deepEqual(ownerPolicies, backendPolicies)
 })
+
+test('default_currency: a policy separate from the reward currency, default USDT, mirrors the backend', () => {
+  const ours = featureByKey('default_currency')
+  const theirs = backendCatalogue.featureByKey('default_currency')
+
+  assert.ok(ours)
+  assert.equal(isPolicy('default_currency'), true)
+  assert.equal(ours.defaultVariant, 'USDT')
+  assert.equal(ours.variants.some(v => v.key === 'none'), false)
+  assert.equal(variantLabel('default_currency', 'INR'), 'INR — Indian rupee')
+  for (const code of ['USDT', 'INR', 'BTC']) assert.equal(isVariantOf('default_currency', code), true, code)
+  for (const code of ['BJB', 'NC', 'none', '']) assert.equal(isVariantOf('default_currency', code), false, code)
+  assert.equal(theirs.kind, 'policy')
+  assert.equal(theirs.defaultVariant, ours.defaultVariant)
+  assert.deepEqual(ours.variants, theirs.variants.map(v => ({ key: v.key, label: v.label, description: v.description })))
+  assert.deepEqual(ours.variants.map(v => v.key), [...backend.DEFAULT_CURRENCY_CHOICES])
+})

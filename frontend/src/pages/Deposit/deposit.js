@@ -45,6 +45,14 @@ import { USE_FIXTURES, request } from '../../services/client';
  * default is what renders — which is also what a first-time depositor sees. */
 export const DEFAULT_CURRENCIES = ['ETH', 'BTC', 'USDT', 'USDC', 'DOGE', 'SOL', 'BNB', 'XRP', 'TON', 'ADA'];
 
+/* The coin the deposit dialog opens on before anything else: the SITE'S DEFAULT COIN (the owner's
+   `default_currency`, USDT unless set — `session.defaultCurrency`, a wallet row name such as `USDT`
+   or `INRFIAT`) — unless the player picked a coin themselves (`setting.currencyPicked`, set by the
+   header dropdown and every other picker), in which case their pick wins as before. `null` when
+   there is nothing to override. */
+export const depositDefault = (session) =>
+  session?.setting?.currencyPicked ? null : session?.defaultCurrency || null;
+
 /* ── RECOVERED ──
  *
  * The notice under the address, an i18n string with its two placeholders intact:

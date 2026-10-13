@@ -639,6 +639,11 @@ const Entitlements = () => {
                                       onCap={withdrawalCap => edit(next => void (next.withdrawalCap = withdrawalCap))}
                                     />
                                   )}
+                                  {r.key === 'default_currency' && variant && coinBlocked(variant) && (
+                                    <p className='text-destructive mt-0.5 text-xs' data-warning='default-currency-coin-off'>
+                                      {variant} is not entitled under Site flags, so screens cannot open on it. Allow the coin or pick another default coin.
+                                    </p>
+                                  )}
                                   {r.key === 'reward_currency' && variant && coinBlocked(variant) && (
                                     <p className='text-destructive mt-0.5 text-xs' data-warning='reward-currency-coin-off'>
                                       {variant} is not entitled under Site flags, so players cannot see that balance. Allow the coin or pick another reward currency.

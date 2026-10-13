@@ -24,6 +24,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useApi, useApiMutation, useListState } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
 import { truncateId } from '@/lib/format'
+import { ALL_CURRENCIES } from '@/components/shared/charts'
+import { useDefaultCurrency } from '@/components/shared/DefaultCurrency'
 import { Details, ImageDialog, ViewDialog, stop, usePageNumbered } from './shared'
 import {
   P2P_COINS,
@@ -66,6 +68,7 @@ const StatusFilter = ({ value, onChange, options }: { value: string; onChange: (
 const NoteAction = ({ path, title, description, label, icon, destructive, success, multipart }: { path: string; title: string; description: ReactNode; label: string; icon: ReactNode; destructive?: boolean; success: string; multipart?: boolean }) => {
   const [note, setNote] = useState('')
   const [file, setFile] = useState<File | null>(null)
+
   const run = useApiMutation({
     fn: () => {
       if (multipart) {
@@ -111,6 +114,7 @@ const NoteAction = ({ path, title, description, label, icon, destructive, succes
 
 const OrderStatus = ({ id }: { id: string | number }) => {
   const [form, setForm] = useState({ status: 'DISPUTED', note: '' })
+
   const set = useApiMutation({
     fn: () => api.patch(`${BASE}/orders/${id}/status`, form.note ? form : { status: form.status }),
     invalidate: ALL_LISTS,
@@ -228,9 +232,23 @@ const orderColumns = (kind: 'orders' | 'sell-orders'): Column<P2pOrderRow>[] => 
   }
 ]
 
+/**
+ * The coin filter of the order and offer lists (`?coin=`): the site's default coin when P2P trades
+ * it and nobody picked another, `?coin=ALL` for every coin.
+ */
+const useP2pCoin = (picked: string | number | undefined) => {
+  const def = useDefaultCurrency().code
+  const value = String(picked ?? '').toUpperCase()
+
+  if (value === ALL_CURRENCIES) return ''
+
+  return value || ((P2P_COINS as readonly string[]).includes(def) ? def : '')
+}
+
 const Orders = ({ kind }: { kind: 'orders' | 'sell-orders' }) => {
   const { state, set, query } = useListState(['status', 'userId', 'coin'])
-  const list = usePageNumbered<P2pOrderRow>(`${BASE}/${kind}`, { page: query.page, limit: query.limit, status: query.status, userId: query.userId, coin: query.coin })
+  const coin = useP2pCoin(state.coin)
+  const list = usePageNumbered<P2pOrderRow>(`${BASE}/${kind}`, { page: query.page, limit: query.limit, status: query.status, userId: query.userId, coin: coin || undefined })
 
   return (
     <DataTable
@@ -247,7 +265,7 @@ const Orders = ({ kind }: { kind: 'orders' | 'sell-orders' }) => {
         <>
           <StatusFilter value={String(state.status ?? '')} onChange={status => set({ status })} options={kind === 'orders' ? P2P_ORDER_STATUSES : P2P_SELL_STATUSES} />
           <Input placeholder='User id' aria-label='User id' value={String(state.userId ?? '')} onChange={e => set({ userId: e.target.value })} className='w-32' />
-          <Select value={String(state.coin || 'all')} onValueChange={v => v && set({ coin: v === 'all' ? '' : v })}>
+          <Select value={coin || 'all'} onValueChange={v => v && set({ coin: v === 'all' ? ALL_CURRENCIES : v })}>
             <SelectTrigger className='w-28'>
               <SelectValue />
             </SelectTrigger>
@@ -268,6 +286,7 @@ const Orders = ({ kind }: { kind: 'orders' | 'sell-orders' }) => {
 
 const DisputeStatus = ({ row }: { row: P2pDisputeRow }) => {
   const [form, setForm] = useState({ status: row.status === 'OPEN' ? 'UNDER_REVIEW' : 'RESOLVED', adminNote: '' })
+
   const set = useApiMutation({
     fn: () => api.patch(`${BASE}/disputes/${row.id}/status`, form.adminNote ? form : { status: form.status }),
     invalidate: ALL_LISTS,
@@ -339,6 +358,7 @@ const Disputes = () => {
 
 const OfferStatus = ({ row }: { row: P2pOfferRow }) => {
   const [status, setStatus] = useState(String(row.status ?? 'ACTIVE'))
+
   const set = useApiMutation({
     fn: () => api.patch(`${BASE}/offers/${row.id}/status`, { status }),
     invalidate: ALL_LISTS,
@@ -363,6 +383,7 @@ const OfferStatus = ({ row }: { row: P2pOfferRow }) => {
 
 const CreateOffer = ({ accounts }: { accounts: P2pPaymentAccount[] }) => {
   const [form, setForm] = useState({ coin: 'USDT', fiat: 'INR', segment: 'BUY', price: '', availableAmount: '', minLimit: '', maxLimit: '', username: '', paymentAccountIds: '', paymentTime: '', isFeatured: false, isVerified: false, isKycVerified: false })
+
   const create = useApiMutation({
     fn: () => {
       const body: Record<string, unknown> = {
@@ -450,7 +471,8 @@ const offerColumns: Column<P2pOfferRow>[] = [
 
 const Offers = ({ accounts }: { accounts: P2pPaymentAccount[] }) => {
   const { state, set, query } = useListState(['coin'])
-  const list = usePageNumbered<P2pOfferRow>(`${BASE}/offers`, { page: query.page, limit: query.limit, coin: query.coin })
+  const coin = useP2pCoin(state.coin)
+  const list = usePageNumbered<P2pOfferRow>(`${BASE}/offers`, { page: query.page, limit: query.limit, coin: coin || undefined })
 
   return (
     <DataTable
@@ -465,7 +487,7 @@ const Offers = ({ accounts }: { accounts: P2pPaymentAccount[] }) => {
       onLimitChange={limit => set({ limit })}
       toolbar={
         <>
-          <Select value={String(state.coin || 'all')} onValueChange={v => v && set({ coin: v === 'all' ? '' : v })}>
+          <Select value={coin || 'all'} onValueChange={v => v && set({ coin: v === 'all' ? ALL_CURRENCIES : v })}>
             <SelectTrigger className='w-28'>
               <SelectValue />
             </SelectTrigger>
@@ -511,6 +533,7 @@ const CreateType = () => {
 const CreateAccount = ({ types }: { types: P2pPaymentType[] }) => {
   const [form, setForm] = useState({ paymentTypeId: String(types[0]?.id ?? ''), accountName: '', accountNumber: '', ifscCode: '', upiId: '', extraDetails: '' })
   const [file, setFile] = useState<File | null>(null)
+
   const create = useApiMutation({
     fn: () => {
       const fd = new FormData()

@@ -8,6 +8,7 @@ import Money from '@/components/shared/Money'
 import PageHeader from '@/components/shared/PageHeader'
 import { Input } from '@/components/ui/input'
 import { useListState, usePagedApi } from '@/hooks/use-api'
+import { CurrencySelect, useCurrencyChoices, useCurrencyParam } from './currencyFilter'
 
 /** `GET admin/user/swap/history` — raw `swap_history` rows (snake_case, decimals as strings). */
 type SwapRow = {
@@ -57,12 +58,15 @@ const columns: Column<SwapRow>[] = [
 const SwapHistory = () => {
   const { state, set, query } = useListState(['userId'])
 
-  // The validator is strict: only `userId`, `limit` and `offset` (from `page`) are accepted.
-  const list = usePagedApi<SwapRow>(LIST, { limit: query.limit, page: query.page, userId: query.userId })
+  // One currency at a time — a swap out of OR into it; the site's default coin until somebody picks
+  // another (in the URL). The validator is strict: `userId`, `currency`, `limit` and `offset` only.
+  const cur = useCurrencyParam()
+  const choices = useCurrencyChoices()
+  const list = usePagedApi<SwapRow>(LIST, { limit: query.limit, page: query.page, userId: query.userId, currency: cur.currency })
 
   return (
     <div>
-      <PageHeader title='Swap history' description='Currency swaps users made in the wallet, newest first, with the fee taken.' />
+      <PageHeader title='Swap history' description='Currency swaps users made in the wallet, newest first, with the fee taken — out of or into the selected currency.' />
       <DataTable
         columns={columns}
         rows={list.data?.rows}
@@ -73,7 +77,10 @@ const SwapHistory = () => {
         pagination={list.data?.pagination}
         onPageChange={page => set({ page })}
         onLimitChange={limit => set({ limit })}
+        emptyMessage={`No swaps out of or into ${cur.currency}.`}
         toolbar={
+          <>
+          <CurrencySelect filter={cur} currencies={choices.all} />
           <Input
             placeholder='User id'
             aria-label='User id'
@@ -82,6 +89,7 @@ const SwapHistory = () => {
             onChange={e => set({ userId: e.target.value.replace(/\D/g, '') })}
             className='w-28'
           />
+          </>
         }
       />
     </div>

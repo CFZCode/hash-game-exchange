@@ -108,6 +108,37 @@ function rewardCurrencyOf(code) {
   return REWARD_CURRENCY_CHOICES.includes(upper) ? upper : REWARD_CURRENCY;
 }
 
+/**
+ * ── DEFAULT_CURRENCY ────────────────────────────────────────────────────
+ *
+ * The site's DEFAULT COIN — the currency every money screen opens on before
+ * anybody picks one: the site admin's Finance pages filter to it on first
+ * load, and the player site preselects it in the deposit dialog (and on the
+ * header balance chip of a player with no funded coin). Chosen by the
+ * platform OWNER (the `default_currency` policy in featureCatalogue.js, owner
+ * panel → Features & plan → Policies), separate from the reward currency:
+ * one decides what rewards PAY in, this one only what a screen SHOWS first.
+ *
+ * Same choices as the reward currency — the built-in wallet coins (crypto and
+ * fiat) the wallet can credit, minus retired BJB and the NC test coin.
+ * Resolved by admin-service `SiteConfigService.defaultCurrency()` and
+ * published as `defaultCurrency` on `GET /admin/site-config/public`.
+ */
+const DEFAULT_CURRENCY = 'USDT';
+
+const DEFAULT_CURRENCY_CHOICES = REWARD_CURRENCY_CHOICES;
+
+/** True for a coin the owner may choose as the default coin. Case-insensitive. */
+function isDefaultCurrencyChoice(code) {
+  return DEFAULT_CURRENCY_CHOICES.includes(String(code ?? '').trim().toUpperCase());
+}
+
+/** The default coin a stored value names: an allowed choice, uppercased, or USDT. */
+function defaultCurrencyOf(code) {
+  const upper = String(code ?? '').trim().toUpperCase();
+  return DEFAULT_CURRENCY_CHOICES.includes(upper) ? upper : DEFAULT_CURRENCY;
+}
+
 /** A currency code: uppercase letter, then 1–9 uppercase letters or digits. */
 const CURRENCY_CODE_RE = /^[A-Z][A-Z0-9]{1,9}$/;
 
@@ -187,6 +218,10 @@ module.exports = {
   REWARD_CURRENCY_NAMES,
   isRewardCurrencyChoice,
   rewardCurrencyOf,
+  DEFAULT_CURRENCY,
+  DEFAULT_CURRENCY_CHOICES,
+  isDefaultCurrencyChoice,
+  defaultCurrencyOf,
   currencyNotSupportedFor,
   assertCurrencySupportedFor,
   refuseCustomCurrencies,

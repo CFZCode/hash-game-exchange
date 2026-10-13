@@ -19,6 +19,8 @@ const listing = z.object({
 const cryptoList = {
   query: listing.extend({
     chain: z.string().trim().min(1).max(20).optional(),
+    // The coin (ticker) — the site admin's currency filter on Finance → Deposits → Crypto.
+    coin: z.string().trim().toUpperCase().min(2).max(12).regex(/^[A-Z0-9]+$/).optional(),
   }),
 };
 

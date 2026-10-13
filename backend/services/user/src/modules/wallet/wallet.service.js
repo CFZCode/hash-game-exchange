@@ -127,12 +127,13 @@ class WalletService {
    * a currency-switchable table, and 200 rows of lazily-loaded coins is 200
    * requests to render one column.
    */
-  async listBalances({ staffId, search, limit, offset }) {
+  async listBalances({ staffId, search, heldCurrency, limit, offset }) {
     const visible = await this.#visibleStaffIds(staffId);
 
     const { rows, total } = await this.repo.listPlayerWallets({
       parentStaffIds: visible.all ? null : visible.ids,
       search,
+      heldCurrency,
       limit,
       offset,
     });

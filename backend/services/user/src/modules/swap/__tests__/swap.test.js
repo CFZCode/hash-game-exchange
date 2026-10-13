@@ -216,6 +216,22 @@ test('swap', async (t) => {
     assert.equal(money.toDecimalString(money.toMinor(usdtLeg.amount)), '10.20000000');
   });
 
+  await t.test('the staff history takes a currency filter (a swap out of or into it)', async () => {
+    assert.equal(v.adminHistory.query.parse({ currency: 'usdt' }).currency, 'USDT');
+    assert.equal(v.adminHistory.query.safeParse({ currency: "INR' OR 1=1" }).success, false);
+
+    const uid = newUid();
+    await seed(uid, { inr: '10000', usdt: '0' });
+    await service.swap({ userId: uid, fromCurrency: 'INR', toCurrency: 'USDT', amount: '1000' });
+    // The root sees everyone: scope is the requested player only.
+    const scoped = new SwapService({ models: connection.models, db: connection, logger, config: { SERVICE_NAME: 'user-service', ROOT_STAFF_ID: 1 }, clients: { admin: { get: async () => ({ ids: [1] }) } } });
+    const list = async (currency) => (await scoped.listAllHistory({ staff: { id: 1 }, userId: uid, currency, limit: 10, offset: 0 })).count;
+    assert.equal(await list(undefined), 1);
+    assert.equal(await list('USDT'), 1, 'into USDT');
+    assert.equal(await list('INR'), 1, 'out of INR');
+    assert.equal(await list('BTC'), 0);
+  });
+
   await t.test('swap history records the rates used, so a swap can be re-derived', async () => {
     const uid = newUid();
     await seed(uid, { inr: '10000', usdt: '0' });

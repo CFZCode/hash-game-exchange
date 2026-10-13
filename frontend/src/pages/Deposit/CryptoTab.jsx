@@ -11,6 +11,7 @@ import useResource from '../../hooks/useResource';
 import { USE_FIXTURES } from '../../services/client';
 import Notice from '../../components/shared/Notice';
 import {
+  depositDefault,
   DEFAULT_CURRENCIES,
   networksFor,
   placeholderAddress,
@@ -145,11 +146,11 @@ export default function CryptoTab() {
      wallet's, but seeds it from the account's currency — so opening the dialog on a fiat wallet
      still lands on a coin. BCD is not depositable, so a wallet sitting on it falls to the first
      quick-pick. */
+  /* The site's default coin comes first for a player who has not picked one (`depositDefault`). */
+  const siteDefault = depositDefault(session);
+  const seed = siteDefault && getCurrency(siteDefault)?.currencyType !== 'FIAT' ? siteDefault : session.setting.currencyName;
   const initial =
-    getCurrency(session.setting.currencyName)?.currencyType === 'FIAT' ||
-    !networksFor(session.setting.currencyName)
-      ? DEFAULT_CURRENCIES[0]
-      : session.setting.currencyName;
+    getCurrency(seed)?.currencyType === 'FIAT' || !networksFor(seed) ? DEFAULT_CURRENCIES[0] : seed;
 
   const [currency, setCurrency] = React.useState(initial);
   const networks = networksFor(currency);

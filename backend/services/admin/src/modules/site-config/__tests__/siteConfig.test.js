@@ -207,6 +207,37 @@ test('site-config', async (t) => {
     });
   };
 
+  await t.test('the default coin: the owner policy, USDT when unset or invalid, published', async () => {
+    const setDefault = async (code) => {
+      await connection.models.SiteFeature.destroy({ where: { feature: 'default_currency' } });
+      if (code) await connection.models.SiteFeature.create({ feature: 'default_currency', enabled: true, variant: code, updated_by: 'owner' });
+    };
+    try {
+      await seedConfig();
+      await setDefault(null);
+      assert.equal(await service.defaultCurrency(), 'USDT', 'nothing chosen → USDT');
+      assert.equal((await service.publicSettings()).defaultCurrency, 'USDT');
+
+      await setDefault('INR');
+      assert.equal(await service.defaultCurrency(), 'INR');
+      assert.equal((await service.publicSettings()).defaultCurrency, 'INR');
+
+      // Separate from the reward currency: one does not move the other.
+      await setRewardCurrency('EUR');
+      const pub = await service.publicSettings();
+      assert.equal(pub.defaultCurrency, 'INR');
+      assert.equal(pub.rewardCurrency, 'EUR');
+
+      for (const junk of ['BJB', 'NC', 'nope']) {
+        await setDefault(junk);
+        assert.equal(await service.defaultCurrency(), 'USDT', junk);
+      }
+    } finally {
+      await setDefault(null);
+      await setRewardCurrency(null);
+    }
+  });
+
   await t.test('reading returns the three rates as exact decimals', async () => {
     await seedConfig();
     const settings = await service.affiliateSettings();

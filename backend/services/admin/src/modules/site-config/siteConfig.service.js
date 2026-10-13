@@ -1,12 +1,15 @@
 'use strict';
 
-const { money, Mailer, entitlements, rewardCurrencyOf, REWARD_CURRENCY_NAMES } = require('@ibitplay/common');
+const { money, Mailer, entitlements, rewardCurrencyOf, defaultCurrencyOf, REWARD_CURRENCY_NAMES } = require('@ibitplay/common');
 
 const errors = require('./siteConfig.errors');
 const ownerErrors = require('../features/owner.errors');
 
 /** The `site_features` row holding the owner's reward currency (a catalogue policy). */
 const REWARD_CURRENCY_FEATURE = 'reward_currency';
+
+/** The `site_features` row holding the owner's default coin (a catalogue policy). */
+const DEFAULT_CURRENCY_FEATURE = 'default_currency';
 const { visibleStaffIds } = require('../staff-directory/staffDirectory.service');
 
 /**
@@ -501,6 +504,19 @@ class SiteConfigService {
     return rewardCurrencyOf(row?.variant);
   }
 
+  /**
+   * The site's DEFAULT COIN — what every money screen opens on before anybody
+   * picks a currency (site admin Finance filters, the player's deposit dialog).
+   * The platform owner sets it (the `default_currency` policy); the
+   * entitlement pull writes it into `site_features`. Nothing stored, or a
+   * value that is not an allowed choice → USDT (`defaultCurrencyOf`).
+   */
+  async defaultCurrency() {
+    if (typeof this.models.SiteFeature?.findByPk !== 'function') return defaultCurrencyOf(null);
+    const row = await this.models.SiteFeature.findByPk(DEFAULT_CURRENCY_FEATURE, { attributes: ['variant'], raw: true });
+    return defaultCurrencyOf(row?.variant);
+  }
+
   /** True when an owner panel manages this site (same rule as FeaturesService.ownerManaged). */
   #ownerManaged() {
     return Boolean(this.config?.OWNER_PANEL_URL);
@@ -614,7 +630,7 @@ class SiteConfigService {
 
     // What the site may promise a new player. Only the terms when it is on.
     const tiers = this.#tiers(row?.first_deposit_bonus_tiers);
-    const rewardCurrency = await this.rewardCurrency();
+    const [rewardCurrency, defaultCurrency] = await Promise.all([this.rewardCurrency(), this.defaultCurrency()]);
     const firstDepositBonus = row?.first_deposit_bonus_enabled && tiers.length
       ? { enabled: true, currency: rewardCurrency, payoutCurrency: rewardCurrency, tiers }
       : { enabled: false };
@@ -631,6 +647,9 @@ class SiteConfigService {
       rewardCurrency,
       registerBonusCurrency: rewardCurrency,
       affiliateBonusCurrency: rewardCurrency,
+      // The owner's default coin: what a money screen opens on (admin Finance
+      // filters, the player's deposit dialog) until somebody picks another.
+      defaultCurrency,
       configured: Boolean(row),
     };
   }

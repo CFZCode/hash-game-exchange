@@ -58,6 +58,7 @@ const DEMO_POLICIES = {
   deposit_mode: 'both',
   withdrawal_mode: 'both',
   reward_currency: 'USDT',
+  default_currency: 'USDT',
   withdrawal_requirements: 'kyc'
 }
 

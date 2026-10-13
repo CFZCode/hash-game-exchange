@@ -69,6 +69,15 @@ export const REWARD_CURRENCIES: { code: string; name: string }[] = [
 
 export const REWARD_CURRENCY_NOTE = 'All rewards — VIP, bonuses, rakeback, affiliate, spin wheel — are calculated and paid in this currency.'
 
+/**
+ * The default coin's choices — the same wallet coins as the reward currency (backend
+ * `DEFAULT_CURRENCY_CHOICES` = `REWARD_CURRENCY_CHOICES` in currencies.js).
+ */
+export const DEFAULT_CURRENCIES = REWARD_CURRENCIES
+
+export const DEFAULT_CURRENCY_NOTE =
+  'The currency money screens open on: site admin Finance pages filter to it first, and players see it first in the deposit dialog. Anyone can still switch.'
+
 const CATALOGUE: FeatureEntry[] = [
   {
     key: 'business_model',
@@ -124,6 +133,22 @@ const CATALOGUE: FeatureEntry[] = [
       key: c.code,
       label: `${c.code} — ${c.name}`,
       description: `All rewards — VIP, bonuses, rakeback, affiliate, spin wheel — are calculated and paid in ${c.code}.`
+    }))
+  },
+  {
+    // The default coin: a policy (always on, owner-only) whose variant keys ARE the coin codes, like the
+    // reward currency but separate from it — it only decides what a screen shows first.
+    key: 'default_currency',
+    label: 'Default coin',
+    category: 'business',
+    flag: null,
+    policy: true,
+    defaultVariant: 'USDT',
+    note: DEFAULT_CURRENCY_NOTE,
+    variants: DEFAULT_CURRENCIES.map(c => ({
+      key: c.code,
+      label: `${c.code} — ${c.name}`,
+      description: `Admin Finance screens open filtered to ${c.code}, and players see ${c.code} first in the deposit dialog.`
     }))
   },
   {

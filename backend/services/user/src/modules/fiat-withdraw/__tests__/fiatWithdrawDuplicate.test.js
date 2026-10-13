@@ -189,3 +189,10 @@ test('fiat withdrawal double submit', async (t) => {
     await reconciles(uid);
   });
 });
+
+test('the staff list takes a currency filter (site admin Finance → Withdrawals → Fiat)', () => {
+  const v = require('../fiatWithdraw.validators');
+  assert.equal(v.listAll.query.parse({ currency: 'inr' }).currency, 'INR');
+  assert.equal(v.listAll.query.parse({ currency: 'usdt' }).currency, 'USDT');
+  assert.equal(v.listAll.query.safeParse({ currency: "INR' OR 1=1" }).success, false);
+});

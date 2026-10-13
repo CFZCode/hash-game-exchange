@@ -67,8 +67,12 @@ class DepositReportsService {
    * charts (`reports/financeStats.service.js`) follow. An unpriced coin is
    * `amountUsd: null`, never a made-up figure.
    */
-  async listCryptoDeposits({ staff, status, from, to, userId, chain, limit = 10, offset = 0 }) {
+  async listCryptoDeposits({ staff, status, from, to, userId, chain, coin, limit = 10, offset = 0 }) {
     const where = await this.#cryptoScope(staff, { status, from, to, userId, chain });
+    // `ccdeposit` keys the coin by CCPayment's numeric id: a ticker filter is
+    // every id that reads as it (the configured map, then the built-in one).
+    // A coin no id maps to matches nothing.
+    if (coin) where.coinid = { [Op.in]: this.#coinIdsFor(coin) };
 
     const [{ rows, count }, rates] = await Promise.all([
       this.models.Ccdeposit.findAndCountAll({
@@ -517,6 +521,27 @@ class DepositReportsService {
       if (code && Number.isFinite(rate) && rate > 0) rates.set(code, money.toMinorQuantised(String(row.usd_rate)));
     }
     return rates;
+  }
+
+  /** Ticker → every `ccdeposit.coinid` that `#coinSymbol` reads as it. */
+  #coinIdsFor(coin) {
+    const wanted = String(coin).toUpperCase();
+    const ids = new Set();
+    let map = this.config?.CCPAYMENT_COIN_IDS;
+    if (typeof map === 'string') {
+      try {
+        map = JSON.parse(map);
+      } catch {
+        map = null;
+      }
+    }
+    if (map && typeof map === 'object') {
+      for (const [ticker, id] of Object.entries(map)) if (String(ticker).toUpperCase() === wanted && Number.isFinite(Number(id))) ids.add(Number(id));
+    }
+    for (const [id, ticker] of Object.entries(CCPAYMENT_COINS)) {
+      if (ticker === wanted && this.#coinSymbol(id) === wanted) ids.add(Number(id));
+    }
+    return [...ids];
   }
 
   /** `ccdeposit.coinid` → ticker; an unknown id reads `#<id>`, as on the finance charts. */

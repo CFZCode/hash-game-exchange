@@ -311,10 +311,11 @@ class CryptoWithdrawService {
   }
 
   /** Totals per status, for the queue header. */
-  async summary({ userId }) {
+  async summary({ userId, coin } = {}) {
     const rows = await this.models.Withdrawals.findAll({
       attributes: ['status', 'coin', [fn('COUNT', col('id')), 'count'], [fn('SUM', col('amount')), 'total']],
-      where: userId ? { uid: userId } : {},
+      // `coin`: the site admin's currency filter (staff route only; a player's own summary never passes it).
+      where: { ...(userId ? { uid: userId } : {}), ...(coin ? { coin } : {}) },
       group: ['status', 'coin'],
       raw: true,
     });

@@ -12,7 +12,7 @@ import DateTime from '@/components/shared/DateTime'
 import FormDialog from '@/components/shared/FormDialog'
 import { DateField, SelectField, TextField } from '@/components/shared/FormField'
 import Money from '@/components/shared/Money'
-import { FilterBar, useStatsFilters } from '@/components/shared/charts'
+import { FilterBar } from '@/components/shared/charts'
 import PageHeader from '@/components/shared/PageHeader'
 import StatusBadge from '@/components/shared/StatusBadge'
 import { Button } from '@/components/ui/button'
@@ -22,6 +22,7 @@ import { useSession } from '@/contexts/SessionContext'
 import { useApiMutation, useListState } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
 import { truncateId } from '@/lib/format'
+import { allConvertedLabel, useCurrencyChoices, useFinanceFilters } from './currencyFilter'
 import FinanceStatsPanel from './FinanceStatsPanel'
 import { usePageNumbered } from './shared'
 import type { CryptoDepositRow } from './types'
@@ -108,10 +109,12 @@ const CryptoDeposits = () => {
   const { can } = useSession()
   const { state, set, query } = useListState(['status', 'chain', 'userid'])
 
-  // One period for the charts and the table: the list takes inclusive days.
-  const filters = useStatsFilters()
+  // One period and one coin for the charts and the table: the list takes inclusive days. The coin
+  // is the site's default coin until somebody picks another.
+  const filters = useFinanceFilters()
+  const choices = useCurrencyChoices()
   const range = { startDate: filters.from, endDate: filters.to }
-  const list = usePageNumbered<CryptoDepositRow>(LIST, { limit: query.limit, page: query.page, status: query.status, chain: query.chain, userid: query.userid, ...range })
+  const list = usePageNumbered<CryptoDepositRow>(LIST, { limit: query.limit, page: query.page, status: query.status, chain: query.chain, userid: query.userid, coin: filters.currency || undefined, ...range })
 
   return (
     <div>
@@ -124,7 +127,7 @@ const CryptoDeposits = () => {
           </Can>
         }
       />
-      <FilterBar filters={filters} className='mb-4' />
+      <FilterBar filters={filters} currencies={choices.crypto} allCurrenciesLabel={allConvertedLabel(filters.defaultCurrency)} className='mb-4' />
       {can('reports:read') && (
         <FinanceStatsPanel kind='deposits' rail='crypto' filters={filters} statusLabels={{ success: 'Successful', pending: 'Processing', failed: 'Failed' }} />
       )}

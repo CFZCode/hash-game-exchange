@@ -62,13 +62,23 @@ class WalletRepository {
    * return the player, but LEFT JOIN paging is where "50 rows" quietly becomes
    * something else the moment a second one-to-many is added.
    */
-  async listPlayerWallets({ parentStaffIds, search, limit, offset }) {
+  async listPlayerWallets({ parentStaffIds, search, heldCurrency, limit, offset }) {
     if (Array.isArray(parentStaffIds) && parentStaffIds.length === 0) {
       return { rows: [], total: 0 };
     }
 
     const where = {};
     if (Array.isArray(parentStaffIds)) where.parent_staff_id = { [Op.in]: parentStaffIds };
+
+    // Only players holding a positive balance in this coin (the site admin's
+    // Wallets currency filter). The column comes from the allow-list, never
+    // from the request; a custom coin's code is a bound replacement.
+    if (heldCurrency) {
+      const holders = isCustomCurrency(heldCurrency)
+        ? `SELECT uid FROM wallet_balances WHERE currency = ${this.sequelize.escape(String(heldCurrency).toUpperCase())} AND balance > 0`
+        : `SELECT uid FROM credits WHERE "${resolveColumn(heldCurrency)}" > 0`;
+      where.id = { [Op.in]: literal(`(${holders})`) };
+    }
 
     if (search) {
       // A UID is what an operator has in front of them when a player is on the

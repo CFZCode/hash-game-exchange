@@ -62,7 +62,8 @@ const STATUS_COLOR: Record<StatusKey, ChartColor> = { success: 'success', pendin
 const DONUT_SLICES = 6
 
 const FinanceStatsPanel = ({ kind, rail, filters, statusLabels }: Props) => {
-  const query = { kind, rail, ...filters.query }
+  // Every currency: valued in the site's default coin (`convertTo`), not USD.
+  const query = { kind, rail, ...filters.query, ...(!filters.currency && filters.defaultCurrency ? { convertTo: filters.defaultCurrency } : {}) }
   const stats = useApi<FinanceStats>(STATS, query)
   const prev = useApi<FinanceStats>(STATS, { ...query, ...filters.previous.apiRange })
 
@@ -150,7 +151,7 @@ const FinanceStatsPanel = ({ kind, rail, filters, statusLabels }: Props) => {
       {s && s.unconverted.length > 0 && (
         <Alert>
           <AlertDescription>
-            Not in the USD totals (no exchange rate):{' '}
+            Not in the {currency} totals (no exchange rate):{' '}
             {s.unconverted.map(u => `${formatNumber(u.count)} in ${u.currency ?? 'unknown currency'}`).join(', ')}. Pick that currency to see it.
           </AlertDescription>
         </Alert>

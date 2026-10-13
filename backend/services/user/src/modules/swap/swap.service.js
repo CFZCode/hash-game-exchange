@@ -1,5 +1,6 @@
 'use strict';
 
+const { Op } = require('sequelize');
 const { money, currencyRegistry } = require('@ibitplay/common');
 const { assertPlayerCapability } = require('@ibitplay/auth');
 
@@ -231,9 +232,12 @@ class SwapService {
    * Scoped to the caller's tree — this listed every player's swaps to any
    * staff member with `wallet:read`, agents included.
    */
-  async listAllHistory({ staff, userId, limit, offset }) {
+  async listAllHistory({ staff, userId, currency, limit, offset }) {
+    const where = await ownerWhere(this, staff?.id, 'uid', userId);
+    // The site admin's currency filter: a swap out of OR into that coin.
+    if (currency) where[Op.or] = [{ from_currency: currency }, { to_currency: currency }];
     return this.models.SwapHistory.findAndCountAll({
-      where: await ownerWhere(this, staff?.id, 'uid', userId),
+      where,
       order: [['id', 'DESC']],
       limit,
       offset,

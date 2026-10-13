@@ -6,7 +6,6 @@ import Link from 'next/link'
 
 import { HandCoinsIcon, RotateCcwIcon, SearchIcon } from 'lucide-react'
 
-import { useStatsFilters } from '@/components/shared/charts'
 import DataTable, { type Column } from '@/components/shared/DataTable'
 import DateTime from '@/components/shared/DateTime'
 import ErrorState from '@/components/shared/ErrorState'
@@ -24,6 +23,7 @@ import type { Pagination } from '@/lib/api/types'
 import { formatNumber } from '@/lib/format'
 import RewardStats from '@/views/promotions/RewardStats'
 
+import { useFinanceFilters } from './currencyFilter'
 import type { TipList, TipParty, TipRow } from './types'
 
 /**
@@ -182,8 +182,9 @@ const Tips = () => {
   const { state, set, query } = useListState()
   const { actor, can } = useSession()
 
-  // The charts' filter bar drives the table too: its period (inclusive UTC days) and currency.
-  const f = useStatsFilters({ defaultPreset: '30d' })
+  // The charts' filter bar drives the table too: its period (inclusive UTC days) and currency — the
+  // site's default coin until somebody picks another.
+  const f = useFinanceFilters({ defaultPreset: '30d' })
 
   // Same gate as the welcome-bonus settings: config:read to see, house staff only (not the agent tree).
   const showLimits = Boolean(actor?.promotions) && can('config:read')
@@ -232,13 +233,13 @@ const Tips = () => {
     ? { page, limit: PAGE_SIZE, total, totalPages, hasNext: page < totalPages, hasPrev: page > 1 }
     : undefined
 
-  const filtered = Boolean(query.search || f.currency || f.preset !== '30d')
+  const filtered = Boolean(query.search || f.currency !== f.defaultCurrency || f.preset !== '30d')
   const summary = list.data?.summary
 
   const reset = () => {
     setTerm('')
     set({ search: '' })
-    f.set({ preset: '30d', currency: '' })
+    f.set({ preset: '30d', currency: f.defaultCurrency })
   }
 
   return (

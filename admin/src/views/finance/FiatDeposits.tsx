@@ -12,7 +12,7 @@ import DateTime from '@/components/shared/DateTime'
 import FormDialog from '@/components/shared/FormDialog'
 import { TextAreaField, TextField } from '@/components/shared/FormField'
 import Money from '@/components/shared/Money'
-import { FilterBar, useStatsFilters } from '@/components/shared/charts'
+import { FilterBar } from '@/components/shared/charts'
 import PageHeader from '@/components/shared/PageHeader'
 import StatusBadge from '@/components/shared/StatusBadge'
 import { Button } from '@/components/ui/button'
@@ -21,6 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useSession } from '@/contexts/SessionContext'
 import { useApiMutation, useListState, usePagedApi } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
+import { allConvertedLabel, useFinanceFilters } from './currencyFilter'
 import FinanceStatsPanel from './FinanceStatsPanel'
 import { Details, ImageDialog, ViewDialog, stop } from './shared'
 import { FIAT_CURRENCIES, type FiatDepositRow } from './types'
@@ -179,9 +180,9 @@ const FiatDeposits = () => {
   const { can } = useSession()
   const { state, set, query } = useListState(['status', 'userId'], { status: 'pending' })
 
-  // Period, bucket size and currency for the charts. The currency also filters the table (the
-  // review queue has no date filter, so it stays whole).
-  const filters = useStatsFilters()
+  // Period, bucket size and currency for the charts. The currency (the site's default coin until
+  // somebody picks another) also filters the table; the review queue has no date filter.
+  const filters = useFinanceFilters()
 
   const list = usePagedApi<FiatDepositRow>(LIST, {
     limit: query.limit,
@@ -195,7 +196,7 @@ const FiatDeposits = () => {
   return (
     <div>
       <PageHeader title='Fiat deposits' description='Manual bank-transfer deposits awaiting review. Approving credits the user; rejecting records a reason they can see.' />
-      <FilterBar filters={filters} currencies={[...FIAT_CURRENCIES]} className='mb-4' />
+      <FilterBar filters={filters} currencies={[...FIAT_CURRENCIES]} allCurrenciesLabel={allConvertedLabel(filters.defaultCurrency)} className='mb-4' />
       {can('reports:read') && (
         <FinanceStatsPanel kind='deposits' rail='fiat' filters={filters} statusLabels={{ success: 'Successful', pending: 'Pending', failed: 'Failed' }} />
       )}

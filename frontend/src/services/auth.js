@@ -111,17 +111,31 @@ function toWalletRows(balances, flags) {
  * money. An agent-funded player is the case that forced the distinction: the first sign-in on an
  * empty wallet lands on the first row (BTC), that answer is persisted, and once the agent credits
  * INR every reload kept opening the pill on **0 BTC** beside ₹450 in the dropdown. So an unfunded
- * default gives way to the largest balance, and only then to the default itself or the first row.
+ * default gives way to the largest balance, and then to the SITE'S DEFAULT COIN (`siteDefault`, the
+ * owner's `default_currency` — USDT unless set) when the wallet has a row for it; only after that
+ * to the remembered default itself or the first row (which used to open an empty wallet on BTC).
  */
-function pickCurrency(rows, preferred, explicit = false) {
+function pickCurrency(rows, preferred, explicit = false, siteDefault = null) {
   const held = rows.find((row) => row.currencyName === preferred);
   if (held && (explicit || Number(held.amount) > 0)) return preferred;
 
   const funded = rows
     .filter((row) => Number(row.amount) > 0)
     .sort((a, b) => Number(b.amount) - Number(a.amount))[0];
+  const siteRow = siteDefault ? rows.find((row) => row.currencyName === siteDefault) : null;
 
-  return funded?.currencyName ?? held?.currencyName ?? rows[0]?.currencyName ?? ACCOUNT_DEFAULTS.setting.currencyName;
+  return funded?.currencyName ?? siteRow?.currencyName ?? held?.currencyName ?? rows[0]?.currencyName ?? ACCOUNT_DEFAULTS.setting.currencyName;
+}
+
+/**
+ * The site's default coin as this wallet's row name (`USDT`, or `INRFIAT` for a fiat code), or
+ * `null` when the site names none or the wallet has no row for it. `defaultCurrency` on
+ * `GET /admin/site-config/public` is the owner's `default_currency` policy, a bare code.
+ */
+function siteDefaultRow(rows, siteConfig) {
+  const code = String(siteConfig?.defaultCurrency ?? '').toUpperCase();
+  if (!code) return null;
+  return rows.find((row) => row.aliasCurrencyName === code)?.currencyName ?? null;
 }
 
 /* ── The account ───────────────────────────────────────────────────────────────────────────
@@ -130,7 +144,7 @@ function pickCurrency(rows, preferred, explicit = false) {
  * and only `profile` maps the columns (`twoFactorEnabled` for `two_fa_status`, `referralCode`
  * for `referalcode`) and adds `gamesPlayed`. See the note in `endpoints.js`.
  */
-function toAccount(profile, rows, previous, prefs, bonus) {
+function toAccount(profile, rows, previous, prefs, bonus, siteDefault = null) {
   /* THE XP BAND IS DERIVED FROM THE LEVEL AND THE POSITION INSIDE IT IS MEASURED, NOT INVENTED.
      The band comes out of the captured VIP ladder in `data/vipConfig.js`, which is real, and this
      shell's header ring and the bonus page's level card both read `currXP` against
@@ -249,8 +263,18 @@ function toAccount(profile, rows, previous, prefs, bonus) {
         rows,
         previous?.login ? previous?.setting?.currencyName : undefined,
         Boolean(previous?.login && previous?.setting?.currencyPicked),
+        siteDefault,
       ),
+      /* Restated rather than spread from `previous`: a visitor's persisted `setting` can carry the
+         flag from a pick made while signed out, and the deposit dialog reads it to decide whether
+         the site's default coin or the player's own pick comes first. */
+      currencyPicked: Boolean(previous?.login && previous?.setting?.currencyPicked),
     },
+
+    /* The site's default coin (the owner's `default_currency`), as this wallet's row name — what
+       the deposit dialog opens on for a player who has not picked a coin themselves. Not persisted
+       (the record keeps `login`, `name` and `setting`); every load rebuilds it from site-config. */
+    defaultCurrency: siteDefault,
   };
 }
 
@@ -349,7 +373,7 @@ export async function loadAccount(previous) {
      they read as "no rate" rather than as another asset's price. See the note at that function. */
   dropUnpricedCodes(rows.map((row) => row.aliasCurrencyName));
 
-  return { account: toAccount(profile, rows, previous, prefs, bonus), balances: rows };
+  return { account: toAccount(profile, rows, previous, prefs, bonus, siteDefaultRow(rows, siteConfig)), balances: rows };
 }
 
 /**

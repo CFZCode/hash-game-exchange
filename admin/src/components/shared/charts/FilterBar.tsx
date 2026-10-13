@@ -18,6 +18,9 @@ type Props = {
 
   /** Label of the "no currency" option. */
   allCurrenciesLabel?: string
+
+  /** Offer the "every currency" option at all. Off on a screen with no converted totals. */
+  allowAll?: boolean
   showGranularity?: boolean
 
   /** Extra dimension controls (a sport select, a channel select), placed after the built-in ones. */
@@ -33,8 +36,13 @@ const shortDay = (day: string) => `${bucketLabel(day, 'day')} ${day.slice(0, 4)}
  * One row of filters above a stats screen: period, custom range, bucket size and currency.
  * Everything it changes goes to the URL through `useStatsFilters`.
  */
-const FilterBar = ({ filters, currencies, allCurrenciesLabel = 'All currencies (USD)', showGranularity = true, children, className }: Props) => {
+const FilterBar = ({ filters, currencies, allCurrenciesLabel = 'All currencies (USD)', allowAll = true, showGranularity = true, children, className }: Props) => {
   const today = new Date().toISOString().slice(0, 10)
+
+  // The default and the current pick are always offered, even when the caller's list lacks them.
+  const currencyOptions = currencies?.length
+    ? Array.from(new Set([...(filters.defaultCurrency ? [filters.defaultCurrency] : []), ...(filters.currency ? [filters.currency] : []), ...currencies]))
+    : []
 
   return (
     <div role='group' aria-label='Report filters' className={cn('flex flex-wrap items-center gap-2', className)}>
@@ -93,14 +101,14 @@ const FilterBar = ({ filters, currencies, allCurrenciesLabel = 'All currencies (
         </ToggleGroup>
       )}
 
-      {currencies && currencies.length > 0 && (
+      {currencyOptions.length > 0 && (
         <Select value={filters.currency || 'ALL'} onValueChange={v => v && filters.set({ currency: v === 'ALL' ? '' : v })}>
-          <SelectTrigger className='w-48' aria-label='Currency'>
+          <SelectTrigger className='w-56' aria-label='Currency'>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value='ALL'>{allCurrenciesLabel}</SelectItem>
-            {currencies.map(c => (
+            {(allowAll || !filters.currency) && <SelectItem value='ALL'>{allCurrenciesLabel}</SelectItem>}
+            {currencyOptions.map(c => (
               <SelectItem key={c} value={c}>
                 {c}
               </SelectItem>

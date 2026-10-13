@@ -12,7 +12,7 @@ import DateTime from '@/components/shared/DateTime'
 import FormDialog from '@/components/shared/FormDialog'
 import { SelectField, TextAreaField, TextField } from '@/components/shared/FormField'
 import Money from '@/components/shared/Money'
-import { FilterBar, useStatsFilters } from '@/components/shared/charts'
+import { FilterBar } from '@/components/shared/charts'
 import PageHeader from '@/components/shared/PageHeader'
 import StatCard from '@/components/shared/StatCard'
 import StatusBadge from '@/components/shared/StatusBadge'
@@ -23,6 +23,7 @@ import { useSession } from '@/contexts/SessionContext'
 import { useApi, useApiMutation, useListState, usePagedApi } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
 import { formatNumber, truncateId } from '@/lib/format'
+import { allConvertedLabel, useCurrencyChoices, useFinanceFilters } from './currencyFilter'
 import FinanceStatsPanel from './FinanceStatsPanel'
 import { Details, ViewDialog, stop } from './shared'
 import { CRYPTO_WITHDRAW_STATUSES, type CryptoWithdrawSummary, type CryptoWithdrawalRow } from './types'
@@ -134,8 +135,10 @@ const CryptoWithdrawals = () => {
   const { state, set, query } = useListState(['status', 'userId'], { status: 'In Queue' })
   const { can } = useSession()
 
-  // One period and one coin for the charts and the table. The list's `to` is inclusive.
-  const filters = useStatsFilters()
+  // One period and one coin for the charts, the queue cards and the table (the site's default coin
+  // until somebody picks another). The list's `to` is inclusive.
+  const filters = useFinanceFilters()
+  const choices = useCurrencyChoices()
 
   const list = usePagedApi<CryptoWithdrawalRow>(LIST, {
     limit: query.limit,
@@ -147,8 +150,8 @@ const CryptoWithdrawals = () => {
     to: `${filters.to}T23:59:59.999Z`
   })
 
-  const summary = useApi<CryptoWithdrawSummary[]>(SUMMARY)
-  const coins = [...new Set((summary.data ?? []).map(r => r.coin).filter(Boolean))].sort()
+  const summary = useApi<CryptoWithdrawSummary[]>(SUMMARY, filters.currency ? { coin: filters.currency } : undefined)
+  const coins = choices.crypto
 
   const byStatus = (status: string) => {
     const rows = (summary.data ?? []).filter(r => r.status === status)
@@ -159,11 +162,11 @@ const CryptoWithdrawals = () => {
   return (
     <div>
       <PageHeader title='Crypto withdrawals' description='On-chain payout requests. Approve → send coin → mark Sent with the hash. Rejecting returns the held balance.' />
-      <FilterBar filters={filters} currencies={coins} allCurrenciesLabel='All coins (USD)' className='mb-4' />
+      <FilterBar filters={filters} currencies={coins} allCurrenciesLabel={allConvertedLabel(filters.defaultCurrency)} className='mb-4' />
       {can('reports:read') && (
         <FinanceStatsPanel kind='withdrawals' rail='crypto' filters={filters} statusLabels={{ success: 'Sent', pending: 'In queue / approved', failed: 'Rejected' }} />
       )}
-      <p className='text-muted-foreground mb-2 text-xs font-medium'>Queue right now, all dates</p>
+      <p className='text-muted-foreground mb-2 text-xs font-medium'>Queue right now, all dates · {filters.currency || 'all coins'}</p>
       <div className='mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4'>
         {CRYPTO_WITHDRAW_STATUSES.map(s => {
           const v = byStatus(s)
