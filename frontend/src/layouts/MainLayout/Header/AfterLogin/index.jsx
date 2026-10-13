@@ -1,3 +1,4 @@
+import { CHAT_AVAILABLE } from '../../../../services/availability';
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSession } from '../../../../context/session';
@@ -477,15 +478,21 @@ export default function AfterLogin({ onToggleChat, onToggleNotice }) {
                  isOfflineAgent ? "w-10" : "w-30") */}
       <div className="button relative ml-3 flex h-10 flex-none rounded-lg bg-layer5 p-0">
         {/* First child, so `first:left-10` wins over `left-20` and the rule sits at 40px. */}
-        <div className="absolute left-20 top-2 h-6 w-[1px] bg-third first:left-10" />
-        <button
-          type="button"
-          className="button size-10 p-0"
-          onClick={onToggleChat}
-          aria-label="Live chat"
-        >
-          <SpriteIcon name="chat" />
-        </button>
+        {/* No chat on this platform (services/availability.js): the group drops to the bell
+            alone — the original's own one-button arm, the `w-10` its chunk line names. */}
+        {CHAT_AVAILABLE && (
+          <>
+            <div className="absolute left-20 top-2 h-6 w-[1px] bg-third first:left-10" />
+            <button
+              type="button"
+              className="button size-10 p-0"
+              onClick={onToggleChat}
+              aria-label="Live chat"
+            >
+              <SpriteIcon name="chat" />
+            </button>
+          </>
+        )}
         {/* `onClick: () => t.setRight("notice")` — the desktop bell does NOT navigate; it names
             which of the three right-hand drawers the layout should show. `onToggleNotice` is that
             setter here. Its mobile twin below really does navigate, to `/notification`, which is

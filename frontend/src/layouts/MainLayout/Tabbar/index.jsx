@@ -1,3 +1,4 @@
+import { CHAT_AVAILABLE } from '../../../services/availability';
 import { useLocation, useNavigate } from 'react-router-dom';
 import './Tabbar.css';
 
@@ -28,6 +29,7 @@ export default function Tabbar({ onToggleSidebar, isMenuOpen }) {
 
   const exploreActive = isActive('/explore');
   const casinoActive = isActive('/casino');
+  const sportsActive = isActive('/sports');
   const chatActive = isActive('/chat-public');
 
   /* Tapping any navigating tab dismisses the menu drawer first. It is not a route in this
@@ -78,11 +80,16 @@ export default function Tabbar({ onToggleSidebar, isMenuOpen }) {
         <p className={`mt-0.5 text-xs font-extrabold ${casinoActive ? 'text-brand' : 'text-tertiary'}`}>Casino</p>
       </button>
 
-      <button className="button flex h-full w-1/5 flex-1 flex-col items-center justify-center px-1 py-2" type="button">
+      {/* Was a button with no handler; `/sports` is the exchange lobby now, so it goes there. */}
+      <button
+        className={`button flex h-full w-1/5 flex-1 flex-col items-center justify-center px-1 py-2 ${sportsActive ? 'text-brand' : ''}`}
+        type="button"
+        onClick={() => go('/sports')}
+      >
         <div className="relative">
-          <div className="color_icon_img scale-[80%] sports_p"></div>
+          <div className={`color_icon_img scale-[80%] ${sportsActive ? 'sports_g' : 'sports_p'}`}></div>
         </div>
-        <p className="mt-0.5 text-xs font-extrabold text-tertiary">Sports</p>
+        <p className={`mt-0.5 text-xs font-extrabold ${sportsActive ? 'text-brand' : 'text-tertiary'}`}>Sports</p>
       </button>
 
       {/* `{ label: "Chat", icon: "chat", link: "/chat-public", buttonName: "tabbar_chat" }` — the
@@ -91,6 +98,8 @@ export default function Tabbar({ onToggleSidebar, isMenuOpen }) {
           right-hand drawer at all and global chat is a real page; that page is built now, so this
           navigates. See pages/ChatPublic for the route, its phone-only guard and the live
           measurements behind its box. */}
+      {/* Hidden while the platform has no chat (services/availability.js). */}
+      {CHAT_AVAILABLE && (
       <button
         className={`button flex h-full w-1/5 flex-1 flex-col items-center justify-center px-1 py-2 ${chatActive ? 'text-brand' : ''}`}
         type="button"
@@ -101,6 +110,7 @@ export default function Tabbar({ onToggleSidebar, isMenuOpen }) {
         </div>
         <p className={`mt-0.5 text-xs font-extrabold ${chatActive ? 'text-brand' : 'text-tertiary'}`}>Chat</p>
       </button>
+      )}
     </div>
   );
 }

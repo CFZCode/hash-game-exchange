@@ -234,7 +234,7 @@ export default function Footer() {
         >
           <div className="flex min-h-15 items-center gap-4">
             <img
-              className={brandLogo ? 'h-8 w-36 object-contain object-left' : 'h-8'}
+              className={brandLogo ? `h-8 w-36 object-contain object-left${darken ? '' : ' brand-logo-on-light'}` : 'h-8'}
               alt={(brandLogo && siteName()) || 'logo'}
               src={brandLogo ?? (darken ? logoPureImg : logoPureLightImg)}
             />

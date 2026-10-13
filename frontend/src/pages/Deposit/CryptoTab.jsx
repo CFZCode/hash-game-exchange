@@ -55,12 +55,14 @@ function QuickPick({ currency, onPick, onOpenSelect }) {
   const rest = DEFAULT_CURRENCIES.slice(count, count + 3);
 
   return (
-    <div className="mt-2 flex items-center text-secondary">
+    /* `hide-scroll overflow-x-auto` + `flex-none` chips: six chips and the More pile are wider
+       than a 390px phone, and a non-wrapping row pushed the whole page to 431px. */
+    <div className="hide-scroll mt-2 flex items-center overflow-x-auto text-secondary">
       {chips.map((name) => (
         <button
           key={name}
           type="button"
-          className={`button center mr-1 h-9 rounded-l-full rounded-r-full border bg-layer5 ${
+          className={`button center mr-1 h-9 flex-none rounded-l-full rounded-r-full border bg-layer5 ${
             currency === name ? 'border-brand' : 'border-input'
           }`}
           onClick={() => onPick(name)}

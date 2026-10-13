@@ -1,3 +1,5 @@
+import { LIVE_SUPPORT_AVAILABLE } from '../../../services/availability';
+
 /* The footer's five link columns, from the live footer's own DOM.
  *
  * `footer-jnUVITid.js` is named in `Enter-MsmOuq5R.js`'s __vite__mapDeps table but was never
@@ -61,7 +63,9 @@ export const COLUMNS = [
       { label: 'Responsible Gambling', href: '/responsible/faq' },
       { label: 'AML', href: '/help/aml' },
       /* Design Resources (BC.GAME's Google Drive brand kit) removed: not Parker567's. */
-      { label: 'Live Support', button: true },
+      /* Live Support: no support provider on this platform, so the inert button is left out
+         (services/availability.js). */
+      ...(LIVE_SUPPORT_AVAILABLE ? [{ label: 'Live Support', button: true }] : []),
     ],
   },
   {

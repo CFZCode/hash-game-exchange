@@ -1,4 +1,6 @@
+import { languageName } from '../../components/modals/LanguageCurrencyModal/languages';
 import React from 'react';
+import { LIVE_SUPPORT_AVAILABLE } from '../../services/availability';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSession } from '../../context/session';
 import { useGates } from '../../context/gates';
@@ -401,11 +403,8 @@ const SecurityStatus = () => <IconAttention className="size-5 fill-warning" />;
 function SettingsCards({ onRefer, onLanguage, onCurrency, confirm, affiliateOn = true }) {
   const { session } = useSession();
 
-  /* `O.langs[R.lang]?.[0] ?? "English"`. There is no language store in this build — the
-     language/currency modal keeps its choice in its own state — so this is the fallback the
-     original prints for an unrecognised locale, and it is the right string for the one locale
-     that ships. */
-  const language = 'English';
+  /* `O.langs[R.lang]?.[0] ?? "English"` — the store's `setting.lang`, the field the picker writes. */
+  const language = languageName(session.setting.lang);
 
   /* `enableLocaleCurrency ? getAlias(localeCurrencyName).replace(/FIAT$/, "") : t("None")`.
      `getAlias` is the catalogue lookup rather than a suffix strip — KLAY prints KAIA — and the
@@ -620,6 +619,7 @@ function SupportBlock({ onSignOut }) {
   return (
     <div className="mb-6 mt-3 w-full px-4">
       {/* `J.emit("live_support", !0)` opens the support widget, which is not built. Inert. */}
+      {LIVE_SUPPORT_AVAILABLE && (
       <div className="btn-like flex h-11 w-full items-center rounded-lg bg-layer4 px-3">
         {/* The one icon on the page whose fill differs between themes — `fill-secondary
             dark:fill-brand`, and both arms are written now that `dark:` keys off the class. */}
@@ -627,6 +627,7 @@ function SupportBlock({ onSignOut }) {
         <RowLabel>Live Support</RowLabel>
         <Chevron className="ml-auto" />
       </div>
+      )}
 
       {/* `/user/enter/feedback` is a dialog sibling of this route and is not built, so this
           lands on the catch-all. Left navigating rather than made inert because the path is the

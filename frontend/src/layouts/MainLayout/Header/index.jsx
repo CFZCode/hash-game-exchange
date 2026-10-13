@@ -1,3 +1,5 @@
+import { getAlias } from '../../../utils/currency';
+import { CHAT_AVAILABLE } from '../../../services/availability';
 import React from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import logoImg from '../../../assets/logo.png';
@@ -112,6 +114,9 @@ export default function Header({
   const brandLogo = useSiteLogo({ own: 'hash-games' });
   const logo = brandLogo ?? (darken ? logoImg : logoLightImg);
   const logoAlt = (brandLogo && siteName()) || 'logo';
+  /* The owner uploads ONE logo, drawn for the dark theme (white "PARKER"); on the light theme it
+     vanishes against the light header, so it is inverted there (index.css `.brand-logo-on-light`). */
+  const logoTone = brandLogo && !darken ? ' brand-logo-on-light' : '';
 
   const [langModalOpen, setLangModalOpen] = React.useState(false);
   const [langModalTab, setLangModalTab] = React.useState('language');
@@ -148,7 +153,7 @@ export default function Header({
             {/* Logo container. */}
             <div className="center h-full w-40 flex-none text-[0] absolute left-16 top-0">
               <NavLink to="/">
-                <img alt={logoAlt} className={brandLogo ? 'h-8 w-36 object-contain' : 'h-8 w-auto object-contain'} src={logo} />
+                <img alt={logoAlt} className={(brandLogo ? 'h-8 w-36 object-contain' : 'h-8 w-auto object-contain') + logoTone} src={logo} />
               </NavLink>
             </div>
           </div>
@@ -230,6 +235,7 @@ export default function Header({
                   (`pe`) the very same `setRight` it hands the signed-in one, so the chat is
                   readable without an account. Only posting needs a session, and the composer's
                   send is where that check lives on the original. */}
+              {CHAT_AVAILABLE && (
               <div className="relative ml-3 flex h-10 w-10 flex-none rounded-lg bg-layer5">
                 <button
                   className="button button-m size-10 p-0"
@@ -240,6 +246,7 @@ export default function Header({
                   <div className="color_icon_img scale-[80%] chat"></div>
                 </button>
               </div>
+              )}
 
               {/* Language & Currency Selector Block */}
               <div className="relative ml-3 flex h-10 w-auto flex-none rounded-lg bg-layer5">
@@ -259,7 +266,12 @@ export default function Header({
                   type="button"
                   onClick={() => openLangModal('currency')}
                 >
-                  <span className="font-semibold text-primary text-[14px]">USD</span>
+                  <span className="font-semibold text-primary text-[14px]">
+                    {/* The picker's own field, as the sidebar and Preferences print it. */}
+                    {session.setting.enableLocaleCurrency
+                      ? getAlias(session.setting.localeCurrencyName).replace(/FIAT$/, '')
+                      : 'None'}
+                  </span>
                 </button>
               </div>
                 </>
@@ -288,7 +300,7 @@ export default function Header({
         <div className="flex size-full items-center overflow-hidden px-4">
           <div className="text-[0] flex-none">
             <NavLink to="/">
-              <img alt={logoAlt} className="mobile-logo-img object-contain" src={logo} />
+              <img alt={logoAlt} className={`mobile-logo-img object-contain${logoTone}`} src={logo} />
             </NavLink>
           </div>
           <button

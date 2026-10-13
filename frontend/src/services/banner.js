@@ -30,48 +30,35 @@ const normalise = (rows, hasSportsbook) =>
     .filter((row) => !row.isBg)
     .filter((row) => hasSportsbook || !BLOCKED_WITHOUT_SPORTSBOOK.includes(row.bannerId));
 
-/* ── THE PLATFORM'S OWN BANNERS, AND WHAT THEY CAN ACTUALLY REPLACE ─────────────────────────
+/* ── THE PLATFORM'S OWN BANNERS ─────────────────────────────────────────────────────────────
  *
- * `GET /admin/banners` is public and answers `{total, rows}` where a row is an image and a
- * unique `type` — no title, no description, no link, no tag, no sort. The whole `banners` table
- * is ten columns and none of them is text. So a platform banner can only say WHICH ARTWORK a
- * slide shows; every word on the card, and where it goes when clicked, has nowhere to come from
- * but the capture in `banners.js`.
- *
- * This therefore OVERRIDES ART ON A KNOWN SLIDE rather than building slides out of the
- * response. A row whose `type` is `home_top_<n>` replaces the artwork of the nth slide, 1-based,
- * in the order `banners.js` lists them. That naming is THIS BUILD'S CONVENTION and not the
- * platform's: `type` is validated as `/^[a-z0-9][a-z0-9_-]{0,63}$/` and carries no meaning
- * server-side, and the table was empty when this was written, so there was no established
- * placement name to match. An operator uploading `home_top_2` changes the second card's
- * picture; a row naming anything else is ignored rather than guessed at.
- *
- * EVERY FAILURE PATH LANDS ON THE CAPTURED SLIDES, which is the point: no rows, all rows
- * inactive, a 500, a refused fetch, or fixtures mode all render exactly what this build
- * rendered before the platform was asked. The read cannot make the hero worse than not making
- * it — and the component's own `rows.length < 3` padding is still behind that.
- *
- * The image is a CSS `url()` on the gateway, so it needs `API_BASE` in front of the row's own
- * relative `url` and does NOT go through `request()`. `imageUrl` is the field the card prefers
- * over its `artFor(image)` glob lookup.
- */
+ * `GET /admin/banners` is public and answers the rows as `data`; a row is an image under a unique
+ * `type` plus the optional slide copy (title, subtitle, cta, sortOrder). `home_top_<n>` is THIS
+ * BUILD'S placement name for a hero slide. The image is a CSS `url()` on the gateway, so it needs
+ * `API_BASE` in front and does not go through `request()`. */
 const PLACEMENT_PREFIX = 'home_top_';
 
-const withPlatformArt = (slides, answer) => {
+/* LIVE MODE BUILDS THE STRIP FROM THE PLATFORM'S ROWS ONLY. The captured slides in `banners.js`
+ * are bc.game's own campaigns (Soaked by Sea Men, €20/€10 free spins, Knockoin, a $500 soccer
+ * freebet) — another brand's marketing in another currency — so they must never reach Parker567's
+ * players. A `home_top_<n>` row is one slide: its image, plus the copy migration 037 added
+ * (`title`, `subtitle`, `cta`). No rows, a 500 or a refused fetch is an EMPTY strip, and the
+ * carousel then renders nothing (Banner's `if (!count) return null`). Fixture mode keeps the
+ * capture, which is the pixel reference. */
+const platformSlides = (answer) => {
   const rows = Array.isArray(answer) ? answer : (answer?.rows ?? []);
-  const live = new Map(
-    rows
-      .filter((row) => row?.type && row.active !== false)
-      .map((row) => [row.type, row]),
-  );
-  if (live.size === 0) return slides;
-
-  return slides.map((slide, index) => {
-    const row = live.get(`${PLACEMENT_PREFIX}${index + 1}`);
-    if (!row) return slide;
-    const path = row.url ?? PLATFORM.site.bannerImage(row.type);
-    return { ...slide, imageUrl: `${API_BASE}${path}` };
-  });
+  return rows
+    .filter((row) => typeof row?.type === 'string' && row.type.startsWith(PLACEMENT_PREFIX) && row.active !== false)
+    .sort((x, y) => (x.sortOrder ?? 0) - (y.sortOrder ?? 0) || x.type.localeCompare(y.type, undefined, { numeric: true }))
+    .map((row) => ({
+      bannerId: row.type,
+      tagName: '',
+      title: row.title ?? '',
+      description: row.subtitle ?? '',
+      buttonContent: row.cta?.label ?? '',
+      linkUrl: row.cta?.href ?? '',
+      imageUrl: `${API_BASE}${row.url ?? PLATFORM.site.bannerImage(row.type)}`,
+    }));
 };
 
 export const getHomeBanners = ({
@@ -86,8 +73,8 @@ export const getHomeBanners = ({
 
   if (!USE_FIXTURES) {
     return Promise.resolve(request(PLATFORM.site.banners, { live: true, fixture: null }))
-      .then((answer) => withPlatformArt(slides, answer))
-      .catch(() => slides);
+      .then(platformSlides)
+      .catch(() => []);
   }
 
   return request(ENDPOINTS.homeMainBanner({ bannerType, areaCode, uid, level, vip }), {

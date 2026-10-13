@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { CHAT_AVAILABLE } from './services/availability';
 import { Link, Navigate, Route, Routes, useLocation, useNavigate, useNavigationType } from 'react-router-dom';
 import MainLayout from './layouts/MainLayout/MainLayout';
 import Home from './pages/Home';
@@ -729,7 +730,7 @@ function AppShell() {
               carrying `guards: [() => !m.mobile && "/"]`, with the redirect inside the component
               because it depends on a live matchMedia subscription. Above `lg` the same panel is
               the right-hand drawer's `chat` arm instead. The tabbar's fifth button links here. */}
-          <Route path="/chat-public" element={<ChatPublicPage />} />
+          <Route path="/chat-public" element={CHAT_AVAILABLE ? <ChatPublicPage /> : <Navigate to="/" replace />} />
           {/* THE SPORTS EXCHANGE (pages/Exchange, docs/exchange.md). The original's `/sports/*` was
               one mounted BetBy widget; it is replaced, at the user's request, by the native
               exchange — lobby, match page, My Bets, Statement — kept to hash.game's tokens and

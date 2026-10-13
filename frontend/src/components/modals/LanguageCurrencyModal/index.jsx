@@ -3,7 +3,7 @@ import useDialogScrollLock from '../../../hooks/useDialogScrollLock';
 import { useIsDesktop } from '../../../hooks/useMediaQuery';
 import useSheetDrag from '../../../hooks/useSheetDrag';
 import { useSession } from '../../../context/session';
-import { LANGUAGES } from './languages';
+import { SUPPORTED_LANGUAGES as LANGUAGES, supportedLang } from './languages';
 
 const CURRENCIES = [
   { code: 'NONE', name: 'None', symbol: '★', bg: '#6b7280' },
@@ -73,7 +73,8 @@ export default function LanguageCurrencyModal({
      conversion ON across the whole shell — which is exactly what the dialog's own blurb promises
      ("The Currencies will be shown in approximated values"). */
   const { session, setSetting } = useSession();
-  const { lang, enableLocaleCurrency, localeCurrencyName } = session.setting;
+  const { enableLocaleCurrency, localeCurrencyName } = session.setting;
+  const lang = supportedLang(session.setting.lang);
   const overlayerRef = useRef(null);
 
   /* A PHONE GETS A BOTTOM SHEET, AND THAT IS THE POPUP MANAGER'S DEFAULT RATHER THAN A CHOICE.
@@ -91,7 +92,16 @@ export default function LanguageCurrencyModal({
   /* `Vx` again — the manager binds it to any panel that is not `.pop-center`, which is exactly the
      sheet arm below. See `hooks/useSheetDrag`; it was `PopCenter`'s until this became its second
      consumer. */
-  const { panelRef, handlers } = useSheetDrag({ enabled: !isDesktop, onClose });
+  /* CLOSING DROPS FOCUS. The rows are divs, so the trigger that opened this (the header's
+     currency <button>) kept keyboard focus the whole time — and after the dialog shut, a space
+     typed into a search field the click had not actually focused pressed that button again and
+     reopened "View in currency". */
+  const close = useCallback(() => {
+    if (typeof document !== 'undefined') document.activeElement?.blur?.();
+    onClose();
+  }, [onClose]);
+
+  const { panelRef, handlers } = useSheetDrag({ enabled: !isDesktop, onClose: close });
 
   /* THERE IS NO TAB STRIP, AT EITHER WIDTH, AND THE EARLIER NOTE HERE WAS A MISREADING.
      ---------------------------------------------------------------------------------------
@@ -208,9 +218,9 @@ export default function LanguageCurrencyModal({
   /* Close on overlay click (but not on modal click) */
   const handleOverlayClick = useCallback(
     (e) => {
-      if (e.target === overlayerRef.current) onClose();
+      if (e.target === overlayerRef.current) close();
     },
-    [onClose],
+    [close],
   );
 
   if (!isOpen) return null;
@@ -333,7 +343,7 @@ export default function LanguageCurrencyModal({
           <button
             className="button button-m pop-close !p-0"
             type="button"
-            onClick={onClose}
+            onClick={close}
           >
             <svg viewBox="0 0 32 32" className="icon">
               <path d="M7.15445 7.40846C6.3734 8.18951 6.3734 9.45584 7.15445 10.2369L12.9175 15.9999L7.15445 21.7629C6.3734 22.544 6.3734 23.8103 7.15445 24.5914L7.40846 24.8454C8.18951 25.6264 9.45584 25.6264 10.2369 24.8454L15.9998 19.0825L21.7631 24.8458C22.5441 25.6269 23.8104 25.6269 24.5915 24.8458L24.8455 24.5918C25.6265 23.8108 25.6265 22.5444 24.8455 21.7634L19.0825 16.0003L24.8455 10.2373C25.6265 9.45627 25.6265 8.18994 24.8455 7.40889L24.5915 7.15488C23.8104 6.37383 22.5441 6.37383 21.7631 7.15488L16.0002 12.9177L10.2369 7.15445C9.45584 6.3734 8.18951 6.3734 7.40846 7.15445L7.15445 7.40846Z" />
@@ -422,10 +432,12 @@ export default function LanguageCurrencyModal({
                              changes only the name in the row. Kept anyway — it is the behaviour
                              being reproduced, and the day a second bundle exists this is already
                              the line that would have to be here. */
+                          /* NO RELOAD. The original reloads to swap its compiled translation
+                             bundle; this build ships English only (see languages.js), so there is
+                             nothing to swap, and the list holds only languages the UI renders. */
                           onClick={() => {
                             setSetting('lang', code);
-                            onClose();
-                            window.location.reload();
+                            close();
                           }}
                         >
                           {/* 16px, measured off the original. `text-base` has to be explicit:
@@ -460,7 +472,7 @@ export default function LanguageCurrencyModal({
                               setSetting('localeCurrencyName', `${curr.code}FIAT`);
                               setSetting('enableLocaleCurrency', true);
                             }
-                            onClose();
+                            close();
                           }}
                         >
                           <div className="flex items-center gap-2">

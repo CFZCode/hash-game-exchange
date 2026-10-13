@@ -141,6 +141,9 @@ function merge(payload, summary, rakeback) {
 export function getRewards({ now, reloads } = {}) {
   const payload = buildRewards(now);
   if (USE_FIXTURES) return request(ENDPOINTS.bonus.rewards, { fixture: payload });
+  /* "Instant $BC" is bc.game's own token reward; this platform has no $BC and no such type, so
+     the live page does not draw the row at all. */
+  delete payload.rewards[RewardType.INSTANT_BC];
 
   return Promise.all([
     request(PLATFORM.user.bonus.summary, { live: true }).catch(emptyIfAgentBlocked(null)),

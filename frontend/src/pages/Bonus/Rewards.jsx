@@ -314,10 +314,12 @@ const trimAmount = (value) =>
 function Redeem() {
   const [code, setCode] = React.useState('');
   const [pending, setPending] = React.useState(false);
+  const [error, setError] = React.useState('');
 
   const submit = async () => {
     if (!code || pending) return;
     setPending(true);
+    setError('');
     try {
       const answer = await redeemBonusCode({ code });
       /* `REDEEMED!` is `_t`'s own heading. The amount is the platform's, which bc.game's screen
@@ -333,7 +335,11 @@ function Redeem() {
          in an error boundary whose fallback is `n => (Te.error(n), m.pop(), null)` — the bonus
          pages' `.error` (ring off, the gradient class), carrying the server's own message:
          "That redeem code is not valid", "…has already been used or has expired". */
-      bonusToast.error(failure?.message || 'That redeem code is not valid');
+      const message = failure?.message || 'That redeem code is not valid';
+      bonusToast.error(message);
+      /* ALSO INLINE, under the field — the gift-card dialog's idiom — so the refusal stays on
+         screen after the toast has gone and the visitor can see what to fix. The page stays put. */
+      setError(message);
     } finally {
       setPending(false);
     }
@@ -345,10 +351,17 @@ function Redeem() {
         <input
           className="input h-10 flex-1 !bg-input_darken text-sm font-semibold placeholder:text-quarterary"
           value={code}
-          onChange={(e) => setCode(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') submit();
+          onChange={(e) => {
+            setCode(e.target.value);
+            if (error) setError('');
           }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              submit();
+            }
+          }}
+          aria-invalid={error ? true : undefined}
           placeholder="Enter code here..."
         />
         <button
@@ -361,6 +374,11 @@ function Redeem() {
           Redeem
         </button>
       </div>
+      {error ? (
+        <p role="alert" className="mt-2 text-xs font-semibold text-error">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }

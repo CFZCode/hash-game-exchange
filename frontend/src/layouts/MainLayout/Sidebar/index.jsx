@@ -1,3 +1,4 @@
+import { LIVE_SUPPORT_AVAILABLE } from '../../../services/availability';
 import { brandLabel } from '../../../services/siteBranding';
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -13,7 +14,12 @@ import GiftCardDialog from '../../../components/modals/GiftCard';
 import { IconGift } from '../Header/AfterLogin/icons';
 import pwaImg from '../../../assets/pwa.png';
 import pwaLightImg from '../../../assets/pwa_w.png';
-import usdCoin from '../../../assets/icons/USD.png';
+import { languageName } from '../../../components/modals/LanguageCurrencyModal/languages';
+import { getAlias } from '../../../utils/currency';
+import { coinIcon } from '../../../utils/coinArt';
+
+/* The Application card — see its call site for why it is off. */
+const SHOW_APP_CARD = false;
 
 // BC Arrow SVG (used for dropdowns and chevrons)
 const ArrowSvg = ({ className }) => (
@@ -517,7 +523,11 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
               {/* ============================================================ */}
               {/* 1. APPLICATION BANNER  (expanded only)                        */}
               {/* ============================================================ */}
-              {isExpanded && (
+              {/* HIDDEN: its artwork (`pwa.png` / `pwa_w.png`) is a phone mock of BC.GAME's own
+                  site, and `/events/app-download-recall` is not built, so it was another brand's
+                  marketing linking to the catch-all. Parker567 ships no app; turn this back on
+                  with our own artwork and page if one is ever made. */}
+              {isExpanded && SHOW_APP_CARD && (
               <div className="sidebar-banner-block mb-2">
                 {/* `/events/app-download-recall`, the third arm of `Tt`'s host switch — the
                     other two are the Mexico and Kenya builds, and this one is the `when: !0`
@@ -746,6 +756,7 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
               {/* ============================================================ */}
               {/* 6. LIVE SUPPORT                                               */}
               {/* ============================================================ */}
+              {LIVE_SUPPORT_AVAILABLE && (
               <div className="Sidebar-Unit_bg nav-link-same rounded-lg">
                 <div className="nav-link-item mt-3 flex h-10 w-full cursor-pointer items-center overflow-hidden rounded-lg px-3 lg:mt-1 lg:p-0">
                   <div className="nav-scale-box center size-[32px] flex-none lg:size-10">
@@ -754,6 +765,7 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
                   <span className="sidebar-collapse-hide ml-2 whitespace-nowrap text-base font-semibold text-primary lg:ml-0 lg:text-sm">Live Support</span>
                 </div>
               </div>
+              )}
 
               {/* ============================================================ */}
               {/* 7. LANGUAGE & CURRENCY ROW                                   */}
@@ -771,7 +783,7 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
                     <div className="nav-scale-box center size-[32px] flex-none lg:size-10">
                       <GlobeSvg />
                     </div>
-                    <span className="sidebar-collapse-hide ms-2 whitespace-nowrap text-base font-semibold text-primary lg:ms-0 lg:text-sm">English</span>
+                    <span className="sidebar-collapse-hide ms-2 whitespace-nowrap text-base font-semibold text-primary lg:ms-0 lg:text-sm">{languageName(session.setting.lang)}</span>
                     <div className="sidebar-collapse-hide arrow-button ms-auto flex size-6 items-center justify-center rounded p-0 lg:me-2 lg:size-5">
                       <ArrowSvg className="rotate-180" />
                     </div>
@@ -783,9 +795,21 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
                     onClick={() => openLangModal('currency')}
                   >
                     <div className="nav-scale-box center size-[32px] flex-none lg:size-10">
-                      <img alt="coin" className="h-6 lg:h-5" src={usdCoin} />
+                      {/* THE ROWS PRINT THE SAME `setting` FIELDS THE PICKER WRITES, as Settings ›
+                          Preferences does. They were the literals "English" / "USD", so a pick
+                          landed in the store and the sidebar never moved. "None" (conversion
+                          off) draws the picker's own None disc. */}
+                      {session.setting.enableLocaleCurrency ? (
+                        <img alt="coin" className="h-6 lg:h-5" src={coinIcon(session.setting.localeCurrencyName)} />
+                      ) : (
+                        <span className="flex size-6 items-center justify-center rounded-full bg-[#6b7280] text-[0.625rem] font-black leading-none text-white lg:size-5">★</span>
+                      )}
                     </div>
-                    <span className="sidebar-collapse-hide ms-2 whitespace-nowrap text-base font-semibold text-primary lg:ms-0 lg:text-sm">USD</span>
+                    <span className="sidebar-collapse-hide ms-2 whitespace-nowrap text-base font-semibold text-primary lg:ms-0 lg:text-sm">
+                      {session.setting.enableLocaleCurrency
+                        ? getAlias(session.setting.localeCurrencyName).replace(/FIAT$/, '')
+                        : 'None'}
+                    </span>
                     <div className="sidebar-collapse-hide arrow-button ms-auto flex size-6 items-center justify-center rounded p-0 lg:me-2 lg:size-5">
                       <ArrowSvg className="rotate-180" />
                     </div>

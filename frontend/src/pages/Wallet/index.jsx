@@ -106,7 +106,9 @@ export default function WalletLayout() {
       /* `-mt-6` on the outer box and `pt-6` back on the heading: the shell pulls itself up under
          the header and the sticky strip re-adds the space, so the strip's background covers the
          gap when it pins. Same trick the Help Center heading documents. */
-      <div className="-mt-6">
+      /* `px-4 sm:px-0` — below sm `.main-layout-content` zeroes its gutter and every section
+         supplies its own (MainLayout.css); without it the wallet ran edge to edge at 390. */
+      <div className="-mt-6 px-4 sm:px-0">
         <Sticky className="z-40 bg-layer2">
           {/* `Show when={title && !mobile}` — the heading is dropped on a phone, where the
               dialog chrome carries it instead. That arm is the device test this file cannot
