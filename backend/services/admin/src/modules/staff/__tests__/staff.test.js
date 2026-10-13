@@ -733,10 +733,10 @@ test('admin staff', async (t) => {
     (await connection.models.Staff.findByPk(id, { attributes: ['must_change_password'], raw: true }))
       .must_change_password;
 
-  await t.test('a created account must change its password; its own change clears the flag', async () => {
+  await t.test("a created account keeps its creator's password; a superior's reset forces a change", async () => {
     const boss = await seedStaff(newStaffId(), { level: 3 });
     const created = await make(actorFor(boss), 4);
-    assert.equal(await mustChange(created.id), true);
+    assert.equal(await mustChange(created.id), false);
 
     await service.changePassword({
       actor: { id: created.id, level: 4 }, oldPassword: PASSWORD, newPassword: 'another long password',

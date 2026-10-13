@@ -6,7 +6,7 @@ import path from 'node:path'
 
 import { FEATURE_CATALOGUE, FEATURE_KEYS, FEATURE_OPTIONS, FLAG_KEYS, isPolicy, isVariantOf, resolveOptions } from '@/configs/entitlementCatalogue'
 import { serverConfig } from '@/configs/site'
-import { pinToUi } from '@/configs/siteUi'
+import { pinToUi, SITE_UI } from '@/configs/siteUi'
 import { DEFAULT_TEMPLATE, resolveTemplateKey, templateByKey, TEMPLATE_KEYS } from '@/configs/templateCatalogue'
 import { HttpError } from '@/lib/owner/guard'
 import { brandingProblem, BRANDING_SLOTS, cleanBranding, type Branding } from './branding'
@@ -33,6 +33,17 @@ function complete(map: Record<string, unknown> | undefined, keys: string[]) {
   for (const [key, value] of Object.entries(map ?? {})) if (!(key in out)) out[key] = value !== false
 
   return out
+}
+
+/**
+ * A feature this UI does not have (siteUi `absent`) reads as OFF even before the owner's next
+ * save writes it: a key added to the catalogue later (e.g. `p2p`) would otherwise read as
+ * entitled from a document that predates it, while the panel shows it off.
+ */
+function offWhereAbsent(features: Record<string, boolean>) {
+  for (const [key, s] of Object.entries(SITE_UI)) if (s.status === 'absent') features[key] = false
+
+  return features
 }
 
 /** Only catalogue features, only their own variant keys; anything else is dropped (read) or refused (save). */
@@ -133,7 +144,7 @@ export async function readEntitlements(): Promise<EntitlementsDoc> {
     // An old name (e.g. from before the rename) reads as its current key; a file without one
     // runs DEFAULT_TEMPLATE, and the next save writes it — nothing is written here.
     template: typeof stored.template === 'string' && stored.template ? resolveTemplateKey(stored.template) : DEFAULT_TEMPLATE,
-    features: complete(stored.features, FEATURE_KEYS),
+    features: offWhereAbsent(complete(stored.features, FEATURE_KEYS)),
     flags: complete(stored.flags, FLAG_KEYS),
 
     // Absent in an older document: the backend then keeps the site's current variants.

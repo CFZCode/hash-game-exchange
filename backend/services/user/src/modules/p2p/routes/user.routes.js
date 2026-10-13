@@ -1,7 +1,7 @@
 'use strict';
 
 const { Router } = require('express');
-const { validate, createRateLimiter, refuseCustomCurrencies, noQuery } = require('@ibitplay/common');
+const { validate, createRateLimiter, refuseCustomCurrencies, noQuery, entitlements } = require('@ibitplay/common');
 const { denyAgentPlayer } = require('@ibitplay/auth');
 
 const v = require('../p2p.validators');
@@ -33,6 +33,8 @@ module.exports = function userRoutes(deps) {
     admin: buildP2pAdminService(deps),
   });
   const router = Router();
+  // Not in the owner's plan: every route answers 403 NOT_ENTITLED.
+  router.use(entitlements.requireFeature('p2p'));
   // Custom coins (owner-created, no provider behind them) never reach this module: CURRENCY_NOT_SUPPORTED_FOR_P2P.
   router.use(refuseCustomCurrencies('P2P'));
 

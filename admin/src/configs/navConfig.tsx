@@ -229,7 +229,8 @@ export const navItems: NavItem[] = [
 
       // Player-to-player tips (read-only). Hidden when the owner left `tips` out of the plan.
       { icon: 'HandCoins', label: 'Tips', href: '/tips', permission: 'reports:read', feature: 'tips' },
-      { icon: 'Handshake', label: 'P2P trading', href: '/p2p', permission: 'config:write' }
+      // Hidden when the owner left `p2p` out of the plan (the /admin/p2p routes refuse it too).
+      { icon: 'Handshake', label: 'P2P trading', href: '/p2p', permission: 'config:write', feature: 'p2p' }
     ]
   },
   {
