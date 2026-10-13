@@ -13,6 +13,13 @@ function createAdminController({ service }) {
     adjust: asyncHandler(async (req, res) => {
       await service.assertPlayerVisible(req.staff.id, req.body.userId);
 
+      // One key per submit (body, or the standard header). The same key again is
+      // a retry and is replayed with `replayed: true`; see `WalletService.adminAdjust`.
+      const headerKey = req.headers?.['idempotency-key'];
+      if (!req.body.idempotencyKey && headerKey && /^[A-Za-z0-9:_-]{8,80}$/.test(headerKey.trim())) {
+        req.body = { ...req.body, idempotencyKey: headerKey.trim() };
+      }
+
       /**
        * ONLY the platform owner creates money. Every other staff session —
        * Admin and Sub Admin included, and any executive — moves money between

@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, type ReactNode } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 
 import { useQuery } from '@tanstack/react-query'
 import { ImageIcon, WalletIcon } from 'lucide-react'
+import { toast } from 'sonner'
 
 import FormDialog from '@/components/shared/FormDialog'
 import { SelectField, TextAreaField, TextField } from '@/components/shared/FormField'
@@ -98,6 +99,12 @@ export const ImageDialog = ({ path, title, label = 'View' }: { path: string; tit
 }
 
 
+/** A fresh per-submit idempotency key (UUID where the browser has one). */
+const newIdempotencyKey = () =>
+  typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? `ui-${crypto.randomUUID()}`
+    : `ui-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`
+
 /** Stops a row click from also firing when an action button inside the row is pressed. */
 export const stop = (e: React.MouseEvent) => e.stopPropagation()
 
@@ -119,17 +126,32 @@ export const AdjustWalletDialog = ({ userId, userName, currencies, invalidate = 
   const list = agentTree ? ['INR'] : Array.from(new Set([...(currencies ?? []), ...registry]))
   const [form, setForm] = useState({ currency: list[0], amount: '', operation: 'credit', description: '', transactionPassword: '' })
 
+  /*
+   * One idempotency key per submit. A retry of the SAME submit (double-click, a request that
+   * timed out) reuses the key and the server replays it; once a submit succeeds, or the figures
+   * change, the next Apply gets a new key — so a deliberate second identical adjustment goes through.
+   */
+  const submitKey = useRef<{ fingerprint: string; key: string } | null>(null)
+
   const adjust = useApiMutation({
     fn: () => {
       const body: Record<string, string | number> = { userId: Number(userId), currency: agentTree ? 'INR' : form.currency, amount: form.amount, operation: form.operation, description: form.description }
+      const fingerprint = JSON.stringify([body.userId, body.currency, body.amount, body.operation, body.description])
+
+      if (submitKey.current?.fingerprint !== fingerprint) submitKey.current = { fingerprint, key: newIdempotencyKey() }
+      body.idempotencyKey = submitKey.current.key
 
       if (form.transactionPassword) body.transactionPassword = form.transactionPassword
 
-      return api.post('admin/user/wallet/adjust', body)
+      return api.post<{ replayed?: boolean }>('admin/user/wallet/adjust', body)
     },
     invalidate: [['paged', 'admin/user/wallet/balances'], ['api', `admin/reports/players/${userId}`], ['api', `admin/user/wallet/${userId}/balances`], ['paged', `admin/user/wallet/${userId}/history`], ['api', 'admin/accounts/float'], ...invalidate],
-    success: 'Balance adjusted',
-    onSuccess: () => setForm(f => ({ ...f, amount: '', description: '', transactionPassword: '' }))
+    onSuccess: result => {
+      submitKey.current = null
+      if (result?.replayed) toast.info('Already processed — this adjustment was applied once; nothing was moved again')
+      else toast.success('Balance adjusted')
+      setForm(f => ({ ...f, amount: '', description: '', transactionPassword: '' }))
+    }
   })
 
   return (

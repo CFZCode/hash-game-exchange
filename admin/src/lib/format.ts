@@ -6,6 +6,7 @@ export function formatMoney(value: string | number | null | undefined, currency?
 
   if (!Number.isFinite(n)) return String(value)
   const digits = opts.digits ?? (Math.abs(n) >= 1000 ? 2 : n === Math.trunc(n) ? 0 : 2)
+
   const s = new Intl.NumberFormat('en-IN', {
     minimumFractionDigits: digits,
     maximumFractionDigits: Math.max(digits, 2),
@@ -13,6 +14,25 @@ export function formatMoney(value: string | number | null | undefined, currency?
   }).format(n)
 
   return currency ? `${s} ${currency}` : s
+}
+
+/**
+ * An exact decimal amount for display without padding: grouping on the whole part, trailing zeros
+ * dropped from the fraction (kept up to 8 places, so crypto keeps its precision). Works on the
+ * STRING, so nothing is rounded: "1000.00000000" → "1,000", "0.00012300" → "0.000123".
+ */
+export function formatAmount(value: string | number | null | undefined, currency?: string) {
+  if (value === null || value === undefined || value === '') return '—'
+  const str = String(value).trim()
+  const m = /^(-?)(\d+)(?:\.(\d+))?$/.exec(str)
+
+  if (!m) return currency ? `${str} ${currency}` : str
+  const [, sign, whole, frac = ''] = m
+  const grouped = new Intl.NumberFormat('en-IN').format(BigInt(whole))
+  const trimmed = frac.slice(0, 8).replace(/0+$/, '')
+  const out = `${sign}${grouped}${trimmed ? `.${trimmed}` : ''}`
+
+  return currency ? `${out} ${currency}` : out
 }
 
 export function formatNumber(value: number | string | null | undefined) {
@@ -41,6 +61,7 @@ export function relativeTime(value: string | number | Date | null | undefined) {
   const diff = Date.now() - new Date(value).getTime()
   const abs = Math.abs(diff)
   const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })
+
   const units: [Intl.RelativeTimeFormatUnit, number][] = [
     ['year', 31536e6],
     ['month', 2592e6],

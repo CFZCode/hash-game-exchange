@@ -21,8 +21,11 @@ import { useCurrencyCodes } from './useCurrencyCodes'
  * `default_currency`, USDT unless set), never INR by accident. Where the screen offers it,
  * "every currency" is an explicit pick stored as `?currency=ALL`. A change goes back to page 1.
  */
-export function useCurrencyParam({ allowAll = false }: { allowAll?: boolean } = {}) {
-  const def = useDefaultCurrency()
+export function useCurrencyParam({ allowAll = false, defaultCode }: { allowAll?: boolean; defaultCode?: string } = {}) {
+  const site = useDefaultCurrency()
+
+  // A screen may override the site default for the caller (agent-tree staff: their players hold INR only).
+  const def = { code: defaultCode || site.code }
   const [raw, setRaw] = useQueryStates({ currency: parseAsString.withDefault(''), page: parseAsInteger }, { history: 'replace' })
   const picked = String(raw.currency ?? '').toUpperCase()
 

@@ -2,7 +2,7 @@
 
 const { Op, fn, col, literal, where: sqlWhere } = require('sequelize');
 const { money, resolveVipLadder, rewardCurrencyOf } = require('@ibitplay/common');
-const { canManagePromotions } = require('@ibitplay/auth');
+const { canManagePromotions, AGENT_TREE_LEVELS } = require('@ibitplay/auth');
 
 const errors = require('./reports.errors');
 const csv = require('./csv');
@@ -117,12 +117,13 @@ class ReportsService {
     // VIP standing is house-only (as on `reward-stats/vip` and the P&L costs):
     // an agent-tree caller gets `vip: null`, and the ladder is not even read.
     const house = canManagePromotions(staff);
-    const [credits, wagers, totals, ladder, bets] = await Promise.all([
+    const [credits, wagers, totals, ladder, bets, agentParents] = await Promise.all([
       this.#creditsFor(ids),
       this.#wagersFor(ids),
       this.#lifetimeTotalsFor(ids),
       house ? resolveVipLadder(this.models, { logger: this.logger }) : null,
       this.#betCountsFor(ids),
+      this.#agentTreeParents(rows.map((r) => r.parent_staff_id)),
     ]);
 
     return {
@@ -132,7 +133,12 @@ class ReportsService {
           user,
           credits.get(String(user.id)),
           wagers.get(String(user.id)),
-          { totals: totals.get(String(user.id)), ladder, bets: bets.get(String(user.id)) ?? 0 }
+          {
+            totals: totals.get(String(user.id)),
+            ladder,
+            bets: bets.get(String(user.id)) ?? 0,
+            agentTree: agentParents.has(Number(user.parent_staff_id)),
+          }
         )
       ),
     };
@@ -150,7 +156,7 @@ class ReportsService {
     const user = await this.#assertVisible(staff, userId);
 
     const house = canManagePromotions(staff);
-    const [credits, wagers, totals, ladder, bets, lockRow] = await Promise.all([
+    const [credits, wagers, totals, ladder, bets, lockRow, agentParents] = await Promise.all([
       this.#creditsFor([user.id]),
       this.#wagersFor([user.id]),
       this.#lifetimeTotalsFor([user.id]),
@@ -160,6 +166,7 @@ class ReportsService {
         attributes: ['system_locked', 'casino_locked', 'sports_betlocked', 'withdraw_locked'],
         raw: true,
       }),
+      this.#agentTreeParents([user.parent_staff_id]),
     ]);
 
     const report = this.#describePlayer(user, credits.get(String(user.id)), wagers.get(String(user.id)), {
@@ -167,6 +174,7 @@ class ReportsService {
       totals: totals.get(String(user.id)),
       ladder,
       bets: bets.get(String(user.id)) ?? 0,
+      agentTree: agentParents.has(Number(user.parent_staff_id)),
     });
     return {
       ...report,
@@ -708,8 +716,13 @@ class ReportsService {
         staffId: full.parent_staff_id != null ? String(full.parent_staff_id) : null,
         staffName: agent?.name ?? null,
         staffEmail: agent?.email ?? null,
-        // Anchored to the CALLER, not merely to some agent.
-        isDirect: full.parent_staff_id != null && Number(full.parent_staff_id) === Number(staff.id),
+        // A direct (house) player: no parent staff, or a house account above it
+        // (Super Admin / Admin / Sub Admin). The same whoever is looking — it
+        // used to mean "the caller's own player", so an Agent saw its own
+        // agent player labelled "Direct player".
+        isDirect: !(await this.#agentTreeParents([full.parent_staff_id])).has(Number(full.parent_staff_id)),
+        // The caller's own player (its direct child), which is what `isDirect` used to say.
+        isOwnPlayer: full.parent_staff_id != null && Number(full.parent_staff_id) === Number(staff.id),
         lastIp: lastLogin?.ip_address ?? null,
         lastLoginAt: lastLogin?.created_at ?? null,
         lastLocation: {
@@ -1922,7 +1935,31 @@ class ReportsService {
     return new Map(rows.map((r) => [String(r.user_id), Number(r.n)]));
   }
 
-  #describePlayer(user, credits, wager, { verbose = false, totals, ladder, bets = 0 } = {}) {
+  /**
+   * Which of these parent staff ids sit in the agent tree (Super Master,
+   * Master, Agent). A player under one of them is an AGENT player; a player
+   * with no parent, or under a house account (Super Admin, Admin, Sub Admin),
+   * is a direct / house player — whoever is looking.
+   *
+   * @returns {Promise<Set<number>>}
+   */
+  async #agentTreeParents(parentIds) {
+    const ids = [...new Set(parentIds.filter((id) => id != null).map(Number))].filter(Number.isSafeInteger);
+    if (!ids.length) return new Set();
+    const rows = await this.models.Staff.findAll({
+      where: { id: ids },
+      attributes: ['id', 'role_id'],
+      raw: true,
+    });
+    const roleIds = [...new Set(rows.map((r) => r.role_id).filter((r) => r != null))];
+    const roles = roleIds.length
+      ? await this.models.Roles.findAll({ where: { id: roleIds }, attributes: ['id', 'level'], raw: true })
+      : [];
+    const levelOf = new Map(roles.map((r) => [Number(r.id), Number(r.level)]));
+    return new Set(rows.filter((r) => AGENT_TREE_LEVELS.includes(levelOf.get(Number(r.role_id)))).map((r) => Number(r.id)));
+  }
+
+  #describePlayer(user, credits, wager, { verbose = false, totals, ladder, bets = 0, agentTree = user.parent_staff_id != null } = {}) {
     // `fromStored`, not `toMinor`: `credits` is bare `numeric`, and real rows
     // carry more than eight decimal places. `toMinor` refuses those, which
     // turned one over-precise balance into a 400 for the whole listing.
@@ -1941,8 +1978,11 @@ class ReportsService {
       // Lifetime bets from the ledger (see #betCountsFor), not `users.games_played`.
       gamesPlayed: bets,
       referralCode: user.referalcode ?? null,
-      channel: user.parent_staff_id == null ? 'direct' : 'agent',
-      agentId: user.parent_staff_id ?? null,
+      // From the parent's LEVEL, not from "has a parent": a player created by a
+      // house account (e.g. the Super Admin) is a direct player, not an agent's.
+      channel: agentTree ? 'agent' : 'direct',
+      agentId: agentTree ? user.parent_staff_id ?? null : null,
+      ownerStaffId: user.parent_staff_id ?? null,
 
       /**
        * All four of these were zero in legacy. `credits` has no `balance`,

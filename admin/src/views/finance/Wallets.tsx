@@ -13,6 +13,7 @@ import { Switch } from '@/components/ui/switch'
 import { useListState, usePagedApi } from '@/hooks/use-api'
 import { CurrencySelect, useCurrencyChoices, useCurrencyParam } from './currencyFilter'
 import { AdjustWalletDialog, stop } from './shared'
+import { useIsAgentTree } from './StaffFloat'
 import type { WalletBalanceRow } from './types'
 
 const LIST = 'admin/user/wallet/balances'
@@ -67,7 +68,10 @@ const Wallets = () => {
 
   // One currency at a time — the site's default coin until somebody picks another (in the URL).
   // By default only players who hold it; `?holders=all` lists everybody with that column.
-  const cur = useCurrencyParam()
+  // Agent-tree staff (Super Master / Master / Agent): their players hold INR only (the float is
+  // INR), so INR is their default; house staff keep the site's default coin.
+  const agentTree = useIsAgentTree()
+  const cur = useCurrencyParam({ defaultCode: agentTree ? 'INR' : undefined })
   const choices = useCurrencyChoices()
   const holdersOnly = state.holders !== 'all'
 

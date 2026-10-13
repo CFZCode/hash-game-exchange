@@ -80,7 +80,8 @@ const FeatureFlags = () => {
 
       <div className='grid gap-6 lg:grid-cols-2'>
         {groups.map(group => {
-          const keys = group.keys.filter(k => k in draft && (!q || k.includes(q) || flagLabel(k).toLowerCase().includes(q)))
+          // A flag the owner left out of the plan is not listed at all (it cannot be switched on here).
+          const keys = group.keys.filter(k => k in draft && flagEntitled(k) && (!q || k.includes(q) || flagLabel(k).toLowerCase().includes(q)))
 
           if (flags.data && keys.length === 0) return null
 

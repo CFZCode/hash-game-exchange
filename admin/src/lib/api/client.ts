@@ -94,7 +94,14 @@ export async function request<T>(path: string, opts: RequestOptions = {}): Promi
 
   if (!json.success) {
     // Some error bodies carry `success: false` without an `error` block.
-    const error: { code?: string; message?: string; details?: Record<string, unknown> } = (json as { error?: typeof error }).error ?? {}
+    // The sports service (mssports port) answers `{ success: false, error: '<text>' }` or
+    // `{ success: false, message: '<text>' }` — keep that text instead of "Request failed".
+    const failed = json as { error?: unknown; message?: unknown }
+
+    const error: { code?: string; message?: string; details?: Record<string, unknown> } =
+      failed.error && typeof failed.error === 'object'
+        ? (failed.error as typeof error)
+        : { message: typeof failed.error === 'string' ? failed.error : typeof failed.message === 'string' ? failed.message : undefined }
 
     if (res.status === 401 && typeof window !== 'undefined' && !location.pathname.startsWith('/login') && error.code === 'UNAUTHENTICATED') {
       location.assign(`/login?next=${encodeURIComponent(location.pathname)}`)

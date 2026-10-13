@@ -36,6 +36,10 @@ export type Exposure = Record<string, unknown> & {
   openBets?: number
 }
 
+/**
+ * A market with open bets, from the sports service's manual-settle routes
+ * (`admin/sports/internalsettle/momatches | fanmatches`) — camelCase there.
+ */
 export type SettlementMatch = Record<string, unknown> & {
   match_id?: string
   matchId?: string
@@ -48,34 +52,16 @@ export type SettlementMatch = Record<string, unknown> & {
   game_type?: string
   gameType?: string
   openBets?: number
-  bets?: number
+  totalBets?: number
+  selectionName?: string
+  runners?: unknown[] | null
 }
 
-export type SettledMarket = SettlementMatch & { settledAt?: string; settled_at?: string; winnerName?: string; winner_name?: string }
-
-export type SportRow = { id: number; gameId: number; gameName: string; enabled: boolean }
-
-export type FancyControl = {
-  id?: number
-  eventId: string
-  eventName?: string | null
-  marketId: string
-  marketName?: string | null
-  showFancy: boolean
-  updatedAt?: string
-}
-
-export type MarketResult = Record<string, unknown> & {
-  id?: number
-  matchId?: string
-  match_id?: string
-  matchTitle?: string
-  marketType?: string
-  market_type?: string
-  winnerName?: string
-  winner_name?: string
-  userId?: number | string
-  username?: string
-  amount?: string
-  createdAt?: string
+/** `admin/sports/internalsettle/settled-markets` — one row per match + market settled in the last 24 h. */
+export type SettledMarket = SettlementMatch & {
+  settledAt?: string
+  settled_at?: string
+  totalEntries?: number
+  totalUsers?: number
+  totalNetAmount?: number
 }

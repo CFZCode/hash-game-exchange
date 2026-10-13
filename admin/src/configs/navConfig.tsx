@@ -283,7 +283,6 @@ export const navItems: NavItem[] = [
         childItems: [
           { label: 'Bets', href: '/sports/bets', permission: 'sports:read' },
           { label: 'Settlement', href: '/sports/settlement', permission: 'sports:settle' },
-          { label: 'Results', href: '/sports/results', permission: 'sports:read' },
           { label: 'Catalogue & locks', href: '/sports/catalogue', permission: 'sports:read' },
 
           // The wager report reads `admin/reports/wager-stats` (reports:read, tree-scoped), so a
@@ -312,12 +311,13 @@ export const navItems: NavItem[] = [
       { icon: 'Bell', label: 'Notifications', href: '/content/notifications', permission: ['users:read', 'config:write'], feature: 'notifications' },
       {
         /*
-         * OneSignal web push. Not gated on `push_notifications`: when the owner has it off the
-         * pages still open and their status card says so (campaigns then write bell rows only).
+         * OneSignal web push. Hidden when the owner left `push_notifications` out of the plan —
+         * every page would only say "Not in your plan". The routes still open from a direct link.
          */
         icon: 'BellRing',
         label: 'Push notifications',
         permission: 'config:read',
+        feature: 'push_notifications',
         childItems: [
           { label: 'Compose', href: '/push/compose' },
           { label: 'Campaigns', href: '/push/campaigns' },

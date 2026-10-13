@@ -99,15 +99,55 @@ test('wallet adjust routing', async (t) => {
     assert.ok(!service.calls.some((c) => c[0] === 'adminAdjust'));
   });
 
-  await t.test('agentAdjust forwards a derived idempotency key to admin-service', async () => {
+  await t.test('agentAdjust forwards the caller\'s per-submit idempotency key, namespaced by staff', async () => {
     const posted = [];
     const service = Object.create(WalletService.prototype);
     service.clients = { admin: { post: async (path, payload) => { posted.push([path, payload]); return { replayed: true }; } } };
 
-    await service.agentAdjust(body, { staffId: 9 });
+    await service.agentAdjust({ ...body, idempotencyKey: 'ui-0f2c9a7e-1111' }, { staffId: 9 });
     assert.equal(posted[0][0], '/internal/admin/accounts/player-adjust');
     assert.equal(posted[0][1].staffId, 9);
     assert.equal(posted[0][1].transactionPassword, 'tp');
-    assert.match(posted[0][1].idempotencyKey, /^adm:9:42:INR:credit:100:\d+$/);
+    assert.equal(posted[0][1].idempotencyKey, 'adm:9:ui-0f2c9a7e-1111');
+  });
+
+  await t.test('identical adjusts without a key are NOT deduplicated (no per-minute bucket)', async () => {
+    const posted = [];
+    const service = Object.create(WalletService.prototype);
+    service.clients = { admin: { post: async (path, payload) => { posted.push(payload); return { replayed: false }; } } };
+    service.pushBalances = async () => {};
+    await service.agentAdjust(body, { staffId: 9 }).catch(() => {});
+    await service.agentAdjust(body, { staffId: 9 }).catch(() => {});
+    assert.equal(posted.length, 2);
+    assert.notEqual(posted[0].idempotencyKey, posted[1].idempotencyKey);
+    assert.match(posted[0].idempotencyKey, /^adm:9:auto-/);
+  });
+
+  await t.test('adminAdjust uses the same key for a retry and a new key for a new submit', async () => {
+    const service = Object.create(WalletService.prototype);
+    const keys = [];
+    service.credit = async (input) => { keys.push(input.idempotencyKey); return {}; };
+    await service.adminAdjust({ ...body, idempotencyKey: 'submit-aaaaaaaa' }, { staffId: 1 });
+    await service.adminAdjust({ ...body, idempotencyKey: 'submit-aaaaaaaa' }, { staffId: 1 });
+    await service.adminAdjust({ ...body, idempotencyKey: 'submit-bbbbbbbb' }, { staffId: 1 });
+    assert.deepEqual(keys, ['adm:1:submit-aaaaaaaa', 'adm:1:submit-aaaaaaaa', 'adm:1:submit-bbbbbbbb']);
+  });
+
+  await t.test('the controller takes the key from the Idempotency-Key header when the body has none', async () => {
+    const svc = fakeService();
+    const ctrl = createAdminController({ service: svc });
+    await call(ctrl.adjust, {
+      staff: { id: 9, level: STAFF_LEVELS.AGENT, permissions: ['*'] },
+      body: { ...body },
+      headers: { 'idempotency-key': 'hdr-12345678' },
+    });
+    const agentCall = svc.calls.find((c) => c[0] === 'agentAdjust');
+    assert.equal(agentCall[1].idempotencyKey, 'hdr-12345678');
+  });
+
+  await t.test('the validator accepts a per-submit key and refuses a malformed one', () => {
+    const v = require('../wallet.validators');
+    assert.equal(v.adminAdjust.body.safeParse({ ...body, idempotencyKey: 'ab12cd34-ef56' }).success, true);
+    assert.equal(v.adminAdjust.body.safeParse({ ...body, idempotencyKey: 'bad key with spaces' }).success, false);
   });
 });

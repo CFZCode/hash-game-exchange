@@ -129,6 +129,35 @@ test('user risk and geo stats against a database', async (t) => {
   const asA = { id: agentA, permissions: ['*'] };
   const asB = { id: agentB, permissions: ['*'] };
 
+  await t.test('isDirect means "no agent-tree parent", not "the caller\'s own player"', async () => {
+    // agentA is an Agent (level 6): its own player is an AGENT player, even to itself.
+    const own = await service.userRisk({ staff: asA, userId: playerA1 });
+    assert.equal(own.user.isDirect, false);
+    assert.equal(own.user.isOwnPlayer, true);
+    const listed = await service.playerReport({ staff: asA, userId: playerA1 });
+    assert.equal(listed.channel, 'agent');
+    assert.equal(Number(listed.agentId), agentA);
+
+    // A player under a HOUSE account (Super Admin) is a direct player.
+    const houseRole = (await models.Roles.findOne({ where: { level: 1 }, raw: true }))?.id;
+    const house = newId();
+    const housePlayer = newId();
+    await models.Staff.create({ id: house, name: `risk-h-${house}`, email: `risk-h${house}@t.test`, password: 'x', role_id: houseRole, parent_id: null });
+    await models.Users.create({ id: housePlayer, name: `risk-hp-${housePlayer}`, password: 'x', status: 'active', parent_staff_id: house });
+    try {
+      const asHouse = { id: house, level: 1, permissions: ['*'] };
+      const r = await service.userRisk({ staff: asHouse, userId: housePlayer });
+      assert.equal(r.user.isDirect, true);
+      const report = await service.playerReport({ staff: asHouse, userId: housePlayer });
+      assert.equal(report.channel, 'direct');
+      assert.equal(report.agentId, null);
+    } finally {
+      await models.UserLoginHistory.destroy({ where: { user_id: housePlayer } });
+      await models.Users.destroy({ where: { id: housePlayer } });
+      await models.Staff.destroy({ where: { id: house } });
+    }
+  });
+
   await t.test("a rival's player is a 404, not a 403", async () => {
     await assert.rejects(
       () => service.userRisk({ staff: asA, userId: playerB }),

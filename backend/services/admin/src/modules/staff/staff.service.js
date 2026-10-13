@@ -19,6 +19,9 @@ const { assertTransactionPassword } = require('../staff-auth/transactionPassword
 const { cascadeSuspension } = require('../locks/suspendCascade');
 
 /** `status` NULL is the legacy default and reads as active everywhere. */
+/** `players.constants.js` CLOSED_STATUS: an account closed and anonymised by `PlayersService.close`. */
+const CLOSED_PLAYER_STATUS = 'closed';
+
 const isActive = (status) => status == null || status === 'active';
 
 /**
@@ -800,10 +803,22 @@ class StaffService {
       throw errors.CANNOT_DELETE_WITH_BALANCE({ staffId, balance: String(balance.inr) });
     }
 
-    const players = await this.models.Users.count({ where: { parent_staff_id: staffId } });
+    // A closed (anonymised) player is a financial record, not a live account:
+    // it does not keep its agent alive. Only open players block the delete.
+    const players = await this.models.Users.count({
+      where: { parent_staff_id: staffId, status: { [Op.or]: [{ [Op.ne]: CLOSED_PLAYER_STATUS }, { [Op.is]: null }] } },
+    });
     if (players) throw errors.CANNOT_DELETE_WITH_DESCENDANTS({ staffId, players });
 
     return this.db.transaction(async (transaction) => {
+      // `users.parent_staff_id` references `staff`, so the closed players move
+      // up to the deleted account's own parent — their ledger and transfer rows
+      // stay joinable through a live branch.
+      const row = await this.models.Staff.findByPk(staffId, { attributes: ['parent_id'], transaction, raw: true });
+      await this.models.Users.update(
+        { parent_staff_id: row?.parent_id ?? null },
+        { where: { parent_staff_id: staffId, status: CLOSED_PLAYER_STATUS }, transaction }
+      );
       await this.models.StaffHierarchy.destroy({
         where: { [Op.or]: [{ ancestor_id: staffId }, { descendant_id: staffId }] },
         transaction,
@@ -964,7 +979,7 @@ class StaffService {
     this.#assertLevelBelow(actor.level, level);
     if (Number(actor.level) === STAFF_LEVELS.SUPER_ADMIN) return;
     if (!canCreateLevel(actor.level, level)) {
-      throw errors.LEVEL_NOT_BELOW({
+      throw errors.LEVEL_NOT_DIRECT_CHILD({
         level,
         reason: 'you can only create the level directly below your own',
       });
@@ -975,7 +990,7 @@ class StaffService {
   #assertChildOfParent(actor, parentLevel, level) {
     if (Number(actor.level) === STAFF_LEVELS.SUPER_ADMIN) return;
     if (!canCreateLevel(parentLevel, level)) {
-      throw errors.LEVEL_NOT_BELOW({ level, reason: 'the new account must be the level directly below its parent' });
+      throw errors.LEVEL_NOT_DIRECT_CHILD({ level, reason: 'the new account must be the level directly below its parent' });
     }
   }
 

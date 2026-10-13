@@ -13,6 +13,8 @@ const { createLogger } = require('@ibitplay/common');
 const { hashPassword } = require('@ibitplay/auth');
 
 const { LordsService } = require('../../lords/lords.service');
+const { StaffService } = require('../../staff/staff.service');
+const { LocksService } = require('../locks.service');
 const { uplineBlock, betLockState, resolveStaff } = require('../../staff-directory/staffDirectory.service');
 
 /**
@@ -192,5 +194,67 @@ test('suspension cascade and agent-tree locks', async (t) => {
     await lords.setStatus({ actor, accountType: 'staff', accountId: master, status: 'active', transactionPassword: TXN });
     assert.equal(await lockOf(models.Staff, agent), false);
     assert.equal(await lockOf(models.Users, player), false);
+  });
+
+  // The routes the site admin actually calls: PATCH /admin/staff/:id {status}
+  // (StaffService.update) and POST /admin/locks {staffId, system} (LocksService).
+  // Each must reach the agent TWO levels down and that agent's player — the
+  // existing agent token (resolveStaff.uplineBlocked) and the player login
+  // (internal /staff/:id/access → uplineBlock includeSelf) included.
+  await t.test('PATCH /admin/staff status=suspended on a master blocks the agent, its token and its player', async () => {
+    const staffSvc = new StaffService({ models, db: connection, logger, config: { SERVICE_NAME: 'admin-service' }, clients: {} });
+    const actor = { id: sm, level: 4 };
+    // The read-back after the write may need other services; the write is what is under test.
+    const quiet = (p) => p.catch((err) => { if (!/client|fetch|ECONNREFUSED|undefined/i.test(String(err?.message))) throw err; });
+    await quiet(staffSvc.update({ actor, staffId: master, status: 'suspended' }));
+    try {
+      assert.equal(await lockOf(models.Staff, agent), true, 'agent system-locked by the cascade');
+      assert.equal(await lockOf(models.Users, player), true, 'agent player system-locked by the cascade');
+      assert.deepEqual((await resolveStaff(models, agent)).uplineBlocked, { staffId: master, reason: 'suspended' });
+      assert.ok(await uplineBlock(models, agent, { includeSelf: true }), 'player access check (agent + upline) refuses');
+      assert.equal(await lockOf(models.Users, otherPlayer), false, 'another tree is untouched');
+    } finally {
+      await quiet(staffSvc.update({ actor, staffId: master, status: 'active' }));
+    }
+    assert.equal(await lockOf(models.Staff, agent), false);
+    assert.equal(await lockOf(models.Users, player), false);
+    assert.equal((await resolveStaff(models, agent)).uplineBlocked, null);
+    assert.equal(await uplineBlock(models, agent, { includeSelf: true }), null);
+  });
+
+  await t.test('POST /admin/locks {staffId: master, system: true} locks the whole branch; unlocking lifts it', async () => {
+    const locks = new LocksService({ models, db: connection, logger, config: { SERVICE_NAME: 'admin-service' } });
+    const actor = { id: sm, level: 4 };
+    const out = await locks.updateLocks({ actor, staffId: master, locks: { system: true } });
+    try {
+      assert.ok(out.agentsInSubtree >= 2, 'the master and every account beneath it');
+      assert.equal(out.playersAffected, 1);
+      assert.equal(await lockOf(models.Staff, master), true);
+      assert.equal(await lockOf(models.Staff, agent), true);
+      assert.equal(await lockOf(models.Users, player), true);
+      assert.ok((await resolveStaff(models, agent)).uplineBlocked, 'existing agent token refused');
+    } finally {
+      await locks.updateLocks({ actor, staffId: master, locks: { system: false } });
+    }
+    assert.equal(await lockOf(models.Staff, agent), false);
+    assert.equal(await lockOf(models.Users, player), false);
+  });
+
+  // QA's reported "regression": each level had been created by a DIFFERENT
+  // demo account (new accounts report to their creator), so the "child" agent
+  // reported to another master. That agent is outside the branch and is
+  // rightly untouched.
+  await t.test('an agent that reports to another master is outside the suspended branch', async () => {
+    const otherMaster = await seedStaff(5, sm);
+    const strayAgent = await seedStaff(6, otherMaster);
+    const strayPlayer = await seedPlayer(strayAgent);
+    const actor = { id: sm, level: 4 };
+    await lords.setStatus({ actor, accountType: 'staff', accountId: master, status: 'suspended', transactionPassword: TXN });
+    try {
+      assert.equal(await lockOf(models.Staff, strayAgent), false);
+      assert.equal(await lockOf(models.Users, strayPlayer), false);
+    } finally {
+      await lords.setStatus({ actor, accountType: 'staff', accountId: master, status: 'active', transactionPassword: TXN });
+    }
   });
 });

@@ -127,6 +127,7 @@ export type PlayerRisk = {
     staffName: string | null
     staffEmail: string | null
     isDirect: boolean
+    isOwnPlayer?: boolean
     lastIp: string | null
     lastLoginAt: string | null
   }

@@ -2514,6 +2514,7 @@ the service layer, so a code is reachable from any route in its module.
 | `409` | `STAFF_CANNOT_DELETE_WITH_BALANCE` | This account still holds a balance — move it first |
 | `403` | `STAFF_NOT_PERMITTED` | Your role does not permit that |
 | `403` | `STAFF_LEVEL_NOT_BELOW` | You can only manage accounts below your own level |
+| `403` | `STAFF_LEVEL_NOT_DIRECT_CHILD` | You can only create the level directly below your own |
 | `422` | `STAFF_UNKNOWN_ROLE` | No such role |
 | `403` | `STAFF_PASSWORD_CHANGE_REQUIRED` | Set a new password before doing anything else |
 | `400` | `STAFF_OLD_PASSWORD_WRONG` | The current password is not correct |
