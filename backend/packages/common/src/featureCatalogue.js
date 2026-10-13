@@ -141,6 +141,12 @@ const GENERATED = [
           "builtFor": "stake-site"
         },
         {
+          "key": "redeem_dialog",
+          "label": "Sidebar card and redeem dialog",
+          "description": "Sidebar Gift Card card and redeem dialog. The player types the card's code; a card with no deposit or wager condition is claimed at once, one with conditions is activated.",
+          "builtFor": "hash-games"
+        },
+        {
           "key": "none",
           "label": "Off",
           "description": "No gift card surface."
@@ -803,12 +809,12 @@ const TEMPLATES = Object.freeze({
     // every feature to them (owner-panel/src/configs/siteUi.ts).
     "hash_game": {
       "label": "Hash Game (original)",
-      "description": "Hash Game (original): this site's own UI in its original colours, no theme applied. VIP, bonus, referral, promotions, daily contest, weekly raffle, quests, vault, swap, notifications and KYC.",
+      "description": "Hash Game (original): this site's own UI in its original colours, no theme applied. VIP, bonus, referral, promotions, daily contest, weekly raffle, quests, vault, swap, notifications, KYC and gift cards.",
       "variants": {
         "vip": "ring_panel",
         "promotions": "event_list",
         "spin_wheel": "none",
-        "gift_cards": "none",
+        "gift_cards": "redeem_dialog",
         "bonus": "reward_hub",
         "affiliate": "referral_hub",
         "races": "daily_contest",

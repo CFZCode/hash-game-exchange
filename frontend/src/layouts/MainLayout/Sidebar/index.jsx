@@ -9,7 +9,9 @@ import { useSession } from '../../../context/session';
 import { useGates } from '../../../context/gates';
 import { useSettings } from '../../../context/settings';
 import './Sidebar.css';
-import bcTokenLogo from '../../../assets/bc_token_logo.png';
+import SportsMenu from './SportsMenu';
+import GiftCardDialog from '../../../components/modals/GiftCard';
+import { IconGift } from '../Header/AfterLogin/icons';
 import pwaImg from '../../../assets/pwa.png';
 import pwaLightImg from '../../../assets/pwa_w.png';
 import usdCoin from '../../../assets/icons/USD.png';
@@ -73,7 +75,7 @@ const HeadphonesSvg = () => (
 // Games and Providers all land on the real page with the right tab lit. Sports lands on the
 // real sportsbook. Promotions' four rows were already real.
 //
-// It costs the honest 404. BC Exclusive, Bingo and Provider BTi have no
+// It costs the honest 404. BC Exclusive and Bingo have no
 // page here, so they keep their URL and render Home under it. Those
 // are the rows to give a real page next; the paths are already correct, so building the page is
 // the whole job. Quest Hub and Bonus were both on that list and are now built — `/quests` and
@@ -316,6 +318,7 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
   /* The Refer and Earn dialog. Local state rather than a route, because it is not one on the
      original either — `Enter` pushes it onto the popup stack in response to the row's event. */
   const [referOpen, setReferOpen] = useState(false);
+  const [giftOpen, setGiftOpen] = useState(false);
 
   // Row body expands only — it never collapses. Clicking an already-open row is a
   // no-op for expansion. Collapsing is the arrow's job.
@@ -364,6 +367,17 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
     setReferOpen(true);
   };
 
+  /* The Gift Card card (in the BC Token card's slot): signed out, the sign-in dialog, as the
+     Refer and Earn row does; signed in, the redeem dialog as local state. */
+  const openGiftCard = () => {
+    if (onCloseMobile) onCloseMobile();
+    if (!session.login) {
+      navigate('/login/signin');
+      return;
+    }
+    setGiftOpen(true);
+  };
+
   // Main nav items with submenu data from original HTML
   const mainNavItems = [
     {
@@ -392,12 +406,10 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
     },
     {
       id: 'sports', label: 'Sports', colorIcon: 'sports', hasArrow: true, href: '/sports',
-      subItems: [
-        { label: 'Provider Betby', menuIcon: 'sports_global', href: '/sports', hasSubArrow: true },
-        { label: 'Provider BTi', menuIcon: 'sports_korea', href: '/bti', hasSubArrow: true },
-        // Provider BZ is in the bundle's menu data but is not shown on the live site,
-        // same as the Pachinko / Pachislot / Crash Games entries under Casino.
-      ]
+      /* The exchange's sports tree, not a fixed list — see SportsMenu.jsx. The original's
+         "Provider Betby" / "Provider BTi" rows are gone: this platform has neither. */
+      tree: 'sports',
+      subItems: [],
     },
     /* DELIBERATE DEPARTURE FROM THE ORIGINAL, on the user's request: bc.game's menu has a
        Predictions row here (`/predictions`) and a Crypto Futures group (`/trading/contract`,
@@ -423,30 +435,6 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
         { label: 'View All', menuIcon: 'view_all', href: '/promotions/promotion' },
       ]
     },
-  ];
-
-  /* Sponsorships sits below the bottom group but behaves like the nav items above.
-     Every path is `Ut`'s in index-DuwOs_Mv.js, and the slugs are worth reading rather than
-     pattern-matching off the labels: five of the fourteen are shortened in ways no rule would
-     produce — Colby Covington is `/sponsorship/colby`, Leicester City `/lcfc`, Sashimi Poker
-     `/sashimi`, Deccan Gladiators `/deccan` and Abu Dhabi T10 League `/abu`. None of these
-     pages is built, so all fourteen land on the catch-all; the paths are correct, which is
-     what makes building one of them a page-only job. */
-  const sponsorshipItems = [
-    { label: 'Sponsorship Journey', menuIcon: 'sponsorship', href: '/sponsorship/journey' },
-    { label: "O'HIGGINS", menuIcon: 'o_higgins', href: '/sponsorship/ohiggins' },
-    { label: 'Jason Derulo', menuIcon: 'jason_derulo', href: '/sponsorship/jason' },
-    { label: 'Lil Pump', menuIcon: 'lil_pump', href: '/sponsorship/lil-pump' },
-    { label: 'Colby Covington', menuIcon: 'colby_covington', href: '/sponsorship/colby' },
-    { label: 'Miami Club', menuIcon: 'miami', href: '/sponsorship/miami' },
-    { label: 'BC Game Esports', icon: 'bc-originals-svg', href: '/sponsorship/esports' },
-    { label: 'St. Kitts & Nevis Patriots', menuIcon: 'st_kitts', href: '/sponsorship/patriots' },
-    { label: 'Kwara United', menuIcon: 'kwara_united', href: '/sponsorship/kwara' },
-    { label: 'Sashimi Poker', menuIcon: 'sashimi_poker', href: '/sponsorship/sashimi' },
-    { label: 'Leicester City', menuIcon: 'leicester_city', href: '/sponsorship/lcfc' },
-    { label: 'KRASAVA', menuIcon: 'krasava', href: '/sponsorship/krasava' },
-    { label: 'Deccan Gladiators', menuIcon: 'deccan_gladiators', href: '/sponsorship/deccan' },
-    { label: 'Abu Dhabi T10 League', icon: 'bc-originals-svg', href: '/sponsorship/abu' },
   ];
 
   // Bottom group items (use menu_icon_img - grey sprite)
@@ -494,12 +482,12 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
        bare host. This build is en-US, so the empty arm is the only reachable one.
 
        Forum (between Referral and Provably Fair on the original) is removed on the user's
-       request — this platform has no forum. A deliberate departure; see the note over the
+       request — this platform has no forum. Sport Betting Insights (last, after Blog) is removed
+       on the user's request too, as is the Sponsorships group that sat below this block. A deliberate departure; see the note over the
        Predictions gap above. */
     { id: 'fair',         label: 'Provably Fair',         menuIcon: 'fair',           href: '/help/provably-fair' },
     { id: 'responsible',  label: 'Responsible Gambling',  menuIcon: 'account',        href: '/responsible/faq' },
     { id: 'blog',         label: 'Blog',                  menuIcon: 'blog',           external: true, gate: 'blog', href: 'https://blog.bc.game/' },
-    { id: 'betting',      label: 'Sport Betting Insights',menuIcon: 'betting_insights',external: true, href: 'https://betting.bc.game/' },
   ];
 
   return (
@@ -580,44 +568,40 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
               )}
 
               {/* ============================================================ */}
-              {/* 2. BC TOKEN TICKER  (expanded only)                           */}
+              {/* 2. GIFT CARD  (expanded only)                                 */}
               {/* ============================================================ */}
-              {isExpanded && (
+              {/* THE BC TOKEN CARD'S SLOT, REPURPOSED ON THE USER'S REQUEST. The original's `/bc`
+                  ticker (a token page this platform does not have, with a hard-coded price and
+                  holder count) is replaced by a Gift Card entry that keeps the card exactly:
+                  same `.bc-token-*` classes, padding, logo circle, title type and arrow button.
+                  The logo is the header's own gift glyph (`$r`, Enter-MsmOuq5R.js) and the price
+                  line becomes a one-line subtitle in the price row's place. Hidden when the
+                  owner's `gift_cards` feature or the site's `giftcards` flag is off, on a B2B
+                  site, and for an agent's player (services/gates.js `giftcards`). */}
+              {isExpanded && gates.on('giftcards') && (
               <div className="bc-token-entry">
-                {/* `/bc`, the BC Token page — `et`'s own link in index-DuwOs_Mv.js and what the
-                    rendered mobile DOM carries. Not built; lands on the catch-all. */}
-                <Link to="/bc" className="sidebar-bc-token-link relative z-10 block rounded-lg" onClick={onCloseMobile}>
+                <button
+                  type="button"
+                  className="sidebar-bc-token-link relative z-10 block w-full rounded-lg text-left"
+                  onClick={openGiftCard}
+                >
                   <div className="bc-token-inner flex items-center rounded-lg px-3 py-3 pb-2 pl-[1.2em] lg:mb-2 lg:px-2 lg:py-2 lg:pl-[0.8em]">
                     <div className="flex-1">
                       <div className="mb-1 flex items-center lg:mb-2">
                         <div className="center rounded-full mr-1.5 size-[1.625em] shrink-0 lg:mr-1 lg:size-4">
-                          <img className="h-full" alt="bc logo" src={bcTokenLogo} />
+                          <IconGift className="size-full fill-current text-brand" />
                         </div>
-                        <span className="mr-1 text-lg font-semibold leading-[1.375em] text-primary lg:text-sm lg:leading-[18px]">BC Token</span>
+                        <span className="mr-1 text-lg font-semibold leading-[1.375em] text-primary lg:text-sm lg:leading-[18px]">Gift Card</span>
                       </div>
-                      <div className="mb-2 flex items-center gap-2 lg:mb-0 lg:gap-1">
-                        <span className="sidebar-bc-price-value font-mono text-2xl font-extrabold leading-9 text-primary lg:text-base lg:font-semibold lg:leading-normal">$0.02378</span>
-                        <div className="flex items-center text-error">
-                          <svg viewBox="0 0 32 32" className="icon mr-0.5 -rotate-90" style={{ width: '12px', height: '12px' }}>
-                            <path fillRule="evenodd" clipRule="evenodd" d="M16.9069 25.6438L9.5905 15.58L16.9069 5.51611L10.2572 5.51611L2.9408 15.58L10.2572 25.6438L16.9069 25.6438ZM28.1005 25.6438L20.784 15.58L28.1005 5.51611L21.4508 5.51611L14.1343 15.58L21.4508 25.6438L28.1005 25.6438Z" fill="currentColor" />
-                          </svg>
-                          <span className="text-sm font-semibold leading-4 lg:text-xs">2.87%</span>
-                        </div>
-                      </div>
-                      {/* DRAWER ONLY, and it is the original's own row — `sm:hidden` there, which is
-                          the same "compact sidebar" test every other variant in this block makes,
-                          just expressed as a hide rather than a resize. The wide card has room for a
-                          third line; the 208px rail does not. */}
-                      <div className="flex items-center gap-1 text-sm font-semibold leading-[18px] lg:hidden">
-                        <span className="text-secondary">Holders:</span>
-                        <span className="text-primary">589,737</span>
+                      <div className="mb-2 flex items-center lg:mb-0">
+                        <span className="text-sm font-semibold leading-9 text-secondary lg:text-xs lg:leading-6">Redeem your gift card</span>
                       </div>
                     </div>
                     <div className="arrow-button center flex size-6 rounded lg:size-5">
                       <ArrowSvg className="rotate-180" />
                     </div>
                   </div>
-                </Link>
+                </button>
               </div>
               )}
 
@@ -649,6 +633,14 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
                   </div>
 
                   {/* Expanded submenu — never shown while the sidebar is collapsed */}
+                  {isExpanded && isOpen(item.id) && item.tree === 'sports' && (
+                    <div className="overflow-hidden">
+                      <div className="h-0 w-full border-t border-third"></div>
+                      <div className="px-1.5 pb-1">
+                        <SportsMenu Arrow={ArrowSvg} onCloseMobile={onCloseMobile} />
+                      </div>
+                    </div>
+                  )}
                   {isExpanded && isOpen(item.id) && item.subItems && item.subItems.length > 0 && (
                     <div className="overflow-hidden">
                       <div className="h-0 w-full border-t border-third"></div>
@@ -750,42 +742,6 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
                     </a>
                   );
                 })}
-              </div>
-
-              {/* ============================================================ */}
-              {/* 5. SPONSORSHIPS                                               */}
-              {/* ============================================================ */}
-              <div className="Sidebar-Unit_bg mt-1 overflow-hidden rounded-lg">
-                <div
-                  className={`toggle-link-item flex h-10 w-full cursor-pointer items-center px-3 lg:px-0 ${isOpen('sponsorships') ? 'toggle-link-item-open' : ''} ${activeMenu === 'sponsorships' ? 'toggle-link-item-active' : ''}`}
-                  /* `Ut` gives this group a `link` of its own — `/sponsorship/journey`, the same
-                     path as its first child — so the row navigates as well as expanding, which
-                     is what every other group row with a link does. */
-                  onClick={() => handleRowClick('sponsorships', '/sponsorship/journey')}
-                >
-                  <div className="nav-scale-box center flex-none lg:size-10">
-                    <div className="menu_icon_img menu_icon_img_normal sponsorships"></div>
-                  </div>
-                  <span className="sidebar-collapse-hide ml-2 flex-1 overflow-hidden whitespace-nowrap text-base font-semibold lg:ml-0 lg:text-sm">Sponsorships</span>
-                  <button
-                    className="sidebar-collapse-hide arrow-button center ms-auto flex size-6 rounded p-0 lg:me-2 lg:size-5"
-                    type="button"
-                    onClick={(e) => handleArrowClick(e, 'sponsorships')}
-                  >
-                    <ArrowSvg className={isOpen('sponsorships') ? 'rotate-90' : '-rotate-90'} />
-                  </button>
-                </div>
-
-                {isExpanded && isOpen('sponsorships') && (
-                  <div className="overflow-hidden">
-                    <div className="h-0 w-full border-t border-third"></div>
-                    <div className="px-1.5 pb-1">
-                      {sponsorshipItems.map((sub, idx) => (
-                        <SubNavLink key={idx} item={sub} onCloseMobile={onCloseMobile} />
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
 
               {/* ============================================================ */}
@@ -1004,6 +960,7 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
         `.pop-overlayer`'s z-index resolves against the root stacking context wherever this is
         declared. It is the flyout that genuinely has to sit here, because it does not portal. */}
     <Refer open={referOpen} onClose={() => setReferOpen(false)} />
+    {giftOpen && <GiftCardDialog onClose={() => setGiftOpen(false)} />}
     </>
   );
 }

@@ -2,9 +2,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { SportTabs, LatestEventsStrip, InPlayList } from '../../../components/exchange';
 import Loading from '../../../components/shared/Loading';
 import { useSportsList, useLatestEvents } from '../../../hooks/exchange';
-import { useIsDesktop } from '../../../hooks/useMediaQuery';
 import ExchangeFrame from '../ExchangeFrame';
-import SportsTree from './SportsTree';
 import { LOBBY_SPORTS, INPLAY_TAB, matchPath, sportIconOf, splitBoard } from '../model';
 
 /* In-Play first (BetBy's own order puts Live ahead of the sports), then the three boards. The
@@ -24,7 +22,8 @@ const Notice = ({ children }) => (
 /**
  * `/sports` — the exchange lobby. Sport pills (In-Play / Cricket / Football / Tennis, kept in
  * `?sport=` so Back returns to the same board), the latest-events strip, and the board grouped by
- * competition from `useSportsList(sid)` (5s). Desktop adds the sports tree on the left.
+ * competition from `useSportsList(sid)` (5s). The sports tree (sport → competition → match) is the main sidebar's Sports group
+ * (layouts/MainLayout/Sidebar/SportsMenu.jsx), so this page no longer draws a column of its own.
  *
  * A row opens `/sports/match/:sid/:gmid`; a price opens the same page with
  * `?market=<mid>&runner=<section sid>&side=back|lay` so the match page can preselect it.
@@ -32,7 +31,6 @@ const Notice = ({ children }) => (
 export default function ExchangeLobby() {
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
-  const isDesktop = useIsDesktop();
 
   const asked = params.get('sport');
   const tab = TABS.some((t) => t.id === asked) ? asked : DEFAULT_TAB;
@@ -109,7 +107,6 @@ export default function ExchangeLobby() {
   return (
     <ExchangeFrame>
       <div className="mt-4 flex gap-4">
-        {isDesktop && <SportsTree activeSid={LOBBY_SPORTS.find((s) => s.id === tab)?.sid ?? 4} />}
         <div className="flex min-w-0 flex-1 flex-col gap-4">
           <LatestEventsStrip events={latestEvents} linkFor={(e) => matchPath(e.sportId, e.id)} />
           <SportTabs sports={TABS} active={tab} onChange={setTab} />

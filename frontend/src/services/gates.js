@@ -52,6 +52,10 @@ export const GATES = {
   contest: { feature: 'races', capability: 'promotions' },
   raffle: { flag: 'lotto', feature: 'raffles', capability: 'promotions' },
   quests: { feature: 'challenges', capability: 'promotions' },
+  // The sidebar's Gift Card card and its redeem dialog: the owner's `gift_cards` feature AND the
+  // site's `giftcards` flag, and never for an agent's player (the backend's
+  // `denyAgentPlayer('promotions')` on every player gift-card route).
+  giftcards: { flag: 'giftcards', feature: 'gift_cards', capability: 'promotions' },
   // Rewards with no site switch of their own (free plays): only the player's capability.
   rewards: { capability: 'promotions' },
   // `sports` is the site admin's kill switch.
@@ -112,7 +116,7 @@ export function gateOf(href) {
    off for EVERYONE — guests, direct players and agent players alike — and the backend refuses them
    the same way (PROMOTIONS_DISABLED_B2B). hybrid and b2c keep the per-player rule (the
    `promotions` capability). */
-const PROMO_GATES = new Set(['bonus', 'vip', 'affiliate', 'promotions', 'contest', 'raffle', 'quests', 'rewards']);
+const PROMO_GATES = new Set(['bonus', 'vip', 'affiliate', 'promotions', 'contest', 'raffle', 'quests', 'rewards', 'giftcards']);
 
 /* The owner's policies when the site never chose one — the backend's own `POLICY_DEFAULTS`
    (packages/common/src/sitePolicy.js). */

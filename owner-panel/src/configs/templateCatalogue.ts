@@ -40,7 +40,7 @@ export const TEMPLATE_CATALOGUE: TemplateEntry[] = [
       vip: 'ring_panel',
       promotions: 'event_list',
       spin_wheel: 'none',
-      gift_cards: 'none',
+      gift_cards: 'redeem_dialog',
       bonus: 'reward_hub',
       affiliate: 'referral_hub',
       races: 'daily_contest',

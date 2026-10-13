@@ -1057,6 +1057,17 @@ export const PLATFORM = {
       redeem: '/api/v1/user/bonus/redeem',
     },
 
+    /* Gift cards — user-service `modules/gift-cards`, behind the owner's `gift_cards` feature (and
+       its `giftcards` site flag) and refused for an agent's player (`denyAgentPlayer('promotions')`).
+       `redeem` takes `{code}` (the card's key, case-sensitive) and ACTIVATES the card for the
+       player; `claim` takes `{giftCardId}`, checks the deposit/wager conditions and credits the
+       wallet. The sidebar's Gift Card dialog calls both, in that order. */
+    giftCards: {
+      mine: '/api/v1/user/gift-cards',
+      redeem: '/api/v1/user/gift-cards/redeem',
+      claim: '/api/v1/user/gift-cards/claim',
+    },
+
     /* The fourth of `/bonus`'s six types, and its own module rather than part of `bonus` — which
        is their arrangement, not a split of ours. `{amount, currency, claimable, minimum, rate}`,
        where `minimum` is the floor a claim has to clear and `rate` is the share of house edge

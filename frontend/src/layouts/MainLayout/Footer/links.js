@@ -32,7 +32,7 @@ export const COLUMNS = [
       { label: 'Sports Home', href: '/sports' },
       { label: 'Live', href: '/sports/live' },
       { label: 'Rules', href: '/help/terms-sports' },
-      { label: 'Sport Betting Insights', href: 'https://betting.bc.game/', external: true },
+      // Sport Betting Insights (betting.bc.game) removed on the user's request.
     ],
   },
   {

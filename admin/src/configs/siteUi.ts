@@ -23,12 +23,12 @@ export const SITE_UI: Record<string, UiSupport> = {
   swap: { status: 'toggle', variant: 'swap_page', surfaces: 'wallet Swap tab, /wallet/swap' },
   notifications: { status: 'toggle', variant: 'notice_centre', surfaces: '/notification' },
   kyc: { status: 'toggle', variant: 'document_cockpit', surfaces: '/settings/verify' },
+  gift_cards: { status: 'toggle', variant: 'redeem_dialog', surfaces: 'sidebar Gift Card card and redeem dialog' },
 
   casino_lobby: { status: 'fixed', variant: 'tabbed_themes', surfaces: 'the casino lobby is the site itself; use the Casino flag and the game-category flags' },
   banners: { status: 'fixed', variant: 'artwork_slides', surfaces: 'the home hero carousel (artwork from the site admin banners)' },
 
   spin_wheel: { status: 'absent', why: 'The backend has it; this UI has no wheel screen.' },
-  gift_cards: { status: 'absent', why: 'The backend has it; this UI has no gift card screen.' },
   tips: { status: 'absent', why: 'No tip-sending screen in this UI.' },
   p2p: { status: 'absent', why: 'No P2P trading screen in this UI.' },
   chat: { status: 'absent', why: 'Chat is socket-only and this UI has no socket client.' },

@@ -1,6 +1,7 @@
 import React from 'react';
 import { usePolling } from './usePolling';
-import { getSportEvents, getSportsTree, getLatestEvents, getMatchHeader } from '../../services/exchange/feed';
+import { useSharedSportsTree } from './sharedSportsTree';
+import { getSportEvents, getLatestEvents, getMatchHeader } from '../../services/exchange/feed';
 import { getMatchExposure, getOpenBets } from '../../services/exchange/positions';
 import { getBettingConfig } from '../../services/exchange/config';
 import { getStakeButtons, getOneClickButtons } from '../../services/exchange/stakes';
@@ -18,13 +19,13 @@ export function useSportsList(sid) {
   return usePolling(fetcher, { intervalMs: 5000, enabled: sid != null && sid !== '', key: String(sid ?? '') });
 }
 
-const readTree = (signal) => getSportsTree({ signal });
 const readLatest = (signal) => getLatestEvents({ signal });
 const readConfig = () => getBettingConfig();
 
-/** Sidebar tree, 60s. data: { sports, racing }. */
+/** Sidebar tree, 60s. data: { sports, racing }. ONE shared poll for every caller (the main
+    sidebar's Sports group and anything else) — see sharedSportsTree.js. */
 export function useSportsTree() {
-  return usePolling(readTree, { intervalMs: 60000, key: 'tree' });
+  return useSharedSportsTree();
 }
 
 /** Latest-events strip, 30s. data: Array<{ id, lid, name, sportId }>. */

@@ -22,7 +22,7 @@ look stays hash.game's (the hash-ui-fidelity skill lists it under Deliberate dep
 
 | Route | File | What it reads |
 |---|---|---|
-| `/sports` (`?sport=inplay\|cricket\|soccer\|tennis`, default cricket) | `pages/Exchange/Lobby/index.jsx` | `useSportsList(sid)` per board on screen (In-Play polls 4, 1 and 2; a sport view only its own), `useLatestEvents`, desktop `useSportsTree` (`Lobby/SportsTree.jsx`) |
+| `/sports` (`?sport=inplay\|cricket\|soccer\|tennis`, default cricket) | `pages/Exchange/Lobby/index.jsx` | `useSportsList(sid)` per board on screen (In-Play polls 4, 1 and 2; a sport view only its own), `useLatestEvents`. The sports tree is the main sidebar's Sports group (`layouts/MainLayout/Sidebar/SportsMenu.jsx`, `useSportsTree`), not a column on this page |
 | `/sports/live` | redirect | → `/sports?sport=inplay` (the footer's link) |
 | `/sports/match/:sid/:gmid` | `pages/Exchange/Match/index.jsx` (match agent) | `React.lazy` inside a `LazyRouteBoundary` keyed on the path |
 | `/sports/my-bets` | `pages/Exchange/MyBets/index.jsx` | `getSportsBets({status, betType, search, page})`, open tabs every 10s, `cancelBet` after a PopCenter confirm |
@@ -51,7 +51,7 @@ look stays hash.game's (the hash-ui-fidelity skill lists it under Deliberate dep
 | Endpoint (`/api/v1/sports/user` +) | Service | Hook | Returned shape |
 |---|---|---|---|
 | `POST /cricket/all-data {id:sid}` | `getSportEvents(sid)` | `useSportsList(sid)` 5s | `{t1, t2, events}` — EventRow[]; `events` = both, deduped, in-play first |
-| `GET /all/sports/tree` | `getSportsTree()` | `useSportsTree()` 60s | `{sports:[{name, etid, children:[{name, cid, children:[{name, gmid, etid, iscc}]}]}], racing:[…sdatetime]}` |
+| `GET /all/sports/tree` | `getSportsTree()` | `useSportsTree()` 60s, one shared poll for every caller (`hooks/exchange/sharedSportsTree.js`) | `{sports:[{name, etid, children:[{name, cid, children:[{name, gmid, etid, iscc}]}]}], racing:[…sdatetime]}` |
 | `GET /v1/sports-get_latest_events` | `getLatestEvents()` | `useLatestEvents()` 30s | `[{id, lid, name, sportId}]` |
 | `POST /cricket/get-match-private-data {gmid,sid}` | `getMatchMarkets(gmid,sid)` | `useMatchMarkets(gmid,sid)` 1s (not 300ms: gateway 429), watchdog, paused hidden | service `{state:'ok'\|'no_record'\|'gone'\|'empty', markets}`; hook `{markets (shaped), loading, error, noMarkets, roundGone, matchGone, getMarkets(), refresh}` |
 | `GET /v1/sports-gamedetailPrivate?gmid&etid` | `getMatchHeader(gmid,sid)` | `useMatchHeader(gmid,sid)` 5s | `{gmid, cname, ename, stime, iplay, iscc, tv, scard, bm, …}` or null |

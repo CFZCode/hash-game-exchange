@@ -229,6 +229,7 @@ const CATALOGUE: FeatureEntry[] = [
     flag: 'giftcards',
     variants: [
       { key: 'claim_cards', label: 'Activate-then-claim cards', description: 'Activate-then-claim card list with deposit and wager progress and claimed history, on /promotions.' },
+      { key: 'redeem_dialog', label: 'Sidebar card and redeem dialog', description: "Sidebar Gift Card card and redeem dialog. The player types the card's code; a card with no deposit or wager condition is claimed at once, one with conditions is activated." },
       { key: 'none', label: 'Off', description: 'No gift card surface.' }
     ]
   },
