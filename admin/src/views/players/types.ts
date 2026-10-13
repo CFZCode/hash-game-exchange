@@ -54,15 +54,19 @@ export type SharedIpRow = {
   users: { id: string; name: string; logins: number; lastSeen: string }[]
 }
 
-/** `GET admin/reports/user-risk/:id` — the parts the Risk tab reads. */
+/** `GET admin/reports/user-risk/:id` — the parts the Risk Management view reads. */
 export type RiskIp = {
   ipAddress: string
   isPrivate: boolean
   uses: number
+  countryCode?: string | null
   country: string | null
+  region?: string | null
   city: string | null
   isp: string | null
-  region?: string | null
+  asn?: string | null
+  isProxy?: boolean | null
+  isHosting?: boolean | null
   firstSeen: string
   lastSeen: string
 }
@@ -74,8 +78,58 @@ export type RiskBet = {
   currency: string
   status: string | null
   resultStatus: string | null
+  event?: string | null
+  market?: string | null
+  selection?: string | null
+  betType?: string | null
+  odds?: string | null
+}
+export type RiskCasinoBet = {
+  id: string
+  source: 'inhouse' | 'gis' | 'jsgames' | 'jsgamesv2'
+  createdAt: string
+  game: string | null
+  stakeAmount: string
+  currency: string
+  result: string | null
+  profit: string | null
+}
+export type RiskLogin = {
+  id: string | number
+  ipAddress: string | null
+  isPrivate: boolean
+  city: string | null
+  region: string | null
+  country: string | null
+  countryCode: string | null
+  isp: string | null
+  asn: string | null
+  isProxy: boolean | null
+  isHosting: boolean | null
+  source: string | null
+  userAgent: string | null
+  device: string | null
+  createdAt: string
 }
 export type PlayerRisk = {
+  user: {
+    id: string
+    name: string
+    email: string
+    phone: string
+    country: string
+    created: string | null
+    updatedAt: string | null
+    level: number
+    gamesPlayed: number
+    twoFaEnabled: boolean
+    staffId: string | null
+    staffName: string | null
+    staffEmail: string | null
+    isDirect: boolean
+    lastIp: string | null
+    lastLoginAt: string | null
+  }
   registration: {
     ip: string | null
     source: 'signup' | 'first_login' | null
@@ -88,8 +142,19 @@ export type PlayerRisk = {
     registeredAt: string | null
     declaredCountry: string | null
   }
-  locks: { isLocked: boolean; lockTargetx: boolean; sportsBetlocked: boolean; casinoLocked: boolean }
+  locks: {
+    isLocked: boolean
+    lockTargetx: boolean
+    sportsBetlocked: boolean
+    casinoLocked: boolean
+    withdrawLocked?: boolean
+    status?: string | null
+    betStatus?: string | null
+  }
   financials: {
+    totalDeposit: string
+    totalWithdrawal: string
+    net: string
     reward: {
       currency: string
       totalDeposit: string
@@ -105,9 +170,12 @@ export type PlayerRisk = {
     publicIpCount: number
     countries: { countryCode: string; country: string | null; logins: number }[]
     ipBreakdown: RiskIp[]
+    recentLogins: RiskLogin[]
     recentBets: RiskBet[]
+    recentCasinoBets?: RiskCasinoBet[]
   }
   sharedIps: { total: number; accounts: { id: string; name: string; ips: string[]; lastSeen: string }[] }
+  withdrawalRatio?: { reward: number | null; inr: number | null; threshold: number }
   riskFlags: Record<string, boolean>
 }
 

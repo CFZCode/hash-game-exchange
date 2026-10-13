@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 
 import Link from 'next/link'
 
-import { ChevronDownIcon, ChevronRightIcon, CopyIcon, RotateCcwIcon, SearchIcon } from 'lucide-react'
+import { ChevronDownIcon, ChevronRightIcon, CopyIcon, RotateCcwIcon, SearchIcon, ShieldAlertIcon } from 'lucide-react'
 import { toast } from 'sonner'
 
 import DataTable, { type Column } from '@/components/shared/DataTable'
@@ -21,6 +21,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useListState, usePagedApi } from '@/hooks/use-api'
 import GeoAttribution from './GeoAttribution'
 import GeoStats from './GeoStats'
+import { RiskManagementDialog } from './RiskManagement'
 import type { IpLoginRow, SharedIpRow } from './types'
 
 /**
@@ -71,11 +72,28 @@ const Ip = ({ ip, isPrivate }: { ip: string | null; isPrivate?: boolean }) => {
   )
 }
 
-const UserLink = ({ id, name }: { id: string; name: string }) => (
-  <Link href={`/users/${id}`} className='text-sm hover:underline' onClick={e => e.stopPropagation()}>
-    {name || `#${id}`}
-    <span className='text-muted-foreground ml-1 font-mono text-xs'>#{id}</span>
-  </Link>
+type RiskTarget = { id: string; name: string }
+
+/** The user's page, and a shield that opens their Risk Management view in place. */
+const UserLink = ({ id, name, onRisk }: RiskTarget & { onRisk: (u: RiskTarget) => void }) => (
+  <span className='inline-flex items-center gap-1'>
+    <Link href={`/users/${id}`} className='text-sm hover:underline' onClick={e => e.stopPropagation()}>
+      {name || `#${id}`}
+      <span className='text-muted-foreground ml-1 font-mono text-xs'>#{id}</span>
+    </Link>
+    <Button
+      variant='ghost'
+      size='icon-xs'
+      aria-label={`Risk Management for ${name || `#${id}`}`}
+      title='Risk Management'
+      onClick={e => {
+        e.stopPropagation()
+        onRisk({ id, name })
+      }}
+    >
+      <ShieldAlertIcon />
+    </Button>
+  </span>
 )
 
 const Network = ({ isProxy, isHosting }: { isProxy: boolean | null; isHosting: boolean | null }) =>
@@ -87,9 +105,9 @@ const Network = ({ isProxy, isHosting }: { isProxy: boolean | null; isHosting: b
     <span className='text-muted-foreground text-sm'>—</span>
   )
 
-const loginColumns: Column<IpLoginRow>[] = [
+const loginColumnsFor = (onRisk: (u: RiskTarget) => void): Column<IpLoginRow>[] => [
   { key: 'at', header: 'When', cell: r => <DateTime value={r.createdAt} /> },
-  { key: 'user', header: 'User', cell: r => <UserLink id={r.user.id} name={r.user.name} /> },
+  { key: 'user', header: 'User', cell: r => <UserLink id={r.user.id} name={r.user.name} onRisk={onRisk} /> },
   { key: 'ip', header: 'IP', cell: r => <Ip ip={r.ipAddress} isPrivate={r.isPrivate} /> },
   {
     key: 'where',
@@ -146,6 +164,17 @@ const IpTracker = () => {
   const { state, set, query } = useListState(['tab', 'ip', 'country', 'source', 'from', 'to', 'proxyOnly'])
   const tab = state.tab === 'shared' ? 'shared' : state.tab === 'countries' ? 'countries' : 'logins'
   const [open, setOpen] = useState<Set<string>>(() => new Set())
+
+  // The last player stays set while the dialog closes, so its header does not blank mid-animation.
+  const [risk, setRisk] = useState<RiskTarget | null>(null)
+  const [riskOpen, setRiskOpen] = useState(false)
+
+  const openRisk = (u: RiskTarget) => {
+    setRisk(u)
+    setRiskOpen(true)
+  }
+
+  const loginColumns = loginColumnsFor(openRisk)
 
   const [search, setSearch] = useDebounced(String(state.search ?? ''), v => set({ search: v }))
   const [ip, setIp] = useDebounced(String(state.ip ?? ''), v => set({ ip: v }))
@@ -243,7 +272,7 @@ const IpTracker = () => {
       cell: r => (
         <span className='flex flex-wrap items-center gap-x-3 gap-y-1'>
           {r.users.slice(0, 3).map(u => (
-            <UserLink key={u.id} id={u.id} name={u.name} />
+            <UserLink key={u.id} id={u.id} name={u.name} onRisk={openRisk} />
           ))}
           {r.accounts > 3 && (
             <button
@@ -270,7 +299,7 @@ const IpTracker = () => {
         <div className='grid gap-x-6 gap-y-1.5 sm:grid-cols-2 lg:grid-cols-3'>
           {r.users.map(u => (
             <div key={u.id} className='flex items-baseline justify-between gap-3'>
-              <UserLink id={u.id} name={u.name} />
+              <UserLink id={u.id} name={u.name} onRisk={openRisk} />
               <span className='text-muted-foreground text-xs whitespace-nowrap'>
                 {u.logins} {u.logins === 1 ? 'login' : 'logins'} · <DateTime value={u.lastSeen} />
               </span>
@@ -284,6 +313,7 @@ const IpTracker = () => {
 
   return (
     <div>
+      <RiskManagementDialog userId={risk?.id ?? null} name={risk?.name} open={riskOpen} onOpenChange={setRiskOpen} />
       <PageHeader
         title='IP tracker'
         description='Where your users sign in from, and which addresses several accounts share. Only users in your own tree are shown.'

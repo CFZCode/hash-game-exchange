@@ -32,6 +32,17 @@ const { GIS_AMOUNT_SQL, gisMagnitude } = require('../statements/statements.const
 // The one "withdrawn" rule (bank Approved or Paid) — see dashboard.constants.js.
 const { WITHDRAWAL_DONE } = require('../dashboard/dashboard.constants');
 
+/** Withdrawals above this share of deposits flag a player (the legacy risk dialog's 0.8). */
+const HIGH_WITHDRAWAL_RATIO = 0.8;
+
+const safeMinor = (v) => {
+  try { return money.toMinorQuantised(String(v ?? '0') || '0'); } catch { return 0n; }
+};
+/** withdrawn > 80% of deposited, in integer minor units; false when nothing was deposited. */
+const overRatio = (deposited, withdrawn) => deposited > 0n && withdrawn * 10n > deposited * 8n;
+const ratioOf = (deposited, withdrawn) =>
+  deposited > 0n ? Math.round((Number(withdrawn) / Number(deposited)) * 1000) / 1000 : null;
+
 /**
  * Player reports.
  *
@@ -548,12 +559,13 @@ class ReportsService {
     const { QueryTypes } = sequelize.constructor;
     const one = { replacements: { uid: user.id }, type: QueryTypes.SELECT };
 
-    const [full, agent, totals, logins, ipRows, [ipCounts], countryRows, firstLogin, bets, reward, shared] = await Promise.all([
+    const [full, agent, totals, logins, ipRows, [ipCounts], countryRows, firstLogin, bets, casinoBets, reward, shared] = await Promise.all([
       this.models.Users.findByPk(user.id, {
         attributes: [
           'id', 'name', 'email', 'country', 'phone', 'created', 'updated_at',
           'level', 'games_played', 'two_fa_status', 'parent_staff_id',
           'system_locked', 'lock_targetx', 'sports_betlocked', 'casino_locked',
+          'withdraw_locked', 'status', 'bet_status',
           // migration 058-login-geo (+ signup_region, 084)
           'last_country_code', 'last_country', 'last_city', 'last_isp',
           'signup_ip', 'signup_country_code', 'signup_country', 'signup_region', 'signup_city', 'signup_isp',
@@ -587,9 +599,14 @@ class ReportsService {
           [fn('MIN', col('created_at')), 'first_seen'],
           [fn('MAX', col('created_at')), 'last_seen'],
           // One IP sits in one place; MAX just picks the non-null lookup.
+          [fn('MAX', col('country_code')), 'country_code'],
           [fn('MAX', col('country')), 'country'],
+          [fn('MAX', col('region')), 'region'],
           [fn('MAX', col('city')), 'city'],
           [fn('MAX', col('isp')), 'isp'],
+          [fn('MAX', col('asn')), 'asn'],
+          [fn('BOOL_OR', col('is_proxy')), 'is_proxy'],
+          [fn('BOOL_OR', col('is_hosting')), 'is_hosting'],
         ],
         group: ['ip_address'],
         order: [[literal('MAX(created_at)'), 'DESC']],
@@ -625,11 +642,15 @@ class ReportsService {
       // casino rounds (credits_ledger, provider tables) carry none.
       this.models.SportsBet.findAll({
         where: { user_id: user.id },
-        attributes: ['id', 'ip_address', 'created_at', 'stake_amount', 'original_currency', 'status', 'result_status'],
+        attributes: [
+          'id', 'ip_address', 'created_at', 'stake_amount', 'original_currency', 'status', 'result_status',
+          'event_name', 'match_title', 'market_type', 'selection_name', 'fancy_name', 'bet_type', 'odds',
+        ],
         order: [['created_at', 'DESC']],
         limit: RISK_BET_ROWS,
         raw: true,
       }),
+      this.#recentCasinoBets(user.id),
       this.#rewardTotalsFor(user.id),
       this.#sharedWith(staff, user.id),
     ]);
@@ -637,6 +658,8 @@ class ReportsService {
     const lifetime = totals.get(String(user.id)) ?? { deposited: '0.00000000', withdrawn: '0.00000000' };
     const deposited = money.toMinor(lifetime.deposited);
     const withdrawn = money.toMinor(lifetime.withdrawn);
+    const rewardDeposited = safeMinor(reward.totalDeposit);
+    const rewardWithdrawn = safeMinor(reward.totalWithdrawal);
     const lastLogin = logins[0] ?? null;
     const ips = ipRows.map((r) => r.ip_address);
     const allIps = ipCounts?.ips ?? [];
@@ -710,6 +733,9 @@ class ReportsService {
         lockTargetx: Boolean(full.lock_targetx),
         sportsBetlocked: Boolean(full.sports_betlocked),
         casinoLocked: Boolean(full.casino_locked),
+        withdrawLocked: Boolean(full.withdraw_locked),
+        status: full.status ?? null,
+        betStatus: full.bet_status ?? null,
       },
       financials: {
         totalDeposit: lifetime.deposited,
@@ -731,7 +757,12 @@ class ReportsService {
           uses: Number(r.uses),
           country: r.country ?? null,
           city: r.city ?? null,
+          countryCode: r.country_code ?? null,
+          region: r.region ?? null,
           isp: r.isp ?? null,
+          asn: r.asn ?? null,
+          isProxy: r.is_proxy ?? null,
+          isHosting: r.is_hosting ?? null,
           firstSeen: r.first_seen,
           lastSeen: r.last_seen,
         })),
@@ -762,9 +793,22 @@ class ReportsService {
           currency: b.original_currency ?? 'INR',
           status: b.status,
           resultStatus: b.result_status,
+          event: b.event_name || b.match_title || null,
+          market: b.fancy_name || b.market_type || null,
+          selection: b.selection_name || null,
+          betType: b.bet_type || null,
+          odds: b.odds != null ? String(b.odds) : null,
         })),
+        // Casino rounds across the four casino tables (no IP is recorded on them).
+        recentCasinoBets: casinoBets,
       },
       sharedIps: shared,
+      withdrawalRatio: {
+        // withdrawn ÷ deposited, as a plain number for display; null when nothing was deposited.
+        reward: ratioOf(rewardDeposited, rewardWithdrawn),
+        inr: ratioOf(deposited, withdrawn),
+        threshold: HIGH_WITHDRAWAL_RATIO,
+      },
       riskFlags: {
         multipleIps: publicIps.length > 1,
         // From the geo lookup on each login (migration 058-login-geo), over all of history.
@@ -772,12 +816,73 @@ class ReportsService {
         multipleCountries: Number(ipCounts?.countries ?? 0) > 1,
         sharedIp: shared.total > 0,
         twoFaDisabled: !full.two_fa_status,
-        // Withdrawing nearly everything deposited is the shape of a pass-through
-        // account. Guarded on a non-zero deposit — 0/0 is not a ratio.
-        highWithdrawalRatio: deposited > 0n && withdrawn * 100n > deposited * 90n,
-        noActivity: allIps.length === 0 && bets.length === 0,
+        // Withdrawing most of what was deposited (> 80%) is the shape of a
+        // pass-through account. Measured on every coin (the reward-currency
+        // totals) and on bank + gateway INR; either one trips it. Guarded on a
+        // non-zero deposit — 0/0 is not a ratio.
+        highWithdrawalRatio: overRatio(deposited, withdrawn) || overRatio(rewardDeposited, rewardWithdrawn),
+        // No bets or games of any kind — logins alone are not activity.
+        noActivity: bets.length === 0 && casinoBets.length === 0 && Number(full.games_played ?? 0) === 0,
       },
     };
+  }
+
+  /**
+   * A player's last casino rounds across the four tables the wager reports
+   * read (in-house `bets`, Slotegrator `gis_transactions`, jsGames
+   * `js_game_transactions` and `game_transactions`) — stake rows only, newest
+   * first. Each branch is capped before the union so a busy account is four
+   * index reads, not a scan. Game names are joined from the catalogues where
+   * one exists; otherwise the provider's game id is shown.
+   */
+  async #recentCasinoBets(userId) {
+    const { sequelize } = this.models.UserLoginHistory;
+    const { QueryTypes } = sequelize.constructor;
+    const rows = await sequelize.query(
+      `SELECT * FROM (
+         (SELECT 'inhouse' AS source, b.id::text AS id, b.created AS created_at,
+                 b.game AS game, ABS(b.amount)::text AS stake,
+                 UPPER(COALESCE(NULLIF(b.coin, ''), '?')) AS currency,
+                 CASE WHEN b.profit > 0 THEN 'won' WHEN b.profit < 0 THEN 'lost' ELSE 'even' END AS result,
+                 b.profit::text AS profit
+            FROM bets b
+           WHERE b.uid = :uid AND (b.result->>'fake') IS DISTINCT FROM 'true'
+           ORDER BY b.created DESC LIMIT :n)
+         UNION ALL
+         (SELECT 'gis', g.id::text, COALESCE(g.transaction_datetime, g.created_at),
+                 COALESCE(gg.name, g.game_uuid), ABS(g.amount)::text,
+                 CASE WHEN UPPER(g.currency) = 'PKR' THEN 'INR' ELSE UPPER(COALESCE(NULLIF(g.currency, ''), '?')) END,
+                 'bet', NULL
+            FROM gis_transactions g
+            LEFT JOIN LATERAL (SELECT name FROM gisgamesnew WHERE uuid = g.game_uuid LIMIT 1) gg ON TRUE
+           WHERE g.user_id = :uid AND LOWER(g.action) = 'bet'
+           ORDER BY g.id DESC LIMIT :n)
+         UNION ALL
+         (SELECT 'jsgames', j.id::text, j."timestamp", COALESCE(jg.game_name, j.game_uid), ABS(j.amount)::text,
+                 UPPER(COALESCE(NULLIF(j.currency, ''), '?')), LOWER(j.transaction_type), NULL
+            FROM js_game_transactions j
+            LEFT JOIN LATERAL (SELECT game_name FROM js_games WHERE game_uid = j.game_uid LIMIT 1) jg ON TRUE
+           WHERE j.user_id = :uid AND LOWER(j.transaction_type) IN ('bet', 'loss', 'settle')
+           ORDER BY j."timestamp" DESC NULLS LAST LIMIT :n)
+         UNION ALL
+         (SELECT 'jsgamesv2', t.id::text, t.created_at, COALESCE(NULLIF(t.game_name, ''), t.game_uid), ABS(t.amount)::text,
+                 UPPER(COALESCE(NULLIF(t.currency, ''), '?')), LOWER(t.transaction_type), NULL
+            FROM game_transactions t
+           WHERE t.user_id = :uid AND LOWER(t.transaction_type) IN ('bet', 'loss', 'settle')
+           ORDER BY t.created_at DESC NULLS LAST LIMIT :n)
+       ) x ORDER BY created_at DESC NULLS LAST LIMIT :n`,
+      { replacements: { uid: Number(userId), n: RISK_BET_ROWS }, type: QueryTypes.SELECT }
+    );
+    return rows.map((r) => ({
+      id: `${r.source}:${r.id}`,
+      source: r.source,
+      createdAt: r.created_at,
+      game: r.game ?? null,
+      stakeAmount: r.stake ?? '0',
+      currency: r.currency,
+      result: r.result ?? null,
+      profit: r.profit ?? null,
+    }));
   }
 
   /**

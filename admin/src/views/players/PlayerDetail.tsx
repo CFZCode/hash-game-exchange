@@ -5,7 +5,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
-import { BanIcon, LockIcon, PencilIcon, WalletIcon } from 'lucide-react'
+import { BanIcon, LockIcon, PencilIcon, ShieldAlertIcon, WalletIcon } from 'lucide-react'
 import { parseAsStringLiteral, useQueryState } from 'nuqs'
 
 import Can from '@/components/shared/Can'
@@ -31,7 +31,7 @@ import { formatNumber } from '@/lib/format'
 import { AdjustWalletDialog } from '@/views/finance/shared'
 import { PlayerBonusesTab } from '@/views/promotions/BonusBalances'
 import GeoAttribution from './GeoAttribution'
-import PlayerRiskTab from './PlayerRiskTab'
+import { RiskManagementDialog, RiskManagementPanel } from './RiskManagement'
 import PlayerStatsTab from './PlayerStatsTab'
 import WithdrawBlockAction, { BetLockedBadge, WithdrawBlockedBadge, type AccountLocks } from './WithdrawBlockAction'
 import type { PlayerRow } from './types'
@@ -410,6 +410,15 @@ const ReportDetail = ({ id }: { id: string }) => {
         actions={
           p && (
             <>
+              <RiskManagementDialog
+                userId={id}
+                name={p.name}
+                trigger={
+                  <Button variant='outline'>
+                    <ShieldAlertIcon /> Risk
+                  </Button>
+                }
+              />
               {/* The same grants the Wallets screen and the API use (`wallet:credit` / `wallet:debit`); there is no `wallet:adjust` on the adjust route. */}
               <Can permission={['wallet:credit', 'wallet:debit']}>
                 <AdjustWalletDialog
@@ -489,7 +498,7 @@ const ReportDetail = ({ id }: { id: string }) => {
           </TabsContent>
         )}
         <TabsContent value='risk'>
-          <PlayerRiskTab userId={id} />
+          <RiskManagementPanel userId={id} />
         </TabsContent>
         <TabsContent value='sheet'>
           <RawTab path={`admin/reports/balance-sheet/${id}`} />
