@@ -130,7 +130,6 @@ function TypeFilter() {
         { label: 'Deposit', value: TYPE.Deposit },
         { label: 'Withdraw', value: TYPE.Withdraw },
         { label: 'Swap', value: TYPE.Swap },
-        { label: 'Buy Crypto', value: TYPE.Buy },
         { label: 'Bonus', value: TYPE.Bonus },
       ].filter((option) => !agentPlayer || AGENT_PLAYER_TYPES.has(option.value)),
     [agentPlayer],

@@ -1,7 +1,6 @@
 import {
   IconWallet,
   IconWithdraw,
-  IconBuyCrypto,
   IconTransaction,
   IconFreePlays,
   IconBetHistory,
@@ -49,7 +48,6 @@ import {
 export const ACCOUNT_MENU = [
   { label: 'Wallet', link: '/wallet/balance', icon: IconWallet, gated: '!isFiat' },
   { label: 'Withdraw', link: '/wallet/withdraw', icon: IconWithdraw, gated: '!isFiat && !isOfflineAgent' },
-  { label: 'Buy Crypto', link: '/wallet/buy', icon: IconBuyCrypto, gated: '!isFiat && !isOfflineAgent' },
   { label: 'Transactions', link: '/wallet/transaction', icon: IconTransaction },
   { label: 'Free Plays', link: '/free-plays', icon: IconFreePlays, dot: true },
   { label: 'Bet History', link: '/wallet/bet-history', icon: IconBetHistory },

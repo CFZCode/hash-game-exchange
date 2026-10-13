@@ -1,5 +1,4 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
 import Select from '../../components/shared/Select';
 import { useSession } from '../../context/session';
 import { getCurrency } from '../../data/currencies';
@@ -22,7 +21,6 @@ import {
 /* `W1` — the same `IconBuycrypto-DVCGQYOc.js` the wallet rail and the account dropdown draw, which
    is why it is imported from the dropdown's module rather than copied. See the note at the head of
    `pages/Wallet/index.jsx` on that import. */
-import { IconBuyCrypto } from '../../layouts/MainLayout/Header/AfterLogin/icons';
 import tagArt from '../../assets/deposit/chip_tag.png';
 import Skeleton from '../../components/shared/Skeleton';
 import useResource from '../../hooks/useResource';
@@ -332,16 +330,7 @@ function AmountInput({ value, min, max, onChange, children }) {
  * for. The `isMaintain` arm has its own wording and is unreachable without a maintenance payload;
  * it is written out because it is one line and the two strings are both verbatim i18n. */
 function NoChannels({ onDepositCrypto, isMaintain = false }) {
-  const navigate = useNavigate();
-
   const rows = [
-    {
-      label: 'Buy Crypto',
-      desc: 'Buy Crypto Instantly - Credit/Debit Card Accepted',
-      Icon: IconBuyCrypto,
-      onClick: () => navigate('/wallet/buy'),
-      button: 'Buy',
-    },
     {
       label: 'Deposit Crypto',
       desc: 'Deposit Crypto - Transfer from External Wallet',

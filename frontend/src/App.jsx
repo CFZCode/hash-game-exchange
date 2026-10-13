@@ -48,7 +48,6 @@ import Responsible from './pages/Responsible';
 import WalletLayout from './pages/Wallet';
 import Balance from './pages/Wallet/Balance';
 import WithdrawPanels from './pages/Wallet/Withdraw';
-import BuyCrypto from './pages/Wallet/BuyCrypto';
 import Swap from './pages/Wallet/Swap';
 import VaultPro from './pages/Wallet/VaultPro';
 import Transaction from './pages/Wallet/Transaction';
@@ -926,7 +925,8 @@ function AppShell() {
                 route — there is no top-level `/buy` dialog path. The parent's `info.dialog` is
                 `m.mobile`, so on a desktop it is always the pane; its own guard,
                 `Pe.isFiat && "/deposit"`, never fires on this deploy. */}
-            <Route path="buy" element={<BuyCrypto />} />
+            {/* Buy Crypto is switched off on this site: old links land on Deposit. */}
+            <Route path="buy" element={<Navigate to="/wallet/deposit" replace />} />
             {/* `DialogSwap`, one route like Buy Crypto and the same never-firing
                 `Pe.isFiat` guard. */}
             <Route path="swap" element={<Swap />} />

@@ -273,7 +273,8 @@ function VipCard() {
    flag turns on. The one this build cannot draw is `dot`, `FreePlayDot`'s unread count, which
    needs a claimable-bonus feed. */
 const TILES = [
-  { label: 'Buy', Icon: IconBuy, link: '/wallet/buy', show: true },
+  // Buy Crypto is switched off on this site (removed from every menu).
+  { label: 'Buy', Icon: IconBuy, link: '/wallet/buy', show: false },
   { label: 'Swap', Icon: IconSwap, link: '/wallet/swap', show: true },
   { label: 'Vault Pro', Icon: IconVaultPro, link: '/wallet/vault', show: true },
   { label: 'Transaction', Icon: IconTransaction, link: '/wallet/transaction', show: true },
