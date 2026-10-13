@@ -38,8 +38,10 @@ import { bestPrice, bookFor } from './shape';
  *   Place → prevalidateBet → beginBetSubmit → buildPlaceRequest → savePendingBet → placeBet
  *         (the SERVER holds the owner's buffer; the slip shows its seconds as a countdown)
  *   ok    → close, toast BET_PLACED, clearPendingBet, announceBetPlaced (exposure + open bets refresh)
- *   error → the server's message stays INLINE in the slip (the brief for this page — TENEXCH
- *           closed the slip and toasted); endBetSubmit always.
+ *   error → TENEXCH usePlaceBetPanel: close the slip FIRST, then toast the reason (a client-side
+ *           reject or the server's own message, e.g. "Bet not confirm check balance."). Leaving
+ *           the slip open invited a second Place of a bet already refused. endBetSubmit always.
+ *           One-click goes through the same submit, so it toasts the same way.
  *
  * Differences from a plain click that the reference makes and this keeps:
  *   - line markets (fancy2): the field shows the touched rung but the bet executes at that
@@ -116,12 +118,11 @@ export function projectedBook(slip, stake, odds, market, book) {
   return out;
 }
 
+/* TENEXCH: the server's message as-is, NETWORK_ERROR for a failed fetch, GENERIC_ERROR otherwise. */
 function errorText(err) {
   if (!err) return BET_TOAST.GENERIC_ERROR;
   if (err.code === 'NETWORK' || /fetch|network/i.test(err.message || '')) return BET_TOAST.NETWORK_ERROR;
-  const msg = err.message || BET_TOAST.GENERIC_ERROR;
-  const code = err.code && !/^HTTP_/.test(String(err.code)) && !msg.includes(err.code) ? ` (${err.code})` : '';
-  return `${msg}${code}`;
+  return err.message || BET_TOAST.GENERIC_ERROR;
 }
 
 /**
@@ -160,6 +161,18 @@ export function useMatchSlip({ sid, gmid, match, getMarkets, signedIn }) {
     setLoading(false);
   }, []);
 
+  /* TENEXCH `handleClose(); bToastError(msg)` — only closes the slip this submit came from, so a
+     late answer never shuts a slip the player has since opened on another price. */
+  const reject = React.useCallback((token, message) => {
+    if (aliveRef.current && token === tokenRef.current) {
+      tokenRef.current += 1;
+      setSlip(null);
+      setStake('');
+      setError(null);
+    }
+    toast.error(message);
+  }, []);
+
   /** The whole submit. `s` / `stakeStr` are passed in so one-click can place before state lands. */
   const submit = React.useCallback(
     async (s, stakeStr) => {
@@ -181,12 +194,12 @@ export function useMatchSlip({ sid, gmid, match, getMarkets, signedIn }) {
       });
       // A cashout's hedge stake is solved, not chosen: TENEXCH holds it to no minimum.
       if (err && !(bv.is_cashout && err.code === 'BELOW_MIN' && Number(stakeStr) > 0)) {
-        setError(err.message);
+        reject(token, err.message);
         return;
       }
       const key = betMarketKey(bv);
       if (!beginBetSubmit(key)) {
-        setError(BET_TOAST.MULTIPLE_BET_NOT_ALLOWED);
+        reject(token, BET_TOAST.MULTIPLE_BET_NOT_ALLOWED);
         return;
       }
       const { payload, clientRef } = buildPlaceRequest({ bv, odds, stake: stakeStr, isEdited, selectedOdds: bv.odds });
@@ -207,26 +220,27 @@ export function useMatchSlip({ sid, gmid, match, getMarkets, signedIn }) {
         savePendingBet(clientRef);
         await placeBet(payload);
         clearPendingBet(clientRef);
-        announceBetPlaced();
-        toast.success(BET_TOAST.BET_PLACED);
+        // TENEXCH order: the slip closes first, then the toast.
         if (aliveRef.current && token === tokenRef.current) {
           tokenRef.current += 1;
           setSlip(null);
           setStake('');
           setError(null);
         }
+        toast.success(BET_TOAST.BET_PLACED);
+        announceBetPlaced();
       } catch (e) {
         // A network failure or a 409 (still deciding) may still book server-side — keep the ref so
         // reconcilePendingBets reports it on the next load.
         const keepPending = e?.pending || e?.code === 'NETWORK' || e?.status === 0;
         if (!keepPending) clearPendingBet(clientRef);
-        if (aliveRef.current && token === tokenRef.current) setError(errorText(e));
+        reject(token, errorText(e));
       } finally {
         endBetSubmit(key);
         if (aliveRef.current) setLoading(false);
       }
     },
-    [getMarkets, matchInfo, signedIn, sid],
+    [getMarkets, matchInfo, signedIn, sid, reject],
   );
 
   /**

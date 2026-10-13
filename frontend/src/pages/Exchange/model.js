@@ -15,9 +15,46 @@ export const LOBBY_SPORTS = [
 /** The In-Play view: live matches of all three boards. Uses BetBy's own live glyph. */
 export const INPLAY_TAB = 'inplay';
 
-const SPORT_ICON = { 4: 'cricket', 1: 'soccer', 2: 'tennis', 7: 'horseracing', 8: 'tabletennis' };
-/** sid → sport-art key, or undefined when the asset set has none (the caller draws nothing). */
-export const sportIconOf = (sid) => SPORT_ICON[Number(sid)];
+/* sid (mssports etid, = TENEXCH's `icon-<etid>`) → icon key. A key is either a captured BetBy
+   file (src/assets/sports/sport-<key>.svg, hash.game's own art) or one of the glyphs drawn in
+   components/exchange/icons.jsx (`DRAWN_SPORT_GLYPHS`) for sports BetBy ships no file for.
+   Ids verified against the live `all/sports/tree` on 2026-10-14 — note 7 is Beach Volleyball and
+   10 is Horse Racing (7 was mapped to horseracing here once). */
+const SPORT_ICON = {
+  1: 'soccer', 2: 'tennis', 3: 'mma', 4: 'cricket', 5: 'golf', 6: 'boxing', 7: 'beachvolleyball',
+  8: 'tabletennis', 9: 'soccer', 10: 'horseracing', 11: 'esports', 15: 'basketball', 16: 'motorbike',
+  17: 'chess', 18: 'volleyball', 19: 'icehockey', 22: 'badminton', 29: 'cycling', 32: 'motorbike',
+  33: 'athletics', 35: 'blitz-basketball', 37: 'sumo', 38: 'esports', 39: 'handball', 40: 'politics',
+  52: 'formula-1', 53: 'baseball', 54: 'rugby', 55: 'rugbyleague', 57: 'darts', 58: 'americanfootball',
+  59: 'snooker', 62: 'soccer', 64: 'esports', 65: 'greyhound', 66: 'kabbadi', 67: 'boatracing',
+  68: 'fifa-b', 69: 'wrestling',
+};
+
+/* Name fallback, for an id the table above does not know yet: the feed's name lower-cased with
+   everything but letters and digits stripped ("Ice Hockey" → "icehockey"). */
+const SPORT_ICON_BY_NAME = {
+  politics: 'politics', election: 'politics', elections: 'politics',
+  cricket: 'cricket', football: 'soccer', soccer: 'soccer', futsal: 'soccer',
+  tennis: 'tennis', tabletennis: 'tabletennis', badminton: 'badminton',
+  basketball: 'basketball', basketball3x3: 'blitz-basketball',
+  volleyball: 'volleyball', beachvolleyball: 'beachvolleyball',
+  icehockey: 'icehockey', baseball: 'baseball', americanfootball: 'americanfootball',
+  rugby: 'rugby', rugbyunion: 'rugby', rugbyleague: 'rugbyleague',
+  boxing: 'boxing', mma: 'mma', mixedmartialarts: 'mma', wrestling: 'wrestling',
+  golf: 'golf', darts: 'darts', snooker: 'snooker', chess: 'chess', handball: 'handball',
+  kabaddi: 'kabbadi', kabbadi: 'kabbadi', sumo: 'sumo', athletics: 'athletics', cycling: 'cycling',
+  horseracing: 'horseracing', greyhound: 'greyhound', greyhoundracing: 'greyhound',
+  esports: 'esports', egames: 'esports', virtualsports: 'esports', esoccer: 'fifa-b',
+  motorsport: 'formula-1', motorsports: 'formula-1', formula1: 'formula-1',
+  motogp: 'motorbike', motorbikes: 'motorbike', boatracing: 'boatracing',
+};
+
+const nameKey = (name) => String(name ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+/** sid (and optionally the feed's sport name) → icon key for the kit's SportIcon. Id first, then
+ *  name; undefined when neither is known (SportIcon's `fallback` then draws the generic glyph). */
+export const sportIconOf = (sid, name) =>
+  SPORT_ICON[Number(sid)] ?? SPORT_ICON_BY_NAME[nameKey(name)];
 
 /** `/sports/match/:sid/:gmid`, with the price the visitor clicked as query so the match page can
  *  preselect it: `?market=<mid>&runner=<section sid>&side=back|lay`. */

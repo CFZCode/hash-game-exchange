@@ -33,7 +33,8 @@ import {
 import { BET_TOAST, ODDS_FIELD, ADDAPLAY_MIN_BET } from '../../../utils/exchange';
 import MarketBlocks from './MarketBlocks';
 import { useMatchSlip, placementOdds, slipFigures, projectedBook } from './useMatchSlip';
-import { SPORT_ART, TAB_LABELS, marketTab, marketKind, ladder, rowStatus } from './shape';
+import { TAB_LABELS, marketTab, marketKind, ladder, rowStatus } from './shape';
+import { sportIconOf } from '../model';
 
 /* ─── /sports/match/:sid/:gmid — the exchange match page ─────────────────────────────────
  *
@@ -236,8 +237,12 @@ export default function ExchangeMatchPage() {
       await saveStakeButtons(values.map((v) => ({ label: stakeLabel(v), value: v })));
       refreshStakes();
       setStakeModal(false);
+      // TENEXCH SetButtonValueModal's wording, both ways; the modal stays open on a failure.
+      toast.success(BET_TOAST.STAKE_BUTTONS_SAVED);
     } catch (e) {
-      setStakeError(e?.message || BET_TOAST.GENERIC_ERROR);
+      const msg = e?.message || BET_TOAST.STAKE_BUTTONS_FAILED;
+      setStakeError(msg);
+      toast.error(msg);
     } finally {
       setStakeSaving(false);
     }
@@ -294,7 +299,7 @@ export default function ExchangeMatchPage() {
 
   /* ── render ── */
   const gone = mk.noMarkets || mk.matchGone;
-  const sport = SPORT_ART[String(sid)];
+  const sport = sportIconOf(sid);
 
   const header = (
     <MatchHeader

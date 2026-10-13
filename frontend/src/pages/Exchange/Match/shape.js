@@ -11,9 +11,6 @@ import {
   isBallRunning,
 } from '../../../utils/exchange';
 
-/** sid → the kit's SportIcon key. */
-export const SPORT_ART = { 1: 'soccer', 2: 'tennis', 4: 'cricket' };
-
 const num = (v) => Number(v) || 0;
 const gtypeOf = (m) => String(m?.gtype || '').toLowerCase();
 

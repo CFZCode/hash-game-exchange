@@ -5,6 +5,7 @@ import { ExposureBadge, StakeButtonsModal } from '../../components/exchange';
 import { useSportsBalance, useStakeButtons } from '../../hooks/exchange';
 import { saveStakeButtons } from '../../services/exchange';
 import { toast } from '../../components/shared/Toast/toast';
+import { BET_TOAST } from '../../utils/exchange';
 import { useSession } from '../../context/session';
 import { stakeLabel } from './model';
 /* The rail's geometry (`.sports-rail*`) is the sports lobby's own — measured off BetBy's widget
@@ -107,9 +108,12 @@ function SignedInTools({ userId, inRail, tipProps = () => null }) {
       await saveStakeButtons(values.map((value) => ({ label: stakeLabel(value), value })));
       refresh();
       setEditing(false);
-      toast.success('Stake buttons saved');
+      // TENEXCH SetButtonValueModal's wording, both ways; the modal stays open on a failure.
+      toast.success(BET_TOAST.STAKE_BUTTONS_SAVED);
     } catch (e) {
-      setError(e?.message || 'Could not save the stake buttons.');
+      const msg = e?.message || BET_TOAST.STAKE_BUTTONS_FAILED;
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSaving(false);
     }

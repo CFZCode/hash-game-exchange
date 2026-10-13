@@ -124,6 +124,11 @@ id from the access token's `sub` (`currentUserId()`), which is the id mssports k
   `server_buffer` (`buildPlaceRequest`) — the client checks are previews and pre-validation.
 - After a placed bet: close slip → toast → `announceBetPlaced()` (250 ms later `bet:placed`, which
   refreshes `useMatchExposure` / `useOpenBets`).
+- A refused bet (client pre-validation or the server's message, e.g. "Bet not confirm check
+  balance."): close slip → `toast.error(message)` — TENEXCH `handleClose(); bToastError(msg)`, no
+  inline slip error. One-click goes through the same submit. Stake-button saves toast TENEXCH's
+  `Update Button Value` / `Failed to update button values`; cancels toast `BET_CANCELLED` /
+  `CANCEL_FAILED` (or the server's message).
 - Ball running (`section.br`) suspends a runner — an improvement over TENEXCH, which never read it.
 - Back/lay colours: `bg-back`, `bg-back-hover`, `bg-lay`, `bg-lay-hover`, `bg-back-muted`,
   `bg-lay-muted`, `text-exchange-ink` (both themes; templates inherit).

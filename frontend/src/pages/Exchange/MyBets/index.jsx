@@ -7,6 +7,7 @@ import EmptyPlaceholder from '../../../components/shared/EmptyPlaceholder';
 import Pagination from '../../../components/shared/Pagination';
 import PopCenter from '../../../components/shared/PopCenter';
 import { toast } from '../../../components/shared/Toast/toast';
+import { BET_TOAST } from '../../../utils/exchange';
 import { usePolling } from '../../../hooks/exchange';
 import { getSportsBets, cancelBet } from '../../../services/exchange';
 import { ExchangeAccountPage } from '../ExchangeFrame';
@@ -173,10 +174,10 @@ export default function ExchangeMyBets() {
     setCancelling((ids) => [...ids, bet.id]);
     try {
       const res = await cancelBet(bet.id);
-      toast.success(res.message || 'Bet cancelled');
+      toast.success(res.message || BET_TOAST.BET_CANCELLED);
       refresh();
     } catch (e) {
-      toast.error(e?.message || 'The bet could not be cancelled.');
+      toast.error(e?.message || BET_TOAST.CANCEL_FAILED);
     } finally {
       setCancelling((ids) => ids.filter((id) => id !== bet.id));
     }

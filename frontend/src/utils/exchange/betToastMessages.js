@@ -86,5 +86,9 @@ export const BET_TOAST = {
   BET_CANCELLED: 'Bet cancelled successfully',
   CANCEL_FAILED: 'Failed to cancel bet',
   NETWORK_ERROR: 'Network error',
+  // TENEXCH SetButtonValueModal.jsx (stake-button edit save) — its literals, kept here so the
+  // match page and the rail print the same text.
+  STAKE_BUTTONS_SAVED: 'Update Button Value',
+  STAKE_BUTTONS_FAILED: 'Failed to update button values',
   GENERIC_ERROR: 'Something went wrong',
 };

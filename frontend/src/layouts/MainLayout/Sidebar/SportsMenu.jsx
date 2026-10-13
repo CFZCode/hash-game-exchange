@@ -41,7 +41,7 @@ export default function SportsMenu({ Arrow, onCloseMobile }) {
   return sports.map((sport, si) => {
     const sKey = `s${sport.etid}:${si}`;
     const sOpen = Boolean(open[sKey]);
-    const icon = sportIconOf(sport.etid);
+    const icon = sportIconOf(sport.etid, sport.name);
     return (
       <div key={sKey}>
         <button
@@ -51,11 +51,7 @@ export default function SportsMenu({ Arrow, onCloseMobile }) {
           className={`nav-link-item relative mt-1 flex h-10 w-full cursor-pointer items-center overflow-hidden rounded-lg px-3 text-left lg:pl-0 lg:pr-2 ${sOpen ? 'text-primary' : ''}`}
         >
           <div className="nav-scale-box center flex flex-none lg:size-10">
-            {icon ? (
-              <SportIcon sport={icon} className="center size-5 [&_svg]:size-full [&_svg]:fill-current" />
-            ) : (
-              <span className="size-5" />
-            )}
+            <SportIcon sport={icon} fallback className="center size-5 [&_svg]:size-full [&_svg]:fill-current" />
           </div>
           <span className="sidebar-collapse-hide ml-2 truncate whitespace-nowrap text-base font-semibold lg:ml-0 lg:text-sm">
             {sport.name}
