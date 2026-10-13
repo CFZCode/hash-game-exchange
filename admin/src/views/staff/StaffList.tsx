@@ -90,24 +90,6 @@ const creatableRoles = (level: number | undefined) =>
     ([l]) => Number(l) !== EXECUTIVE_LEVEL && (Number(level) === 1 ? Number(l) > 1 : level !== undefined && Number(l) === Number(level) + 1)
   )
 
-/** `parentId` value meaning "reports to the signed-in staff member" (the platform's default). */
-const SELF_PARENT = 'self'
-
-/** The platform's top level: the only caller who may skip levels when picking a parent. */
-const SUPER_ADMIN_LEVEL = 1
-
-/**
- * May an account at `parentLevel` be the parent of a new account at `roleLevel`? Below the Super
- * Admin the ladder is strict (the new level must be the parent's direct child level); the Super
- * Admin may place an account under anyone strictly above it. Sites with a looser rule only see a
- * narrower list, never a wider one.
- */
-const fitsUnder = (parentLevel: number, roleLevel: number, superAdmin: boolean) =>
-  superAdmin ? parentLevel < roleLevel : parentLevel === roleLevel - 1
-
-/** Every node of the viewer's subtree, flattened, depth-first. */
-const flattenTree = (nodes: StaffNode[] | undefined): StaffNode[] => (nodes ?? []).flatMap(n => [n, ...flattenTree(n.children)])
-
 const CreateStaff = () => {
   const { actor } = useSession()
 
@@ -124,34 +106,9 @@ const CreateStaff = () => {
     country: '',
     roleId: roles.some(([l]) => l === '6') ? '6' : (roles[0]?.[0] ?? '6'),
     percentage: '',
-    parentId: SELF_PARENT
   })
 
   const router = useRouter()
-
-  // "Reports to": the viewer, or an account in their subtree the platform accepts as the parent —
-  // exactly one level above the chosen role, or (for the Super Admin) any level above it.
-  const tree = useApi<StaffNode[]>('admin/staff/tree')
-  const selfId = actor ? Number(actor.staffId) : undefined
-  const superAdmin = Number(actor?.level) === SUPER_ADMIN_LEVEL
-
-  const canParent = (n: StaffNode, roleId: string) =>
-    Number(n.id) !== selfId && n.status === 'active' && Number(n.roleId) !== EXECUTIVE_LEVEL && fitsUnder(Number(n.roleId), Number(roleId), superAdmin)
-
-  const parents = useMemo(
-    () => flattenTree(tree.data).filter(n => canParent(n, form.roleId)),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [tree.data, selfId, form.roleId, superAdmin]
-  )
-
-  const setRole = (roleId: string) =>
-    setForm(f => ({
-      ...f,
-      roleId,
-
-      // A parent picked for another level may not be allowed above this one.
-      parentId: f.parentId === SELF_PARENT || flattenTree(tree.data).some(n => String(n.id) === f.parentId && canParent(n, roleId)) ? f.parentId : SELF_PARENT
-    }))
 
   const create = useApiMutation({
     fn: () => {
@@ -160,7 +117,6 @@ const CreateStaff = () => {
       if (form.phone) body.phone = form.phone
       if (form.country) body.country = form.country
       if (form.percentage) body.percentage = form.percentage
-      if (form.parentId !== SELF_PARENT) body.parentId = Number(form.parentId)
 
       return api.post<{ id: number }>('admin/staff', body)
     },
@@ -177,7 +133,7 @@ const CreateStaff = () => {
         </Button>
       }
       title='Create a staff account'
-      description='The new account reports to you unless you pick someone in your team. Password must be at least 12 characters; the new account signs in with it.'
+      description='The new account reports to you. Password must be at least 12 characters; the new account signs in with it.'
       submitLabel='Create'
       onSubmit={() => create.mutateAsync()}
     >
@@ -185,20 +141,9 @@ const CreateStaff = () => {
       <TextField id='s-email' label='Email' type='email' required value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
       <TextField id='s-password' label='Password' type='password' required minLength={12} value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} />
       <div className='grid grid-cols-2 gap-4'>
-        <SelectField id='s-role' label='Role' value={form.roleId} onChange={setRole} options={roles.map(([v, l]) => ({ value: v, label: `${l} (level ${v})` }))} />
+        <SelectField id='s-role' label='Role' value={form.roleId} onChange={roleId => setForm({ ...form, roleId })} options={roles.map(([v, l]) => ({ value: v, label: `${l} (level ${v})` }))} />
         <TextField id='s-pct' label='Share %' hint='0–100, up to 4 decimals' value={form.percentage} onChange={e => setForm({ ...form, percentage: e.target.value })} />
       </div>
-      <SelectField
-        id='s-parent'
-        label='Reports to'
-        hint={tree.isError ? 'Could not load your team — the account will report to you.' : superAdmin ? 'Only active accounts above the chosen role are listed.' : 'Only active accounts one level above the chosen role are listed.'}
-        value={form.parentId}
-        onChange={parentId => setForm({ ...form, parentId })}
-        options={[
-          { value: SELF_PARENT, label: 'You' },
-          ...parents.map(n => ({ value: String(n.id), label: `${n.name} — ${ROLE_NAMES[n.roleId] ?? `role ${n.roleId}`} (#${n.id})` }))
-        ]}
-      />
       <div className='grid grid-cols-2 gap-4'>
         <TextField id='s-phone' label='Phone' value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
         <TextField id='s-country' label='Country' value={form.country} onChange={e => setForm({ ...form, country: e.target.value })} />
