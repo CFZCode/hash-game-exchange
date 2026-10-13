@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import VipTierIcon from './VipTierIcon';
 import { getRecentBigWins } from '../../../services/home';
 import { useResource } from '../../../hooks/useResource';
@@ -66,17 +67,19 @@ function TabButton({ title, active, onClick }) {
 
 function WinCard({ win }) {
   return (
-    /* href is "#" until the app has a router; the real target is
-       `/game-detail/${win.distributeId}`, which is kept on the data for that day. */
-    <a
-      href="#"
+    /* The router's own link to the game page, as every game tile on the site is (CLAUDE.md:
+       an internal destination is a `<Link>`, never a bare `<a href>`). */
+    <Link
+      to={win.gameUnique ? `/game/${win.gameUnique}` : '#'}
       className="flex h-28 w-14 flex-none flex-col items-center text-xs hover:opacity-80 sm:h-[106px]"
     >
       {/* pt-[133%] is the 3:4 portrait art (the source files are 400x533), so the tile's
           height comes from its own width and no image dimension is hardcoded. */}
       <div className="relative mb-1 w-full rounded-lg pt-[133%]">
         <img
-          className="absolute left-0 top-0 w-full rounded-lg"
+          /* h-full + object-cover: catalogue art is not always 3:4, so it is cropped into the
+             portrait box rather than leaving a gap under a square cover. */
+          className="absolute left-0 top-0 h-full w-full rounded-lg object-cover"
           src={win.icon}
           alt={win.gameUnique}
         />
@@ -96,7 +99,7 @@ function WinCard({ win }) {
           {win.amount}
         </div>
       </div>
-    </a>
+    </Link>
   );
 }
 

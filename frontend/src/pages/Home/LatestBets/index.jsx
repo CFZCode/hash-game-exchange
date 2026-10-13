@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import SectionHeader from '../../../components/shared/SectionHeader';
 import { gameIcon, coinIcon, multiplier, formatAmount } from './bets';
 import Loading from '../../../components/shared/Loading';
@@ -75,6 +76,9 @@ const Label = ({ children }) => (
    distinction is the whole zebra pattern: positions shift by one every time the oldest row
    is dropped, so striping on position would invert the whole list on every push. Striping on
    the row's own sequence number makes the bands travel down with the content. */
+const GameLink = ({ slug, ...props }) =>
+  slug ? <Link to={`/game/${slug}`} {...props} /> : <a href="#" {...props} />;
+
 function BetRow({ bet, seq, precision }) {
   const mult = multiplier(bet.payout);
   const won = mult >= 1;
@@ -87,13 +91,19 @@ function BetRow({ bet, seq, precision }) {
         }`}
       >
         <div className="min-w-0">
-          <a
-            href="#"
+          {/* A row that knows its game page (the static showcase rows carry `slug`) links to it;
+              `icon` is the catalogue art for a third-party game the icon map does not know. */}
+          <GameLink
+            slug={bet.slug}
             className="flex items-center font-semibold text-primary hover:underline"
           >
-            <img className="mr-1 inline-block w-5" alt="game icon" src={gameIcon(bet.gameUnique)} />
+            <img
+              className="mr-1 inline-block size-5 rounded-sm object-cover"
+              alt="game icon"
+              src={bet.icon || gameIcon(bet.gameUnique)}
+            />
             <span className="ellipsis">{bet.fullName || bet.gameUnique}</span>
-          </a>
+          </GameLink>
         </div>
 
         <div className="ellipsis font-semibold text-primary">

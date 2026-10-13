@@ -22,6 +22,7 @@ import {
 import { bets } from '../pages/Home/LatestBets/bets';
 import { bigWinsByTab, vipTier, displayName } from '../pages/Home/RecentBigWins/data';
 import { matches } from '../pages/Home/Highlights/matches';
+import { staticBigWins, STATIC_LATEST_BETS, STATIC_HIGH_ROLLERS } from '../data/staticShowcase';
 
 /* The home page's data.
  *
@@ -140,12 +141,33 @@ const toLatestBet = (row) => {
   };
 };
 
+/* STATIC SHOWCASE FALLBACK (user request): when a live feed answers no rows or fails, the panel
+   shows the curated rows in `data/staticShowcase.js` instead of an empty box. Real rows always
+   win. With BC Originals switched off, the showcase drops its in-house rows. */
+const originalsOn = () =>
+  publicGates()
+    .then((gates) => gates.on('originals'))
+    .catch(() => true);
+
+const orStatic = (read, fallback) =>
+  Promise.resolve()
+    .then(read)
+    .catch(() => [])
+    .then((rows) => (rows?.length ? rows : fallback()));
+
+const staticBets = (rows) => () =>
+  originalsOn().then((on) => (on ? rows : rows.filter((row) => !row.original)));
+
 export function getLatestBets() {
   if (USE_FIXTURES) return request(ENDPOINTS.lastBets, { fixture: bets });
-  return Promise.resolve(
-    /* `LIVE_BETS` is the component's own capacity: it keeps 30 and shows 10 at a time. */
-    request(PLATFORM.casino.betHistoryLive, { live: true, params: { limit: LIVE_BETS }, fixture: [] }),
-  ).then((rows) => (rows ?? []).map(toLatestBet));
+  return orStatic(
+    () =>
+      Promise.resolve(
+        /* `LIVE_BETS` is the component's own capacity: it keeps 30 and shows 10 at a time. */
+        request(PLATFORM.casino.betHistoryLive, { live: true, params: { limit: LIVE_BETS }, fixture: [] }),
+      ).then((rows) => (rows ?? []).map(toLatestBet)),
+    staticBets(STATIC_LATEST_BETS),
+  );
 }
 
 /* THE HIGH ROLLER TAB'S OWN FEED, wired 2026-09-04 — and it is a SECOND feed, which is the whole
@@ -184,9 +206,13 @@ export function getHighRollers() {
      invisible until someone flipped the flag. An empty list is the honest fixture: this pane's
      own empty state is a panel with no rows, which `BetFeed` now renders correctly. */
   if (USE_FIXTURES) return request(ENDPOINTS.lastBets, { fixture: [] });
-  return Promise.resolve(
-    request(PLATFORM.casino.topWins, { live: true, params: { limit: LIVE_BETS }, fixture: [] }),
-  ).then((rows) => (rows ?? []).map(toLatestBet));
+  return orStatic(
+    () =>
+      Promise.resolve(
+        request(PLATFORM.casino.topWins, { live: true, params: { limit: LIVE_BETS }, fixture: [] }),
+      ).then((rows) => (rows ?? []).map(toLatestBet)),
+    staticBets(STATIC_HIGH_ROLLERS),
+  );
 }
 
 /* ONE READ PER TAB, because that is what the live site does: `?gameTypeId=<tab>` is a separate
@@ -204,15 +230,21 @@ export const getRecentBigWins = ({ tab = 0 } = {}) => {
      (no aggregator wins feed exists). It names nobody and carries no VIP level, so every card
      is the site's hidden name with no tier, and the amount is the real profit in its own coin
      rather than the capture's USD figure. */
-  if (tab !== 0 && tab !== 1) return Promise.resolve([]);
+  /* An empty or failed read falls back to the static showcase for that tab (see `orStatic`). */
+  const fallback = () => originalsOn().then((originals) => staticBigWins(tab, { originals }));
+  if (tab !== 0 && tab !== 1) return fallback();
   /* Every row of this feed is an in-house round, so with BC Originals switched off it has
      nothing to show (and nothing to link to). */
-  return publicGates().then((gates) =>
-    gates.on('originals')
-      ? Promise.resolve(
-          request(PLATFORM.casino.topWins, { live: true, params: { limit: 20 }, fixture: [] }),
-        ).then((rows) => (rows ?? []).map(toBigWin))
-      : [],
+  return orStatic(
+    () =>
+      publicGates().then((gates) =>
+        gates.on('originals')
+          ? Promise.resolve(
+              request(PLATFORM.casino.topWins, { live: true, params: { limit: 20 }, fixture: [] }),
+            ).then((rows) => (rows ?? []).map(toBigWin))
+          : [],
+      ),
+    fallback,
   );
 };
 
