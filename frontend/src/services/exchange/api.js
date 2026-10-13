@@ -1,5 +1,5 @@
 import { API_BASE, refreshSession } from '../client';
-import { getAccessToken, notifyAuthExpired } from '../tokens';
+import { getAccessToken, isAccountLockedCode, notifyAuthExpired } from '../tokens';
 
 /* ─── The exchange's own transport ────────────────────────────────────────────────────────
  *
@@ -114,6 +114,9 @@ async function attempt(path, { method, params, json, signal, timeout, auth }, re
     if (ok) return attempt(path, { method, params, json, signal, timeout, auth }, true);
     if (auth) notifyAuthExpired();
   }
+
+  /* A locked account ends the session here too — see the same arm in `services/client.js`. */
+  if (res.status === 403 && token && isAccountLockedCode(body?.error?.code)) notifyAuthExpired('locked');
 
   if (!res.ok || body?.success === false) {
     throw new ExchangeError(messageFor(res.status, body), {

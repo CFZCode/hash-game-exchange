@@ -126,13 +126,19 @@ export function onAuthExpired(fn) {
   return () => listeners.delete(fn);
 }
 
-export function notifyAuthExpired() {
+/* The codes the platform answers a LOCKED account with: `ACCOUNT_LOCKED` from the player-route
+   guard (`requireActive`), `AUTH_ACCOUNT_LOCKED` from login and `POST /auth/refresh`. Both mean
+   the same thing — staff (or an upline suspension) locked the account and no token will work. */
+export const isAccountLockedCode = (code) => code === 'ACCOUNT_LOCKED' || code === 'AUTH_ACCOUNT_LOCKED';
+
+/** `reason` is `'locked'` when the session ended because the account was locked, else undefined. */
+export function notifyAuthExpired(reason) {
   clearTokens();
   /* Copied before iterating: a listener that unsubscribes itself would otherwise mutate the
      set mid-loop. */
   for (const fn of [...listeners]) {
     try {
-      fn();
+      fn(reason);
     } catch {
       /* One listener throwing must not stop the others being told the session is gone. */
     }

@@ -3,6 +3,7 @@ import {
   getAccessToken,
   getRefreshToken,
   notifyAuthExpired,
+  isAccountLockedCode,
   setTokens,
 } from './tokens';
 
@@ -224,8 +225,15 @@ export function refreshSession() {
     body: JSON.stringify({ refreshToken: token }),
   })
     .then(async (res) => {
-      if (!res.ok) return false;
       const body = await res.json().catch(() => null);
+      /* A refresh refused because the account is LOCKED ends the session with that reason, so
+         the visitor is told why rather than being silently signed out. The caller's own
+         `notifyAuthExpired()` that follows is then a no-op re-run of the same sign-out. */
+      if (res.status === 403 && isAccountLockedCode(body?.error?.code)) {
+        notifyAuthExpired('locked');
+        return false;
+      }
+      if (!res.ok) return false;
       const data = body?.success ? body.data : null;
       if (!data?.accessToken) return false;
       setTokens(data);
@@ -297,8 +305,8 @@ async function handle(res, body, path, retried, replay) {
      that was signed in when the lock landed is signed out here instead of staying on screen with
      a header that can no longer read its own wallet. Login answers the same code about the
      credentials in its body, which is why the auth routes are excluded, as for the 401 arm. */
-  if (res.status === 403 && body?.error?.code === 'ACCOUNT_LOCKED' && !NO_REFRESH_PATH.test(path)) {
-    notifyAuthExpired();
+  if (res.status === 403 && isAccountLockedCode(body?.error?.code) && !NO_REFRESH_PATH.test(path)) {
+    notifyAuthExpired('locked');
   }
 
   if (!res.ok) {

@@ -17,6 +17,10 @@ import {
   register as apiRegister,
 } from '../services/auth';
 import { primeUsdPrices } from '../services/exchangeRate';
+import { toast } from '../components/shared/Toast/toast';
+
+/* The platform's own wording for a locked account (`AUTH_ACCOUNT_LOCKED` on login). */
+const LOCKED_MESSAGE = 'This account is locked. Contact support.';
 
 /* Who the visitor is, for the whole app.
  *
@@ -187,11 +191,20 @@ export function SessionProvider({ children }) {
   /* The transport fires this when a refresh has failed, which is the only way a session ends
      without the visitor asking. It has to reach state from outside React, which is what the
      listener registry in `services/tokens.js` is for. */
+  /* A LOCKED account is told why, once: a cold load fires a dozen reads that all answer
+     `ACCOUNT_LOCKED`, and each one ends the session again, so the notice is held back for a
+     moment after it shows rather than restarting the toast's timer a dozen times. */
+  const lockedNoticeAt = React.useRef(0);
+
   React.useEffect(
     () =>
-      onAuthExpired(() => {
+      onAuthExpired((reason) => {
         setAccount(VISITOR);
         setBalances(VISITOR_BALANCES);
+        if (reason === 'locked' && Date.now() - lockedNoticeAt.current > 5000) {
+          lockedNoticeAt.current = Date.now();
+          toast.error(LOCKED_MESSAGE);
+        }
       }),
     [],
   );
