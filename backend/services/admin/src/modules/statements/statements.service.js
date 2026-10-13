@@ -22,6 +22,7 @@ const {
   GIS_AMOUNT_SQL,
   gisMagnitude,
 } = require('./statements.constants');
+const { casinoRoundsSql, dayRange } = require('./casinoRounds');
 const { descendantIds, visibleStaffIds } = require('../staff-directory/staffDirectory.service');
 const { PLAYER_FUNDING_TYPES, TRANSFER_TYPE } = require('../lords/lords.constants');
 
@@ -437,45 +438,71 @@ class StatementsService {
     };
   }
 
+  /**
+   * Slotegrator transactions (INR, as the totals above read them) plus the
+   * in-house rounds, jsGames v2 callbacks and seamless transactions
+   * (`casinoRounds.js`, every coin — each row names its currency), newest
+   * first. Paged in the database over the union.
+   *
+   * `amount` is the signed wallet movement of the row (a stake negative, a win
+   * positive; an in-house round is ONE row, net of its payout); `stake`,
+   * `profit` and `status` say what the round was.
+   */
   async #casinoBets(ids, { from, to, page, limit, offset }) {
-    const where = {
-      user_id: ids,
-      currency: { [Op.in]: CASINO_INR_CURRENCIES },
-      ...this.#casinoDateWhere(from, to),
-    };
+    const { sequelize } = this.models.CreditsLedger;
+    const { QueryTypes } = sequelize.constructor;
+    const range = dayRange(from, to);
+    const union = `
+      SELECT 'gis' AS source, g.id::text AS id, COALESCE(g.transaction_datetime, g.created_at) AS ts, g.user_id::bigint AS user_id,
+             g.action::text AS action, g.game_uuid::text AS game, g.round_id::text AS round,
+             CASE WHEN UPPER(g.currency) = 'PKR' THEN 'INR' ELSE UPPER(g.currency) END AS currency,
+             CASE WHEN LOWER(g.action) = 'bet' THEN -ABS(g.amount) ELSE g.amount END AS amount,
+             CASE WHEN LOWER(g.action) = 'bet' THEN ABS(g.amount) END AS stake,
+             NULL::numeric AS profit, NULL::text AS status
+        FROM gis_transactions g
+       WHERE g.user_id IN (:ids) AND UPPER(g.currency) IN (:inr)
+         AND COALESCE(g.transaction_datetime, g.created_at) >= :roundsFrom
+         AND COALESCE(g.transaction_datetime, g.created_at) < :roundsTo
+      UNION ALL
+      SELECT r.source, r.id, r.ts, r.user_id,
+             CASE WHEN r.source = 'inhouse' THEN 'round' ELSE r.status END, r.game, NULL, r.currency,
+             r.net, r.stake, CASE WHEN r.source = 'inhouse' AND r.status <> 'open' THEN r.net END, r.status
+        FROM (${casinoRoundsSql({ range: true })}) r`;
+    const replacements = { ids: ids.map(Number), inr: CASINO_INR_CURRENCIES, ...range };
 
-    const { rows, count } = await this.models.GisTransactions.findAndCountAll({
-      where,
-      attributes: ['id', 'transaction_datetime', 'created_at', 'user_id', 'action', 'amount', 'round_id', 'game_uuid'],
-      // The timestamp the row is REPORTED under, so the list and the totals
-      // above it agree about which day a round belongs to.
-      order: [[CASINO_TS, 'DESC'], ['id', 'DESC']],
-      limit,
-      offset,
-      raw: true,
-    });
+    const [[{ total }], rows] = await Promise.all([
+      sequelize.query(`SELECT COUNT(*)::int AS total FROM (${union}) x`, { replacements, type: QueryTypes.SELECT }),
+      sequelize.query(`SELECT * FROM (${union}) x ORDER BY ts DESC, id DESC LIMIT :limit OFFSET :offset`, {
+        replacements: { ...replacements, limit, offset },
+        type: QueryTypes.SELECT,
+      }),
+    ]);
 
+    const gisRows = rows.filter((r) => r.source === 'gis');
     const [names, games] = await Promise.all([
       this.#userNames(rows.map((r) => r.user_id)),
-      this.#gameNames(rows.map((r) => r.game_uuid).filter(Boolean)),
+      this.#gameNames(gisRows.map((r) => r.game).filter(Boolean)),
     ]);
+    const dec = (v) => (v == null ? null : money.toDecimalString(money.toMinorQuantised(String(v))));
 
     return {
       kind: 'casino',
-      total: count,
-      rows: rows.map((tx) => {
-        const minor = gisMagnitude(tx.action, money.toMinorQuantised(tx.amount ?? '0'));
-        return {
-          id: String(tx.id),
-          ts: tx.transaction_datetime ?? tx.created_at,
-          user: names.get(String(tx.user_id)) ?? String(tx.user_id),
-          action: tx.action,
-          game: games.get(tx.game_uuid) ?? this.#text(tx.game_uuid),
-          round: tx.round_id ?? null,
-          amount: money.toDecimalString(tx.action === 'bet' ? -minor : minor),
-        };
-      }),
-      pagination: { page, limit, total: count, totalPages: Math.max(1, Math.ceil(count / limit)) },
+      total,
+      rows: rows.map((tx) => ({
+        id: tx.source === 'gis' ? String(tx.id) : `${tx.source}:${tx.id}`,
+        ts: tx.ts,
+        user: names.get(String(tx.user_id)) ?? String(tx.user_id),
+        source: tx.source,
+        action: tx.action,
+        game: tx.source === 'gis' ? games.get(tx.game) ?? this.#text(tx.game) : this.#text(tx.game),
+        round: tx.round ?? null,
+        currency: tx.currency,
+        stake: dec(tx.stake),
+        profit: dec(tx.profit),
+        status: tx.status ?? null,
+        amount: dec(tx.amount),
+      })),
+      pagination: { page, limit, total, totalPages: Math.max(1, Math.ceil(total / limit)) },
     };
   }
 
@@ -655,6 +682,35 @@ class StatementsService {
       );
     }
 
+    /**
+     * 7b. In-house rounds, jsGames v2 and seamless (`casinoRounds.js`), INR.
+     *
+     * One event per round / callback, for what the wallet actually moved: a
+     * settled in-house round nets payout − stake, an open one has taken its
+     * stake and paid nothing yet, a refunded one never happened. Without these
+     * a player who only played the house games had a statement whose running
+     * balance could not reach `credits.inr`.
+     */
+    const { sequelize } = this.models.CreditsLedger;
+    const rounds = await sequelize.query(
+      `SELECT * FROM (${casinoRoundsSql()}) r WHERE r.currency IN (:inr) AND r.net <> 0 ORDER BY r.ts, r.id`,
+      { replacements: { ids: [Number(userId)], inr: CASINO_INR_CURRENCIES }, type: sequelize.constructor.QueryTypes.SELECT }
+    );
+    for (const row of rounds) {
+      const label = row.source === 'inhouse'
+        ? `Casino ${row.game} (${row.status === 'open' ? 'open' : row.status})`
+        : `Casino ${row.source === 'jsgamesv2' ? 'jsGames' : 'seamless'} ${row.status}`;
+      push(
+        row.ts,
+        KIND.CASINO,
+        label,
+        row.game ?? '—',
+        money.toDecimalString(money.toMinorQuantised(String(row.net ?? '0'))),
+        `${row.source} ${row.id}`,
+        Number(row.id) || 0
+      );
+    }
+
     events.sort((a, b) => {
       const byTime = new Date(a.ts).getTime() - new Date(b.ts).getTime();
       return byTime || a.seq - b.seq;
@@ -692,7 +748,7 @@ class StatementsService {
       ...this.#dateWhere('created_at', from, to),
     };
 
-    const [sportsPerPlayer, sportsDaily, betAgg, casinoAgg, casinoPerPlayer, casinoDaily] = await Promise.all([
+    const [sportsPerPlayer, sportsDaily, betAgg, casinoAgg, casinoPerPlayer, casinoDaily, roundRows] = await Promise.all([
       this.models.CreditsLedger.findAll({
         where: ledgerWhere,
         attributes: ['user_id', [fn('COUNT', col('id')), 'bets'], [fn('COALESCE', fn('SUM', col('netamount')), 0), 'net']],
@@ -740,6 +796,21 @@ class StatementsService {
         order: [[fn('DATE', CASINO_TS), 'ASC']],
         raw: true,
       }),
+      // In-house, jsGames v2 and seamless rounds (`casinoRounds.js`), INR only
+      // like the Slotegrator figures beside them.
+      this.models.CreditsLedger.sequelize.query(
+        `SELECT r.user_id, DATE(r.ts) AS date,
+                COALESCE(SUM(r.stake), 0)::text AS staked, COALESCE(SUM(r.payout), 0)::text AS won,
+                COALESCE(SUM(r.n), 0)::int AS bets,
+                COUNT(*) FILTER (WHERE r.payout > 0)::int AS wins, COUNT(*)::int AS txns
+           FROM (${casinoRoundsSql({ range: true })}) r
+          WHERE r.currency IN (:inr)
+          GROUP BY 1, 2`,
+        {
+          replacements: { ids, inr: CASINO_INR_CURRENCIES, ...dayRange(from, to) },
+          type: this.models.CreditsLedger.sequelize.constructor.QueryTypes.SELECT,
+        }
+      ),
     ]);
 
     const perPlayer = new Map(asText.map((id) => [id, { sportsPnl: 0n, casinoPnl: 0n, sportsBets: 0, casinoBets: 0, casinoStaked: 0n }]));
@@ -807,6 +878,28 @@ class StatementsService {
     }
 
     const casinoByDay = new Map();
+    for (const row of roundRows) {
+      const staked = money.toMinorQuantised(row.staked ?? '0');
+      const won = money.toMinorQuantised(row.won ?? '0');
+      const bets = Number(row.bets) || 0;
+      casinoStaked += staked;
+      casinoWon += won;
+      casinoBets += bets;
+      casinoWins += Number(row.wins) || 0;
+      casinoTxns += Number(row.txns) || 0;
+      const entry = perPlayer.get(String(row.user_id));
+      if (entry) {
+        entry.casinoPnl += won - staked;
+        entry.casinoStaked += staked;
+        entry.casinoBets += bets;
+      }
+      const date = dayOf(row.date);
+      if (!casinoByDay.has(date)) casinoByDay.set(date, { date, bets: 0, staked: 0n, won: 0n });
+      const bucket = casinoByDay.get(date);
+      bucket.staked += staked;
+      bucket.won += won;
+      bucket.bets += bets;
+    }
     for (const row of casinoDaily) {
       const date = dayOf(row.date);
       if (!casinoByDay.has(date)) casinoByDay.set(date, { date, bets: 0, staked: 0n, won: 0n });
@@ -838,7 +931,7 @@ class StatementsService {
         playerPnl: money.toDecimalString(money.toMinorQuantised(row.net ?? '0')),
         agentPnl: money.toDecimalString(-money.toMinorQuantised(row.net ?? '0')),
       })),
-      casinoDaily: [...casinoByDay.values()].map((d) => ({
+      casinoDaily: [...casinoByDay.values()].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0)).map((d) => ({
         date: d.date,
         bets: d.bets,
         staked: money.toDecimalString(d.staked),

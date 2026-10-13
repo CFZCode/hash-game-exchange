@@ -21,6 +21,7 @@ const {
   decimal,
 } = require('./audienceStats.helpers');
 const { CASINO_SOURCES, SPORTS_TURNOVER } = require('./wagerStats.service');
+const { INHOUSE_UNLEDGERED, INHOUSE_PAYOUT } = require('../statements/casinoRounds');
 
 const HOUSE_ONLY_NOTE =
   'VIP, vault, rakeback and bonus figures are house-only, as on the Rewards pages and the P&L. ' +
@@ -270,7 +271,23 @@ class PlayerStatsService {
            FROM credits_ledger l
           WHERE l.user_id = :uid AND ${rangeSql('l.created_at')}
             AND l.reason IN (:playReasons)${cur('l.currency')}
-          GROUP BY 1, 2, 3, 4, 5`,
+          GROUP BY 1, 2, 3, 4, 5
+         /* In-house rounds from before the engine wrote ledger rows — read from
+            \`bets\` (casinoRounds.js INHOUSE_UNLEDGERED), the stake as a BET_STAKE and
+            what it paid as a BET_PAYOUT, so a round is counted once either way. */
+         UNION ALL
+         SELECT ${bucketSql('b.created')}, 'casino', 'INHOUSE', UPPER(b.coin), 'BET_STAKE',
+                ROUND(-SUM(b.amount), 8)::text, COUNT(*)::int
+           FROM bets b
+          WHERE b.uid = :uidNum AND ${rangeSql('b.created')} AND ${INHOUSE_UNLEDGERED('b')}${cur('b.coin')}
+          GROUP BY 1, 4
+         UNION ALL
+         SELECT ${bucketSql('b.created')}, 'casino', 'INHOUSE', UPPER(b.coin), 'BET_PAYOUT',
+                ROUND(SUM(${INHOUSE_PAYOUT('b')}), 8)::text, COUNT(*)::int
+           FROM bets b
+          WHERE b.uid = :uidNum AND ${rangeSql('b.created')} AND ${INHOUSE_UNLEDGERED('b')}
+            AND b.result IS NOT NULL AND b.amount + b.profit > 0${cur('b.coin')}
+          GROUP BY 1, 4`,
         { ...base, playReasons: PLAY_REASONS }
       ),
       select(

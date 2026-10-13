@@ -2,6 +2,7 @@
 
 const S = require('./stats.shared');
 const { gisKindSql, gisSideAmountSql, gisPlayFilterSql } = require('../statements/statements.constants');
+const { V2_STAKE, V2_PAYOUT } = require('../statements/casinoRounds');
 
 /**
  * Casino and sports turnover, payouts and GGR over time — the wager reports.
@@ -64,11 +65,13 @@ const CASINO_SOURCES = Object.freeze([
     currency: 'coin',
     currencySql: plainCurrencySql('coin'),
     game: 'game',
-    where: ` AND ${NOT_FAKE}`,
+    // A refunded round never happened; an open one has paid nothing yet.
+    where: ` AND ${NOT_FAKE} AND (result IS NULL OR result::text <> '"refunded"')`,
     bets: 'COUNT(*)',
     paidWins: 'COUNT(*) FILTER (WHERE profit > 0)',
     wagered: 'COALESCE(SUM(ABS(amount)), 0)',
-    won: 'COALESCE(SUM(GREATEST(ABS(amount) + profit, 0)), 0)',
+    // `profit` is the net actually paid, so stake + profit is the payout.
+    won: 'COALESCE(SUM(CASE WHEN result IS NULL THEN 0 ELSE GREATEST(ABS(amount) + profit, 0) END), 0)',
     refunded: '0',
     refunds: '0',
   },
@@ -111,6 +114,18 @@ const CASINO_SOURCES = Object.freeze([
       won: `COALESCE(SUM(ABS(amount)) FILTER (WHERE ${isWin}), 0)`,
       refunded: `COALESCE(SUM(ABS(amount)) FILTER (WHERE ${isRefund}), 0)`,
       refunds: `COUNT(*) FILTER (WHERE ${isRefund})`,
+      // v2 stores `amount` = win − bet, so its stake and payout are the
+      // callback's own bet_amount / win_amount (a negative bet nets off).
+      ...(s.key === 'jsgamesv2'
+        ? {
+            bets: `COUNT(*) FILTER (WHERE ${V2_STAKE(s.table)} > 0)`,
+            paidWins: `COUNT(*) FILTER (WHERE ${V2_PAYOUT(s.table)} > 0)`,
+            wagered: `COALESCE(SUM(${V2_STAKE(s.table)}), 0)`,
+            won: `COALESCE(SUM(${V2_PAYOUT(s.table)}), 0)`,
+            refunded: '0',
+            refunds: '0',
+          }
+        : {}),
     };
   }),
 ]);

@@ -4,6 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 
 const db = require('@ibitplay/db');
+const { Op } = require('sequelize');
 const { createLogger, money } = require('@ibitplay/common');
 
 const { GameEngine } = require('../engine/gameEngine');
@@ -468,6 +469,8 @@ test('the engine against a database', async (t) => {
     await models.Bets.destroy({ where: { uid: player } });
     await models.House.destroy({ where: { uid: player } });
     await models.Credits.destroy({ where: { uid: player } });
+    await models.CreditsLedger.destroy({ where: { user_id: String(player) } });
+    await models.WalletHistory.destroy({ where: { uid: player } });
     await models.Users.destroy({ where: { id: player } });
     if (connection) await connection.close();
   });
@@ -526,6 +529,93 @@ test('the engine against a database', async (t) => {
 
     assert.equal(settled.payout, '198.00000000');
     assert.equal(await balanceOf(), '1098.00000000');
+  });
+
+  const ledgerFor = (betId) =>
+    models.CreditsLedger.findAll({
+      where: { user_id: String(player), source_service: 'casino-service' },
+      raw: true,
+    }).then((rows) => rows.filter((r) => r.meta?.refType === 'INHOUSE' && r.meta?.refId === String(betId)));
+
+  await t.test('RECORDED PROFIT IS WHAT WAS PAID: a 2× win records +9.80, not +10', async () => {
+    await setBalance('1000');
+    const bet = await engine.placeBet({ userId: player, game: 'limbo', coin: 'INR', amount: '10' });
+    const settled = await engine.settle({
+      userId: player, betId: bet.betId, profit: '10', result: 2.5, hash: `h-${Date.now()}-${Math.random()}`, isWinner: true, coin: 'INR', amount: '10',
+    });
+
+    assert.equal(settled.payout, '19.80000000');
+    assert.equal(settled.profit, '9.80000000', 'socket reply carries the net');
+    const row = await models.Bets.findByPk(bet.betId, { raw: true });
+    assert.equal(money.toDecimalString(money.toMinor(String(row.profit))), '9.80000000', 'bets.profit is the net');
+    assert.equal(await balanceOf(), '1009.80000000');
+  });
+
+  await t.test('a loss records −stake and pays nothing', async () => {
+    await setBalance('1000');
+    const bet = await engine.placeBet({ userId: player, game: 'limbo', coin: 'INR', amount: '10' });
+    const settled = await engine.settle({
+      userId: player, betId: bet.betId, profit: '-10', result: 1.2, hash: `h-${Date.now()}-${Math.random()}`, isWinner: false, coin: 'INR', amount: '10',
+    });
+    assert.equal(settled.payout, '0.00000000');
+    assert.equal(settled.profit, '-10.00000000');
+    assert.equal(await balanceOf(), '990.00000000');
+    const ledger = await ledgerFor(bet.betId);
+    assert.deepEqual(ledger.map((r) => r.reason), ['BET_STAKE'], 'no payout row on a loss');
+  });
+
+  await t.test('A PUSH (profit 0) RETURNS THE FULL STAKE and records 0', async () => {
+    await setBalance('1000');
+    const bet = await engine.placeBet({ userId: player, game: 'limbo', coin: 'INR', amount: '10' });
+    const settled = await engine.settle({
+      userId: player, betId: bet.betId, profit: '0', result: 2, hash: `h-${Date.now()}-${Math.random()}`, isWinner: false, coin: 'INR', amount: '10',
+    });
+    assert.equal(settled.payout, '10.00000000');
+    assert.equal(settled.profit, '0.00000000');
+    assert.equal(await balanceOf(), '1000.00000000');
+  });
+
+  await t.test('STAKE, PAYOUT AND REFUND WRITE LEDGER + HISTORY ROWS that sum to the balance change', async () => {
+    await setBalance('1000');
+    const win = await engine.placeBet({ userId: player, game: 'limbo', coin: 'INR', amount: '10' });
+    await engine.settle({
+      userId: player, betId: win.betId, profit: '10', result: 2.5, hash: `h-${Date.now()}-${Math.random()}`, isWinner: true, coin: 'INR', amount: '10',
+    });
+    const refunded = await engine.placeBet({ userId: player, game: 'limbo', coin: 'INR', amount: '10' });
+    await engine.refund({ userId: player, betId: refunded.betId, coin: 'INR', amount: '10' });
+
+    const winRows = await ledgerFor(win.betId);
+    assert.deepEqual(winRows.map((r) => [r.reason, money.toDecimalString(money.toMinor(String(r.amount))), r.currency]).sort(), [
+      ['BET_PAYOUT', '19.80000000', 'INR'],
+      ['BET_STAKE', '-10.00000000', 'INR'],
+    ]);
+    const stakeRow = winRows.find((r) => r.reason === 'BET_STAKE');
+    assert.equal(stakeRow.idempotency_key, `casino-service:BET_STAKE:INHOUSE:${win.betId}`);
+    assert.equal(money.toDecimalString(money.toMinor(String(stakeRow.meta.previousBalance))), '1000.00000000');
+    assert.equal(money.toDecimalString(money.toMinor(String(stakeRow.balance))), '990.00000000');
+
+    const refundRows = await ledgerFor(refunded.betId);
+    assert.deepEqual(refundRows.map((r) => r.reason).sort(), ['BET_REFUND', 'BET_STAKE']);
+
+    const all = [...winRows, ...refundRows].reduce((sum, r) => sum + money.toMinor(String(r.amount)), 0n);
+    assert.equal(money.toDecimalString(all), '9.80000000', 'ledger sums to the balance change');
+    assert.equal(await balanceOf(), '1009.80000000');
+
+    const history = await models.WalletHistory.count({ where: { uid: player, description: { [Op.like]: `%#${win.betId}` } } });
+    assert.equal(history, 2, 'wallet_history mirrors the ledger');
+  });
+
+  await t.test('games_played counts a SETTLED round, never a refunded one', async () => {
+    const before = (await models.Users.findByPk(player, { raw: true })).games_played ?? 0;
+    await setBalance('1000');
+    const a = await engine.placeBet({ userId: player, game: 'limbo', coin: 'INR', amount: '10' });
+    await engine.refund({ userId: player, betId: a.betId, coin: 'INR', amount: '10' });
+    const b = await engine.placeBet({ userId: player, game: 'limbo', coin: 'INR', amount: '10' });
+    await engine.settle({
+      userId: player, betId: b.betId, profit: '-10', result: 1, hash: `h-${Date.now()}-${Math.random()}`, isWinner: false, coin: 'INR', amount: '10',
+    });
+    const after = (await models.Users.findByPk(player, { raw: true })).games_played ?? 0;
+    assert.equal(Number(after) - Number(before), 1);
   });
 
   await t.test('A BET SETTLES ONCE', async () => {
@@ -909,4 +999,26 @@ test('SERVER AUTHORITY closes the four client-controlled payouts', async (t) => 
       Math.random = original;
     }
   });
+});
+
+test('a single-shot round validates BEFORE the stake is taken', async () => {
+  const sockets = require('../sockets');
+  const handlers = new Map();
+  const touched = [];
+  const fake = (name) => new Proxy({}, { get: (_, op) => async () => { touched.push(`${name}.${String(op)}`); return null; } });
+  const deps = {
+    models: { House: { findOne: async () => null }, Credits: fake('Credits'), Bets: fake('Bets'), Users: fake('Users') },
+    db: { sequelize: { query: async () => { throw new Error('no db in this test'); } }, transaction: async () => { touched.push('db.transaction'); } },
+    logger: createLogger({ name: 'in-house-sockets-test', level: 'silent' }),
+    config: {},
+    io: { emit() {}, to: () => ({ emit() {} }) },
+  };
+  sockets.register({ on: (event, spec) => handlers.set(event, spec.handle), deps });
+
+  const { EVENTS } = require('@ibitplay/socket');
+  const limbo = handlers.get(EVENTS.PLAY_LIMBO);
+  const reply = await limbo({ amount: '10', coin: 'INR', payout: '1.00' }, { userId: 1 });
+
+  assert.equal(reply.code, 'INHOUSE_INVALID_STAKE');
+  assert.deepEqual(touched, [], 'no debit, no bet row, no transaction for an invalid round');
 });

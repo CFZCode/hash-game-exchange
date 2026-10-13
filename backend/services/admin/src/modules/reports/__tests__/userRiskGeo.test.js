@@ -224,7 +224,7 @@ test('user risk and geo stats against a database', async (t) => {
       r.activity.recentCasinoBets.map((b) => `${b.source}/${b.game}/${b.result}`),
       ['jsgames/no-such-game/bet', 'inhouse/dice/won', 'inhouse/crash/lost']
     );
-    assert.equal(r.activity.recentCasinoBets[1].stakeAmount, '20');
+    assert.equal(r.activity.recentCasinoBets[1].stakeAmount, '20.00000000');
     assert.equal(r.riskFlags.noActivity, false);
     assert.equal(r.withdrawalRatio.inr, 0.85);
     assert.equal(r.withdrawalRatio.threshold, 0.8);

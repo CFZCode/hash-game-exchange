@@ -29,6 +29,7 @@ const { descendantIds, visibleStaffIds } = require('../staff-directory/staffDire
 // transfer, refill, issuance, adjust — money handed over; never 'gt'/'casino'.
 const { PLAYER_FUNDING_TYPES } = require('../lords/lords.constants');
 const { GIS_AMOUNT_SQL, gisMagnitude } = require('../statements/statements.constants');
+const { casinoRoundsSql, INHOUSE_UNLEDGERED } = require('../statements/casinoRounds');
 // The one "withdrawn" rule (bank Approved or Paid) — see dashboard.constants.js.
 const { WITHDRAWAL_DONE } = require('../dashboard/dashboard.constants');
 
@@ -853,14 +854,17 @@ class ReportsService {
     const { QueryTypes } = sequelize.constructor;
     const rows = await sequelize.query(
       `SELECT * FROM (
-         (SELECT 'inhouse' AS source, b.id::text AS id, b.created AS created_at,
-                 b.game AS game, ABS(b.amount)::text AS stake,
-                 UPPER(COALESCE(NULLIF(b.coin, ''), '?')) AS currency,
-                 CASE WHEN b.profit > 0 THEN 'won' WHEN b.profit < 0 THEN 'lost' ELSE 'even' END AS result,
-                 b.profit::text AS profit
-            FROM bets b
-           WHERE b.uid = :uid AND (b.result->>'fake') IS DISTINCT FROM 'true'
-           ORDER BY b.created DESC LIMIT :n)
+         -- In-house rounds, jsGames v2 stake callbacks and seamless stakes — the
+         -- per-player views' shared reading (statements/casinoRounds.js): a
+         -- refunded round is left out, an open one shows as 'open', the v2 stake
+         -- is the callback's bet_amount.
+         (SELECT r.source, r.id, r.ts AS created_at, r.game, r.stake::text AS stake,
+                 COALESCE(NULLIF(r.currency, ''), '?') AS currency,
+                 r.status AS result,
+                 CASE WHEN r.source = 'inhouse' AND r.status = 'open' THEN NULL ELSE r.net::text END AS profit
+            FROM (${casinoRoundsSql()}) r
+           WHERE r.n = 1
+           ORDER BY r.ts DESC LIMIT :n)
          UNION ALL
          (SELECT 'gis', g.id::text, COALESCE(g.transaction_datetime, g.created_at),
                  COALESCE(gg.name, g.game_uuid), ABS(g.amount)::text,
@@ -877,24 +881,18 @@ class ReportsService {
             LEFT JOIN LATERAL (SELECT game_name FROM js_games WHERE game_uid = j.game_uid LIMIT 1) jg ON TRUE
            WHERE j.user_id = :uid AND LOWER(j.transaction_type) IN ('bet', 'loss', 'settle')
            ORDER BY j."timestamp" DESC NULLS LAST LIMIT :n)
-         UNION ALL
-         (SELECT 'jsgamesv2', t.id::text, t.created_at, COALESCE(NULLIF(t.game_name, ''), t.game_uid), ABS(t.amount)::text,
-                 UPPER(COALESCE(NULLIF(t.currency, ''), '?')), LOWER(t.transaction_type), NULL
-            FROM game_transactions t
-           WHERE t.user_id = :uid AND LOWER(t.transaction_type) IN ('bet', 'loss', 'settle')
-           ORDER BY t.created_at DESC NULLS LAST LIMIT :n)
        ) x ORDER BY created_at DESC NULLS LAST LIMIT :n`,
-      { replacements: { uid: Number(userId), n: RISK_BET_ROWS }, type: QueryTypes.SELECT }
+      { replacements: { uid: Number(userId), ids: [Number(userId)], n: RISK_BET_ROWS }, type: QueryTypes.SELECT }
     );
     return rows.map((r) => ({
       id: `${r.source}:${r.id}`,
       source: r.source,
       createdAt: r.created_at,
       game: r.game ?? null,
-      stakeAmount: r.stake ?? '0',
+      stakeAmount: money.toDecimalString(money.toMinorQuantised(String(r.stake ?? '0'))),
       currency: r.currency,
       result: r.result ?? null,
-      profit: r.profit ?? null,
+      profit: r.profit == null ? null : money.toDecimalString(money.toMinorQuantised(String(r.profit))),
     }));
   }
 
@@ -1928,9 +1926,15 @@ class ReportsService {
     if (!ids.length) return new Map();
     const { sequelize } = this.models.Users;
     const rows = await sequelize.query(
-      `SELECT user_id, COUNT(*)::int AS n FROM credits_ledger
-        WHERE user_id IN (:ids) AND reason = 'BET_STAKE' GROUP BY user_id`,
-      { replacements: { ids: ids.map(String) }, type: sequelize.constructor.QueryTypes.SELECT }
+      `SELECT user_id, SUM(n)::int AS n FROM (
+         SELECT user_id, COUNT(*) AS n FROM credits_ledger
+          WHERE user_id IN (:ids) AND reason = 'BET_STAKE' GROUP BY user_id
+         UNION ALL
+         -- In-house rounds with no ledger stake row (played before the engine wrote them).
+         SELECT b.uid::text, COUNT(*) FROM bets b
+          WHERE b.uid IN (:numIds) AND ${INHOUSE_UNLEDGERED('b')} GROUP BY b.uid
+       ) x GROUP BY user_id`,
+      { replacements: { ids: ids.map(String), numIds: ids.map(Number) }, type: sequelize.constructor.QueryTypes.SELECT }
     );
     return new Map(rows.map((r) => [String(r.user_id), Number(r.n)]));
   }

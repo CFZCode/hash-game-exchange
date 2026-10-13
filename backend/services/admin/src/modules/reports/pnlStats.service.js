@@ -1,6 +1,7 @@
 'use strict';
 
 const { canManagePromotions } = require('@ibitplay/auth');
+const { INHOUSE_PAYOUT, V2_STAKE, V2_PAYOUT } = require('../statements/casinoRounds');
 
 const { DashboardStatsService, SPORTS_LEDGER_REASONS, SPORTS_NOT_TURNOVER } = require('../dashboard/dashboardStats.service');
 const dashboardConstants = require('../dashboard/dashboard.constants');
@@ -444,9 +445,11 @@ class PnlStatsService {
            WHERE b.amount > 0 AND (b.result IS NULL OR b.result::text <> '"refunded"') AND ${NOT_FAKE}
              AND ${rangeSql('b.created')}${cur('b.coin')}${owned('b.uid')}
           UNION ALL
-          SELECT 'inhouse', 'In-house', 'Originals', 'inhouse:' || b.game, b.game, UPPER(b.coin), 'win', b.amount + b.profit, 0
+          -- What was PAID: stake + profit on every settled round (a push or a
+          -- partial return pays too), not only on rounds with profit > 0.
+          SELECT 'inhouse', 'In-house', 'Originals', 'inhouse:' || b.game, b.game, UPPER(b.coin), 'win', ${INHOUSE_PAYOUT('b')}, 0
             FROM bets b
-           WHERE b.profit > 0 AND ${NOT_FAKE}
+           WHERE b.result IS NOT NULL AND b.result::text <> '"refunded"' AND b.amount + b.profit > 0 AND ${NOT_FAKE}
              AND ${rangeSql('b.created')}${cur('b.coin')}${owned('b.uid')}
           UNION ALL
           SELECT 'gis', COALESCE(NULLIF(gg.provider, ''), 'Slotegrator'), COALESCE(NULLIF(gg.type, ''), 'Other'),
@@ -466,13 +469,17 @@ class PnlStatsService {
            WHERE j.amount <> 0 AND LOWER(j.transaction_type) IN ('bet', 'settle', 'win') AND LOWER(j.transaction_status) = 'completed'
              AND ${rangeSql('j."timestamp"')}${cur('j.currency')}${owned('j.user_id')}
           UNION ALL
+          -- jsGames v2: 'amount' is win − bet, so the stake and the payout come
+          -- from the callback's own bet_amount / win_amount (one row may carry
+          -- both; a negative bet_amount is a correction and nets the stake off).
           SELECT 'jsgamesv2', COALESCE(NULLIF(jg2.vendor, ''), 'jsGames'), COALESCE(NULLIF(jg2.game_type, ''), 'Other'),
                  'js:' || COALESCE(v.game_uid, ''), COALESCE(jg2.game_name, v.game_name, v.game_uid), UPPER(v.currency),
-                 CASE WHEN LOWER(v.transaction_type) = 'win' THEN 'win' ELSE 'stake' END, ABS(v.amount),
-                 CASE WHEN LOWER(v.transaction_type) = 'win' THEN 0 ELSE 1 END
+                 k.kind, k.amount, k.n
             FROM game_transactions v
             LEFT JOIN js_games jg2 ON jg2.game_uid = v.game_uid
-           WHERE v.amount <> 0 AND LOWER(v.transaction_type) IN ('bet', 'loss', 'win')
+            CROSS JOIN LATERAL (VALUES ('stake', ${V2_STAKE('v')}, CASE WHEN ${V2_STAKE('v')} > 0 THEN 1 ELSE 0 END),
+                                       ('win', ${V2_PAYOUT('v')}, 0)) AS k(kind, amount, n)
+           WHERE k.amount <> 0
              AND ${rangeSql('v.created_at')}${cur('v.currency')}${owned('v.user_id')}
         ) x
        GROUP BY source, provider, category, game_key, currency`;
@@ -536,9 +543,9 @@ class PnlStatsService {
          WHERE b.amount > 0 AND (b.result IS NULL OR b.result::text <> '"refunded"') AND ${NOT_FAKE}
            AND ${rangeSql('b.created')}${cur('b.coin')}${owned('b.uid')}
         UNION ALL
-        SELECT b.uid, 'casino', 'win', 'house', UPPER(b.coin), b.amount + b.profit, 0
+        SELECT b.uid, 'casino', 'win', 'house', UPPER(b.coin), ${INHOUSE_PAYOUT('b')}, 0
           FROM bets b
-         WHERE b.profit > 0 AND ${NOT_FAKE} AND ${rangeSql('b.created')}${cur('b.coin')}${owned('b.uid')}
+         WHERE b.result IS NOT NULL AND b.result::text <> '"refunded"' AND b.amount + b.profit > 0 AND ${NOT_FAKE} AND ${rangeSql('b.created')}${cur('b.coin')}${owned('b.uid')}
         UNION ALL
         SELECT g.user_id, CASE WHEN LOWER(COALESCE(gg.type, '')) LIKE '%sport%' THEN 'sports' ELSE 'casino' END,
                ${gisKindSql('g')}, 'partner', ${GIS_CURRENCY}, ${gisSideAmountSql('g')}, ${gisBetCountSql('g')}
@@ -553,10 +560,11 @@ class PnlStatsService {
          WHERE j.amount <> 0 AND LOWER(j.transaction_type) IN ('bet', 'settle', 'win') AND LOWER(j.transaction_status) = 'completed'
            AND ${rangeSql('j."timestamp"')}${cur('j.currency')}${owned('j.user_id')}
         UNION ALL
-        SELECT v.user_id, 'casino', CASE WHEN LOWER(v.transaction_type) = 'win' THEN 'win' ELSE 'stake' END, 'house',
-               UPPER(v.currency), ABS(v.amount), CASE WHEN LOWER(v.transaction_type) = 'win' THEN 0 ELSE 1 END
+        SELECT v.user_id, 'casino', k.kind, 'house', UPPER(v.currency), k.amount, k.n
           FROM game_transactions v
-         WHERE v.amount <> 0 AND LOWER(v.transaction_type) IN ('bet', 'loss', 'win')
+          CROSS JOIN LATERAL (VALUES ('stake', ${V2_STAKE('v')}, CASE WHEN ${V2_STAKE('v')} > 0 THEN 1 ELSE 0 END),
+                                     ('win', ${V2_PAYOUT('v')}, 0)) AS k(kind, amount, n)
+         WHERE k.amount <> 0
            AND ${rangeSql('v.created_at')}${cur('v.currency')}${owned('v.user_id')}
         UNION ALL
         SELECT s.user_id, 'sports', 'stake', 'house', ${SPORTS_CURRENCY('s')}, s.stake_amount, 1

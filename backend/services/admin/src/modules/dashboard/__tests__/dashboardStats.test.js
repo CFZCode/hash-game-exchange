@@ -107,6 +107,7 @@ test('dashboard stats against a database', async (t) => {
   const playerB = newId(); // a direct signup — the owner's only
   const COIN = `T${String(process.pid % 100_000).padStart(5, '0')}`.slice(0, 8);
   const GIS_COIN = `G${COIN.slice(1)}`;
+  const PAY_COIN = `P${COIN.slice(1)}`;
   const service = new DashboardStatsService({ models, db: connection, logger, config: { ROOT_STAFF_ID: ownerId } });
 
   // A quiet stretch of the past, so other tests' rows cannot land in the window.
@@ -119,9 +120,10 @@ test('dashboard stats against a database', async (t) => {
     await sequelize.query('DELETE FROM "SportsBet" WHERE user_id IN (:ids)', { replacements: { ids: [playerA, playerB] } });
     await sequelize.query('DELETE FROM bets WHERE uid IN (:ids)', { replacements: { ids: [playerA, playerB] } });
     await sequelize.query('DELETE FROM gis_transactions WHERE user_id IN (:ids)', { replacements: { ids: [playerA, playerB] } });
+    await sequelize.query('DELETE FROM game_transactions WHERE user_id IN (:ids)', { replacements: { ids: [playerA, playerB] } });
     await models.Users.destroy({ where: { id: [playerA, playerB] } });
     await models.Staff.destroy({ where: { id: [agentId, ownerId] } });
-    await models.Exchangerate.destroy({ where: { currency: [COIN, GIS_COIN] } });
+    await models.Exchangerate.destroy({ where: { currency: [COIN, GIS_COIN, PAY_COIN] } });
   };
 
   t.before(async () => {
@@ -162,7 +164,9 @@ test('dashboard stats against a database', async (t) => {
     );
     await sequelize.query(
       `INSERT INTO bets (uid, gid, game, coin, amount, profit, created, result)
-       VALUES (:a, :a, 'dice', :coin, 10, 5, :at, NULL), (:b, :b, 'dice', :coin, 20, 0, :at2, NULL),
+       -- Settled rounds: a win (profit = the net paid, +5) and a loss (−20).
+       -- An OPEN round (result NULL) has paid nothing and is never a win.
+       VALUES (:a, :a, 'dice', :coin, 10, 5, :at, '2.5'), (:b, :b, 'dice', :coin, 20, -20, :at2, '1.1'),
               -- A bot/QA round: not turnover, as the casino service and the wager reports rule.
               (:a, :a, 'fake-sim', :coin, 5000, 900, :at, '{"fake": true}')`,
       { replacements: { a: playerA, b: playerB, coin: COIN, at: day('05'), at2: day('20') } }
@@ -260,5 +264,32 @@ test('dashboard stats against a database', async (t) => {
 
     const top = await service.top({ actor: { id: ownerId }, ...window, currency: GIS_COIN });
     assert.deepEqual(top.games.map((g) => [g.key, g.wagered, g.bets]), [['gis:g-slot', '30.00000000', 2]]);
+  });
+
+  await t.test('casino WON is what was paid: pushes and partial returns count, open and refunded rounds do not; v2 reads bet/win amounts', async () => {
+    await sequelize.query(
+      `INSERT INTO bets (uid, gid, game, coin, amount, profit, created, result)
+       VALUES (:a, :a, 'limbo', :coin, 10, 9.8, :at, '2.5'),       -- win: paid 19.80
+              (:a, :a, 'limbo', :coin, 10, 0, :at, '2'),           -- push: paid 10
+              (:a, :a, 'plinko', :coin, 10, -5.2, :at, '0.5'),     -- partial: paid 4.80
+              (:a, :a, 'limbo', :coin, 10, -10, :at, '1.1'),       -- loss: paid 0
+              (:a, :a, 'limbo', :coin, 10, 0, :at, '"refunded"'),  -- never happened
+              (:a, :a, 'limbo', :coin, 10, 0, :at, NULL)           -- open: staked, paid 0`,
+      { replacements: { a: playerA, coin: PAY_COIN, at: day('06') } }
+    );
+    // v2: a round settled in one message (bet 10, win 25 → amount +15) and a lost spin (bet 10 → −10).
+    await sequelize.query(
+      `INSERT INTO game_transactions (user_id, transaction_type, amount, currency, external_transaction_id, transaction_status, additional_data, created_at, updated_at)
+       VALUES (:a, 'bet_result', 15, :coin, :r1, 'completed', '{"bet_amount":"10","win_amount":"25"}', :at, :at),
+              (:a, 'bet', -10, :coin, :r2, 'completed', '{"bet_amount":"10","win_amount":"0"}', :at, :at)`,
+      { replacements: { a: playerA, coin: PAY_COIN, at: day('06'), r1: `dash-${PAY_COIN}-1`, r2: `dash-${PAY_COIN}-2` } }
+    );
+
+    const r = await service.series({ actor: { id: ownerId }, ...window, currency: PAY_COIN });
+    // In-house: 5 stakes of 10 (refunded excluded) = 50; paid 19.80 + 10 + 4.80 = 34.60.
+    // v2: stakes 20, paid 25.
+    assert.equal(r.totals.casinoWagered, '70.00000000');
+    assert.equal(r.totals.casinoWon, '59.60000000');
+    assert.equal(r.totals.casinoGgr, '10.40000000');
   });
 });

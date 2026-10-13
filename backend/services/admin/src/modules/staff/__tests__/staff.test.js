@@ -387,6 +387,31 @@ test('admin staff', async (t) => {
     assert.equal(await staffBalance(owner), '500.00000000', 'the owner draws on nothing');
   });
 
+  await t.test('a transfer to or from a player writes the player\'s ledger + history, so the wallet reconciles', async () => {
+    const owner = await seedStaff(newStaffId(), { inr: '500', level: 1 });
+    const agent = await seedStaff(newStaffId(), { parentId: owner });
+    const player = await seedPlayer(newUid(), agent, '0');
+
+    await service.transfer({ transactionPassword: TXN,
+      actor: ownerActor(owner), toType: 'user', toId: player, amount: '75', direction: 'deposit',
+    });
+    await service.transfer({ transactionPassword: TXN,
+      actor: ownerActor(owner), toType: 'user', toId: player, amount: '30', direction: 'withdraw',
+    });
+
+    const rows = await connection.models.CreditsLedger.findAll({ where: { user_id: String(player) }, order: [['id', 'ASC']], raw: true });
+    assert.deepEqual(
+      rows.map((r) => [r.reason, money.toDecimalString(money.toMinor(String(r.amount))), money.toDecimalString(money.toMinor(String(r.balance)))]),
+      [['TRANSFER_IN', '75.00000000', '75.00000000'], ['TRANSFER_OUT', '-30.00000000', '45.00000000']]
+    );
+    assert.equal(rows[1].meta.previousBalance, '75.00000000');
+    const sum = rows.reduce((a, r) => a + money.toMinor(String(r.amount)), 0n);
+    assert.equal(money.toDecimalString(sum), await playerBalance(player), 'ledger sums to the wallet');
+    assert.equal(await connection.models.WalletHistory.count({ where: { uid: player } }), 2);
+    await connection.models.CreditsLedger.destroy({ where: { user_id: String(player) } });
+    await connection.models.WalletHistory.destroy({ where: { uid: player } });
+  });
+
   await t.test('an outside account cannot be transferred to', async () => {
     const boss = await seedStaff(newStaffId(), { inr: '1000' });
     const stranger = await seedStaff(newStaffId(), { inr: '0' });

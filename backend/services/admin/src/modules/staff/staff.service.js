@@ -574,6 +574,18 @@ class StaffService {
         { transaction }
       );
 
+      // The PLAYER side of the movement gets its ledger + history rows, as the
+      // opening balance and account close already do (players.service): a
+      // player wallet changed here without them drifted from its ledger and
+      // reconcile reported `balanced: false`.
+      if (source.type === TARGET_TYPE.USER || destination.type === TARGET_TYPE.USER) {
+        const isCredit = destination.type === TARGET_TYPE.USER;
+        await this.#playerLedger(
+          { userId: isCredit ? destination.id : source.id, amount, isCredit, transferId: row.id, actor },
+          transaction
+        );
+      }
+
       this.logger?.info(
         { actorStaffId: actor.id, from: source, to: destination, amount, direction, transferId: row.id },
         'Staff transfer'
@@ -874,6 +886,50 @@ class StaffService {
    * debited unconditionally — so two transfers issued at once both passed the
    * comparison and the account went negative.
    */
+  /** credits_ledger TRANSFER_IN/OUT + wallet_history for a player in a staff transfer (INR). */
+  async #playerLedger({ userId, amount, isCredit, transferId, actor }, transaction) {
+    const moved = money.toMinor(String(amount));
+    const wallet = await this.models.Credits.findOne({ where: { uid: userId }, attributes: ['inr'], transaction, raw: true });
+    const after = money.fromStored(wallet?.inr ?? '0');
+    const previous = money.toDecimalString(money.toMinor(after) + (isCredit ? -moved : moved));
+    const player = await this.models.Users.findOne({ where: { id: userId }, attributes: ['name'], transaction, raw: true });
+    const description = isCredit ? 'Funded by staff transfer' : 'Withdrawn by staff transfer';
+
+    await this.models.CreditsLedger.create(
+      {
+        user_id: String(userId),
+        currency: 'INR',
+        amount: money.toDecimalString(isCredit ? moved : -moved),
+        reason: isCredit ? 'TRANSFER_IN' : 'TRANSFER_OUT',
+        description,
+        balance: after,
+        closing: after,
+        netamount: 0,
+        profit: 0,
+        loss: 0,
+        commission: 0,
+        idempotency_key: null,
+        source_service: 'admin-service',
+        meta: { refType: 'STAFF_TRANSFER', refId: String(transferId), staffId: String(actor.id), previousBalance: previous },
+      },
+      { transaction }
+    );
+    await this.models.WalletHistory.create(
+      {
+        uid: userId,
+        username: player?.name || String(userId),
+        coin: 'INR',
+        operation: isCredit ? 'credit' : 'debit',
+        amount: money.toDecimalString(moved),
+        previous_balance: previous,
+        new_balance: after,
+        description,
+        transaction_time: new Date(),
+      },
+      { transaction }
+    );
+  }
+
   async #debit(party, amount, { actor, transaction, allowCredit = false }) {
     /**
      * The platform owner is the source of funds and has no balance to draw
