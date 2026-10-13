@@ -111,8 +111,11 @@ test('stats against a database', async (t) => {
 
   const roleId = (await models.Roles.findOne({ where: { level: 6 }, raw: true }))?.id;
   assert.ok(roleId, 'the test database needs a level-6 (agent) role');
-  const houseRoleId = (await models.Roles.findOne({ where: { level: 2 }, raw: true }))?.id;
-  assert.ok(houseRoleId, 'the test database needs a level-2 (admin) role');
+  // The platform owner: since the Addaplay rule only the Super Admin reads
+  // every tree (an Admin is scoped to its own subtree). A restored legacy
+  // owner role may carry level 0.
+  const houseRoleId = (await models.Roles.findOne({ where: { level: [0, 1] }, order: [['level', 'ASC']], raw: true }))?.id;
+  assert.ok(houseRoleId, 'the test database needs a super-admin role');
 
   const agentA = newId();
   const agentB = newId();
@@ -126,9 +129,9 @@ test('stats against a database', async (t) => {
   const asA = { id: agentA, permissions: ['*'] };
   const asB = { id: agentB, permissions: ['*'] };
   const asC = { id: agentC, level: 6, permissions: ['*'] };
-  // An agent-tree session (level 6) and a house one (level 2): the level decides the house-only figures.
+  // An agent-tree session (level 6) and a house one (the owner, level 1): the level decides the house-only figures.
   const agentA6 = { id: agentA, level: 6, permissions: ['*'] };
-  const house = { id: houseId, level: 2, permissions: ['*'] };
+  const house = { id: houseId, level: 1, permissions: ['*'] };
 
   // A window around "now" so the fixtures land inside it.
   const now = Date.now();

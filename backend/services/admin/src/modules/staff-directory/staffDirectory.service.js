@@ -1,7 +1,14 @@
 'use strict';
 
 const { Op } = require('sequelize');
-const { resolvePermissions, verifyPassword, safeCompare, BCRYPT_PATTERN, STAFF_LEVELS } = require('@ibitplay/auth');
+const {
+  resolvePermissions,
+  verifyPassword,
+  safeCompare,
+  BCRYPT_PATTERN,
+  STAFF_LEVELS,
+  isLoginPasswordMode,
+} = require('@ibitplay/auth');
 
 /**
  * Staff identity resolution — the authority every service defers to.
@@ -87,6 +94,11 @@ async function resolveStaff(models, staffId, executiveId = null) {
     parentLevel = parent?.role?.level ?? null;
   }
 
+  // A suspended or system-locked account ANYWHERE above this one stops it
+  // too — on an existing token, not only at the next login. The auth guard
+  // refuses a non-null `uplineBlocked`.
+  const upline = await uplineBlock(models, staff.id);
+
   return {
     ...staff,
     level,
@@ -94,6 +106,55 @@ async function resolveStaff(models, staffId, executiveId = null) {
     roleName: staff.role?.name ?? null,
     permissions,
     executive,
+    uplineBlocked: upline ? { staffId: upline.staffId, reason: upline.reason } : null,
+  };
+}
+
+/**
+ * The first staff account at or above `staffId` that blocks it: suspended or
+ * inactive (`status` ≠ active) or system-locked. `includeSelf: false` asks
+ * only about the ancestors (the account's own row is checked by its caller).
+ *
+ * One read of `staff_hierarchy` (the closure table: every ancestor at any
+ * depth) and one of `staff`. Returns null when nothing blocks it, or when the
+ * account does not exist.
+ *
+ * @returns {Promise<null | { staffId: number, reason: 'suspended'|'inactive'|'locked' }>}
+ */
+async function uplineBlock(models, staffId, { includeSelf = false } = {}) {
+  const { Staff, StaffHierarchy } = models;
+  const id = Number(staffId);
+  if (!Number.isSafeInteger(id) || id <= 0) return null;
+
+  let ids = [];
+  if (StaffHierarchy) {
+    const rows = await StaffHierarchy.findAll({
+      where: { descendant_id: id, ...(includeSelf ? {} : { ancestor_id: { [Op.ne]: id } }) },
+      attributes: ['ancestor_id'],
+      raw: true,
+    });
+    ids = rows.map((r) => Number(r.ancestor_id));
+  }
+  if (includeSelf && !ids.includes(id)) ids.push(id);
+  if (!ids.length) return null;
+
+  const blocked = await Staff.findOne({
+    where: {
+      id: ids,
+      [Op.or]: [
+        { system_locked: true },
+        { status: { [Op.ne]: 'active' } },
+      ],
+    },
+    attributes: ['id', 'status', 'system_locked'],
+    order: [['id', 'ASC']],
+    raw: true,
+  });
+  if (!blocked) return null;
+
+  return {
+    staffId: Number(blocked.id),
+    reason: blocked.status && blocked.status !== 'active' ? String(blocked.status) : 'locked',
   };
 }
 
@@ -176,9 +237,13 @@ async function descendantIds(models, staffId, { logger } = {}) {
  * with nobody under them — got `[own id]`: no agents' players, no direct
  * signups, an empty Players screen on a site with players in it.
  *
- * A back-office role now reads the WHOLE tree, root included. Everyone else
- * gets what they got before. Use this for "which players may I see"; keep
- * `descendantIds` for "whose subtree is this" and for authority over staff.
+ * ONLY THE SUPER ADMIN (level 1, the platform owner) reads the WHOLE tree,
+ * root included — which is also what lets it see direct signups. Admin and
+ * Sub Admin are scoped to their OWN subtree like every other level (the
+ * Addaplay rule): an Admin under the owner sees its own Sub Admins, their
+ * agents and their players, and nothing hanging from another Admin. Use this
+ * for "which players may I see"; keep `descendantIds` for "whose subtree is
+ * this" and for authority over staff.
  *
  * An EXECUTIVE staff row acts with its parent's authority (`resolveStaff`,
  * `effectiveStaffLevel`), so it sees what its parent sees: an executive under
@@ -197,7 +262,9 @@ async function visibleStaffIds(models, staffId, { logger, hops = 0 } = {}) {
     const parents = await visibleStaffIds(models, me.parent_id, { logger, hops: hops + 1 });
     return [...new Set([...own, ...parents.map(Number)])];
   }
-  if (!Number.isFinite(level) || level > STAFF_LEVELS.SUB_ADMIN) return own;
+  // `<=`: a restored legacy owner role can carry level 0 (legacy's
+  // `level !== 0` owner check); it is the owner too, never a lesser level.
+  if (!Number.isFinite(level) || level > STAFF_LEVELS.SUPER_ADMIN) return own;
 
   return everyTree(models, own, { logger });
 }
@@ -347,8 +414,14 @@ function roleGrants(value) {
  * Returns a boolean. The caller decides what a false means — this function has
  * no opinion about status codes.
  */
-async function verifyTransactionPassword(models, staffId, candidate) {
+async function verifyTransactionPassword(models, staffId, candidate, { executiveId = null } = {}) {
   if (typeof candidate !== 'string' || !candidate) return false;
+
+  // TXN_PASSWORD_MODE=login (the default): the transaction password IS the
+  // login password — the same bcrypt compare the staff sign-in runs. An
+  // executive session is checked against the executive's OWN login password
+  // (and only when that executive belongs to `staffId`), never its parent's.
+  if (isLoginPasswordMode()) return verifyLoginPassword(models, staffId, candidate, { executiveId });
 
   const staff = await models.Staff.findByPk(staffId, {
     attributes: ['id', 'transaction_password'],
@@ -371,6 +444,26 @@ async function verifyTransactionPassword(models, staffId, candidate) {
   return safeCompare(candidate, stored);
 }
 
+/** The login-password half of `verifyTransactionPassword` (TXN_PASSWORD_MODE=login). */
+async function verifyLoginPassword(models, staffId, candidate, { executiveId = null } = {}) {
+  let hash = null;
+  if (executiveId) {
+    const executive = models.Executives
+      ? await models.Executives.findOne({
+          where: { id: executiveId, parent_staff_id: staffId, status: 'active' },
+          attributes: ['id', 'password'],
+          raw: true,
+        })
+      : null;
+    hash = executive?.password ?? null;
+  } else {
+    const staff = await models.Staff.findByPk(staffId, { attributes: ['id', 'password'], raw: true });
+    hash = staff?.password ?? null;
+  }
+  // No hash still burns a bcrypt comparison inside `verifyPassword`, so "no
+  // such account" is not measurably faster than "wrong password".
+  return verifyPassword(candidate, hash);
+}
 
 /**
  * Is sports betting locked anywhere at or above this staff account.
@@ -396,18 +489,19 @@ async function betLockState(models, staffId, { logger } = {}) {
   const { Staff, StaffHierarchy } = models;
 
   const self = await Staff.findByPk(staffId, {
-    attributes: ['id', 'name', 'sports_betlocked', 'system_locked', 'parent_id'],
+    attributes: ['id', 'name', 'sports_betlocked', 'system_locked', 'status', 'parent_id'],
     raw: true,
   });
   if (!self) return { staffId: Number(staffId), locked: false, found: false };
 
-  if (self.sports_betlocked || self.system_locked) {
+  const suspended = (row) => row.status != null && row.status !== 'active';
+  if (self.sports_betlocked || self.system_locked || suspended(self)) {
     return {
       staffId: Number(staffId),
       locked: true,
       found: true,
       lockedBy: Number(staffId),
-      reason: self.system_locked ? 'account locked' : 'sports betting locked',
+      reason: suspended(self) ? `account ${self.status}` : self.system_locked ? 'account locked' : 'sports betting locked',
     };
   }
 
@@ -430,9 +524,9 @@ async function betLockState(models, staffId, { logger } = {}) {
   const locked = await Staff.findOne({
     where: {
       id: ids,
-      [Op.or]: [{ sports_betlocked: true }, { system_locked: true }],
+      [Op.or]: [{ sports_betlocked: true }, { system_locked: true }, { status: { [Op.ne]: 'active' } }],
     },
-    attributes: ['id', 'sports_betlocked', 'system_locked'],
+    attributes: ['id', 'sports_betlocked', 'system_locked', 'status'],
     raw: true,
   });
 
@@ -443,7 +537,11 @@ async function betLockState(models, staffId, { logger } = {}) {
     ...(locked
       ? {
           lockedBy: Number(locked.id),
-          reason: locked.system_locked ? 'an ancestor account is locked' : 'locked by an administrator',
+          reason: suspended(locked)
+            ? 'an ancestor account is suspended'
+            : locked.system_locked
+              ? 'an ancestor account is locked'
+              : 'locked by an administrator',
         }
       : {}),
   };
@@ -566,6 +664,7 @@ async function transfersForUser(models, userId, { limit = 50, offset = 0 } = {})
 }
 
 module.exports = {
+  uplineBlock,
   transfersForUser,
   betLockState,
   betLockList,

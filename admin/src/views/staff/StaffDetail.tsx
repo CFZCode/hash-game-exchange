@@ -26,7 +26,7 @@ import { useSession } from '@/contexts/SessionContext'
 import { useApi, useApiMutation, useListState, usePagedApi } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
 import { formatNumber } from '@/lib/format'
-import { useIsAgentTree } from '@/views/finance/StaffFloat'
+import { useIsAgentTree, TxnPasswordLabel } from '@/views/finance/StaffFloat'
 import WithdrawBlockAction, { WithdrawBlockedBadge, type AccountLocks } from '@/views/players/WithdrawBlockAction'
 import type { StaffTransferRow } from '@/views/finance/types'
 import { ROLE_NAMES, STAFF_STATUSES, type StaffRow } from './types'
@@ -165,7 +165,7 @@ const StaffDetail = ({ id }: { id: string }) => {
                 >
                   <SelectField id='t-dir' label='Direction' value={transfer.direction} onChange={direction => setTransfer({ ...transfer, direction })} options={[{ value: 'deposit', label: 'Deposit to them' }, { value: 'withdraw', label: 'Withdraw from them' }]} />
                   <TextField id='t-amt' label='Amount' required placeholder='1000.00' value={transfer.amount} onChange={e => setTransfer({ ...transfer, amount: e.target.value })} />
-                  <TextField id='t-tp' label='Transaction password' type='password' required={txnRequired} hint={txnRequired ? 'Required for every balance move' : 'Required if your account has one set'} value={transfer.transactionPassword} onChange={e => setTransfer({ ...transfer, transactionPassword: e.target.value })} />
+                  <TextField id='t-tp' label={<TxnPasswordLabel />} type='password' required={txnRequired} hint={txnRequired ? 'Required for every balance move' : 'Required (if your account uses one)'} value={transfer.transactionPassword} onChange={e => setTransfer({ ...transfer, transactionPassword: e.target.value })} />
                 </FormDialog>
               )}
               <Can permission='users:write'>

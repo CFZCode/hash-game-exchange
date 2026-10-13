@@ -1,5 +1,9 @@
 'use strict';
 
+// These cases exercise the SEPARATE transaction password (`staff.transaction_password`);
+// login mode (the default) is covered in staff-auth/__tests__/txnPasswordMode.test.js.
+process.env.TXN_PASSWORD_MODE = 'separate';
+
 const test = require('node:test');
 const assert = require('node:assert');
 

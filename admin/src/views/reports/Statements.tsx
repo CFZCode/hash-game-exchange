@@ -22,6 +22,7 @@ import { DateRangePicker } from '@/components/ui/date-picker'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useSession } from '@/contexts/SessionContext'
 import { useApi, useListState, usePagedApi } from '@/hooks/use-api'
 import { api, errorMessage } from '@/lib/api/client'
 import { formatMoney, formatNumber } from '@/lib/format'
@@ -277,22 +278,36 @@ const StatementTab = () => {
   )
 }
 
-const Statements = () => (
-  <div>
-    <PageHeader title='Statements' description='Transfers between accounts in your tree, and the full account statement ("hisab") for one user or staff member.' />
-    <Tabs defaultValue='statement'>
-      <TabsList className='mb-4'>
-        <TabsTrigger value='statement'>Account statement</TabsTrigger>
-        <TabsTrigger value='transfers'>Transfers</TabsTrigger>
-      </TabsList>
-      <TabsContent value='statement'>
-        <StatementTab />
-      </TabsContent>
-      <TabsContent value='transfers'>
-        <TransfersTab />
-      </TabsContent>
-    </Tabs>
-  </div>
-)
+/**
+ * The account statement reads `admin/statements` (reports:read); the transfer list reads
+ * `admin/accounts/statement` (users:read). Each tab shows only for the grant it needs.
+ */
+const Statements = () => {
+  const { can } = useSession()
+  const canStatement = can('reports:read')
+  const canTransfers = can('users:read')
+
+  return (
+    <div>
+      <PageHeader title='Statements' description='Transfers between accounts in your tree, and the full account statement ("hisab") for one user or staff member.' />
+      <Tabs defaultValue={canStatement ? 'statement' : 'transfers'}>
+        <TabsList className='mb-4'>
+          {canStatement && <TabsTrigger value='statement'>Account statement</TabsTrigger>}
+          {canTransfers && <TabsTrigger value='transfers'>Transfers</TabsTrigger>}
+        </TabsList>
+        {canStatement && (
+          <TabsContent value='statement'>
+            <StatementTab />
+          </TabsContent>
+        )}
+        {canTransfers && (
+          <TabsContent value='transfers'>
+            <TransfersTab />
+          </TabsContent>
+        )}
+      </Tabs>
+    </div>
+  )
+}
 
 export default Statements

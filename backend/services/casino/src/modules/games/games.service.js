@@ -938,6 +938,7 @@ class GamesService {
     await this.clients.admin.post('/internal/admin/staff-directory/verify-transaction-password', {
       staffId: actor.id,
       transactionPassword,
+      ...(actor.executiveId ? { executiveId: actor.executiveId } : {}),
     });
 
     // Every name checked before anything is written: one typo refuses the batch.

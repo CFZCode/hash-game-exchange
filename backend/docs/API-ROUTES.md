@@ -601,7 +601,7 @@ attaches and the shape the handler answers with. Regenerate with
 
 | | |
 | --- | ---: |
-| Routes mounted | 777 |
+| Routes mounted | 778 |
 | Modules | 83 |
 | Answering outside the envelope | 49 |
 
@@ -625,7 +625,7 @@ listed per route: they are thrown from the service layer, so a module's whole
 error catalogue is reachable from every route in it, and the catalogues are at
 the end of this appendix.
 
-### admin-service — :4002 (216 routes)
+### admin-service — :4002 (217 routes)
 
 #### `access`
 
@@ -934,6 +934,7 @@ the end of this appendix.
 | Method | Path | Guard | Response |
 |---|---|---|---|
 | `GET` | `/internal/admin/staff-directory/staff/:staffId` | `internal` | `200` `resolveStaff(…)` |
+| `GET` | `/internal/admin/staff-directory/staff/:staffId/access` | `internal` | `200` `{ staffId, blocked, ...(block ? { blockedBy: block.staffId,  }` |
 | `GET` | `/internal/admin/staff-directory/staff/:staffId/betlock` | `internal` | `200` `response.ok(…)` |
 | `POST` | `/internal/admin/staff-directory/staff/:staffId/betlock` | `internal` | `200` `setBetLock(…)` |
 | `GET` | `/internal/admin/staff-directory/staff/:staffId/betlock/list` | `internal` | `200` `response.ok(…)` |
@@ -1832,19 +1833,17 @@ the service layer, so a code is reachable from any route in its module.
 | `403` | `ACCESS_NOT_PERMITTED` | Your role does not permit that |
 | `403` | `ACCESS_TRANSACTION_PASSWORD_REQUIRED` | This action requires your transaction password |
 
-#### `ACCOUNTS` — admin/lords (10)
+#### `ACCOUNTS` — admin/lords (8)
 
 | Status | Code | Message |
 |---:|---|---|
 | `404` | `ACCOUNTS_NOT_IN_YOUR_TREE` | Account not found |
 | `404` | `ACCOUNTS_NOT_FOUND` | Account not found |
 | `403` | `ACCOUNTS_TRANSACTION_PASSWORD_REQUIRED` | This action requires your transaction password |
-| `402` | `ACCOUNTS_INSUFFICIENT_FUNDS` | There is not enough in your balance to cover this |
 | `422` | `ACCOUNTS_REFILL_TOO_LARGE` | That amount exceeds the single-refill limit |
 | `422` | `ACCOUNTS_CANNOT_ACT_ON_SELF` | An account cannot do that to itself |
 | `422` | `ACCOUNTS_FLOAT_CURRENCY_ONLY` | Agent balance moves are in INR only |
 | `422` | `ACCOUNTS_PLAYER_CREDIT_NOT_SUPPORTED` | Players cannot be given a credit limit |
-| `402` | `ACCOUNTS_PLAYER_INSUFFICIENT_FUNDS` | The player does not have enough balance for this |
 | `409` | `ACCOUNTS_IDEMPOTENCY_CONFLICT` | This request key was already used with a different amount |
 
 #### `AFFILIATE` — user/affiliate (10)
@@ -2335,14 +2334,13 @@ the service layer, so a code is reachable from any route in its module.
 | `403` | `PAYORDER_KYC_REQUIRED` | Identity verification is required before withdrawing |
 | `503` | `PAYORDER_WITHDRAWALS_DISABLED` | Automatic withdrawals are currently disabled |
 
-#### `PLAYERS` — admin/players (7)
+#### `PLAYERS` — admin/players (6)
 
 | Status | Code | Message |
 |---:|---|---|
 | `404` | `PLAYERS_NOT_FOUND` | Player not found |
 | `409` | `PLAYERS_ALREADY_EXISTS` | That username or email is already in use |
 | `403` | `PLAYERS_NOT_PERMITTED` | You may not do that |
-| `422` | `PLAYERS_INSUFFICIENT_FUNDS` | Not enough balance to fund that account |
 | `409` | `PLAYERS_ALREADY_CLOSED` | That account is already closed |
 | `400` | `PLAYERS_NOTHING_TO_UPDATE` | No changes were supplied |
 | `403` | `PLAYERS_CANNOT_REPARENT_OUTSIDE_TREE` | A player may only be moved to an account inside your own tree |
@@ -2504,14 +2502,13 @@ the service layer, so a code is reachable from any route in its module.
 | `403` | `SPORTSBOOK_SPORTSBOOK_LOCKED` | Sportsbook play is locked on this account |
 | `404` | `SPORTSBOOK_USER_NOT_FOUND` | Player not found |
 
-#### `STAFF` — admin/staff (12)
+#### `STAFF` — admin/staff (11)
 
 | Status | Code | Message |
 |---:|---|---|
 | `404` | `STAFF_NOT_FOUND` | Staff account not found |
 | `404` | `STAFF_NOT_IN_YOUR_TREE` | Staff account not found |
 | `404` | `STAFF_PLAYER_NOT_IN_YOUR_TREE` | Player not found |
-| `402` | `STAFF_INSUFFICIENT_FUNDS` | There is not enough in that balance to cover this transfer |
 | `422` | `STAFF_CANNOT_TRANSFER_TO_SELF` | An account cannot transfer to itself |
 | `409` | `STAFF_CANNOT_DELETE_WITH_DESCENDANTS` | This account still has accounts beneath it |
 | `409` | `STAFF_CANNOT_DELETE_WITH_BALANCE` | This account still holds a balance — move it first |

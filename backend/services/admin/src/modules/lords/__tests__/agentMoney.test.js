@@ -1,5 +1,9 @@
 'use strict';
 
+// These cases exercise the SEPARATE transaction password (`staff.transaction_password`);
+// login mode (the default) is covered in staff-auth/__tests__/txnPasswordMode.test.js.
+process.env.TXN_PASSWORD_MODE = 'separate';
+
 const test = require('node:test');
 const assert = require('node:assert');
 
@@ -16,7 +20,7 @@ const txn = require('../../staff-auth/transactionPassword');
  * Agent-tree money (B2B fixes 1, 2, 3, 5).
  *
  *   - an agent-tree "adjust balance" is a TRANSFER from the agent's own float,
- *     never new money; it refuses with 422 INSUFFICIENT_STAFF_BALANCE, needs the
+ *     never new money; it refuses with 422 INSUFFICIENT_FUNDS, needs the
  *     transaction password, and lands on both statements
  *   - two simultaneous credits cannot overdraw the float
  *   - the credit limit is stored (player and staff) and the staff one lets a
@@ -74,7 +78,7 @@ test('agent-tree money', async (t) => {
 
   const seedStaff = async (id, { inr = '0', creditLimit = '0', parentId = null, withTxn = true } = {}) => {
     await connection.sequelize.query(
-      `INSERT INTO roles (id, name, level) VALUES (:roleId, :name, 6) ON CONFLICT (id) DO NOTHING`,
+      `INSERT INTO roles (id, name, level) VALUES (:roleId, :name, 6) ON CONFLICT (id) DO UPDATE SET level = EXCLUDED.level`,
       { replacements: { roleId, name: `agent-money-role-${roleId}` } }
     );
     const { Op } = require('sequelize');
@@ -185,18 +189,18 @@ test('agent-tree money', async (t) => {
     const agent = await seedStaff(newStaffId(), { inr: '0' });
     const player = await seedPlayer(newUid(), agent, '50');
 
-    await assert.rejects(() => adjust(agent, player, 'debit', '80'), (err) => err.code === 'ACCOUNTS_PLAYER_INSUFFICIENT_FUNDS');
+    await assert.rejects(() => adjust(agent, player, 'debit', '80'), (err) => err.code === 'INSUFFICIENT_FUNDS' && err.status === 422 && err.details?.party === 'user');
     assert.equal(await playerBalance(player), '50.00000000');
     assert.equal(await floatOf(agent), '0.00000000');
   });
 
-  await t.test('a credit beyond the float is a 422 INSUFFICIENT_STAFF_BALANCE and moves nothing', async () => {
+  await t.test('a credit beyond the float is a 422 INSUFFICIENT_FUNDS and moves nothing', async () => {
     const agent = await seedStaff(newStaffId(), { inr: '100' });
     const player = await seedPlayer(newUid(), agent, '0');
 
     await assert.rejects(
       () => adjust(agent, player, 'credit', '150'),
-      (err) => err.code === 'INSUFFICIENT_STAFF_BALANCE' && err.status === 422
+      (err) => err.code === 'INSUFFICIENT_FUNDS' && err.status === 422 && err.details?.party === 'staff'
     );
     assert.equal(await playerBalance(player), '0.00000000');
     assert.equal(await floatOf(agent), '100.00000000');
@@ -215,7 +219,7 @@ test('agent-tree money', async (t) => {
 
     assert.equal(results.filter((r) => r.status === 'fulfilled').length, 1);
     const refused = results.find((r) => r.status === 'rejected');
-    assert.equal(refused.reason.code, 'INSUFFICIENT_STAFF_BALANCE');
+    assert.equal(refused.reason.code, 'INSUFFICIENT_FUNDS');
     assert.equal(await floatOf(agent), '40.00000000', 'exactly one debit, never negative');
     const total = money.toMinor(await playerBalance(a)) + money.toMinor(await playerBalance(b));
     assert.equal(money.toDecimalString(total), '60.00000000', 'money is conserved');
@@ -396,14 +400,14 @@ test('agent-tree money', async (t) => {
     await adjust(agent, player, 'credit', '250');
     assert.equal(await floatOf(agent), '-150.00000000');
 
-    await assert.rejects(() => adjust(agent, player, 'credit', '100'), (err) => err.code === 'INSUFFICIENT_STAFF_BALANCE');
+    await assert.rejects(() => adjust(agent, player, 'credit', '100'), (err) => err.code === 'INSUFFICIENT_FUNDS');
     await adjust(agent, player, 'credit', '50');
     assert.equal(await floatOf(agent), '-200.00000000');
 
     // A refill draws on the same line — and the line is exhausted.
     await assert.rejects(
       () => lords.refill({ actor: { id: agent, canIssueFunds: false }, accountId: player, amount: '1', transactionPassword: TXN_PASSWORD }),
-      (err) => err.code === 'ACCOUNTS_INSUFFICIENT_FUNDS'
+      (err) => err.code === 'INSUFFICIENT_FUNDS' && err.status === 422
     );
 
     const float = await lords.myFloat({ actor: { id: agent } });
@@ -412,19 +416,51 @@ test('agent-tree money', async (t) => {
     });
   });
 
-  await t.test('a staff transfer to a PLAYER may use the credit line; to staff it may not', async () => {
+  await t.test('a staff transfer from an agent never reaches a player, and to staff never uses the credit line', async () => {
     const master = await seedStaff(newStaffId(), { inr: '0' });
     const agent = await seedStaff(newStaffId(), { inr: '0', creditLimit: '100', parentId: master });
     const sub = await seedStaff(newStaffId(), { inr: '0', parentId: agent });
     const player = await seedPlayer(newUid(), agent, '0');
-    const actor = { id: agent, level: 5, canIssueFunds: false, canAdjustWallets: true };
+    // Even holding `wallet:adjust`: only the owner takes the wide path now.
+    const actor = { id: agent, level: 5, canIssueFunds: false, canAdjustWallets: true, canCredit: true, canDebit: true };
 
-    await assert.rejects(() => staffService.transfer({ actor, toType: 'user', toId: player, amount: '60', direction: 'deposit' }), (err) => err.code === 'TXN_PASSWORD_REQUIRED');
-    await staffService.transfer({ actor, toType: 'user', toId: player, amount: '60', direction: 'deposit', transactionPassword: TXN_PASSWORD });
-    assert.equal(await floatOf(agent), '-60.00000000');
+    await assert.rejects(
+      () => staffService.transfer({ actor, toType: 'user', toId: player, amount: '60', direction: 'deposit', transactionPassword: TXN_PASSWORD }),
+      (err) => err.code === 'STAFF_NOT_PERMITTED'
+    );
+    await assert.rejects(
+      () => staffService.transfer({ actor, toType: 'staff', toId: sub, amount: '10', direction: 'deposit', transactionPassword: TXN_PASSWORD }),
+      (err) => err.code === 'INSUFFICIENT_FUNDS' && err.status === 422
+    );
+    assert.equal(await floatOf(agent), '0.00000000');
+  });
 
-    await assert.rejects(() => staffService.transfer({ actor, toType: 'staff', toId: sub, amount: '10', direction: 'deposit', transactionPassword: TXN_PASSWORD }), (err) => err.code === 'STAFF_INSUFFICIENT_FUNDS' || err.status === 402);
-    assert.equal(await floatOf(agent), '-60.00000000');
+  await t.test('player money moves are the DIRECT parent\'s only: a master cannot credit or debit its agent\'s player', async () => {
+    const master = await seedStaff(newStaffId(), { inr: '1000' });
+    const agent = await seedStaff(newStaffId(), { inr: '0', parentId: master });
+    const grandchildPlayer = await seedPlayer(newUid(), agent, '100');
+    const ownPlayer = await seedPlayer(newUid(), master, '0');
+    const notFound = (err) => err.code === 'ACCOUNTS_NOT_IN_YOUR_TREE' && err.status === 404;
+
+    await assert.rejects(() => adjust(master, grandchildPlayer, 'credit', '10'), notFound);
+    await assert.rejects(() => adjust(master, grandchildPlayer, 'debit', '10'), notFound);
+    await assert.rejects(
+      () => lords.refill({ actor: { id: master, canIssueFunds: false }, accountId: grandchildPlayer, amount: '10', transactionPassword: TXN_PASSWORD }),
+      notFound
+    );
+    // Out-of-scope is decided before the password: a wrong one still reads 404.
+    await assert.rejects(() => adjust(master, grandchildPlayer, 'credit', '10', { transactionPassword: 'wrong' }), notFound);
+    assert.equal(await playerBalance(grandchildPlayer), '100.00000000');
+    assert.equal(await floatOf(master), '1000.00000000');
+
+    // Its own direct player works.
+    await adjust(master, ownPlayer, 'credit', '10');
+    assert.equal(await playerBalance(ownPlayer), '10.00000000');
+    assert.equal(await floatOf(master), '990.00000000');
+
+    // The platform owner is exempt (refill issues funds to any player in scope).
+    await lords.refill({ actor: { id: master, level: 1, canIssueFunds: true }, accountId: grandchildPlayer, amount: '5', transactionPassword: TXN_PASSWORD });
+    assert.equal(await playerBalance(grandchildPlayer), '105.00000000');
   });
 
   await t.test('password, exposure and credit settings act only strictly BELOW the caller', async () => {

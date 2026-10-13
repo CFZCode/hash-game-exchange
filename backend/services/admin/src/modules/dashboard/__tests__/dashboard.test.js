@@ -370,7 +370,7 @@ async function scopeTests(t, conn, logger) {
    * agentB ── playerB                (a rival tree)
    * playerD                          (a direct signup — nobody's tree but the root's)
    * owner                            (the root, via ROOT_STAFF_ID)
-   * admin                            (back office — every root's tree, so the root's too)
+   * admin                            (back office — its own subtree only, which is empty)
    */
   const master = newId();
   const agentA = newId();
@@ -460,10 +460,11 @@ async function scopeTests(t, conn, logger) {
     assert.equal(own.owner, `${tag}-a`);
   });
 
-  await t.test('admin and the root keep the site-wide view, direct signups included', async () => {
-    // `visibleStaffIds` widens the back office to every root's tree, which
-    // contains the platform root — so an admin sees what the owner sees.
-    assert.deepEqual(await regIds({ id: adminId }), players.map(String).sort());
+  await t.test('the root keeps the site-wide view, direct signups included; an admin sees only its own subtree', async () => {
+    // Only the Super Admin widens to every root's tree (the Addaplay rule): an
+    // Admin is scoped to its own subtree like every other level, and this
+    // admin has nothing beneath it.
+    assert.deepEqual(await regIds({ id: adminId }), []);
     assert.deepEqual(await regIds({ id: ownerId }), players.map(String).sort());
 
     const seen = currencies(await service.overview({ actor: { id: ownerId } }));

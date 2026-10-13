@@ -10,9 +10,12 @@ const {
   createSecretBox,
   STAFF_LEVELS,
   canManagePromotions,
+  isLoginPasswordMode,
+  transactionPasswordMode,
 } = require('@ibitplay/auth');
 
 const errors = require('./staffAuth.errors');
+const { uplineBlock } = require('../staff-directory/staffDirectory.service');
 const {
   LOGIN_WINDOW_MS,
   LOGIN_MAX_ATTEMPTS,
@@ -480,7 +483,9 @@ class StaffAuthService {
        * change-password screen. Never set for an executive sub-login.
        */
       mustChangePassword: !executive && staff.must_change_password === true,
-      hasTransactionPassword: Boolean(staff.transaction_password),
+      // Always true in TXN_PASSWORD_MODE=login: the login password is the transaction password.
+      hasTransactionPassword: isLoginPasswordMode() || Boolean(staff.transaction_password),
+      transactionPasswordMode: transactionPasswordMode(),
       actor: {
         staffId: staff.id,
         name: staff.name,
@@ -503,8 +508,8 @@ class StaffAuthService {
   /**
    * Can this account sign in at all.
    *
-   * Three gates: its own status, its own system lock, and a system lock
-   * anywhere above it. Legacy checked the last two and never looked at
+   * Three gates: its own status, its own system lock, and a suspension or
+   * system lock anywhere above it. Legacy checked the last two and never looked at
    * `status`, so an account suspended through the management screen kept
    * working.
    */
@@ -520,28 +525,11 @@ class StaffAuthService {
       this.logger?.info({ staffId: staff.id }, 'Staff signing in with a first-login password');
     }
 
-    const locked = await this.models.StaffHierarchy.findOne({
-      where: { descendant_id: staff.id, ancestor_id: { [Op.ne]: staff.id } },
-      raw: true,
-      include: [],
-    });
-
-    if (!locked) return;
-
-    const ancestors = await this.models.StaffHierarchy.findAll({
-      where: { descendant_id: staff.id, ancestor_id: { [Op.ne]: staff.id } },
-      attributes: ['ancestor_id'],
-      raw: true,
-    });
-
-    const lockedAncestor = await this.models.Staff.findOne({
-      where: { id: ancestors.map((a) => a.ancestor_id), system_locked: true },
-      attributes: ['id'],
-      raw: true,
-    });
-
-    if (lockedAncestor) {
-      throw errors.ACCOUNT_UNAVAILABLE({ reason: 'locked by an upline account' });
+    // Suspended, inactive or system-locked ANYWHERE above — one walk of
+    // `staff_hierarchy`, the same one the auth guard runs on every request.
+    const upline = await uplineBlock(this.models, staff.id);
+    if (upline) {
+      throw errors.ACCOUNT_UNAVAILABLE({ reason: `${upline.reason === 'locked' ? 'locked' : 'suspended'} by an upline account` });
     }
   }
 

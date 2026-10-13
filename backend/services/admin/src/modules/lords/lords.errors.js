@@ -16,11 +16,6 @@ module.exports = defineErrors('ACCOUNTS', {
     message: 'This action requires your transaction password',
   },
 
-  INSUFFICIENT_FUNDS: {
-    status: 402,
-    message: 'There is not enough in your balance to cover this',
-  },
-
   REFILL_TOO_LARGE: {
     status: 422,
     // Legacy had no ceiling on a direct wallet credit.
@@ -41,10 +36,7 @@ module.exports = defineErrors('ACCOUNTS', {
     message: 'Players cannot be given a credit limit',
   },
 
-  PLAYER_INSUFFICIENT_FUNDS: {
-    status: 402,
-    message: 'The player does not have enough balance for this',
-  },
+  // Overdraw is the shared 422 INSUFFICIENT_FUNDS — see `staffFloat.js`.
 
   IDEMPOTENCY_CONFLICT: {
     status: 409,

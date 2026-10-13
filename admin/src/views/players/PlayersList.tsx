@@ -10,6 +10,7 @@ import { toast } from 'sonner'
 
 import Can from '@/components/shared/Can'
 import DataTable, { type Column } from '@/components/shared/DataTable'
+import DateTime from '@/components/shared/DateTime'
 import FormDialog from '@/components/shared/FormDialog'
 import { TextField } from '@/components/shared/FormField'
 import Money from '@/components/shared/Money'
@@ -22,6 +23,7 @@ import { useSession } from '@/contexts/SessionContext'
 import { useApiMutation, useListState, usePagedApi } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
 import { formatNumber } from '@/lib/format'
+import { useIsAgentTree, TxnPasswordLabel } from '@/views/finance/StaffFloat'
 import type { PlayerRow } from './types'
 import UserStatusOverview from './UserStatusOverview'
 
@@ -54,9 +56,16 @@ const columns: Column<PlayerRow>[] = [
   { key: 'ref', header: 'Referral', cell: r => <span className='font-mono text-xs'>{r.referralCode}</span> }
 ]
 
+/**
+ * `POST admin/players`. A starting balance is a balance move: agent-tree staff always need the
+ * transaction password for it (403 TXN_PASSWORD_REQUIRED / TXN_PASSWORD_INVALID), house staff once
+ * they have set one. The field shows only when the balance is above zero and is sent only when filled.
+ */
 const CreatePlayer = () => {
-  const [form, setForm] = useState({ username: '', email: '', phone: '', country: '', password: '', initialBalance: '0' })
+  const agentTree = useIsAgentTree()
+  const [form, setForm] = useState({ username: '', email: '', phone: '', country: '', password: '', initialBalance: '0', transactionPassword: '' })
   const router = useRouter()
+  const hasBalance = Number(form.initialBalance) > 0
 
   const create = useApiMutation({
     fn: () => {
@@ -65,12 +74,16 @@ const CreatePlayer = () => {
       if (form.email) body.email = form.email
       if (form.phone) body.phone = form.phone
       if (form.country) body.country = form.country
+      if (hasBalance && form.transactionPassword) body.transactionPassword = form.transactionPassword
 
       return api.post<{ id: string | number }>('admin/players', body)
     },
-    invalidate: [['paged', 'admin/reports/players']],
+    invalidate: [['paged', 'admin/reports/players'], ['paged', 'admin/user/directory']],
     success: 'User created',
-    onSuccess: r => r?.id && router.push(`/users/${r.id}`)
+    onSuccess: r => {
+      setForm(f => ({ ...f, transactionPassword: '' }))
+      if (r?.id) router.push(`/users/${r.id}`)
+    }
   })
 
   return (
@@ -93,11 +106,94 @@ const CreatePlayer = () => {
       </div>
       <TextField id='password' label='Password' type='password' required minLength={8} value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} />
       <TextField id='initialBalance' label='Initial balance' hint='Decimal string, e.g. 100.00' value={form.initialBalance} onChange={e => setForm({ ...form, initialBalance: e.target.value })} />
+      {hasBalance && (
+        <TextField id='cp-tp' label={<TxnPasswordLabel />} type='password' hint={agentTree ? 'Required for a starting balance' : 'Required (if your account uses one)'} value={form.transactionPassword} onChange={e => setForm({ ...form, transactionPassword: e.target.value })} />
+      )}
     </FormDialog>
   )
 }
 
+/** `GET admin/user/directory` — the allow-listed player columns, tree-scoped, guarded by users:read. */
+type DirectoryRow = {
+  id: number | string
+  name: string
+  email: string | null
+  phone: string | null
+  status: string
+  is_locked: boolean | null
+  system_locked: boolean | null
+  parent_staff_id: number | null
+  created: string | null
+}
+
+const directoryColumns: Column<DirectoryRow>[] = [
+  {
+    key: 'name',
+    header: 'User',
+    cell: r => (
+      <div className='flex flex-col'>
+        <Link href={`/users/${r.id}`} className='font-medium hover:underline'>
+          {r.name}
+        </Link>
+        <span className='text-muted-foreground font-mono text-xs'>{r.id}</span>
+      </div>
+    )
+  },
+  { key: 'status', header: 'Status', cell: r => <StatusBadge value={r.system_locked ? 'Locked' : r.status} /> },
+  { key: 'email', header: 'Email', cell: r => <span className='text-sm'>{r.email ?? '—'}</span> },
+  { key: 'phone', header: 'Phone', cell: r => <span className='text-sm'>{r.phone ?? '—'}</span> },
+  { key: 'agent', header: 'Under', cell: r => (r.parent_staff_id ? <Badge variant='outline'>#{r.parent_staff_id}</Badge> : '—') },
+  { key: 'created', header: 'Joined', cell: r => (r.created ? <DateTime value={r.created} relative /> : '—') }
+]
+
+/**
+ * The Users list for a login holding users:read without reports:read (e.g. an executive granted
+ * only users:read). `admin/reports/players` would refuse it, so it reads the player directory,
+ * which carries no balances or lifetime totals.
+ */
+const DirectoryList = () => {
+  const { state, set, query } = useListState()
+  const list = usePagedApi<DirectoryRow>('admin/user/directory', { limit: query.limit, page: query.page, search: query.search || undefined })
+  const router = useRouter()
+
+  return (
+    <div>
+      <PageHeader
+        title='Users'
+        description='Every user account in your tree.'
+        actions={
+          <Can permission='users:write'>
+            <CreatePlayer />
+          </Can>
+        }
+      />
+      <DataTable
+        columns={directoryColumns}
+        rows={list.data?.rows}
+        rowKey={r => String(r.id)}
+        loading={list.isLoading}
+        fetching={list.isFetching}
+        error={list.error}
+        pagination={list.data?.pagination}
+        onPageChange={page => set({ page })}
+        onLimitChange={limit => set({ limit })}
+        search={String(state.search ?? '')}
+        onSearchChange={search => set({ search })}
+        searchPlaceholder='Username, email, phone…'
+        onRowClick={r => router.push(`/users/${r.id}`)}
+      />
+    </div>
+  )
+}
+
 const PlayersList = () => {
+  const { can } = useSession()
+
+  // The full list is `admin/reports/players` (reports:read); users:read alone gets the directory.
+  return can('reports:read') ? <ReportsList /> : <DirectoryList />
+}
+
+const ReportsList = () => {
   // Agent-tree logins see no promotions: the VIP column goes with them.
   const promotions = useSession().actor?.promotions === true
   const visibleColumns = promotions ? columns : columns.filter(c => c.key !== 'vip')

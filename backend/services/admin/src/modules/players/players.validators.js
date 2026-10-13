@@ -32,6 +32,12 @@ module.exports = {
         initialBalance: amount,
         /** Anchor the player under a sub-agent rather than the caller. */
         parentId: z.coerce.number().int().positive().optional(),
+        /**
+         * Required when `initialBalance` > 0 for every staff level below the
+         * Super Admin (and for the Super Admin once it has set one) — same
+         * rule as `POST /admin/staff/transfer`.
+         */
+        transactionPassword: z.string().min(1).max(200).optional(),
       })
       .strict(),
   },

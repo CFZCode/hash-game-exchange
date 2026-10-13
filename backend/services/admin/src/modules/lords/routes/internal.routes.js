@@ -37,6 +37,8 @@ const playerAdjust = {
       idempotencyKey: z.string().min(1).max(120),
       username: z.string().max(200).nullish(),
       transactionPassword: z.string().max(200).optional(),
+      // An executive session: its OWN login password is checked (TXN_PASSWORD_MODE=login).
+      executiveId: z.coerce.number().int().positive().nullish(),
     })
     .strict(),
 };
@@ -49,8 +51,8 @@ module.exports = function internalRoutes(deps) {
     '/player-adjust',
     validate(playerAdjust),
     asyncHandler(async (req, res) => {
-      const { staffId, ...rest } = req.body;
-      return response.ok(res, await service.adjustPlayer({ ...rest, actor: { id: staffId } }));
+      const { staffId, executiveId, ...rest } = req.body;
+      return response.ok(res, await service.adjustPlayer({ ...rest, actor: { id: staffId, executiveId: executiveId ?? null } }));
     })
   );
 

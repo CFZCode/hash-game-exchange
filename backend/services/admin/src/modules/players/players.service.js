@@ -3,11 +3,21 @@
 const crypto = require('node:crypto');
 const { Op, literal } = require('sequelize');
 const { money } = require('@ibitplay/common');
-const { hashPassword, isAgentTree } = require('@ibitplay/auth');
+const {
+  hashPassword,
+  isAgentTree,
+  hasPermission,
+  canIssueFunds,
+  effectiveStaffLevel,
+  PERMISSIONS,
+  AGENT_TREE_LEVELS,
+} = require('@ibitplay/auth');
 
 const errors = require('./players.errors');
 const { PLAYER_ROLE_ID, PASSWORD_ROUNDS, CLOSED_STATUS, WALLET_SEED } = require('./players.constants');
 const { visibleStaffIds, resolveStaff } = require('../staff-directory/staffDirectory.service');
+const { assertTransactionPassword } = require('../staff-auth/transactionPassword');
+const { insufficientStaffBalance } = require('../lords/staffFloat');
 
 /**
  * Player accounts, from an operator's side.
@@ -29,7 +39,7 @@ class PlayersService {
    * Legacy opened a transaction, took three early returns out of it without
    * rolling back, and debited with no floor.
    */
-  async create({ actor, username, email, phone, country, password, initialBalance = '0', parentId }) {
+  async create({ actor, username, email, phone, country, password, initialBalance = '0', parentId, transactionPassword }) {
     const anchor = await this.#resolveParent(actor, parentId);
 
     /**
@@ -61,6 +71,36 @@ class PlayersService {
        * unvalidated. Refused explicitly here; the validator refuses it too.
        */
       throw errors.NOT_PERMITTED({ reason: 'an opening balance may not be negative' });
+    }
+
+    /**
+     * The second factor for the opening balance.
+     *
+     * A funded creation moves money out of the caller's own float exactly like
+     * `POST /admin/staff/transfer`, so it asks for the transaction password
+     * under the SAME policy as `StaffService.transfer`: required for everyone
+     * except the platform owner (Super Admin), for whom it is required once
+     * set.
+     * Checked before the transaction opens, so a refusal moves nothing. An
+     * unfunded creation moves no money and needs no second factor.
+     */
+    if (funding > 0n) {
+      /**
+       * The opening balance is a money move with the new player, so it is the
+       * DIRECT PARENT's only (the addaplay rule, as `LordsService.adjustPlayer`):
+       * a player created under a descendant is funded by that descendant, not
+       * out of the creator's float past it. The platform owner is exempt.
+       */
+      if (Number(anchor) !== Number(actor.id) && !canIssueFunds(actor)) {
+        throw errors.NOT_PERMITTED({ reason: 'only the account a player reports to can fund it' });
+      }
+      // Required for everyone but the platform owner, who keeps the old rule
+      // (required once set) — the same split as `StaffService.transfer`.
+      const parentFunding = !(canIssueFunds(actor) && hasPermission(actor.permissions, PERMISSIONS.WALLET_ADJUST));
+      await assertTransactionPassword(this.models, actor.id, transactionPassword, {
+        required: parentFunding || AGENT_TREE_LEVELS.includes(Number(effectiveStaffLevel(actor))),
+        executiveId: actor.executiveId ?? null,
+      });
     }
 
     /**
@@ -312,7 +352,7 @@ class PlayersService {
       { where: { staff_id: actor.id, inr: { [Op.gte]: decimal } }, transaction }
     );
 
-    if (!affected) throw errors.INSUFFICIENT_FUNDS({ amount: decimal });
+    if (!affected) throw insufficientStaffBalance({ amount: decimal });
 
     await this.models.Credits.increment({ inr: decimal }, { where: { uid: userId }, transaction });
 

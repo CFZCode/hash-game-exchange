@@ -97,6 +97,9 @@ const LEVEL_PERMISSIONS = {
     PERMISSIONS.SPORTS_READ,
     PERMISSIONS.REPORTS_READ,
     PERMISSIONS.STAFF_READ,
+    // A sub admin builds its own super masters and executives — scoped in
+    // `StaffService.create` by `CHILD_LEVELS` and to its own subtree.
+    PERMISSIONS.STAFF_WRITE,
     PERMISSIONS.CONFIG_READ,
     PERMISSIONS.REDEEM_CODES_WRITE,
   ],
@@ -110,6 +113,8 @@ const LEVEL_PERMISSIONS = {
   [STAFF_LEVELS.SUPER_MASTER]: [
     PERMISSIONS.USERS_READ,
     PERMISSIONS.USERS_WRITE,
+    // Lock / suspend / bet-lock — own subtree only (`LordsService.setStatus`).
+    PERMISSIONS.USERS_LOCK,
     PERMISSIONS.WALLET_READ,
     PERMISSIONS.WALLET_CREDIT,
     PERMISSIONS.WALLET_DEBIT,
@@ -122,6 +127,7 @@ const LEVEL_PERMISSIONS = {
   [STAFF_LEVELS.MASTER]: [
     PERMISSIONS.USERS_READ,
     PERMISSIONS.USERS_WRITE,
+    PERMISSIONS.USERS_LOCK,
     PERMISSIONS.WALLET_READ,
     PERMISSIONS.WALLET_CREDIT,
     PERMISSIONS.WALLET_DEBIT,
@@ -139,6 +145,7 @@ const LEVEL_PERMISSIONS = {
   [STAFF_LEVELS.AGENT]: [
     PERMISSIONS.USERS_READ,
     PERMISSIONS.USERS_WRITE,
+    PERMISSIONS.USERS_LOCK,
     PERMISSIONS.WALLET_READ,
     PERMISSIONS.WALLET_CREDIT,
     PERMISSIONS.WALLET_DEBIT,
@@ -146,6 +153,32 @@ const LEVEL_PERMISSIONS = {
   ],
   [STAFF_LEVELS.EXECUTIVE]: [PERMISSIONS.USERS_READ, PERMISSIONS.WALLET_READ, PERMISSIONS.REPORTS_READ],
 };
+
+/**
+ * Which staff level each creator level may create through `POST /admin/staff`
+ * (the Addaplay ladder): every level creates ONLY the level directly below it,
+ * inside its own tree. The Super Admin may create any level. An agent creates
+ * players only. EXECUTIVE (7) is never created as a staff row — executives are
+ * sub-logins made through `/admin/access/executives`.
+ */
+const CHILD_LEVELS = Object.freeze({
+  [STAFF_LEVELS.SUPER_ADMIN]: Object.freeze([
+    STAFF_LEVELS.ADMIN,
+    STAFF_LEVELS.SUB_ADMIN,
+    STAFF_LEVELS.SUPER_MASTER,
+    STAFF_LEVELS.MASTER,
+    STAFF_LEVELS.AGENT,
+  ]),
+  [STAFF_LEVELS.ADMIN]: Object.freeze([STAFF_LEVELS.SUB_ADMIN]),
+  [STAFF_LEVELS.SUB_ADMIN]: Object.freeze([STAFF_LEVELS.SUPER_MASTER]),
+  [STAFF_LEVELS.SUPER_MASTER]: Object.freeze([STAFF_LEVELS.MASTER]),
+  [STAFF_LEVELS.MASTER]: Object.freeze([STAFF_LEVELS.AGENT]),
+  [STAFF_LEVELS.AGENT]: Object.freeze([]),
+});
+
+/** May a creator at `creatorLevel` create a staff account at `level`? Fails closed. */
+const canCreateLevel = (creatorLevel, level) =>
+  Boolean(CHILD_LEVELS[Number(creatorLevel)]?.includes(Number(level)));
 
 /**
  * Does `granted` satisfy `required`?
@@ -300,4 +333,6 @@ module.exports = {
   executiveGrants,
   canActOn,
   canIssueFunds,
+  CHILD_LEVELS,
+  canCreateLevel,
 };

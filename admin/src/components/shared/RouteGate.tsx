@@ -9,7 +9,9 @@ import { BanIcon } from 'lucide-react'
 
 import { Skeleton } from '@/components/ui/skeleton'
 import { isPromotionRoute, routeRequirement } from '@/configs/navConfig'
+import themeConfig from '@/configs/themeConfig'
 import { useSession } from '@/contexts/SessionContext'
+import { useHomeHref } from '@/hooks/use-nav-visible'
 
 const isRoute = (pathname: string, route: string) => pathname === route || pathname.startsWith(`${route}/`)
 
@@ -32,21 +34,28 @@ const noticeReason = (pathname: string, reason: Refusal) => {
   return 'Your role does not include this screen. Ask the site operator if you need access.'
 }
 
-export const NotAvailableNotice = ({ pathname = '', reason = 'promotions' }: { pathname?: string; reason?: Refusal }) => (
-  <div
-    role='status'
-    className='border-border bg-card mx-auto mt-10 flex max-w-lg flex-col items-center gap-3 rounded-xl border px-6 py-10 text-center'
-  >
-    <span className='bg-muted text-muted-foreground flex size-10 items-center justify-center rounded-full'>
-      <BanIcon className='size-5' />
-    </span>
-    <h1 className='text-foreground text-base font-semibold'>Not available for your account</h1>
-    <p className='text-muted-foreground text-sm'>{noticeReason(pathname, reason)}</p>
-    <Link href='/dashboard' className='text-sm font-medium underline underline-offset-4'>
-      Back to dashboard
-    </Link>
-  </div>
-)
+export const NotAvailableNotice = ({ pathname = '', reason = 'promotions' }: { pathname?: string; reason?: Refusal }) => {
+  // The first page this account can open, so the way out is never another refusal.
+  const home = useHomeHref()
+
+  return (
+    <div
+      role='status'
+      className='border-border bg-card mx-auto mt-10 flex max-w-lg flex-col items-center gap-3 rounded-xl border px-6 py-10 text-center'
+    >
+      <span className='bg-muted text-muted-foreground flex size-10 items-center justify-center rounded-full'>
+        <BanIcon className='size-5' />
+      </span>
+      <h1 className='text-foreground text-base font-semibold'>Not available for your account</h1>
+      <p className='text-muted-foreground text-sm'>{noticeReason(pathname, reason)}</p>
+      {home !== pathname && (
+        <Link href={home} className='text-sm font-medium underline underline-offset-4'>
+          {home === themeConfig.homePageUrl ? 'Back to dashboard' : 'Go to your start page'}
+        </Link>
+      )}
+    </div>
+  )
+}
 
 /**
  * The route gate. Every screen the sidebar links to carries the marks it is filtered on
@@ -61,18 +70,28 @@ export const NotAvailableNotice = ({ pathname = '', reason = 'promotions' }: { p
 const RouteGate = ({ children }: { children: ReactNode }) => {
   const pathname = usePathname()
   const router = useRouter()
-  const { actor, loading, can } = useSession()
+  const { actor, loading, can, flagsLoading } = useSession()
+  const home = useHomeHref()
   const mustChange = actor?.mustChangePassword === true
+
+  const required = routeRequirement(pathname)
+  const promotions = isPromotionRoute(pathname) || required?.promotions === true
+
+  /*
+   * Every way into the panel lands on the dashboard (sign-in, `/`, a signed-in visit to /login,
+   * a changed password). An account whose role cannot open it — e.g. an executive granted only
+   * users:read — is sent on to the first page in the sidebar it CAN use, instead of a refusal.
+   */
+  const landingRefused =
+    pathname === themeConfig.homePageUrl && !!actor && !flagsLoading && !!required && !required.permissions.every(p => can(p))
 
   // Nothing opens until a password somebody else chose is replaced — the platform refuses it anyway.
   useEffect(() => {
     if (mustChange) router.replace('/change-password')
-  }, [mustChange, router])
+    else if (landingRefused && home !== pathname) router.replace(home)
+  }, [mustChange, landingRefused, home, pathname, router])
 
-  if (mustChange) return <Skeleton className='h-40 w-full' />
-
-  const required = routeRequirement(pathname)
-  const promotions = isPromotionRoute(pathname) || required?.promotions === true
+  if (mustChange || (landingRefused && home !== pathname)) return <Skeleton className='h-40 w-full' />
 
   if (!promotions && !required) return <>{children}</>
   if (!actor) return loading ? <Skeleton className='h-40 w-full' /> : <NotAvailableNotice pathname={pathname} reason='permission' />

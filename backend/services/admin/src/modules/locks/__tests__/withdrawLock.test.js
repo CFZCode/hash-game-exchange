@@ -1,5 +1,9 @@
 'use strict';
 
+// These cases exercise the SEPARATE transaction password (`staff.transaction_password`);
+// login mode (the default) is covered in staff-auth/__tests__/txnPasswordMode.test.js.
+process.env.TXN_PASSWORD_MODE = 'separate';
+
 const test = require('node:test');
 const assert = require('node:assert');
 const express = require('express');
@@ -101,7 +105,7 @@ test('withdraw lock against a database', async (t) => {
     const txn = await hashPassword(TXN, 4);
     await models.Staff.bulkCreate([
       { id: root, name: `wlr-${root}`, email: `wlr${root}@t.test`, password: 'x', transaction_password: txn, role_id: roleId, parent_id: null },
-      { id: agent, name: `wla-${agent}`, email: `wla${agent}@t.test`, password: 'x', role_id: roleId, parent_id: root },
+      { id: agent, name: `wla-${agent}`, email: `wla${agent}@t.test`, password: 'x', transaction_password: txn, role_id: roleId, parent_id: root },
     ]);
     await models.StaffBalances.bulkCreate([
       { staff_id: root, inr: '1000' },
@@ -242,15 +246,19 @@ test('withdraw lock against a database', async (t) => {
     await post({ userId: player, withdraw: true });
     await settle();
 
+    // Player money moves are the DIRECT parent's (the agent); the staff
+    // transfer to a player is the platform owner's only.
+    const parentActor = { id: agent, level: 6 };
+    const ownerActor = { ...actor, level: 1, canIssueFunds: true };
     await assert.rejects(
       lords.adjustPlayer({
-        actor, userId: player, currency: 'INR', amount: '100', operation: 'debit', transactionPassword: TXN,
+        actor: parentActor, userId: player, currency: 'INR', amount: '100', operation: 'debit', transactionPassword: TXN,
       }),
       (error) => error.code === 'WITHDRAW_BLOCKED' && (error.statusCode ?? error.status) === 403
     );
     await assert.rejects(
       staffService.transfer({
-        actor, toType: 'user', toId: player, amount: '100', direction: 'withdraw', transactionPassword: TXN,
+        actor: ownerActor, toType: 'user', toId: player, amount: '100', direction: 'withdraw', transactionPassword: TXN,
       }),
       (error) => error.code === 'WITHDRAW_BLOCKED'
     );
@@ -260,7 +268,7 @@ test('withdraw lock against a database', async (t) => {
 
     // Funding the player is not a withdrawal and still works.
     const credit = await lords.adjustPlayer({
-      actor, userId: player, currency: 'INR', amount: '50', operation: 'credit', transactionPassword: TXN,
+      actor: parentActor, userId: player, currency: 'INR', amount: '50', operation: 'credit', transactionPassword: TXN,
     });
     assert.equal(credit.direction, 'credit');
 
@@ -268,7 +276,7 @@ test('withdraw lock against a database', async (t) => {
     await post({ userId: player, withdraw: false });
     await settle();
     const debit = await lords.adjustPlayer({
-      actor, userId: player, currency: 'INR', amount: '100', operation: 'debit', transactionPassword: TXN,
+      actor: parentActor, userId: player, currency: 'INR', amount: '100', operation: 'debit', transactionPassword: TXN,
     });
     assert.equal(debit.direction, 'debit');
   });

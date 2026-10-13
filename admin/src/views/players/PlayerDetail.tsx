@@ -286,7 +286,75 @@ const TABS = ['wallet', 'stats', 'logins', 'balances', 'bonuses', 'prefs', 'risk
 
 type Tab = (typeof TABS)[number]
 
+/** `GET admin/user/directory/:id` — the allow-listed columns of one player in the caller's tree (users:read). */
+type DirectoryPlayer = {
+  id: number | string
+  name: string
+  email: string | null
+  phone: string | null
+  status: string
+  is_locked: boolean | null
+  system_locked: boolean | null
+  bet_status: string | null
+  parent_staff_id: number | null
+  created: string | null
+}
+
+/**
+ * One user for a login holding users:read without reports:read. Every tab of the full screen reads
+ * a reports:read (or wallet / config) route, so this shows the directory record and the
+ * notification history, which users:read does answer.
+ */
+const DirectoryDetail = ({ id }: { id: string }) => {
+  const q = useApi<DirectoryPlayer>(`admin/user/directory/${id}`)
+  const p = q.data
+
+  return (
+    <div>
+      <PageHeader
+        title={p?.name ?? `User ${id}`}
+        description={
+          p ? (
+            <span className='flex flex-wrap items-center gap-2'>
+              <span className='font-mono'>#{p.id}</span>
+              <StatusBadge value={p.system_locked ? 'Locked' : p.status} />
+              {p.parent_staff_id && <Badge variant='outline'>under #{p.parent_staff_id}</Badge>}
+              {p.created && (
+                <span>
+                  joined <DateTime value={p.created} relative />
+                </span>
+              )}
+            </span>
+          ) : undefined
+        }
+      />
+      {q.error && <ErrorState error={q.error} />}
+      <div className='grid grid-cols-2 gap-4 lg:grid-cols-4'>
+        <StatCard label='Email' value={p?.email ?? '—'} loading={q.isLoading} />
+        <StatCard label='Phone' value={p?.phone ?? '—'} loading={q.isLoading} />
+        <StatCard label='Status' value={p?.status ?? '—'} loading={q.isLoading} />
+        <StatCard label='Betting' value={p?.bet_status ?? '—'} loading={q.isLoading} />
+      </div>
+      <Card className='mt-6 shadow-none'>
+        <CardHeader>
+          <CardTitle className='text-base'>Notifications sent</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <RawTab path={`admin/notifications/history/${id}`} />
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
 const PlayerDetail = ({ id }: { id: string }) => {
+  const { can } = useSession()
+
+  // The full screen is built on `admin/reports/players/:id` (reports:read).
+  return can('reports:read') ? <ReportDetail id={id} /> : <DirectoryDetail id={id} />
+}
+
+const ReportDetail = ({ id }: { id: string }) => {
   const router = useRouter()
 
   // `replace`, so flicking through tabs does not fill the back button.

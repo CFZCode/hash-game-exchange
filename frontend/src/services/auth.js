@@ -102,20 +102,26 @@ function toWalletRows(balances, flags) {
 /**
  * Which coin the header pill opens on.
  *
- * The persisted choice wins when the account can actually hold it, which is the whole point of
- * persisting it. When it cannot — a saved `BCD` against a wallet that has no such column, which
- * is every first live sign-in on a browser that has used this build with fixtures — the pill
- * would otherwise render a coin with no row behind it and print a zero for a wallet with money
- * in it. So the fallback is the largest balance, and only then the first row.
+ * A coin the visitor EXPLICITLY picked (`explicit` — the header dropdown, the game page's
+ * currency picker, a free-play claim; see `setSetting` in `SessionContext.jsx`) wins whenever the
+ * wallet has a row for it, funded or not: it was their choice.
+ *
+ * Anything else in `preferred` is only a default the shell remembered — `ACCOUNT_DEFAULTS`' BTC,
+ * or whatever this function answered on an earlier load — and it is kept only while it holds
+ * money. An agent-funded player is the case that forced the distinction: the first sign-in on an
+ * empty wallet lands on the first row (BTC), that answer is persisted, and once the agent credits
+ * INR every reload kept opening the pill on **0 BTC** beside ₹450 in the dropdown. So an unfunded
+ * default gives way to the largest balance, and only then to the default itself or the first row.
  */
-function pickCurrency(rows, preferred) {
-  if (rows.some((row) => row.currencyName === preferred)) return preferred;
+function pickCurrency(rows, preferred, explicit = false) {
+  const held = rows.find((row) => row.currencyName === preferred);
+  if (held && (explicit || Number(held.amount) > 0)) return preferred;
 
   const funded = rows
     .filter((row) => Number(row.amount) > 0)
     .sort((a, b) => Number(b.amount) - Number(a.amount))[0];
 
-  return funded?.currencyName ?? rows[0]?.currencyName ?? ACCOUNT_DEFAULTS.setting.currencyName;
+  return funded?.currencyName ?? held?.currencyName ?? rows[0]?.currencyName ?? ACCOUNT_DEFAULTS.setting.currencyName;
 }
 
 /* ── The account ───────────────────────────────────────────────────────────────────────────
@@ -239,7 +245,11 @@ function toAccount(profile, rows, previous, prefs, bonus) {
        * says: "a sign-out does not carry the previous session's currency choice into the next
        * one". A reload keeps its preference, because `restore()` raises `login` before
        * `loadAccount` runs. */
-      currencyName: pickCurrency(rows, previous?.login ? previous?.setting?.currencyName : undefined),
+      currencyName: pickCurrency(
+        rows,
+        previous?.login ? previous?.setting?.currencyName : undefined,
+        Boolean(previous?.login && previous?.setting?.currencyPicked),
+      ),
     },
   };
 }

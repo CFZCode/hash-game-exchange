@@ -146,14 +146,16 @@ test('reports against a database', async (t) => {
    * Two agents with no relationship to each other, each with one player.
    * `agentA` must not be able to read `playerB` by any route here.
    */
-  // An AGENT's role, not the first one in the table: Super Admin, Admin and Sub
-  // Admin are the back office and see every player on the site, so rivals
-  // modelled with one of those would not be rivals at all.
+  // An AGENT's role, not the first one in the table: the Super Admin sees
+  // every player on the site, so rivals modelled with it would not be rivals.
   const roleId = (await models.Roles.findOne({ where: { level: 6 }, raw: true }))?.id;
   assert.ok(roleId, 'the test database needs a level-6 (agent) role');
 
-  const houseRoleId = (await models.Roles.findOne({ where: { level: 2 }, raw: true }))?.id;
-  assert.ok(houseRoleId, 'the test database needs a level-2 (admin) role');
+  // The platform owner: since the Addaplay rule only the Super Admin reads
+  // every tree (an Admin is scoped to its own subtree). A restored legacy
+  // owner role may carry level 0.
+  const houseRoleId = (await models.Roles.findOne({ where: { level: [0, 1] }, order: [['level', 'ASC']], raw: true }))?.id;
+  assert.ok(houseRoleId, 'the test database needs a super-admin role');
 
   const agentA = newId();
   const agentB = newId();
@@ -213,7 +215,7 @@ test('reports against a database', async (t) => {
   const asB = { id: agentB, permissions: ['*'] };
   // The level decides the house-only fields (VIP); the tree decides the rows.
   const agentA6 = { id: agentA, level: 6, permissions: ['*'] };
-  const house = { id: houseId, level: 2, permissions: ['*'] };
+  const house = { id: houseId, level: 1, permissions: ['*'] };
 
   await t.test('an agent sees their own player', async () => {
     const report = await service.playerReport({ staff: asA, userId: playerA });

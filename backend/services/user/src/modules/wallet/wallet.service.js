@@ -674,7 +674,7 @@ class WalletService {
    * one transaction (`POST /internal/admin/accounts/player-adjust`): guarded
    * float debit (down to −credit_limit), player credit, `staff_transfers` row
    * for both statements, ledger + history rows for this wallet. A short float
-   * is a 422 `INSUFFICIENT_STAFF_BALANCE`, and the caller's transaction
+   * is a 422 `INSUFFICIENT_FUNDS` (`details.party`), and the caller's transaction
    * password is REQUIRED there; both codes come back through `ServiceClient`
    * unchanged.
    *
@@ -695,6 +695,7 @@ class WalletService {
       description,
       idempotencyKey,
       ...(transactionPassword ? { transactionPassword } : {}),
+      ...(context.executiveId ? { executiveId: context.executiveId } : {}),
     });
 
     if (!result?.replayed) await this.#pushBalances(userId);
@@ -706,10 +707,11 @@ class WalletService {
    * the hash). `required: false` enforces it only once the account has one.
    * A refusal arrives as a 403 `TXN_PASSWORD_*`.
    */
-  async checkTransactionPassword(staffId, transactionPassword, { required = true } = {}) {
+  async checkTransactionPassword(staffId, transactionPassword, { required = true, executiveId = null } = {}) {
     return this.clients.admin.post('/internal/admin/auth/transaction-password/check', {
       staffId,
       required,
+      ...(executiveId ? { executiveId } : {}),
       ...(transactionPassword ? { transactionPassword } : {}),
     });
   }

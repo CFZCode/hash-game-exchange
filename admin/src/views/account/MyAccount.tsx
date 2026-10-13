@@ -25,7 +25,7 @@ const MyAccount = () => {
   const [code, setCode] = useState('')
   const [pw, setPw] = useState({ oldPassword: '', newPassword: '', confirm: '' })
   const [disable, setDisable] = useState({ password: '', code: '' })
-  const txnStatus = useApi<{ set: boolean }>('admin/auth/transaction-password')
+  const txnStatus = useApi<{ set: boolean; mode?: 'login' | 'separate' }>('admin/auth/transaction-password')
   const [txn, setTxn] = useState({ currentPassword: '', transactionPassword: '', confirm: '' })
 
   const begin = useApiMutation({ fn: () => api.post<Begin>('admin/auth/2fa/begin'), onSuccess: r => setSetup(r) })
@@ -174,6 +174,8 @@ const MyAccount = () => {
           </CardContent>
         </Card>
 
+        {/* TXN_PASSWORD_MODE=login (the backend default): money moves take the login password, so there is nothing to set. */}
+        {txnStatus.data && txnStatus.data.mode === 'separate' && (
         <Card className='shadow-none'>
           <CardHeader>
             <CardTitle className='flex items-center gap-2 text-base'>
@@ -202,6 +204,7 @@ const MyAccount = () => {
             </form>
           </CardContent>
         </Card>
+        )}
       </div>
     </div>
   )

@@ -74,15 +74,23 @@ export function decodePlatformToken(token) {
   }
   const level = Number(p.level);
   if (p.executiveId || level >= 7) throw new Error('Executive accounts cannot use the sportsbook');
-  if (level === OWNER_LEVEL) return { owner_id: OWNER_ID, role: 'OWNER' };
+  // `platform_staff_id`: the platform's own staff id, which the owner mapping (owner_id 1) loses —
+  // the transaction-password check in TXN_PASSWORD_MODE=login verifies against that account.
+  if (level === OWNER_LEVEL) return { owner_id: OWNER_ID, role: 'OWNER', platform_staff_id: Number(p.sub) };
   const mapped = STAFF_ROLES[level];
   if (!mapped) throw new Error(`No sportsbook role for staff level ${p.level}`);
-  return { staff_id: Number(p.sub), role: mapped.role, level: mapped.level };
+  return { staff_id: Number(p.sub), role: mapped.role, level: mapped.level, platform_staff_id: Number(p.sub) };
 }
 
 /** decodePlatformToken, plus the account's mssports rows. */
-export async function verifyPlatformToken(token) {
+//
+// `refresh: true` re-reads a PLAYER's state now instead of trusting a mirror up to MIRROR_TTL_MS
+// old. The auth middleware asks for it on every write (bet placement, cancel…), so a player whose
+// account — or, through the suspension cascade's `system_locked`, whose upline — was just
+// suspended or locked cannot place a bet in the TTL window. Reads keep the cache.
+export async function verifyPlatformToken(token, { refresh = false } = {}) {
   const decoded = decodePlatformToken(token);
+  if (decoded.user_id && refresh) fresh.delete(`user:${decoded.user_id}`);
   if (decoded.user_id) await ensureUser(decoded.user_id);
   else if (decoded.staff_id) await ensureStaff(decoded.staff_id);
   else await ensureOwner();

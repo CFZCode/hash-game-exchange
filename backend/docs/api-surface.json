@@ -6829,6 +6829,33 @@
       "module": "staff-directory",
       "audience": "internal",
       "method": "GET",
+      "path": "/internal/admin/staff-directory/staff/:staffId/access",
+      "routePath": "/staff/:staffId/access",
+      "handler": "asyncHandler",
+      "handlerSource": "internal.routes.js",
+      "middleware": [
+        {
+          "type": "validate",
+          "value": ""
+        }
+      ],
+      "responses": [
+        {
+          "index": 138,
+          "kind": "ok",
+          "status": 200,
+          "shape": "{ staffId, blocked, ...(block ? { blockedBy: block.staffId,  }"
+        }
+      ],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/admin/src/modules/staff-directory/routes/internal.routes.js"
+    },
+    {
+      "service": "admin",
+      "module": "staff-directory",
+      "audience": "internal",
+      "method": "GET",
       "path": "/internal/admin/staff-directory/staff/:staffId/betlock",
       "routePath": "/staff/:staffId/betlock",
       "handler": "asyncHandler",
@@ -22440,13 +22467,13 @@
       ],
       "responses": [
         {
-          "index": 558,
+          "index": 863,
           "kind": "ok",
           "status": 200,
           "shape": "service.agentAdjust(…)"
         },
         {
-          "index": 1063,
+          "index": 1368,
           "kind": "ok",
           "status": 200,
           "shape": "service.adminAdjust(…)"
@@ -23214,12 +23241,6 @@
           "message": "This action requires your transaction password"
         },
         {
-          "key": "INSUFFICIENT_FUNDS",
-          "code": "ACCOUNTS_INSUFFICIENT_FUNDS",
-          "status": 402,
-          "message": "There is not enough in your balance to cover this"
-        },
-        {
           "key": "REFILL_TOO_LARGE",
           "code": "ACCOUNTS_REFILL_TOO_LARGE",
           "status": 422,
@@ -23242,12 +23263,6 @@
           "code": "ACCOUNTS_PLAYER_CREDIT_NOT_SUPPORTED",
           "status": 422,
           "message": "Players cannot be given a credit limit"
-        },
-        {
-          "key": "PLAYER_INSUFFICIENT_FUNDS",
-          "code": "ACCOUNTS_PLAYER_INSUFFICIENT_FUNDS",
-          "status": 402,
-          "message": "The player does not have enough balance for this"
         },
         {
           "key": "IDEMPOTENCY_CONFLICT",
@@ -23356,12 +23371,6 @@
           "code": "PLAYERS_NOT_PERMITTED",
           "status": 403,
           "message": "You may not do that"
-        },
-        {
-          "key": "INSUFFICIENT_FUNDS",
-          "code": "PLAYERS_INSUFFICIENT_FUNDS",
-          "status": 422,
-          "message": "Not enough balance to fund that account"
         },
         {
           "key": "ALREADY_CLOSED",
@@ -23672,12 +23681,6 @@
           "code": "STAFF_PLAYER_NOT_IN_YOUR_TREE",
           "status": 404,
           "message": "Player not found"
-        },
-        {
-          "key": "INSUFFICIENT_FUNDS",
-          "code": "STAFF_INSUFFICIENT_FUNDS",
-          "status": 402,
-          "message": "There is not enough in that balance to cover this transfer"
         },
         {
           "key": "CANNOT_TRANSFER_TO_SELF",

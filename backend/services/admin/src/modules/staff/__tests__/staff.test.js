@@ -1,5 +1,9 @@
 'use strict';
 
+// These cases exercise the SEPARATE transaction password (`staff.transaction_password`);
+// login mode (the default) is covered in staff-auth/__tests__/txnPasswordMode.test.js.
+process.env.TXN_PASSWORD_MODE = 'separate';
+
 const test = require('node:test');
 const assert = require('node:assert');
 
@@ -26,6 +30,9 @@ const newStaffId = () => (nextStaffId += 1);
 
 let nextUid = 860_000_000 + Math.floor(process.pid % 100_000) * 1000;
 const newUid = () => (nextUid += 1);
+
+/** Every seeded account's transaction password (plaintext is a supported legacy shape). */
+const TXN = 'staff test txn password';
 
 test('admin staff', async (t) => {
   const logger = createLogger({ name: 'staff-test', level: 'silent' });
@@ -218,6 +225,7 @@ test('admin staff', async (t) => {
       role_id: roleId,
       parent_id: parentId,
       status: 'active',
+      transaction_password: TXN,
     });
     await connection.models.StaffBalances.create({ staff_id: id, inr });
 
@@ -274,16 +282,27 @@ test('admin staff', async (t) => {
   };
 
   const actorFor = (id, extra = {}) => ({
-    // `canAdjustWallets`: these transfer tests are the `wallet:adjust` path; the
-    // parent-to-direct-child path has its own file (parentFunding.test.js).
-    id, level: levels.get(id) ?? 3, canResetOthers: false, canIssueFunds: false, canAdjustWallets: true, ...extra,
+    // Not the owner, so every transfer here is the parent-to-DIRECT-child path
+    // (the only one below the Super Admin); parentFunding.test.js covers its
+    // rules in detail. These tests are about the guarded debit itself.
+    id,
+    level: levels.get(id) ?? 3,
+    canResetOthers: false,
+    canIssueFunds: false,
+    canAdjustWallets: false,
+    canCredit: true,
+    canDebit: true,
+    ...extra,
   });
+  /** The platform owner: `wallet:adjust` + `canIssueFunds`, the only wide path. */
+  const ownerActor = (id, extra = {}) =>
+    actorFor(id, { level: 1, canIssueFunds: true, canAdjustWallets: true, ...extra });
 
   await t.test('a transfer down the tree moves money and records it', async () => {
     const boss = await seedStaff(newStaffId(), { inr: '1000' });
     const agent = await seedStaff(newStaffId(), { parentId: boss, inr: '0' });
 
-    const result = await service.transfer({
+    const result = await service.transfer({ transactionPassword: TXN,
       actor: actorFor(boss), toType: 'staff', toId: agent, amount: '250', direction: 'deposit',
     });
 
@@ -303,10 +322,10 @@ test('admin staff', async (t) => {
     const agent = await seedStaff(newStaffId(), { parentId: boss, inr: '0' });
 
     await assert.rejects(
-      () => service.transfer({
+      () => service.transfer({ transactionPassword: TXN,
         actor: actorFor(boss), toType: 'staff', toId: agent, amount: '500', direction: 'deposit',
       }),
-      (err) => err.code === 'STAFF_INSUFFICIENT_FUNDS' && err.status === 402
+      (err) => err.code === 'INSUFFICIENT_FUNDS' && err.status === 422
     );
 
     assert.equal(await staffBalance(boss), '100.00000000');
@@ -321,8 +340,8 @@ test('admin staff', async (t) => {
     const b = await seedStaff(newStaffId(), { parentId: boss });
 
     const results = await Promise.allSettled([
-      service.transfer({ actor: actorFor(boss), toType: 'staff', toId: a, amount: '100', direction: 'deposit' }),
-      service.transfer({ actor: actorFor(boss), toType: 'staff', toId: b, amount: '100', direction: 'deposit' }),
+      service.transfer({ transactionPassword: TXN, actor: actorFor(boss), toType: 'staff', toId: a, amount: '100', direction: 'deposit' }),
+      service.transfer({ transactionPassword: TXN, actor: actorFor(boss), toType: 'staff', toId: b, amount: '100', direction: 'deposit' }),
     ]);
 
     assert.equal(results.filter((r) => r.status === 'fulfilled').length, 1);
@@ -333,7 +352,7 @@ test('admin staff', async (t) => {
     const boss = await seedStaff(newStaffId(), { inr: '0' });
     const agent = await seedStaff(newStaffId(), { parentId: boss, inr: '400' });
 
-    await service.transfer({
+    await service.transfer({ transactionPassword: TXN,
       actor: actorFor(boss), toType: 'staff', toId: agent, amount: '150', direction: 'withdraw',
     });
 
@@ -346,34 +365,34 @@ test('admin staff', async (t) => {
     const agent = await seedStaff(newStaffId(), { parentId: boss, inr: '10' });
 
     await assert.rejects(
-      () => service.transfer({
+      () => service.transfer({ transactionPassword: TXN,
         actor: actorFor(boss), toType: 'staff', toId: agent, amount: '500', direction: 'withdraw',
       }),
-      (err) => err.code === 'STAFF_INSUFFICIENT_FUNDS'
+      (err) => err.code === 'INSUFFICIENT_FUNDS' && err.status === 422
     );
     assert.equal(await staffBalance(agent), '10.00000000');
     assert.equal(await staffBalance(boss), '0.00000000');
   });
 
-  await t.test('money can move to a player under the tree', async () => {
-    const boss = await seedStaff(newStaffId(), { inr: '500' });
-    const agent = await seedStaff(newStaffId(), { parentId: boss });
+  await t.test('only the platform owner moves money to a player here — and it mints', async () => {
+    const owner = await seedStaff(newStaffId(), { inr: '500', level: 1 });
+    const agent = await seedStaff(newStaffId(), { parentId: owner });
     const player = await seedPlayer(newUid(), agent, '0');
 
-    await service.transfer({
-      actor: actorFor(boss), toType: 'user', toId: player, amount: '75', direction: 'deposit',
+    await service.transfer({ transactionPassword: TXN,
+      actor: ownerActor(owner), toType: 'user', toId: player, amount: '75', direction: 'deposit',
     });
 
     assert.equal(await playerBalance(player), '75.00000000');
-    assert.equal(await staffBalance(boss), '425.00000000');
+    assert.equal(await staffBalance(owner), '500.00000000', 'the owner draws on nothing');
   });
 
-  await t.test('an account outside the tree cannot be transferred to', async () => {
+  await t.test('an outside account cannot be transferred to', async () => {
     const boss = await seedStaff(newStaffId(), { inr: '1000' });
     const stranger = await seedStaff(newStaffId(), { inr: '0' });
 
     await assert.rejects(
-      () => service.transfer({
+      () => service.transfer({ transactionPassword: TXN,
         actor: actorFor(boss), toType: 'staff', toId: stranger, amount: '100', direction: 'deposit',
       }),
       (err) => err.code === 'STAFF_NOT_IN_YOUR_TREE' && err.status === 404
@@ -381,18 +400,26 @@ test('admin staff', async (t) => {
     assert.equal(await staffBalance(boss), '1000.00000000');
   });
 
-  await t.test('a player under a DIFFERENT tree cannot be transferred to', async () => {
-    const boss = await seedStaff(newStaffId(), { inr: '1000' });
-    const other = await seedStaff(newStaffId(), { inr: '0' });
-    const theirPlayer = await seedPlayer(newUid(), other, '0');
+  await t.test('an Admin holding wallet:adjust is NOT the wide path: no player, no grandchild', async () => {
+    const admin = await seedStaff(newStaffId(), { inr: '1000', level: 2 });
+    const sub = await seedStaff(newStaffId(), { parentId: admin, inr: '0' });
+    const grandchild = await seedStaff(newStaffId(), { parentId: sub, inr: '0' });
+    const player = await seedPlayer(newUid(), admin, '0');
+    const actor = actorFor(admin, { canAdjustWallets: true });
 
     await assert.rejects(
-      () => service.transfer({
-        actor: actorFor(boss), toType: 'user', toId: theirPlayer, amount: '50', direction: 'deposit',
-      }),
-      (err) => err.code === 'STAFF_PLAYER_NOT_IN_YOUR_TREE'
+      () => service.transfer({ transactionPassword: TXN, actor, toType: 'user', toId: player, amount: '50', direction: 'deposit' }),
+      (err) => err.code === 'STAFF_NOT_PERMITTED'
     );
-    assert.equal(await playerBalance(theirPlayer), '0.00000000');
+    await assert.rejects(
+      () => service.transfer({ transactionPassword: TXN, actor, toType: 'staff', toId: grandchild, amount: '50', direction: 'deposit' }),
+      (err) => err.code === 'STAFF_NOT_IN_YOUR_TREE' && err.status === 404
+    );
+    // Its direct child, out of its own float.
+    await service.transfer({ transactionPassword: TXN, actor, toType: 'staff', toId: sub, amount: '50', direction: 'deposit' });
+    assert.equal(await staffBalance(admin), '950.00000000');
+    assert.equal(await staffBalance(sub), '50.00000000');
+    assert.equal(await playerBalance(player), '0.00000000');
   });
 
   await t.test('the platform owner issues funds, and it is logged as issuance', async () => {
@@ -402,8 +429,8 @@ test('admin staff', async (t) => {
     const owner = await seedStaff(newStaffId(), { inr: '0' });
     const agent = await seedStaff(newStaffId(), { parentId: owner, inr: '0' });
 
-    await service.transfer({
-      actor: actorFor(owner, { canIssueFunds: true, level: 1 }),
+    await service.transfer({ transactionPassword: TXN,
+      actor: ownerActor(owner),
       toType: 'staff', toId: agent, amount: '1000', direction: 'deposit',
     });
 
@@ -548,7 +575,7 @@ test('admin staff', async (t) => {
     // `GET /api/staff/transactions` was shadowed by `/:id` and never ran.
     const boss = await seedStaff(newStaffId(), { inr: '500' });
     const agent = await seedStaff(newStaffId(), { parentId: boss });
-    await service.transfer({
+    await service.transfer({ transactionPassword: TXN,
       actor: actorFor(boss), toType: 'staff', toId: agent, amount: '100', direction: 'deposit',
     });
 
@@ -587,42 +614,76 @@ test('admin staff', async (t) => {
     await cleanup(sub.id);
   });
 
-  await t.test('a super master builds masters and agents under itself; a master builds agents', async () => {
-    const sm = await seedStaff(newStaffId(), { level: 4 });
+  await t.test('each level creates ONLY the level directly below it (CHILD_LEVELS)', async () => {
+    const admin = await seedStaff(newStaffId(), { level: 2 });
+    await assert.rejects(() => make(actorFor(admin), 4), refusedLevel, 'an Admin does not skip to Super Master');
 
+    const sub = await seedStaff(newStaffId(), { parentId: admin, level: 3 });
+    await assert.rejects(() => make(actorFor(sub), 3), refusedLevel, 'not a peer');
+    await assert.rejects(() => make(actorFor(sub), 5), refusedLevel, 'a Sub Admin does not skip to Master');
+    const smMade = await make(actorFor(sub), 4);
+    assert.equal(Number(smMade.parentId), sub);
+
+    const sm = await seedStaff(newStaffId(), { level: 4 });
     await assert.rejects(() => make(actorFor(sm), 4), refusedLevel, 'not a peer');
     await assert.rejects(() => make(actorFor(sm), 3), refusedLevel, 'not upwards');
+    await assert.rejects(() => make(actorFor(sm), 6), refusedLevel, 'a Super Master does not skip to Agent');
 
     const master = await make(actorFor(sm), 5);
-    const agent = await make(actorFor(sm), 6);
     levels.set(Number(master.id), 5);
 
     await assert.rejects(() => make(actorFor(master.id), 5), refusedLevel);
     await assert.rejects(() => make(actorFor(master.id), 4), refusedLevel);
     const agentOfMaster = await make(actorFor(master.id), 6);
     assert.equal(Number(agentOfMaster.parentId), Number(master.id));
+    levels.set(Number(agentOfMaster.id), 6);
 
-    await cleanup(agentOfMaster.id, agent.id, master.id);
+    // An agent creates players only.
+    await assert.rejects(() => make(actorFor(agentOfMaster.id), 7));
+    await assert.rejects(() => make(actorFor(agentOfMaster.id), 6), refusedLevel);
+
+    await cleanup(agentOfMaster.id, master.id, smMade.id);
   });
 
-  await t.test('an account may be created under a descendant, below that descendant, never outside the subtree', async () => {
-    const sm = await seedStaff(newStaffId(), { level: 4 });
+  await t.test('the Super Admin creates any level, under itself or a descendant', async () => {
+    const owner = await seedStaff(newStaffId(), { level: 1 });
+    const sm = await seedStaff(newStaffId(), { parentId: owner, level: 4 });
     const master = await seedStaff(newStaffId(), { parentId: sm, level: 5 });
-    const stranger = await seedStaff(newStaffId(), { level: 5 });
 
-    const agent = await make(actorFor(sm), 6, { parentId: master });
+    const admin = await make(ownerActor(owner), 2);
+    const agentDirect = await make(ownerActor(owner), 6);
+    const agent = await make(ownerActor(owner), 6, { parentId: master });
     assert.equal(Number(agent.parentId), master);
     const closure = await connection.models.StaffHierarchy.findAll({ where: { descendant_id: agent.id }, raw: true });
     assert.ok(closure.some((r) => Number(r.ancestor_id) === sm && Number(r.depth) === 2), 'grandparent row');
 
-    // Level 5 under a level-5 parent would put a peer beneath a peer.
+    // Still strictly below the parent it hangs from.
+    await assert.rejects(() => make(ownerActor(owner), 5, { parentId: master }), refusedLevel);
+
+    await cleanup(agent.id, agentDirect.id, admin.id);
+  });
+
+  await t.test('below the Super Admin, a create under a descendant must be that parent\'s direct child level', async () => {
+    const sm = await seedStaff(newStaffId(), { level: 4 });
+    const master = await seedStaff(newStaffId(), { parentId: sm, level: 5 });
+    const stranger = await seedStaff(newStaffId(), { level: 5 });
+
+    // A Super Master's child level is Master; Agent under its master is refused.
+    await assert.rejects(() => make(actorFor(sm), 6, { parentId: master }), refusedLevel);
     await assert.rejects(() => make(actorFor(sm), 5, { parentId: master }), refusedLevel);
     await assert.rejects(
-      () => make(actorFor(sm), 6, { parentId: stranger }),
+      () => make(actorFor(sm), 5, { parentId: stranger }),
       (err) => err.code === 'STAFF_NOT_IN_YOUR_TREE'
     );
+  });
 
-    await cleanup(agent.id);
+  await t.test('an Executive (role 7) is never created or re-levelled through /admin/staff', async () => {
+    const owner = await seedStaff(newStaffId(), { level: 1 });
+    const sm = await seedStaff(newStaffId(), { level: 4 });
+    const notPermitted = (err) => err.code === 'STAFF_NOT_PERMITTED' && err.status === 403;
+
+    await assert.rejects(() => make(actorFor(sm), 7), notPermitted);
+    await assert.rejects(() => make(ownerActor(owner), 7), notPermitted);
   });
 
   await t.test('an unknown role is refused', async () => {
@@ -646,10 +707,12 @@ test('admin staff', async (t) => {
     await assert.rejects(() => service.update({ actor: actorFor(sm), staffId: master, roleId: roleFor(6) }), refusedLevel);
     // Raising the agent to its parent's level.
     await assert.rejects(() => service.update({ actor: actorFor(sm), staffId: agent, roleId: roleFor(5) }), refusedLevel);
-    // Executive (7) under a master is fine.
+    // Executive (7) is not a staff level you move an account to.
     await ensureRole(7);
-    const updated = await service.update({ actor: actorFor(sm), staffId: agent, roleId: roleFor(7) });
-    assert.equal(Number(updated.roleId), roleFor(7));
+    await assert.rejects(
+      () => service.update({ actor: actorFor(sm), staffId: agent, roleId: roleFor(7) }),
+      (err) => err.code === 'STAFF_NOT_PERMITTED'
+    );
   });
 
   await t.test('a descendant at or above your level cannot be edited, reset or removed', async () => {
@@ -704,5 +767,57 @@ test('admin staff', async (t) => {
       }),
       (err) => err.code === 'STAFF_PASSWORD_CHANGE_REQUIRED' && err.status === 403
     );
+  });
+
+  // ── Suspension cascades like the system lock ─────────────────────────
+
+  await t.test('suspending an account locks its whole downline; reactivating lifts only that', async () => {
+    const boss = await seedStaff(newStaffId(), { level: 3 });
+    const sm = await seedStaff(newStaffId(), { parentId: boss, level: 4 });
+    const master = await seedStaff(newStaffId(), { parentId: sm, level: 5 });
+    const agent = await seedStaff(newStaffId(), { parentId: master, level: 6 });
+    const smPlayer = await seedPlayer(newUid(), sm, '0');
+    const agentPlayer = await seedPlayer(newUid(), agent, '0');
+    const lockedOnPurpose = await seedPlayer(newUid(), agent, '0');
+    await connection.models.Users.update(
+      { system_locked: true, lock_sources: { system_locked: { own: true, by: [] } } },
+      { where: { id: lockedOnPurpose } }
+    );
+
+    const flags = async () => ({
+      master: (await connection.models.Staff.findByPk(master, { raw: true })).system_locked,
+      agent: (await connection.models.Staff.findByPk(agent, { raw: true })).system_locked,
+      sm: (await connection.models.Staff.findByPk(sm, { raw: true })).system_locked,
+      smPlayer: (await connection.models.Users.findByPk(smPlayer, { raw: true })).system_locked,
+      agentPlayer: (await connection.models.Users.findByPk(agentPlayer, { raw: true })).system_locked,
+      lockedOnPurpose: (await connection.models.Users.findByPk(lockedOnPurpose, { raw: true })).system_locked,
+    });
+
+    await service.update({ actor: actorFor(boss), staffId: sm, status: 'suspended' });
+    let f = await flags();
+    assert.equal(f.master, true, 'a staff account beneath');
+    assert.equal(f.agent, true, 'two levels beneath');
+    assert.equal(f.smPlayer, true, 'its own player');
+    assert.equal(f.agentPlayer, true, 'a player two levels beneath');
+    assert.equal(Boolean(f.sm), false, 'the suspended account is refused by its status, not locked');
+
+    await service.update({ actor: actorFor(boss), staffId: sm, status: 'active' });
+    f = await flags();
+    assert.equal(Boolean(f.master), false);
+    assert.equal(Boolean(f.agent), false);
+    assert.equal(Boolean(f.smPlayer), false);
+    assert.equal(Boolean(f.agentPlayer), false);
+    assert.equal(f.lockedOnPurpose, true, 'a direct lock survives the reactivation');
+  });
+
+  await t.test('a bulk suspension cascades too', async () => {
+    const boss = await seedStaff(newStaffId(), { level: 3 });
+    const sm = await seedStaff(newStaffId(), { parentId: boss, level: 4 });
+    const player = await seedPlayer(newUid(), sm, '0');
+
+    await service.bulkStatus({ actor: actorFor(boss), ids: [sm], status: 'suspended' });
+    assert.equal((await connection.models.Users.findByPk(player, { raw: true })).system_locked, true);
+    await service.bulkStatus({ actor: actorFor(boss), ids: [sm], status: 'active' });
+    assert.equal(Boolean((await connection.models.Users.findByPk(player, { raw: true })).system_locked), false);
   });
 });

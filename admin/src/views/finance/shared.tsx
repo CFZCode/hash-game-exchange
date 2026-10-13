@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { useApiMutation } from '@/hooks/use-api'
 import { api, request } from '@/lib/api/client'
 import type { Paged, Query } from '@/lib/api/types'
-import { StaffFloatNote, useIsAgentTree } from './StaffFloat'
+import { StaffFloatNote, useIsAgentTree, TxnPasswordLabel } from './StaffFloat'
 import { useCurrencyCodes } from './useCurrencyCodes'
 
 /**
@@ -106,7 +106,7 @@ export const stop = (e: React.MouseEvent) => e.stopPropagation()
  * — used by Wallets and by the player page.
  *
  * Agent-tree staff (levels 4–6): the backend makes this a TRANSFER from the caller's own float
- * (INR only), refuses with 422 INSUFFICIENT_STAFF_BALANCE, and always needs the transaction
+ * (INR only), refuses with 422 INSUFFICIENT_FUNDS, details.party = staff, and always needs the transaction
  * password — so the dialog shows the available float, offers INR only and marks the password
  * required. House staff: an operator adjustment, with the transaction password once one is set.
  */
@@ -157,7 +157,7 @@ export const AdjustWalletDialog = ({ userId, userName, currencies, invalidate = 
       </div>
       <TextField id='aw-amt' label='Amount' required placeholder='100.00' value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} />
       <TextAreaField id='aw-desc' label='Reason' required value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
-      <TextField id='aw-tp' label='Transaction password' type='password' required={agentTree} hint={agentTree ? 'Required for every balance move' : 'Required if your account has one set'} value={form.transactionPassword} onChange={e => setForm({ ...form, transactionPassword: e.target.value })} />
+      <TextField id='aw-tp' label={<TxnPasswordLabel />} type='password' required={agentTree} hint={agentTree ? 'Required for every balance move' : 'Required (if your account uses one)'} value={form.transactionPassword} onChange={e => setForm({ ...form, transactionPassword: e.target.value })} />
     </FormDialog>
   )
 }

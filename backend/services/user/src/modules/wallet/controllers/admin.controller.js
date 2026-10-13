@@ -1,7 +1,7 @@
 'use strict';
 
 const { response, asyncHandler } = require('@ibitplay/common');
-const { isAgentTree } = require('@ibitplay/auth');
+const { canIssueFunds } = require('@ibitplay/auth');
 
 /** Staff wallet operations. */
 function createAdminController({ service }) {
@@ -14,17 +14,25 @@ function createAdminController({ service }) {
       await service.assertPlayerVisible(req.staff.id, req.body.userId);
 
       /**
-       * Agent-tree staff (levels 4–6 and their executives) never create money:
-       * their adjust is a TRANSFER between their own float and the player,
-       * made atomically by admin-service, which owns the float. House staff
-       * (1–3) keep the operator adjustment — behind their transaction password
-       * once they have set one. See `WalletService.agentAdjust`.
+       * ONLY the platform owner creates money. Every other staff session —
+       * Admin and Sub Admin included, and any executive — moves money between
+       * its OWN float and its DIRECT player (`users.parent_staff_id` = caller),
+       * made atomically by admin-service, which owns the float and checks both
+       * the direct-parent rule and the transaction password.
+       * See `WalletService.agentAdjust` and `LordsService.adjustPlayer`.
+       *
+       * This used to branch on `isAgentTree`, so house staff (levels 1–3) all
+       * took the operator adjustment: a Sub Admin with a zero balance could
+       * credit any player on the site and nothing was debited.
        */
-      if (isAgentTree(req.staff)) {
-        return response.ok(res, await service.agentAdjust(req.body, { staffId: req.staff.id }));
+      if (!canIssueFunds(req.staff)) {
+        return response.ok(res, await service.agentAdjust(req.body, { staffId: req.staff.id, executiveId: req.staff.executiveId ?? null }));
       }
 
-      await service.checkTransactionPassword(req.staff.id, req.body.transactionPassword, { required: false });
+      await service.checkTransactionPassword(req.staff.id, req.body.transactionPassword, {
+        required: false,
+        executiveId: req.staff.executiveId ?? null,
+      });
       const result = await service.adminAdjust(req.body, {
         staffId: req.staff.id,
         sourceService: 'admin-ui',

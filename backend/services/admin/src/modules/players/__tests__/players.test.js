@@ -1,10 +1,15 @@
 'use strict';
 
+// These cases exercise the SEPARATE transaction password (`staff.transaction_password`);
+// login mode (the default) is covered in staff-auth/__tests__/txnPasswordMode.test.js.
+process.env.TXN_PASSWORD_MODE = 'separate';
+
 const test = require('node:test');
 const assert = require('node:assert');
 
 const db = require('@ibitplay/db');
 const { createLogger, money } = require('@ibitplay/common');
+const { hashPassword } = require('@ibitplay/auth');
 
 const { PlayersService } = require('../players.service');
 const v = require('../players.validators');
@@ -38,6 +43,13 @@ test('player validators', async (t) => {
     assert.equal(parse(1000).success, false, 'a number is not a decimal string');
     assert.equal(parse('1e5').success, false);
     assert.equal(parse('abc').success, false);
+  });
+
+  await t.test('the create body accepts a transaction password', () => {
+    assert.equal(
+      v.create.body.safeParse({ username: 'someone', password: 'correct-horse', initialBalance: '10', transactionPassword: 'x' }).success,
+      true
+    );
   });
 
   await t.test('a close needs a reason', () => {
@@ -94,6 +106,9 @@ test('players against a database', async (t) => {
 
   const agent = newId();
   const rival = newId();
+  // Every funded creation below the platform owner needs the transaction
+  // password (the Addaplay rule), whatever grants the session holds.
+  const OWN_TXN = 'players own txn password';
   const created = [];
 
   t.before(async () => {
@@ -101,8 +116,8 @@ test('players against a database', async (t) => {
     await models.Staff.destroy({ where: { id: [agent, rival] } });
 
     await models.Staff.bulkCreate([
-      { id: agent, name: `pa-${agent}`, email: `pa${agent}@t.test`, password: 'x', role_id: roleId, parent_id: null },
-      { id: rival, name: `pr-${rival}`, email: `pr${rival}@t.test`, password: 'x', role_id: roleId, parent_id: null },
+      { id: agent, name: `pa-${agent}`, email: `pa${agent}@t.test`, password: 'x', role_id: roleId, parent_id: null, transaction_password: OWN_TXN },
+      { id: rival, name: `pr-${rival}`, email: `pr${rival}@t.test`, password: 'x', role_id: roleId, parent_id: null, transaction_password: OWN_TXN },
     ]);
     await models.StaffBalances.create({ staff_id: agent, inr: '10000' });
     await models.StaffBalances.create({ staff_id: rival, inr: '0' });
@@ -141,6 +156,7 @@ test('players against a database', async (t) => {
       username: `p${newId()}`,
       password: 'correct-horse-battery',
       initialBalance: '2500',
+      transactionPassword: OWN_TXN,
     });
     created.push(Number(player.id));
 
@@ -205,11 +221,79 @@ test('players against a database', async (t) => {
           username: `p${newId()}`,
           password: 'correct-horse-battery',
           initialBalance: '999999',
+          transactionPassword: OWN_TXN,
         }),
-      (err) => err.code === 'PLAYERS_INSUFFICIENT_FUNDS'
+      (err) => err.code === 'INSUFFICIENT_FUNDS' && err.status === 422
     );
 
     assert.equal(await balanceOf(rival), before, 'nothing moved');
+  });
+
+  await t.test('a funded creation under a DESCENDANT is refused: only the direct parent funds a player', async () => {
+    const child = newId();
+    await models.Staff.create({ id: child, name: `pc-${child}`, email: `pc${child}@t.test`, password: 'x', role_id: roleId, parent_id: agent });
+    try {
+      const before = await balanceOf(agent);
+      const username = `p${newId()}`;
+      await assert.rejects(
+        () => service.create({
+          actor: asAgent, username, password: 'correct-horse-battery', parentId: child,
+          initialBalance: '100', transactionPassword: OWN_TXN,
+        }),
+        (err) => err.code === 'PLAYERS_NOT_PERMITTED' && err.status === 403
+      );
+      assert.equal(await balanceOf(agent), before, 'nothing moved');
+      assert.equal(await models.Users.count({ where: { name: username } }), 0);
+
+      // Unfunded, under the same descendant, is fine.
+      const player = await service.create({ actor: asAgent, username: `p${newId()}`, password: 'correct-horse-battery', parentId: child });
+      created.push(Number(player.id));
+      await models.Users.update({ parent_staff_id: agent }, { where: { id: player.id } });
+    } finally {
+      await models.Staff.destroy({ where: { id: child } });
+    }
+  });
+
+  await t.test('an AGENT-TREE funded creation needs the transaction password; a refusal moves nothing', async () => {
+    /**
+     * Same rule as `POST /admin/staff/transfer`: an agent-tree session (or
+     * anyone without `wallet:adjust`) funding a player out of its own float
+     * must give its transaction password. Without this check the opening
+     * balance was a second-factor-free way to move float.
+     */
+    const TXN = 'agent txn password';
+    await models.Staff.update({ transaction_password: await hashPassword(TXN, 4) }, { where: { id: agent } });
+    const asTreeAgent = { id: agent, level: 6, permissions: ['users:write', 'wallet:credit'] };
+    try {
+      for (const [transactionPassword, code] of [
+        [undefined, 'TXN_PASSWORD_REQUIRED'],
+        ['not the password', 'TXN_PASSWORD_INVALID'],
+      ]) {
+        const before = await balanceOf(agent);
+        const username = `p${newId()}`;
+        await assert.rejects(
+          () => service.create({
+            actor: asTreeAgent, username, password: 'correct-horse-battery', initialBalance: '300', transactionPassword,
+          }),
+          (err) => err.code === code
+        );
+        assert.equal(await balanceOf(agent), before, 'nothing moved');
+        assert.equal(await models.Users.count({ where: { name: username } }), 0, 'no player was created');
+      }
+
+      const before = await balanceOf(agent);
+      const player = await service.create({
+        actor: asTreeAgent, username: `p${newId()}`, password: 'correct-horse-battery', initialBalance: '300', transactionPassword: TXN,
+      });
+      created.push(Number(player.id));
+      assert.equal(await balanceOf(agent), money.toDecimalString(money.toMinor(before) - money.toMinor('300')));
+
+      // An UNFUNDED creation moves no money and needs no second factor.
+      const unfunded = await service.create({ actor: asTreeAgent, username: `p${newId()}`, password: 'correct-horse-battery' });
+      created.push(Number(unfunded.id));
+    } finally {
+      await models.Staff.update({ transaction_password: OWN_TXN }, { where: { id: agent } });
+    }
   });
 
   await t.test('a negative opening balance is refused', async () => {
@@ -285,6 +369,7 @@ test('players against a database', async (t) => {
       username: `p${newId()}`,
       password: 'correct-horse-battery',
       initialBalance: '750',
+      transactionPassword: OWN_TXN,
     });
     const playerId = Number(player.id);
     created.push(playerId);

@@ -143,7 +143,7 @@ class AuthService {
 
     // Only AFTER the password is proven — a locked account should not be
     // discoverable without the password.
-    this.#assertUsable(user);
+    await this.#assertUsable(user);
 
     if (user.two_fa_status && user.two_fa) {
       if (!twoFactorCode) throw errors.TWO_FACTOR_REQUIRED({ userId: user.id });
@@ -238,7 +238,7 @@ class AuthService {
 
     const user = await this.models.Users.findByPk(session.user_id);
     if (!user) throw errors.SESSION_NOT_FOUND();
-    this.#assertUsable(user);
+    await this.#assertUsable(user);
 
     return this.db.transaction(async (transaction) => {
       const next = await this.#createSession(
@@ -860,10 +860,35 @@ class AuthService {
     throw errors.REGISTRATION_FAILED({ reason: 'could not allocate a referral code' });
   }
 
-  #assertUsable(user) {
+  async #assertUsable(user) {
     if (user.system_locked) throw errors.ACCOUNT_LOCKED({ reason: 'system' });
     if (user.is_locked) throw errors.ACCOUNT_LOCKED({ reason: 'manual' });
     if (user.status && user.status !== 'active') throw errors.ACCOUNT_INACTIVE({ status: user.status });
+    await this.#assertUplineUsable(user);
+  }
+
+  /**
+   * A player whose agent — or any staff account above it — is suspended or
+   * system-locked cannot sign in. Suspension also cascades `system_locked`
+   * onto the players (admin `locks/suspendCascade.js`); this walk covers a
+   * player added under a suspended branch afterwards, and legacy rows.
+   *
+   * `staff_hierarchy` is admin-owned, so admin-service answers. It fails
+   * CLOSED, like the bet lock: an unreachable check must not let a blocked
+   * downline in.
+   */
+  async #assertUplineUsable(user) {
+    const parent = user.parent_staff_id == null ? null : Number(user.parent_staff_id);
+    if (!parent || !this.clients?.admin) return;
+
+    let state;
+    try {
+      state = await this.clients.admin.get(`/internal/admin/staff-directory/staff/${parent}/access`);
+    } catch (error) {
+      this.logger?.error({ err: error, userId: user.id }, 'Could not check the upline access state — refusing sign-in');
+      throw errors.ACCOUNT_LOCKED({ reason: 'upline' });
+    }
+    if ((state?.data ?? state)?.blocked) throw errors.ACCOUNT_LOCKED({ reason: 'upline' });
   }
 
   /**

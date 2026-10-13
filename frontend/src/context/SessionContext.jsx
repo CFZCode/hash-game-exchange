@@ -278,7 +278,20 @@ export function SessionProvider({ children }) {
          because that is the only branch anything writes to; widen it the day something needs
          to set a top-level field. */
       setSetting: (key, value) =>
-        setAccount((current) => ({ ...current, setting: { ...current.setting, [key]: value } })),
+        setAccount((current) => ({
+          ...current,
+          setting: {
+            ...current.setting,
+            [key]: value,
+            /* `currencyPicked` marks the selected coin as the visitor's OWN choice, which every
+               caller writing `currencyName` is (the header dropdown, the game page's picker, a
+               free-play claim). `pickCurrency` in `services/auth.js` keeps a picked coin even at
+               a zero balance, and moves an unpicked default to the coin the wallet actually
+               holds. Not in `ACCOUNT_DEFAULTS` — that is the original's `NC`, verbatim, and its
+               hash is the store's version — so it lives only in the persisted `setting`. */
+            ...(key === 'currencyName' ? { currencyPicked: true } : {}),
+          },
+        })),
 
       /* The two-argument form of the same setter, for a field on the account itself rather than
          inside `setting`. The original's `I(key, value)` — this file used to carry only the

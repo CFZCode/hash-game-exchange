@@ -57,6 +57,19 @@ const agentKey = (agentId) => {
   return String(id);
 };
 
+/**
+ * The `by` entry a cascade records. A lock from `POST /admin/locks` is the
+ * bare agent id; a SUSPENSION of the agent (`status` ≠ active) is
+ * `suspend:<id>` — its own holder, so lifting the lock never reactivates a
+ * suspended agent's downline and reactivating never lifts the lock.
+ */
+const CASCADE_KINDS = Object.freeze({ LOCK: 'lock', SUSPEND: 'suspend' });
+const sourceKey = (agentId, kind = CASCADE_KINDS.LOCK) => {
+  if (kind === CASCADE_KINDS.SUSPEND) return `suspend:${agentKey(agentId)}`;
+  if (kind !== CASCADE_KINDS.LOCK) throw new Error(`Bad cascade kind: ${kind}`);
+  return agentKey(agentId);
+};
+
 const SOURCES = `COALESCE(lock_sources, '{}'::jsonb)`;
 const byOf = (column) => `COALESCE(${SOURCES}->'${column}'->'by', '[]'::jsonb)`;
 
@@ -88,10 +101,11 @@ function directSources(changes) {
  * The SET clause for a CASCADE from `agentId` onto the accounts beneath it.
  *
  * @param {Record<string, boolean>} changes lock column → locked.
+ * @param {{ kind?: 'lock'|'suspend' }} [options] what is holding the lock — see `sourceKey`.
  * @returns {Record<string, import('sequelize').Utils.Literal>} attributes for `Model.update`.
  */
-function cascadeUpdate(changes, agentId) {
-  const key = agentKey(agentId);
+function cascadeUpdate(changes, agentId, { kind = CASCADE_KINDS.LOCK } = {}) {
+  const key = sourceKey(agentId, kind);
   const set = {};
   let sources = SOURCES;
 
@@ -110,4 +124,4 @@ function cascadeUpdate(changes, agentId) {
   return set;
 }
 
-module.exports = { LOCK_COLUMNS, directSources, cascadeUpdate };
+module.exports = { LOCK_COLUMNS, CASCADE_KINDS, directSources, cascadeUpdate };

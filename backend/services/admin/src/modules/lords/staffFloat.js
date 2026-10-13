@@ -27,14 +27,30 @@ const { money, AppError } = require('@ibitplay/common');
  * ═════════════════════════════════════════════════════════════════════════
  */
 
-/** 422 with the exact public code the admin UI matches on. */
-const insufficientStaffBalance = (details) =>
-  new AppError(
-    'There is not enough in your own balance (including any credit line) to cover this',
-    422,
-    'INSUFFICIENT_STAFF_BALANCE',
-    details
+/**
+ * ONE overdraw error for every staff money path — 422 `INSUFFICIENT_FUNDS`,
+ * the same code `InsufficientFundsError` (packages/common) gives a player.
+ *
+ * It used to be three: 402 `STAFF_INSUFFICIENT_FUNDS` (staff transfer),
+ * 422 `INSUFFICIENT_STAFF_BALANCE` (agent float) and 422
+ * `PLAYERS_INSUFFICIENT_FUNDS` (funded player creation), plus 402
+ * `ACCOUNTS_INSUFFICIENT_FUNDS` / `ACCOUNTS_PLAYER_INSUFFICIENT_FUNDS` in the
+ * lords module. The hub admin UI never branched on any of them. Who was short
+ * is in `details.party` (`staff` | `user`).
+ */
+const insufficientFunds = (details = {}, message = 'There is not enough balance to cover this') =>
+  new AppError(message, 422, 'INSUFFICIENT_FUNDS', details);
+
+/** The caller's own float (including any credit line) is short. */
+const insufficientStaffBalance = (details = {}) =>
+  insufficientFunds(
+    { party: 'staff', ...details },
+    'There is not enough in your own balance (including any credit line) to cover this'
   );
+
+/** The player's wallet is short. */
+const insufficientPlayerBalance = (details = {}) =>
+  insufficientFunds({ party: 'user', ...details }, 'The player does not have enough balance for this');
 
 /**
  * Take `amount` from a staff float, or refuse.
@@ -85,4 +101,11 @@ async function readStaffFloat(models, staffId, { transaction } = {}) {
   };
 }
 
-module.exports = { debitStaffFloat, creditStaffFloat, readStaffFloat, insufficientStaffBalance };
+module.exports = {
+  debitStaffFloat,
+  creditStaffFloat,
+  readStaffFloat,
+  insufficientFunds,
+  insufficientStaffBalance,
+  insufficientPlayerBalance,
+};

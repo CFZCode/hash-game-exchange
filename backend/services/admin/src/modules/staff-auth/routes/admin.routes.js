@@ -73,7 +73,11 @@ module.exports = function adminRoutes(deps) {
   router.get(
     '/transaction-password',
     asyncHandler(async (req, res) =>
-      response.ok(res, { set: await txn.hasTransactionPassword(deps.models, req.staff.id) })
+      response.ok(res, {
+        set: await txn.hasTransactionPassword(deps.models, req.staff.id),
+        // `login`: the transaction password is the login password — nothing to set.
+        mode: txn.transactionPasswordMode(),
+      })
     )
   );
   router.post(

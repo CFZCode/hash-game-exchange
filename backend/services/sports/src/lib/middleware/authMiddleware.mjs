@@ -18,7 +18,8 @@ var authMiddleware = async (req, res, next) => {
     if (await isTokenBlacklisted(token)) {
       return res.status(401).json({ error: "Token invalidated. Please log in again." });
     }
-    const decoded = await verifyPlatformToken(token);
+    // A write (bet placement) re-reads the player's live state — see verifyPlatformToken.
+    const decoded = await verifyPlatformToken(token, { refresh: !["GET", "HEAD", "OPTIONS"].includes(req.method) });
     let actor = decoded.actor;
     let account = decoded.account;
     if (!actor || !account) {
@@ -39,7 +40,8 @@ var authMiddleware = async (req, res, next) => {
       role: decoded.role?.toUpperCase(),
       level: decoded.level || null,
       username: decoded.username || null,
-      permissions: decoded.permissions || null
+      permissions: decoded.permissions || null,
+      platformStaffId: decoded.platform_staff_id ?? null
     };
     if (req.user.actor?.type === "EXECUTIVE") {
       const executive = await Executive_default.findByPk(req.user.actor.id);

@@ -1,5 +1,9 @@
 'use strict';
 
+// These cases exercise the SEPARATE transaction password (`staff.transaction_password`);
+// login mode (the default) is covered in staff-auth/__tests__/txnPasswordMode.test.js.
+process.env.TXN_PASSWORD_MODE = 'separate';
+
 const test = require('node:test');
 const assert = require('node:assert');
 
@@ -240,7 +244,7 @@ test('admin account controls', async (t) => {
         actor: actorFor(staff), accountId: player, amount: '500',
         transactionPassword: TXN_PASSWORD,
       }),
-      (err) => err.code === 'ACCOUNTS_INSUFFICIENT_FUNDS' && err.status === 402
+      (err) => err.code === 'INSUFFICIENT_FUNDS' && err.status === 422
     );
 
     assert.equal(await staffBalance(staff), '100.00000000');

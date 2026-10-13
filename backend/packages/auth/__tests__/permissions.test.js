@@ -14,6 +14,8 @@ const {
   createAuthMiddleware,
   TokenService,
   PASSWORD_CHANGE_REQUIRED,
+  CHILD_LEVELS,
+  canCreateLevel,
 } = require('..');
 
 /**
@@ -70,6 +72,55 @@ test('the B2B tree: who may build staff and players', () => {
     assert.ok(!hasPermission(grants(level), PERMISSIONS.ROLES_MANAGE));
     assert.ok(!hasPermission(grants(level), PERMISSIONS.WALLET_ADJUST));
   }
+});
+
+test('the Addaplay ladder: each level creates only the level directly below (CHILD_LEVELS)', () => {
+  const L = STAFF_LEVELS;
+  assert.deepEqual([...CHILD_LEVELS[L.SUPER_ADMIN]], [L.ADMIN, L.SUB_ADMIN, L.SUPER_MASTER, L.MASTER, L.AGENT]);
+  assert.ok(canCreateLevel(L.ADMIN, L.SUB_ADMIN));
+  assert.ok(!canCreateLevel(L.ADMIN, L.SUPER_MASTER));
+  assert.ok(canCreateLevel(L.SUB_ADMIN, L.SUPER_MASTER));
+  assert.ok(!canCreateLevel(L.SUB_ADMIN, L.MASTER));
+  assert.ok(canCreateLevel(L.SUPER_MASTER, L.MASTER));
+  assert.ok(!canCreateLevel(L.SUPER_MASTER, L.AGENT));
+  assert.ok(canCreateLevel(L.MASTER, L.AGENT));
+  for (const level of Object.values(L)) {
+    assert.ok(!canCreateLevel(L.AGENT, level), 'an agent creates players only');
+    assert.ok(!canCreateLevel(level, L.EXECUTIVE), 'an executive is never a created staff row');
+  }
+  assert.ok(!canCreateLevel(L.EXECUTIVE, L.AGENT));
+  assert.ok(!canCreateLevel(undefined, L.AGENT), 'fails closed');
+});
+
+test('a sub admin builds its own staff and executives (staff:write)', () => {
+  assert.ok(hasPermission(LEVEL_PERMISSIONS[STAFF_LEVELS.SUB_ADMIN], PERMISSIONS.STAFF_WRITE));
+  assert.ok(!hasPermission(LEVEL_PERMISSIONS[STAFF_LEVELS.SUB_ADMIN], PERMISSIONS.WALLET_ADJUST));
+});
+
+test('the agent tree locks, suspends and bet-locks its own tree (users:lock)', () => {
+  for (const level of [STAFF_LEVELS.SUPER_MASTER, STAFF_LEVELS.MASTER, STAFF_LEVELS.AGENT]) {
+    assert.ok(hasPermission(LEVEL_PERMISSIONS[level], PERMISSIONS.USERS_LOCK), `level ${level}`);
+  }
+  assert.ok(!hasPermission(LEVEL_PERMISSIONS[STAFF_LEVELS.EXECUTIVE], PERMISSIONS.USERS_LOCK));
+});
+
+test('a staff token is refused when an upline account is suspended or locked', async () => {
+  const config = { JWT_ACCESS_SECRET: 'test-access-secret-0123456789', JWT_REFRESH_SECRET: 'test-refresh-secret-0123456789' };
+  const tokens = new TokenService(config);
+  let row = { id: 5, status: 'active', level: 6, permissions: ['*'], uplineBlocked: { staffId: 2, reason: 'suspended' } };
+  const auth = createAuthMiddleware({ config, loadStaff: async () => row });
+  const guard = auth.authenticateStaff();
+  const call = () =>
+    new Promise((resolve) => {
+      const token = tokens.signAdminToken({ staffId: 5, roleId: 6, level: 6 });
+      guard({ method: 'GET', originalUrl: '/api/v1/admin/staff', headers: { authorization: `Bearer ${token}` } }, {}, (err) => resolve(err));
+    });
+
+  const err = await call();
+  assert.ok(err);
+  assert.equal(err.status, 403);
+  row = { ...row, uplineBlocked: null };
+  assert.equal(await call(), undefined, 'reactivated upline: the same token works again');
 });
 
 test('only a Super Admin issues funds — level 1, not 0', () => {

@@ -1,14 +1,25 @@
 'use strict';
 
 const { Op, fn, col, literal } = require('sequelize');
-const { hashPassword, verifyPassword, canActOn, STAFF_LEVELS, AGENT_TREE_LEVELS } = require('@ibitplay/auth');
+const {
+  hashPassword,
+  verifyPassword,
+  canActOn,
+  canCreateLevel,
+  STAFF_LEVELS,
+  AGENT_TREE_LEVELS,
+} = require('@ibitplay/auth');
 const { money, withdrawBlock } = require('@ibitplay/common');
 
 const errors = require('./staff.errors');
 const { TRANSFER_DIRECTION, TARGET_TYPE, BALANCE_CURRENCY, PASSWORD_ROUNDS } = require('./staff.constants');
 const { descendantIds, manageableStaffIds } = require('../staff-directory/staffDirectory.service');
-const { debitStaffFloat, insufficientStaffBalance } = require('../lords/staffFloat');
+const { debitStaffFloat, insufficientStaffBalance, insufficientFunds } = require('../lords/staffFloat');
 const { assertTransactionPassword } = require('../staff-auth/transactionPassword');
+const { cascadeSuspension } = require('../locks/suspendCascade');
+
+/** `status` NULL is the legacy default and reads as active everywhere. */
+const isActive = (status) => status == null || status === 'active';
 
 /**
  * Staff accounts, the players beneath them, and transfers down the tree.
@@ -492,16 +503,15 @@ class StaffService {
     /**
      * Two ways in.
      *
-     *   `wallet:adjust` (Super Admin, Admin) — any account in the caller's
-     *     scope, staff or player, exactly as before.
+     *   the Super Admin (`canIssueFunds`, holding `wallet:adjust`) — any
+     *     account in scope, staff or player; the platform owner mints.
      *
-     *   everyone else — a PARENT settling with a DIRECT CHILD STAFF account
-     *     out of its own float (the addaplay rule). See `#assertParentFunding`.
-     *
-     * `canAdjustWallets` is set by the controller from the session's grants;
-     * an actor without it takes the narrow path (fail closed).
+     *   everyone else, Admin and Sub Admin included — a PARENT settling with a
+     *     DIRECT CHILD STAFF account out of its own float (the addaplay rule).
+     *     See `#assertParentFunding`. `wallet:adjust` alone no longer widens
+     *     this: an Admin moving money with a grandchild skipped a ledger.
      */
-    const parentFunding = !actor.canAdjustWallets;
+    const parentFunding = !(actor.canAdjustWallets && actor.canIssueFunds);
     if (parentFunding) this.#assertParentFunding(actor, toType, toId, direction);
 
     /**
@@ -511,6 +521,7 @@ class StaffService {
      */
     await assertTransactionPassword(this.models, actor.id, transactionPassword, {
       required: parentFunding || AGENT_TREE_LEVELS.includes(Number(actor.level)),
+      executiveId: actor.executiveId ?? null,
     });
     const target = parentFunding
       ? await this.#assertDirectChildStaff(actor, toId)
@@ -543,7 +554,7 @@ class StaffService {
       // An agent funding a PLAYER may draw on its credit line; a transfer to
       // another staff account never does. See `lords/staffFloat.js`.
       const allowCredit = source.type === TARGET_TYPE.STAFF && destination.type === TARGET_TYPE.USER;
-      await this.#debit(source, amount, { actor, transaction, allowCredit, ownFloatError: parentFunding });
+      await this.#debit(source, amount, { actor, transaction, allowCredit });
       await this.#credit(destination, amount, { transaction });
 
       const row = await this.models.StaffTransfers.create(
@@ -588,13 +599,15 @@ class StaffService {
   async create({ actor, name, email, password, phone, country, roleId, percentage, parentId }) {
     const level = await this.#roleLevel(roleId);
     if (level === null) throw errors.UNKNOWN_ROLE({ roleId });
-    this.#assertLevelBelow(actor.level, level);
+    this.#assertCreatableLevel(actor, level);
 
     const parent = parentId == null ? Number(actor.id) : await this.#assertVisible(actor, parentId);
     if (parent !== Number(actor.id)) {
       // The account is created under a descendant: it must sit below THAT
       // account too, or the tree would hold a master beneath an agent.
-      this.#assertLevelBelow(await this.#staffLevel(parent), level, 'below the account it reports to');
+      const parentLevel = await this.#staffLevel(parent);
+      this.#assertLevelBelow(parentLevel, level, 'below the account it reports to');
+      this.#assertChildOfParent(actor, parentLevel, level);
     }
 
     const existing = await this.models.Staff.findOne({ where: { email }, raw: true });
@@ -683,11 +696,13 @@ class StaffService {
     if (patch.roleId !== undefined) {
       const level = await this.#roleLevel(patch.roleId);
       if (level === null) throw errors.UNKNOWN_ROLE({ roleId: patch.roleId });
-      this.#assertLevelBelow(actor.level, level);
+      this.#assertCreatableLevel(actor, level);
 
       const target = await this.models.Staff.findByPk(staffId, { attributes: ['id', 'parent_id'], raw: true });
       if (target?.parent_id != null && Number(target.parent_id) !== Number(actor.id)) {
-        this.#assertLevelBelow(await this.#staffLevel(target.parent_id), level, 'below the account it reports to');
+        const parentLevel = await this.#staffLevel(target.parent_id);
+        this.#assertLevelBelow(parentLevel, level, 'below the account it reports to');
+        this.#assertChildOfParent(actor, parentLevel, level);
       }
 
       const children = await this.models.Staff.findAll({ where: { parent_id: staffId }, attributes: ['role_id'], raw: true });
@@ -701,8 +716,19 @@ class StaffService {
     }
     if (!Object.keys(fields).length) throw errors.NOT_PERMITTED({ reason: 'nothing to change' });
 
-    const [affected] = await this.models.Staff.update(fields, { where: { id: staffId } });
-    if (!affected) throw errors.NOT_FOUND({ staffId });
+    await this.db.transaction(async (transaction) => {
+      const before = await this.models.Staff.findByPk(staffId, { attributes: ['id', 'status'], transaction, raw: true });
+      if (!before) throw errors.NOT_FOUND({ staffId });
+
+      const [affected] = await this.models.Staff.update(fields, { where: { id: staffId }, transaction });
+      if (!affected) throw errors.NOT_FOUND({ staffId });
+
+      // A suspension reaches the whole downline, as the system lock does;
+      // reactivation lifts what the suspension imposed (`locks/suspendCascade.js`).
+      if (fields.status !== undefined && isActive(before.status) !== isActive(fields.status)) {
+        await cascadeSuspension(this.models, staffId, !isActive(fields.status), { transaction, logger: this.logger });
+      }
+    });
 
     this.logger?.info({ actorStaffId: actor.id, staffId, fields }, 'Staff account updated');
     return this.getById({ actor, staffId });
@@ -808,7 +834,16 @@ class StaffService {
       this.#assertCanActOn(actor, await this.#roleLevel(row.role_id), row.id);
     }
 
-    const [affected] = await this.models.Staff.update({ status }, { where: { id: ids } });
+    const affected = await this.db.transaction(async (transaction) => {
+      const before = await this.models.Staff.findAll({ where: { id: ids }, attributes: ['id', 'status'], transaction, raw: true });
+      const [count] = await this.models.Staff.update({ status }, { where: { id: ids }, transaction });
+      for (const row of before) {
+        if (isActive(row.status) !== isActive(status)) {
+          await cascadeSuspension(this.models, row.id, !isActive(status), { transaction, logger: this.logger });
+        }
+      }
+      return count;
+    });
     this.logger?.warn({ actorStaffId: actor.id, ids, status, affected }, 'Staff status changed in bulk');
     return { updated: affected, status };
   }
@@ -824,7 +859,7 @@ class StaffService {
    * debited unconditionally — so two transfers issued at once both passed the
    * comparison and the account went negative.
    */
-  async #debit(party, amount, { actor, transaction, allowCredit = false, ownFloatError = false }) {
+  async #debit(party, amount, { actor, transaction, allowCredit = false }) {
     /**
      * The platform owner is the source of funds and has no balance to draw
      * down — legacy expressed this as `req.staff.level !== 0`, skipping the
@@ -855,12 +890,11 @@ class StaffService {
         );
 
     if (!affected) {
-      // A parent funding its child from its own float gets the same 422 the
-      // agent money dialogs already show; everything else keeps the 402.
-      if (ownFloatError && party.type === TARGET_TYPE.STAFF && Number(party.id) === Number(actor.id)) {
+      // One overdraw error everywhere: 422 INSUFFICIENT_FUNDS (`staffFloat.js`).
+      if (party.type === TARGET_TYPE.STAFF && Number(party.id) === Number(actor.id)) {
         throw insufficientStaffBalance({ staffId: party.id, amount });
       }
-      throw errors.INSUFFICIENT_FUNDS({ party: party.type, id: party.id, amount });
+      throw insufficientFunds({ party: party.type, id: party.id, amount });
     }
   }
 
@@ -911,6 +945,37 @@ class StaffService {
     }
     if (!canActOn(Number(actor.level), targetLevel)) {
       throw errors.LEVEL_NOT_BELOW({ staffId, reason: 'you can only act on accounts below your own level' });
+    }
+  }
+
+  /**
+   * The Addaplay ladder (`CHILD_LEVELS` in `@ibitplay/auth`): a creator makes
+   * ONLY the level directly below its own — Admin → Sub Admin, Sub Admin →
+   * Super Master, Super Master → Master, Master → Agent; an Agent makes
+   * players only. The Super Admin makes any level strictly below it.
+   *
+   * EXECUTIVE (7) is never a staff row made here, by anyone: executives are
+   * sub-logins and are made through `/admin/access/executives`.
+   */
+  #assertCreatableLevel(actor, level) {
+    if (Number(level) === STAFF_LEVELS.EXECUTIVE) {
+      throw errors.NOT_PERMITTED({ reason: 'executives are created from the executives screen, not as staff' });
+    }
+    this.#assertLevelBelow(actor.level, level);
+    if (Number(actor.level) === STAFF_LEVELS.SUPER_ADMIN) return;
+    if (!canCreateLevel(actor.level, level)) {
+      throw errors.LEVEL_NOT_BELOW({
+        level,
+        reason: 'you can only create the level directly below your own',
+      });
+    }
+  }
+
+  /** Under a descendant, the new level must also be that parent's direct child level. */
+  #assertChildOfParent(actor, parentLevel, level) {
+    if (Number(actor.level) === STAFF_LEVELS.SUPER_ADMIN) return;
+    if (!canCreateLevel(parentLevel, level)) {
+      throw errors.LEVEL_NOT_BELOW({ level, reason: 'the new account must be the level directly below its parent' });
     }
   }
 

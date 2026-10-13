@@ -181,7 +181,9 @@ export const navItems: NavItem[] = [
   {
     groupLabel: 'Users',
     items: [
-      { icon: 'Users', label: 'Users', href: '/users', activePath: '/users', permission: 'reports:read' } as MenuItem,
+      // Either grant opens the list: reports:read reads `admin/reports/players` (balances, deposits,
+      // wagers); users:read alone falls back to the player directory `admin/user/directory`.
+      { icon: 'Users', label: 'Users', href: '/users', activePath: '/users', permission: ['reports:read', 'users:read'] } as MenuItem,
       { icon: 'Globe', label: 'IP tracker', href: '/ip-tracker', permission: 'reports:read' },
       { icon: 'ShieldCheck', label: 'KYC', href: '/kyc', permission: 'users:read', feature: 'kyc' },
       { icon: 'Landmark', label: 'Bank details', href: '/bank-details', permission: 'config:read' }
@@ -237,7 +239,8 @@ export const navItems: NavItem[] = [
       { icon: 'Ticket', label: 'Redeem codes', href: '/redeem-codes', permission: 'reports:read', promotions: true },
 
       // Tree-scoped by the backend (like player data), so not house-only.
-      { icon: 'LockKeyhole', label: 'Bonus balances', href: '/bonus-balances', permission: 'reports:read' },
+      // `admin/user/bonus-balance` and its stats answer any of reports:read, users:read, wallet:read.
+      { icon: 'LockKeyhole', label: 'Bonus balances', href: '/bonus-balances', permission: ['reports:read', 'users:read', 'wallet:read'] },
       { icon: 'CreditCard', label: 'Gift cards', href: '/gift-cards', permission: 'reports:read', promotions: true, flag: 'giftcards', feature: 'gift_cards' },
       { icon: 'Disc3', label: 'Spin wheel', href: '/spin-wheel', permission: 'reports:read', promotions: true, flag: 'wheelspin', feature: 'spin_wheel' },
       { icon: 'Crown', label: 'VIP & club', href: '/vip', permission: 'reports:read', promotions: true, flag: 'vipclub', feature: 'vip' },
@@ -261,6 +264,7 @@ export const navItems: NavItem[] = [
           // The house-games and bet-history admin reads are guarded by reports:read, not casino:read.
           { label: 'In-house games', href: '/casino/in-house', permission: 'reports:read' },
           { label: 'Bet history', href: '/casino/bets', permission: 'reports:read' },
+
           // Like bet history: `GET admin/reports/wager-stats` is reports:read and tree-scoped.
           { label: 'Wager report', href: '/casino/wager-report', permission: 'reports:read' }
         ]
@@ -302,7 +306,9 @@ export const navItems: NavItem[] = [
     items: [
       { icon: 'Image', label: 'Banners', href: '/content/banners', permission: 'config:read', feature: 'banners' },
       { icon: 'Newspaper', label: 'Blogs', href: '/content/blogs', permission: 'config:read', feature: 'blog' },
-      { icon: 'Bell', label: 'Notifications', href: '/content/notifications', permission: 'config:write', feature: 'notifications' },
+
+      // The device list and per-user history are users:read; sending (gated on the page) is config:write.
+      { icon: 'Bell', label: 'Notifications', href: '/content/notifications', permission: ['users:read', 'config:write'], feature: 'notifications' },
       {
         /*
          * OneSignal web push. Not gated on `push_notifications`: when the owner has it off the
@@ -325,7 +331,9 @@ export const navItems: NavItem[] = [
     items: [
       { icon: 'FileBarChart', label: 'User reports', href: '/reports/players', permission: 'reports:read' },
       { icon: 'TrendingUp', label: 'Profit & loss', href: '/reports/pnl', permission: 'reports:read' },
-      { icon: 'BookOpen', label: 'Statements', href: '/reports/statements', permission: 'reports:read' },
+
+      // The transfer list is `admin/accounts/statement` (users:read); the drill-down is `admin/statements` (reports:read).
+      { icon: 'BookOpen', label: 'Statements', href: '/reports/statements', permission: ['users:read', 'reports:read'] },
       { icon: 'ShieldAlert', label: 'Risk', href: '/reports/risk', permission: 'reports:read' }
     ]
   },
@@ -421,3 +429,44 @@ const ROUTES = collectRoutes()
 
 export const routeRequirement = (pathname: string): RouteRequirement | null =>
   ROUTES.find(r => pathname === r.href || pathname.startsWith(`${r.href}/`)) ?? null
+
+/** The marks the sidebar filters an entry on (see `useNavVisible`). */
+export type NavMarks = {
+  permission?: string | string[]
+  flag?: string
+  ownerFlag?: string
+  feature?: string
+  account?: 'marketing'
+  promotions?: boolean
+}
+
+type NavEntry = NavMarks & { href?: string; childItems?: MenuSubItem[] }
+
+/**
+ * The first page, in sidebar order, that `visible` lets through — the landing route after sign-in.
+ * `/account` (My account) opens for everyone, so it is only the answer when nothing else is.
+ */
+export const firstNavHref = (visible: (entry: NavMarks) => boolean): string => {
+  const find = (entry: NavEntry): string | null => {
+    if (!visible(entry)) return null
+    if (entry.href) return entry.href
+
+    for (const child of entry.childItems ?? []) {
+      const hit = find(child as NavEntry)
+
+      if (hit) return hit
+    }
+
+    return null
+  }
+
+  for (const group of navItems) {
+    for (const item of group.items) {
+      const hit = find(item as NavEntry)
+
+      if (hit && hit !== '/account') return hit
+    }
+  }
+
+  return '/account'
+}

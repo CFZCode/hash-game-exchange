@@ -18,9 +18,11 @@ const {
 } = require('./middleware');
 const { SecretBox, createSecretBox } = require('./secretBox');
 const agentPlayers = require('./agentPlayers');
+const txnPasswordMode = require('./transactionPasswordMode');
 
 /** @ibitplay/auth — tokens, hashing, 2FA and the route-protection middleware. */
 module.exports = {
+  ...txnPasswordMode,
   ...password,
   totp,
   ...permissions,

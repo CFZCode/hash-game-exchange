@@ -26,6 +26,7 @@ import { api } from '@/lib/api/client'
 import type { Query } from '@/lib/api/types'
 import { formatNumber } from '@/lib/format'
 import type { GisGame, GisProvider, GisType, GisVendor, JsGame, JsScopeEntry } from './types'
+import { TxnPasswordLabel } from '@/views/finance/StaffFloat'
 
 const ALL = '__all__'
 
@@ -383,7 +384,7 @@ const ProvidersTab = () => {
                   </li>
                 ))}
               </ul>
-              <TextField id='tp' label='Transaction password' type='password' required value={tp} onChange={e => setTp(e.target.value)} />
+              <TextField id='tp' label={<TxnPasswordLabel />} type='password' required value={tp} onChange={e => setTp(e.target.value)} />
             </FormDialog>
           </div>
         </CardHeader>

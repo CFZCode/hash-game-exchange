@@ -17,6 +17,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useSession } from '@/contexts/SessionContext'
 import { useApiMutation, useListState, usePagedApi } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
 import { NOTIFICATION_TYPES, type Device, type NotificationRow } from './types'
@@ -86,6 +87,7 @@ const Compose = () => {
 const Devices = () => {
   const { state, set, query } = useListState(['userId'])
   const [activeOnly, setActiveOnly] = useState(true)
+
   const list = usePagedApi<Device>('admin/notifications/devices', {
     limit: query.limit,
     page: query.page,
@@ -161,26 +163,42 @@ const History = () => {
   )
 }
 
-const Notifications = () => (
-  <div>
-    <PageHeader title='Notifications' description='Push messages to users’ devices, the devices registered for them, and what a given user has already been sent.' />
-    <Tabs defaultValue='compose'>
-      <TabsList className='mb-4'>
-        <TabsTrigger value='compose'>Compose</TabsTrigger>
-        <TabsTrigger value='devices'>Devices</TabsTrigger>
-        <TabsTrigger value='history'>User history</TabsTrigger>
-      </TabsList>
-      <TabsContent value='compose'>
-        <Compose />
-      </TabsContent>
-      <TabsContent value='devices'>
-        <Devices />
-      </TabsContent>
-      <TabsContent value='history'>
-        <History />
-      </TabsContent>
-    </Tabs>
-  </div>
-)
+/**
+ * Two grants meet here: sending is config:write, the device list and a user's history are
+ * users:read (`admin/notifications/devices|history`). Each tab shows only for the grant it needs.
+ */
+const Notifications = () => {
+  const { can } = useSession()
+  const canSend = can('config:write')
+  const canRead = can('users:read')
+
+  return (
+    <div>
+      <PageHeader title='Notifications' description='Push messages to users’ devices, the devices registered for them, and what a given user has already been sent.' />
+      <Tabs defaultValue={canSend ? 'compose' : 'devices'}>
+        <TabsList className='mb-4'>
+          {canSend && <TabsTrigger value='compose'>Compose</TabsTrigger>}
+          {canRead && <TabsTrigger value='devices'>Devices</TabsTrigger>}
+          {canRead && <TabsTrigger value='history'>User history</TabsTrigger>}
+        </TabsList>
+        {canSend && (
+          <TabsContent value='compose'>
+            <Compose />
+          </TabsContent>
+        )}
+        {canRead && (
+          <TabsContent value='devices'>
+            <Devices />
+          </TabsContent>
+        )}
+        {canRead && (
+          <TabsContent value='history'>
+            <History />
+          </TabsContent>
+        )}
+      </Tabs>
+    </div>
+  )
+}
 
 export default Notifications

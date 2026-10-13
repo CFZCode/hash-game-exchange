@@ -1,5 +1,9 @@
 'use strict';
 
+// These cases exercise the SEPARATE transaction password (`staff.transaction_password`);
+// login mode (the default) is covered in staff-auth/__tests__/txnPasswordMode.test.js.
+process.env.TXN_PASSWORD_MODE = 'separate';
+
 const test = require('node:test');
 const assert = require('node:assert');
 
@@ -15,14 +19,15 @@ const { StatementsService } = require('../../statements/statements.service');
 /**
  * Parent funding (the addaplay rule, `lordsController.transferFunds`).
  *
- *   - any staff level deposits to / withdraws from a DIRECT CHILD STAFF account
- *     out of its own float, without `wallet:adjust`
+ *   - every staff level below the owner deposits to / withdraws from a DIRECT
+ *     CHILD STAFF account out of its own float
  *   - the transaction password is always required on that path
  *   - a grandchild, a sibling or a parent reads as not in your tree
  *   - no self-transfer, no player target (players keep their own route)
  *   - every move is a `staff_transfers` row on the transfer and agent statements
- *   - `wallet:adjust` (Super Admin / Admin) is unchanged: any account in scope,
- *     and the owner still mints
+ *   - only the Super Admin (the owner, `wallet:adjust` + `canIssueFunds`)
+ *     reaches any account in scope, and mints; an Admin holding
+ *     `wallet:adjust` is a parent like any other
  */
 
 const TEST_DB = process.env.TEST_DB_NAME || 'ibitplay_test';
@@ -242,20 +247,20 @@ test('parent funds its direct child staff', async (t) => {
     assert.equal(await floatOf(master), '100.00000000');
   });
 
-  await t.test('insufficient own balance is the 422 INSUFFICIENT_STAFF_BALANCE and moves nothing', async () => {
+  await t.test('insufficient own balance is the 422 INSUFFICIENT_FUNDS and moves nothing', async () => {
     await assert.rejects(
       () => move(treeActor(master, 5), agentA, '100.01'),
-      (err) => err.code === 'INSUFFICIENT_STAFF_BALANCE' && err.status === 422
+      (err) => err.code === 'INSUFFICIENT_FUNDS' && err.status === 422 && err.details?.party === 'staff'
     );
     // A credit line funds players, never another staff account.
     await models.StaffBalances.update({ credit_limit: '500' }, { where: { staff_id: master } });
-    await assert.rejects(() => move(treeActor(master, 5), agentA, '150'), (err) => err.code === 'INSUFFICIENT_STAFF_BALANCE');
+    await assert.rejects(() => move(treeActor(master, 5), agentA, '150'), (err) => err.code === 'INSUFFICIENT_FUNDS');
     await models.StaffBalances.update({ credit_limit: '0' }, { where: { staff_id: master } });
 
     // Pulling back more than the child holds is the child's shortfall.
     await assert.rejects(
       () => move(treeActor(master, 5), agentA, '1', 'withdraw'),
-      (err) => err.code === 'STAFF_INSUFFICIENT_FUNDS'
+      (err) => err.code === 'INSUFFICIENT_FUNDS' && err.status === 422
     );
 
     // Two at once cannot overdraw the float.
@@ -282,30 +287,38 @@ test('parent funds its direct child staff', async (t) => {
     assert.equal(await floatOf(agentA), '0.00000000');
   });
 
-  await t.test('wallet:adjust is unchanged: an admin reaches any account in scope; the owner mints', async () => {
+  await t.test('wallet:adjust alone is no longer the wide path: an Admin is a parent like any other; only the owner mints', async () => {
     const admin = await seedStaff(2, { inr: '100' });
     const sMaster = await seedStaff(4, { parentId: admin });
     const mMaster = await seedStaff(5, { parentId: sMaster });
     const player = await seedPlayer(mMaster, '0');
 
-    // A grandchild and a player — beyond the direct-child rule.
-    await service.transfer({ actor: adminActor(admin), toType: 'staff', toId: mMaster, amount: '30', direction: 'deposit', transactionPassword: TXN });
-    await service.transfer({ actor: adminActor(admin), toType: 'user', toId: player, amount: '20', direction: 'deposit', transactionPassword: TXN });
-    assert.equal(await floatOf(admin), '50.00000000');
-    assert.equal(await floatOf(mMaster), '30.00000000');
+    // A grandchild and a player — beyond the direct-child rule, refused.
+    await assert.rejects(
+      () => service.transfer({ actor: adminActor(admin), toType: 'staff', toId: mMaster, amount: '30', direction: 'deposit', transactionPassword: TXN }),
+      (err) => err.code === 'STAFF_NOT_IN_YOUR_TREE' && err.status === 404
+    );
+    await assert.rejects(
+      () => service.transfer({ actor: adminActor(admin), toType: 'user', toId: player, amount: '20', direction: 'deposit', transactionPassword: TXN }),
+      (err) => err.code === 'STAFF_NOT_PERMITTED'
+    );
+    // Its direct child, out of its own float.
+    await service.transfer({ actor: adminActor(admin), toType: 'staff', toId: sMaster, amount: '30', direction: 'deposit', transactionPassword: TXN });
+    assert.equal(await floatOf(admin), '70.00000000');
+    assert.equal(await floatOf(sMaster), '30.00000000');
 
-    // Its shortfall keeps the 402 it always had.
+    // Its shortfall is the one overdraw error.
     await assert.rejects(
       () => service.transfer({ actor: adminActor(admin), toType: 'staff', toId: sMaster, amount: '1000', direction: 'deposit', transactionPassword: TXN }),
-      (err) => err.code === 'STAFF_INSUFFICIENT_FUNDS' && err.status === 402
+      (err) => err.code === 'INSUFFICIENT_FUNDS' && err.status === 422
     );
 
-    // The owner issues funds without a balance to draw down.
+    // The owner issues funds without a balance to draw down, to any account in scope.
     await models.StaffBalances.update({ inr: '0' }, { where: { staff_id: admin } });
     await service.transfer({
-      actor: adminActor(admin, { level: 1, canIssueFunds: true }), toType: 'staff', toId: sMaster, amount: '40', direction: 'deposit', transactionPassword: TXN,
+      actor: adminActor(admin, { level: 1, canIssueFunds: true }), toType: 'staff', toId: mMaster, amount: '40', direction: 'deposit', transactionPassword: TXN,
     });
     assert.equal(await floatOf(admin), '0.00000000');
-    assert.equal(await floatOf(sMaster), '40.00000000');
+    assert.equal(await floatOf(mMaster), '40.00000000');
   });
 });

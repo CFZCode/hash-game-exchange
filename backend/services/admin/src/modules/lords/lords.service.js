@@ -2,18 +2,25 @@
 
 const { Op, fn, col, literal } = require('sequelize');
 const { money, withdrawBlock } = require('@ibitplay/common');
-const { hashPassword } = require('@ibitplay/auth');
+const { hashPassword, canActOn, effectiveStaffLevel, STAFF_LEVELS } = require('@ibitplay/auth');
 
 const errors = require('./lords.errors');
 const { ACCOUNT_TYPE, PASSWORD_ROUNDS } = require('./lords.constants');
 const { manageableStaffIds, verifyTransactionPassword } = require('../staff-directory/staffDirectory.service');
 const { directSources } = require('../locks/lockSources');
+const { cascadeSuspension } = require('../locks/suspendCascade');
 const {
   assertTransactionPassword,
   hasTransactionPassword,
   errors: txnErrors,
 } = require('../staff-auth/transactionPassword');
-const { debitStaffFloat, creditStaffFloat, readStaffFloat, insufficientStaffBalance } = require('./staffFloat');
+const {
+  debitStaffFloat,
+  creditStaffFloat,
+  readStaffFloat,
+  insufficientStaffBalance,
+  insufficientPlayerBalance,
+} = require('./staffFloat');
 const { TRANSFER_TYPE } = require('./lords.constants');
 
 /** The only currency a staff float holds (`staff_balances.inr`). */
@@ -102,11 +109,16 @@ class LordsService {
    */
   async setStatus({ actor, accountType, accountId, transactionPassword, ...flags }) {
     await this.#assertInTree(actor, accountType, accountId);
-    await this.#assertTransactionPassword(actor, transactionPassword);
-
-    if (accountType === ACCOUNT_TYPE.STAFF && Number(accountId) === Number(actor.id)) {
-      throw errors.CANNOT_ACT_ON_SELF({ reason: 'you cannot change your own locks' });
+    if (accountType === ACCOUNT_TYPE.STAFF) {
+      if (Number(accountId) === Number(actor.id)) {
+        throw errors.CANNOT_ACT_ON_SELF({ reason: 'you cannot change your own locks' });
+      }
+      // Strictly below the caller, as every other staff write: the agent tree
+      // (levels 4–6) now holds `users:lock`, and a subtree may still carry a
+      // legacy row at or above the caller's level.
+      await this.#assertBelowActor(actor, accountId);
     }
+    await this.#assertTransactionPassword(actor, transactionPassword);
 
     const patch = {};
     if (flags.status !== undefined) patch.status = flags.status;
@@ -117,15 +129,28 @@ class LordsService {
 
     if (!Object.keys(patch).length) throw errors.NOT_FOUND({ reason: 'nothing to change' });
 
-    const model = accountType === ACCOUNT_TYPE.STAFF ? this.models.Staff : this.models.Users;
+    const isStaff = accountType === ACCOUNT_TYPE.STAFF;
+    const model = isStaff ? this.models.Staff : this.models.Users;
     // A lock set or lifted HERE is a direct one — recorded as such, so a later
     // unlock of the parent agent does not undo it. See `locks/lockSources.js`.
     const sources = directSources(patch);
-    const [affected] = await model.update(
-      sources ? { ...patch, lock_sources: sources } : patch,
-      { where: { id: accountId } }
-    );
-    if (!affected) throw errors.NOT_FOUND({ accountId });
+    await this.db.transaction(async (transaction) => {
+      const before = isStaff && patch.status !== undefined
+        ? await this.models.Staff.findByPk(accountId, { attributes: ['id', 'status'], transaction, raw: true })
+        : null;
+      const [affected] = await model.update(
+        sources ? { ...patch, lock_sources: sources } : patch,
+        { where: { id: accountId }, transaction }
+      );
+      if (!affected) throw errors.NOT_FOUND({ accountId });
+
+      // Suspending a staff account suspends its downline, as the system lock
+      // does; reactivating lifts it. See `locks/suspendCascade.js`.
+      const active = (status) => status == null || status === 'active';
+      if (before && active(before.status) !== active(patch.status)) {
+        await cascadeSuspension(this.models, accountId, !active(patch.status), { transaction, logger: this.logger });
+      }
+    });
 
     this.logger?.warn(
       { actorStaffId: actor.id, accountType, accountId, patch },
@@ -219,7 +244,7 @@ class LordsService {
    * ─────────────────────────────────────────────────────────────────────
    */
   async refill({ actor, accountId, amount, note, transactionPassword }) {
-    await this.#assertInTree(actor, ACCOUNT_TYPE.USER, accountId);
+    await this.#assertMoneyTarget(actor, accountId);
     await this.#assertTransactionPassword(actor, transactionPassword);
 
     const ceiling = String(this.config.ADMIN_MAX_REFILL ?? '1000000');
@@ -240,7 +265,7 @@ class LordsService {
          * reason about.
          */
         const debited = await debitStaffFloat(this.models, actor.id, amount, { transaction, allowCredit: true });
-        if (!debited) throw errors.INSUFFICIENT_FUNDS({ amount });
+        if (!debited) throw insufficientStaffBalance({ amount });
       }
 
       const [credits, created] = await this.models.Credits.findOrCreate({
@@ -334,8 +359,11 @@ class LordsService {
     // Tree scope FIRST: an account outside the caller's tree is a 404 whatever
     // password came with it, so the password check is never an oracle (or a
     // spent attempt) for a probe at someone else's player.
-    await this.#assertInTree(actor, ACCOUNT_TYPE.USER, userId);
-    await assertTransactionPassword(this.models, actor.id, transactionPassword, { required: true });
+    await this.#assertMoneyTarget(actor, userId);
+    await assertTransactionPassword(this.models, actor.id, transactionPassword, {
+      required: true,
+      executiveId: actor.executiveId ?? null,
+    });
 
     if (String(currency).toUpperCase() !== FLOAT_CURRENCY) {
       throw errors.FLOAT_CURRENCY_ONLY({ currency, allowed: FLOAT_CURRENCY });
@@ -393,7 +421,7 @@ class LordsService {
 
       let wallet = await lockWallet();
       if (!wallet) {
-        if (!isCredit) throw errors.PLAYER_INSUFFICIENT_FUNDS({ requested: decimal, available: '0' });
+        if (!isCredit) throw insufficientPlayerBalance({ requested: decimal, available: '0' });
         await this.models.Credits.findOrCreate({ where: { uid: userId }, defaults: { uid: userId }, transaction });
         wallet = await lockWallet();
       }
@@ -415,7 +443,7 @@ class LordsService {
           { where: { uid: userId, inr: { [Op.gte]: decimal } }, transaction }
         );
         if (!affected) {
-          throw errors.PLAYER_INSUFFICIENT_FUNDS({ requested: decimal, available: money.toDecimalString(previous) });
+          throw insufficientPlayerBalance({ requested: decimal, available: money.toDecimalString(previous) });
         }
         await creditStaffFloat(this.models, actor.id, decimal, { transaction });
       }
@@ -859,8 +887,51 @@ class LordsService {
     // than "not valid" for a password the operator could never have typed.
     if (!(await hasTransactionPassword(this.models, actor.id))) throw txnErrors.NOT_SET();
     if (!transactionPassword) throw errors.TRANSACTION_PASSWORD_REQUIRED();
-    const ok = await verifyTransactionPassword(this.models, actor.id, transactionPassword);
+    const ok = await verifyTransactionPassword(this.models, actor.id, transactionPassword, {
+      executiveId: actor.executiveId ?? null,
+    });
     if (!ok) throw errors.TRANSACTION_PASSWORD_REQUIRED({ reason: 'not valid' });
+  }
+
+  /**
+   * Money moves with a player are its DIRECT PARENT's only
+   * (`users.parent_staff_id` = the caller) — the addaplay rule, the player
+   * twin of `StaffService#assertDirectChildStaff`. A master crediting its
+   * agent's player skipped the agent's ledger. The platform owner
+   * (`canIssueFunds`) is exempt and reaches any player in scope.
+   *
+   * Anything else reads as not found (404 NOT_IN_YOUR_TREE), checked BEFORE
+   * the transaction password like every other scope check here.
+   */
+  async #assertMoneyTarget(actor, userId) {
+    if (actor.canIssueFunds) return this.#assertInTree(actor, ACCOUNT_TYPE.USER, userId);
+
+    const player = await this.models.Users.findOne({
+      where: { id: userId, parent_staff_id: actor.id },
+      attributes: ['id'],
+      raw: true,
+    });
+    if (!player) throw errors.NOT_IN_YOUR_TREE({ accountId: userId, reason: 'not your direct player' });
+    return Number(player.id);
+  }
+
+  /** A staff target strictly below the caller's own level; an unknown level only for the Super Admin. */
+  async #assertBelowActor(actor, staffId) {
+    const level = Number(effectiveStaffLevel(actor));
+    const row = await this.models.Staff.findByPk(staffId, {
+      attributes: ['id'],
+      include: [{ model: this.models.Roles, as: 'role', attributes: ['level'], required: false }],
+      raw: true,
+      nest: true,
+    });
+    const target = row?.role?.level == null ? NaN : Number(row.role.level);
+    if (!Number.isFinite(target)) {
+      if (level === STAFF_LEVELS.SUPER_ADMIN) return;
+      throw errors.NOT_IN_YOUR_TREE({ accountId: staffId, reason: 'that account has no known level' });
+    }
+    if (!canActOn(level, target)) {
+      throw errors.NOT_IN_YOUR_TREE({ accountId: staffId, reason: 'you can only act on accounts below your own level' });
+    }
   }
 
   /**

@@ -21,11 +21,21 @@ export const useIsAgentTree = () => {
 }
 
 /** Has the caller set a transaction password? `GET admin/auth/transaction-password`. */
-export const useTransactionPasswordSet = () => useApi<{ set: boolean }>('admin/auth/transaction-password')
+export const useTransactionPasswordSet = () => useApi<{ set: boolean; mode?: 'login' | 'separate' }>('admin/auth/transaction-password')
+
+/**
+ * The money-dialog field label. With the backend's TXN_PASSWORD_MODE=login (the default) the
+ * "transaction password" is the staff member's own login password; `separate` keeps the old name.
+ */
+export const TxnPasswordLabel = () => {
+  const txn = useTransactionPasswordSet()
+
+  return <>{txn.data?.mode === 'separate' ? 'Transaction password' : 'Password (your login password)'}</>
+}
 
 /**
  * The caller's available float, shown inside a money dialog for agent-tree staff — so "credit
- * 5,000" is never a surprise refusal (422 INSUFFICIENT_STAFF_BALANCE).
+ * 5,000" is never a surprise refusal (422 INSUFFICIENT_FUNDS, details.party = staff).
  */
 export const StaffFloatNote = () => {
   const float = useApi<StaffFloat>('admin/accounts/float')

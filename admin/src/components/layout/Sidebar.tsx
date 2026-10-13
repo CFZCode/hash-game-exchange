@@ -13,7 +13,7 @@ import { usePathname, useSearchParams } from 'next/navigation'
 import { ChevronRightIcon, SquareArrowOutUpRightIcon } from 'lucide-react'
 
 // Type Imports
-import { navIcons, navItems, type MenuGroupSubItem, type MenuItem, type MenuLeafSubItem, type MenuSubItem, type NavItem } from '@/configs/navConfig'
+import { firstNavHref, navIcons, navItems, type MenuGroupSubItem, type MenuItem, type MenuLeafSubItem, type MenuSubItem, type NavItem } from '@/configs/navConfig'
 
 // Component Imports
 import LogoSvg from '@/assets/svg/logo'
@@ -50,7 +50,7 @@ import {
 // Config Imports
 import themeConfig from '@/configs/themeConfig'
 import { siteConfig } from '@/configs/site'
-import { useSession } from '@/contexts/SessionContext'
+import { useNavVisible } from '@/hooks/use-nav-visible'
 
 // Util Imports
 import { cn } from '@/lib/utils'
@@ -463,11 +463,8 @@ const SidebarLayout = () => {
   const searchParams = useSearchParams()
   const { state, isMobile, setOpenMobile } = useSidebar()
 
-  const { actor, can, flags, featureEntitled, flagEntitled } = useSession()
-  const isMarketing = actor?.marketing === true
-
-  // Agent-tree logins (levels 4–6 and their executives) see no promotions anywhere.
-  const promotionsAllowed = actor?.promotions === true
+  const visible = useNavVisible()
+  const homeHref = firstNavHref(visible)
 
   // On mobile the menu is a sheet over the page: following any link in it closes the sheet.
   const closeOnNavigate = useCallback(
@@ -486,25 +483,6 @@ const SidebarLayout = () => {
   // Hide what the role cannot reach, what the operator switched off and what the owner left out
   // of the plan. A flag or entitlement that has not loaded yet (or is not readable) hides nothing.
   const navGroups = useMemo(() => {
-    const flagOn = (flag?: string) => !flag || (flags[flag] !== false && flagEntitled(flag))
-
-    // `ownerFlag` (e.g. the Sports switch) only follows the owner's plan, never the operator's own
-    // switch — otherwise turning sports off would hide the one screen that turns it back on.
-    const visible = (entry: {
-      permission?: string | string[]
-      flag?: string
-      ownerFlag?: string
-      feature?: string
-      account?: 'marketing'
-      promotions?: boolean
-    }) =>
-      (entry.account !== 'marketing' || isMarketing) &&
-      (!entry.promotions || promotionsAllowed) &&
-      can(entry.permission) &&
-      flagOn(entry.flag) &&
-      (!entry.ownerFlag || flagEntitled(entry.ownerFlag)) &&
-      featureEntitled(entry.feature)
-
     return navItems
       .map(group => ({
         ...group,
@@ -530,7 +508,7 @@ const SidebarLayout = () => {
           .filter(item => !item.childItems || item.childItems.length > 0)
       }))
       .filter(group => group.items.length > 0)
-  }, [can, flags, featureEntitled, flagEntitled, isMarketing, promotionsAllowed])
+  }, [visible])
 
   const activeBranchKeys = useMemo(
     () => getActiveBranchKeys(navGroups, pathname, searchParams),
@@ -559,7 +537,7 @@ const SidebarLayout = () => {
             <SidebarMenuButton
               size='lg'
               className='gap-2.5 bg-transparent! hover:bg-transparent! [&>svg]:size-8'
-              render={<Link href={`${themeConfig.homePageUrl}`} />}
+              render={<Link href={homeHref} />}
             >
               <LogoSvg />
               <div className='flex min-w-0 flex-col items-start gap-0.5'>

@@ -78,10 +78,11 @@ module.exports = function adminRoutes(deps) {
    * can rename an account. Legacy gated it on the same middleware as
    * everything else.
    *
-   * `wallet:adjust` (Super Admin, Admin) reaches any account in scope.
-   * `wallet:credit` / `wallet:debit` alone reach only a DIRECT CHILD STAFF
-   * account, out of the caller's own float, with the transaction password —
-   * the service enforces that (`StaffService#assertParentFunding`).
+   * The Super Admin (the platform owner, holding `wallet:adjust`) reaches any
+   * account in scope and mints. EVERY other level — Admin and Sub Admin too —
+   * reaches only a DIRECT CHILD STAFF account, out of its own float, with the
+   * transaction password; the service enforces that
+   * (`StaffService#assertParentFunding`).
    */
   router.post(
     '/transfer',

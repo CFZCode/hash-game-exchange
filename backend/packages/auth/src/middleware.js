@@ -265,6 +265,9 @@ function createAuthMiddleware({ config, loadUser, loadStaff, cache = null }) {
           throw new ForbiddenError(`Staff account is ${staff.status}`);
         }
         if (staff.system_locked) throw new ForbiddenError('Staff account is locked');
+        // Suspended or locked ANYWHERE above (resolveStaff walks staff_hierarchy):
+        // suspending an upline stops every session beneath it immediately.
+        if (staff.uplineBlocked) throw new ForbiddenError('Staff account is blocked by an upline account');
 
         // An executive must still belong to the staff member named in the token;
         // otherwise a re-parented executive would keep the old parent's reach.

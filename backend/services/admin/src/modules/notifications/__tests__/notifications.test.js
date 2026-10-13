@@ -390,9 +390,10 @@ test('admin notifications', async (t) => {
       await assert.rejects(() => service.staffHistory({ staff: agent, userId: othersPlayer, limit: 50, offset: 0 }), notFound);
       await assert.rejects(() => service.staffUnreadCount({ staff: agent, userId: othersPlayer }), notFound);
 
-      // The back office (level 3 here) reads across staff trees.
-      const across = await service.staffHistory({ staff, userId: agentsPlayer, limit: 50, offset: 0 });
-      assert.equal(across.total, 1);
+      // A Sub Admin (level 3 here) is scoped to its own subtree like every
+      // level below the Super Admin: another tree's player is not found, its
+      // own player is.
+      await assert.rejects(() => service.staffHistory({ staff, userId: agentsPlayer, limit: 50, offset: 0 }), notFound);
       assert.equal((await service.staffUnreadCount({ staff, userId: othersPlayer })).unread, 1);
 
       // No caller is no access.

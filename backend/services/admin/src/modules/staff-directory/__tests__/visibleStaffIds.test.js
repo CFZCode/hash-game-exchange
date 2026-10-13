@@ -49,12 +49,27 @@ test('visibleStaffIds', async (t) => {
     assert.deepEqual(await sorted(6), [6, 7]);
   });
 
-  await t.test('an admin (back office) sees every root tree', async () => {
-    assert.deepEqual(await sorted(2), [1, 2, 3, 4, 5, 6, 7, 8]);
+  await t.test('only the Super Admin sees every root tree', async () => {
+    assert.deepEqual(await sorted(1), [1, 2, 3, 4, 5, 6, 7, 8]);
+    assert.deepEqual(await sorted(8), [1, 2, 3, 4, 5, 6, 7, 8]);
+  });
+
+  await t.test('an admin sees its OWN subtree only — not the root, not another tree', async () => {
+    assert.deepEqual(await sorted(2), [2, 3, 4, 5, 6, 7]);
+  });
+
+  await t.test('a sub admin sees its own subtree only', async () => {
+    STAFF.push({ id: 9, parent_id: 2, role_id: 3 }, { id: 10, parent_id: 9, role_id: 4 });
+    LEVEL[3] = 3;
+    try {
+      assert.deepEqual(await sorted(9), [9, 10]);
+    } finally {
+      STAFF.splice(STAFF.findIndex((s) => s.id === 9), 2);
+    }
   });
 
   await t.test('an executive under an admin sees what the admin sees, not an empty tree', async () => {
-    assert.deepEqual(await sorted(3), [1, 2, 3, 4, 5, 6, 7, 8]);
+    assert.deepEqual(await sorted(3), [2, 3, 4, 5, 6, 7]);
   });
 
   await t.test("an executive under an agent sees that agent's tree only", async () => {

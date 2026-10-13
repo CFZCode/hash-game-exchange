@@ -14,15 +14,7 @@ module.exports = defineErrors('STAFF', {
 
   PLAYER_NOT_IN_YOUR_TREE: { status: 404, message: 'Player not found' },
 
-  INSUFFICIENT_FUNDS: {
-    status: 402,
-    /**
-     * Decided by the guarded UPDATE, not by a JavaScript comparison a
-     * concurrent request could invalidate. Legacy read the balance without a
-     * lock and then debited unconditionally.
-     */
-    message: 'There is not enough in that balance to cover this transfer',
-  },
+  // Overdraw is the shared 422 INSUFFICIENT_FUNDS — see `lords/staffFloat.js`.
 
   CANNOT_TRANSFER_TO_SELF: { status: 422, message: 'An account cannot transfer to itself' },
 

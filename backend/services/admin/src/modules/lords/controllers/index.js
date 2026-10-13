@@ -12,6 +12,9 @@ const { canIssueFunds } = require('@ibitplay/auth');
 const actorFrom = (req) => ({
   id: req.staff.id,
   level: req.staff.level,
+  parentLevel: req.staff.parentLevel ?? null,
+  // Checked against the executive's own login password in TXN_PASSWORD_MODE=login.
+  executiveId: req.staff.executiveId ?? null,
   // Super Admin (level 1), not an executive under one. Was `level === 0`,
   // which no staff level is.
   canIssueFunds: canIssueFunds(req.staff),

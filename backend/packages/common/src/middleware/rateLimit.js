@@ -55,20 +55,76 @@ const INCREMENT_SCRIPT = `
   return { hits, redis.call('PTTL', KEYS[1]) }
 `;
 
+/**
+ * Give back one hit — only if the counter still exists and is positive.
+ *
+ * `express-rate-limit` calls `decrement` AFTER the response (that is how
+ * `skipSuccessfulRequests` works). A bare DECR on a key that expired, or that
+ * an operator deleted to clear a lockout, in the meantime CREATES the key at
+ * -1 with no TTL: a permanent extra allowance that never resets.
+ */
+const DECREMENT_SCRIPT = `
+  local hits = tonumber(redis.call('GET', KEYS[1]) or '0')
+  if hits > 0 then
+    return redis.call('DECR', KEYS[1])
+  end
+  return 0
+`;
+
 /** Resolved once, on first use. `null` means "no Redis configured". */
 let sharedClient;
 let warnedNoRedis = false;
+/** Set while counting in memory because Redis failed; cleared on recovery. */
+let fallingBack = false;
+
+/**
+ * Most limiters are built without a logger (`createRateLimiter({ name, max })`).
+ * The "your limits are per-process" warning must not depend on WHICH limiter
+ * happens to be used first — so a missing logger falls back to a real one
+ * instead of `logger?.warn` silently swallowing the only warning there is.
+ */
+let defaultLogger;
+function loggerFor(logger) {
+  if (logger) return logger;
+  if (!defaultLogger) {
+    try {
+      defaultLogger = require('../logger').createLogger({ service: 'rate-limit' });
+    } catch {
+      defaultLogger = { warn: console.warn, info: console.info, debug() {} };
+    }
+  }
+  return defaultLogger;
+}
+
+/**
+ * Where the counters live.
+ *
+ * `RATE_LIMIT_REDIS_URL` wins so the limiter can be pointed at Redis without
+ * also moving the cache, the socket adapter and presence (which all read
+ * `REDIS_URL`) — the root `.env` ships `REDIS_URL` blank, which is exactly how
+ * the staff sign-in bucket ended up counting in the admin process's heap.
+ */
+function resolveRedisUrl() {
+  /**
+   * Not under `node --test`. `npm test` loads the root `.env`, and a suite
+   * that mounts real routers would otherwise count into the developer's live
+   * Redis — buckets that outlive the run by 15 minutes and fail the next one.
+   * A test that wants Redis sets `REDIS_URL` or calls `configureRateLimitStore`.
+   */
+  const dedicated = process.env.NODE_TEST_CONTEXT ? '' : process.env.RATE_LIMIT_REDIS_URL;
+  return dedicated || process.env.REDIS_URL || '';
+}
 
 function getSharedClient(logger) {
   if (sharedClient !== undefined) return sharedClient;
 
-  const url = process.env.REDIS_URL;
+  const url = resolveRedisUrl();
   if (!url) {
     sharedClient = null;
     if (!warnedNoRedis) {
       warnedNoRedis = true;
-      logger?.warn(
-        'REDIS_URL is not set — rate limit counters live in this process\'s heap. ' +
+      loggerFor(logger).warn(
+        'Neither RATE_LIMIT_REDIS_URL nor REDIS_URL is set — rate limit counters live in this process\'s heap. ' +
           'Every additional instance multiplies each limit by one. Fine for a single-process ' +
           'dev run; not fine anywhere the services are scaled out.'
       );
@@ -120,7 +176,7 @@ function getSharedClient(logger) {
     sharedClient.on('connect', unref);
     sharedClient.on('reconnecting', unref);
   } catch (error) {
-    logger?.warn({ err: error.message }, 'Could not open Redis for rate limiting — using local counters');
+    loggerFor(logger).warn({ err: error.message }, 'Could not open Redis for rate limiting — using local counters');
     sharedClient = null;
   }
 
@@ -135,6 +191,29 @@ function getSharedClient(logger) {
  */
 function configureRateLimitStore(client) {
   sharedClient = client === undefined ? undefined : client;
+  fallingBack = false;
+}
+
+/**
+ * Redis was configured but a command failed, so this request is counted in
+ * memory. Warn ONCE per outage (not per request, which would flood the log
+ * during exactly the incident someone is reading it for) and say so again on
+ * recovery, so the log shows the window in which limits were per-process.
+ */
+function noteFallback(logger, bucket, error) {
+  if (fallingBack) return;
+  fallingBack = true;
+  loggerFor(logger).warn(
+    { err: error?.message, bucket },
+    'Rate-limit Redis store unreachable — counting in this process\'s memory until it recovers. ' +
+      'Limits are per-instance and cannot be cleared via Redis meanwhile.'
+  );
+}
+
+function noteRecovered(logger) {
+  if (!fallingBack) return;
+  fallingBack = false;
+  loggerFor(logger).info('Rate-limit Redis store reachable again — counters are shared');
 }
 
 /**
@@ -199,27 +278,40 @@ class SharedStore {
 
     try {
       const [hits, ttlMs] = await client.eval(INCREMENT_SCRIPT, 1, key, this.windowMs);
-      return {
+      const result = {
         totalHits: Number(hits),
         resetTime: new Date(Date.now() + (Number(ttlMs) > 0 ? Number(ttlMs) : this.windowMs)),
       };
+      // Redis holds this key's count now; a stale outage-era local entry
+      // must not capture the matching `decrement`.
+      this.local.delete(key);
+      noteRecovered(this.logger);
+      return result;
     } catch (error) {
-      this.logger?.debug(
-        { err: error.message, bucket: this.name },
-        'Rate-limit store unreachable — counting locally for this request'
-      );
+      noteFallback(this.logger, this.name, error);
       return this.#localIncrement(key);
     }
   }
 
-  async decrement(key) {
-    const client = getSharedClient(this.logger);
-    if (client) {
-      await client.decr(key).catch(() => {});
-      return;
-    }
+  #localDecrement(key) {
     const entry = this.local.get(key);
     if (entry && entry.totalHits > 0) entry.totalHits -= 1;
+  }
+
+  async decrement(key) {
+    // A hit counted locally during an outage is given back locally too —
+    // otherwise `skipSuccessfulRequests` stops working while Redis is down.
+    if (this.local.has(key)) {
+      this.#localDecrement(key);
+      return;
+    }
+    const client = getSharedClient(this.logger);
+    if (!client) return;
+    try {
+      await client.eval(DECREMENT_SCRIPT, 1, key);
+    } catch (error) {
+      noteFallback(this.logger, this.name, error);
+    }
   }
 
   async resetKey(key) {
@@ -276,4 +368,4 @@ function createRateLimiter({
   });
 }
 
-module.exports = { createRateLimiter, configureRateLimitStore, closeRateLimitStore, SharedStore };
+module.exports = { createRateLimiter, configureRateLimitStore, closeRateLimitStore, SharedStore, resolveRedisUrl };

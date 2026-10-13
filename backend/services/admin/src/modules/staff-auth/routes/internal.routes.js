@@ -73,12 +73,16 @@ module.exports = function internalRoutes(deps) {
           staffId: z.coerce.number().int().positive(),
           transactionPassword: z.string().max(200).optional(),
           required: z.boolean().default(true),
+          executiveId: z.coerce.number().int().positive().nullish(),
         })
         .strict(),
     }),
     asyncHandler(async (req, res) => {
-      const { staffId, transactionPassword, required } = req.body;
-      return response.ok(res, await assertTransactionPassword(models, staffId, transactionPassword, { required }));
+      const { staffId, transactionPassword, required, executiveId } = req.body;
+      return response.ok(
+        res,
+        await assertTransactionPassword(models, staffId, transactionPassword, { required, executiveId: executiveId ?? null })
+      );
     })
   );
 
