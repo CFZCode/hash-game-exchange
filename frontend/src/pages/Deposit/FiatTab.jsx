@@ -344,10 +344,12 @@ function NoChannels({ onDepositCrypto, isMaintain = false }) {
     <>
       <div className="my-4 flex rounded-xl bg-warning/10 p-2 text-secondary">
         <IconInform className="icon -mt-0.5 mr-1.5 size-6 flex-none fill-warning" />
+        {/* Reworded: Buy Crypto (card purchase) is removed from this site, so the original's
+            "buy crypto by using your credit/debit card" would point at nothing. */}
         <div>
           {isMaintain
             ? 'Our fiat deposit channels are currently under maintenance. Please use cryptocurrency deposits instead during this time.'
-            : "Sorry, it is not currently supported to directly deposit this currency. Don't worry! You can still buy crypto by using your credit/debit card or deposit your existing crypto assets."}
+            : "Sorry, it is not currently supported to directly deposit this currency. Don't worry! You can still deposit your existing crypto assets."}
         </div>
       </div>
 

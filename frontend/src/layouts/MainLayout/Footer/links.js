@@ -60,21 +60,16 @@ export const COLUMNS = [
       { label: 'Law Enforcement', href: '/help/law-enforcement' },
       { label: 'Responsible Gambling', href: '/responsible/faq' },
       { label: 'AML', href: '/help/aml' },
-      {
-        label: 'Design Resources',
-        href: 'https://drive.google.com/drive/folders/1Q48CUgrJOAeDGpBqmdHGNwWGxNEdTZzQ',
-        external: true,
-      },
+      /* Design Resources (BC.GAME's Google Drive brand kit) removed: not Parker567's. */
       { label: 'Live Support', button: true },
     ],
   },
   {
     title: 'About Us',
     links: [
-      /* The blog — gated by name (`gate`), since an external href has no route gate. */
-      { label: 'News', href: 'https://blog.bc.game/', external: true, gate: 'blog' },
+      /* News (blog.bc.game) and Help Desk (help.bc.support) removed: both are BC.GAME's own
+         sites and Parker567 has no equivalent. Help Center above covers support. */
       { label: 'Business Contacts', button: true },
-      { label: 'Help Desk', href: 'https://help.bc.support/en/', external: true },
       { label: 'Verify Representative', href: '/verify_representative' },
       { label: 'Verify This Site', button: true },
     ],
@@ -92,25 +87,20 @@ export const SEO = {
   ],
 };
 
-export const FEEDBACK = {
-  title: 'Help us improve your experience',
-  intro: 'Get rewarded for your valuable feedback!',
-  email: 'feedback@bcgame.com',
-  security:
-    'If you find any vulnerabilities or leaks, please contact us (security-related issues only; non-related issues will be omitted).',
-  securityEmail: 'security@bcgame.com',
-};
+/* The original's feedback band listed BC.GAME's own mailboxes (feedback@ / security@bcgame.com);
+   Parker567 publishes none, so the band is not drawn (see index.jsx). */
 
-export const LEGAL = {
+/* The legal band. `brand` is the site's printed name (services/siteBranding `brandName()`), so
+   no operator's name is baked in here. BC.GAME's operator/licence paragraphs (Twocent
+   Technology Limited, Anjouan licence ALSI-202410011-FI1) are NOT Parker567's and are gone. */
+export const legal = (brand) => ({
   brand: [
-    'The ultimate crypto gaming destination, trusted by millions worldwide. We bring bold entertainment, cutting-edge experiences, and a thriving community together for non-stop thrills. Play, win, and stay untamed.',
-    'Your use of and access to BC.GAME signifies that you fully understand and agree to be legally bound by the contents of our Terms of Service and Responsible Gaming Policy',
-    'Crypto trading is not gambling by definition, therefore it is not covered by our gaming license.',
+    'The ultimate crypto gaming destination. We bring bold entertainment, cutting-edge experiences, and a thriving community together for non-stop thrills. Play, win, and stay untamed.',
+    `Your use of and access to ${brand} signifies that you fully understand and agree to be legally bound by the contents of our Terms of Service and Responsible Gaming Policy.`,
   ],
   licence: [
-    'BC.GAME is operated by Twocent Technology Limited, a limited liability company registered in Belize with company registration number 41939, with registered address at Sea Urchin Street #2, San Pedro, Ambergris Caye, Belize. BC.GAME is licensed and regulated by the Government of the Autonomous Island of Anjouan, Union of Comoros and operates under License No. ALSI-202410011-FI1.',
-    'BC.GAME is duly licensed and authorised to provide online gaming and betting services within the scope of, and subject to the terms, conditions, restrictions and regulatory requirements applicable to its license.',
+    'Crypto trading is not gambling by definition, therefore it is not covered by our gaming license.',
+    'Gambling can be addictive. Please play responsibly — 18+ only.',
   ],
-  /* Year and rate are live values on the real site; fixed here, as the contest data is. */
-  copyright: 'Copyright ©2026 Twocent Technology Limited ALL RIGHTS RESERVED. 1BTC=$63,638.38',
-};
+  copyright: `Copyright ©${new Date().getFullYear()} ${brand}. ALL RIGHTS RESERVED.`,
+});

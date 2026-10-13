@@ -1,3 +1,4 @@
+import { brandName } from '../../services/siteBranding';
 import React from 'react';
 import PopCenter from '../../components/shared/PopCenter';
 import { IconBook, IconLink } from '../../components/shared/icons';
@@ -27,7 +28,7 @@ import { IconBook, IconLink } from '../../components/shared/icons';
    fixture (it is the UPI one); the rest are kept for the reason the hero's three fallback
    banners are, since they cost nothing and are already correct.
    `__ENV_HOST__` is the deploy's own host, which the original interpolates at render. */
-const HOST = 'bc.game';
+const HOST = brandName();
 
 const GUIDES = {
   0: {

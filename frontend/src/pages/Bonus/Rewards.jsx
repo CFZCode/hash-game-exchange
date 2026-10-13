@@ -365,7 +365,7 @@ function Redeem() {
   );
 }
 
-export default function Rewards({ payload, sections, mobile = false, loading = false, onClaimed }) {
+export default function Rewards({ payload, sections, mobile = false, loading = false, error = null, onRetry, onClaimed }) {
   const { session } = useSession();
 
   return (
@@ -390,6 +390,19 @@ export default function Rewards({ payload, sections, mobile = false, loading = f
         {loading ? (
           <div className="center min-h-40">
             <Loading />
+          </div>
+        ) : error && !payload ? (
+          /* A failed read (a 429 from the gateway on a cold load, most often) is said inline with
+             a retry, rather than leaving the section empty. */
+          <div className="center min-h-40 flex-col gap-3 text-center" role="alert">
+            <p className="text-sm font-semibold text-secondary">
+              {Number(error?.status) === 429 ? 'Too many requests — please wait a moment.' : 'Rewards could not be loaded.'}
+            </p>
+            {onRetry && (
+              <button type="button" className="button button-second h-10 px-4" onClick={onRetry}>
+                Retry
+              </button>
+            )}
           </div>
         ) : (
           sections.map((section) => (

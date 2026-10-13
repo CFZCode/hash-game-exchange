@@ -1,3 +1,4 @@
+import { brandName } from '../../../services/siteBranding';
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import Select from '../../../components/shared/Select';
@@ -730,7 +731,7 @@ const FAQ_ITEMS = [
   {
     question: 'Can I trust that my funds in Vault Pro are safe?',
     answer:
-      'Absolutely! BC.GAME ensures that the funds (cryptos) in Vault Pro are safeguarded and will ' +
+      'Absolutely! ' + brandName() + ' ensures that the funds (cryptos) in Vault Pro are safeguarded and will ' +
       'not be accessed by anyone other than the depositor. Your funds are entirely yours, and they ' +
       'will always remain secure for your use.',
   },
@@ -784,8 +785,11 @@ export default function VaultPro() {
      the transfer panel's APR and the asset table all reduce over it. So the pending arm is one
      boundary around all three rather than three placeholders, which is also why the FAQ below is
      outside it — it is copy compiled into the chunk and has nothing to wait for. */
-  const readRows = React.useCallback(() => getVaultAmountList(balances), [balances]);
-  const { data: rowData, loading } = useResource(readRows);
+  /* `retries` is part of the reader's identity so the inline error's Retry re-runs it. */
+  const [retries, setRetries] = React.useState(0);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const readRows = React.useCallback(() => getVaultAmountList(balances), [balances, retries]);
+  const { data: rowData, loading, error: rowError } = useResource(readRows);
   const rows = rowData ?? [];
 
   /* `partition(orderBy(wallet, "sort"), display)` then grouped, fiat first — the same wallet list
@@ -822,6 +826,18 @@ export default function VaultPro() {
         <PaneLoading />
       ) : (
         <>
+          {/* A failed read (a 429 on a cold load, most often) is said inline with a retry; the
+              page still renders around it rather than going blank. */}
+          {rowError && (
+            <div className="mb-3 flex items-center justify-between gap-3 rounded-lg bg-layer4 px-4 py-3" role="alert">
+              <span className="text-sm font-semibold text-secondary">
+                {Number(rowError?.status) === 429 ? 'Too many requests — please wait a moment.' : 'Vault balances could not be loaded.'}
+              </span>
+              <button type="button" className="button button-second h-8 px-3" onClick={() => setRetries((n) => n + 1)}>
+                Retry
+              </button>
+            </div>
+          )}
           {/* `sm:flex-wrap sm:gap-6` IS THIS BUILD'S, and the panel's `ml-6` moved into that gap.
               The chunk writes a bare `justify-between sm:flex` over a `shrink-0` 523px summary and
               a `flex-1` panel, which only fits once the pane is ~900px wide — on this build's

@@ -1,3 +1,4 @@
+import { brandLabel } from '../../services/siteBranding';
 import { GAMES } from '../../data/games';
 import {
   AllGamesIcon,
@@ -20,7 +21,7 @@ import {
  */
 export const TABS = [
   { label: 'All Games', value: 'allgames', Icon: AllGamesIcon },
-  { label: 'BC Originals', value: 'original', Icon: OriginalsIcon },
+  { label: brandLabel('BC Originals'), value: 'original', Icon: OriginalsIcon },
   { label: 'Hot Games', value: 'hot', Icon: HotIcon },
   { label: 'Slots', value: 'slots', Icon: SlotsIcon },
   { label: 'Live Casino', value: 'live', Icon: LiveCasinoIcon },

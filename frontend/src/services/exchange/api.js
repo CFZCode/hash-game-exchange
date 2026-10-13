@@ -138,8 +138,23 @@ async function attempt(path, { method, params, json, signal, timeout, auth }, re
  * @param {AbortSignal} [o.signal]
  * @param {boolean} [o.auth]    the route needs a signed-in player (401 then ends the session)
  */
+/* Identical GETs in flight at once share one request (the match page and the rail's tools both
+   read the stake buttons on mount, for one). Only GETs with no caller signal — a caller that may
+   abort must not abort someone else's read. Shared only while in flight; nothing is cached. */
+const inFlight = new Map();
+
 export function exchangeRequest(path, { method = 'GET', params, json, signal, timeout, auth = false } = {}) {
-  return attempt(path, { method, params, json, signal, timeout, auth }, false);
+  if (String(method).toUpperCase() !== 'GET' || json !== undefined || signal) {
+    return attempt(path, { method, params, json, signal, timeout, auth }, false);
+  }
+  const key = `${withQuery(path, params)}\u0000${getAccessToken() ?? ''}`;
+  const pending = inFlight.get(key);
+  if (pending) return pending;
+  const p = attempt(path, { method, params, json, signal, timeout, auth }, false).finally(() => {
+    if (inFlight.get(key) === p) inFlight.delete(key);
+  });
+  inFlight.set(key, p);
+  return p;
 }
 
 /* mssports wraps the upstream provider's body in its own: {success, data:{success, data:X}} —

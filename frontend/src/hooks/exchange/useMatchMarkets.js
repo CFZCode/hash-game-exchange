@@ -3,6 +3,7 @@ import { getMatchMarkets } from '../../services/exchange/feed';
 import { POLL_TIMEOUT_MS } from '../../services/exchange/api';
 import { fetchEventLimits, applyEventLimits } from '../../services/exchange/eventLimits';
 import { applyMatchOddsLimits } from '../../utils/exchange/oddsHelpers';
+import { isRateLimited, rateLimitDelay } from './usePolling';
 
 /* ─── Live markets of one match ──────────────────────────────────────────────────────────
  *
@@ -57,6 +58,7 @@ export function useMatchMarkets(gmid, sid) {
     let hadMarkets = false;
     let lastPayload = null;
     let lastLimitsAt = 0;
+    let strikes = 0; // consecutive 429s — backs the 1s poll off (usePolling's rateLimitDelay)
     marketsRef.current = [];
 
     const patch = (p) => setState((prev) => ({ ...(prev.key === key ? prev : { ...EMPTY, key }), ...p, key }));
@@ -87,7 +89,9 @@ export function useMatchMarkets(gmid, sid) {
         } else {
           patch({ loaded: true });
         }
+        strikes = 0;
       } catch (error) {
+        strikes = isRateLimited(error) ? strikes + 1 : 0;
         if (active) patch({ loaded: true, error });
       }
       if (active && Date.now() - lastLimitsAt > LIMITS_REFRESH_MS) {
@@ -105,7 +109,8 @@ export function useMatchMarkets(gmid, sid) {
       } finally {
         if (myGen === gen) inFlightSince = null;
         if (active && myGen === gen && !document.hidden) {
-          timer = setTimeout(() => loop(myGen), Math.max(0, POLL_MS - (Date.now() - startedAt)));
+          const wait = strikes ? rateLimitDelay(POLL_MS, strikes) : POLL_MS;
+          timer = setTimeout(() => loop(myGen), Math.max(0, wait - (Date.now() - startedAt)));
         }
       }
     };

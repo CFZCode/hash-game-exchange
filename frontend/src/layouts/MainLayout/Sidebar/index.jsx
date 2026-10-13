@@ -1,10 +1,9 @@
+import { brandLabel } from '../../../services/siteBranding';
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import LanguageCurrencyModal from '../../../components/modals/LanguageCurrencyModal';
 import Refer from '../../../components/modals/Refer';
 import { FLYOUTS } from './originals';
-import SOCIALS from '../../../components/modals/RegionBlock/icons';
-import { CommunityItem, GlobalIcon } from '../../../components/shared/CommunityItem';
 import { useSession } from '../../../context/session';
 import { useGates } from '../../../context/gates';
 import { useSettings } from '../../../context/settings';
@@ -389,8 +388,8 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
         /* `flyout` names a list in originals.js. `hasSubArrow` only draws the chevron — the
            two Sports Provider rows carry it too and have no list here, so they render the
            chevron and open nothing, which is what they already did. */
-        { label: 'BC Originals', icon: 'bc-originals-svg', href: '/casino/brand', hasSubArrow: true, flyout: 'originals' },
-        { label: 'BC Exclusive', menuIcon: 'bc_exlusive', href: '/section/exclusive' },
+        { label: brandLabel('BC Originals'), icon: 'bc-originals-svg', href: '/casino/brand', hasSubArrow: true, flyout: 'originals' },
+        { label: brandLabel('BC Exclusive'), menuIcon: 'bc_exlusive', href: '/section/exclusive' },
         { label: 'Hot Games', menuIcon: 'hotgame', href: '/casino/hot' },
         { label: 'Slots', menuIcon: 'slots', href: '/casino/slots' },
         { label: 'Live Casino', menuIcon: 'liveevents', href: '/casino/live' },
@@ -487,7 +486,7 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
        Predictions gap above. */
     { id: 'fair',         label: 'Provably Fair',         menuIcon: 'fair',           href: '/help/provably-fair' },
     { id: 'responsible',  label: 'Responsible Gambling',  menuIcon: 'account',        href: '/responsible/faq' },
-    { id: 'blog',         label: 'Blog',                  menuIcon: 'blog',           external: true, gate: 'blog', href: 'https://blog.bc.game/' },
+    /* Blog (blog.bc.game) removed: BC.GAME's blog, no Parker567 equivalent. */
   ];
 
   return (
@@ -918,21 +917,8 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
                   eight marks and the last one is a paper plane in a globe rather than the set's
                   own final entry. `De` is IconGlobal, the same mark the footer prints under
                   "Join Our Local Community". */}
-              {!session.login && (
-                <div className="Sidebar-Unit_bg mt-2 rounded-lg px-3 py-2 lg:hidden">
-                  <p className="m-0 text-center text-base text-primary">Join Our Global Community</p>
-                  <ul className="mt-2 flex items-center justify-between">
-                    {SOCIALS.slice(0, -1).map((social) => (
-                      <CommunityItem key={social.label} {...social} />
-                    ))}
-                    <CommunityItem
-                      label="Global"
-                      href="https://hash.game/telegram"
-                      icon={<GlobalIcon />}
-                    />
-                  </ul>
-                </div>
-              )}
+              {/* The signed-out community card (BC.GAME's socials + hash.game/telegram) is removed:
+                  Parker567 has no social channels to list. */}
 
             </div>
           </nav>

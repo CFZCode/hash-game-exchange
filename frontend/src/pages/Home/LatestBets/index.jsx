@@ -343,7 +343,10 @@ export default function LatestBets() {
   const contestOn = useGates().on('contest');
   const { data: contest, loading: contestLoading } = useResource(contestOn ? getHomeContest : NO_CONTEST);
   const [chosen, setTab] = React.useState(0);
-  const tabs = contestOn ? TABS : TABS.slice(0, 2);
+  /* A race the platform has switched off (`enabled: false` on its config) is hidden rather than
+     drawn as an idle "Ended" board; fixtures carry no flag and keep the tab. */
+  const raceOff = contest?.contest?.enabled === false;
+  const tabs = contestOn && !raceOff ? TABS : TABS.slice(0, 2);
   const tab = chosen < tabs.length ? chosen : 0;
 
   const feed = tab === 1 ? rollers : bets;

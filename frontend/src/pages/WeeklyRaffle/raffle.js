@@ -28,7 +28,8 @@
  *
  * `__ENV_HOST__` is the bundle's own placeholder for the site name and is substituted here.
  */
-const HOST = 'BC.GAME';
+import { brandName } from '../../services/siteBranding';
+const HOST = brandName();
 
 /* The two "How to Earn Ticket" cards. `amount` is printed in brand green inside the line,
    which is why the line is split rather than stored as one string — the original's own

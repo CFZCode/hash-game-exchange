@@ -1,3 +1,4 @@
+import { brandLabel } from '../../services/siteBranding';
 import React from 'react';
 import SectionHeader from '../../components/shared/SectionHeader';
 import { Controller } from '../Home/GameSection';
@@ -121,7 +122,8 @@ export function ThemeRow({ themes }) {
       items={themes.map((label) => ({
         key: label,
         href: `/tagname/${encodeURIComponent(label)}`,
-        label,
+        /* The label is also the tag href, so the brand rename is display-only. */
+        label: brandLabel(label),
       }))}
       renderItem={(item) => <span className="px-2 text-center">{item.label}</span>}
     />

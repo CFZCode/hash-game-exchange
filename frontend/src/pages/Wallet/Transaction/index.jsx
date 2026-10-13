@@ -1,3 +1,4 @@
+import { brandName } from '../../../services/siteBranding';
 import React from 'react';
 import { Link } from 'react-router-dom';
 import Select from '../../../components/shared/Select';
@@ -526,15 +527,15 @@ function TransactionList({ settings }) {
    a text node in the template, not a list marker. */
 const DISPUTE_RULES = [
   'For any issues or disputes arising out of any fiat transactions on Our Site, you must formally ' +
-    'report and submit such issues or disputes to BC.GAME within 60 calendar days from the date of ' +
+    'report and submit such issues or disputes to ' + brandName() + ' within 60 calendar days from the date of ' +
     'the transaction(s) in question.',
-  'For any issues or disputes received by BC.GAME exceeding 60 calendar days from the date of such ' +
+  'For any issues or disputes received by ' + brandName() + ' exceeding 60 calendar days from the date of such ' +
     'transaction(s), We will not accept them for resolution and such transaction(s) are ineligible ' +
     'for us to resolve.',
   'Any attempts to circumvent this rule by raising your issue or dispute in relation to the fiat ' +
     'transaction(s) beyond the 60 calendar days period on a public complaint forum of any website, ' +
     'whether online or otherwise, will not change this.',
-  'BC.GAME will not be able to assist any issues or disputes submitted beyond the stipulated ' +
+  brandName() + ' will not be able to assist any issues or disputes submitted beyond the stipulated ' +
     'timeframe. There are no exceptions to this rule.',
 ];
 

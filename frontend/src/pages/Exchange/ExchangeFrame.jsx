@@ -1,6 +1,27 @@
 import MenuPageLayout from '../../components/shared/MenuPageLayout';
 import { useIsDesktop } from '../../hooks/useMediaQuery';
 import ExchangeRail, { ExchangeTools } from './ExchangeRail';
+import Notice from '../../components/shared/Notice';
+import { useSession } from '../../context/session';
+import { getAlias } from '../../utils/currency';
+
+/**
+ * The exchange books, settles and shows every figure in INR (₹) whatever the header wallet is,
+ * so a player on any other currency (USDT, BTC…) is told so before staking — otherwise "100" on
+ * the slip reads as 100 of their own coin. Signed-in, non-INR wallets only. Says nothing about
+ * how funds move between wallets: that is not this note's to promise.
+ */
+export function ExchangeCurrencyNote({ className = 'mt-3' }) {
+  const { session } = useSession();
+  const code = String(session?.setting?.currencyName ?? '');
+  if (!session?.login || !code || code === 'BCD' || /^INR(FIAT)?$/i.test(code)) return null;
+  return (
+    <Notice type="warning" className={className}>
+      Sports exchange bets are in INR (₹). Stakes, profit, liability and exposure on these pages are
+      shown in INR, not in {getAlias(code)}.
+    </Notice>
+  );
+}
 
 /**
  * The exchange's page frame: the sports rail across the top, then the page.
@@ -15,6 +36,7 @@ export default function ExchangeFrame({ children }) {
       <div className="-mx-4 sm:mx-0">
         <ExchangeRail />
       </div>
+      <ExchangeCurrencyNote />
       {children}
     </div>
   );
@@ -50,6 +72,7 @@ export function ExchangeAccountPage({ title, children }) {
           </div>
         }
       >
+        <ExchangeCurrencyNote className="mb-3" />
         {children}
       </MenuPageLayout>
     );

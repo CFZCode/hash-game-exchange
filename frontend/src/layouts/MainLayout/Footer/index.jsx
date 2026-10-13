@@ -1,16 +1,11 @@
 import { useLocation } from 'react-router-dom';
 import logoPureImg from '../../../assets/footer/logo-pure.png';
 import logoPureLightImg from '../../../assets/footer/logo-pure_w.png';
-import anjSealImg from '../../../assets/footer/anj-seal.png';
-/* The same eight networks the region-block dialog lists, in the same order and already at
-   the `size-6 fill-secondary` the footer wants. Shared rather than duplicated. */
-import SOCIALS from '../../../components/modals/RegionBlock/icons';
-import { CommunityItem, GlobalIcon } from '../../../components/shared/CommunityItem';
-import { COLUMNS, SEO, FEEDBACK, LEGAL } from './links';
-import { AWARDS, PARTNERS } from './badges';
+import { COLUMNS, SEO, legal } from './links';
+import { PARTNERS } from './badges';
 import { useSettings } from '../../../context/settings';
 import { useGates } from '../../../context/gates';
-import { siteName, useSiteLogo } from '../../../services/siteBranding';
+import { siteName, useBrandName, useSiteLogo } from '../../../services/siteBranding';
 import './Footer.css';
 
 /* The site footer, from the live DOM.
@@ -84,12 +79,6 @@ function NavLink({ label, href, external, button }) {
   );
 }
 
-/* `SocialButton` and `GlobalIcon` both moved to `components/shared/CommunityItem` when the
-   sidebar's mobile community card became their second call site — see the note there. The
-   name follows the original's own chunk (`CommunityItem-DguQXLpB.js`); the alias keeps this
-   file's markup reading as it did. */
-const SocialButton = CommunityItem;
-
 /* `oe` in index-BPci0vXA.js. The original writes each mark as a bare
    `<img width={m.width * remScale + "px"}>` inside its link and nothing else — no wrapper box,
    no height, no alignment flag.
@@ -140,6 +129,9 @@ export default function Footer() {
      awards, partners, link columns, licence — is unchanged on every route. */
   const { pathname } = useLocation();
   const showBlurb = BLURB_SHOWN_ON.includes(pathname);
+  /* Parker567 branding: the printed name comes from the owner panel's branding payload. */
+  const brand = useBrandName();
+  const LEGAL = legal(brand);
 
   return (
     /* `hidden lg:flex` — desktop only, like the Sidebar. The footer does not render below
@@ -163,49 +155,12 @@ export default function Footer() {
             </div>
           </div>
 
-          {/* `footer-feedback` is ours — see Footer.css. `flex-shrink-0` is the original's and
-              is what overflows below sm. */}
-          <div className="footer-feedback flex max-w-[500px] flex-shrink-0 flex-grow flex-col gap-y-3 leading-5">
-            <h3 className="text-lg font-semibold text-primary">{FEEDBACK.title}</h3>
-            <p className="text-sm font-semibold text-secondary">{FEEDBACK.intro}</p>
-            {/* The original writes `font-sm` on these two spans, which is not a class — so they
-                keep the footer's inherited size instead of dropping to text-sm like the <p>s
-                around them. Reproduced by simply not setting a size. */}
-            <div className="flex flex-col">
-              <span className="font-semibold text-secondary">
-                Email us:
-                <a className="ml-1 text-brand underline" href={`mailto:${FEEDBACK.email}`}>
-                  {FEEDBACK.email}
-                </a>
-              </span>
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-secondary">{FEEDBACK.security}</p>
-            </div>
-            <div className="flex flex-col">
-              <span className="font-semibold text-secondary">
-                Security email:
-                <a className="ml-1 text-brand underline" href={`mailto:${FEEDBACK.securityEmail}`}>
-                  {FEEDBACK.securityEmail}
-                </a>
-              </span>
-            </div>
-          </div>
+          {/* The feedback band (BC.GAME's feedback@/security@bcgame.com mailboxes) is not drawn:
+              Parker567 publishes no such addresses. */}
         </div>
       )}
 
-      {/* Awards. Two up below sm, eight across above it: basis-1/2 capped by
-          sm:max-w-[12.5%], so the cap does the work rather than the basis. */}
-      <div className="flex flex-wrap justify-center pb-1 pt-8 sm:max-w-300">
-        {AWARDS.map((item) => (
-          <div
-            key={item.name}
-            className="mb-7 max-w-[50%] flex-shrink-0 flex-grow-0 basis-1/2 px-1.5 sm:max-w-[12.5%]"
-          >
-            <img alt={item.alt} src={darken ? item.dark : item.light} />
-          </div>
-        ))}
-      </div>
+      {/* BC.GAME's SiGMA/AIBC award strip is not drawn — those awards are not Parker567's. */}
 
       {/* Certifiers, then sponsorships. The vertical rule between them is `divide-x` on the
           wrapper — the same mechanism as the horizontal rules, not a border on either group.
@@ -223,15 +178,11 @@ export default function Footer() {
       <div className="w-full max-w-300 py-4 sm:px-4">
         <div className="footer-partners flex w-full flex-wrap gap-x-10 divide-x divide-third">
           <div className="flex flex-shrink-0 flex-grow items-center justify-around gap-x-6">
-            {PARTNERS.certifiers.map((item) => (
+            {PARTNERS.certifiers.filter((item) => item.name !== 'sigma').map((item) => (
               <PartnerLogo key={item.name} {...item} />
             ))}
           </div>
-          <div className="flex flex-shrink-0 flex-grow items-center justify-around gap-x-6 pl-6">
-            {PARTNERS.sponsorships.map((item) => (
-              <PartnerLogo key={item.name} {...item} />
-            ))}
-          </div>
+          {/* BC.GAME's sponsorships (clubs, artists) are not drawn — not Parker567's. */}
         </div>
       </div>
 
@@ -268,55 +219,8 @@ export default function Footer() {
           </div>
         ))}
 
-        <div>
-          <div className="flex flex-col gap-6">
-            <div>
-              <h4 className="mb-5 text-base font-extrabold text-primary">
-                Join Our Global Community
-              </h4>
-              {/* gap-2 is 8px, but four 1fr columns stretch past the 40px buttons, so the
-                  visible gutter reads wider than the gap. */}
-              <ul className="grid grid-cols-4 gap-2">
-                {SOCIALS.map((social) => (
-                  <SocialButton key={social.label} {...social} />
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h4 className="mb-5 text-base font-extrabold text-primary">
-                Join Our Local Community
-              </h4>
-              {/* ONE entry, and it really does render — an earlier pass left this heading
-                  standing alone on the belief that the local set was region-gated to empty.
-                  The rendered DOM has the row, on the same `grid grid-cols-4 gap-2` as the
-                  global set above it, so the single button sits in the first of four tracks
-                  rather than filling the width. Restoring it puts 40px of button plus the
-                  grid's own row back into this column, which is what was pulling the seal —
-                  and the column's whole lower half — up against the original. */}
-              <ul className="grid grid-cols-4 gap-2">
-                <SocialButton
-                  label="Global"
-                  href="https://hash.game/telegram"
-                  icon={<GlobalIcon />}
-                />
-              </ul>
-            </div>
-          </div>
-          {/* EMPTY, exactly as the original leaves it. `#trust-seal-container` is GameCheck's
-              injection point and the vendor script never fills it on the live page — the seal
-              simply is not there under the community block. A static badge stood here instead,
-              and removing it fixes two things at once:
-
-              it was the widest thing in the column at 218.4px, so it — not the 207.2px heading
-              — was SETTING this column's width. justify-between hands the columns whatever the
-              band has left, so 11px of surplus width here was 11px stolen from the five
-              gutters, holding every column except the first ~2px per gutter to the LEFT of
-              where the original puts them. The kept wrapper is height-zero; its mt-5 is the
-              original's and applies either way. */}
-          <div className="mt-5 flex w-full flex-col items-center justify-center">
-            <div id="trust-seal-container" />
-          </div>
-        </div>
+        {/* "Join Our Global/Local Community" (BC.GAME's socials and hash.game/telegram) is not
+            drawn: Parker567 has no social channels to list. */}
       </div>
 
       {/* Legal. `text-xs` here is the whole answer to the 12px question — the logo row, both
@@ -335,36 +239,9 @@ export default function Footer() {
               src={brandLogo ?? (darken ? logoPureImg : logoPureLightImg)}
             />
           </div>
-          {/* The Anjouan seal, structured as the vendor's own snippet builds it. It is sized by
-              WIDTH — a `max-width: 48px` box (the `data-anj-image-size="48"`) holding an image
-              at `width: 100%; height: auto` — and that distinction is the whole reason this
-              badge used to sit left of the original's.
-
-              The asset is the real one, pulled from `*.snippet.anjcdn.org/sealassets/...`;
-              anjcdn resolves from here even though bc.game's own origin does not, the same
-              split that got the promotions artwork and the raffle avatars. It is 128x128 with
-              its ink spanning x 12..117, so at a 48px width the badge starts 4.5px in and runs
-              39.7 wide. The previous asset was an ink-CROP crossed with height sizing: 38.4
-              wide starting flush at x=0, which is a ~5px leftward shift of a 40px badge.
-              Sizing by height also cannot be right in general — a square source and a 0.8
-              source give different widths for the same height, and the vendor pins width.
-
-              Dropped from the snippet: the `data-anj-*` attributes and instance id (hooks for
-              a script this build does not run) and the beacon background-image (a tracking
-              pixel). `aria-label` is ours — the vendor ships `alt=""`, which leaves the link
-              with no accessible name. */}
-          <div className="flex min-h-15">
-            <div className="relative block max-w-12 min-w-8 overflow-hidden">
-              <a
-                href="https://verification.anjouangamingboard.org/validate?domain=hash.game&seal_id=25e3958206f75b3536584ffc3d4b3b5fd92747712fe8da3f0727559031f069ec6272ba88047b9393a6b97beca611ad95&stamp=af31c2aded661ef82cc7fcd852f5a427"
-                target="_blank"
-                rel="noreferrer"
-                aria-label="Anjouan licence — click to verify"
-              >
-                <img className="h-auto w-full" alt="" src={anjSealImg} />
-              </a>
-            </div>
-          </div>
+          {/* The Anjouan licence seal (BC.GAME's licence, verifying hash.game) is not drawn. The
+              cell stays so the 2x2 legal grid keeps its shape. */}
+          <div className="flex min-h-15" />
           <div className="flex flex-col gap-y-4">
             {LEGAL.brand.map((text) => (
               <p key={text.slice(0, 24)}>{text}</p>

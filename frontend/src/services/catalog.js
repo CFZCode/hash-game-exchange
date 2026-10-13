@@ -162,11 +162,21 @@ export function getLiveProviders() {
 /* One game for `/game/:gameUnique`: by page slug, then by uuid (a recently-played row links by
    uuid). `null` when neither knows it; a 404 or 422 is "not in the catalogue", not a failure. */
 export async function getLiveGame(ref) {
-  const read = (path) =>
-    Promise.resolve(request(path, { live: true, fixture: null })).catch((error) => {
-      if (error?.status === 404 || error?.status === 422) return null;
-      throw error;
-    });
+  /* 404/422 is "no such game"; a 429 (the gateway's 300/min per-IP limit) or a 5xx is NOT, so it
+     is retried twice with backoff and then thrown — the page shows Retry rather than claiming the
+     game is not in the catalogue. */
+  const read = async (path) => {
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        return await Promise.resolve(request(path, { live: true, fixture: null }));
+      } catch (error) {
+        if (error?.status === 404 || error?.status === 422) return null;
+        const transient = error?.status === 429 || error?.status >= 500 || !error?.status;
+        if (!transient || attempt >= 2) throw error;
+        await new Promise((resolve) => setTimeout(resolve, 800 * 2 ** attempt));
+      }
+    }
+  };
   const bySlug = /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(ref) ? await read(API.bySlug(ref)) : null;
   const row = bySlug ?? (/^[A-Za-z0-9._:-]+$/.test(ref) ? await read(API.byUuid(ref)) : null);
   return row ? toCatalogGame(row) : null;

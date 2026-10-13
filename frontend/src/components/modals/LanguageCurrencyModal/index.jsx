@@ -232,6 +232,10 @@ export default function LanguageCurrencyModal({
       <div
         ref={panelRef}
         {...handlers}
+        /* The accessible dialog contract (ours, not the original's): a named modal dialog. */
+        role="dialog"
+        aria-modal="true"
+        aria-label="Language and currency settings"
         /* The original writes `bg-layer3 dark:bg-layer2` (index-BsFv7ByC.js, the `pop-center`
            branch). This build is dark-only and Tailwind v4 has no class-based `dark` variant
            configured, so `dark:` would resolve against prefers-color-scheme and leave the

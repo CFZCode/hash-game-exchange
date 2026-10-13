@@ -2,7 +2,6 @@ import React from 'react';
 import Select from '../../../components/shared/Select';
 import PageCard from '../../../components/shared/PageCard';
 import Notice from '../../../components/shared/Notice';
-import CwalletRow, { OrDivider } from '../../../components/shared/CwalletRow';
 import { IconArrow, IconAddressBook, IconSearch, IconClose, IconInform } from '../../../components/shared/icons';
 import { useNavigate } from 'react-router-dom';
 import { useSession } from '../../../context/session';
@@ -781,8 +780,7 @@ export function WithdrawPanels() {
       {/* `da` — the divider is the withdraw wrapper's, not the row's. The second arm (withdraw
           straight to a linked Cwallet) needs a `cwallet.state.cwalletId` this build has no feed
           for; the unlinked row is what both captures show. */}
-      <OrDivider />
-      <CwalletRow />
+      {/* The Cwallet band is not drawn: BC.GAME's partner wallet, no Parker567 equivalent. */}
 
       {confirm && !placed && (
         <WithdrawConfirm

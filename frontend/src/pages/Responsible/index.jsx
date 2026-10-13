@@ -12,6 +12,7 @@ import rgBadges from '../../assets/responsible/rg.png';
 import rgBadgesLight from '../../assets/responsible/rg_w.png';
 import * as globMaps from './index.globs.js';
 import '../Help/Help.css';
+import { brandTokens } from '../../services/siteBranding';
 
 /* Responsible Gambling — `/responsible/:responsibleId`, and `/responsible` bare.
  *
@@ -41,17 +42,12 @@ import '../Help/Help.css';
 const docs = globMaps.docs;
 
 /* The remote's own substitution — see the note in pages/Help/index.jsx. */
-const ENV = {
-  __BC_HOST__: 'BC.GAME',
-  __SMALL_BC_HOST__: 'bc.game',
-  __BC_SITENAME__: 'BC',
-  __SMALL_BC_MAIL_ADDRESS__: 'compliance@bcgame.com',
-};
+/* Filled with Parker567's identity (services/siteBranding), never bc.game's. */
 
 const docHtml = (element) => {
   const raw = element && docs[`../Help/topics/${element}.html`];
   if (!raw) return null;
-  return raw.replace(/__[A-Z_]+__/g, (token) => ENV[token] ?? token);
+  return raw.replace(/__[A-Z_]+__/g, (token) => brandTokens()[token] ?? token);
 };
 
 /* The chunk does NOT render the document whole. It splits it and emits, per section,

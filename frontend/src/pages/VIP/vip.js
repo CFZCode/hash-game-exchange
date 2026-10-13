@@ -17,6 +17,7 @@
  * inside the element, so they change nothing visually, and matching the source exactly is what
  * makes a future diff against a newer chunk readable.
  */
+import { brandName } from '../../services/siteBranding';
 
 /* ------------------------------------------------------------------------------- artwork
  *
@@ -68,7 +69,7 @@ export const HERO = {
 export const TRANSFER = {
   /* "Only __ENV_SITE__ Defines " — `__ENV_SITE__` is the SHORT name, "BC", not the host. The
      trailing space is the original's. */
-  lead: 'Only BC Defines ',
+  lead: `Only ${brandName()} Defines `,
   accent: 'True VIP',
   blurb: 'Have VIP status elsewhere? Transfer it and unlock premium perks instantly.',
   cta: { label: 'Start VIP Transfer Now →', href: '/events/viptransfer-survey' },
@@ -180,15 +181,15 @@ export const FAQ_TABS = [
       {
         question: 'How do I become a VIP?',
         answer:
-          "Becoming a VIP at BC.GAME is by invitation only. Our VIP team is constantly reviewing players' activity, and as soon as you meet the requirements, you will receive an invitation to join.",
+          "Becoming a VIP at " + brandName() + " is by invitation only. Our VIP team is constantly reviewing players' activity, and as soon as you meet the requirements, you will receive an invitation to join.",
       },
       {
         question: 'What is the VIP Transfer?',
         answer:
-          'VIP Transfer is a unique feature that allows you to transfer your VIP Status to BC.GAME and receive all the benefits of the VIP Club instantly once the requirements of the program are fulfilled.',
+          'VIP Transfer is a unique feature that allows you to transfer your VIP Status to ' + brandName() + ' and receive all the benefits of the VIP Club instantly once the requirements of the program are fulfilled.',
       },
       {
-        question: 'What makes the BC.GAME VIP Club different from others?',
+        question: 'What makes the ' + brandName() + ' VIP Club different from others?',
         answer:
           'We are committed to delivering a premium experience tailored to each member. Our dedicated VIP team provides personalized support, exclusive promotions, and benefits curated to match your preferences. Transparency, integrity, and attention to detail are at the core of our program. As a VIP, you can expect fast responses, exceptional service, and a level of care that goes beyond standard support.',
       },

@@ -2,6 +2,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { SportTabs, LatestEventsStrip, InPlayList } from '../../../components/exchange';
 import Loading from '../../../components/shared/Loading';
 import { useSportsList, useLatestEvents, useSportsTree } from '../../../hooks/exchange';
+import { treeWithoutDead, useDeadMatchesVersion, withoutDeadMatches } from '../../../services/exchange/deadMatches';
 import ExchangeFrame from '../ExchangeFrame';
 import { LOBBY_SPORTS, INPLAY_TAB, matchPath, sportIconOf, splitBoard } from '../model';
 
@@ -69,7 +70,11 @@ export default function ExchangeLobby() {
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
 
-  const { data: tree, error: treeError } = useSportsTree();
+  /* Matches whose page answered "no longer available" (provider 404) are dropped from every list
+     here — the feed keeps listing them for a while (services/exchange/deadMatches.js). */
+  useDeadMatchesVersion();
+  const { data: rawTree, error: treeError } = useSportsTree();
+  const tree = treeWithoutDead(rawTree);
   const sportTabs = sportTabsOf(tree);
   /* The default board keeps its pill even on a day the tree lists no match for it. */
   if (!sportTabs.some((t) => t.id === DEFAULT_TAB)) sportTabs.unshift({ ...FIXED_BY_SID.get(4), fallback: true });
@@ -96,8 +101,8 @@ export default function ExchangeLobby() {
   const other = useSportsList(otherSid);
   const boards = { cricket, soccer, tennis };
 
-  const views = LOBBY_SPORTS.map((s) => ({ ...s, board: boards[s.id], rows: splitBoard(boards[s.id].data?.events, s.sid) }));
-  const otherView = otherSid != null ? { ...current, board: other, rows: splitBoard(other.data?.events, otherSid) } : null;
+  const views = LOBBY_SPORTS.map((s) => ({ ...s, board: boards[s.id], rows: splitBoard(withoutDeadMatches(boards[s.id].data?.events), s.sid) }));
+  const otherView = otherSid != null ? { ...current, board: other, rows: splitBoard(withoutDeadMatches(other.data?.events), otherSid) } : null;
   const byId = new Map();
   for (const v of otherView ? [...views, otherView] : views) for (const m of [...v.rows.live, ...v.rows.upcoming]) byId.set(m.id, m);
 
@@ -109,7 +114,7 @@ export default function ExchangeLobby() {
   };
 
   const { data: latest } = useLatestEvents();
-  const latestEvents = (Array.isArray(latest) ? latest : []).slice(0, 20).map((e) => ({
+  const latestEvents = (withoutDeadMatches(Array.isArray(latest) ? latest : []) ?? []).slice(0, 20).map((e) => ({
     id: String(e.id),
     name: e.name,
     sportId: e.sportId,
