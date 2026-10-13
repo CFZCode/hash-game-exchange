@@ -1,15 +1,52 @@
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { SportTabs, LatestEventsStrip, InPlayList } from '../../../components/exchange';
 import Loading from '../../../components/shared/Loading';
-import { useSportsList, useLatestEvents } from '../../../hooks/exchange';
+import { useSportsList, useLatestEvents, useSportsTree } from '../../../hooks/exchange';
 import ExchangeFrame from '../ExchangeFrame';
 import { LOBBY_SPORTS, INPLAY_TAB, matchPath, sportIconOf, splitBoard } from '../model';
 
-/* In-Play first (BetBy's own order puts Live ahead of the sports), then the three boards. The
+/* In-Play first (BetBy's own order puts Live ahead of the sports), then every sport. The
    In-Play pill has no glyph: SportTabs draws sport art only, and the asset set has no "live"
    sport — BetBy's live mark is chrome (`ic-live`), which the row's own in-play mark already uses. */
-const TABS = [{ id: INPLAY_TAB, label: 'In-Play' }, ...LOBBY_SPORTS];
+const INPLAY = { id: INPLAY_TAB, label: 'In-Play' };
 const DEFAULT_TAB = 'cricket';
+
+/* The three fixed boards keep their old `?sport=` ids (cricket / soccer / tennis) and labels, so
+   existing links still land; any other sport's id is its name as a slug ("Ice Hockey" →
+   "ice-hockey"), falling back to its sid. */
+const FIXED_BY_SID = new Map(LOBBY_SPORTS.map((s) => [s.sid, s]));
+const slug = (name) =>
+  String(name ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+const list = (v) => (Array.isArray(v) ? v : []);
+
+/* The pills after In-Play: every sport of the shared sports tree (the same read, and the same
+   "has matches" rule, as the sidebar's Sports group) in the feed's order. Until the tree answers
+   — or if it fails — the three fixed boards stand in, so the row is never empty. */
+function sportTabsOf(tree) {
+  const sports = list(tree?.sports).filter((s) => list(s.children).length > 0 && s.etid != null);
+  if (sports.length === 0) return LOBBY_SPORTS.map((s) => ({ ...s, fallback: true }));
+  const seen = new Set();
+  const tabs = [];
+  for (const s of sports) {
+    const sid = Number(s.etid);
+    const fixed = FIXED_BY_SID.get(sid);
+    let id = fixed?.id ?? (slug(s.name) || String(sid));
+    if (seen.has(id)) id = `${id}-${sid}`;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    tabs.push({
+      id,
+      sid,
+      label: fixed?.label ?? s.name,
+      icon: fixed?.icon ?? sportIconOf(sid, s.name),
+      fallback: true,
+    });
+  }
+  return tabs;
+}
 
 /* The muted box InPlayList itself draws for an empty list, reused for the two states it has no
    arm for (first read in flight, read failed). */
@@ -20,8 +57,8 @@ const Notice = ({ children }) => (
 );
 
 /**
- * `/sports` — the exchange lobby. Sport pills (In-Play / Cricket / Football / Tennis, kept in
- * `?sport=` so Back returns to the same board), the latest-events strip, and the board grouped by
+ * `/sports` — the exchange lobby. Sport pills (In-Play, then every sport of the shared sports
+ * tree that has matches, kept in `?sport=` so Back returns to the same board), the latest-events strip, and the board grouped by
  * competition from `useSportsList(sid)` (5s). The sports tree (sport → competition → match) is the main sidebar's Sports group
  * (layouts/MainLayout/Sidebar/SportsMenu.jsx), so this page no longer draws a column of its own.
  *
@@ -32,22 +69,37 @@ export default function ExchangeLobby() {
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
 
+  const { data: tree, error: treeError } = useSportsTree();
+  const sportTabs = sportTabsOf(tree);
+  /* The default board keeps its pill even on a day the tree lists no match for it. */
+  if (!sportTabs.some((t) => t.id === DEFAULT_TAB)) sportTabs.unshift({ ...FIXED_BY_SID.get(4), fallback: true });
+  const tabs = [INPLAY, ...sportTabs];
+
   const asked = params.get('sport');
-  const tab = TABS.some((t) => t.id === asked) ? asked : DEFAULT_TAB;
+  /* A `?sport=` the tree has not confirmed yet (first read in flight) is held, not thrown away,
+     so a reload on /sports?sport=politics does not flash the cricket board. */
+  const treePending = tree === undefined && !treeError;
+  const known = tabs.some((t) => t.id === asked);
+  const holding = Boolean(asked) && !known && treePending;
+  const tab = known ? asked : holding ? asked : DEFAULT_TAB;
   const setTab = (id) => setParams(id === DEFAULT_TAB ? {} : { sport: id }, { replace: true });
   const all = tab === INPLAY_TAB;
+  const current = sportTabs.find((t) => t.id === tab) ?? null;
 
-  /* One poll per board, and only the boards on screen: the In-Play view needs all three, a sport
-     view only its own (a null sid disables the hook). Three explicit calls — hooks cannot sit in
-     a loop. */
+  /* One poll per board, and only the boards on screen: the In-Play view needs the three fixed
+     boards, a sport view only its own (a null sid disables the hook). Explicit calls — hooks
+     cannot sit in a loop; any sport beyond the three goes through the fourth, by its sid. */
   const cricket = useSportsList(all || tab === 'cricket' ? 4 : null);
   const soccer = useSportsList(all || tab === 'soccer' ? 1 : null);
   const tennis = useSportsList(all || tab === 'tennis' ? 2 : null);
+  const otherSid = current && !FIXED_BY_SID.has(current.sid) ? current.sid : null;
+  const other = useSportsList(otherSid);
   const boards = { cricket, soccer, tennis };
 
   const views = LOBBY_SPORTS.map((s) => ({ ...s, board: boards[s.id], rows: splitBoard(boards[s.id].data?.events, s.sid) }));
+  const otherView = otherSid != null ? { ...current, board: other, rows: splitBoard(other.data?.events, otherSid) } : null;
   const byId = new Map();
-  for (const v of views) for (const m of [...v.rows.live, ...v.rows.upcoming]) byId.set(m.id, m);
+  for (const v of otherView ? [...views, otherView] : views) for (const m of [...v.rows.live, ...v.rows.upcoming]) byId.set(m.id, m);
 
   const linkFor = (m) => matchPath(m.sid, m.gmid);
   const onSelect = (sel) => {
@@ -88,8 +140,14 @@ export default function ExchangeLobby() {
           {...listProps}
         />
       );
+  } else if (holding) {
+    body = (
+      <Notice>
+        <Loading />
+      </Notice>
+    );
   } else {
-    const view = views.find((v) => v.id === tab);
+    const view = otherView ?? views.find((v) => v.id === tab);
     const { live, upcoming } = view.rows;
     body =
       view.board.data === undefined ? (
@@ -109,7 +167,7 @@ export default function ExchangeLobby() {
       <div className="mt-4 flex gap-4">
         <div className="flex min-w-0 flex-1 flex-col gap-4">
           <LatestEventsStrip events={latestEvents} linkFor={(e) => matchPath(e.sportId, e.id)} />
-          <SportTabs sports={TABS} active={tab} onChange={setTab} />
+          <SportTabs sports={tabs} active={tab} onChange={setTab} />
           {body}
         </div>
       </div>
