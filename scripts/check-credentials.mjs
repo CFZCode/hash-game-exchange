@@ -39,7 +39,10 @@ function rows() {
   return lines.slice(1).filter(l => !l.startsWith('|---')).map(l => {
     const c = l.split(/(?<!\\)\|/).map(x => x.trim().replace(/\\\|/g, '|'))
     const v = s => (s === '—' ? '' : s.replace(/^`|`$/g, ''))
-    return { role: c[at('role')], login: v(c[at('login / email')]), password: v(c[at('password')]), tx: v(c[at('transaction password')]) }
+    const pw = v(c[at('password')])
+    const tx = v(c[at('transaction password')])
+    // TXN_PASSWORD_MODE=login: the file says so instead of repeating the password.
+    return { role: c[at('role')], login: v(c[at('login / email')]), password: pw, tx: tx === 'same as login password' ? pw : tx }
   })
 }
 
@@ -71,14 +74,20 @@ for (const r of all.filter(r => r.role === 'Owner')) {
 
 // ── Staff ─────────────────────────────────────────────────────────────────
 for (const r of all.filter(r => staffRoles.includes(r.role))) {
-  const { status, json } = await post(`${API}/admin/auth/login`, { email: r.login, password: r.password })
+  // An executive is a sub-login (no staff row): username sign-in, acting as its parent's role.
+  const isExec = r.role === 'Executive'
+  const { status, json } = isExec
+    ? await post(`${API}/admin/auth/executive/login`, { username: r.login, password: r.password })
+    : await post(`${API}/admin/auth/login`, { email: r.login, password: r.password })
   const d = json?.data ?? {}
-  const ok = status === 200 && d.token && !d.mustChangePassword && !d.firstLogin && d.actor?.roleName === r.role
-  report(`${r.role} ${r.login}: admin login (role ${d.actor?.roleName ?? '?'})`, Boolean(ok), `${status} ${json?.error?.code ?? ''}`)
+  const ok = status === 200 && d.token && !d.mustChangePassword && !d.firstLogin &&
+    (isExec ? Boolean(d.actor?.executiveId) : d.actor?.roleName === r.role)
+  report(`${r.role} ${r.login}: ${isExec ? 'executive' : 'admin'} login (role ${d.actor?.roleName ?? '?'})`, Boolean(ok), `${status} ${json?.error?.code ?? ''}`)
   if (ok) tokens[r.role] = d.token
   if (ok && r.tx) {
     // A pure check (no write): the admin-service route user-service calls before a money move.
-    const check = tx => post(`${ADMIN_SVC}/internal/admin/auth/transaction-password/check`, { staffId: d.actor.staffId, transactionPassword: tx }, null, INTERNAL)
+    const check = tx => post(`${ADMIN_SVC}/internal/admin/auth/transaction-password/check`,
+      { staffId: d.actor.staffId, transactionPassword: tx, ...(isExec ? { executiveId: d.actor.executiveId } : {}) }, null, INTERNAL)
     const right = await check(r.tx)
     const wrong = await check(`${r.tx}x`)
     report(`${r.role} ${r.login}: transaction password verifies`, right.status === 200 && right.json?.data?.verified === true && wrong.status === 403,
@@ -101,8 +110,9 @@ for (const r of all.filter(r => /player/i.test(r.role))) {
     const off = caps ? RESTRICTED.filter(k => caps[k] === false) : []
     report(`${r.role} ${r.login}: capabilities restricted (${off.join(',') || 'none'} off)`, off.length === RESTRICTED.length)
   } else {
-    const off = caps ? Object.keys(caps).filter(k => caps[k] === false) : ['(missing)']
-    report(`${r.role} ${r.login}: capabilities unrestricted`, Boolean(caps) && off.length === 0, off.join(','))
+    // A B2B site switches promotions off for every player; nothing else may be off.
+    const off = caps ? Object.keys(caps).filter(k => caps[k] === false && k !== 'promotions') : ['(missing)']
+    report(`${r.role} ${r.login}: capabilities unrestricted${caps?.promotions === false ? ' (promotions off site-wide: B2B)' : ''}`, Boolean(caps) && off.length === 0, off.join(','))
   }
   const staffApi = await get(`${API}/admin/staff`, token)
   report(`${r.role} ${r.login}: refused on the admin API`, staffApi.status === 401 || staffApi.status === 403, `${staffApi.status}`)

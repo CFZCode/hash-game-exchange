@@ -1,36 +1,45 @@
 #!/usr/bin/env node
 /**
- * Fill a FRESHLY SEEDED database with one working account per role, through the real APIs,
- * and write every login to CREDENTIALS.local.md (repo root, mode 0600, gitignored).
+ * Fill a database that has only the bootstrap Super Admin with one working account per role,
+ * through the real APIs, and write every login to CREDENTIALS.local.md (repo root, mode 0600,
+ * gitignored).
  *
- *   node scripts/make-fresh-accounts.mjs
+ *   node scripts/make-fresh-accounts.mjs           # on a freshly seeded / already wiped DB
+ *   node scripts/make-fresh-accounts.mjs --wipe    # FIRST runs scripts/wipe-accounts.sql (deletes
+ *                                                  # every account but staff id 1 and all activity)
+ *                                                  # and clears the ibitplay:rl:* Redis keys
  *
- * Needs: the stack running (./run.sh start), a database made by `db cli create/migrate/seed` +
- * `seed-data.js` (NO --demo), and RATE_LIMIT_ENABLED=false while it runs (it signs in ~16 times
- * from one address; the staff sign-in bucket allows 12 per 15 min). Switch it back on afterwards.
+ * Take a pg_dump before --wipe. Needs the stack running (./run.sh start). The staff sign-in rate
+ * limit counts failures only, so a clean run stays inside it; on a 429 clear ibitplay:rl:staff-auth:*.
  *
- * What it makes (each staff account is created BY its parent, with its parent's token, so the
- * closure table, float row and role checks are exactly the panel's):
+ * The ladder is the backend's CHILD_LEVELS (@ibitplay/auth): every level creates ONLY the level
+ * directly below it, each with its own token, so the closure table, float row and role checks are
+ * exactly the panel's:
  *
- *   Super Admin   the bootstrap one (SEED_ADMIN_EMAIL): first-login password replaced, transaction
- *                 password set; SEED_ADMIN_PASSWORD in backend/.env is updated to the final one
+ *   Super Admin   the bootstrap one (SEED_ADMIN_EMAIL): password replaced with a fresh random one;
+ *                 SEED_ADMIN_PASSWORD in backend/.env is updated to it
  *   └ Admin
- *     ├ Executive      (read-only support; under Admin, as the platform's own demo tree does)
+ *     ├ Executive      read-only sub-login (POST /admin/access/executives by the Admin; an executive is
+ *     │                not a staff row, signs in on the site admin's "Executive" tab with a username)
  *     └ Sub Admin
- *       └ Super Master   (created by Admin with parentId = Sub Admin: Sub Admin has no staff:write)
+ *       └ Super Master   (made by the Sub Admin)
  *         └ Master
  *           └ Agent
- *               └ agent player     created by the Agent (POST /admin/players) → in the agent's tree
+ *               └ agent player     made by the Agent (POST /admin/players) → in the agent's tree
  *   direct player    POST /user/auth/register, no referral, in no tree
  *
+ * TXN_PASSWORD_MODE=login (the backend default): the transaction password IS the login password,
+ * so none is set (setting one answers 409) and the file says "same as login password".
+ *
  * Every staff account replaces the password its parent chose (PATCH /admin/staff/password), so the
- * file holds the final working passwords, and sets a transaction password. Passwords come from
- * crypto.randomBytes. NOTHING SECRET IS PRINTED: the only output is "wrote N accounts" (or the
- * failing step, without values). Refuses to run when staff other than the bootstrap one exist.
+ * file holds the final working passwords. Passwords come from crypto.randomBytes. NOTHING SECRET IS
+ * PRINTED: the only output is "wrote N accounts" (or the failing step, without values). Refuses to
+ * run when staff other than the bootstrap one exist.
  */
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
+import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { createRequire } from 'node:module'
 import { URLS } from './stack.config.mjs'
@@ -40,9 +49,9 @@ const require = createRequire(import.meta.url)
 const OUT = path.join(ROOT, 'CREDENTIALS.local.md')
 const BE_ENV = path.join(ROOT, 'backend', '.env')
 const API = `${process.env.GATEWAY_URL || URLS.gateway}/api/v1`
+const SAME_AS_LOGIN = 'same as login password'
 
 const password = () => `${crypto.randomBytes(18).toString('base64url')}aZ9!`
-const txnPassword = () => `${crypto.randomBytes(12).toString('base64url')}7`
 
 function readEnv(file) {
   const out = {}
@@ -85,7 +94,22 @@ const staffLogin = async (step, email, pw) => {
 const env = readEnv(BE_ENV)
 const accounts = []
 
+/** --wipe: scripts/wipe-accounts.sql in one transaction, then the Redis rate-limit keys. */
+function wipe() {
+  const sql = spawnSync('psql', [
+    '-h', env.DB_HOST || '127.0.0.1', '-p', env.DB_PORT || '5432', '-U', env.DB_USER || 'postgres',
+    '-d', env.DB_NAME, '-v', 'ON_ERROR_STOP=1', '-q', '-f', path.join(ROOT, 'scripts', 'wipe-accounts.sql'),
+  ], { env: { ...process.env, PGPASSWORD: env.DB_PASSWORD ?? '' }, encoding: 'utf8' })
+  if (sql.status !== 0) throw new Error(`wipe: psql exited ${sql.status}`)
+  const redis = env.REDIS_URL ? ['-u', env.REDIS_URL] : []
+  const keys = spawnSync('redis-cli', [...redis, '--scan', '--pattern', `${env.REDIS_PREFIX || 'ibitplay'}:rl:*`], { encoding: 'utf8' })
+  const list = (keys.stdout || '').split('\n').filter(Boolean)
+  if (list.length) spawnSync('redis-cli', [...redis, 'del', ...list])
+}
+
 async function main() {
+  if (process.argv.includes('--wipe')) wipe()
+
   // ── Super Admin (bootstrap) ─────────────────────────────────────────────
   const saEmail = env.SEED_ADMIN_EMAIL
   const first = await staffLogin('super admin login', saEmail, env.SEED_ADMIN_PASSWORD)
@@ -104,27 +128,21 @@ async function main() {
   }
   // The seeder only reads it when it creates the account; keep .env telling the truth.
   setEnv(BE_ENV, 'SEED_ADMIN_PASSWORD', saPassword)
-  if (!saToken) saToken = (await staffLogin('super admin re-login', saEmail, saPassword)).token
-
-  const existing = await call('staff list', 'GET', '/admin/staff?limit=50', { token: saToken })
-  const rows = Array.isArray(existing) ? existing : existing?.items ?? existing?.rows ?? existing?.staff ?? []
-  if (rows.filter(r => (r.email ?? '') !== saEmail).length) {
-    throw new Error('staff other than the bootstrap super admin already exist — run on a freshly seeded database')
-  }
-
-  const saTxn = txnPassword()
-  await call('super admin transaction password', 'POST', '/admin/auth/transaction-password', {
-    token: saToken,
-    body: { currentPassword: saPassword, transactionPassword: saTxn },
-  })
-  const saMe = await staffLogin('super admin check', saEmail, saPassword)
+  const saMe = await staffLogin('super admin re-login', saEmail, saPassword)
+  if (!saToken) saToken = saMe.token
   accounts.push({
-    key: 'superadmin', role: 'Super Admin', url: `${URLS.siteAdmin}/login`, login: saEmail, password: saPassword, tx: saTxn,
+    key: 'superadmin', role: 'Super Admin', url: `${URLS.siteAdmin}/login`, login: saEmail, password: saPassword, tx: SAME_AS_LOGIN,
     id: saMe.actor?.staffId,
     note: 'Root of the staff tree (bootstrap account from `db cli seed`). Whole site: every player, every staff account, config, reports, money.',
   })
 
-  // ── The hierarchy, each account made by its parent ──────────────────────
+  const existing = await call('staff list', 'GET', '/admin/staff?limit=50', { token: saToken })
+  const rows = Array.isArray(existing) ? existing : existing?.items ?? existing?.rows ?? existing?.staff ?? []
+  if (rows.filter(r => (r.email ?? '') !== saEmail).length) {
+    throw new Error('staff other than the bootstrap super admin already exist — run with --wipe, or on a freshly seeded database')
+  }
+
+  // ── The hierarchy, each account made by its parent (CHILD_LEVELS) ───────
   // Role ids and names from the roles seed (levels from STAFF_LEVELS), not copied by hand.
   const { ROLES } = require(path.join(ROOT, 'backend/packages/db/seeders/001-roles-and-admin.js'))
   const roleId = name => {
@@ -135,57 +153,66 @@ async function main() {
 
   const TREE = [
     { key: 'admin', role: 'Admin', parent: 'superadmin', email: 'admin@hge.local',
-      note: 'Under Super Admin. Full operations: players, staff below it, payments, reports; no role management.' },
-    { key: 'executive', role: 'Executive', parent: 'admin', email: 'executive@hge.local',
-      note: 'Under Admin. Read-only support account (sees what Admin sees, changes nothing).' },
+      note: 'Under Super Admin. Full operations: players, staff below it, payments, reports; no role management. Creates Sub Admins and executives.' },
     { key: 'subadmin', role: 'Sub Admin', parent: 'admin', email: 'subadmin@hge.local',
-      note: 'Under Admin. Player operations, payments and reporting for its subtree.' },
-    // A Sub Admin has no `staff:write` (LEVEL_PERMISSIONS), so its Admin creates the Super Master
-    // under it with `parentId` — the panel's own way (a creator may place an account under one of
-    // its descendants).
-    { key: 'supermaster', role: 'Super Master', parent: 'subadmin', by: 'admin', email: 'supermaster@hge.local',
-      note: 'Under Sub Admin. Manages masters and their downstream players (agent tree).' },
+      note: 'Under Admin. Player operations, payments and reporting for its subtree; creates Super Masters.' },
+    { key: 'supermaster', role: 'Super Master', parent: 'subadmin', email: 'supermaster@hge.local',
+      note: 'Under Sub Admin (made by it). Manages masters and their downstream players (agent tree).' },
     { key: 'master', role: 'Master', parent: 'supermaster', email: 'master@hge.local',
       note: 'Under Super Master. Manages agents and their players (agent tree).' },
     { key: 'agent', role: 'Agent', parent: 'master', email: 'agent@hge.local',
       note: 'Under Master. Creates and funds its own players; owns `agent_player`. Float starts at 0.' },
   ]
   const tokens = { superadmin: saToken }
+  const actors = { superadmin: saMe.actor }
 
   for (const s of TREE) {
     const parent = accounts.find(a => a.key === s.parent)
     const temp = password()
     await call(`create ${s.role}`, 'POST', '/admin/staff', {
-      token: tokens[s.by ?? s.parent],
-      body: {
-        name: s.key, email: s.email, password: temp, roleId: roleId(s.role),
-        ...(s.by ? { parentId: Number(parent.id) } : {}),
-      },
+      token: tokens[s.parent],
+      body: { name: s.key, email: s.email, password: temp, roleId: roleId(s.role) },
     })
     const firstLogin = await staffLogin(`${s.role} first login`, s.email, temp)
     const final = password()
-    await call(`${s.role} password change`, 'PATCH', '/admin/staff/password', {
-      token: firstLogin.token,
-      body: { oldPassword: temp, newPassword: final },
-    })
+    if (firstLogin.firstLogin && !firstLogin.mustChangePassword) {
+      await call(`${s.role} first-login password`, 'POST', '/admin/auth/first-login-password', {
+        body: { email: s.email, currentPassword: temp, newPassword: final },
+      })
+    } else {
+      await call(`${s.role} password change`, 'PATCH', '/admin/staff/password', {
+        token: firstLogin.token,
+        body: { oldPassword: temp, newPassword: final },
+      })
+    }
     const session = await staffLogin(`${s.role} login`, s.email, final)
     if (session.mustChangePassword || session.firstLogin) throw new Error(`${s.role}: still asked to change the password`)
-    let tx = txnPassword()
-    try {
-      await call(`${s.role} transaction password`, 'POST', '/admin/auth/transaction-password', {
-        token: session.token,
-        body: { currentPassword: final, transactionPassword: tx },
-      })
-    } catch (error) {
-      if (s.role !== 'Executive') throw error
-      tx = '' // a read-only account that may not set one: recorded as "—"
-    }
     tokens[s.key] = session.token
+    actors[s.key] = session.actor
     accounts.push({
-      key: s.key, role: s.role, url: `${URLS.siteAdmin}/login`, login: s.email, password: final, tx,
+      key: s.key, role: s.role, url: `${URLS.siteAdmin}/login`, login: s.email, password: final, tx: SAME_AS_LOGIN,
       id: session.actor?.staffId, note: s.note, parentLogin: parent.login,
     })
   }
+
+  // ── Executive: a read-only sub-login of the Admin ───────────────────────
+  const readOnly = (actors.admin?.permissions ?? []).filter(p => /:read$/.test(p))
+  if (!readOnly.length) throw new Error('executive: the Admin holds no :read permission to grant')
+  const execPw = password()
+  const execUser = 'executive.hge'
+  await call('create Executive', 'POST', '/admin/access/executives', {
+    token: tokens.admin,
+    body: { username: execUser, password: execPw, permissions: readOnly },
+  })
+  const execSession = await call('Executive login', 'POST', '/admin/auth/executive/login', {
+    body: { username: execUser, password: execPw },
+  })
+  if (!execSession?.token) throw new Error('Executive login: no token')
+  accounts.push({
+    key: 'executive', role: 'Executive', url: `${URLS.siteAdmin}/login (Executive tab)`, login: execUser, password: execPw, tx: SAME_AS_LOGIN,
+    note: 'Sub-login of `admin@hge.local` (Admin), read-only grants only (every `:read` the Admin holds). Not a staff row: sign in on the "Executive" tab with this username (an executive username cannot hold an @).',
+    parentLogin: 'admin@hge.local',
+  })
 
   // ── Agent player: made by the Agent, so it sits in the agent's tree ─────
   const agentPlayerPw = password()
@@ -199,34 +226,52 @@ async function main() {
   })
 
   // ── Direct player: the public sign-up, no referral ──────────────────────
+  // A B2B site (owner policy business_model=b2b) closes public sign-up; the owner's choice is left
+  // alone and the Super Admin makes a house player instead (owned by level 1 → not in the agent tree).
   const directPw = password()
-  await call('direct player register', 'POST', '/user/auth/register', {
-    body: { username: 'direct_player', email: 'direct_player@hge.local', password: directPw },
-  })
+  let viaSignup = true
+  try {
+    await call('direct player register', 'POST', '/user/auth/register', {
+      body: { username: 'direct_player', email: 'direct_player@hge.local', password: directPw },
+    })
+  } catch (error) {
+    if (!/SITE_POLICY_CHANNEL_CLOSED/.test(error.message)) throw error
+    viaSignup = false
+    await call('direct player create (house)', 'POST', '/admin/players', {
+      token: saToken,
+      body: { username: 'direct_player', password: directPw, initialBalance: '0' },
+    })
+  }
   accounts.push({
     key: 'direct_player', role: 'Direct player', url: `${URLS.frontend}/login/signin`, login: 'direct_player', password: directPw, tx: '',
-    note: 'Self-registered through the public sign-up, no referral, in no agent tree (house player). Every player page; email `direct_player@hge.local` also signs in. Balance 0, KYC not done.',
+    note: viaSignup
+      ? 'Self-registered through the public sign-up, no referral, in no agent tree (house player). Every player page; email `direct_player@hge.local` also signs in. Balance 0, KYC not done.'
+      : 'House player made by the Super Admin (public sign-up is closed: the owner set this site to B2B), no referral, in no agent tree. Deposit, withdraw, swap and vault open; promotions off for everyone on a B2B site. Balance 0, KYC not done.',
   })
 }
 
 function writeFile() {
   const ownerEnv = readEnv(path.join(ROOT, 'owner-panel', '.env.local'))
   const cell = v => String(v ?? '').replace(/\|/g, '\\|').replace(/\n/g, ' ')
-  const code = v => (v ? '`' + cell(v).replace(/`/g, "'") + '`' : '—')
+  const code = v => (v === SAME_AS_LOGIN ? v : v ? '`' + cell(v).replace(/`/g, "'") + '`' : '—')
+  const ORDER = ['superadmin', 'admin', 'executive', 'subadmin', 'supermaster', 'master', 'agent', 'agent_player', 'direct_player']
+  const made = [...accounts].sort((a, b) => ORDER.indexOf(a.key) - ORDER.indexOf(b.key))
+  const today = new Date().toLocaleDateString('en-CA')
   const rows = [
     {
       role: 'Owner', url: `${URLS.ownerPanel}/login`, login: ownerEnv.OWNER_USERNAME, password: ownerEnv.OWNER_PASSWORD, tx: '',
       note: 'Ours only, never handed to the client. Features & plan, policies, coins, branding, audit. Config login (owner-panel/.env.local), no DB row.',
     },
-    ...accounts,
+    ...made,
   ]
-  const tree = accounts
+  const tree = made
     .filter(a => a.parentLogin)
     .map(a => `${a.role} \`${a.login}\` ← ${accounts.find(p => p.login === a.parentLogin)?.role}`)
   const doc = `# Credentials (LOCAL ONLY)
 
-Generated by \`node scripts/make-fresh-accounts.mjs\` on ${new Date().toISOString().slice(0, 10)}, on a freshly wiped
-and seeded \`cfz_hash_game_exchange\`. Gitignored, mode 0600: never commit, paste or share.
+Generated by \`node scripts/make-fresh-accounts.mjs\` on ${today}, after a cleanup: every old account and all
+their activity were wiped from \`cfz_hash_game_exchange\` (\`scripts/wipe-accounts.sql\`; platform data kept) and
+this tree was made fresh through the real APIs. Gitignored, mode 0600: never commit, paste or share.
 Check them all with \`node scripts/check-credentials.mjs\` (prints OK/FAIL only).
 
 ## How to run
@@ -242,12 +287,13 @@ Check them all with \`node scripts/check-credentials.mjs\` (prints OK/FAIL only)
 - Player site: ${URLS.frontend}
 - Gateway: ${URLS.gateway}
 
-Staff sign in on the site admin only, players on the player site only. The transaction password is
-asked before a transfer, a wallet adjust or a setting change. Every password below is final (the
-first-login change is already done).
+Staff sign in on the site admin only (executives on its "Executive" tab, with a username), players on
+the player site only. The transaction password is asked before a transfer, a wallet adjust or a setting
+change; this backend runs TXN_PASSWORD_MODE=login, so it is the account's own login password. Every
+password below is final (the first-login change is already done). Balances all start at 0.
 
-Staff tree: Super Admin → Admin → Sub Admin → Super Master → Master → Agent → agent_player; Executive
-sits under Admin. (${tree.join('; ')})
+Staff tree (each level made by the one above it, CHILD_LEVELS): Super Admin → Admin → Sub Admin → Super
+Master → Master → Agent → agent_player; Executive is a read-only sub-login of Admin. (${tree.join('; ')})
 
 | role | sign in at | login / email | password | transaction password | notes |
 |---|---|---|---|---|---|
