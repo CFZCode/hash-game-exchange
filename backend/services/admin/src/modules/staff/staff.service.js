@@ -626,9 +626,9 @@ class StaffService {
           parent_id: parent,
           percentage: percentage ?? null,
           status: 'active',
-          // Somebody else chose this password, so its owner must replace it
-          // before the panel does anything else (see the auth guard).
-          must_change_password: true,
+          // The creator's password is final: no forced change on first sign-in.
+          must_change_password: false,
+          first_login: false,
         },
         { transaction }
       );

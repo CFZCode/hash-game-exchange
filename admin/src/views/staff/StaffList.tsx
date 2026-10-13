@@ -177,13 +177,13 @@ const CreateStaff = () => {
         </Button>
       }
       title='Create a staff account'
-      description='The new account reports to you unless you pick someone in your team. Password must be at least 12 characters; they will be asked to change it on first sign-in.'
+      description='The new account reports to you unless you pick someone in your team. Password must be at least 12 characters; the new account signs in with it.'
       submitLabel='Create'
       onSubmit={() => create.mutateAsync()}
     >
       <TextField id='s-name' label='Name' required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
       <TextField id='s-email' label='Email' type='email' required value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
-      <TextField id='s-password' label='Temporary password' type='password' required minLength={12} value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} />
+      <TextField id='s-password' label='Password' type='password' required minLength={12} value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} />
       <div className='grid grid-cols-2 gap-4'>
         <SelectField id='s-role' label='Role' value={form.roleId} onChange={setRole} options={roles.map(([v, l]) => ({ value: v, label: `${l} (level ${v})` }))} />
         <TextField id='s-pct' label='Share %' hint='0–100, up to 4 decimals' value={form.percentage} onChange={e => setForm({ ...form, percentage: e.target.value })} />
