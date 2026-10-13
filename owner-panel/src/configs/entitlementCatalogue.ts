@@ -299,6 +299,16 @@ const CATALOGUE: FeatureEntry[] = [
     ]
   },
   {
+    key: 'p2p',
+    label: 'P2P trading',
+    category: 'wallet',
+    flag: null,
+    variants: [
+      { key: 'order_book', label: 'P2P trading', description: 'Players buy and sell crypto against staff-run fiat offers (GET /user/p2p/offers, POST /user/p2p/orders, /sell-orders), with payment proofs, disputes and a staff release desk.' },
+      { key: 'none', label: 'Off', description: 'No P2P trading.' }
+    ]
+  },
+  {
     key: 'chat',
     label: 'Chat / social / presence',
     category: 'content',

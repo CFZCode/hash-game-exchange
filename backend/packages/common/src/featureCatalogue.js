@@ -559,6 +559,27 @@ const TIPS = {
   ],
 };
 
+/**
+ * Peer-to-peer trading — hand-written, like TIPS. The player API is
+ * `services/user/src/modules/p2p` (`/user/p2p`), the operator's is `/admin/p2p`;
+ * both routers are guarded by `requireFeature('p2p')`, so an owner who leaves
+ * it out of the plan closes the player trades and the staff screens alike.
+ */
+const P2P = {
+  key: 'p2p',
+  label: 'P2P trading',
+  category: 'wallet',
+  flag: null,
+  variants: [
+    {
+      key: 'order_book',
+      label: 'P2P trading',
+      description: 'Players buy and sell crypto against staff-run fiat offers (GET /user/p2p/offers, POST /user/p2p/orders, /sell-orders), with payment proofs, disputes and a staff release desk.',
+    },
+    { key: 'none', label: 'Off', description: 'No P2P trading.' },
+  ],
+};
+
 const PUSH_NOTIFICATIONS = {
   key: 'push_notifications',
   label: 'Push notifications',
@@ -740,7 +761,7 @@ const WITHDRAWAL_REQUIREMENTS_POLICY = {
   ],
 };
 
-const FEATURES = Object.freeze([...POLICIES, REWARD_CURRENCY_POLICY, REGION_RESTRICTION_POLICY, WITHDRAWAL_REQUIREMENTS_POLICY, ...GENERATED, TIPS, PUSH_NOTIFICATIONS, ANALYTICS]);
+const FEATURES = Object.freeze([...POLICIES, REWARD_CURRENCY_POLICY, REGION_RESTRICTION_POLICY, WITHDRAWAL_REQUIREMENTS_POLICY, ...GENERATED, TIPS, P2P, PUSH_NOTIFICATIONS, ANALYTICS]);
 
 /**
  * Site templates — the bundles the OWNER picks for a site (docs/OWNER-PANEL.md
@@ -773,6 +794,7 @@ const TEMPLATES = Object.freeze({
         "vault": "flat_balance",
         "swap": "swap_page",
         "tips": "none",
+        "p2p": "none",
         "chat": "none",
         "notifications": "notice_centre",
         "banners": "artwork_slides",

@@ -129,6 +129,8 @@ test('player guards', async (t) => {
     ['user/src/modules/gift-cards/routes/user.routes', 'POST', '/claim', 'gift_cards', 'giftcards'],
     ['user/src/modules/tip/routes/user.routes', 'POST', '/send', 'tips', null],
     ['user/src/modules/tip/routes/user.routes', 'GET', '/users?q=ab', 'tips', null],
+    ['user/src/modules/p2p/routes/user.routes', 'GET', '/offers', 'p2p', null],
+    ['user/src/modules/p2p/routes/user.routes', 'POST', '/orders', 'p2p', null],
   ]) {
     await t.test(`${feature}: refused by the feature${flag ? ' and by its product flag' : ''}`, async () => {
       const call = await mount(t, routerPath);
@@ -140,4 +142,23 @@ test('player guards', async (t) => {
       }
     });
   }
+
+  await t.test('p2p: the staff routes are refused with the player ones', async () => {
+    const allow = () => (_req, _res, next) => next();
+    const adminDeps = { ...deps, auth: { requirePermission: allow }, clients: { ...deps.clients, admin: { post: async () => ({}) } }, config: { SERVICE_NAME: 'user' } };
+    const app = express();
+    app.use(express.json());
+    app.use(requestContext());
+    app.use(require(`${SERVICES}/user/src/modules/p2p/routes/admin.routes`)(adminDeps));
+    app.use(errorHandler({ logger }));
+    const server = app.listen(0);
+    t.after(() => server.close());
+    const base = `http://127.0.0.1:${server.address().port}`;
+    plan({ p2p: false });
+    for (const [method, path] of [['GET', '/orders'], ['POST', '/orders/1/release'], ['GET', '/payment-types']]) {
+      const res = await fetch(`${base}${path}`, { method, headers: { 'content-type': 'application/json' }, body: method === 'GET' ? undefined : '{}' });
+      const json = await res.json();
+      refused({ status: res.status, code: json?.error?.code, details: json?.error?.details }, 'feature', 'p2p');
+    }
+  });
 });

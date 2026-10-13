@@ -1,7 +1,7 @@
 'use strict';
 
 const { Router } = require('express');
-const { validate, createActivityRecorder } = require('@ibitplay/common');
+const { validate, createActivityRecorder, entitlements } = require('@ibitplay/common');
 const { PERMISSIONS } = require('@ibitplay/auth');
 
 const v = require('../p2p.validators');
@@ -52,6 +52,9 @@ module.exports = function adminRoutes(deps) {
   });
 
   const router = Router();
+
+  // Not in the owner's plan: the staff desk closes with the player side (403 NOT_ENTITLED).
+  router.use(entitlements.requireFeature('p2p'));
 
   /**
    * Two permissions, not one.

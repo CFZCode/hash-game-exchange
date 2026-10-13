@@ -49,6 +49,7 @@ export const TEMPLATE_CATALOGUE: TemplateEntry[] = [
       vault: 'flat_balance',
       swap: 'swap_page',
       tips: 'none',
+      p2p: 'none',
       chat: 'none',
       notifications: 'notice_centre',
       banners: 'artwork_slides',
