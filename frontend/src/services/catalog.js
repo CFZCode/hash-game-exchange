@@ -75,6 +75,15 @@ export const isLiveSet = (key) => !USE_FIXTURES && Object.prototype.hasOwnProper
 
 const SORT_PARAM = { 'a-z': 'az', 'z-a': 'za' };
 
+/**
+ * A game's tags as plain words. The JSGames import wrote strings; Slotegrator sends
+ * `{ code, label }` objects, which React cannot render as text.
+ */
+export const tagWords = (tags) =>
+  (Array.isArray(tags) ? tags : [])
+    .map((tag) => (typeof tag === 'string' ? tag : tag?.label || tag?.code || ''))
+    .filter(Boolean);
+
 export function toCatalogGame(row) {
   return {
     slug: row.slug || row.uuid,
@@ -83,7 +92,9 @@ export function toCatalogGame(row) {
     category: row.type ?? '',
     players: 0,
     sections: [],
-    tags: Array.isArray(row.tags) ? row.tags : [],
+    tags: tagWords(row.tags),
+    // The provider's own facts (Slotegrator: rtp, volatility, lines); the game page shows RTP from it.
+    parameters: row.parameters && typeof row.parameters === 'object' ? row.parameters : null,
     image: row.image || (typeof row.images === 'string' ? row.images : Object.values(row.images || {}).map((i) => (typeof i === 'string' ? i : i?.url)).find(Boolean)) || undefined,
     uuid: row.uuid,
     source: 'aggregator',

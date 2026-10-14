@@ -10,6 +10,7 @@ import PopCenter from '../../components/shared/PopCenter';
 import Select from '../../components/shared/Select';
 import { toast } from '../../components/shared/Toast/toast';
 import { getGame, launchGame, launchCurrency } from '../../services/game';
+import { tagWords } from '../../services/catalog';
 import { getAlias, printCurrency } from '../../utils/currency';
 import { addFavoriteGame, isFavoriteGame, removeFavoriteGame } from '../../services/collection';
 import { formatOnlineUsers } from '../../utils/gameArt';
@@ -42,6 +43,12 @@ import './Game.css';
 /* `--` is what the original prints for a figure it does not have (the level card's next tier,
    the vault's return); the same sentinel here for the four stats no source carries. */
 const UNKNOWN = '--';
+
+/** The game's RTP in percent from the provider's `parameters`, or null. */
+function rtpOf(game) {
+  const rtp = Number(game?.parameters?.rtp);
+  return Number.isFinite(rtp) && rtp > 0 && rtp <= 100 ? rtp : null;
+}
 
 function Stat({ label, value = UNKNOWN }) {
   return (
@@ -611,9 +618,9 @@ export default function GamePage() {
                   </p>
                 ) : null}
               </div>
-              {game?.tags?.length ? (
+              {tagWords(game?.tags).length ? (
                 <div className="game-info-tags">
-                  {game.tags.map((tag) => (
+                  {tagWords(game.tags).map((tag) => (
                     <Link key={tag} to={`/tagname/${encodeURIComponent(tag)}`} className="game-info-tag">
                       # {brandLabel(tag)}
                     </Link>
@@ -623,8 +630,9 @@ export default function GamePage() {
             </div>
             {game ? (
               <div className="game-stats">
-                <Stat label="House Edge" />
-                <Stat label="RTP (Return to Player)" />
+                {/* Slotegrator rows carry `parameters.rtp`; the JSGames import has none (shows "--"). */}
+                <Stat label="House Edge" {...(rtpOf(game) != null ? { value: `${(100 - rtpOf(game)).toFixed(2)}%` } : {})} />
+                <Stat label="RTP (Return to Player)" {...(rtpOf(game) != null ? { value: `${rtpOf(game)}%` } : {})} />
                 <Stat label="Max Win" />
                 <Stat label="Stakes Range" />
               </div>
