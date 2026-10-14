@@ -30,7 +30,7 @@ async function up({ sequelize, transaction, logger }) {
     `CREATE UNIQUE INDEX IF NOT EXISTS gisgamesnew_parked_uuid_key ON gisgamesnew_parked (uuid)`,
     { transaction }
   );
-  logger?.info('096: gisgamesnew.aggregator and gisgamesnew_parked ready');
+  logger?.info('097: gisgamesnew.aggregator and gisgamesnew_parked ready');
 }
 
 async function down({ sequelize, transaction, logger }) {
@@ -40,7 +40,7 @@ async function down({ sequelize, transaction, logger }) {
   );
   await sequelize.query(`DROP TABLE IF EXISTS gisgamesnew_parked`, { transaction });
   await sequelize.query(`ALTER TABLE gisgamesnew DROP COLUMN IF EXISTS aggregator`, { transaction });
-  logger?.info('096: reverted');
+  logger?.info('097: reverted');
 }
 
 module.exports = { up, down };

@@ -796,7 +796,7 @@ const WITHDRAWAL_REQUIREMENTS_POLICY = {
  * A policy (always in force, the variant IS the setting, the owner alone sets it, staff see it
  * read-only → `403 OWNER_MANAGED`), with no `none`: the lobby always has one aggregator. The
  * catalogue table holds ONE aggregator's games at a time; switching parks the other's rows in
- * `gisgamesnew_parked` (migration 096) and brings the chosen one's back, so switching back needs
+ * `gisgamesnew_parked` (migration 097) and brings the chosen one's back, so switching back needs
  * no re-fetch. The default `js_games` is the catalogue every site had before this existed.
  */
 const CASINO_AGGREGATOR_POLICY = {

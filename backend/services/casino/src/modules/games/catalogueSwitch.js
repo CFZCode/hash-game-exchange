@@ -6,7 +6,7 @@ const { sitePolicy } = require('@ibitplay/common');
  * The casino aggregator switch — the owner's `casino_aggregator` policy, applied to the catalogue.
  *
  * `gisgamesnew` (what the lobby reads) holds ONE aggregator's games at a time. The other's rows
- * wait in `gisgamesnew_parked` (migration 096), ids and all, so switching back brings the same
+ * wait in `gisgamesnew_parked` (migration 097), ids and all, so switching back brings the same
  * games, favourites and artwork back without a re-fetch — JSGames V2 refuses its list endpoints
  * to our key, so a deleted JSGames catalogue could not be fetched again.
  *
@@ -33,7 +33,7 @@ async function chosenAggregator(models) {
 
 /**
  * Make the catalogue match the policy. Returns what moved: `{ aggregator, parked, restored }`.
- * A database without migration 096 is left alone (`skipped: true`).
+ * A database without migration 097 is left alone (`skipped: true`).
  */
 async function applyAggregator({ db, models, logger }) {
   const aggregator = await chosenAggregator(models);

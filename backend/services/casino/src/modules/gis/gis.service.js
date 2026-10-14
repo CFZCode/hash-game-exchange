@@ -1072,7 +1072,7 @@ class GisService {
 
     // Slotegrator rows go to the lobby's table when Slotegrator is the owner's aggregator,
     // otherwise to the parked one — `games/catalogueSwitch.js`. A database before migration
-    // 096 has neither the column nor the parked table: the plain upsert, as before.
+    // 097 has neither the column nor the parked table: the plain upsert, as before.
     const switchReady = await this.#aggregatorSwitchReady();
     const table = switchReady && (await chosenAggregator(this.models)) !== 'slotegrator' ? PARKED : LIVE;
 
@@ -1158,7 +1158,7 @@ class GisService {
 
   // ══════════════════════════════════════════════════════════════════════
 
-  /** Is migration 096 (the aggregator column and the parked table) in this database? */
+  /** Is migration 097 (the aggregator column and the parked table) in this database? */
   async #aggregatorSwitchReady() {
     const [[row]] = await this.db.sequelize.query(`SELECT to_regclass('${PARKED}') IS NOT NULL AS ok`);
     return Boolean(row?.ok);

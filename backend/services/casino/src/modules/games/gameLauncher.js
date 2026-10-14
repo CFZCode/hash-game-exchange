@@ -24,7 +24,7 @@ async function aggregatorOf({ db }, gameUuid) {
     });
     return row?.aggregator === 'slotegrator' ? 'slotegrator' : 'js_games';
   } catch {
-    // Before migration 096 there is no column: every lobby game is a JSGames one.
+    // Before migration 097 there is no column: every lobby game is a JSGames one.
     return 'js_games';
   }
 }
