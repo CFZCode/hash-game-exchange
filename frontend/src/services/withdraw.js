@@ -1,6 +1,8 @@
 import { request, USE_FIXTURES, ApiError } from './client';
 import ENDPOINTS, { PLATFORM } from './endpoints';
-import { CURRENCY_TOKENS, tokensFor, defaultToken, lowestWithdrawLimit } from '../data/currencyTokens';
+import { CURRENCY_TOKENS, defaultToken, lowestWithdrawLimit } from '../data/currencyTokens';
+/* The captured table cut to the owner's enabled networks (identity in fixture mode). */
+import { tokensFor } from './currencies';
 
 /* `/wallet/withdraw` — the crypto withdraw form.
  *

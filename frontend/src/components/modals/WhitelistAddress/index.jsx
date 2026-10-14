@@ -9,7 +9,8 @@ import { useIsDesktop } from '../../../hooks/useMediaQuery';
 import { addWhitelistAddress, renameWhitelistAddress } from '../../../services/settings';
 import { emit, WHITELIST_CHANGED } from '../../../context/appEvents';
 import { getAlias } from '../../../utils/currency';
-import { tokensFor } from '../../../data/currencyTokens';
+/* The captured token table cut to the owner's enabled networks (identity in fixture mode). */
+import { tokensFor } from '../../../services/currencies';
 
 /* `/settings/whitelist/add` and `/settings/whitelist/edit` — the two forms behind the Whitelist
  * Management pane's Add Address button and each row's pencil.

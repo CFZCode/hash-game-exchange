@@ -25,7 +25,8 @@
 
 import { rechargeBonusConfigNow } from '../../services/bonus';
 import { getCurrency } from '../../data/currencies';
-import { tokensFor } from '../../data/currencyTokens';
+/* The captured token table cut to the owner's enabled networks (identity in fixture mode). */
+import { tokensFor } from '../../services/currencies';
 import { convertCurrency } from '../../utils/currency';
 import { USE_FIXTURES, request } from '../../services/client';
 

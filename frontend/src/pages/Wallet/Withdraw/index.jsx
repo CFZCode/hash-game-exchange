@@ -8,7 +8,8 @@ import { useSession } from '../../../context/session';
 import { getCurrency } from '../../../data/currencies';
 import { getAlias, printCurrency } from '../../../utils/currency';
 import { coinIcon } from '../../../utils/coinArt';
-import { tokensFor } from '../../../data/currencyTokens';
+/* The captured token table cut to the owner's enabled networks (identity in fixture mode). */
+import { tokensFor } from '../../../services/currencies';
 import {
   getWithdrawFee,
   getUnlockedBalance,

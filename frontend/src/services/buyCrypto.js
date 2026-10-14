@@ -2,6 +2,7 @@ import { request } from './client';
 import ENDPOINTS from './endpoints';
 import { BUY_FIATS, BUY_COINS } from '../data/buyCrypto';
 import { getUsdPrice } from '../data/usdPrice';
+import { filterListedCodes } from './currencies';
 
 /* `/wallet/buy` — Buy Crypto. `api-C3PVkuGZ.js` is the page's whole request module and is barely
  * minified, so every path and body below is the chunk's own.
@@ -24,7 +25,24 @@ import { getUsdPrice } from '../data/usdPrice';
    what the page destructures (`a = () => config()[0]`, `o = () => config()[1]`) and because it is
    what a real answer will arrive as. */
 export function getBuyCryptoConfig() {
-  return request(ENDPOINTS.buyCrypto.fiats, { fixture: [BUY_FIATS, BUY_COINS] });
+  const cut = ([fiats, coins]) => [fiats, enabledCoins(coins)];
+  const config = request(ENDPOINTS.buyCrypto.fiats, { fixture: [BUY_FIATS, BUY_COINS] });
+  /* `FIXTURE_DELAY=0` answers synchronously and must stay synchronous (see services/client.js). */
+  return typeof config?.then === 'function' ? config.then(cut) : cut(config);
+}
+
+/* THE COINS ARE CUT TO THE OWNER'S LIST (`services/currencies.js`): a coin the site does not take
+   cannot be bought into this wallet. `null` (fixture mode, a failed read) keeps all 38. If the cut
+   would leave none — the list and Onramper's catalogue share no code — the catalogue stays whole,
+   since an empty select is a broken page rather than a smaller one.
+
+   THE FIATS ARE NOT CUT, deliberately. They are what the card is charged in (Onramper's 42, USD
+   the default), not wallet currencies: the platform's fiats are seven wallet columns, and cutting
+   by them would drop USD, the page's opening currency. */
+function enabledCoins(coins) {
+  const codes = new Set(filterListedCodes((coins ?? []).map((row) => row.coinCode)));
+  const kept = (coins ?? []).filter((row) => codes.has(row.coinCode));
+  return kept.length ? kept : coins;
 }
 
 /* ── THE QUOTE ────────────────────────────────────────────────────────────────────────────────

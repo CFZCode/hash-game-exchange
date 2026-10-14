@@ -751,6 +751,10 @@ export const PLATFORM = {
        `eur` was added to this map by migration 037: the wallet has 28 currency columns and the
        flag list carried 27, so EUR was the one currency an operator could not switch off. */
     config: '/api/v1/admin/site-config/public',
+    /* THE OWNER'S COIN LIST: only the coins switched on (owner plan, site admin, not retired),
+       each with its enabled networks `[{key, name}]`. An allow-list, read beside the flags above
+       because an owner-created coin has a row here and no flag there. See services/currencies.js. */
+    currencies: '/api/v1/admin/currencies/public',
     banners: '/api/v1/admin/banners',
     banner: (type) => `/api/v1/admin/banners/${type}`,
     bannerImage: (type) => `/api/v1/admin/banners/image/${encodeURIComponent(type)}`,

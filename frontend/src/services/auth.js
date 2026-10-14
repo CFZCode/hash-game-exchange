@@ -1,6 +1,7 @@
 import { request } from './client';
 import { loadCapabilities } from './gates';
 import { getSiteConfig, isCurrencyEnabled } from './siteConfig';
+import { isCurrencyListed, loadEnabledCurrencies } from './currencies';
 import { PLATFORM } from './endpoints';
 import { clearTokens, setTokens } from './tokens';
 import { ACCOUNT_DEFAULTS, SIGNED_IN, SIGNED_IN_BALANCES, VISITOR } from '../context/account';
@@ -55,7 +56,7 @@ import { dropUnpricedCodes } from '../data/usdPrice';
  * `SIGNED_IN_BALANCES`; the catalogue is the better source and agrees with it on every code this
  * wallet carries.
  */
-function toWalletRows(balances, flags) {
+export function toWalletRows(balances, flags, listed = null) {
   return Object.entries(balances ?? {})
     /* THE OPERATOR'S OWN CURRENCY SWITCHES, and the filter runs BEFORE `index` is taken so `sort`
        stays a dense 0..n-1 over the rows that survive rather than carrying holes where a disabled
@@ -66,6 +67,10 @@ function toWalletRows(balances, flags) {
        `services/siteConfig.js` for why a broken config must never hide a currency. So this is a
        no-op on a deployment that has not configured itself, which is every one of them today. */
     .filter(([code]) => isCurrencyEnabled(flags, code, isFiatCode(code)))
+    /* AND THE OWNER'S COIN LIST (`/admin/currencies/public`, see `services/currencies.js`): only
+       the coins switched on in the owner panel, owner-created ones included, which have no flag
+       above. `null` (fixture mode, a failed read) keeps every row, the same rule as the flags. */
+    .filter(([code]) => isCurrencyListed(listed, code))
     .map(([code, amount], index) => {
     const fiat = isFiatCode(code);
     return {
@@ -338,7 +343,7 @@ async function readBonusSummary() {
  * the time the header spends on its signed-out tree.
  */
 export async function loadAccount(previous) {
-  const [profile, balances, prefs, bonus, siteConfig] = await Promise.all([
+  const [profile, balances, prefs, bonus, siteConfig, listed] = await Promise.all([
     request(PLATFORM.user.profile.get, { live: true, fixture: null }),
     request(PLATFORM.user.wallet.balances, { live: true, fixture: null }),
     /* The third read is the marketing switch's own state, and it is folded into the ACCOUNT
@@ -361,6 +366,10 @@ export async function loadAccount(previous) {
        and a second round trip after the account had landed would show the full list and then
        shorten it. */
     getSiteConfig(),
+    /* THE SIXTH IS THE OWNER'S COIN LIST, public, and allowed to fail for the fifth's reason: a
+       `null` list hides nothing. Read fresh on every load so a reload sees the panel's latest
+       switches, and it also fills the store the deposit and withdraw network selects read. */
+    loadEnabledCurrencies({ fresh: true }),
   ]);
 
   if (!profile) return FIXTURE_ACCOUNT;
@@ -369,7 +378,7 @@ export async function loadAccount(previous) {
      browser's push subscription has to be tied to this player. */
   pushLogin(profile.id);
 
-  const rows = toWalletRows(balances, siteConfig);
+  const rows = toWalletRows(balances, siteConfig, listed);
 
   /* THE WALLET IS WHAT SAYS WHICH CURRENCIES ARE REAL HERE, so it is what settles the rate table.
      `data/usdPrice.js` is a merge of this platform's rates over bc.game's captured snapshot, and

@@ -2,6 +2,7 @@ import { request, USE_FIXTURES } from './client';
 import ENDPOINTS, { PLATFORM } from './endpoints';
 import { SWAP_CONFIG } from '../data/swapConfig';
 import { getUsdPrice } from '../data/usdPrice';
+import { isCurrencyListed, enabledCurrencies } from './currencies';
 
 /* `/wallet/swap`. `api-CW_rj_H1.js` is the page's whole request module and is barely minified, so
  * the four paths and their POST bodies are the chunk's own.
@@ -232,5 +233,10 @@ export function swapOptions(config, balances) {
 
   if (!USE_FIXTURES) return balances.map((coin) => coin.currencyName);
 
-  return config.list.filter((code) => wallet.has(code) && Number(wallet.get(code).amount) >= 0);
+  /* And the owner's coin list (`services/currencies.js`), which is `null` — every coin — in
+     fixture mode; the live arm above already reads a wallet that list has cut. */
+  const listed = enabledCurrencies();
+  return config.list.filter(
+    (code) => wallet.has(code) && Number(wallet.get(code).amount) >= 0 && isCurrencyListed(listed, code),
+  );
 }

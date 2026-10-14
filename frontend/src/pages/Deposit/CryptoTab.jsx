@@ -9,6 +9,7 @@ import { useIsDialog } from '../../context/dialogRoute';
 import { IconCopy, IconArrow, IconSearch, IconClose, IconInform } from '../../components/shared/icons';
 import useResource from '../../hooks/useResource';
 import { USE_FIXTURES } from '../../services/client';
+import { depositQuickPicks, inWallet } from '../../services/currencies';
 import Notice from '../../components/shared/Notice';
 import {
   depositDefault,
@@ -51,8 +52,12 @@ function QuickPick({ currency, onPick, onOpenSelect }) {
      The wallet capture shows six (ETH BTC USDT USDC DOGE SOL) over a three-icon stack, which is
      how this was caught. See context/dialogRoute.js. */
   const count = useIsDialog() ? 4 : 6;
-  const chips = DEFAULT_CURRENCIES.slice(0, count);
-  const rest = DEFAULT_CURRENCIES.slice(count, count + 3);
+  /* Only the defaults the wallet carries — the wallet is already cut to the coins the owner
+     enabled (services/currencies.js). Fixture mode keeps all ten. */
+  const { balances } = useSession();
+  const picks = depositQuickPicks(DEFAULT_CURRENCIES, balances);
+  const chips = picks.slice(0, count);
+  const rest = picks.slice(count, count + 3);
 
   return (
     /* `hide-scroll overflow-x-auto` + `flex-none` chips: six chips and the More pile are wider
@@ -154,10 +159,12 @@ export default function CryptoTab() {
   /* A fiat wallet (INR in the header) or an undepositable coin lands on the SITE'S default coin
      (the owner's `default_currency`, USDT) — not the quick-pick list's first entry, which is
      ETH and is the original's order, not this site's default. */
-  const cryptoOk = (name) => Boolean(name) && name !== 'BCD' && getCurrency(name)?.currencyType !== 'FIAT' && Boolean(networksFor(name));
+  /* `inWallet`: the fallback must be a coin the owner enabled, i.e. one the (cut) wallet carries —
+     always true in fixture mode. Failing all named ones, the wallet's first crypto row. */
+  const cryptoOk = (name) => Boolean(name) && name !== 'BCD' && getCurrency(name)?.currencyType !== 'FIAT' && Boolean(networksFor(name)) && inWallet(balances, name);
   const initial = cryptoOk(seed)
     ? seed
-    : [session.defaultCurrency, 'USDT', DEFAULT_CURRENCIES[0]].find(cryptoOk) ?? DEFAULT_CURRENCIES[0];
+    : [session.defaultCurrency, 'USDT', DEFAULT_CURRENCIES[0], ...balances.map((coin) => coin.currencyName)].find(cryptoOk) ?? DEFAULT_CURRENCIES[0];
 
   const [currency, setCurrency] = React.useState(initial);
   const networks = networksFor(currency);
