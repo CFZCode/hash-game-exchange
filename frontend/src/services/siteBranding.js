@@ -139,11 +139,12 @@ export function brandTokens() {
   };
 }
 
-/** "BC Originals" / "BC Exclusive" / "BC.GAME: Originals" as Parker567 prints them. For labels
- *  that double as keys (tag hrefs, tag searches) — rename at DISPLAY only. */
+/** "BC Originals" / "BC Exclusive" / "BC.GAME: Originals" as this site prints them: the bare
+ *  word, "Originals" / "Exclusive", with no brand prefix (the user's call — not "Parker567
+ *  Originals"). For labels that double as keys (tag hrefs, tag searches) — rename at DISPLAY only. */
 export const brandLabel = (label) =>
   typeof label === 'string'
-    ? label.replace(/\bBC(?:\.GAME)?(:?)\s+(Originals|Exclusive)\b/g, (_, colon, word) => `${brandName()}${colon} ${word}`)
+    ? label.replace(/\bBC(?:\.GAME)?:?\s+(Originals|Exclusive)\b/g, (_, word) => word)
     : label;
 
 export const siteTitle = () => runtime?.title ?? runtime?.siteName ?? env('NEXT_PUBLIC_SITE_TITLE');
