@@ -132,7 +132,9 @@ const CATEGORIES = [
   { key: 'racing', icon: 'racing', title: 'RACING', src: racingImg, href: '/racing' },
   /* LOTTERY (`/lottery`) sat here on the original; removed on the user's request, a deliberate
      departure — see .claude/skills/hash-ui-fidelity. The three remaining cards share the row. */
-  { key: 'bingo', icon: 'bingo', title: 'BINGO', src: bingoImg, href: '/bingo' },
+  /* The Bingo card's art, relabelled SLOTS on the user's request (hash.game has no slots render);
+     it opens the casino Slots list, the same route as the sidebar's Slots row. */
+  { key: 'slots', icon: 'bingo', title: 'SLOTS', src: bingoImg, href: '/casino/slots' },
 ];
 
 /* The light half of the only paired card in that list. A lookup rather than a second field on
