@@ -167,7 +167,7 @@ export default function Bonus({ mobile = false, onBack }) {
      derived timestamps in the payload should not jump because money moved. */
   const [reloads, setReloads] = React.useState(0);
   const read = React.useCallback(() => getRewards({ now, reloads }), [now, reloads]);
-  const { data: payload, loading } = useResource(read);
+  const { data: payload, loading, error } = useResource(read);
   const onClaimed = React.useCallback(() => setReloads((n) => n + 1), []);
 
   /* `guards: [() => b.login ? !1 : "/"]` — the route's own. A guard returning `false` in that
@@ -185,7 +185,7 @@ export default function Bonus({ mobile = false, onBack }) {
     return (
       <MobileLayout
         onBack={onBack}
-        rewards={<Rewards payload={payload} sections={sections} mobile loading={loading} onClaimed={onClaimed} />}
+        rewards={<Rewards payload={payload} sections={sections} mobile loading={loading} error={error} onRetry={onClaimed} onClaimed={onClaimed} />}
         vip={<Vip />}
       />
     );
@@ -211,7 +211,7 @@ export default function Bonus({ mobile = false, onBack }) {
             label="Rewards"
           />
           <div className="mt-4">
-            <Rewards payload={payload} sections={sections} loading={loading} onClaimed={onClaimed} />
+            <Rewards payload={payload} sections={sections} loading={loading} error={error} onRetry={onClaimed} onClaimed={onClaimed} />
           </div>
         </Panel>
 

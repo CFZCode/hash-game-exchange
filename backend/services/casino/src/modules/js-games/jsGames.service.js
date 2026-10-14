@@ -661,7 +661,7 @@ class JsGamesService {
 
       const outcome = await this.#applyMovement({
         model: this.models.GameTransaction,
-        where: { external_transaction_id: round, transaction_type: type },
+        where: { user_id: userId, external_transaction_id: round, transaction_type: type },
         record: {
           user_id: userId,
           game_uid: body.game_uid ?? null,
@@ -678,7 +678,9 @@ class JsGamesService {
         userId,
         currency: settlement,
         delta,
-        refId: `v2:${round}:${type}`,
+        // Per player, like the row's unique key (migration 095): another
+        // player's same round id is a different movement, not a replay.
+        refId: `v2:${userId}:${round}:${type}`,
       });
 
       if (outcome.duplicate) {
@@ -702,18 +704,39 @@ class JsGamesService {
        * `bet` and not `delta`: what was WAGERED is the stake, independent of
        * whether it won, which is what a wagering requirement measures.
        */
+      /* The wager key is PER PLAYER, like the settlement row (migration 095):
+         `wager_activity` is unique on (source, ref), so a bare round id let
+         one player's stake swallow another's on the same round. A retried
+         callback never reaches here — the settlement row's unique index
+         answers it as a duplicate first — so the change of key cannot count
+         an old round twice. */
+      const wagerRef = `${userId}:${round}`;
       if (bet > 0n) {
-        /* Counted in USD and rakeback accrued by user-service, under the same
-           `jsgames-v2:<round>` key the accrual has always used — so a round
-           accrued before this change is not accrued again. */
+        // Counted in USD and rakeback accrued by user-service.
         await this.games.recordActivity({
           userId,
           gameRef: body.game_uid ?? null,
           wagered: money.toDecimalString(bet),
           currency: settlement,
           source: 'jsgames-v2',
-          ref: round,
+          ref: wagerRef,
         });
+      } else if (bet < 0n) {
+        /* A negative bet is the provider taking back a stake it recorded
+           wrongly: that part of the stake was never risked, so it stops
+           counting (wager, rakeback) — a PARTIAL reversal of the
+           `jsgames-v2:<player>:<round>` stake, keyed by this correction so a retried
+           callback reverses once. Best-effort, queued in the outbox on failure. */
+        await this.games
+          .reverseActivity({
+            userId,
+            source: 'jsgames-v2',
+            ref: wagerRef,
+            amount: money.toDecimalString(-bet),
+            refundRef: `${type}:${body.serial_number ?? round}`,
+            outbox: true,
+          })
+          .catch((error) => this.logger?.warn({ err: error, round }, 'Wager reversal failed — the correction stands'));
       }
 
       const balance = outcome.balance ?? (await this.#balanceOf(userId, settlement)) ?? '0';

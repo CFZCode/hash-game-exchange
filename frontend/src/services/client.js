@@ -251,7 +251,7 @@ export function refreshSession() {
 
 /* One fetch, no retry. `request` and `requestPage` wrap this so the token, the content type and
    the 204/binary handling live in exactly one place. */
-async function send(url, path, { json, headers, ...init }) {
+async function sendOnce(url, path, { json, headers, ...init }) {
   const token = getAccessToken();
 
   const res = await fetch(url, {
@@ -276,6 +276,117 @@ async function send(url, path, { json, headers, ...init }) {
   const body = type.includes('json') ? await res.json().catch(() => null) : await res.blob();
 
   return { res, body };
+}
+
+/* ── Rate limits: one request where the page asked for several, and a 429 that waits ──────────
+ *
+ * A cold load used to fire `features/public`, `site-config`, `auth/me`, the bonus and rakeback
+ * summaries two or three times each (the gates, the session, the header and the page each read
+ * them on their own), and the gateway's per-IP bucket answered 429 — which blanked whichever
+ * page lost the race. Three rules, all here at the seam so no call site has to know:
+ *
+ *   1. IN-FLIGHT SHARING. Two identical GETs (same URL, same token) while the first is still
+ *      out share its answer. Only GETs without an AbortSignal — a caller that may abort must
+ *      not abort someone else's read.
+ *   2. A SHORT TTL for the startup reads listed in `SHARED_TTL` — config the server hands every
+ *      visitor (30s) and the per-account summaries every widget reads at once (3s). ANY write
+ *      (a non-GET through this seam) clears it, so "save, then re-read" never sees the old row.
+ *   3. A 429 ON A GET IS RETRIED with backoff — `Retry-After` when the server sends one (capped),
+ *      else 1s, 2s, 4s — before it is surfaced as an ApiError. Writes are never retried here.
+ *
+ * Each sharer gets its own copy of the parsed body, so a caller that mutates what it got cannot
+ * corrupt another's.
+ */
+const SHARED_TTL = [
+  [/\/api\/v1\/admin\/(?:site-config|features|branding)\/public$/, 30000],
+  [/\/api\/v1\/user\/(?:auth\/me|profile|bonus|rakeback|vip)$/, 3000],
+];
+const ttlFor = (path) => SHARED_TTL.find(([re]) => re.test(path))?.[1] ?? 0;
+
+const shared = new Map(); // key -> { promise, settledAt: number|null, ttl }
+
+const copyBody = (body) => {
+  if (!body || typeof body !== 'object' || (typeof Blob !== 'undefined' && body instanceof Blob)) return body;
+  try {
+    return structuredClone(body);
+  } catch {
+    return body;
+  }
+};
+
+/** Drop every cached GET — called on any write, and on sign-in/out through a token change. */
+export function invalidateSharedReads() {
+  shared.clear();
+}
+
+const MAX_429_RETRIES = 3;
+const MAX_RETRY_AFTER_MS = 10000;
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function retryDelay(res, n) {
+  const header = Number(res.headers?.get?.('retry-after'));
+  if (Number.isFinite(header) && header > 0) return Math.min(header * 1000, MAX_RETRY_AFTER_MS);
+  return 1000 * 2 ** n + Math.floor(Math.random() * 250);
+}
+
+/* A GET that answered 429 is tried again, up to MAX_429_RETRIES times. */
+async function sendWithBackoff(url, path, init) {
+  let n = 0;
+  for (;;) {
+    const out = await sendOnce(url, path, init);
+    if (out.res.status !== 429 || n >= MAX_429_RETRIES || init.signal?.aborted) return out;
+    await wait(retryDelay(out.res, n));
+    n += 1;
+  }
+}
+
+async function send(url, path, init) {
+  const method = String(init.method ?? 'GET').toUpperCase();
+  if (method !== 'GET' || init.json !== undefined) {
+    /* A write: never shared, never retried, and it makes every cached read stale. */
+    shared.clear();
+    return sendOnce(url, path, init);
+  }
+  if (init.signal) return sendWithBackoff(url, path, init);
+
+  const key = `${url}\u0000${getAccessToken() ?? ''}`;
+  const now = Date.now();
+  const hit = shared.get(key);
+  if (hit && (hit.settledAt === null || now - hit.settledAt < hit.ttl)) {
+    const { res, body } = await hit.promise;
+    return { res, body: copyBody(body) };
+  }
+
+  const ttl = ttlFor(path);
+  const entry = { promise: null, settledAt: null, ttl };
+  entry.promise = sendWithBackoff(url, path, init).then(
+    (out) => {
+      /* Only a success is kept past its flight; a failure is shared with whoever was waiting
+         on it and then forgotten, so the next caller asks again. */
+      if (out.res.ok && ttl > 0) entry.settledAt = Date.now();
+      else if (shared.get(key) === entry) shared.delete(key); // ttl 0: shared only while in flight
+      return out;
+    },
+    (error) => {
+      if (shared.get(key) === entry) shared.delete(key);
+      throw error;
+    }
+  );
+  shared.set(key, entry);
+  const { res, body } = await entry.promise;
+  return { res, body: copyBody(body) };
+}
+
+/**
+ * A shared JSON GET for callers outside `request()` that want the RAW body (siteFeatures,
+ * onesignal both read `features/public` this way). Goes through the same sharing, TTL and 429
+ * backoff as `request()`. Answers the parsed body, or null on any failure — never throws.
+ */
+export function fetchSharedJson(path, { base = BASE } = {}) {
+  const url = String(base ?? '').replace(/\/+$/, '') + path;
+  return send(url, path, {})
+    .then(({ res, body }) => (res.ok ? body : null))
+    .catch(() => null);
 }
 
 /* A 401 FROM AN AUTH ROUTE IS AN ANSWER, NOT AN EXPIRED TOKEN. Wrong password on login, a bad

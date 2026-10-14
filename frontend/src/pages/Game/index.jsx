@@ -1,3 +1,5 @@
+import { supportedLang } from '../../components/modals/LanguageCurrencyModal/languages';
+import { brandLabel } from '../../services/siteBranding';
 import React from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import EmptyPlaceholder from '../../components/shared/EmptyPlaceholder';
@@ -8,7 +10,7 @@ import PopCenter from '../../components/shared/PopCenter';
 import Select from '../../components/shared/Select';
 import { toast } from '../../components/shared/Toast/toast';
 import { getGame, launchGame, launchCurrency } from '../../services/game';
-import { getAlias } from '../../utils/currency';
+import { getAlias, printCurrency } from '../../utils/currency';
 import { addFavoriteGame, isFavoriteGame, removeFavoriteGame } from '../../services/collection';
 import { formatOnlineUsers } from '../../utils/gameArt';
 import './Game.css';
@@ -171,9 +173,22 @@ function GameUnavailable({ open, onClose }) {
  * this game's route cannot settle takes. The picker lists only the wallets it CAN settle, so the
  * fix is one tap away; picking writes `setting.currencyName`, the header's own selection, as
  * `We`'s `onChange` does. */
-function PlayOverlay({ game, login, currencyName, balances, launching, onPlay, onSignIn, onPickCurrency }) {
+function PlayOverlay({ game, login, currencyName, balances, setting, launching, onPlay, onSignIn, onPickCurrency }) {
   const code = launchCurrency(game, currencyName);
   const alias = getAlias(currencyName || 'INRFIAT');
+  /* The wallet's real balance beside its code, in the wallet's OWN currency (`target` pins it, so
+     a "display in USD" setting cannot turn the INR the game will settle in into a dollar figure).
+     Floored at zero like the header pill. Unknown until the balances read lands. */
+  const balanceOf = (name) => {
+    const row = (balances ?? []).find((b) => b.currencyName === name);
+    if (!row) return null;
+    return printCurrency(Math.max(0, Number(row.generalAmount) || 0), name, {
+      target: name,
+      settings: setting ?? {},
+      hasAlias: false,
+    });
+  };
+  const shownBalance = balanceOf(currencyName);
   const choices = (balances ?? [])
     .filter((row) => launchCurrency(game, row.currencyName))
     .map((row) => row.currencyName);
@@ -200,12 +215,16 @@ function PlayOverlay({ game, login, currencyName, balances, launching, onPlay, o
                     title="Play with balance in"
                     className="mt-2 w-full bg-layer5 p-0 sm:ml-2 sm:flex-1 md:mt-0"
                     labelRender={() => (
-                      <span className="flex items-center justify-start p-1 text-sm font-extrabold whitespace-nowrap text-primary">
+                      <span className="flex items-center justify-start gap-2 p-1 text-sm font-extrabold whitespace-nowrap text-primary">
                         {alias}
+                        {shownBalance != null && <span className="text-secondary">{shownBalance}</span>}
                       </span>
                     )}
                   >
-                    {(option) => getAlias(option)}
+                    {(option) => {
+                      const amount = balanceOf(option);
+                      return amount != null ? `${getAlias(option)}  ${amount}` : getAlias(option);
+                    }}
                   </Select>
                 </div>
               ) : null}
@@ -219,12 +238,33 @@ function PlayOverlay({ game, login, currencyName, balances, launching, onPlay, o
                   </>
                 )}
               </p>
+              {/* THE WAY OUT, spelled out: one button per wallet this game CAN settle. Picking one
+                  is the player's own choice of header coin (the same write the picker above
+                  makes) — nothing switches it for them. */}
+              {!code && choices.length > 0 && (
+                <div className="mb-4 flex flex-wrap justify-center gap-2">
+                  {choices.map((name) => (
+                    <button
+                      key={name}
+                      type="button"
+                      className="button button-s button-second px-3"
+                      onClick={() => onPickCurrency(name)}
+                    >
+                      Use {getAlias(name)}
+                      {balanceOf(name) != null && <span className="ml-1 text-secondary">{balanceOf(name)}</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="flex gap-x-4">
               <button
                 type="button"
-                className="button button-m button-brand mx-auto w-64"
+                /* Unsupported coin: visibly off (grey, not a dimmed green that still reads as a
+                   live button) as well as `disabled`. */
+                className={`button button-m mx-auto w-64 ${code ? 'button-brand' : 'button-second cursor-not-allowed'}`}
                 disabled={!code || launching}
+                title={code ? undefined : `${alias} isn't supported for this game`}
                 aria-busy={launching}
                 onClick={onPlay}
               >
@@ -232,6 +272,11 @@ function PlayOverlay({ game, login, currencyName, balances, launching, onPlay, o
                 Play With Deposit Balance
               </button>
             </div>
+            {shownBalance != null && (
+              <p className="mt-3 mb-0 text-center text-xs font-semibold text-secondary">
+                Balance: <span className="text-primary">{shownBalance} {alias}</span>
+              </p>
+            )}
           </>
         ) : (
           <div className="flex flex-col gap-4">
@@ -266,8 +311,13 @@ export default function GamePage() {
   const { session, balances, setSetting } = useSession();
   const navigate = useNavigate();
 
-  const readGame = React.useCallback(() => getGame(gameUnique), [gameUnique]);
-  const { data: game, loading } = useResource(readGame);
+  /* `attempt` re-runs the read from the inline Retry below. A FAILED read (429 rate limit, 5xx,
+     network) is NOT a game missing from the catalogue: it used to fall into `missing` and print
+     "This game is not in the catalogue" over a game that is there — the QA report's
+     /game/5-lions-by-pragmatic, whose slug resolves fine once the gateway stops answering 429. */
+  const [attempt, setAttempt] = React.useState(0);
+  const readGame = React.useCallback(() => getGame(gameUnique, attempt), [gameUnique, attempt]);
+  const { data: game, loading, error: readError } = useResource(readGame);
 
   /* ── THE LAUNCH IS A PRESS, NOT AN ARRIVAL ────────────────────────────────────────────────────
    *
@@ -289,8 +339,14 @@ export default function GamePage() {
      is a game the catalogue does not hold (or an owner switched off, which reads the same), and it
      is opened once per slug: closing it must not reopen it on the next render. */
   const [dismissedFor, setDismissedFor] = React.useState(null);
-  const frameUrl = session.login && launched?.for === gameUnique ? launched.url : null;
-  const missing = !loading && !game;
+  /* The frame is ALSO held against the coin it was launched in. Switching the header coin while a
+     game runs used to leave the provider's session in the old currency (INR in the frame, USDT in
+     the header). Now the frame drops and the overlay comes back: Play relaunches in the new coin,
+     or — if this game cannot settle in it — says so with Play disabled and the coins it can use. */
+  const currentCode = launchCurrency(game, session.setting?.currencyName);
+  const frameUrl =
+    session.login && launched?.for === gameUnique && launched.currency === currentCode ? launched.url : null;
+  const missing = !loading && !game && !readError;
   const unavailableOpen = failedFor === gameUnique || (missing && dismissedFor !== gameUnique);
   const closeUnavailable = () => {
     setFailedFor(null);
@@ -309,12 +365,12 @@ export default function GamePage() {
       const url = await Promise.resolve(
         launchGame(game, {
           currencyName: session.setting?.currencyName,
-          language: session.setting?.lang ?? 'en',
+          language: supportedLang(session.setting?.lang),
           /* v1 only: where the provider's own home button lands — this page, not the lobby. */
           homeUrl: `${window.location.origin}/game/${gameUnique}`,
         }),
       );
-      if (url) setLaunched({ for: target, url });
+      if (url) setLaunched({ for: target, url, currency: launchCurrency(game, session.setting?.currencyName) });
       else setFailedFor(target);
     } catch (error) {
       console.warn('[game] launch refused', error?.code ?? error?.status ?? error);
@@ -449,12 +505,20 @@ export default function GamePage() {
                   login={session.login}
                   currencyName={session.setting?.currencyName}
                   balances={balances}
+                  setting={session.setting}
                   launching={launching}
                   onPlay={play}
                   onSignIn={play}
                   onPickCurrency={(name) => setSetting('currencyName', name)}
                 />
               </>
+            ) : readError ? (
+              <div className="game-frame-connecting">
+                <p className="game-frame-note">Couldn&apos;t load this game right now.</p>
+                <button type="button" className="button button-s button-second mt-3" onClick={() => setAttempt((n) => n + 1)}>
+                  Retry
+                </button>
+              </div>
             ) : (
               <div className="game-frame-connecting">
                 <p className="game-frame-note">This game is not in the catalogue.</p>
@@ -542,7 +606,7 @@ export default function GamePage() {
                       to={`/gamelist/brand`}
                       className="game-info-provider"
                     >
-                      {game.provider}
+                      {brandLabel(game.provider)}
                     </Link>
                   </p>
                 ) : null}
@@ -551,7 +615,7 @@ export default function GamePage() {
                 <div className="game-info-tags">
                   {game.tags.map((tag) => (
                     <Link key={tag} to={`/tagname/${encodeURIComponent(tag)}`} className="game-info-tag">
-                      # {tag}
+                      # {brandLabel(tag)}
                     </Link>
                   ))}
                 </div>

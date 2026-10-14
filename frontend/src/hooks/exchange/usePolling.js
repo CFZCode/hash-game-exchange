@@ -1,9 +1,18 @@
 import React from 'react';
 
+/* A 429 (the gateway's rate limit) is not answered by asking again on schedule — that only keeps
+   the bucket full. Each consecutive 429 doubles the wait (from at least 5s, capped at 60s); the
+   first success returns the loop to its own interval. */
+export const RATE_LIMIT_BASE_MS = 5000;
+export const RATE_LIMIT_MAX_MS = 60000;
+export const isRateLimited = (error) => Number(error?.status) === 429;
+export const rateLimitDelay = (intervalMs, strikes) =>
+  Math.min(RATE_LIMIT_MAX_MS, Math.max(intervalMs, RATE_LIMIT_BASE_MS) * 2 ** Math.max(0, strikes - 1));
+
 /* ─── One poll loop for every exchange read ───────────────────────────────────────────────
  *
  * Self-scheduling (the next cycle starts `intervalMs` after the previous one BEGAN, or at once
- * if the request took longer) — never setInterval, which piles overlapping requests up and lets
+ * if the request took longer; backed off on 429, see RATE_LIMIT_*) — never setInterval, which piles overlapping requests up and lets
  * an old answer overwrite a newer one. Paused while the tab is hidden; on return it polls at once.
  * `refreshEvent` (a window event name, e.g. 'bet:placed') triggers an immediate poll.
  *
@@ -26,6 +35,7 @@ export function usePolling(fetcher, { intervalMs = 0, enabled = true, key = '', 
     let timer = null;
     let gen = 0;
     let controller = null;
+    let strikes = 0; // consecutive 429s
 
     const run = async (myGen) => {
       if (!active || myGen !== gen) return;
@@ -33,8 +43,10 @@ export function usePolling(fetcher, { intervalMs = 0, enabled = true, key = '', 
       controller = new AbortController();
       try {
         const data = await fetcher(controller.signal);
+        strikes = 0;
         if (active && myGen === gen) setState({ key, data, error: null });
       } catch (error) {
+        strikes = isRateLimited(error) ? strikes + 1 : 0;
         if (active && myGen === gen && error?.name !== 'AbortError') {
           setState((prev) => ({
             key,
@@ -43,8 +55,10 @@ export function usePolling(fetcher, { intervalMs = 0, enabled = true, key = '', 
           }));
         }
       } finally {
-        if (active && myGen === gen && intervalMs > 0 && !document.hidden) {
-          timer = setTimeout(() => run(myGen), Math.max(0, intervalMs - (Date.now() - startedAt)));
+        /* A one-shot read (intervalMs 0) that met a 429 is still retried, a few times, on the backoff. */
+        if (active && myGen === gen && (intervalMs > 0 || (strikes > 0 && strikes <= 4)) && !document.hidden) {
+          const wait = strikes ? rateLimitDelay(intervalMs, strikes) : intervalMs;
+          timer = setTimeout(() => run(myGen), Math.max(0, wait - (Date.now() - startedAt)));
         }
       }
     };

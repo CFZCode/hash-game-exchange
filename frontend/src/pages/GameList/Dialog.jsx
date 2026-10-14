@@ -1,3 +1,4 @@
+import { brandLabel } from '../../services/siteBranding';
 import { useLocation } from 'react-router-dom';
 import PageDialog from '../../components/shared/PageDialog';
 import { SectionPage, GameListRoute, TagPage, RelatedPage } from './index';
@@ -46,7 +47,7 @@ export default function GameListDialog({ onClose, onBack, enter }) {
 
   return (
     <PageDialog
-      title={titleFor(pathname, search)}
+      title={brandLabel(titleFor(pathname, search))}
       onClose={onClose}
       onBack={onBack}
       enter={enter}

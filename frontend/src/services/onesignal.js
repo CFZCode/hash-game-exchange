@@ -24,6 +24,7 @@
  * next person on a shared machine does not receive the last one's messages.
  * ═════════════════════════════════════════════════════════════════════════
  */
+import { fetchSharedJson } from './client';
 
 const SDK_URL = 'https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js';
 
@@ -57,9 +58,10 @@ export function initPush({ apiBase } = {}) {
 
   started = (async () => {
     try {
-      const res = await fetch(`${trim(apiBase)}/api/v1/admin/features/public`, { credentials: 'omit' });
-      if (!res.ok) return false;
-      const json = await res.json();
+      /* Shared with services/gates.js's read of the same route (client.js fetchSharedJson), so a
+         cold load asks for features/public once rather than once per reader. */
+      const json = await fetchSharedJson('/api/v1/admin/features/public', { base: trim(apiBase) });
+      if (!json) return false;
       const push = (json?.data ?? []).find((f) => f.feature === 'push_notifications');
       const appId = push?.variant === 'onesignal' ? push?.config?.appId : null;
       if (!appId) return false;

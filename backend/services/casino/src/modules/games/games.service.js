@@ -1172,7 +1172,7 @@ class GamesService {
    * with no currency cannot be converted. `rakeback: false` skips the accrual
    * for a path that has none.
    */
-  async recordActivity({ userId, gameRef, wagered, currency, source = 'casino', ref, rakeback = true }) {
+  async recordActivity({ userId, gameRef, wagered, currency, source = 'casino', ref, rakeback = true, countPlay = true }) {
     try {
       if (gameRef) await this.recordPlay({ userId, gameUuid: gameRef });
     } catch (error) {
@@ -1205,7 +1205,9 @@ class GamesService {
     }
 
     // A round, once — a retried settlement for the same bet is not another game.
-    if (!outcome?.duplicate) {
+    // `countPlay: false` is the in-house engine, which counts a round when it
+    // SETTLES instead, so a refunded or invalid round is not a game played.
+    if (countPlay && !outcome?.duplicate) {
       try {
         await this.models.Users.increment({ games_played: 1 }, { where: { id: userId } });
       } catch (error) {

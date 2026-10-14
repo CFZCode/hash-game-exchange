@@ -28,11 +28,12 @@
  * card, unrelated to which tab it files under — it happens to be a Casino promotion, but the
  * two are separate fields.
  */
+import { brandLabel } from '../../services/siteBranding';
 
 export const TABS = [
   { id: 'all', label: 'All' },
   { id: 'casino', label: 'Casino' },
-  { id: 'exclusive', label: 'BC Exclusive' },
+  { id: 'exclusive', label: brandLabel('BC Exclusive') },
   { id: 'deposit', label: 'Deposit' },
 ];
 

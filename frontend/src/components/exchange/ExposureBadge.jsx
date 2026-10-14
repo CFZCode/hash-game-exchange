@@ -12,6 +12,9 @@ import { cx, formatAmount as defaultFormatAmount } from './utils';
  * @param {()=>void} [props.onClick]            Makes it a button (e.g. open the exposure list).
  * @param {boolean}  [props.loading]             Dashes instead of figures.
  * @param {string}   [props.className]
+ * @param {string}   [props.balanceLabel='Bal']  Label before the balance figure.
+ * @param {string}   [props.exposureLabel='Exp'] Label before the exposure figure.
+ * @param {string}   [props.title]               Tooltip for the whole badge.
  */
 export default function ExposureBadge({
   balance,
@@ -21,6 +24,9 @@ export default function ExposureBadge({
   onClick,
   loading = false,
   className = '',
+  balanceLabel = 'Bal',
+  exposureLabel = 'Exp',
+  title,
 }) {
   const exp = Math.abs(Number(exposure) || 0);
   const Tag = onClick ? 'button' : 'div';
@@ -29,6 +35,7 @@ export default function ExposureBadge({
     <Tag
       type={onClick ? 'button' : undefined}
       onClick={onClick}
+      title={title}
       className={cx(
         'flex h-10 flex-col items-end justify-center rounded-lg bg-layer4 px-3 text-right leading-4',
         onClick && 'transition-colors hover:bg-layer5',
@@ -36,13 +43,13 @@ export default function ExposureBadge({
       )}
     >
       <span className="whitespace-nowrap text-xs text-tertiary">
-        Bal{' '}
+        {balanceLabel}{' '}
         <span className="font-extrabold text-primary">
           {loading ? '—' : `${currency}${formatAmount(balance)}`}
         </span>
       </span>
       <span className="whitespace-nowrap text-xs text-tertiary">
-        Exp{' '}
+        {exposureLabel}{' '}
         <span className={cx('font-extrabold', exp > 0 ? 'text-error' : 'text-secondary')}>
           {loading ? '—' : `${exp > 0 ? '−' : ''}${currency}${formatAmount(exp)}`}
         </span>

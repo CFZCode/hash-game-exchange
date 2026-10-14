@@ -61,6 +61,9 @@ const transferColumns = (selfId: string): Column<Transfer>[] => [
   { key: 'type', header: 'Type', cell: r => <span className='text-muted-foreground text-sm'>{r.transferType ?? '—'}</span> }
 ]
 
+/** The rollup's `staffAccounts` counts the account itself; the downline is everyone else. */
+const downlineStaff = (n?: number) => (typeof n === 'number' ? Math.max(0, n - 1) : n)
+
 const StaffDetail = ({ id }: { id: string }) => {
   const agentTree = useIsAgentTree()
   const router = useRouter()
@@ -228,8 +231,8 @@ const StaffDetail = ({ id }: { id: string }) => {
       <div className='grid grid-cols-2 gap-4 lg:grid-cols-4'>
         <StatCard label='Balance' value={<Money value={s?.balance?.inr} currency={s?.balance?.currency} />} loading={staff.isLoading} />
         <StatCard label='Credit limit' value={<Money value={s?.balance?.creditLimit} />} hint={<>exposure limit <Money value={s?.balance?.exposureLimit} /></>} loading={staff.isLoading} />
-        <StatCard label='Downline staff' value={formatNumber(rollup.data?.staffAccounts)} hint='whole subtree' loading={rollup.isLoading} />
-        <StatCard label='Users' value={formatNumber(rollup.data?.players)} hint={<>subtree balance <Money value={rollup.data?.balance} currency={rollup.data?.currency} /></>} loading={rollup.isLoading} />
+        <StatCard label='Downline staff' value={formatNumber(downlineStaff(rollup.data?.staffAccounts))} hint='whole subtree, not counting this account' loading={rollup.isLoading} />
+        <StatCard label='Users (whole subtree)' value={formatNumber(rollup.data?.players)} hint={<>staff balances in the subtree <Money value={rollup.data?.balance} currency={rollup.data?.currency} /></>} loading={rollup.isLoading} />
       </div>
 
       <Tabs defaultValue='transfers' className='mt-6'>
@@ -243,15 +246,50 @@ const StaffDetail = ({ id }: { id: string }) => {
           <DataTable columns={transferColumns(id)} rows={transfers.data?.rows} rowKey={r => r.id} loading={transfers.isLoading} error={transfers.error} pagination={transfers.data?.pagination} onPageChange={page => set({ page })} onLimitChange={limit => set({ limit })} dense />
         </TabsContent>
         <TabsContent value='analytics'>
+          <p className='text-muted-foreground mb-2 text-sm'>Transfers in and out of THIS account only (last 30 days), by day.</p>
           <Raw path={`admin/staff/analytics/${id}`} query={{ days: 30 }} />
         </TabsContent>
         <TabsContent value='chain'>
           <Raw path={`admin/staff/${id}/percent-chain`} />
         </TabsContent>
         <TabsContent value='risk'>
-          <Raw path={`admin/reports/staff-risk/${id}`} />
+          <StaffRiskSummary id={id} />
         </TabsContent>
       </Tabs>
+    </div>
+  )
+}
+
+type StaffRiskDownline = {
+  directStaffCount: number
+  subtreeStaffCount: number
+  playersCount: number
+  lockedPlayers: number
+  totalDeposits: string
+  totalWithdrawals: string
+  net: string
+}
+
+/**
+ * `GET admin/reports/staff-risk/:id`. Its money figures are the DOWNLINE's (every player in the
+ * subtree), not this account's own — labelled as such.
+ */
+const StaffRiskSummary = ({ id }: { id: string }) => {
+  const q = useApi<{ currency: string; downline: StaffRiskDownline; riskFlags: Record<string, boolean> }>(`admin/reports/staff-risk/${id}`)
+
+  if (q.error) return <ErrorState error={q.error} />
+  const d = q.data?.downline
+  const flags = Object.entries(q.data?.riskFlags ?? {}).filter(([, v]) => v)
+
+  return (
+    <div className='grid gap-4'>
+      <div className='grid grid-cols-2 gap-4 lg:grid-cols-4'>
+        <StatCard label='Downline staff' value={d ? `${formatNumber(d.subtreeStaffCount)}` : undefined} hint={d ? `${formatNumber(d.directStaffCount)} direct` : undefined} loading={q.isLoading} />
+        <StatCard label='Downline users' value={formatNumber(d?.playersCount)} hint={d ? `${formatNumber(d.lockedPlayers)} locked` : undefined} loading={q.isLoading} />
+        <StatCard label='Subtree deposits' value={<Money value={d?.totalDeposits} currency={q.data?.currency} />} hint={<>all players in the subtree · withdrawals <Money value={d?.totalWithdrawals} /></>} loading={q.isLoading} />
+        <StatCard label='Subtree net' value={<Money value={d?.net} signed />} hint='deposits − withdrawals, whole subtree' loading={q.isLoading} />
+      </div>
+      <p className='text-muted-foreground text-sm'>Risk flags: {flags.length ? flags.map(([k]) => k).join(', ') : 'none'}</p>
     </div>
   )
 }

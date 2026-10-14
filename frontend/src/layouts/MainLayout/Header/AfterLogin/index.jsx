@@ -1,3 +1,4 @@
+import { CHAT_AVAILABLE } from '../../../../services/availability';
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSession } from '../../../../context/session';
@@ -230,6 +231,10 @@ function Wallet({ mobile = false }) {
   const amount = printCurrency(Math.max(0, Number(current.generalAmount)), current.currencyName, {
     settings: session.setting,
   });
+  /* While the signed-in wallet is still loading the session holds the captured VISITOR row, a
+     BCD (BC.GAME's own token) placeholder this platform never issues — so the pill drew
+     "0 BCD" for a moment on every cold load. Until a real row lands, draw a placeholder. */
+  const walletLoading = !current || current.currencyName === 'BCD';
 
   return (
     /* The dropdown is a SIBLING of the pill rather than a child of it, and that is a React
@@ -257,12 +262,20 @@ function Wallet({ mobile = false }) {
         onClick={() => setOpen((value) => !value)}
       >
         <div className="mr-1 flex flex-auto cursor-pointer select-none items-center">
-          <img className="mx-1 flex size-6 flex-none" alt="" src={coinIcon(current.currencyName)} />
+          {walletLoading ? (
+            <span className="mx-1 flex size-6 flex-none animate-pulse rounded-full bg-layer5" aria-hidden="true" />
+          ) : (
+            <img className="mx-1 flex size-6 flex-none" alt="" src={coinIcon(current.currencyName)} />
+          )}
           {/* `w-0 flex-auto truncate` rather than a max-width: the pill is fixed, so the amount
               gets whatever is left after the coin, the chevron and the Deposit button and
               ellipsises inside it. */}
           <div className="flex w-0 flex-auto items-center truncate font-extrabold">
-            <span>{amount}</span>
+            {walletLoading ? (
+              <span className="h-4 w-20 animate-pulse rounded bg-layer5" aria-label="Loading balance" />
+            ) : (
+              <span>{amount}</span>
+            )}
           </div>
           {/* The site's one chevron, a left-pointing `<` that every call site rotates.
               `-rotate-90` points it down. */}
@@ -465,15 +478,21 @@ export default function AfterLogin({ onToggleChat, onToggleNotice }) {
                  isOfflineAgent ? "w-10" : "w-30") */}
       <div className="button relative ml-3 flex h-10 flex-none rounded-lg bg-layer5 p-0">
         {/* First child, so `first:left-10` wins over `left-20` and the rule sits at 40px. */}
-        <div className="absolute left-20 top-2 h-6 w-[1px] bg-third first:left-10" />
-        <button
-          type="button"
-          className="button size-10 p-0"
-          onClick={onToggleChat}
-          aria-label="Live chat"
-        >
-          <SpriteIcon name="chat" />
-        </button>
+        {/* No chat on this platform (services/availability.js): the group drops to the bell
+            alone — the original's own one-button arm, the `w-10` its chunk line names. */}
+        {CHAT_AVAILABLE && (
+          <>
+            <div className="absolute left-20 top-2 h-6 w-[1px] bg-third first:left-10" />
+            <button
+              type="button"
+              className="button size-10 p-0"
+              onClick={onToggleChat}
+              aria-label="Live chat"
+            >
+              <SpriteIcon name="chat" />
+            </button>
+          </>
+        )}
         {/* `onClick: () => t.setRight("notice")` — the desktop bell does NOT navigate; it names
             which of the three right-hand drawers the layout should show. `onToggleNotice` is that
             setter here. Its mobile twin below really does navigate, to `/notification`, which is

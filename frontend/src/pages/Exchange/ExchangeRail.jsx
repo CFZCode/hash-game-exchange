@@ -144,6 +144,12 @@ function SignedInTools({ userId, inRail, tipProps = () => null }) {
         exposure={exposure ?? 0}
         currency="₹"
         loading={balance == null}
+        /* NAMED AS THE SPORTS WALLET. The exchange settles from its own INR wallet, which is not
+           the casino balance in the site header — so a bare "Bal ₹0.00" under a header showing
+           ₹1,000 read as a bug. Labelled until the two wallets are bridged. */
+        balanceLabel="Sports balance"
+        exposureLabel="Exposure"
+        title="Your sports exchange wallet — separate from the casino balance in the header"
       />
       {editing && stakes && (
         <StakeButtonsModal

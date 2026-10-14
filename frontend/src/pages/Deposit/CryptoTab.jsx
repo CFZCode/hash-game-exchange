@@ -55,12 +55,14 @@ function QuickPick({ currency, onPick, onOpenSelect }) {
   const rest = DEFAULT_CURRENCIES.slice(count, count + 3);
 
   return (
-    <div className="mt-2 flex items-center text-secondary">
+    /* `hide-scroll overflow-x-auto` + `flex-none` chips: six chips and the More pile are wider
+       than a 390px phone, and a non-wrapping row pushed the whole page to 431px. */
+    <div className="hide-scroll mt-2 flex items-center overflow-x-auto text-secondary">
       {chips.map((name) => (
         <button
           key={name}
           type="button"
-          className={`button center mr-1 h-9 rounded-l-full rounded-r-full border bg-layer5 ${
+          className={`button center mr-1 h-9 flex-none rounded-l-full rounded-r-full border bg-layer5 ${
             currency === name ? 'border-brand' : 'border-input'
           }`}
           onClick={() => onPick(name)}
@@ -149,8 +151,13 @@ export default function CryptoTab() {
   /* The site's default coin comes first for a player who has not picked one (`depositDefault`). */
   const siteDefault = depositDefault(session);
   const seed = siteDefault && getCurrency(siteDefault)?.currencyType !== 'FIAT' ? siteDefault : session.setting.currencyName;
-  const initial =
-    getCurrency(seed)?.currencyType === 'FIAT' || !networksFor(seed) ? DEFAULT_CURRENCIES[0] : seed;
+  /* A fiat wallet (INR in the header) or an undepositable coin lands on the SITE'S default coin
+     (the owner's `default_currency`, USDT) — not the quick-pick list's first entry, which is
+     ETH and is the original's order, not this site's default. */
+  const cryptoOk = (name) => Boolean(name) && name !== 'BCD' && getCurrency(name)?.currencyType !== 'FIAT' && Boolean(networksFor(name));
+  const initial = cryptoOk(seed)
+    ? seed
+    : [session.defaultCurrency, 'USDT', DEFAULT_CURRENCIES[0]].find(cryptoOk) ?? DEFAULT_CURRENCIES[0];
 
   const [currency, setCurrency] = React.useState(initial);
   const networks = networksFor(currency);

@@ -186,6 +186,27 @@ function register({ on, deps }) {
          */
         const canProfit = await engine.canProfit(context.userId);
 
+        /**
+         * VALIDATE FIRST, THEN TAKE THE STAKE.
+         *
+         * `game.play` is pure — it draws and prices the round and moves no
+         * money — so it runs before the debit. A game returning `null` is
+         * legacy's silent `return` on a bad parameter (Limbo's
+         * `if (payout < 1.01) return;`); it used to arrive AFTER the stake was
+         * taken and needed a refund, a reversed wager and a bet row marked
+         * `refunded`. Now an invalid round never opens a bet at all.
+         */
+        let outcome;
+        try {
+          outcome = game.play({ ...payload, canProfit, serverAuthority, logger });
+        } catch (error) {
+          logger?.warn({ err: error, game: game.key }, 'In-house round refused before the stake');
+          outcome = null;
+        }
+        if (!outcome) {
+          return { command: 'error', message: 'Invalid bet parameters', code: 'INHOUSE_INVALID_STAKE' };
+        }
+
         let bet;
         try {
           bet = await engine.placeBet({
@@ -200,23 +221,6 @@ function register({ on, deps }) {
         }
 
         try {
-          const outcome = game.play({ ...payload, canProfit, serverAuthority, logger });
-
-          /**
-           * A game returning `null` is legacy's silent `return` on a bad
-           * parameter — several do it, e.g. Limbo's `if (payout < 1.01) return;`.
-           * The stake has already been taken by then, so it is given back.
-           */
-          if (!outcome) {
-            await engine.refund({
-              userId: context.userId,
-              betId: bet.betId,
-              coin: bet.currency,
-              amount: bet.stake,
-            });
-            return { command: 'error', message: 'Invalid bet parameters', code: 'INHOUSE_INVALID_STAKE' };
-          }
-
           const settled = await engine.settle({
             userId: context.userId,
             betId: bet.betId,

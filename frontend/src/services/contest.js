@@ -100,19 +100,24 @@ function readBoard(type) {
   });
 }
 
+/* The configs are read FIRST and the leaderboard only when that race is switched on: a disabled
+   race always answers the board with 404 RACE_NOT_RUNNING, which was a red 404 in the console on
+   every home/contest load for a state the config already states. `enabled` rides on the result
+   so a call site can hide the race rather than draw its idle shell. */
 function liveContest(title, type = 'daily') {
-  return Promise.all([
-    request(RACE.configs, { live: true }).catch(emptyIfAgentBlocked([])),
-    readBoard(type),
-    request(RACE.history, { live: true, params: { type, limit: 1 } }).catch(() => []),
-  ]).then(([configs, board, history]) =>
-    toContest({
-      title,
-      config: (configs ?? []).find((c) => c.type === type),
-      board,
-      history,
-    }),
-  );
+  return Promise.resolve(request(RACE.configs, { live: true }))
+    .catch(emptyIfAgentBlocked([]))
+    .then((configs) => {
+      const config = (configs ?? []).find((c) => c.type === type);
+      const enabled = Boolean(config?.enabled);
+      return Promise.all([
+        enabled ? readBoard(type) : null,
+        request(RACE.history, { live: true, params: { type, limit: 1 } }).catch(() => []),
+      ]).then(([board, history]) => {
+        const out = toContest({ title, config, board, history });
+        return { ...out, contest: { ...out.contest, enabled } };
+      });
+    });
 }
 
 export const getHomeContest = () =>

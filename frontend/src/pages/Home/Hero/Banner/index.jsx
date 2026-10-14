@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useResource } from '../../../../hooks/useResource';
 import { useIsDesktop } from '../../../../hooks/useMediaQuery';
 import { getHomeBanners, getFallbackBanners } from '../../../../services/banner';
+import { USE_FIXTURES } from '../../../../services/client';
 import DepositSlide from './DepositSlide';
 import { artFor, ARROW_PATH, SLIDE_PAD, CARD, CARD_BODY, CARD_TAG, CARD_BUTTON } from './card';
 import Skeleton from '../../../../components/shared/Skeleton';
@@ -109,6 +110,8 @@ const builtRoute = (linkUrl) =>
   linkUrl.startsWith(PROMOTION_EVENT) ? PROMOTIONS_LIST : linkUrl;
 
 function BannerCard({ banner, style }) {
+  /* A platform slide may be image-only (no copy, no CTA): it then draws only what it has, and
+     with no `linkUrl` the card is not a link at all. */
   const external = banner.linkUrl.startsWith('http');
   const to = builtRoute(banner.linkUrl);
 
@@ -119,7 +122,7 @@ function BannerCard({ banner, style }) {
       className={CARD_BODY}
       style={{ backgroundImage: `url(${banner.imageUrl ?? artFor(banner.image)})` }}
     >
-      <span className={CARD_TAG}>{banner.tagName}</span>
+      {banner.tagName && <span className={CARD_TAG}>{banner.tagName}</span>}
       <div className="-mt-1 line-clamp-3 pb-2 pr-44 pt-1 text-xl font-extrabold uppercase leading-6">
         {banner.title}
       </div>
@@ -128,17 +131,21 @@ function BannerCard({ banner, style }) {
       <div className="line-clamp-2 whitespace-pre-line pr-40 text-sm uppercase text-secondary">
         {banner.description}
       </div>
-      <div className="mt-auto pr-40">
-        <button type="button" className={CARD_BUTTON}>
-          <span className="truncate">{banner.buttonContent}</span>
-        </button>
-      </div>
+      {banner.buttonContent && (
+        <div className="mt-auto pr-40">
+          <button type="button" className={CARD_BUTTON}>
+            <span className="truncate">{banner.buttonContent}</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 
   return (
     <div className={SLIDE_PAD} style={style}>
-      {external ? (
+      {!banner.linkUrl ? (
+        <div className={`${CARD} inactive`}>{body}</div>
+      ) : external ? (
         <a href={banner.linkUrl} target="_blank" rel="noreferrer" className={`${CARD} inactive`}>
           {body}
         </a>
@@ -507,7 +514,9 @@ export default function Banner({ type = 'top' }) {
        becoming six, `loop` flipping, the dots renumbering. Empty until it lands; the skeleton
        below is what fills the box in the meantime. */
     const rows = feed ?? [];
-    const padded = (feed && rows.length < 3 ? [...rows, ...getFallbackBanners()] : rows).filter((banner) =>
+    /* Live mode never pads: the three fallbacks are bc.game's own slides (its app cashback, its
+       Originals art), so a thin platform feed stays thin — or empty, and the strip goes. */
+    const padded = (USE_FIXTURES && feed && rows.length < 3 ? [...rows, ...getFallbackBanners()] : rows).filter((banner) =>
       bannerAllowed(gates, banner),
     );
     /* The deposit slide is a deposit-bonus offer: promotions and bonus both have to be on. */
@@ -684,7 +693,9 @@ export default function Banner({ type = 'top' }) {
       {/* No dots while the feed is out: their count IS the slide count, so drawing them early
           would mean redrawing a different number of them when it lands — and the fill is a 15s
           tween that would already be part-run against the wrong index. */}
-      {!feedLoading && (
+      {/* One slide needs no pager — and the deposit slide alone draws nothing when the account
+          has no deposit bonus, which left a lone dot floating over an empty hero. */}
+      {!feedLoading && count > 1 && (
         <Dots index={pos} dots={count} pause={!inView || hovered || isDragging} onChange={goTo} />
       )}
     </>

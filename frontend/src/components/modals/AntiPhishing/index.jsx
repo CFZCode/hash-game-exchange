@@ -1,3 +1,4 @@
+import { brandName } from '../../../services/siteBranding';
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import RouteDialog from '../../shared/RouteDialog';
@@ -62,8 +63,8 @@ export function HowWork() {
     <div className="mt-4 flex w-full flex-col items-center">
       <img className="h-48" alt="" src={workArt} />
       <div className="mt-8 w-full font-semibold text-secondary">
-        You can create your own anti-phishing code to appear in official BC.GAME emails and SMS
-        messages. This feature helps you verify the authenticity of communications from BC.GAME
+        You can create your own anti-phishing code to appear in official {brandName()} emails and SMS
+        messages. This feature helps you verify the authenticity of communications from {brandName()}
       </div>
     </div>
   );

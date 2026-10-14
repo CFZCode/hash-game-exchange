@@ -1,15 +1,13 @@
 import { useNavigate } from 'react-router-dom';
 import { useSession } from '../../../context/session';
 import { useCanSignUp } from '../../../context/gates';
-import { useSettings } from '../../../context/settings';
 import Banner from './Banner';
-import bannerImg from '../../../assets/banner.png';
-import bannerMobileImg from '../../../assets/banner_mobile.png';
-import bannerLogoImg from '../../../assets/banner_logo.png';
-import bannerLogoLightImg from '../../../assets/banner_logo_w.png';
+import { siteName, useSiteMark } from '../../../services/siteBranding';
 import googleIcon from '../../../assets/google.png';
 import telegramIcon from '../../../assets/telegram.png';
 import './Hero.css';
+
+const SOCIAL_SIGN_IN = false;
 
 const HeroCopy = () => {
   /* Same wiring as the header's own Sign Up: `b` in BC-D5accpIK.js takes `const t = useNavigate()`
@@ -37,6 +35,10 @@ const HeroCopy = () => {
         Sign Up
       </button>
 
+      {/* "Or Register With" Google / Telegram is not drawn: the buttons had no handler and the
+          platform has no social sign-in, so they were dead controls. */}
+      {SOCIAL_SIGN_IN && (
+        <>
       <p className="mt-3 p-0 font-semibold leading-[150%] text-secondary">Or Register With</p>
 
       <div className="mt-1.5 h-8">
@@ -63,6 +65,8 @@ const HeroCopy = () => {
       </div>
         </>
       )}
+        </>
+      )}
     </div>
   );
 };
@@ -70,29 +74,21 @@ const HeroCopy = () => {
 /* `z`, the default export of BC-D5accpIK.js — the signed-OUT panel, and the only thing this
    file used to contain. */
 function SignedOutHero() {
-  /* `T = () => d(Y, B)` in BC-D5accpIK.js, where `d` is the `darken ? dark : light` picker and
-     the pair is `banner_logo-n3ZYWH_Z.png` / `banner_logo-S55bYPhU.png`. Two genuinely different
-     files, unlike the `banner` beside it — that one's tuple names the SAME file on both sides
-     (`k === M`, `C === S`), which is why only this one is imported twice. */
-  const { darken } = useSettings();
+  /* THE ORIGINAL'S ARTWORK IS GONE: `banner.png` / `banner_mobile.png` are bc.game's esports team
+     in "BC GAME ESPORTS / JB.COM" shirts and `banner_logo*.png` is the 3D BC mark — another
+     brand's marketing. The panel keeps its own fill and copy; the right-hand art is the owner's
+     square mark (branding/public) when one is uploaded, and nothing otherwise. */
+  const mark = useSiteMark();
   return (
     <div dir="ltr" className="w-full px-4 sm:px-0">
       <div className="hero-panel relative h-[14.375rem] w-full overflow-hidden rounded-lg pl-2.5 sm:h-[260px]">
-        <img
-          alt="banner"
-          className="absolute right-0 top-0 h-full w-auto max-w-none lg:hidden"
-          src={bannerMobileImg}
-        />
-        <img
-          alt="banner"
-          className="absolute right-0 top-0 hidden h-full w-auto lg:block"
-          src={bannerImg}
-        />
-        <img
-          alt="banner-logo"
-          className="absolute -left-16 top-0 hidden h-[120%] lg:block"
-          src={darken ? bannerLogoImg : bannerLogoLightImg}
-        />
+        {mark && (
+          <img
+            alt={siteName() || 'logo'}
+            className="absolute right-6 top-1/2 h-3/5 w-auto -translate-y-1/2 rounded-2xl object-contain opacity-90 lg:right-16"
+            src={mark}
+          />
+        )}
 
         <div className="relative hidden h-full w-[50%] items-center justify-center lg:flex">
           <HeroCopy />

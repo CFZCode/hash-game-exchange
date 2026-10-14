@@ -29,6 +29,11 @@ export function useSportsBalance({ userId }) {
 
     const pollRest = async () => {
       if (!active || connected) return;
+      /* Hidden tab: no read, just look again later (and at once when it comes back, below). */
+      if (document.hidden) {
+        restTimer = setTimeout(pollRest, REST_POLL_MS);
+        return;
+      }
       try {
         const b = await fetchBalanceRest();
         if (!connected) patch({ balance: b.balance, source: 'rest' });
@@ -53,10 +58,17 @@ export function useSportsBalance({ userId }) {
     });
     // Until the socket says hello, the REST figure fills the header.
     restTimer = setTimeout(pollRest, 0);
+    const onVisibility = () => {
+      if (document.hidden || connected) return;
+      clearTimeout(restTimer);
+      restTimer = setTimeout(pollRest, 0);
+    };
+    document.addEventListener('visibilitychange', onVisibility);
 
     return () => {
       active = false;
       clearTimeout(restTimer);
+      document.removeEventListener('visibilitychange', onVisibility);
       disconnect();
     };
   }, [key, token, userId]);

@@ -259,10 +259,16 @@ function toAccount(profile, rows, previous, prefs, bonus, siteDefault = null) {
        * says: "a sign-out does not carry the previous session's currency choice into the next
        * one". A reload keeps its preference, because `restore()` raises `login` before
        * `loadAccount` runs. */
+      /* A SIGNED-IN SESSION'S COIN IS NEVER MOVED BY A RE-READ. `explicit` used to be the
+         `currencyPicked` flag alone, so any refresh (the game page's balance re-read, a wallet
+         change) moved an un-picked coin to whichever row held the biggest NUMBER — 1,000 INR
+         beat 100 USDT — and the header flipped to INR under the player while a game was open.
+         The funded-coin choice is for the FIRST sign-in only (`previous.login` false), which is
+         the 0-BTC case below; after that the header changes only when the player changes it. */
       currencyName: pickCurrency(
         rows,
         previous?.login ? previous?.setting?.currencyName : undefined,
-        Boolean(previous?.login && previous?.setting?.currencyPicked),
+        Boolean(previous?.login),
         siteDefault,
       ),
       /* Restated rather than spread from `previous`: a visitor's persisted `setting` can carry the

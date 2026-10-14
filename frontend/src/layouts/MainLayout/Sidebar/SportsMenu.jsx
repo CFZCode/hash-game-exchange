@@ -4,6 +4,7 @@ import { SportIcon } from '../../../components/exchange/icons';
 import Loading from '../../../components/shared/Loading';
 import { useSportsTree } from '../../../hooks/exchange';
 import { matchPath, sportIconOf } from '../../../pages/Exchange/model';
+import { treeWithoutDead, useDeadMatchesVersion } from '../../../services/exchange/deadMatches';
 
 /* The Sports group's rows: the exchange's own sports tree (`GET all/sports/tree`, one shared 60s
  * poll — hooks/exchange/sharedSportsTree.js) in the sidebar's submenu style. A sport row expands
@@ -20,7 +21,11 @@ const list = (v) => (Array.isArray(v) ? v : []);
 
 export default function SportsMenu({ Arrow, onCloseMobile }) {
   const { pathname } = useLocation();
-  const { data, error } = useSportsTree();
+  /* A match the provider has dropped (its page answered 404) leaves the tree at once, not on the
+     tree's next 60s read — which would still list it anyway (services/exchange/deadMatches.js). */
+  useDeadMatchesVersion();
+  const { data: rawData, error } = useSportsTree();
+  const data = treeWithoutDead(rawData);
   const [open, setOpen] = useState({});
   const toggle = (key) => setOpen((o) => ({ ...o, [key]: !o[key] }));
   const sports = list(data?.sports).filter((s) => list(s.children).length > 0);

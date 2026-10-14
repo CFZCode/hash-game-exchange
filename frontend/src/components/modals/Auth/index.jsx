@@ -12,7 +12,6 @@ import googleImg from '../../../assets/google.png';
 import {
   ArrowIcon,
   CloseIcon,
-  CwalletIcon,
   DeviceIcon,
   EyeIcon,
   GoogleIcon,
@@ -393,17 +392,10 @@ function SignInForm({ onSubmit, pending, error }) {
       </div>
 
       <DirectRow heading="Log in directly with">
+        {/* Cwallet (BC.GAME's partner wallet) sign-in is not drawn — no Parker567 integration. */}
         <button
           type="button"
-          className="button button-m mt-4 h-12 w-full bg-layer4 text-base shadow-[0px_2px_4px_rgba(0,0,0,0.10)]"
-        >
-          <CwalletIcon className="size-6 fill-brand_alt" />
-          <span className="ml-2 font-extrabold text-primary">Cwallet</span>
-        </button>
-
-        <button
-          type="button"
-          className="button button-m mt-3 h-12 w-full border border-third bg-black_alpha5 shadow-[0px_2px_4px_rgba(0,0,0,0.10)]"
+          className="button button-m mt-4 h-12 w-full border border-third bg-black_alpha5 shadow-[0px_2px_4px_rgba(0,0,0,0.10)]"
         >
           <PasskeyIcon className="size-5 fill-secondary" />
           <span className="ml-2 text-base font-extrabold text-primary">Sign In with Passkey</span>
@@ -619,14 +611,7 @@ function SignUpForm({ onSubmit, error, onClearError }) {
               pair. Cwallet and Google share a class list apart from Google's missing
               `text-base`; reproduced as written. */}
           <div className="mt-4 flex items-center gap-3">
-            <button
-              type="button"
-              className="button button-m h-11 flex-1 bg-layer4 text-base shadow-[0px_2px_4px_rgba(0,0,0,0.10)]"
-            >
-              <CwalletIcon className="size-6 fill-brand_alt" />
-              <span className="ml-2 font-extrabold text-primary">Cwallet</span>
-            </button>
-
+            {/* Cwallet sign-up is not drawn (BC.GAME's partner wallet). */}
             <button
               type="button"
               className="button button-m h-11 flex-1 bg-layer4 shadow-[0px_2px_4px_rgba(0,0,0,0.10)]"

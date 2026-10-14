@@ -112,7 +112,7 @@ export function isOddsEditable(bv) {
  *
  *   1 signed in                      Addaplay   'Please log in to place bets'
  *   2 virtual event                  Addaplay   'Betting not allowed on virtual events'
- *   3 stake ≥ 50                     Addaplay   'Minimum bet amount is Rs.50'
+ *   3 stake ≥ 50                     Addaplay   'Minimum bet amount is ₹50'
  *   4 stake within runner/market min/max   Addaplay
  *   5 absurd stake (≥1e16 / ≥1e12)   TENEXCH (no Addaplay equivalent)
  *   6 manual odds edit               Addaplay   'Unmatched bet not allowed'

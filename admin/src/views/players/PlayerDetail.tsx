@@ -27,7 +27,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useSession } from '@/contexts/SessionContext'
 import { useApi, useApiMutation, useListState, usePagedApi } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
-import { formatNumber } from '@/lib/format'
+import { formatAmount, formatNumber } from '@/lib/format'
 import { AdjustWalletDialog } from '@/views/finance/shared'
 import { PlayerBonusesTab } from '@/views/promotions/BonusBalances'
 import GeoAttribution from './GeoAttribution'
@@ -281,6 +281,37 @@ const RawTab = ({ path }: { path: string }) => {
   return <JsonView value={q.data === undefined ? 'loading…' : promotions ? q.data : stripPromotionKeys(q.data)} />
 }
 
+/** `GET admin/user/wallet/:id/balances` — every coin the player holds, formatted; zero coins summarised. */
+const BalancesTab = ({ userId }: { userId: string }) => {
+  const q = useApi<{ balances: Record<string, string> }>(`admin/user/wallet/${userId}/balances`)
+
+  if (q.error) return <ErrorState error={q.error} />
+  if (!q.data) return <p className='text-muted-foreground text-sm'>Loading…</p>
+  const entries = Object.entries(q.data.balances ?? {})
+  const held = entries.filter(([, v]) => Number(v) !== 0)
+  const zero = entries.length - held.length
+
+  return (
+    <Card className='shadow-none'>
+      <CardContent className='pt-6'>
+        {held.length ? (
+          <dl className='grid gap-x-6 gap-y-2 sm:grid-cols-2 lg:grid-cols-4'>
+            {held.map(([coin, v]) => (
+              <div key={coin} className='flex items-baseline justify-between gap-3 border-b py-1'>
+                <dt className='text-muted-foreground text-sm'>{coin}</dt>
+                <dd className='font-mono tabular-nums'>{formatAmount(v)}</dd>
+              </div>
+            ))}
+          </dl>
+        ) : (
+          <p className='text-muted-foreground text-sm'>No balance in any coin.</p>
+        )}
+        {zero > 0 && <p className='text-muted-foreground mt-3 text-xs'>{zero} other coins at 0.</p>}
+      </CardContent>
+    </Card>
+  )
+}
+
 /** The tabs, in order; `?tab=` picks one, so `/users/<id>?tab=stats` links straight to it. */
 const TABS = ['wallet', 'stats', 'logins', 'balances', 'bonuses', 'prefs', 'risk', 'sheet', 'transfers', 'notifications'] as const
 
@@ -391,7 +422,7 @@ const ReportDetail = ({ id }: { id: string }) => {
               <StatusBadge value={p.locks?.system ? 'Locked' : p.status} />
               <BetLockedBadge locks={p.locks} />
               <WithdrawBlockedBadge locks={p.locks} />
-              <Badge variant='outline'>{p.channel}{p.agentId ? ` · agent #${p.agentId}` : ''}</Badge>
+              <Badge variant='outline'>{p.channel === 'agent' ? `Agent player${p.agentId ? ` · agent #${p.agentId}` : ''}` : 'Direct player'}</Badge>
               {p.referredBy && (
                 <span>
                   referred by{' '}
@@ -458,7 +489,7 @@ const ReportDetail = ({ id }: { id: string }) => {
       {report.error && <ErrorState error={report.error} />}
 
       <div className='grid grid-cols-2 gap-4 lg:grid-cols-4'>
-        <StatCard label='Balance' value={<Money value={p?.balance} currency='INR' />} loading={report.isLoading} hint={currencies.map(c => `${c} ${p?.wallets[c]}`).join(' · ')} />
+        <StatCard label='Balance' value={<Money value={p?.balance} currency='INR' />} loading={report.isLoading} hint={currencies.filter(c => Number(p?.wallets[c]) !== 0).map(c => formatAmount(p?.wallets[c], c)).join(' · ') || undefined} />
         <StatCard label='Gateway deposits' value={<Money value={p?.totalDeposited} currency='INR' />} loading={report.isLoading} hint='Lifetime bank + gateway, paid in by the player · excludes credits from upline' />
         <StatCard label='Withdrawn' value={<Money value={p?.totalWithdrawn} currency='INR' />} loading={report.isLoading} />
         <StatCard label='Wagered' value={<Money value={p?.wager} currency={p?.wagerCurrency ?? 'USD'} digits={2} />} loading={report.isLoading} hint={`${formatNumber(p?.gamesPlayed)} bets · ref ${p?.referralCode ?? ''}`} />
@@ -490,7 +521,7 @@ const ReportDetail = ({ id }: { id: string }) => {
           <LoginsTab userId={id} />
         </TabsContent>
         <TabsContent value='balances'>
-          <RawTab path={`admin/user/wallet/${id}/balances`} />
+          <BalancesTab userId={id} />
         </TabsContent>
         {canPrefs && (
           <TabsContent value='prefs'>
@@ -510,14 +541,6 @@ const ReportDetail = ({ id }: { id: string }) => {
           <RawTab path={`admin/notifications/history/${id}`} />
         </TabsContent>
       </Tabs>
-      <Card className='mt-6 shadow-none'>
-        <CardHeader>
-          <CardTitle className='text-base'>Raw report</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <JsonView value={promotions ? p : stripPromotionKeys(p)} />
-        </CardContent>
-      </Card>
     </div>
   )
 }

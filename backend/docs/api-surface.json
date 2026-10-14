@@ -23713,6 +23713,12 @@
           "message": "You can only manage accounts below your own level"
         },
         {
+          "key": "LEVEL_NOT_DIRECT_CHILD",
+          "code": "STAFF_LEVEL_NOT_DIRECT_CHILD",
+          "status": 403,
+          "message": "You can only create the level directly below your own"
+        },
+        {
           "key": "UNKNOWN_ROLE",
           "code": "STAFF_UNKNOWN_ROLE",
           "status": 422,

@@ -16,7 +16,7 @@ const LIVE = String(process.env.NEXT_PUBLIC_USE_FIXTURES ?? 'true') === 'false';
 /* index.html's <head>, unchanged: title, SVG favicon, viewport, theme colour. The fixture build
    (the pixel reference) and an unbranded live site keep exactly these. */
 const ORIGINAL_METADATA: Metadata = {
-  title: 'bc-games',
+  title: 'Parker567 — Casino & Sports',
   icons: { icon: { url: '/favicon.svg', type: 'image/svg+xml' } },
 };
 

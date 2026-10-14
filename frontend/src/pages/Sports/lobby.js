@@ -30,6 +30,7 @@
  *   /api/v1/top/events/{brand}/country/{c}/currency/{cur}/lang/{lang}
  *   /api/v4/{feed}/brand/{brand}/{lang}/{...}      <- snapshot + deltas, see `V()` merge
  */
+import { brandLabel } from '../../services/siteBranding';
 
 /* ---------------------------------------------------------------------------------------
    The top rail — the icon-only strip above everything.
@@ -119,7 +120,7 @@ export const EXPANDED_TABS = [
 export const EXPANDED_SPORTS = [
   { id: 'uefa-el-q', label: 'UEFA Europa League, Qualification', icon: 'soccer', flag: 'international', count: 13 },
   { id: 'soccer', label: 'Soccer', icon: 'soccer', count: 771 },
-  { id: 'originals', label: 'BC.GAME: Originals', icon: 'bc-game-original', count: 4 },
+  { id: 'originals', label: brandLabel('BC.GAME: Originals'), icon: 'bc-game-original', count: 4 },
   { id: 'esoccer', label: 'eSoccer', icon: 'fifa-b', count: 73, hot: true },
   { id: 'tennis', label: 'Tennis', icon: 'tennis', count: 294 },
   { id: 'basketball', label: 'Basketball', icon: 'basketball', count: 31 },

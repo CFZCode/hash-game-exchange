@@ -4,7 +4,7 @@ import { useCanSignUp } from '../../context/gates';
 import { BetbyIcon, ChevronIcon, SportIcon } from './icons';
 import { hasSportIcon } from './sportArt';
 import { placeBet } from '../../services/sports';
-import { siteName, siteTitle, useSiteLogo } from '../../services/siteBranding';
+import { brandName, siteName, siteTitle, useSiteLogo } from '../../services/siteBranding';
 import logoImg from '../../assets/logo.png';
 
 /* The bet slip.
@@ -301,7 +301,7 @@ export default function BetSlip({
                 ))}
               </div>
 
-              <img className="sports-betslip-logo" src={brandLogo ?? logoImg} alt={siteName() ?? siteTitle() ?? 'BC.GAME'} />
+              <img className="sports-betslip-logo" src={brandLogo ?? logoImg} alt={siteName() ?? siteTitle() ?? brandName()} />
 
               <div className="sports-betslip-chips">
                 {STAKE_CHIPS.map((amount) => (

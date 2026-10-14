@@ -9,6 +9,7 @@ import { useGates } from '../../context/gates';
 import './Help.css';
 import Loading from '../../components/shared/Loading';
 import * as globMaps from './index.globs.js';
+import { brandTokens } from '../../services/siteBranding';
 
 /* The Help Center — `/help/:helpId`, and `/help/provably-fair` in particular.
  *
@@ -45,17 +46,12 @@ const topicDocs = globMaps.topicDocs;
    substitutes them at render. Missing this leaves raw `__BC_HOST__` in the middle of the terms
    of service. The mail address is a CONDITIONAL there: `compliance@bcgame.com` when the host is
    `bc.game`, `support@<host>` otherwise — the first branch is the one this build takes. */
-const ENV = {
-  __BC_HOST__: 'BC.GAME',
-  __SMALL_BC_HOST__: 'bc.game',
-  __BC_SITENAME__: 'BC',
-  __SMALL_BC_MAIL_ADDRESS__: 'compliance@bcgame.com',
-};
+/* Filled with Parker567's identity (services/siteBranding), never bc.game's. */
 
 const topicHtml = (element) => {
   const raw = element && topicDocs[`./topics/${element}.html`];
   if (!raw) return null;
-  return raw.replace(/__[A-Z_]+__/g, (token) => ENV[token] ?? token);
+  return raw.replace(/__[A-Z_]+__/g, (token) => brandTokens()[token] ?? token);
 };
 
 /* ------------------------------------------------------------------ the Provably Fair pane */

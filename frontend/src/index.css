@@ -960,6 +960,11 @@ body {
   .input > input {
     flex: 1;
     width: 8rem;
+    /* THE FIELD FILLS THE BOX'S HEIGHT, not just its line box. It was ~21px tall inside a 40-48px
+       pill, so a click on the pill above or below the text focused nothing — focus stayed on
+       whatever had it before (e.g. the header's currency button after the picker closed) and the
+       next space typed "into the search" pressed THAT button and opened "View in currency". */
+    align-self: stretch;
     background-color: transparent;
     outline: none;
   }
@@ -2442,3 +2447,10 @@ button:disabled {
   }
 }
 
+
+/* The owner panel's uploaded logo is a single dark-theme file (white wordmark). On the light theme
+   it is inverted and its hue turned back, so the white ink reads dark and the accent keeps its hue.
+   Applied only to the uploaded logo — this build's own PNG pair already has a light file. */
+.brand-logo-on-light {
+  filter: invert(1) hue-rotate(180deg);
+}

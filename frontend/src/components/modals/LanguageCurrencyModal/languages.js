@@ -51,7 +51,17 @@ export const LANGUAGES = [
   { code: 'uz', name: 'Oʻzbekcha', locale: 'uz-UZ' },
 ];
 
+/* THE LANGUAGES THIS BUILD CAN ACTUALLY SHOW. The UI ships English strings only — there is no
+ * translation bundle — so offering हिन्दी (or any of the 34 others) changed the row's label and
+ * the language handed to game providers, while every screen of ours stayed English: a picker
+ * that half-worked. The picker lists only what the UI renders; add a code here the day its
+ * bundle exists. `supportedLang` folds any older saved choice (e.g. `hi` from before this
+ * change) back to English, so the game iframes and the UI agree. */
+const SUPPORTED_CODES = ['en'];
+export const SUPPORTED_LANGUAGES = LANGUAGES.filter((l) => SUPPORTED_CODES.includes(l.code));
+export const supportedLang = (code) => (SUPPORTED_CODES.includes(code) ? code : SUPPORTED_CODES[0]);
+
 export const languageName = (code) =>
-  LANGUAGES.find((l) => l.code === code)?.name ?? LANGUAGES[0].name;
+  LANGUAGES.find((l) => l.code === supportedLang(code))?.name ?? LANGUAGES[0].name;
 
 

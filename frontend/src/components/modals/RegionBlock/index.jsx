@@ -1,4 +1,5 @@
 import React from 'react';
+import { LIVE_SUPPORT_AVAILABLE } from '../../../services/availability';
 import logoImg from '../../../assets/logo.png';
 import logoLightImg from '../../../assets/logo_w.png';
 import globeRing from '../../../assets/block/globe-ring.png';
@@ -179,7 +180,7 @@ export default function RegionBlock({ onClose, region = null, dismissible = true
                 draws at (288x64 in w-40) rather than left at its intrinsic size. */}
             <img
               alt={(brandLogo && siteName()) || 'logo'}
-              className={brandLogo ? 'mx-auto h-9 w-40 object-contain' : undefined}
+              className={brandLogo ? `mx-auto h-9 w-40 object-contain${darken ? '' : ' brand-logo-on-light'}` : undefined}
               src={brandLogo ?? (darken ? logoImg : logoLightImg)}
             />
           </div>
@@ -198,6 +199,7 @@ export default function RegionBlock({ onClose, region = null, dismissible = true
             region. If you think this is a mistake, check your VPN connection.
           </h2>
 
+          {LIVE_SUPPORT_AVAILABLE && (
           <div className="mt-4 flex items-center gap-3">
             <button
               type="button"
@@ -207,6 +209,7 @@ export default function RegionBlock({ onClose, region = null, dismissible = true
               Live Support
             </button>
           </div>
+          )}
 
           <ul className="mt-10 flex w-full items-center justify-around">
             {SOCIALS.map((s) => (

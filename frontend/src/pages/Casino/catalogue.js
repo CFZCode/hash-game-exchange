@@ -1,3 +1,4 @@
+import { brandLabel } from '../../services/siteBranding';
 import { assetExact } from '../../utils/gameArt';
 import { isLiveSet } from '../../services/catalog';
 import { PROVIDER_NAMES } from '../../data/providers';
@@ -86,7 +87,7 @@ function toRow(games) {
  */
 export const TABS = [
   { label: 'Lobby', tab: '' },
-  { label: 'BC Originals', tab: 'brand' },
+  { label: brandLabel('BC Originals'), tab: 'brand' },
   { label: 'Hot Games', tab: 'hot' },
   { label: 'Slots', tab: 'slots' },
   { label: 'Live Casino', tab: 'live' },
@@ -191,7 +192,7 @@ export function gamesFor(tab, originals, live) {
    `/tagname/:tag` — the site's own route for a tag listing (Enter-MsmOuq5R.js:8697), and the
    one the home page's Bingo row already uses. */
 export const ROWS = [
-  { title: 'BC Originals', key: 'brand', href: '/casino/brand' },
+  { title: brandLabel('BC Originals'), key: 'brand', href: '/casino/brand' },
   { title: 'Hot Games', key: 'hot', href: '/casino/hot' },
   { title: 'Slots', key: 'slots', href: '/casino/slots' },
   { title: 'Live Casino', key: 'live', href: '/casino/live' },

@@ -1,3 +1,4 @@
+import { brandName } from './siteBranding';
 import { request, USE_FIXTURES } from './client';
 import ENDPOINTS, { PLATFORM } from './endpoints';
 
@@ -116,7 +117,7 @@ To protect your assets, please double-check the selected blockchain network befo
 
 Thank you for your understanding and continued support.
 
-BC.GAME Team`;
+${brandName()} Team`;
 
 const CAPTURED_NOTICES = [
   {

@@ -1,3 +1,4 @@
+import { LIVE_SUPPORT_AVAILABLE } from '../../../services/availability';
 import React from 'react';
 import './FloatingActions.css';
 
@@ -64,9 +65,11 @@ export default function FloatingActions() {
         </button>
       )}
 
-      <button type="button" aria-label="Live support" className="button button-m bg-brand">
-        <HelperIcon className="size-6 fill-alw_dark" />
-      </button>
+      {LIVE_SUPPORT_AVAILABLE && (
+        <button type="button" aria-label="Live support" className="button button-m bg-brand">
+          <HelperIcon className="size-6 fill-alw_dark" />
+        </button>
+      )}
     </div>
   );
 }

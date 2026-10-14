@@ -424,6 +424,52 @@ test('jsGames', async (t) => {
     assert.equal(balances.get(String(uid)), '25.00000000');
   });
 
+  await t.test('v2 negative-bet correction reverses that part of the stake in the wager feed', async () => {
+    const uid = await seedPlayer(newUid());
+    const balances = new Map([[String(uid), '100']]);
+    const { service } = build(balances);
+    const recorded = [];
+    const reversed = [];
+    service.games = {
+      recordActivity: async (a) => { recorded.push(a); return { counted: true }; },
+      reverseActivity: async (a) => { reversed.push(a); return { reversed: true }; },
+      recordPlay: async () => {},
+    };
+    const round = newRound();
+
+    assert.equal((await service.betCallbackV2(v2Callback(stake(uid, round, '10')))).success, true);
+    const correction = { ...stake(uid, round, '-4'), serial_number: 'sn-fix-1' };
+    assert.equal((await service.betCallbackV2(v2Callback(correction))).success, true);
+
+    assert.equal(recorded.length, 1, 'only the real stake is counted');
+    assert.deepEqual(reversed, [{
+      userId: uid, source: 'jsgames-v2', ref: `${uid}:${round}`, amount: '4.00000000', refundRef: 'negative_bet:sn-fix-1', outbox: true,
+    }]);
+    assert.equal(balances.get(String(uid)), '94.00000000', 'the 4 came back to the wallet');
+  });
+
+  await t.test('v2: ANOTHER PLAYER\'s same round id is a new settlement, not a duplicate', async () => {
+    const a = await seedPlayer(newUid());
+    const b = await seedPlayer(newUid());
+    const balances = new Map([[String(a), '100'], [String(b), '100']]);
+    const { service } = build(balances);
+    const round = newRound();
+
+    const first = await service.betCallbackV2(v2Callback(stake(a, round, '10')));
+    const second = await service.betCallbackV2(v2Callback(stake(b, round, '10')));
+
+    assert.equal(first.success, true);
+    assert.equal(second.success, true);
+    assert.notEqual(second.duplicate, true, 'B is not told his stake was a replay');
+    assert.equal(balances.get(String(a)), '90.00000000');
+    assert.equal(balances.get(String(b)), '90.00000000', 'and B was actually debited');
+
+    // The same player's retry is still a duplicate.
+    const retry = await service.betCallbackV2(v2Callback(stake(b, round, '10')));
+    assert.equal(retry.duplicate, true);
+    assert.equal(balances.get(String(b)), '90.00000000');
+  });
+
   await t.test('v2 refuses a stake the balance will not cover', async () => {
     const uid = await seedPlayer(newUid());
     const balances = new Map([[String(uid), '5']]);
@@ -509,7 +555,7 @@ test('jsGames', async (t) => {
     assert.equal(record.body.amount, '50.00000000');
     assert.equal(record.body.currency, 'USDT');
     assert.equal(record.body.source, 'jsgames-v2');
-    assert.equal(record.body.ref, round, 'keyed on the round, so a retry counts nothing');
+    assert.equal(record.body.ref, `${uid}:${round}`, 'keyed on the player and round, so a retry counts nothing');
     assert.equal(record.body.rakeback, true);
   });
 

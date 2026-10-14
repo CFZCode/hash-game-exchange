@@ -1,6 +1,7 @@
 'use strict';
 
 const { money } = require('@ibitplay/common');
+const { INHOUSE_PAYOUT, V2_STAKE, V2_PAYOUT } = require('../statements/casinoRounds');
 
 const { visibleStaffIds } = require('../staff-directory/staffDirectory.service');
 const { COIN_IDS, DEPOSIT_SUCCESS, WITHDRAWAL_DONE, VALUATION_NOTE, SPORT_NAMES, SPORTS_REFUNDED_RESULTS } = require('./dashboard.constants');
@@ -336,9 +337,12 @@ class DashboardStatsService {
            AND ${this.#window('b.created')} ${cur('b.coin')} ${this.#owned(ctx, 'b.uid')}
          GROUP BY 1, 5
         UNION ALL
-        SELECT ${this.#bucket('b.created')}, 'casino', 'win', 'house', UPPER(b.coin), SUM(b.amount + b.profit), COUNT(*)
+        -- What was PAID on every settled round (pushes and partial returns
+        -- included); the count stays the number of winning rounds.
+        SELECT ${this.#bucket('b.created')}, 'casino', 'win', 'house', UPPER(b.coin), SUM(${INHOUSE_PAYOUT('b')}),
+               COUNT(*) FILTER (WHERE b.profit > 0)
           FROM bets b
-         WHERE b.profit > 0 AND ${NOT_FAKE}
+         WHERE b.result IS NOT NULL AND b.result::text <> '"refunded"' AND b.amount + b.profit > 0 AND ${NOT_FAKE}
            AND ${this.#window('b.created')} ${cur('b.coin')} ${this.#owned(ctx, 'b.uid')}
          GROUP BY 1, 5
         UNION ALL
@@ -361,11 +365,14 @@ class DashboardStatsService {
            AND ${this.#window('j.timestamp')} ${cur('j.currency')} ${this.#owned(ctx, 'j.user_id')}
          GROUP BY 1, 3, 5
         UNION ALL
-        SELECT ${this.#bucket('v.created_at')}, 'casino',
-               CASE WHEN LOWER(v.transaction_type) = 'win' THEN 'win' ELSE 'stake' END,
-               'house', UPPER(v.currency), SUM(ABS(v.amount)), COUNT(*)
+        -- jsGames v2 stake / payout from the callback's bet_amount / win_amount
+        -- ('amount' is win − bet).
+        SELECT ${this.#bucket('v.created_at')}, 'casino', k.kind,
+               'house', UPPER(v.currency), SUM(k.amount), SUM(k.n)
           FROM game_transactions v
-         WHERE v.amount <> 0 AND LOWER(v.transaction_type) IN ('bet', 'loss', 'win')
+          CROSS JOIN LATERAL (VALUES ('stake', ${V2_STAKE('v')}, CASE WHEN ${V2_STAKE('v')} > 0 THEN 1 ELSE 0 END),
+                                     ('win', ${V2_PAYOUT('v')}, CASE WHEN ${V2_PAYOUT('v')} > 0 THEN 1 ELSE 0 END)) AS k(kind, amount, n)
+         WHERE k.amount <> 0
            AND ${this.#window('v.created_at')} ${cur('v.currency')} ${this.#owned(ctx, 'v.user_id')}
          GROUP BY 1, 3, 5
         UNION ALL
@@ -417,10 +424,11 @@ class DashboardStatsService {
              WHERE j.amount <> 0 AND LOWER(j.transaction_type) IN ('bet', 'settle') AND LOWER(j.transaction_status) = 'completed'
                AND ${this.#window('j.timestamp')} ${cur('j.currency')} ${this.#owned(ctx, 'j.user_id')}
             UNION ALL
-            SELECT 'js:' || COALESCE(v.game_uid, ''), UPPER(v.currency), COALESCE(jg2.game_name, v.game_name, v.game_uid), jg2.vendor, ABS(v.amount), 1
+            SELECT 'js:' || COALESCE(v.game_uid, ''), UPPER(v.currency), COALESCE(jg2.game_name, v.game_name, v.game_uid), jg2.vendor,
+                   ${V2_STAKE('v')}, CASE WHEN ${V2_STAKE('v')} > 0 THEN 1 ELSE 0 END
               FROM game_transactions v
               LEFT JOIN js_games jg2 ON jg2.game_uid = v.game_uid
-             WHERE v.amount <> 0 AND LOWER(v.transaction_type) IN ('bet', 'loss')
+             WHERE ${V2_STAKE('v')} <> 0
                AND ${this.#window('v.created_at')} ${cur('v.currency')} ${this.#owned(ctx, 'v.user_id')}
           ) stakes
          GROUP BY game_key, currency

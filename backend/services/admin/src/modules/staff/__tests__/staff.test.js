@@ -387,6 +387,31 @@ test('admin staff', async (t) => {
     assert.equal(await staffBalance(owner), '500.00000000', 'the owner draws on nothing');
   });
 
+  await t.test('a transfer to or from a player writes the player\'s ledger + history, so the wallet reconciles', async () => {
+    const owner = await seedStaff(newStaffId(), { inr: '500', level: 1 });
+    const agent = await seedStaff(newStaffId(), { parentId: owner });
+    const player = await seedPlayer(newUid(), agent, '0');
+
+    await service.transfer({ transactionPassword: TXN,
+      actor: ownerActor(owner), toType: 'user', toId: player, amount: '75', direction: 'deposit',
+    });
+    await service.transfer({ transactionPassword: TXN,
+      actor: ownerActor(owner), toType: 'user', toId: player, amount: '30', direction: 'withdraw',
+    });
+
+    const rows = await connection.models.CreditsLedger.findAll({ where: { user_id: String(player) }, order: [['id', 'ASC']], raw: true });
+    assert.deepEqual(
+      rows.map((r) => [r.reason, money.toDecimalString(money.toMinor(String(r.amount))), money.toDecimalString(money.toMinor(String(r.balance)))]),
+      [['TRANSFER_IN', '75.00000000', '75.00000000'], ['TRANSFER_OUT', '-30.00000000', '45.00000000']]
+    );
+    assert.equal(rows[1].meta.previousBalance, '75.00000000');
+    const sum = rows.reduce((a, r) => a + money.toMinor(String(r.amount)), 0n);
+    assert.equal(money.toDecimalString(sum), await playerBalance(player), 'ledger sums to the wallet');
+    assert.equal(await connection.models.WalletHistory.count({ where: { uid: player } }), 2);
+    await connection.models.CreditsLedger.destroy({ where: { user_id: String(player) } });
+    await connection.models.WalletHistory.destroy({ where: { uid: player } });
+  });
+
   await t.test('an outside account cannot be transferred to', async () => {
     const boss = await seedStaff(newStaffId(), { inr: '1000' });
     const stranger = await seedStaff(newStaffId(), { inr: '0' });
@@ -504,6 +529,29 @@ test('admin staff', async (t) => {
     assert.equal(await connection.models.Staff.findByPk(agent, { raw: true }), null);
   });
 
+  await t.test('closed (anonymised) players do not block a delete; an open one does', async () => {
+    const boss = await seedStaff(newStaffId());
+    const agent = await seedStaff(newStaffId(), { parentId: boss });
+    const closed = await seedPlayer(newUid(), agent, '0');
+    await connection.models.Users.update({ status: 'closed', name: `closed-${closed}` }, { where: { id: closed } });
+    const open = await seedPlayer(newUid(), agent, '0');
+
+    await assert.rejects(
+      () => service.remove({ actor: actorFor(boss), staffId: agent }),
+      (err) => err.code === 'STAFF_CANNOT_DELETE_WITH_DESCENDANTS' && err.status === 409
+    );
+
+    await connection.models.Users.update({ status: 'closed', name: `closed-${open}` }, { where: { id: open } });
+    await service.remove({ actor: actorFor(boss), staffId: agent });
+    assert.equal(await connection.models.Staff.findByPk(agent, { raw: true }), null);
+
+    // The closed players' records move up to the deleted account's parent.
+    const rows = await connection.models.Users.findAll({ where: { id: [closed, open] }, raw: true });
+    assert.deepEqual(rows.map((r) => Number(r.parent_staff_id)), [boss, boss]);
+    await connection.models.Credits.destroy({ where: { uid: [closed, open] } });
+    await connection.models.Users.destroy({ where: { id: [closed, open] } });
+  });
+
   await t.test('deleting an account removes its hierarchy rows too', async () => {
     // Otherwise the closure table keeps naming an id that no longer exists,
     // and every scoped query silently widens to include a ghost.
@@ -602,6 +650,7 @@ test('admin staff', async (t) => {
     );
   const cleanup = (...ids) => connection.models.Staff.destroy({ where: { id: ids } });
   const refusedLevel = (err) => err.code === 'STAFF_LEVEL_NOT_BELOW' && err.status === 403;
+  const refusedSkip = (err) => err.code === 'STAFF_LEVEL_NOT_DIRECT_CHILD' && err.status === 403 && /directly below your own/.test(err.message);
 
   await t.test('an Admin cannot create a Super Admin, nor another Admin', async () => {
     const admin = await seedStaff(newStaffId(), { level: 2 });
@@ -616,18 +665,18 @@ test('admin staff', async (t) => {
 
   await t.test('each level creates ONLY the level directly below it (CHILD_LEVELS)', async () => {
     const admin = await seedStaff(newStaffId(), { level: 2 });
-    await assert.rejects(() => make(actorFor(admin), 4), refusedLevel, 'an Admin does not skip to Super Master');
+    await assert.rejects(() => make(actorFor(admin), 4), refusedSkip, 'an Admin does not skip to Super Master');
 
     const sub = await seedStaff(newStaffId(), { parentId: admin, level: 3 });
     await assert.rejects(() => make(actorFor(sub), 3), refusedLevel, 'not a peer');
-    await assert.rejects(() => make(actorFor(sub), 5), refusedLevel, 'a Sub Admin does not skip to Master');
+    await assert.rejects(() => make(actorFor(sub), 5), refusedSkip, 'a Sub Admin does not skip to Master');
     const smMade = await make(actorFor(sub), 4);
     assert.equal(Number(smMade.parentId), sub);
 
     const sm = await seedStaff(newStaffId(), { level: 4 });
     await assert.rejects(() => make(actorFor(sm), 4), refusedLevel, 'not a peer');
     await assert.rejects(() => make(actorFor(sm), 3), refusedLevel, 'not upwards');
-    await assert.rejects(() => make(actorFor(sm), 6), refusedLevel, 'a Super Master does not skip to Agent');
+    await assert.rejects(() => make(actorFor(sm), 6), refusedSkip, 'a Super Master does not skip to Agent');
 
     const master = await make(actorFor(sm), 5);
     levels.set(Number(master.id), 5);
@@ -669,7 +718,7 @@ test('admin staff', async (t) => {
     const stranger = await seedStaff(newStaffId(), { level: 5 });
 
     // A Super Master's child level is Master; Agent under its master is refused.
-    await assert.rejects(() => make(actorFor(sm), 6, { parentId: master }), refusedLevel);
+    await assert.rejects(() => make(actorFor(sm), 6, { parentId: master }), refusedSkip);
     await assert.rejects(() => make(actorFor(sm), 5, { parentId: master }), refusedLevel);
     await assert.rejects(
       () => make(actorFor(sm), 5, { parentId: stranger }),
@@ -704,7 +753,7 @@ test('admin staff', async (t) => {
     // Promoting the master to the super master's own level.
     await assert.rejects(() => service.update({ actor: actorFor(sm), staffId: master, roleId: roleFor(4) }), refusedLevel);
     // Demoting the master to the level of the agent beneath it.
-    await assert.rejects(() => service.update({ actor: actorFor(sm), staffId: master, roleId: roleFor(6) }), refusedLevel);
+    await assert.rejects(() => service.update({ actor: actorFor(sm), staffId: master, roleId: roleFor(6) }), refusedSkip);
     // Raising the agent to its parent's level.
     await assert.rejects(() => service.update({ actor: actorFor(sm), staffId: agent, roleId: roleFor(5) }), refusedLevel);
     // Executive (7) is not a staff level you move an account to.

@@ -1,3 +1,4 @@
+import { brandName } from '../../services/siteBranding';
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import Pagination from '../../components/shared/Pagination';
@@ -274,7 +275,7 @@ function SecuritySetup() {
             icon={IconAntiPhishing}
             done={Boolean(phishingCode)}
             title="Anti-Phishing Code"
-            desc="This feature helps you verify the authenticity of communications from BC.GAME"
+            desc={`This feature helps you verify the authenticity of communications from ${brandName()}`}
             actionLabel={phishingCode ? 'Change Anti-Phishing Code' : 'Enable Anti-Phishing Code'}
             /* THREE dialog routes, and the tile picks the entry point: a code already set goes
                straight to `detail`, and no code goes to `enter`, the explainer whose one button

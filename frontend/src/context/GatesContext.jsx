@@ -5,6 +5,7 @@ import { ALL_ON, gateOf, loadCapabilities, loadPublicGates, makeGates } from '..
 import { useGates } from './gates';
 import { GatesContext } from './gates';
 import { useSession } from './session';
+import Loading from '../components/shared/Loading';
 
 /* Signed in, /me not answered yet: capability gates read as CLOSED rather than open for a
    moment (SmartBet's UNKNOWN_CAPS), and a gated route waits for `ready` before redirecting. */
@@ -95,6 +96,26 @@ function LiveGates({ children }) {
  */
 export function RouteGate({ pathname, children }) {
   const gates = useGates();
-  if (gateOf(pathname) && (!gates.ready || !gates.routeOn(pathname))) return null;
+  if (!gateOf(pathname)) return children;
+  /* Off: the provider is redirecting to `/` — draw nothing for that instant. */
+  if (gates.ready && !gates.routeOn(pathname)) return null;
+  /* Not answered yet: a spinner rather than an empty page. A cold load that met the gateway's
+     rate limit (429) used to sit here as a BLANK page for as long as the session read failed;
+     the session now retries with backoff (SessionContext), and this says so after a moment. */
+  if (!gates.ready) return <GateWaiting />;
   return children;
+}
+
+function GateWaiting() {
+  const [slow, setSlow] = React.useState(false);
+  React.useEffect(() => {
+    const t = setTimeout(() => setSlow(true), 6000);
+    return () => clearTimeout(t);
+  }, []);
+  return (
+    <div className="flex min-h-60 flex-col items-center justify-center gap-3 py-10" role="status" aria-live="polite">
+      <Loading className="size-6" />
+      {slow && <p className="text-sm font-semibold text-secondary">The server is busy — still loading, retrying…</p>}
+    </div>
+  );
 }

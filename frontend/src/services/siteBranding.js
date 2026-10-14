@@ -106,6 +106,47 @@ export function logoFor(name, { own } = {}) {
 
 /** The site's name (the logo's alt text), or null. */
 export const siteName = () => runtime?.siteName ?? null;
+/**
+ * The name to PRINT in copy ("Parker567"): the owner's `siteName`, cased as the title spells it
+ * (the panel stores the key lower-case, `parker567`, while the title reads "Parker567 — …").
+ * Falls back to the build-time title's first word, then to "Parker567". Never
+ * the original's "BC.GAME".
+ */
+export function brandName() {
+  const name = runtime?.siteName ?? null;
+  const title = runtime?.title ?? env('NEXT_PUBLIC_SITE_TITLE') ?? '';
+  if (name) {
+    const at = title.toLowerCase().indexOf(name.toLowerCase());
+    if (at >= 0) return title.slice(at, at + name.length);
+    return name.charAt(0).toUpperCase() + name.slice(1);
+  }
+  const first = title.split(/\s+[—–|·-]\s+/)[0]?.trim();
+  return first || 'Parker567';
+}
+/**
+ * The placeholders the help/responsible documents ship with (`q()` in createHtmlFile), filled
+ * with THIS site's identity instead of bc.game's. The mail address follows the original's own
+ * non-bc.game branch, `support@<host>`.
+ */
+export function brandTokens() {
+  const name = brandName();
+  const host = typeof window !== 'undefined' ? window.location.host : '';
+  return {
+    __BC_HOST__: name,
+    __SMALL_BC_HOST__: host || name.toLowerCase(),
+    __BC_SITENAME__: name,
+    __SMALL_BC_MAIL_ADDRESS__: `support@${(host || name.toLowerCase()).replace(/:\d+$/, '')}`,
+  };
+}
+
+/** "BC Originals" / "BC Exclusive" / "BC.GAME: Originals" as this site prints them: the bare
+ *  word, "Originals" / "Exclusive", with no brand prefix (the user's call — not "Parker567
+ *  Originals"). For labels that double as keys (tag hrefs, tag searches) — rename at DISPLAY only. */
+export const brandLabel = (label) =>
+  typeof label === 'string'
+    ? label.replace(/\bBC(?:\.GAME)?:?\s+(Originals|Exclusive)\b/g, (_, word) => word)
+    : label;
+
 export const siteTitle = () => runtime?.title ?? runtime?.siteName ?? env('NEXT_PUBLIC_SITE_TITLE');
 export const siteDescription = () => runtime?.description ?? env('NEXT_PUBLIC_SITE_DESCRIPTION');
 
@@ -122,6 +163,10 @@ export function useSiteBranding() {
 export function useSiteLogo(options) {
   useSiteBranding();
   return siteLogo(options);
+}
+export function useBrandName() {
+  useSiteBranding();
+  return brandName();
 }
 export function useSiteMark() {
   useSiteBranding();

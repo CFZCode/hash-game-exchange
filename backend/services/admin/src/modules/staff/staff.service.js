@@ -19,6 +19,9 @@ const { assertTransactionPassword } = require('../staff-auth/transactionPassword
 const { cascadeSuspension } = require('../locks/suspendCascade');
 
 /** `status` NULL is the legacy default and reads as active everywhere. */
+/** `players.constants.js` CLOSED_STATUS: an account closed and anonymised by `PlayersService.close`. */
+const CLOSED_PLAYER_STATUS = 'closed';
+
 const isActive = (status) => status == null || status === 'active';
 
 /**
@@ -571,6 +574,18 @@ class StaffService {
         { transaction }
       );
 
+      // The PLAYER side of the movement gets its ledger + history rows, as the
+      // opening balance and account close already do (players.service): a
+      // player wallet changed here without them drifted from its ledger and
+      // reconcile reported `balanced: false`.
+      if (source.type === TARGET_TYPE.USER || destination.type === TARGET_TYPE.USER) {
+        const isCredit = destination.type === TARGET_TYPE.USER;
+        await this.#playerLedger(
+          { userId: isCredit ? destination.id : source.id, amount, isCredit, transferId: row.id, actor },
+          transaction
+        );
+      }
+
       this.logger?.info(
         { actorStaffId: actor.id, from: source, to: destination, amount, direction, transferId: row.id },
         'Staff transfer'
@@ -800,10 +815,22 @@ class StaffService {
       throw errors.CANNOT_DELETE_WITH_BALANCE({ staffId, balance: String(balance.inr) });
     }
 
-    const players = await this.models.Users.count({ where: { parent_staff_id: staffId } });
+    // A closed (anonymised) player is a financial record, not a live account:
+    // it does not keep its agent alive. Only open players block the delete.
+    const players = await this.models.Users.count({
+      where: { parent_staff_id: staffId, status: { [Op.or]: [{ [Op.ne]: CLOSED_PLAYER_STATUS }, { [Op.is]: null }] } },
+    });
     if (players) throw errors.CANNOT_DELETE_WITH_DESCENDANTS({ staffId, players });
 
     return this.db.transaction(async (transaction) => {
+      // `users.parent_staff_id` references `staff`, so the closed players move
+      // up to the deleted account's own parent — their ledger and transfer rows
+      // stay joinable through a live branch.
+      const row = await this.models.Staff.findByPk(staffId, { attributes: ['parent_id'], transaction, raw: true });
+      await this.models.Users.update(
+        { parent_staff_id: row?.parent_id ?? null },
+        { where: { parent_staff_id: staffId, status: CLOSED_PLAYER_STATUS }, transaction }
+      );
       await this.models.StaffHierarchy.destroy({
         where: { [Op.or]: [{ ancestor_id: staffId }, { descendant_id: staffId }] },
         transaction,
@@ -859,6 +886,50 @@ class StaffService {
    * debited unconditionally — so two transfers issued at once both passed the
    * comparison and the account went negative.
    */
+  /** credits_ledger TRANSFER_IN/OUT + wallet_history for a player in a staff transfer (INR). */
+  async #playerLedger({ userId, amount, isCredit, transferId, actor }, transaction) {
+    const moved = money.toMinor(String(amount));
+    const wallet = await this.models.Credits.findOne({ where: { uid: userId }, attributes: ['inr'], transaction, raw: true });
+    const after = money.fromStored(wallet?.inr ?? '0');
+    const previous = money.toDecimalString(money.toMinor(after) + (isCredit ? -moved : moved));
+    const player = await this.models.Users.findOne({ where: { id: userId }, attributes: ['name'], transaction, raw: true });
+    const description = isCredit ? 'Funded by staff transfer' : 'Withdrawn by staff transfer';
+
+    await this.models.CreditsLedger.create(
+      {
+        user_id: String(userId),
+        currency: 'INR',
+        amount: money.toDecimalString(isCredit ? moved : -moved),
+        reason: isCredit ? 'TRANSFER_IN' : 'TRANSFER_OUT',
+        description,
+        balance: after,
+        closing: after,
+        netamount: 0,
+        profit: 0,
+        loss: 0,
+        commission: 0,
+        idempotency_key: null,
+        source_service: 'admin-service',
+        meta: { refType: 'STAFF_TRANSFER', refId: String(transferId), staffId: String(actor.id), previousBalance: previous },
+      },
+      { transaction }
+    );
+    await this.models.WalletHistory.create(
+      {
+        uid: userId,
+        username: player?.name || String(userId),
+        coin: 'INR',
+        operation: isCredit ? 'credit' : 'debit',
+        amount: money.toDecimalString(moved),
+        previous_balance: previous,
+        new_balance: after,
+        description,
+        transaction_time: new Date(),
+      },
+      { transaction }
+    );
+  }
+
   async #debit(party, amount, { actor, transaction, allowCredit = false }) {
     /**
      * The platform owner is the source of funds and has no balance to draw
@@ -964,7 +1035,7 @@ class StaffService {
     this.#assertLevelBelow(actor.level, level);
     if (Number(actor.level) === STAFF_LEVELS.SUPER_ADMIN) return;
     if (!canCreateLevel(actor.level, level)) {
-      throw errors.LEVEL_NOT_BELOW({
+      throw errors.LEVEL_NOT_DIRECT_CHILD({
         level,
         reason: 'you can only create the level directly below your own',
       });
@@ -975,7 +1046,7 @@ class StaffService {
   #assertChildOfParent(actor, parentLevel, level) {
     if (Number(actor.level) === STAFF_LEVELS.SUPER_ADMIN) return;
     if (!canCreateLevel(parentLevel, level)) {
-      throw errors.LEVEL_NOT_BELOW({ level, reason: 'the new account must be the level directly below its parent' });
+      throw errors.LEVEL_NOT_DIRECT_CHILD({ level, reason: 'the new account must be the level directly below its parent' });
     }
   }
 

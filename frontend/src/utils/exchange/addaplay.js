@@ -101,7 +101,7 @@ export const ADDAPLAY_MIN_BET = 50;
 
 export function validateMinBetAmount(stake) {
   const num = parseFloat(stake) || 0;
-  if (num < 50) return 'Minimum bet amount is Rs.50';
+  if (num < 50) return 'Minimum bet amount is ₹50';
   return null;
 }
 

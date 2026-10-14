@@ -1,3 +1,4 @@
+import { brandLabel } from '../../../services/siteBranding';
 import React from 'react';
 import { Link } from 'react-router-dom';
 import VipTierIcon from './VipTierIcon';
@@ -19,7 +20,7 @@ import Skeleton from '../../../components/shared/Skeleton';
    than a mapping. 0 means "no filter". */
 const TABS = [
   { tab: 0, title: 'All' },
-  { tab: 1, title: 'BC Originals' },
+  { tab: 1, title: brandLabel('BC Originals') },
   { tab: 2, title: 'Slots' },
   { tab: 3, title: 'Live Casino' },
 ];

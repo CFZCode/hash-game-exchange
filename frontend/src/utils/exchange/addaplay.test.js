@@ -101,7 +101,7 @@ describe('per-runner exposure preview (betValidation.js:65-87)', () => {
 
 describe('stake rules (betValidation.js:15-42, MatchDetail.jsx:171-172)', () => {
   it('floor 50', () => {
-    expect(validateMinBetAmount(49)).toBe('Minimum bet amount is Rs.50');
+    expect(validateMinBetAmount(49)).toBe('Minimum bet amount is ₹50');
     expect(validateMinBetAmount(50)).toBeNull();
   });
   it('runner/market range, max 0 means no ceiling', () => {

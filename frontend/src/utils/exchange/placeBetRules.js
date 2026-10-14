@@ -370,7 +370,7 @@ export function suspensionToastMessage(gs) {
 // regardless of the market's own (often 0) min. Cashout hedges are exempt
 // (their stake is computed, not chosen). Applied in usePlaceBetPanel.
 // ADDAPLAY WINS: its global floor is 50 (Addaplay src/utils/betValidation.js:15-19,
-// "Minimum bet amount is Rs.50"); TENEXCH's was 100. See docs/exchange.md, differences table.
+// "Minimum bet amount is ₹50"); TENEXCH's was 100. See docs/exchange.md, differences table.
 export const MIN_BET_AMOUNT = 50;
 
 // Virtual cricket (Dim "(e)" / T5 XI / T10 XI / Virtual Cricket League) carries

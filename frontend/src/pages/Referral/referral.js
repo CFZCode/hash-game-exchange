@@ -30,11 +30,14 @@
  * "…you bring to __ENV_HOST__ This USD reward…". Do not tidy either — they are what the live
  * page renders.
  */
+import { brandName } from '../../services/siteBranding';
 
 /* The one substitution the page performs. Kept next to the strings it fills rather than in the
    component, because which token maps to what is a property of this copy. */
-export const HOST = 'BC.GAME';
-export const BUSINESS_EMAIL = 'jonata@bcgame.com';
+/* Parker567's printed name (owner-panel branding), never the original's "BC.GAME". There is no
+   business mailbox to print (the original's was bc.game's), so `__email__` reads as Live Support. */
+export const HOST = brandName();
+export const BUSINESS_EMAIL = '';
 
 /* `new Decimal(1e3)` in both chunks, printed through `printCurrency` with its default
    "USDFIAT". The commission rate beside it is a literal `25%` in the markup, not a value. */
@@ -124,7 +127,7 @@ export const FAQ = [
   {
     question: 'I have big audience, how I can get special deals?',
     answer:
-      'If you have a website with good traffic or a social media account with a large audience, please contact us at __email__.',
+      'If you have a website with good traffic or a social media account with a large audience, please contact Live Support.',
   },
   {
     question: 'How many referral links can I create if I have different websites/accounts?',

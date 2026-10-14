@@ -1,10 +1,10 @@
+import { LIVE_SUPPORT_AVAILABLE } from '../../../services/availability';
+import { brandLabel } from '../../../services/siteBranding';
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import LanguageCurrencyModal from '../../../components/modals/LanguageCurrencyModal';
 import Refer from '../../../components/modals/Refer';
 import { FLYOUTS } from './originals';
-import SOCIALS from '../../../components/modals/RegionBlock/icons';
-import { CommunityItem, GlobalIcon } from '../../../components/shared/CommunityItem';
 import { useSession } from '../../../context/session';
 import { useGates } from '../../../context/gates';
 import { useSettings } from '../../../context/settings';
@@ -14,7 +14,12 @@ import GiftCardDialog from '../../../components/modals/GiftCard';
 import { IconGift } from '../Header/AfterLogin/icons';
 import pwaImg from '../../../assets/pwa.png';
 import pwaLightImg from '../../../assets/pwa_w.png';
-import usdCoin from '../../../assets/icons/USD.png';
+import { languageName } from '../../../components/modals/LanguageCurrencyModal/languages';
+import { getAlias } from '../../../utils/currency';
+import { coinIcon } from '../../../utils/coinArt';
+
+/* The Application card — see its call site for why it is off. */
+const SHOW_APP_CARD = false;
 
 // BC Arrow SVG (used for dropdowns and chevrons)
 const ArrowSvg = ({ className }) => (
@@ -44,13 +49,6 @@ const ExternalSvg = () => (
 const GlobeSvg = () => (
   <svg viewBox="0 0 32 32" className="icon size-6 fill-secondary">
     <path d="M16 4C9.3726 4 4 9.3726 4 16C4 22.6274 9.3726 28 16 28C22.6274 28 28 22.6274 28 16C28 9.3726 22.6274 4 16 4ZM25.1671 12.0007C25.7022 13.2252 26.0008 14.578 26.0008 16.001C26.0008 17.424 25.7022 18.7768 25.1671 20.0013H20.6577C20.8782 18.7607 20.9984 17.412 20.9984 16.001C20.9984 14.59 20.8781 13.2413 20.6577 12.0007H25.1671ZM13.0018 16.001C13.0018 14.5641 13.112 13.2052 13.3125 12.0007H18.6857C18.8862 13.2052 18.9984 14.564 18.9984 16.001C18.9984 17.4381 18.8862 18.7969 18.6857 20.0014H13.3146C13.1142 18.7969 13.0018 17.4381 13.0018 16.001ZM24.0007 10.0004H20.1927C19.7277 8.4392 19.0904 7.15453 18.3388 6.27668C20.6017 6.82169 22.6039 8.1385 24.0007 10.0004ZM16 7.00222C16.8878 7.00222 17.6875 8.16266 18.2367 10.0025H13.7634C14.3125 8.16073 15.1122 7.00222 16 7.00222ZM13.6611 6.27879C12.9095 7.15458 12.2722 8.44329 11.8092 10.0025H8.0012C9.3974 8.14096 11.3989 6.82423 13.6611 6.27879ZM6.83291 12.0007H11.3423C11.1218 13.2413 11.0015 14.59 11.0015 16.001C11.0015 17.412 11.1219 18.7607 11.3423 20.0013H6.83286C6.28161 18.7398 5.99776 17.3777 5.99915 16.001C5.99915 14.578 6.29784 13.2252 6.83291 12.0007ZM7.9994 22.0015H11.8074C12.2724 23.5627 12.9097 24.8474 13.6612 25.7253C11.3983 25.1802 9.3962 23.8634 7.9994 22.0015ZM16 24.9997C15.1122 24.9997 14.3125 23.8393 13.7633 21.9994H18.2366C17.6835 23.8412 16.8879 24.9997 16 24.9997ZM18.3388 25.7233C19.0904 24.8475 19.7277 23.5588 20.1908 21.9995H23.9988C22.6025 23.8611 20.601 25.1779 18.3388 25.7233Z" />
-  </svg>
-);
-
-/* Turbo Mode's bolt — `Ue` in index-DuwOs_Mv.js, rendered `class="size-4 fill-primary"`. */
-const BoltSvg = () => (
-  <svg viewBox="0 0 32 32" className="icon size-4 fill-primary">
-    <path d="M17.9138 4.81964L7.69383 14.6658C7.01401 15.3205 7.07254 16.3307 7.82512 16.9227L7.95974 17.0188C8.09939 17.1092 8.25241 17.1819 8.41547 17.2346L12.8264 18.6645L10.9132 25.742C10.6807 26.6008 11.2928 27.4612 12.2787 27.6636C12.9234 27.7957 13.5999 27.6151 14.0489 27.1911L24.2947 17.5122C24.9813 16.8633 24.9344 15.8524 24.1894 15.2545L24.0665 15.1642C23.9385 15.0789 23.7989 15.0078 23.65 14.9535L19.4641 13.4399L21.0788 6.19518C21.2719 5.32889 20.6214 4.49019 19.6263 4.32211C18.995 4.21591 18.3461 4.40406 17.9154 4.81964H17.9138Z" />
   </svg>
 );
 
@@ -268,9 +266,6 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
   const { darken, setTheme } = useSettings();
   const darkMode = darken;
   const setDarkMode = (next) => setTheme(next ? 'dark' : 'light');
-  /* `N.lite` on the original, a persisted app setting that thins out animations. Nothing here
-     reads it — see the note over the Turbo Mode card for why the switch is inert. */
-  const [turboMode, setTurboMode] = useState(false);
 
   /* Which submenu row's hover panel is open, by `flyout` key. Held here rather than on the row
      because the panel is a SIBLING of the aside — see the note over `.sidebar-flyout` in
@@ -389,8 +384,8 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
         /* `flyout` names a list in originals.js. `hasSubArrow` only draws the chevron — the
            two Sports Provider rows carry it too and have no list here, so they render the
            chevron and open nothing, which is what they already did. */
-        { label: 'BC Originals', icon: 'bc-originals-svg', href: '/casino/brand', hasSubArrow: true, flyout: 'originals' },
-        { label: 'BC Exclusive', menuIcon: 'bc_exlusive', href: '/section/exclusive' },
+        { label: brandLabel('BC Originals'), icon: 'bc-originals-svg', href: '/casino/brand', hasSubArrow: true, flyout: 'originals' },
+        { label: brandLabel('BC Exclusive'), menuIcon: 'bc_exlusive', href: '/section/exclusive' },
         { label: 'Hot Games', menuIcon: 'hotgame', href: '/casino/hot' },
         { label: 'Slots', menuIcon: 'slots', href: '/casino/slots' },
         { label: 'Live Casino', menuIcon: 'liveevents', href: '/casino/live' },
@@ -487,7 +482,7 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
        Predictions gap above. */
     { id: 'fair',         label: 'Provably Fair',         menuIcon: 'fair',           href: '/help/provably-fair' },
     { id: 'responsible',  label: 'Responsible Gambling',  menuIcon: 'account',        href: '/responsible/faq' },
-    { id: 'blog',         label: 'Blog',                  menuIcon: 'blog',           external: true, gate: 'blog', href: 'https://blog.bc.game/' },
+    /* Blog (blog.bc.game) removed: BC.GAME's blog, no Parker567 equivalent. */
   ];
 
   return (
@@ -518,7 +513,11 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
               {/* ============================================================ */}
               {/* 1. APPLICATION BANNER  (expanded only)                        */}
               {/* ============================================================ */}
-              {isExpanded && (
+              {/* HIDDEN: its artwork (`pwa.png` / `pwa_w.png`) is a phone mock of BC.GAME's own
+                  site, and `/events/app-download-recall` is not built, so it was another brand's
+                  marketing linking to the catch-all. Parker567 ships no app; turn this back on
+                  with our own artwork and page if one is ever made. */}
+              {isExpanded && SHOW_APP_CARD && (
               <div className="sidebar-banner-block mb-2">
                 {/* `/events/app-download-recall`, the third arm of `Tt`'s host switch — the
                     other two are the Mexico and Kenya builds, and this one is the `when: !0`
@@ -747,6 +746,7 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
               {/* ============================================================ */}
               {/* 6. LIVE SUPPORT                                               */}
               {/* ============================================================ */}
+              {LIVE_SUPPORT_AVAILABLE && (
               <div className="Sidebar-Unit_bg nav-link-same rounded-lg">
                 <div className="nav-link-item mt-3 flex h-10 w-full cursor-pointer items-center overflow-hidden rounded-lg px-3 lg:mt-1 lg:p-0">
                   <div className="nav-scale-box center size-[32px] flex-none lg:size-10">
@@ -755,6 +755,7 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
                   <span className="sidebar-collapse-hide ml-2 whitespace-nowrap text-base font-semibold text-primary lg:ml-0 lg:text-sm">Live Support</span>
                 </div>
               </div>
+              )}
 
               {/* ============================================================ */}
               {/* 7. LANGUAGE & CURRENCY ROW                                   */}
@@ -772,7 +773,7 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
                     <div className="nav-scale-box center size-[32px] flex-none lg:size-10">
                       <GlobeSvg />
                     </div>
-                    <span className="sidebar-collapse-hide ms-2 whitespace-nowrap text-base font-semibold text-primary lg:ms-0 lg:text-sm">English</span>
+                    <span className="sidebar-collapse-hide ms-2 whitespace-nowrap text-base font-semibold text-primary lg:ms-0 lg:text-sm">{languageName(session.setting.lang)}</span>
                     <div className="sidebar-collapse-hide arrow-button ms-auto flex size-6 items-center justify-center rounded p-0 lg:me-2 lg:size-5">
                       <ArrowSvg className="rotate-180" />
                     </div>
@@ -784,9 +785,21 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
                     onClick={() => openLangModal('currency')}
                   >
                     <div className="nav-scale-box center size-[32px] flex-none lg:size-10">
-                      <img alt="coin" className="h-6 lg:h-5" src={usdCoin} />
+                      {/* THE ROWS PRINT THE SAME `setting` FIELDS THE PICKER WRITES, as Settings ›
+                          Preferences does. They were the literals "English" / "USD", so a pick
+                          landed in the store and the sidebar never moved. "None" (conversion
+                          off) draws the picker's own None disc. */}
+                      {session.setting.enableLocaleCurrency ? (
+                        <img alt="coin" className="h-6 lg:h-5" src={coinIcon(session.setting.localeCurrencyName)} />
+                      ) : (
+                        <span className="flex size-6 items-center justify-center rounded-full bg-[#6b7280] text-[0.625rem] font-black leading-none text-white lg:size-5">★</span>
+                      )}
                     </div>
-                    <span className="sidebar-collapse-hide ms-2 whitespace-nowrap text-base font-semibold text-primary lg:ms-0 lg:text-sm">USD</span>
+                    <span className="sidebar-collapse-hide ms-2 whitespace-nowrap text-base font-semibold text-primary lg:ms-0 lg:text-sm">
+                      {session.setting.enableLocaleCurrency
+                        ? getAlias(session.setting.localeCurrencyName).replace(/FIAT$/, '')
+                        : 'None'}
+                    </span>
                     <div className="sidebar-collapse-hide arrow-button ms-auto flex size-6 items-center justify-center rounded p-0 lg:me-2 lg:size-5">
                       <ArrowSvg className="rotate-180" />
                     </div>
@@ -840,54 +853,6 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
                   </div>
                 </div>
 
-                {/* ======================================================== */}
-                {/* 9. TURBO MODE  (drawer only)                             */}
-                {/* ======================================================== */}
-                {/* THIS ROW IS GENUINELY MOBILE-ONLY, and that is the chunk's own gate rather
-                    than a guess made to keep the desktop rail unchanged. `tn` in
-                    index-DuwOs_Mv.js is
-
-                      <Show when={m.mobile || N.lite}>          <- the card itself
-                        ...
-                        <Show when={m.mobile}>                  <- the description under it
-                          Reduces effects. Enables Turbo Mode for games.
-
-                    so the desktop rail draws it only once lite mode is ALREADY on — an escape
-                    hatch for turning it back off, not part of the rail's normal content — and
-                    never draws the description. There is no lite setting in this build, so the
-                    card renders in the drawer and nowhere else, which is what `m.mobile` means
-                    on a phone anyway.
-
-                    It sits INSIDE the theme toggle's `w-full overflow-hidden` wrapper because
-                    that is where the template puts it: `B` holds `[Je, tn]` under one
-                    `<Show when={!fold}>`, so folding the rail takes both away together.
-
-                    The switch is inert — `N.lite` drives GSAP and the games' own effects, and
-                    neither exists here. It carries local state so the control still answers to
-                    a tap rather than looking broken. */}
-                <div className="Sidebar-Unit_bg mt-2 w-full rounded-lg p-3 lg:hidden">
-                  <div className="flex w-full items-center">
-                    <BoltSvg />
-                    <span className="ml-1 font-extrabold text-primary">Turbo Mode</span>
-                    {/* `size: "small"` is `.switch-xs`, the same primitive Do Not Disturb and
-                        Hide Small use. A <div> with role=switch, not a <button>: it is the
-                        original's own markup and the rules in index.css key off aria-checked. */}
-                    <div
-                      className="switch switch-xs ml-auto"
-                      role="switch"
-                      aria-checked={turboMode}
-                      aria-label="Turbo Mode"
-                      tabIndex={0}
-                      onClick={() => setTurboMode(v => !v)}
-                      onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setTurboMode(v => !v)}
-                    >
-                      <div />
-                    </div>
-                  </div>
-                  <div className="mt-2 text-xs text-tertiary">
-                    <p>Reduces effects. Enables Turbo Mode for games.</p>
-                  </div>
-                </div>
               </div>
 
               {/* ============================================================ */}
@@ -904,7 +869,7 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
 
                   so it is drawer-only AND signed-out-only, and both halves are reproduced.
                   Being outside the theme toggle's wrapper is the template's own arrangement:
-                  it is a child of <nav>, not of `B`, so unlike Turbo Mode it does not
+                  it is a child of <nav>, not of `B`, so it does not
                   disappear with the fold — which never comes up here, since it cannot render
                   at a width where the rail exists.
 
@@ -918,21 +883,8 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
                   eight marks and the last one is a paper plane in a globe rather than the set's
                   own final entry. `De` is IconGlobal, the same mark the footer prints under
                   "Join Our Local Community". */}
-              {!session.login && (
-                <div className="Sidebar-Unit_bg mt-2 rounded-lg px-3 py-2 lg:hidden">
-                  <p className="m-0 text-center text-base text-primary">Join Our Global Community</p>
-                  <ul className="mt-2 flex items-center justify-between">
-                    {SOCIALS.slice(0, -1).map((social) => (
-                      <CommunityItem key={social.label} {...social} />
-                    ))}
-                    <CommunityItem
-                      label="Global"
-                      href="https://hash.game/telegram"
-                      icon={<GlobalIcon />}
-                    />
-                  </ul>
-                </div>
-              )}
+              {/* The signed-out community card (BC.GAME's socials + hash.game/telegram) is removed:
+                  Parker567 has no social channels to list. */}
 
             </div>
           </nav>

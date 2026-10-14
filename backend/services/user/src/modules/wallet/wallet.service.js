@@ -1,5 +1,7 @@
 'use strict';
 
+const crypto = require('node:crypto');
+
 const { money } = require('@ibitplay/common');
 const { EVENTS, roomForUser, encode } = require('@ibitplay/socket');
 
@@ -9,6 +11,16 @@ const {
   OPERATION, REASON, CREDIT_REASONS, resolveColumn, CURRENCY_COLUMN, assertCreditable, isRetiredCurrency,
   isCustomCurrency, KNOWN_CURRENCIES,
 } = require('./wallet.constants');
+
+/**
+ * The ledger idempotency key for a staff balance adjustment: the caller's own
+ * per-submit key, namespaced by the staff account so two operators' keys can
+ * never collide. Without one, a unique key — nothing is deduplicated that the
+ * caller did not ask to be.
+ */
+function adjustKey(staffId, clientKey) {
+  return `adm:${staffId}:${clientKey ? String(clientKey) : `auto-${crypto.randomUUID()}`}`;
+}
 
 /**
  * The money spine.
@@ -639,16 +651,18 @@ class WalletService {
    * @legacy POST /updatebalance
    * @legacy POST /adminwalletadd
    *
-   * The idempotency key is derived rather than caller-supplied: an admin UI
-   * double-click is the retry that matters here, and it will not think to send
-   * a key. Deriving it from (staff, player, currency, amount, operation, minute)
-   * makes a double-click a replay while leaving a deliberate second adjustment a
-   * minute later free to go through.
+   * The idempotency key is the CALLER's: the admin UI sends a fresh key per
+   * submit (`idempotencyKey` in the body, or an `Idempotency-Key` header), so a
+   * double-click or a network retry of that submit is a replay, while a second,
+   * deliberate adjustment with identical figures is a new movement. It used to
+   * be derived from (staff, player, currency, amount, operation, minute), which
+   * silently swallowed a genuine second adjustment made within the same minute.
+   * No key → a unique one: nothing is deduplicated that the caller did not ask
+   * to be.
    */
-  async adminAdjust({ userId, currency, amount, operation, description }, context = {}) {
+  async adminAdjust({ userId, currency, amount, operation, description, idempotencyKey: clientKey }, context = {}) {
     const staffId = context.staffId ?? 'system';
-    const minute = Math.floor(Date.now() / 60_000);
-    const idempotencyKey = `adm:${staffId}:${userId}:${currency}:${operation}:${amount}:${minute}`;
+    const idempotencyKey = adjustKey(staffId, clientKey);
 
     const input = {
       userId,
@@ -679,13 +693,12 @@ class WalletService {
    * password is REQUIRED there; both codes come back through `ServiceClient`
    * unchanged.
    *
-   * The same derived idempotency key as `adminAdjust`, so a double-click or a
-   * `ServiceClient` retry is a replay, not a second transfer.
+   * The same caller-supplied idempotency key as `adminAdjust`, so a
+   * double-click or a retry of one submit is a replay, not a second transfer.
    */
-  async agentAdjust({ userId, currency, amount, operation, description, transactionPassword }, context = {}) {
+  async agentAdjust({ userId, currency, amount, operation, description, transactionPassword, idempotencyKey: clientKey }, context = {}) {
     const staffId = context.staffId;
-    const minute = Math.floor(Date.now() / 60_000);
-    const idempotencyKey = `adm:${staffId}:${userId}:${currency}:${operation}:${amount}:${minute}`;
+    const idempotencyKey = adjustKey(staffId, clientKey);
 
     const result = await this.clients.admin.post('/internal/admin/accounts/player-adjust', {
       staffId,

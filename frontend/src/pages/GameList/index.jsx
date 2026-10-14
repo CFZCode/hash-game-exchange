@@ -1,3 +1,4 @@
+import { brandLabel } from '../../services/siteBranding';
 import React from 'react';
 import useResource from '../../hooks/useResource';
 import { getOriginals } from '../../services/originals';
@@ -90,7 +91,7 @@ function GameListPage({ title, games, readLive }) {
     /* `px-4 lg:px-0` for the reason `/favorite` documents: the page arm only renders from `lg` up,
        so its own inset has to hold at every width below that, where the dialog shell has none. */
     <div className="px-4 lg:px-0">
-      <PcNav title={title} />
+      <PcNav title={brandLabel(title)} />
       {/* `pb-4` where the chunks pass `py-4` — a requested departure, one word, and the arithmetic
           is worth having because it is not the only term. The original stacks 56px between the
           heading's baseline box and the first row of cards: `PcNav`'s own `mb-6` (24) + this

@@ -1,4 +1,4 @@
-import { request } from './client';
+import { request, USE_FIXTURES } from './client';
 import ENDPOINTS from './endpoints';
 import CHAT_ROOMS from '../data/chatRooms';
 import GLOBAL_MESSAGES from '../components/Chat/messages';
@@ -51,6 +51,8 @@ export const getRichList = () => request(ENDPOINTS.chat.richList, { fixture: RIC
    404 the moment `VITE_USE_FIXTURES` is turned off.
    Only the Global room has a transcription behind it; every other room correctly renders the
    empty state rather than being handed Global's messages. */
-export const getChatMessages = (roomId) => (roomId === 100 ? GLOBAL_MESSAGES : []);
+/* The seed rows are a screenshot of OTHER PEOPLE'S messages on bc.game ("BC_____714____CJP",
+   "Bcloverscoco", …) — fixture-only, never shown on the live site. */
+export const getChatMessages = (roomId) => (USE_FIXTURES && roomId === 100 ? GLOBAL_MESSAGES : []);
 
 export default getChatRooms;

@@ -39,18 +39,27 @@ export function useMatchHeader(gmid, sid) {
   return usePolling(fetcher, { intervalMs: 5000, enabled: Boolean(gmid && sid), key: `${gmid}|${sid}` });
 }
 
+/* Exposure only moves when a bet is placed (refreshed at once on `bet:placed`), matched or
+   settled, so an idle page reads it every 5s; with an unmatched order open — the one case where
+   it changes with nothing on this page doing anything — every 2s. Was 2s always, which with the
+   1s markets poll was most of an idle match page's ~140 requests a minute. */
+const EXPOSURE_IDLE_MS = 5000;
+const EXPOSURE_OPEN_ORDER_MS = 2000;
+
 /**
- * The player's exposure on a match, every 2s and at once on `bet:placed`.
+ * The player's exposure on a match, every 5s (2s while `hasOpenOrder`) and at once on `bet:placed`.
  * Signed out → never fetches (data undefined).
  * @param {string|number} gmid
  * @param {object[]} [markets]  the live list from useMatchMarkets — when given, `book` is mapped
+ * @param {{ hasOpenOrder?: boolean }} [opts]  an unmatched order is open on this match
  * @returns {{ data: rows[]|undefined, book: { ['<mid>:<runner lowercase>']: number },
  *   error, loading, refresh }}   `book` is what cashout and the runner P/L cells read.
  */
-export function useMatchExposure(gmid, markets) {
+export function useMatchExposure(gmid, markets, { hasOpenOrder = false } = {}) {
   const fetcher = React.useCallback((signal) => getMatchExposure(gmid, { signal }), [gmid]);
   const res = usePolling(fetcher, {
-    intervalMs: 2000, enabled: Boolean(gmid) && isSignedIn(), key: String(gmid ?? ''), refreshEvent: BET_PLACED_EVENT,
+    intervalMs: hasOpenOrder ? EXPOSURE_OPEN_ORDER_MS : EXPOSURE_IDLE_MS,
+    enabled: Boolean(gmid) && isSignedIn(), key: String(gmid ?? ''), refreshEvent: BET_PLACED_EVENT,
   });
   const book = React.useMemo(() => mapMatchExposures(res.data || [], markets || []), [res.data, markets]);
   return { ...res, book };

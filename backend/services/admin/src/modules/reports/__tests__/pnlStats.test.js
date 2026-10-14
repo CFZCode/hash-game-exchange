@@ -139,7 +139,8 @@ test('P&L against a database', async (t) => {
     // Casino. A: stake 10, back 15 (house −5); a bot round that is not play. B: stake 20, lost (house +20).
     await run(
       `INSERT INTO bets (uid, gid, game, coin, amount, profit, created, result)
-       VALUES (:a, :a, 'dice', :coin, 10, 5, :d3, NULL), (:b, :b, 'dice', :coin, 20, 0, :d10, NULL),
+       -- Settled: a win (net +5) and a loss (−20). Open rounds have paid nothing.
+       VALUES (:a, :a, 'dice', :coin, 10, 5, :d3, '2.5'), (:b, :b, 'dice', :coin, 20, -20, :d10, '1.1'),
               (:a, :a, 'fake-sim', :coin, 5000, 900, :d3, '{"fake": true}')`,
       { a: playerA, b: playerB, coin: COIN, d3: day(3), d10: day(10) }
     );

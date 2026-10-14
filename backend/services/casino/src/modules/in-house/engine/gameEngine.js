@@ -179,6 +179,16 @@ class GameEngine {
 
       const balance = await this.#balance(userId, column, transaction);
 
+      // The stake's ledger row, in the same transaction as the debit — the
+      // wallet must reconcile against its own ledger (see `#writeLedger`).
+      await this.#writeLedger(
+        {
+          userId, username: player?.name, currency, signed: -stake, newBalance: balance,
+          reason: 'BET_STAKE', betId: bet.id, game,
+        },
+        transaction
+      );
+
       return { betId: String(bet.id), balance, stake: decimal, currency, column };
     });
 
@@ -205,6 +215,9 @@ class GameEngine {
         currency,
         source: 'inhouse',
         ref: opened.betId,
+        // A round is counted in `games_played` when it SETTLES (see `settle`),
+        // so a refunded or invalid round is not a game played.
+        countPlay: false,
       })
       .catch((error) => this.logger?.warn({ err: error, betId: String(opened.betId) }, 'Wager feed failed — the bet stands'));
 
@@ -260,20 +273,38 @@ class GameEngine {
     const won = money.toMinorQuantised(String(profit ?? '0'), { field: 'profit' });
 
     /**
-     * Legacy's payout arithmetic, kept:
+     * ═══════════════════════════════════════════════════════════════════════
+     * WHAT IS PAID IS WHAT IS RECORDED
+     *
+     * Legacy's payout arithmetic:
      *
      *     var percent = (houseEdge / 100) * amount;
      *     var calculateHouse = amount - percent;
      *     var amountAndProfit = profit + calculateHouse;
      *
-     * The stake comes back less the house edge, plus the profit. Computed in
-     * minor units here rather than through `parseFloat`/`toFixed(8)`, so the
-     * figure is the same one every time rather than one of several depending
-     * on rounding.
+     * The engine's 2% house edge (`HOUSE_EDGE_PERCENT`, shown on the admin
+     * In-house page and priced into games such as Magic Wheel, whose odds are
+     * fair before it) is kept: a round that wins or loses returns the stake
+     * less 2%, plus the game's profit.
+     *
+     * What changed is the RECORD. `bets.profit`, the socket reply and every
+     * report built on them used to carry the game's gross profit while the
+     * wallet received 2% of the stake less — ₹10 at 2× recorded +10 and paid
+     * +9.80. Now `profit` is `payout − stake`: the net the player actually
+     * received, so Bet History, P&L / GGR and the agent tree add up to the
+     * ledger.
+     *
+     * A PUSH (the game's profit is exactly 0 — a blackjack push, a Limbo /
+     * Hash Dice tie, Plinko's 1.00× slot, a cash-out before any step) returns
+     * the FULL stake. Taking 2% of a stake on a round that neither won nor
+     * lost is a fee, not an edge, and recorded as profit 0 it was invisible.
+     * ═══════════════════════════════════════════════════════════════════════
      */
-    const houseCut = (stake * BigInt(Math.round(HOUSE_EDGE_PERCENT * 100))) / 10_000n;
-    const returned = stake - houseCut;
-    const payout = won + returned;
+    const push = won === 0n;
+    const houseCut = push ? 0n : (stake * BigInt(Math.round(HOUSE_EDGE_PERCENT * 100))) / 10_000n;
+    const gross = stake + won - houseCut;
+    const payout = gross > 0n ? gross : 0n;
+    const net = payout - stake;
 
     return this.db.transaction(async (transaction) => {
       const bet = await this.models.Bets.findOne({
@@ -293,7 +324,7 @@ class GameEngine {
 
       await bet.update(
         {
-          profit: money.toDecimalString(won),
+          profit: money.toDecimalString(net),
           // `bets.result` is a JSON column. Legacy `JSON.stringify`d into it,
           // which for a bare number stores a JSON number — kept.
           result,
@@ -311,9 +342,22 @@ class GameEngine {
 
       const balance = await this.#balance(userId, column, transaction);
 
+      if (payout > 0n) {
+        await this.#writeLedger(
+          {
+            userId, username: bet.name, currency, signed: payout, newBalance: balance,
+            reason: 'BET_PAYOUT', betId, game: bet.game,
+          },
+          transaction
+        );
+      }
+
+      // A settled round is a game played — once, because a bet settles once.
+      await this.models.Users.increment({ games_played: 1 }, { where: { id: userId }, transaction });
+
       return {
         betId: String(betId),
-        profit: money.toDecimalString(won),
+        profit: money.toDecimalString(net),
         payout: money.toDecimalString(payout),
         balance,
         result,
@@ -343,10 +387,21 @@ class GameEngine {
       if (!bet || bet.result !== null) return { refunded: false };
 
       await bet.update({ profit: '0', result: 'refunded' }, { transaction });
+      const refunded = money.toMinor(String(amount ?? '0'));
       await this.models.Credits.increment(
-        { [column]: money.toDecimalString(money.toMinor(String(amount ?? '0'))) },
+        { [column]: money.toDecimalString(refunded) },
         { where: { uid: userId }, transaction }
       );
+      if (refunded > 0n) {
+        await this.#writeLedger(
+          {
+            userId, username: bet.name, currency: String(coin).toUpperCase(), signed: refunded,
+            newBalance: await this.#balance(userId, column, transaction),
+            reason: 'BET_REFUND', betId, game: bet.game,
+          },
+          transaction
+        );
+      }
 
       this.logger?.warn({ userId: String(userId), betId: String(betId) }, 'In-house bet refunded');
       return { refunded: true };
@@ -506,11 +561,74 @@ class GameEngine {
 
     await round.update({
       status: status ?? (isWinner ? 'cashed_out' : 'lost'),
-      profit: String(profit),
+      // The net actually paid, the same figure as `bets.profit`.
+      profit: settled.profit,
       updated_at: new Date(),
     });
 
     return settled;
+  }
+
+  /**
+   * The ledger + history rows for one in-house money movement.
+   *
+   * Every other wallet move — user-service's `#writeRecords`, the admin
+   * opening balance — writes a signed `credits_ledger` row and a
+   * `wallet_history` row in the SAME transaction as the balance change. The
+   * in-house engine changed `credits` directly and wrote neither, so a player's
+   * wallet drifted from the sum of its ledger by every house-game round and
+   * reconcile reported `balanced: false`.
+   *
+   * Written here, inside the engine's transaction, rather than through
+   * user-service: the bet row, the balance and the record must commit
+   * together. The idempotency key follows `WalletClient.key`'s shape
+   * (`casino-service:<REASON>:INHOUSE:<bet id>`), so the partial unique index on
+   * `credits_ledger.idempotency_key` also refuses a second stake, payout or
+   * refund for the same bet.
+   *
+   * `newBalance` is read after the change while the row lock is held, so
+   * `previousBalance = newBalance − signed` is exact.
+   */
+  async #writeLedger({ userId, username, currency, signed, newBalance, reason, betId, game }, transaction) {
+    const amount = money.toDecimalString(signed);
+    const magnitude = money.toDecimalString(signed < 0n ? -signed : signed);
+    const previousBalance = money.toDecimalString(money.toMinor(newBalance) - signed);
+    const description = `In-house ${game ?? 'game'} ${reason === 'BET_STAKE' ? 'stake' : reason === 'BET_PAYOUT' ? 'payout' : 'refund'} #${betId}`;
+
+    await this.models.CreditsLedger.create(
+      {
+        user_id: String(userId),
+        currency,
+        amount,
+        reason,
+        description,
+        balance: newBalance,
+        closing: newBalance,
+        netamount: 0,
+        profit: 0,
+        loss: 0,
+        commission: 0,
+        idempotency_key: `casino-service:${reason}:INHOUSE:${betId}`,
+        source_service: 'casino-service',
+        meta: { refType: 'INHOUSE', refId: String(betId), game: game ?? null, previousBalance },
+      },
+      { transaction }
+    );
+
+    await this.models.WalletHistory.create(
+      {
+        uid: userId,
+        username: username || String(userId),
+        coin: currency,
+        operation: signed < 0n ? 'debit' : 'credit',
+        amount: magnitude,
+        previous_balance: previousBalance,
+        new_balance: newBalance,
+        description,
+        transaction_time: new Date(),
+      },
+      { transaction }
+    );
   }
 
   async #balance(userId, column, transaction) {

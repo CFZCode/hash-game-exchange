@@ -1,7 +1,6 @@
 import React from 'react';
 import CryptoTab from './CryptoTab';
 import FiatTab from './FiatTab';
-import CwalletRow, { OrDivider } from '../../components/shared/CwalletRow';
 import { useIsDialog } from '../../context/dialogRoute';
 import { useSession } from '../../context/session';
 import { getCurrency } from '../../data/currencies';
@@ -108,8 +107,8 @@ export default function DepositPanels() {
         {tab === 0 ? (
           <>
             <CryptoTab />
-            <OrDivider />
-            <CwalletRow />
+            {/* The Cwallet band ("Connect Cwallet to earn bonus") is not drawn: Cwallet is
+                BC.GAME's partner wallet and Parker567 has no such integration. */}
           </>
         ) : (
           /* `lt.updateCurrency(lt.state.cryptoCurrency)` — the fiat tab's "Deposit Crypto" row

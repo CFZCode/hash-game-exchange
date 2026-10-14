@@ -146,17 +146,29 @@ export function SessionProvider({ children }) {
   React.useEffect(() => {
     if (!INITIAL.pending) return undefined;
 
+    /* RETRIED WITH BACKOFF (2s, 4s, 8s, 16s, then every 30s while the token is held), because "the next navigation retries" was not
+       true — this effect runs once — and a cold load that met the gateway's rate limit (429) left
+       the account pending for the whole visit, which is what rendered /sports/my-bets, /bonus and
+       /wallet/vault blank. A 401 is still the transport's to answer (refresh → onAuthExpired). */
     let live = true;
-    loadAccount(INITIAL.account).then(
-      (next) => {
-        if (!live) return;
-        setAccount(next.account);
-        setBalances(next.balances);
-      },
-      () => {},
-    );
+    let timer = null;
+    const attempt = (n) => {
+      loadAccount(INITIAL.account).then(
+        (next) => {
+          if (!live) return;
+          setAccount(next.account);
+          setBalances(next.balances);
+        },
+        () => {
+          if (!live || !isSignedIn()) return;
+          timer = setTimeout(() => attempt(n + 1), Math.min(30000, 2000 * 2 ** n));
+        },
+      );
+    };
+    attempt(0);
     return () => {
       live = false;
+      clearTimeout(timer);
     };
   }, []);
 

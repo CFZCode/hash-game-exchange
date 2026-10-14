@@ -158,8 +158,10 @@ const Features = () => {
 
           if (!cur) return []
 
-          // Locked when either the row itself or the owner's entitlements say so.
-          return [{ spec, cur, entitled: cur.entitled !== false && featureEntitled(spec.key) }]
+          // Left out of the plan by the owner (the row itself or the entitlements say so): not listed.
+          const entitled = cur.entitled !== false && featureEntitled(spec.key)
+
+          return entitled ? [{ spec, cur, entitled }] : []
         })
     })).filter(g => g.items.length)
   }, [catalogue.data, current.data, featureEntitled])

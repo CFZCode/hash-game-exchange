@@ -126,6 +126,7 @@ test('players against a database', async (t) => {
   t.after(async () => {
     for (const id of created) {
       await models.CreditsLedger.destroy({ where: { user_id: String(id) } });
+      await models.WalletHistory.destroy({ where: { uid: id } });
       await models.StaffTransfers.destroy({
         where: { [require('sequelize').Op.or]: [{ from_id: id }, { to_id: id }] },
       });
@@ -169,6 +170,28 @@ test('players against a database', async (t) => {
       await balanceOf(agent),
       money.toDecimalString(money.toMinor(before) - money.toMinor('2500'))
     );
+
+    // The player's Ledger tab: one TRANSFER_IN, tied to the staff transfer.
+    const ledger = await models.CreditsLedger.findAll({ where: { user_id: String(player.id) }, raw: true });
+    assert.equal(ledger.length, 1, 'the opening balance is on the player ledger');
+    assert.equal(ledger[0].reason, 'TRANSFER_IN');
+    assert.equal(ledger[0].description, 'Opening balance');
+    assert.equal(money.toDecimalString(money.toMinor(ledger[0].amount)), '2500.00000000');
+    assert.equal(money.toDecimalString(money.toMinor(ledger[0].closing)), '2500.00000000');
+    const meta = typeof ledger[0].meta === 'string' ? JSON.parse(ledger[0].meta) : ledger[0].meta;
+    assert.equal(meta.refType, 'STAFF_TRANSFER');
+    const transfer = await models.StaffTransfers.findByPk(meta.refId, { raw: true });
+    assert.equal(transfer.note, 'Opening balance');
+    assert.equal(Number(transfer.to_id), Number(player.id));
+    const history = await models.WalletHistory.findAll({ where: { uid: player.id }, raw: true });
+    assert.equal(history.length, 1);
+    assert.equal(history[0].operation, 'credit');
+  });
+
+  await t.test('an unfunded creation writes no ledger row', async () => {
+    const player = await service.create({ actor: asAgent, username: `p${newId()}`, password: 'correct-horse-battery' });
+    created.push(Number(player.id));
+    assert.equal(await models.CreditsLedger.count({ where: { user_id: String(player.id) } }), 0);
   });
 
   await t.test('an AGENT-TREE player is created WITHOUT a referral code; a house player gets one', async () => {
@@ -393,8 +416,12 @@ test('players against a database', async (t) => {
     assert.equal(result.balanceReturned, '750.00000000');
 
     // ── the record survives ──
-    const ledger = await models.CreditsLedger.count({ where: { user_id: String(playerId) } });
+    const ledger = await models.CreditsLedger.count({
+      where: { user_id: String(playerId), description: 'must survive an account closure' },
+    });
     assert.equal(ledger, 1, 'THE LEDGER ROW IS STILL THERE');
+    const reasons = (await models.CreditsLedger.findAll({ where: { user_id: String(playerId) }, raw: true })).map((r) => r.reason).sort();
+    assert.deepEqual(reasons, ['BET_PAYOUT', 'TRANSFER_IN', 'TRANSFER_OUT'], 'opening balance in, closing return out');
 
     const transfers = await models.StaffTransfers.count({
       where: { [require('sequelize').Op.or]: [{ from_id: playerId }, { to_id: playerId }] },

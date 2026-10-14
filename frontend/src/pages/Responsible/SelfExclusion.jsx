@@ -1,4 +1,5 @@
 import React from 'react';
+import { brandName } from '../../services/siteBranding';
 
 /* Self-exclusion — the fourth rail row.
  *
@@ -19,8 +20,8 @@ import React from 'react';
  * posts and then routes to `/exclusion/cooldown`, and neither is built.
  */
 
-const INTRO = [
-  'Are you seeking a break from BC.GAME? Initiate the automated self-exclusion process by establishing a limit, and you will be temporarily barred from accessing your account for the selected period. Please be aware that during this time, you will not have access to any products on the website, and any remaining balances will also be unavailable.',
+const intro = (brand) => [
+  `Are you seeking a break from ${brand}? Initiate the automated self-exclusion process by establishing a limit, and you will be temporarily barred from accessing your account for the selected period. Please be aware that during this time, you will not have access to any products on the website, and any remaining balances will also be unavailable.`,
   'You will receive an email to confirm your request.',
 ];
 
@@ -66,7 +67,7 @@ export default function SelfExclusion() {
         <h2 className="text-sm font-extrabold text-primary">Self-Exclusion</h2>
         <div className="help-raw-html">
           <section>
-            {INTRO.map((line) => (
+            {intro(brandName()).map((line) => (
               <p key={line}>{line}</p>
             ))}
           </section>

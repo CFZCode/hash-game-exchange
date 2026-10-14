@@ -118,11 +118,15 @@ export function projectedBook(slip, stake, odds, market, book) {
   return out;
 }
 
+/* The rupee as this site prints it. The exchange's messages spell it "Rs." / "Rs" ("Min stake
+   Rs.50"); the rest of the site says ₹. DISPLAY ONLY — nothing parses these strings. */
+export const rupeeText = (text) => String(text ?? '').replace(/\bRs\.?\s?(?=[\d₹])/g, '₹');
+
 /* TENEXCH: the server's message as-is, NETWORK_ERROR for a failed fetch, GENERIC_ERROR otherwise. */
 function errorText(err) {
   if (!err) return BET_TOAST.GENERIC_ERROR;
   if (err.code === 'NETWORK' || /fetch|network/i.test(err.message || '')) return BET_TOAST.NETWORK_ERROR;
-  return err.message || BET_TOAST.GENERIC_ERROR;
+  return rupeeText(err.message) || BET_TOAST.GENERIC_ERROR;
 }
 
 /**
@@ -141,6 +145,11 @@ export function useMatchSlip({ sid, gmid, match, getMarkets, signedIn }) {
   const [delaySeconds, setDelaySeconds] = React.useState(0);
   const tokenRef = React.useRef(0);
   const aliveRef = React.useRef(true);
+  /* THE STAKE OUTLIVES A REFUSAL. The slip closes on a refusal (TENEXCH order, see the header)
+     and used to take the typed stake with it, so after "Minimum bet amount is ₹50" the player
+     had to type it all again. The refused stake is kept here and pre-fills the next slip they
+     open (not a one-click, not a cashout — those bring their own); a placed bet clears it. */
+  const keptStakeRef = React.useRef('');
   React.useEffect(() => {
     aliveRef.current = true;
     return () => {
@@ -163,14 +172,15 @@ export function useMatchSlip({ sid, gmid, match, getMarkets, signedIn }) {
 
   /* TENEXCH `handleClose(); bToastError(msg)` — only closes the slip this submit came from, so a
      late answer never shuts a slip the player has since opened on another price. */
-  const reject = React.useCallback((token, message) => {
+  const reject = React.useCallback((token, message, stakeStr) => {
+    if (stakeStr && Number(stakeStr) > 0) keptStakeRef.current = String(stakeStr);
     if (aliveRef.current && token === tokenRef.current) {
       tokenRef.current += 1;
       setSlip(null);
       setStake('');
       setError(null);
     }
-    toast.error(message);
+    toast.error(rupeeText(message));
   }, []);
 
   /** The whole submit. `s` / `stakeStr` are passed in so one-click can place before state lands. */
@@ -194,12 +204,12 @@ export function useMatchSlip({ sid, gmid, match, getMarkets, signedIn }) {
       });
       // A cashout's hedge stake is solved, not chosen: TENEXCH holds it to no minimum.
       if (err && !(bv.is_cashout && err.code === 'BELOW_MIN' && Number(stakeStr) > 0)) {
-        reject(token, err.message);
+        reject(token, err.message, stakeStr);
         return;
       }
       const key = betMarketKey(bv);
       if (!beginBetSubmit(key)) {
-        reject(token, BET_TOAST.MULTIPLE_BET_NOT_ALLOWED);
+        reject(token, BET_TOAST.MULTIPLE_BET_NOT_ALLOWED, stakeStr);
         return;
       }
       const { payload, clientRef } = buildPlaceRequest({ bv, odds, stake: stakeStr, isEdited, selectedOdds: bv.odds });
@@ -227,6 +237,7 @@ export function useMatchSlip({ sid, gmid, match, getMarkets, signedIn }) {
           setStake('');
           setError(null);
         }
+        keptStakeRef.current = '';
         toast.success(BET_TOAST.BET_PLACED);
         announceBetPlaced();
       } catch (e) {
@@ -234,7 +245,7 @@ export function useMatchSlip({ sid, gmid, match, getMarkets, signedIn }) {
         // reconcilePendingBets reports it on the next load.
         const keepPending = e?.pending || e?.code === 'NETWORK' || e?.status === 0;
         if (!keepPending) clearPendingBet(clientRef);
-        reject(token, errorText(e));
+        reject(token, errorText(e), stakeStr);
       } finally {
         endBetSubmit(key);
         if (aliveRef.current) setLoading(false);
@@ -284,7 +295,7 @@ export function useMatchSlip({ sid, gmid, match, getMarkets, signedIn }) {
         setStake(s);
         submit(next, s);
       } else {
-        setStake('');
+        setStake(keptStakeRef.current);
       }
     },
     [loading, matchInfo, sid, submit],

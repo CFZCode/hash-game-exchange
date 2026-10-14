@@ -145,7 +145,7 @@ class PlayersService {
       await this.models.Credits.create({ uid: user.id, inr: '0' }, { transaction });
 
       if (funding > 0n) {
-        await this.#fund({ actor, userId: user.id, amount: funding, transaction });
+        await this.#fund({ actor, userId: user.id, username: user.name, amount: funding, transaction });
       }
 
       this.logger?.info(
@@ -270,7 +270,7 @@ class PlayersService {
           { where: { staff_id: actor.id }, transaction }
         );
 
-        await this.models.StaffTransfers.create(
+        const transfer = await this.models.StaffTransfers.create(
           {
             from_type: 'user',
             from_id: player.id,
@@ -281,6 +281,32 @@ class PlayersService {
             transfer_type: 'transfer',
             note: 'Account closed — balance returned',
             created_at: new Date(),
+          },
+          { transaction }
+        );
+
+        // The player's ledger closes at 0, mirroring the opening balance row.
+        await this.models.CreditsLedger.create(
+          {
+            user_id: String(player.id),
+            currency: 'INR',
+            amount: `-${money.toDecimalString(remaining)}`,
+            reason: 'TRANSFER_OUT',
+            description: 'Account closed — balance returned',
+            balance: '0',
+            closing: '0',
+            netamount: 0,
+            profit: 0,
+            loss: 0,
+            commission: 0,
+            idempotency_key: null,
+            source_service: 'admin-service',
+            meta: {
+              refType: 'STAFF_TRANSFER',
+              refId: String(transfer.id),
+              staffId: String(actor.id),
+              previousBalance: money.toDecimalString(remaining),
+            },
           },
           { transaction }
         );
@@ -344,7 +370,7 @@ class PlayersService {
    * debited unconditionally — so two concurrent creations both saw enough money
    * and the agent's balance went negative.
    */
-  async #fund({ actor, userId, amount, transaction }) {
+  async #fund({ actor, userId, username, amount, transaction }) {
     const decimal = money.toDecimalString(amount);
 
     const [affected] = await this.models.StaffBalances.update(
@@ -356,7 +382,7 @@ class PlayersService {
 
     await this.models.Credits.increment({ inr: decimal }, { where: { uid: userId }, transaction });
 
-    await this.models.StaffTransfers.create(
+    const transfer = await this.models.StaffTransfers.create(
       {
         from_type: 'staff',
         from_id: actor.id,
@@ -367,6 +393,52 @@ class PlayersService {
         transfer_type: 'transfer',
         note: 'Opening balance',
         created_at: new Date(),
+      },
+      { transaction }
+    );
+
+    /**
+     * The player's side, written like `LordsService.adjustPlayer`: a
+     * credits_ledger TRANSFER_IN (so the wallet reconciles against its ledger
+     * and the admin Ledger tab shows it) and the wallet_history row. The wallet
+     * was created at 0 in this same transaction, so before/after are 0 → amount.
+     */
+    await this.models.CreditsLedger.create(
+      {
+        user_id: String(userId),
+        currency: 'INR',
+        amount: decimal,
+        reason: 'TRANSFER_IN',
+        description: 'Opening balance',
+        balance: decimal,
+        closing: decimal,
+        netamount: 0,
+        profit: 0,
+        loss: 0,
+        commission: 0,
+        idempotency_key: null,
+        source_service: 'admin-service',
+        meta: {
+          refType: 'STAFF_TRANSFER',
+          refId: String(transfer.id),
+          staffId: String(actor.id),
+          previousBalance: '0',
+        },
+      },
+      { transaction }
+    );
+
+    await this.models.WalletHistory.create(
+      {
+        uid: userId,
+        username: username || String(userId),
+        coin: 'INR',
+        operation: 'credit',
+        amount: decimal,
+        previous_balance: '0',
+        new_balance: decimal,
+        description: 'Opening balance',
+        transaction_time: new Date(),
       },
       { transaction }
     );

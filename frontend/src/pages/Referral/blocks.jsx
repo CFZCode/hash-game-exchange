@@ -232,7 +232,7 @@ export function ProgramBand({ program, isDesktop, size = '' }) {
         {/* The non-Korean arm of the chunk's `Show`. The Korean one adds a Telegram button above
             this and capitalises "For"; `Y.lang` is fixed to en here, so only this arm can render
             and the other was not built. */}
-        <div className="w-full">
+        {BUSINESS_EMAIL && <div className="w-full">
           <div className="text-secondary">
             <span>{program.contact}</span>
           </div>
@@ -246,7 +246,7 @@ export function ProgramBand({ program, isDesktop, size = '' }) {
               </button>
             </a>
           </div>
-        </div>
+        </div>}
       </div>
     </div>
   );
