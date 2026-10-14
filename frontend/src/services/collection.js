@@ -6,6 +6,7 @@ import { favorites, recent } from '../pages/GameCollection/collection';
 import { getHomeSections } from './home';
 import { GAMES } from '../data/games';
 import { slugFor } from './originals';
+import { apiAsset } from './catalog';
 
 /* The Casino sidebar's two signed-in lists — `/favorite` and `/recent`.
  *
@@ -84,7 +85,7 @@ const toFavouriteGame = (row) => {
     fullName: server?.name || local?.name || ref,
     /* `undefined` rather than a URL means "use this build's own artwork", which is what the tile
        does with `assetExact(slug)`. The in-house rows carry `image: null` on this delivery. */
-    icon: server?.image || undefined,
+    icon: apiAsset(server?.image) || undefined,
     /* The live count is the captured catalogue's; no route here carries a per-game one. Left
        undefined for a slug the catalogue does not know, so the tile omits the line rather than
        printing a zero it did not measure. */
@@ -181,7 +182,7 @@ const toPlayedGame = (row) => {
     fullName: game.name ?? '',
     /* The tile falls back to `assetExact(slug)` when `icon` is undefined, so a remote URL passes
        straight through and a missing one lands on this build's own artwork lookup. */
-    icon: game.image ?? undefined,
+    icon: apiAsset(game.image) ?? undefined,
     /* No live player count on a game row here; the tile omits the line when it is undefined,
        which is what an unknown count should look like rather than a zero. */
     onlineUsers: undefined,

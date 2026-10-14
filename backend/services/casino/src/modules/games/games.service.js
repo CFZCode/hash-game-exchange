@@ -876,6 +876,16 @@ class GamesService {
     return this.#settingFor(key);
   }
 
+  /** A game's self-hosted tile art (`game_artwork`, migration 098), for an `<img src>`. */
+  async artwork({ name }) {
+    const [row] = await this.models.Gisgamesnew.sequelize.query(
+      'SELECT data, content_type, byte_size, updated_at FROM game_artwork WHERE name = $1 AND data IS NOT NULL',
+      { bind: [name], type: QueryTypes.SELECT }
+    );
+    if (!row) throw E.ARTWORK_NOT_FOUND({ name });
+    return { data: Buffer.from(row.data), contentType: row.content_type, byteSize: row.byte_size, updatedAt: row.updated_at };
+  }
+
   /**
    * The logo bytes, for an `<img src>`.
    *

@@ -27,6 +27,8 @@ module.exports = function publicRoutes(deps) {
   router.get('/providers', validate(v.listProviders), ctrl.providers);
   /** A provider's logo as uploaded in the site admin (migration 067). An `<img src>`, not an envelope. */
   router.get('/providers/:name/logo', validate(v.providerLogo), ctrl.providerLogo);
+  /** A game's tile art self-hosted by `scripts/fix-game-artwork.js --brand` (`game_artwork`, migration 098). */
+  router.get('/image/:name', validate(v.artworkName), ctrl.artwork);
 
   /**
    * The five curated lobby collections.

@@ -207,6 +207,11 @@ const updateProviderSetting = {
     .refine((b) => Object.keys(b).length > 0, { message: 'Nothing to change' }),
 };
 
+/** A self-hosted tile image (migration 098): `<uuid>.<ext>`, as `scripts/fix-game-artwork.js` names it. */
+const artworkName = {
+  params: z.object({ name: z.string().max(80).regex(/^[a-z0-9]+\.(?:png|jpg|webp)$/) }).strict(),
+};
+
 /** `v` is the cache-busting version the public logo URL carries; its value is not read. */
 const providerLogo = {
   params: z.object({ name: providerName }).strict(),
@@ -278,6 +283,7 @@ module.exports = {
   providerParam,
   updateProviderSetting,
   providerLogo,
+  artworkName,
   recentlyPlayed,
   listFavourites,
   favouriteParam,

@@ -55,6 +55,7 @@ module.exports = defineErrors('GAMES', {
   },
 
   LOGO_NOT_FOUND: { status: 404, message: 'No logo for this provider' },
+  ARTWORK_NOT_FOUND: { status: 404, message: 'No artwork by this name' },
 
   // What `@ibitplay/common` imageUpload.inspect needs, in this namespace.
   NO_FILE: { status: 400, message: 'No image was uploaded' },

@@ -7,11 +7,11 @@ const { response, asyncHandler } = require('@ibitplay/common');
  * route's headers, for the same reasons: the bytes came from an upload.
  * `immutable` because the public URL is versioned by upload time.
  */
-function sendLogo(res, image, { immutable }) {
+function sendLogo(res, image, { immutable, cacheControl }) {
   res.set({
     'Content-Type': image.contentType,
     'Content-Length': String(image.byteSize),
-    'Cache-Control': immutable ? 'public, max-age=31536000, immutable' : 'private, no-cache',
+    'Cache-Control': cacheControl || (immutable ? 'public, max-age=31536000, immutable' : 'private, no-cache'),
     'X-Content-Type-Options': 'nosniff',
     'Content-Disposition': 'inline',
     'Content-Security-Policy': "default-src 'none'; sandbox",
@@ -77,6 +77,9 @@ function createControllers({ service }) {
     search: asyncHandler(async (req, res) => response.ok(res, await service.search(req.query))),
 
     /** A provider's logo, for the lobby. A switched-off provider's is not served. */
+    artwork: asyncHandler(async (req, res) =>
+      sendLogo(res, await service.artwork({ name: req.params.name }), { cacheControl: 'public, max-age=86400' })
+    ),
     providerLogo: asyncHandler(async (req, res) =>
       sendLogo(res, await service.providerLogo({ name: req.params.name }), { immutable: Boolean(req.query.v) })
     ),

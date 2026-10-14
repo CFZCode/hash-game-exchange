@@ -1,4 +1,4 @@
-import { request, requestPage, USE_FIXTURES } from './client';
+import { request, requestPage, USE_FIXTURES, API_BASE } from './client';
 import ENDPOINTS from './endpoints';
 import { GAMES } from '../data/games';
 import { PROVIDERS } from '../data/providers';
@@ -84,6 +84,10 @@ export const tagWords = (tags) =>
     .map((tag) => (typeof tag === 'string' ? tag : tag?.label || tag?.code || ''))
     .filter(Boolean);
 
+/* Art the backend serves itself (`fix-game-artwork.js --brand`) comes as `/api/v1/casino/games/image/<uuid>.png`:
+   relative to the API, not to this site, so it gets the API base like every other request. */
+export const apiAsset = (url) => (typeof url === 'string' && url.startsWith('/api/') ? `${API_BASE}${url}` : url);
+
 export function toCatalogGame(row) {
   return {
     slug: row.slug || row.uuid,
@@ -95,7 +99,7 @@ export function toCatalogGame(row) {
     tags: tagWords(row.tags),
     // The provider's own facts (Slotegrator: rtp, volatility, lines); the game page shows RTP from it.
     parameters: row.parameters && typeof row.parameters === 'object' ? row.parameters : null,
-    image: row.image || (typeof row.images === 'string' ? row.images : Object.values(row.images || {}).map((i) => (typeof i === 'string' ? i : i?.url)).find(Boolean)) || undefined,
+    image: apiAsset(row.image) || (typeof row.images === 'string' ? row.images : Object.values(row.images || {}).map((i) => (typeof i === 'string' ? i : i?.url)).find(Boolean)) || undefined,
     uuid: row.uuid,
     source: 'aggregator',
   };
