@@ -8,6 +8,9 @@ const E = require('./games.errors');
 const {
   COLLECTIONS,
   NAME_CATEGORIES,
+  LIVE_PROVIDERS,
+  LIVE_TYPES,
+  TYPE_CATEGORIES,
   GAME_FIELDS,
   GAME_SUMMARY_FIELDS,
   MAX_COLLECTION_SIZE,
@@ -38,6 +41,26 @@ const SLUG_PART_SQL = (column) => `trim(both '-' from regexp_replace(lower("${co
 const SLUG_SQL = `${SLUG_PART_SQL('name')} || '-by-' || ${SLUG_PART_SQL('provider')}`;
 /** The suffix a colliding slug carries: the uuid's first eight letters and digits. */
 const SLUG_SUFFIX_SQL = `left(regexp_replace(lower("uuid"), '[^a-z0-9]', '', 'g'), 8)`;
+
+/** LOWER(BTRIM(column)) — how a provider's own `type` / `provider` word is compared. */
+const folded = (column) => fn('LOWER', fn('BTRIM', col(column)));
+
+/**
+ * Rows in a lobby category: the import's normalised tag (`tags @> '["slots"]'`), or — for a
+ * catalogue without those tags, Slotegrator's — the row's own type and provider
+ * (TYPE_CATEGORIES, LIVE_PROVIDERS in games.constants.js).
+ */
+function categoryMatch(key) {
+  const tagged = { tags: { [Op.contains]: [key] } };
+  const isLive = { [Op.or]: [whereExpr(folded('provider'), { [Op.in]: LIVE_PROVIDERS }), whereExpr(folded('type'), { [Op.in]: LIVE_TYPES })] };
+  if (key === 'live') return { [Op.or]: [tagged, isLive] };
+  const types = TYPE_CATEGORIES[key];
+  if (!types) return tagged;
+  const byType = whereExpr(folded('type'), { [Op.in]: types });
+  // A live provider's table game is `live`, not `table`.
+  const typed = key === 'table' ? { [Op.and]: [byType, whereExpr(folded('provider'), { [Op.notIn]: LIVE_PROVIDERS })] } : byType;
+  return { [Op.or]: [tagged, typed] };
+}
 
 /** True for a row with no artwork: the lobby lists those after the rest (`#order`). */
 const NO_ART_SQL = `(coalesce("image", '') = '')`;
@@ -368,10 +391,10 @@ class GamesService {
     const named = Object.hasOwn(NAME_CATEGORIES, key) ? NAME_CATEGORIES[key] : undefined;
     if (named) {
       // Not a tag the import wrote: match the name (see NAME_CATEGORIES).
-      if (named.tag) where.tags = { [Op.contains]: [named.tag] };
+      if (named.tag) where[Op.and] = [...(where[Op.and] ?? []), categoryMatch(named.tag)];
       where.name = { [Op.iRegexp]: named.pattern };
     } else if (category) {
-      where.tags = { [Op.contains]: [key] };
+      where[Op.and] = [...(where[Op.and] ?? []), categoryMatch(key)];
     }
     if (technology) where.technology = { [Op.iLike]: technology };
     // Merged, so a search inside a name category keeps both conditions.
@@ -722,11 +745,7 @@ class GamesService {
    * `sort_order` where one is set, then by name.
    */
   async listProviders({ search }) {
-    const where = search ? { name: { [Op.iLike]: `%${search}%` } } : {};
-    const [rows, settings] = await Promise.all([
-      this.models.GisProviders.findAll({ where, order: [['name', 'ASC']], raw: true }),
-      this.#providerSettings(),
-    ]);
+    const [rows, settings] = await Promise.all([this.#catalogueProviders(search), this.#providerSettings()]);
 
     const listed = rows
       .map((row) => ({ row, s: settings.get(providerKey(row.name)) }))
@@ -739,6 +758,25 @@ class GamesService {
       }));
 
     return { rows: listed, total: listed.length };
+  }
+
+  /**
+   * The providers the lobby has games for, read from the live catalogue — `{ name }` per
+   * provider, by name. Not `gis_providers`: that table is a fixed list of one aggregator's
+   * names, so after the owner switched aggregator (`catalogueSwitch.js`) the lobby listed
+   * providers with no games and none of the new ones.
+   */
+  async #catalogueProviders(search) {
+    const where = { provider: { [Op.and]: [{ [Op.ne]: null }, { [Op.ne]: '' }] } };
+    if (search) where[Op.and] = [{ provider: { [Op.iLike]: `%${search}%` } }];
+    const rows = await this.models.Gisgamesnew.findAll({
+      attributes: [[fn('BTRIM', col('provider')), 'name']],
+      where,
+      group: [fn('BTRIM', col('provider'))],
+      order: [[fn('BTRIM', col('provider')), 'ASC']],
+      raw: true,
+    });
+    return rows;
   }
 
   /** Every settings row WITHOUT the logo bytes, keyed by provider. */
@@ -756,13 +794,13 @@ class GamesService {
    * Every lobby provider with its switch, logo and game count — including the
    * ones switched off, which is the point of the screen.
    *
-   * The set is `gis_providers` (what the lobby lists) plus any provider that
+   * The set is the live catalogue's providers (what the lobby lists) plus any provider that
    * has a settings row, so a provider the sync drops does not take its switch
    * out of reach.
    */
   async providerSettingsList() {
     const [providers, settings, counts] = await Promise.all([
-      this.models.GisProviders.findAll({ attributes: ['name'], raw: true }),
+      this.#catalogueProviders(),
       this.#providerSettings(),
       this.models.Gisgamesnew.findAll({
         attributes: [[fn('LOWER', fn('BTRIM', col('provider'))), 'provider'], [fn('COUNT', col('id')), 'games']],

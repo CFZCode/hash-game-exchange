@@ -106,7 +106,31 @@ const NAME_CATEGORIES = Object.freeze({
   },
 });
 
+/**
+ * The same categories for a catalogue whose rows carry no normalised tag — Slotegrator's
+ * `tags` are `{ code, label }` objects, not the import's one word (see `#filterClause`). Its
+ * games are matched by their own `type` (trimmed, lowercased) instead, and "live" by provider:
+ * Slotegrator types a live blackjack table `blackjack`, the same word as an RNG one.
+ *
+ * Checked against the Slotegrator catalogue (1,710 games) on 2026-10-14.
+ */
+const LIVE_PROVIDERS = Object.freeze([
+  'evolution gaming', 'pragmaticplaylive', 'ezugi', 'sa gaming', 'iconic21', 'vivogaming', 'xprogaming', 'betgames',
+]);
+const LIVE_TYPES = Object.freeze(['live dealer', 'game show', 'game shows', 'game_shows']);
+const TYPE_CATEGORIES = Object.freeze({
+  slots: ['slots', 'slot', 'video slot', 'slot game'],
+  crash: ['crash', 'instant win', 'instant game'],
+  lottery: ['lottery', 'keno', 'bingo', 'scratch card'],
+  arcade: ['casual'],
+  // Table games that are NOT live (a live provider's table is `live`).
+  table: ['table', 'card', 'poker', 'blackjack', 'baccarat', 'roulette', 'sic bo', 'dragon tiger', 'teen patti', 'andar bahar'],
+});
+
 module.exports = {
+  LIVE_PROVIDERS,
+  LIVE_TYPES,
+  TYPE_CATEGORIES,
   NAME_CATEGORIES,
   COLLECTIONS,
   COLLECTION_SLUGS,
