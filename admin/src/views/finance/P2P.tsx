@@ -40,6 +40,7 @@ import {
   type P2pPaymentAccount,
   type P2pPaymentType
 } from './types'
+import { useOwnerCoinFilter } from './useCurrencyCodes'
 
 const BASE = 'admin/user/p2p'
 const ALL_LISTS = [['paged', `${BASE}/orders`], ['paged', `${BASE}/sell-orders`], ['paged', `${BASE}/disputes`], ['paged', `${BASE}/offers`]]
@@ -232,22 +233,26 @@ const orderColumns = (kind: 'orders' | 'sell-orders'): Column<P2pOrderRow>[] => 
   }
 ]
 
+/** The coins P2P trades that are in the owner's plan. */
+const useP2pCoins = () => useOwnerCoinFilter()(P2P_COINS)
+
 /**
  * The coin filter of the order and offer lists (`?coin=`): the site's default coin when P2P trades
  * it and nobody picked another, `?coin=ALL` for every coin.
  */
-const useP2pCoin = (picked: string | number | undefined) => {
+const useP2pCoin = (picked: string | number | undefined, coins: string[]) => {
   const def = useDefaultCurrency().code
   const value = String(picked ?? '').toUpperCase()
 
   if (value === ALL_CURRENCIES) return ''
 
-  return value || ((P2P_COINS as readonly string[]).includes(def) ? def : '')
+  return value || (coins.includes(def) ? def : '')
 }
 
 const Orders = ({ kind }: { kind: 'orders' | 'sell-orders' }) => {
   const { state, set, query } = useListState(['status', 'userId', 'coin'])
-  const coin = useP2pCoin(state.coin)
+  const coins = useP2pCoins()
+  const coin = useP2pCoin(state.coin, coins)
   const list = usePageNumbered<P2pOrderRow>(`${BASE}/${kind}`, { page: query.page, limit: query.limit, status: query.status, userId: query.userId, coin: coin || undefined })
 
   return (
@@ -271,7 +276,7 @@ const Orders = ({ kind }: { kind: 'orders' | 'sell-orders' }) => {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value='all'>All coins</SelectItem>
-              {P2P_COINS.map(c => (
+              {coins.map(c => (
                 <SelectItem key={c} value={c}>
                   {c}
                 </SelectItem>
@@ -382,12 +387,16 @@ const OfferStatus = ({ row }: { row: P2pOfferRow }) => {
 }
 
 const CreateOffer = ({ accounts }: { accounts: P2pPaymentAccount[] }) => {
+  const coins = useP2pCoins()
   const [form, setForm] = useState({ coin: 'USDT', fiat: 'INR', segment: 'BUY', price: '', availableAmount: '', minLimit: '', maxLimit: '', username: '', paymentAccountIds: '', paymentTime: '', isFeatured: false, isVerified: false, isKycVerified: false })
+
+  // USDT is the usual pick; when the owner has it off, the first coin P2P still trades.
+  const coin = coins.includes(form.coin) ? form.coin : (coins[0] ?? '')
 
   const create = useApiMutation({
     fn: () => {
       const body: Record<string, unknown> = {
-        coin: form.coin,
+        coin,
         fiat: form.fiat,
         segment: form.segment,
         price: form.price,
@@ -423,13 +432,13 @@ const CreateOffer = ({ accounts }: { accounts: P2pPaymentAccount[] }) => {
       onSubmit={() => create.mutateAsync()}
     >
       <div className='grid grid-cols-3 gap-4'>
-        <SelectField id='of-coin' label='Coin' value={form.coin} onChange={coin => setForm({ ...form, coin })} options={P2P_COINS.map(c => ({ value: c, label: c }))} />
+        <SelectField id='of-coin' label='Coin' value={coin} onChange={coin => setForm({ ...form, coin })} options={coins.map(c => ({ value: c, label: c }))} />
         <SelectField id='of-fiat' label='Fiat' value={form.fiat} onChange={fiat => setForm({ ...form, fiat })} options={P2P_FIAT.map(c => ({ value: c, label: c }))} />
         <SelectField id='of-seg' label='Segment' value={form.segment} onChange={segment => setForm({ ...form, segment })} options={[{ value: 'BUY', label: 'BUY (user buys crypto)' }, { value: 'SELL', label: 'SELL (user sells crypto)' }]} />
       </div>
       <div className='grid grid-cols-2 gap-4'>
-        <TextField id='of-price' label={`Price (${form.fiat} per ${form.coin})`} required value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} />
-        <TextField id='of-avail' label={`Available (${form.coin})`} required value={form.availableAmount} onChange={e => setForm({ ...form, availableAmount: e.target.value })} />
+        <TextField id='of-price' label={`Price (${form.fiat} per ${coin})`} required value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} />
+        <TextField id='of-avail' label={`Available (${coin})`} required value={form.availableAmount} onChange={e => setForm({ ...form, availableAmount: e.target.value })} />
       </div>
       <div className='grid grid-cols-3 gap-4'>
         <TextField id='of-min' label='Min limit' value={form.minLimit} onChange={e => setForm({ ...form, minLimit: e.target.value })} />
@@ -471,7 +480,8 @@ const offerColumns: Column<P2pOfferRow>[] = [
 
 const Offers = ({ accounts }: { accounts: P2pPaymentAccount[] }) => {
   const { state, set, query } = useListState(['coin'])
-  const coin = useP2pCoin(state.coin)
+  const coins = useP2pCoins()
+  const coin = useP2pCoin(state.coin, coins)
   const list = usePageNumbered<P2pOfferRow>(`${BASE}/offers`, { page: query.page, limit: query.limit, coin: coin || undefined })
 
   return (
@@ -493,7 +503,7 @@ const Offers = ({ accounts }: { accounts: P2pPaymentAccount[] }) => {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value='all'>All coins</SelectItem>
-              {P2P_COINS.map(c => (
+              {coins.map(c => (
                 <SelectItem key={c} value={c}>
                   {c}
                 </SelectItem>

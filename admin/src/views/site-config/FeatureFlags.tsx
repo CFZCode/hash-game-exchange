@@ -15,7 +15,7 @@ import { Switch } from '@/components/ui/switch'
 import { useSession } from '@/contexts/SessionContext'
 import { useApi, useApiMutation } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
-import { FLAG_GROUPS, flagLabel } from './flagGroups'
+import { CRYPTO_COIN_FLAGS, CRYPTO_MASTER_FLAG, FLAG_GROUPS, flagLabel } from './flagGroups'
 
 type Flags = Record<string, boolean>
 
@@ -24,7 +24,10 @@ const onlyBooleans = (data: Record<string, unknown>): Flags =>
   Object.fromEntries(Object.entries(data).filter(([, v]) => typeof v === 'boolean')) as Flags
 
 const FeatureFlags = () => {
-  const { can, refreshFlags, flagEntitled } = useSession()
+  const { can, refreshFlags, flagEntitled: inPlan } = useSession()
+
+  // In the owner's plan: the flag itself, and for a crypto coin the crypto master switch as well.
+  const flagEntitled = (key: string) => inPlan(key) && !(CRYPTO_COIN_FLAGS.has(key) && !inPlan(CRYPTO_MASTER_FLAG))
   const flags = useApi<Flags>('admin/site-config/global', undefined, { select: data => onlyBooleans(data) })
   const [draft, setDraft] = useState<Flags>({})
   const [filter, setFilter] = useState('')

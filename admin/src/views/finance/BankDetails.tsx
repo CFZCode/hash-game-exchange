@@ -16,6 +16,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useApi, useApiMutation } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
 
+import { useOwnerCoinFilter } from './useCurrencyCodes'
+
 /**
  * The payment destinations a user is shown when they deposit — one list per
  * currency. Writes are multipart because a row may carry a QR image.
@@ -102,8 +104,13 @@ const DetailForm = ({ coin, row, onDone }: { coin: string; row?: BankRow; onDone
 }
 
 const BankDetails = () => {
-  const [coin, setCoin] = useState('INR')
-  const list = useApi<BankRow[]>(`admin/user/bank-details/${coin}`, undefined, { retry: false })
+  const coins = useOwnerCoinFilter()(CURRENCIES)
+  const [picked, setCoin] = useState('INR')
+
+  // INR is the usual pick; when the owner has it off, the first currency still in the plan.
+  const coin = coins.includes(picked) ? picked : (coins[0] ?? '')
+  const list = useApi<BankRow[]>(coin ? `admin/user/bank-details/${coin}` : null, undefined, { retry: false })
+
   const remove = useApiMutation({
     fn: (id: number) => api.delete(`admin/user/bank-details/${coin}/${id}`),
     invalidate: [['api', `admin/user/bank-details/${coin}`]],
@@ -154,7 +161,7 @@ const BankDetails = () => {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {CURRENCIES.map(c => (
+                {coins.map(c => (
                   <SelectItem key={c} value={c}>
                     {c}
                   </SelectItem>

@@ -25,6 +25,7 @@ import { allConvertedLabel, useFinanceFilters } from './currencyFilter'
 import FinanceStatsPanel from './FinanceStatsPanel'
 import { Details, ImageDialog, ViewDialog, stop } from './shared'
 import { FIAT_CURRENCIES, type FiatDepositRow } from './types'
+import { useOwnerCoinFilter } from './useCurrencyCodes'
 
 const LIST = 'admin/user/deposits/fiat'
 const INVALIDATE = [['paged', LIST], ['api', 'admin/reports/finance-stats']]
@@ -183,6 +184,7 @@ const FiatDeposits = () => {
   // Period, bucket size and currency for the charts. The currency (the site's default coin until
   // somebody picks another) also filters the table; the review queue has no date filter.
   const filters = useFinanceFilters()
+  const ownerCoins = useOwnerCoinFilter()
 
   const list = usePagedApi<FiatDepositRow>(LIST, {
     limit: query.limit,
@@ -196,7 +198,7 @@ const FiatDeposits = () => {
   return (
     <div>
       <PageHeader title='Fiat deposits' description='Manual bank-transfer deposits awaiting review. Approving credits the user; rejecting records a reason they can see.' />
-      <FilterBar filters={filters} currencies={[...FIAT_CURRENCIES]} allCurrenciesLabel={allConvertedLabel(filters.defaultCurrency)} className='mb-4' />
+      <FilterBar filters={filters} currencies={ownerCoins(FIAT_CURRENCIES)} allCurrenciesLabel={allConvertedLabel(filters.defaultCurrency)} className='mb-4' />
       {can('reports:read') && (
         <FinanceStatsPanel kind='deposits' rail='fiat' filters={filters} statusLabels={{ success: 'Successful', pending: 'Pending', failed: 'Failed' }} />
       )}

@@ -50,6 +50,12 @@ export const FLAG_GROUPS: { title: string; description: string; keys: string[] }
   }
 ]
 
+/** The crypto master switch: when the owner leaves it out of the plan, every crypto coin is out too. */
+export const CRYPTO_MASTER_FLAG = 'cryptocoin'
+
+/** The per-coin crypto flags (the "Crypto currencies" group after its master switch). */
+export const CRYPTO_COIN_FLAGS = new Set(FLAG_GROUPS.find(g => g.keys.includes(CRYPTO_MASTER_FLAG))?.keys.filter(k => k !== CRYPTO_MASTER_FLAG) ?? [])
+
 export const FLAG_LABELS: Record<string, string> = {
   casino: 'Casino',
   sports: 'Sportsbook (kill switch)',

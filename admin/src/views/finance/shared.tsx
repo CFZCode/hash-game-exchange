@@ -14,7 +14,7 @@ import { useApiMutation } from '@/hooks/use-api'
 import { api, request } from '@/lib/api/client'
 import type { Paged, Query } from '@/lib/api/types'
 import { StaffFloatNote, useIsAgentTree, TxnPasswordLabel } from './StaffFloat'
-import { useCurrencyCodes } from './useCurrencyCodes'
+import { useCurrencyCodes, useOwnerCoinFilter } from './useCurrencyCodes'
 
 /**
  * Some user-service listings page by `page`/`limit` rather than `limit`/`offset`
@@ -120,10 +120,12 @@ export const stop = (e: React.MouseEvent) => e.stopPropagation()
 export const AdjustWalletDialog = ({ userId, userName, currencies, invalidate = [], trigger }: { userId: string | number; userName?: string; currencies?: string[]; invalidate?: (string | null)[][]; trigger?: ReactNode }) => {
   const agentTree = useIsAgentTree()
   const registry = useCurrencyCodes()
+  const ownerCoins = useOwnerCoinFilter()
 
   // House staff: the coins the caller passed first (primary + held), then every other coin in the
-  // registry — so a coin the owner created (custom, phase B) can be adjusted. Agent tree: INR.
-  const list = agentTree ? ['INR'] : Array.from(new Set([...(currencies ?? []), ...registry]))
+  // registry — so a coin the owner created (custom, phase B) can be adjusted; a coin outside the
+  // owner's plan is never offered. Agent tree: INR.
+  const list = agentTree ? ['INR'] : Array.from(new Set([...ownerCoins(currencies ?? []), ...registry]))
   const [form, setForm] = useState({ currency: list[0], amount: '', operation: 'credit', description: '', transactionPassword: '' })
 
   /*

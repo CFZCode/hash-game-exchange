@@ -25,10 +25,9 @@ import { CURRENCIES_PATH } from './useCurrencyCodes'
 /**
  * Finance → Coins: the site's coin registry (`GET admin/currencies`).
  *
- * Every coin the wallet knows, with what players see — name, symbol, image, order, the names of
- * its networks — and its switch. A coin is on for players when the owner's plan includes it AND
- * the site has it on AND it is not retired; "Not in your plan" coins can be renamed but not
- * switched on (the API answers 403 NOT_ENTITLED). Network KEYS are the contract a deposit or
+ * Every coin in the owner's plan, with what players see — name, symbol, image, order, the names
+ * of its networks — and its switch. A coin is on for players when the site has it on AND it is
+ * not retired; coins the owner left out of the plan are not listed at all. Network KEYS are the contract a deposit or
  * withdrawal names, so only their display names and on/off are editable here. House staff only.
  */
 
@@ -65,14 +64,13 @@ const useUpdate = (code: string, success?: string) =>
 
 const EnabledSwitch = ({ row }: { row: CurrencyRow }) => {
   const update = useUpdate(row.code)
-  const locked = !row.ownerEnabled || row.retired
-  const title = row.retired ? 'Retired: never offered again' : !row.ownerEnabled ? 'Not in your plan' : row.siteEnabled ? 'Switch off' : 'Switch on'
+  const title = row.retired ? 'Retired: never offered again' : row.siteEnabled ? 'Switch off' : 'Switch on'
 
   return (
     <Can permission='config:write' fallback={<Switch checked={row.enabled} disabled aria-label={`${row.code} enabled`} />}>
       <Switch
-        checked={row.siteEnabled && !locked}
-        disabled={update.isPending || (locked && !row.siteEnabled) || row.retired}
+        checked={row.siteEnabled && !row.retired}
+        disabled={update.isPending || row.retired}
         title={title}
         aria-label={`${row.code} enabled`}
         onCheckedChange={enabled => update.mutate({ enabled })}
@@ -263,7 +261,6 @@ const Networks = ({ networks }: { networks: CoinNetwork[] }) =>
 
 const State = ({ row }: { row: CurrencyRow }) => {
   if (row.retired) return <Badge variant='secondary'>Retired</Badge>
-  if (!row.ownerEnabled) return <Badge variant='destructive'>Not in your plan</Badge>
 
   return row.enabled ? <Badge variant='outline'>Live</Badge> : <Badge variant='secondary'>Off</Badge>
 }
@@ -272,7 +269,9 @@ const Coins = () => {
   const { can, actor } = useSession()
   const house = actor?.promotions !== false
   const coins = useApi<CurrencyRow[]>(house ? CURRENCIES_PATH : null, undefined, { refetchInterval: 15_000, refetchOnWindowFocus: true })
-  const rows = useMemo(() => [...(coins.data ?? [])].sort((a, b) => a.sortOrder - b.sortOrder || a.code.localeCompare(b.code)), [coins.data])
+
+  // Coins outside the owner's plan are not the site's to see.
+  const rows = useMemo(() => (coins.data ?? []).filter(c => c.ownerEnabled).sort((a, b) => a.sortOrder - b.sortOrder || a.code.localeCompare(b.code)), [coins.data])
   const writable = can('config:write')
 
   const columns: Column<CurrencyRow>[] = [
@@ -304,14 +303,14 @@ const Coins = () => {
     <div>
       <PageHeader
         title='Coins'
-        description='Every currency the wallet holds: what players see (name, symbol, image, order, network names) and whether it is offered. A coin outside your plan can be renamed but not switched on.'
+        description='Every currency in your plan: what players see (name, symbol, image, order, network names) and whether it is offered.'
       />
       {house ? (
         <DataTable columns={columns} rows={rows} rowKey={r => r.code} loading={coins.isLoading} fetching={coins.isFetching} error={coins.error} dense />
       ) : (
         <p className='text-muted-foreground text-sm'>Coins are managed by the house.</p>
       )}
-      <p className='text-muted-foreground mt-3 text-xs'>Players see a coin only when it is in your plan, switched on here and not retired. Changes reach open player sites within seconds.</p>
+      <p className='text-muted-foreground mt-3 text-xs'>Players see a coin only when it is switched on here and not retired. Changes reach open player sites within seconds.</p>
     </div>
   )
 }

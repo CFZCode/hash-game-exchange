@@ -27,6 +27,7 @@ import type { Query } from '@/lib/api/types'
 import { formatNumber } from '@/lib/format'
 import type { GisGame, GisProvider, GisType, GisVendor, JsGame, JsScopeEntry } from './types'
 import { TxnPasswordLabel } from '@/views/finance/StaffFloat'
+import { useOwnerCoinFilter } from '@/views/finance/useCurrencyCodes'
 
 const ALL = '__all__'
 
@@ -453,15 +454,26 @@ const ProvidersTab = () => {
 
 const toEpoch = (s: string) => Math.floor(new Date(s).getTime() / 1000)
 
+/** The currencies GIS free spins and vouchers take. */
+const GIS_CURRENCIES = ['INR', 'USDT'] as const
+
+/** The GIS currencies in the owner's plan, and the form's pick (or the first of them when it is out). */
+const useGisCurrency = (picked: string) => {
+  const options = useOwnerCoinFilter()(GIS_CURRENCIES)
+
+  return { options: options.map(c => ({ value: c, label: c })), currency: options.includes(picked) ? picked : (options[0] ?? '') }
+}
+
 const CreateFreespin = () => {
   const [f, setF] = useState({ playerId: '', playerName: '', currency: 'INR', quantity: '10', validFrom: '', validUntil: '', freespinId: '', gameUuid: '', denomination: '' })
+  const cur = useGisCurrency(f.currency)
 
   const create = useApiMutation({
     fn: () => {
       const body: Record<string, unknown> = {
         playerId: Number(f.playerId),
         playerName: f.playerName,
-        currency: f.currency,
+        currency: cur.currency,
         quantity: Number(f.quantity),
         validFrom: toEpoch(f.validFrom),
         validUntil: toEpoch(f.validUntil),
@@ -483,7 +495,7 @@ const CreateFreespin = () => {
         <TextField id='fs-game' label='Game UUID' required value={f.gameUuid} onChange={e => setF({ ...f, gameUuid: e.target.value })} />
         <TextField id='fs-pid' label='User id' required type='number' value={f.playerId} onChange={e => setF({ ...f, playerId: e.target.value })} />
         <TextField id='fs-pname' label='User name' required value={f.playerName} onChange={e => setF({ ...f, playerName: e.target.value })} />
-        <SelectField id='fs-cur' label='Currency' value={f.currency} onChange={currency => setF({ ...f, currency })} options={[{ value: 'INR', label: 'INR' }, { value: 'USDT', label: 'USDT' }]} />
+        <SelectField id='fs-cur' label='Currency' value={cur.currency} onChange={currency => setF({ ...f, currency })} options={cur.options} />
         <TextField id='fs-qty' label='Spins' required type='number' min={1} max={10000} value={f.quantity} onChange={e => setF({ ...f, quantity: e.target.value })} />
         <DateTimeField id='fs-from' label='Valid from' required value={f.validFrom} onChange={validFrom => setF({ ...f, validFrom })} />
         <DateTimeField id='fs-until' label='Valid until' required min={f.validFrom} defaultTime='23:59' value={f.validUntil} onChange={validUntil => setF({ ...f, validUntil })} />
@@ -495,6 +507,7 @@ const CreateFreespin = () => {
 
 const CreateVoucher = () => {
   const [f, setF] = useState({ playerId: '', voucherId: '', title: '', currency: 'INR', initialBalance: '', maxWinnings: '', validUntil: '', tableIds: '', shortTerms: '' })
+  const cur = useGisCurrency(f.currency)
 
   const create = useApiMutation({
     fn: () => {
@@ -502,7 +515,7 @@ const CreateVoucher = () => {
         playerId: Number(f.playerId),
         voucherId: f.voucherId,
         title: f.title,
-        currency: f.currency,
+        currency: cur.currency,
         initialBalance: Number(f.initialBalance),
         maxWinnings: Number(f.maxWinnings),
         validUntil: toEpoch(f.validUntil),
@@ -522,7 +535,7 @@ const CreateVoucher = () => {
         <TextField id='v-id' label='Voucher id' required value={f.voucherId} onChange={e => setF({ ...f, voucherId: e.target.value })} />
         <TextField id='v-title' label='Title' required value={f.title} onChange={e => setF({ ...f, title: e.target.value })} />
         <TextField id='v-pid' label='User id' required type='number' value={f.playerId} onChange={e => setF({ ...f, playerId: e.target.value })} />
-        <SelectField id='v-cur' label='Currency' value={f.currency} onChange={currency => setF({ ...f, currency })} options={[{ value: 'INR', label: 'INR' }, { value: 'USDT', label: 'USDT' }]} />
+        <SelectField id='v-cur' label='Currency' value={cur.currency} onChange={currency => setF({ ...f, currency })} options={cur.options} />
         <TextField id='v-bal' label='Initial balance' required value={f.initialBalance} onChange={e => setF({ ...f, initialBalance: e.target.value })} />
         <TextField id='v-max' label='Max winnings' required value={f.maxWinnings} onChange={e => setF({ ...f, maxWinnings: e.target.value })} />
         <DateTimeField id='v-until' label='Valid until' required defaultTime='23:59' value={f.validUntil} onChange={validUntil => setF({ ...f, validUntil })} />
