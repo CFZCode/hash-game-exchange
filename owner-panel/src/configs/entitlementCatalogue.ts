@@ -188,6 +188,23 @@ const CATALOGUE: FeatureEntry[] = [
     ]
   },
   {
+    // The casino aggregator: a policy (always on, owner-only), no `none`. Mirrors backend
+    // featureCatalogue.js. The lobby's catalogue table holds ONE aggregator's games at a time;
+    // switching parks the other's (casino-service games/catalogueSwitch.js), so switching back
+    // needs no re-fetch.
+    key: 'casino_aggregator',
+    label: 'Casino games provider',
+    category: 'business',
+    flag: null,
+    policy: true,
+    defaultVariant: 'js_games',
+    note: 'Whose games the casino lobby serves. Only one at a time: the other provider\'s games are parked, not deleted, and come back when you switch back. Slotegrator needs its merchant keys on the backend and a Slotegrator catalogue sync, run from a server IP Slotegrator has whitelisted.',
+    variants: [
+      { key: 'js_games', label: 'JSGames', description: 'The lobby serves the JSGames catalogue and games launch through JSGames. The default.' },
+      { key: 'slotegrator', label: 'Slotegrator', description: 'The lobby serves the Slotegrator catalogue and games launch through Slotegrator. Run the Slotegrator sync to fill it.' }
+    ]
+  },
+  {
     key: 'vip',
     label: 'VIP club',
     category: 'engagement',

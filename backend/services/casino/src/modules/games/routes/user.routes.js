@@ -1,11 +1,13 @@
 'use strict';
 
 const { Router } = require('express');
-const { validate, refuseCustomCurrencies, noBody } = require('@ibitplay/common');
+const { validate, refuseCustomCurrencies, noBody, asyncHandler, response } = require('@ibitplay/common');
 
 const v = require('../games.validators');
 const { GamesService } = require('../games.service');
 const { createControllers } = require('../controllers');
+const { requireGameEntitled } = require('../gameEntitlement');
+const { launchGame } = require('../gameLauncher');
 
 /**
  * A player's own history.
@@ -18,6 +20,17 @@ module.exports = function userRoutes(deps) {
   const router = Router();
   // Custom coins (owner-created, no provider behind them) never reach this module: CURRENCY_NOT_SUPPORTED_FOR_GAMES.
   router.use(refuseCustomCurrencies('GAMES'));
+
+  /**
+   * Open any lobby game. New: the owner's casino aggregator (JSGames or Slotegrator) decides
+   * whose games the lobby serves, so the front end launches here and the row picks the route.
+   */
+  router.post(
+    '/launch',
+    validate(v.launch),
+    requireGameEntitled(deps, (req) => ({ uid: req.body.gameUuid })),
+    asyncHandler(async (req, res) => response.created(res, await launchGame(deps, { ...req.body, userId: req.user.id })))
+  );
 
   /** @legacy GET /api/gis/games/recently-played */
   router.get('/recently-played', validate(v.recentlyPlayed), ctrl.recentlyPlayed);

@@ -40,6 +40,8 @@ const POLICY_DEFAULTS = Object.freeze({
   // Not a channel switch: which checks a withdrawal must pass (modules/withdraw-requirements).
   // The default is the behaviour before the policy existed — KYC Verified, no wagering check.
   withdrawal_requirements: 'kyc',
+  // Not a channel switch: whose game catalogue the lobby serves (casino games/catalogueSwitch.js).
+  casino_aggregator: 'js_games',
 });
 
 /** For each policy, which stored variants allow each channel. */

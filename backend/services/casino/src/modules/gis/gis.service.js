@@ -6,6 +6,7 @@ const { money } = require('@ibitplay/common');
 
 const E = require('./gis.errors');
 const { responseIdFor } = require('./responseId');
+const { chosenAggregator, LIVE, PARKED } = require('../games/catalogueSwitch');
 const {
   ERROR_CODE,
   ACTION,
@@ -1069,6 +1070,12 @@ class GisService {
       expand: 'tags,parameters,images,related_games',
     });
 
+    // Slotegrator rows go to the lobby's table when Slotegrator is the owner's aggregator,
+    // otherwise to the parked one — `games/catalogueSwitch.js`. A database before migration
+    // 096 has neither the column nor the parked table: the plain upsert, as before.
+    const switchReady = await this.#aggregatorSwitchReady();
+    const table = switchReady && (await chosenAggregator(this.models)) !== 'slotegrator' ? PARKED : LIVE;
+
     let written = 0;
     let skipped = 0;
 
@@ -1078,7 +1085,7 @@ class GisService {
         continue;
       }
 
-      await this.models.Gisgamesnew.upsert({
+      const row = {
         uuid: String(game.uuid),
         name: game.name ?? null,
         provider: game.provider ?? null,
@@ -1098,13 +1105,16 @@ class GisService {
         parameters: game.parameters ?? null,
         tags: game.tags ?? null,
         images: game.images ?? null,
-      });
+      };
+
+      if (switchReady) await this.#upsertSlotegratorGame(table, row);
+      else await this.models.Gisgamesnew.upsert(row);
 
       written += 1;
     }
 
-    this.logger?.info({ written, skipped }, 'Slotegrator game catalogue synced');
-    return { written, skipped, fetched: items.length };
+    this.logger?.info({ written, skipped, table }, 'Slotegrator game catalogue synced');
+    return { written, skipped, fetched: items.length, table };
   }
 
   /**
@@ -1147,6 +1157,40 @@ class GisService {
   }
 
   // ══════════════════════════════════════════════════════════════════════
+
+  /** Is migration 096 (the aggregator column and the parked table) in this database? */
+  async #aggregatorSwitchReady() {
+    const [[row]] = await this.db.sequelize.query(`SELECT to_regclass('${PARKED}') IS NOT NULL AS ok`);
+    return Boolean(row?.ok);
+  }
+
+  /**
+   * One Slotegrator game into `table`, tagged `aggregator = 'slotegrator'`. Raw SQL because the
+   * generated model has no `aggregator` column. A uuid already in the OTHER table (a game that
+   * was parked or restored meanwhile) is updated there instead, so a game is never in both.
+   */
+  async #upsertSlotegratorGame(table, row) {
+    const other = table === LIVE ? PARKED : LIVE;
+    const json = (v) => (v == null ? null : JSON.stringify(v));
+    const replacements = { ...row, parameters: json(row.parameters), tags: json(row.tags), images: json(row.images) };
+    const set = `name = :name, provider = :provider, provider_id = :provider_id, type = :type, image = COALESCE(image, :image),
+      technology = :technology, has_lobby = :has_lobby, is_mobile = :is_mobile, has_freespins = :has_freespins,
+      freespin_valid_until_full_day = :freespin_valid_until_full_day, updated_at = :updated_at, label = :label,
+      parameters = :parameters::jsonb, tags = :tags::jsonb, images = :images::jsonb, aggregator = 'slotegrator'`;
+
+    const [, meta] = await this.db.sequelize.query(`UPDATE ${other} SET ${set} WHERE uuid = :uuid`, { replacements });
+    if ((typeof meta === 'number' ? meta : meta?.rowCount ?? 0) > 0) return;
+
+    await this.db.sequelize.query(
+      `INSERT INTO ${table} (uuid, name, provider, provider_id, type, image, technology, has_lobby, is_mobile,
+         has_freespins, freespin_valid_until_full_day, updated_at, label, parameters, tags, images, aggregator, created_at)
+       VALUES (:uuid, :name, :provider, :provider_id, :type, :image, :technology, :has_lobby, :is_mobile,
+         :has_freespins, :freespin_valid_until_full_day, :updated_at, :label, :parameters::jsonb, :tags::jsonb,
+         :images::jsonb, 'slotegrator', NOW())
+       ON CONFLICT (uuid) DO UPDATE SET ${set.replace(/COALESCE\(image, :image\)/, `COALESCE(${table}.image, :image)`)}`,
+      { replacements }
+    );
+  }
 
   #requireProvider() {
     if (!this.provider?.configured) throw E.NOT_CONFIGURED();

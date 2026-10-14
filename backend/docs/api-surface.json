@@ -3059,7 +3059,7 @@
       ],
       "responses": [
         {
-          "index": 93,
+          "index": 106,
           "kind": "ok",
           "status": 200,
           "shape": "service.adjustPlayer(…)"
@@ -6701,7 +6701,7 @@
           "index": 39,
           "kind": "ok",
           "status": 200,
-          "shape": "{ set }"
+          "shape": "{ set, mode }"
         }
       ],
       "thrown": [],
@@ -6760,7 +6760,7 @@
       ],
       "responses": [
         {
-          "index": 115,
+          "index": 128,
           "kind": "ok",
           "status": 200,
           "shape": "response.ok(…)"
@@ -7003,7 +7003,7 @@
       ],
       "responses": [
         {
-          "index": 360,
+          "index": 411,
           "kind": "ok",
           "status": 200,
           "shape": "{ staffId, verified }"
@@ -8595,6 +8595,37 @@
           "kind": "ok",
           "status": 200,
           "shape": "service.addFavourite(…)"
+        }
+      ],
+      "thrown": [],
+      "resolved": true,
+      "file": "services/casino/src/modules/games/routes/user.routes.js"
+    },
+    {
+      "service": "casino",
+      "module": "games",
+      "audience": "user",
+      "method": "POST",
+      "path": "/api/v1/casino/games/launch",
+      "routePath": "/launch",
+      "handler": "asyncHandler",
+      "handlerSource": "user.routes.js",
+      "middleware": [
+        {
+          "type": "validate",
+          "value": "v.launch"
+        },
+        {
+          "type": "guard",
+          "value": "requireGameEntitled(deps, (req) => ({ ui"
+        }
+      ],
+      "responses": [
+        {
+          "index": 33,
+          "kind": "created",
+          "status": 201,
+          "shape": "response.created(…)"
         }
       ],
       "thrown": [],
@@ -16204,7 +16235,7 @@
       ],
       "responses": [
         {
-          "index": 299,
+          "index": 329,
           "kind": "paginated",
           "status": 200,
           "shape": "[ … ] + meta.pagination"
@@ -17960,6 +17991,10 @@
       "handlerSource": "index.js",
       "middleware": [
         {
+          "type": "guard",
+          "value": "entitlements.requireFeature('p2p')"
+        },
+        {
           "type": "rateLimit",
           "value": "writeLimiter"
         },
@@ -17990,6 +18025,10 @@
       "handler": "disputeScreenshot",
       "handlerSource": "index.js",
       "middleware": [
+        {
+          "type": "guard",
+          "value": "entitlements.requireFeature('p2p')"
+        },
         {
           "type": "validate",
           "value": "v.disputeParam"
@@ -18024,6 +18063,10 @@
       "handlerSource": "index.js",
       "middleware": [
         {
+          "type": "guard",
+          "value": "entitlements.requireFeature('p2p')"
+        },
+        {
           "type": "validate",
           "value": "v.offers"
         }
@@ -18050,6 +18093,10 @@
       "handler": "orderDetails",
       "handlerSource": "index.js",
       "middleware": [
+        {
+          "type": "guard",
+          "value": "entitlements.requireFeature('p2p')"
+        },
         {
           "type": "validate",
           "value": "v.orderDetails"
@@ -18078,6 +18125,10 @@
       "handlerSource": "index.js",
       "middleware": [
         {
+          "type": "guard",
+          "value": "entitlements.requireFeature('p2p')"
+        },
+        {
           "type": "validate",
           "value": "v.myOrders"
         }
@@ -18104,6 +18155,10 @@
       "handler": "createOrder",
       "handlerSource": "index.js",
       "middleware": [
+        {
+          "type": "guard",
+          "value": "entitlements.requireFeature('p2p')"
+        },
         {
           "type": "rateLimit",
           "value": "writeLimiter"
@@ -18136,6 +18191,10 @@
       "handlerSource": "index.js",
       "middleware": [
         {
+          "type": "guard",
+          "value": "entitlements.requireFeature('p2p')"
+        },
+        {
           "type": "rateLimit",
           "value": "writeLimiter"
         },
@@ -18166,6 +18225,10 @@
       "handler": "orderProof",
       "handlerSource": "index.js",
       "middleware": [
+        {
+          "type": "guard",
+          "value": "entitlements.requireFeature('p2p')"
+        },
         {
           "type": "validate",
           "value": "v.orderDetails"
@@ -18200,6 +18263,10 @@
       "handlerSource": "index.js",
       "middleware": [
         {
+          "type": "guard",
+          "value": "entitlements.requireFeature('p2p')"
+        },
+        {
           "type": "validate",
           "value": "v.myOrders"
         }
@@ -18226,6 +18293,10 @@
       "handler": "createSellOrder",
       "handlerSource": "index.js",
       "middleware": [
+        {
+          "type": "guard",
+          "value": "entitlements.requireFeature('p2p')"
+        },
         {
           "type": "rateLimit",
           "value": "writeLimiter"
@@ -18257,6 +18328,10 @@
       "handler": "sellQr",
       "handlerSource": "index.js",
       "middleware": [
+        {
+          "type": "guard",
+          "value": "entitlements.requireFeature('p2p')"
+        },
         {
           "type": "validate",
           "value": "v.orderDetails"
@@ -18291,6 +18366,10 @@
       "handlerSource": "index.js",
       "middleware": [
         {
+          "type": "guard",
+          "value": "entitlements.requireFeature('p2p')"
+        },
+        {
           "type": "permission",
           "value": "config:write"
         },
@@ -18321,6 +18400,10 @@
       "handler": "adminDisputeScreenshot",
       "handlerSource": "index.js",
       "middleware": [
+        {
+          "type": "guard",
+          "value": "entitlements.requireFeature('p2p')"
+        },
         {
           "type": "permission",
           "value": "config:write"
@@ -18359,6 +18442,10 @@
       "handlerSource": "index.js",
       "middleware": [
         {
+          "type": "guard",
+          "value": "entitlements.requireFeature('p2p')"
+        },
+        {
           "type": "permission",
           "value": "config:write"
         },
@@ -18389,6 +18476,10 @@
       "handler": "adminOffers",
       "handlerSource": "index.js",
       "middleware": [
+        {
+          "type": "guard",
+          "value": "entitlements.requireFeature('p2p')"
+        },
         {
           "type": "permission",
           "value": "config:write"
@@ -18421,6 +18512,10 @@
       "handlerSource": "index.js",
       "middleware": [
         {
+          "type": "guard",
+          "value": "entitlements.requireFeature('p2p')"
+        },
+        {
           "type": "permission",
           "value": "config:write"
         },
@@ -18451,6 +18546,10 @@
       "handler": "setOfferStatus",
       "handlerSource": "index.js",
       "middleware": [
+        {
+          "type": "guard",
+          "value": "entitlements.requireFeature('p2p')"
+        },
         {
           "type": "permission",
           "value": "config:write"
@@ -18483,6 +18582,10 @@
       "handlerSource": "index.js",
       "middleware": [
         {
+          "type": "guard",
+          "value": "entitlements.requireFeature('p2p')"
+        },
+        {
           "type": "permission",
           "value": "config:write"
         },
@@ -18514,6 +18617,10 @@
       "handlerSource": "index.js",
       "middleware": [
         {
+          "type": "guard",
+          "value": "entitlements.requireFeature('p2p')"
+        },
+        {
           "type": "permission",
           "value": "wallet:adjust"
         },
@@ -18544,6 +18651,10 @@
       "handler": "adminOrderProof",
       "handlerSource": "index.js",
       "middleware": [
+        {
+          "type": "guard",
+          "value": "entitlements.requireFeature('p2p')"
+        },
         {
           "type": "permission",
           "value": "config:write"
@@ -18582,6 +18693,10 @@
       "handlerSource": "index.js",
       "middleware": [
         {
+          "type": "guard",
+          "value": "entitlements.requireFeature('p2p')"
+        },
+        {
           "type": "permission",
           "value": "wallet:adjust"
         },
@@ -18612,6 +18727,10 @@
       "handler": "setOrderStatus",
       "handlerSource": "index.js",
       "middleware": [
+        {
+          "type": "guard",
+          "value": "entitlements.requireFeature('p2p')"
+        },
         {
           "type": "permission",
           "value": "config:write"
@@ -18644,6 +18763,10 @@
       "handlerSource": "index.js",
       "middleware": [
         {
+          "type": "guard",
+          "value": "entitlements.requireFeature('p2p')"
+        },
+        {
           "type": "permission",
           "value": "config:write"
         }
@@ -18670,6 +18793,10 @@
       "handler": "createPaymentAccount",
       "handlerSource": "index.js",
       "middleware": [
+        {
+          "type": "guard",
+          "value": "entitlements.requireFeature('p2p')"
+        },
         {
           "type": "permission",
           "value": "config:write"
@@ -18702,6 +18829,10 @@
       "handlerSource": "index.js",
       "middleware": [
         {
+          "type": "guard",
+          "value": "entitlements.requireFeature('p2p')"
+        },
+        {
           "type": "permission",
           "value": "config:write"
         }
@@ -18728,6 +18859,10 @@
       "handler": "createPaymentType",
       "handlerSource": "index.js",
       "middleware": [
+        {
+          "type": "guard",
+          "value": "entitlements.requireFeature('p2p')"
+        },
         {
           "type": "permission",
           "value": "config:write"
@@ -18760,6 +18895,10 @@
       "handlerSource": "index.js",
       "middleware": [
         {
+          "type": "guard",
+          "value": "entitlements.requireFeature('p2p')"
+        },
+        {
           "type": "permission",
           "value": "config:write"
         },
@@ -18791,6 +18930,10 @@
       "handlerSource": "index.js",
       "middleware": [
         {
+          "type": "guard",
+          "value": "entitlements.requireFeature('p2p')"
+        },
+        {
           "type": "permission",
           "value": "wallet:adjust"
         },
@@ -18821,6 +18964,10 @@
       "handler": "adminSellProof",
       "handlerSource": "index.js",
       "middleware": [
+        {
+          "type": "guard",
+          "value": "entitlements.requireFeature('p2p')"
+        },
         {
           "type": "permission",
           "value": "config:write"
@@ -18859,6 +19006,10 @@
       "handlerSource": "index.js",
       "middleware": [
         {
+          "type": "guard",
+          "value": "entitlements.requireFeature('p2p')"
+        },
+        {
           "type": "permission",
           "value": "config:write"
         },
@@ -18895,6 +19046,10 @@
       "handler": "releaseSellOrder",
       "handlerSource": "index.js",
       "middleware": [
+        {
+          "type": "guard",
+          "value": "entitlements.requireFeature('p2p')"
+        },
         {
           "type": "permission",
           "value": "wallet:adjust"
@@ -20801,7 +20956,7 @@
       ],
       "responses": [
         {
-          "index": 195,
+          "index": 215,
           "kind": "paginated",
           "status": 200,
           "shape": "[ … ] + meta.pagination"
@@ -22467,13 +22622,13 @@
       ],
       "responses": [
         {
-          "index": 863,
+          "index": 1273,
           "kind": "ok",
           "status": 200,
           "shape": "service.agentAdjust(…)"
         },
         {
-          "index": 1368,
+          "index": 1889,
           "kind": "ok",
           "status": 200,
           "shape": "service.adminAdjust(…)"
@@ -22504,7 +22659,7 @@
       ],
       "responses": [
         {
-          "index": 238,
+          "index": 274,
           "kind": "paginated",
           "status": 200,
           "shape": "[ … ] + meta.pagination"

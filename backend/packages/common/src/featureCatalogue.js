@@ -790,7 +790,29 @@ const WITHDRAWAL_REQUIREMENTS_POLICY = {
   ],
 };
 
-const FEATURES = Object.freeze([...POLICIES, REWARD_CURRENCY_POLICY, DEFAULT_CURRENCY_POLICY, REGION_RESTRICTION_POLICY, WITHDRAWAL_REQUIREMENTS_POLICY, ...GENERATED, TIPS, P2P, PUSH_NOTIFICATIONS, ANALYTICS]);
+/**
+ * The casino aggregator — whose game catalogue the lobby serves (services/casino/src/modules/games/catalogueSwitch.js).
+ *
+ * A policy (always in force, the variant IS the setting, the owner alone sets it, staff see it
+ * read-only → `403 OWNER_MANAGED`), with no `none`: the lobby always has one aggregator. The
+ * catalogue table holds ONE aggregator's games at a time; switching parks the other's rows in
+ * `gisgamesnew_parked` (migration 096) and brings the chosen one's back, so switching back needs
+ * no re-fetch. The default `js_games` is the catalogue every site had before this existed.
+ */
+const CASINO_AGGREGATOR_POLICY = {
+  key: 'casino_aggregator',
+  label: 'Casino games provider',
+  category: 'business',
+  kind: 'policy',
+  flag: null,
+  defaultVariant: 'js_games',
+  variants: [
+    { key: 'js_games', label: 'JSGames', description: 'The lobby serves the JSGames catalogue and games launch through JSGames. The default.' },
+    { key: 'slotegrator', label: 'Slotegrator', description: 'The lobby serves the Slotegrator catalogue and games launch through Slotegrator. Run the Slotegrator sync to fill it.' },
+  ],
+};
+
+const FEATURES = Object.freeze([...POLICIES, REWARD_CURRENCY_POLICY, DEFAULT_CURRENCY_POLICY, REGION_RESTRICTION_POLICY, WITHDRAWAL_REQUIREMENTS_POLICY, CASINO_AGGREGATOR_POLICY, ...GENERATED, TIPS, P2P, PUSH_NOTIFICATIONS, ANALYTICS]);
 
 /**
  * Site templates — the bundles the OWNER picks for a site (docs/OWNER-PANEL.md

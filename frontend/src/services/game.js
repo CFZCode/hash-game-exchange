@@ -4,7 +4,10 @@ import { publicGates } from './gates';
 import { ORIGINAL_GAMES } from '../pages/Casino/originalGames';
 import { getLiveGame } from './catalog';
 
-const AGGREGATOR_LAUNCH = '/api/v1/casino/js-games/v2/launch';
+/* Every catalogue game launches through `POST /casino/games/launch`: the backend reads the row and
+   opens it through Slotegrator (GIS) or JSGames V2, whichever the owner's casino aggregator put in
+   the lobby (casino-service games/gameLauncher.js). */
+const AGGREGATOR_LAUNCH = '/api/v1/casino/games/launch';
 import { GAME_DETAIL, PLATFORM } from './endpoints';
 import { GAMES } from '../data/games';
 
@@ -64,13 +67,13 @@ const isHouseGame = (ref) => HOUSE_SLUGS.has(ref) || HOUSE_SLUGS.has(slugFor(ref
 /* ── THE LAUNCH ─────────────────────────────────────────────────────────────────────────────
  *
  * In-house games go to `POST /casino/js-games/v1/launch`, catalogue games to
- * `POST /casino/js-games/v2/launch`. Both answer `{gameLaunchUrl, sessionToken}` and the URL goes
+ * `POST /casino/games/launch` (JSGames V2 or Slotegrator, by the game's row). Both answer `{gameLaunchUrl, sessionToken}` and the URL goes
  * into the frame UNCHANGED (it carries the provider's session). How hash.game does the same job,
  * and why this is the shape it is, is in `docs/casino.md` under "Opening a game".
  *
  * THE TWO BODIES ARE NOT THE SAME, and both validators are `.strict()`, so a key the other route
  * takes is a 422 here:
- *   v2  {gameUid, currencyCode, language}             no return URL, no demo flag
+ *   lobby {gameUuid, currencyCode, language, device}  no return URL, no demo flag
  *   v1  {gameUid, currencyCode, language, homeUrl}    `homeUrl` is where the provider's own
  *                                                     lobby/home button sends the player
  * `gameUid` is the platform's id: the catalogue row's `uuid` (which IS `js_games.game_uid`, the
@@ -104,6 +107,9 @@ export function launchCurrency(game, currencyName) {
 /** The wallet codes (bare, `INR`) this game's route launches in — the overlay's picker. */
 export const launchCurrencies = (game) => LAUNCH_CURRENCIES[routeOf(game)];
 
+const deviceOf = () =>
+  typeof window !== 'undefined' && window.matchMedia?.('(max-width: 767px)').matches ? 'mobile' : 'desktop';
+
 export function launchGame(game, { currencyName, language = 'en', homeUrl } = {}) {
   if (USE_FIXTURES || !getAccessToken() || !game) return null;
   const currencyCode = launchCurrency(game, currencyName);
@@ -112,7 +118,7 @@ export function launchGame(game, { currencyName, language = 'en', homeUrl } = {}
   const lang = String(language || 'en').split(/[-_]/)[0].slice(0, 10) || 'en';
   const json =
     game.launch === 'aggregator'
-      ? { gameUid: game.ref, currencyCode, language: lang }
+      ? { gameUuid: game.ref, currencyCode, language: lang, device: deviceOf() }
       : { gameUid: game.ref, currencyCode, language: lang, ...(homeUrl ? { homeUrl } : {}) };
   return Promise.resolve(
     request(game.launch === 'aggregator' ? AGGREGATOR_LAUNCH : PLATFORM.casino.inHouseLaunch, {

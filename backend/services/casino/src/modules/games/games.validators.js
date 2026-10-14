@@ -125,6 +125,19 @@ const setTypePriority = {
   body: z.object({ uuids: z.array(gameUuid).max(MAX_COLLECTION_SIZE) }).strict(),
 };
 
+/** `POST /games/launch` — any lobby game, JSGames or Slotegrator (`gameLauncher.js`). */
+const launch = {
+  body: z
+    .object({
+      gameUuid,
+      // The currencies BOTH aggregators settle in (JSGames V2_CURRENCIES, GIS SETTLEMENT_CURRENCY).
+      currencyCode: z.enum(['INR', 'USDT', 'USD']),
+      device: z.enum(['desktop', 'mobile']).default('desktop'),
+      language: z.string().trim().max(10).optional(),
+    })
+    .strict(),
+};
+
 const searchGames = {
   query: z
     .object({
@@ -245,6 +258,7 @@ const favouriteParam = {
 const unfavouriteParam = { params: z.object({ gameRef }) };
 
 module.exports = {
+  launch,
   browse,
   byProvider,
   uuidParam,

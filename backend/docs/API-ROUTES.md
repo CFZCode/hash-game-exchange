@@ -601,7 +601,7 @@ attaches and the shape the handler answers with. Regenerate with
 
 | | |
 | --- | ---: |
-| Routes mounted | 778 |
+| Routes mounted | 779 |
 | Modules | 83 |
 | Answering outside the envelope | 49 |
 
@@ -924,7 +924,7 @@ the end of this appendix.
 | `POST` | `/api/v1/admin/auth/2fa/confirm` | `staff` + self-only + rate-limited | `200` `service.confirmTwoFactor(…)` |
 | `POST` | `/api/v1/admin/auth/2fa/disable` | `staff` + self-only + rate-limited | `200` `service.disableTwoFactor(…)` |
 | `POST` | `/api/v1/admin/auth/logout` | `staff` + self-only | `200` `service.logout(…)` |
-| `GET` | `/api/v1/admin/auth/transaction-password` | `staff` + self-only | `200` `{ set }` |
+| `GET` | `/api/v1/admin/auth/transaction-password` | `staff` + self-only | `200` `{ set, mode }` |
 | `POST` | `/api/v1/admin/auth/transaction-password` | `staff` + self-only + rate-limited | `200` `txn.setTransactionPassword(…)` |
 | `POST` | `/internal/admin/auth/transaction-password/check` | `internal` | `200` `response.ok(…)` |
 | `GET` | `/internal/admin/auth/verify` | `internal` | `200` `{ active, staff }` |
@@ -954,7 +954,7 @@ the end of this appendix.
 | `GET` | `/api/v1/admin/statements/user/:userId/pdf` | `staff` + `reports:read` | **raw** `Content-Type: application/pdf` · **raw** `streamed to res` |
 | `GET` | `/api/v1/admin/statements/user/:userId/statement` | `staff` + `reports:read` | `200` `service.userStatement(…)` |
 
-### casino-service — :4003 (141 routes)
+### casino-service — :4003 (142 routes)
 
 #### `aggregators`
 
@@ -1024,6 +1024,7 @@ the end of this appendix.
 | `GET` | `/api/v1/casino/games/favourites` | `player` | `200` `service.favourites(…)` |
 | `DELETE` | `/api/v1/casino/games/favourites/:gameRef` | `player` | `200` `service.removeFavourite(…)` |
 | `PUT` | `/api/v1/casino/games/favourites/:gameRef` | `player` | `200` `service.addFavourite(…)` |
+| `POST` | `/api/v1/casino/games/launch` | `player` | `201` `response.created(…)` |
 | `GET` | `/api/v1/casino/games/recently-played` | `player` | `200` `service.recentlyPlayed(…)` |
 | `PUT` | `/api/v1/admin/casino/games/catalogue/:uuid/image` | `staff` + `casino:manage` | `200` `service.updateImage(…)` |
 | `GET` | `/api/v1/admin/casino/games/catalogue/search` | `staff` + `casino:read` | `200` `service.search(…)` |
@@ -2502,7 +2503,7 @@ the service layer, so a code is reachable from any route in its module.
 | `403` | `SPORTSBOOK_SPORTSBOOK_LOCKED` | Sportsbook play is locked on this account |
 | `404` | `SPORTSBOOK_USER_NOT_FOUND` | Player not found |
 
-#### `STAFF` — admin/staff (11)
+#### `STAFF` — admin/staff (12)
 
 | Status | Code | Message |
 |---:|---|---|
