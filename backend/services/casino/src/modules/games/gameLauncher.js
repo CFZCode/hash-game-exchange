@@ -3,6 +3,7 @@
 const { buildGisService } = require('../gis/gis.factory');
 const { buildJsGamesService } = require('../js-games/jsGames.factory');
 const { LIVE } = require('./catalogueSwitch');
+const { MOBILE_SUFFIX } = require('./games.service');
 
 /**
  * One launch for any lobby game — `POST /casino/games/launch`.
@@ -29,8 +30,32 @@ async function aggregatorOf({ db }, gameUuid) {
   }
 }
 
-async function launchGame(deps, { userId, gameUuid, currencyCode, device, language }) {
-  if ((await aggregatorOf(deps, gameUuid)) === 'slotegrator') {
+/**
+ * The row to open on this device. Slotegrator lists "Le Bandit" (desktop) and "Le Bandit Mobile"
+ * as two games; the lobby shows only the desktop tile (games.service `NOT_A_MOBILE_TWIN`), so
+ * a phone launching it is switched to the Mobile twin, and a desktop launching a Mobile uuid
+ * (an old link, a favourite) to its desktop twin. No twin: the uuid as given.
+ */
+async function deviceVariant({ db }, gameUuid, device) {
+  const wantMobile = device === 'mobile';
+  try {
+    const [[row]] = await db.sequelize.query(
+      `SELECT twin.uuid FROM ${LIVE} g JOIN ${LIVE} twin ON twin.provider = g.provider AND twin.uuid <> g.uuid
+        WHERE g.uuid = :uuid AND (
+          (:wantMobile AND g.name !~* :suffix AND LOWER(twin.name) = LOWER(g.name) || ' mobile')
+          OR (NOT :wantMobile AND g.name ~* :suffix AND LOWER(twin.name) = LOWER(REGEXP_REPLACE(g.name, :suffix, '', 'i'))))
+        LIMIT 1`,
+      { replacements: { uuid: gameUuid, wantMobile, suffix: MOBILE_SUFFIX } }
+    );
+    return row?.uuid ?? gameUuid;
+  } catch {
+    return gameUuid;
+  }
+}
+
+async function launchGame(deps, { userId, gameUuid: requested, currencyCode, device, language }) {
+  if ((await aggregatorOf(deps, requested)) === 'slotegrator') {
+    const gameUuid = await deviceVariant(deps, requested, device);
     const user = await deps.models.Users.findByPk(userId, { attributes: ['id', 'name'], raw: true });
     const { url, sessionId } = await buildGisService(deps).launch({
       userId,
@@ -42,8 +67,8 @@ async function launchGame(deps, { userId, gameUuid, currencyCode, device, langua
     });
     return { gameLaunchUrl: url, via: 'slotegrator', sessionId };
   }
-  const result = await buildJsGamesService(deps).launchV2({ userId, gameUid: gameUuid, currencyCode, language });
+  const result = await buildJsGamesService(deps).launchV2({ userId, gameUid: requested, currencyCode, language });
   return { ...result, via: 'jsgames-v2' };
 }
 
-module.exports = { aggregatorOf, launchGame };
+module.exports = { aggregatorOf, deviceVariant, launchGame };

@@ -7,6 +7,7 @@ const db = require('@ibitplay/db');
 const { createLogger } = require('@ibitplay/common');
 
 const { GamesService } = require('../games.service');
+const { deviceVariant } = require('../gameLauncher');
 
 /**
  * A Slotegrator catalogue in the lobby: its rows carry `{ code, label }` tags (not the
@@ -52,6 +53,9 @@ test('Slotegrator games in the lobby', async (t) => {
     ['RNG Roulette', `${TAG} Platipus`, 'roulette'],
     ['Lucky Keno', `${TAG} Spribe`, 'keno'],
     ['Baccarat Squeeze', `${TAG} SA`, 'baccarat '],
+    ['Wild Twin', `${TAG} Mojos`, 'slots'],
+    ['Wild Twin Mobile', `${TAG} Mojos`, 'slots'],
+    ['Only Mobile', `${TAG} Mojos`, 'slots'],
   ];
   const uuids = games.map((_, i) => `${TAG}-${i}`);
   const cleanUp = () => models.Gisgamesnew.destroy({ where: { uuid: uuids } });
@@ -81,7 +85,7 @@ test('Slotegrator games in the lobby', async (t) => {
   });
 
   await t.test('category tabs match Slotegrator types', async () => {
-    assert.deepEqual(await names('slots'), ['Fruit Dash']);
+    assert.deepEqual(await names('slots'), ['Fruit Dash', 'Only Mobile', 'Wild Twin']);
     assert.deepEqual(await names('crash'), ['Aviator']);
     assert.deepEqual(await names('lottery'), ['Lucky Keno']);
     assert.deepEqual(await names('live'), ['Crazy Time', 'Lightning Blackjack']);
@@ -92,5 +96,16 @@ test('Slotegrator games in the lobby', async (t) => {
   await t.test('name categories still work, game shows only for live games', async () => {
     assert.deepEqual(await names('blackjack'), ['Lightning Blackjack']);
     assert.deepEqual(await names('game-shows'), ['Crazy Time']);
+  });
+
+  await t.test('one tile per desktop/mobile pair; the launch picks the device twin', async () => {
+    assert.deepEqual(await names(), ['Aviator', 'Baccarat Squeeze', 'Crazy Time', 'Fruit Dash', 'Lightning Blackjack', 'Lucky Keno', 'Only Mobile', 'RNG Roulette', 'Wild Twin']);
+    const desk = uuids[7];
+    const mob = uuids[8];
+    const deps = { db: connection };
+    assert.equal(await deviceVariant(deps, desk, 'mobile'), mob);
+    assert.equal(await deviceVariant(deps, desk, 'desktop'), desk);
+    assert.equal(await deviceVariant(deps, mob, 'desktop'), desk);
+    assert.equal(await deviceVariant(deps, uuids[9], 'desktop'), uuids[9], 'a mobile-only game opens as itself');
   });
 });

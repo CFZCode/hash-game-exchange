@@ -80,8 +80,22 @@ const NOT_A_LATER_TWIN = literal(
     ' AND twin.uuid < "Gisgamesnew".uuid)'
 );
 
-/** Merge the twin rule into a `where` without disturbing the filters already in it. */
-const withoutTwins = (where) => ({ ...where, [Op.and]: [...(where[Op.and] ?? []), NOT_A_LATER_TWIN] });
+/**
+ * Slotegrator lists most games twice: "Le Bandit" (desktop) and "Le Bandit Mobile"
+ * (`is_mobile`), same provider. The lobby shows ONE tile — the desktop row — and the launch
+ * opens the right one for the player's device (`gameLauncher.js` `deviceVariant`). A
+ * "… Mobile" row with no desktop partner is the only copy and stays listed.
+ */
+const MOBILE_SUFFIX = '\\s+mobile$';
+const NOT_A_MOBILE_TWIN = literal(
+  `NOT ("Gisgamesnew".name ~* '${MOBILE_SUFFIX}' AND EXISTS (SELECT 1 FROM gisgamesnew desk` +
+    ' WHERE desk.provider = "Gisgamesnew".provider' +
+    ` AND LOWER(desk.name) = LOWER(REGEXP_REPLACE("Gisgamesnew".name, '${MOBILE_SUFFIX}', '', 'i'))` +
+    ' AND desk.uuid <> "Gisgamesnew".uuid))'
+);
+
+/** Merge the twin rules into a `where` without disturbing the filters already in it. */
+const withoutTwins = (where) => ({ ...where, [Op.and]: [...(where[Op.and] ?? []), NOT_A_LATER_TWIN, NOT_A_MOBILE_TWIN] });
 
 /**
  * The local game catalogue and the curation on top of it.
@@ -486,7 +500,8 @@ class GamesService {
     if (!ids.length) return { rows: [], total: 0 };
 
     const games = await this.models.Gisgamesnew.findAll({
-      where: withoutDisabled({ uuid: { [Op.in]: ids } }, await disabledProviders(this.models)),
+      // A curated "… Mobile" twin is shown as its desktop tile's game, not a second tile.
+      where: withoutTwins(withoutDisabled({ uuid: { [Op.in]: ids } }, await disabledProviders(this.models))),
       attributes: [...GAME_FIELDS],
       raw: true,
     });
@@ -1501,4 +1516,4 @@ function logoUrl(name, updatedAt) {
 /** What `updated_by` records: the staff id, as the other curation tables do. */
 const actorTag = (actor) => (actor?.id === undefined || actor?.id === null ? null : String(actor.id));
 
-module.exports = { GamesService, LOGO_MAX_BYTES };
+module.exports = { GamesService, LOGO_MAX_BYTES, MOBILE_SUFFIX };
