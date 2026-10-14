@@ -52,13 +52,6 @@ const GlobeSvg = () => (
   </svg>
 );
 
-/* Turbo Mode's bolt — `Ue` in index-DuwOs_Mv.js, rendered `class="size-4 fill-primary"`. */
-const BoltSvg = () => (
-  <svg viewBox="0 0 32 32" className="icon size-4 fill-primary">
-    <path d="M17.9138 4.81964L7.69383 14.6658C7.01401 15.3205 7.07254 16.3307 7.82512 16.9227L7.95974 17.0188C8.09939 17.1092 8.25241 17.1819 8.41547 17.2346L12.8264 18.6645L10.9132 25.742C10.6807 26.6008 11.2928 27.4612 12.2787 27.6636C12.9234 27.7957 13.5999 27.6151 14.0489 27.1911L24.2947 17.5122C24.9813 16.8633 24.9344 15.8524 24.1894 15.2545L24.0665 15.1642C23.9385 15.0789 23.7989 15.0078 23.65 14.9535L19.4641 13.4399L21.0788 6.19518C21.2719 5.32889 20.6214 4.49019 19.6263 4.32211C18.995 4.21591 18.3461 4.40406 17.9154 4.81964H17.9138Z" />
-  </svg>
-);
-
 // Headphones SVG for Live Support
 const HeadphonesSvg = () => (
   <svg viewBox="0 0 32 32" className="icon size-6 fill-secondary">
@@ -273,9 +266,6 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
   const { darken, setTheme } = useSettings();
   const darkMode = darken;
   const setDarkMode = (next) => setTheme(next ? 'dark' : 'light');
-  /* `N.lite` on the original, a persisted app setting that thins out animations. Nothing here
-     reads it — see the note over the Turbo Mode card for why the switch is inert. */
-  const [turboMode, setTurboMode] = useState(false);
 
   /* Which submenu row's hover panel is open, by `flyout` key. Held here rather than on the row
      because the panel is a SIBLING of the aside — see the note over `.sidebar-flyout` in
@@ -863,54 +853,6 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
                   </div>
                 </div>
 
-                {/* ======================================================== */}
-                {/* 9. TURBO MODE  (drawer only)                             */}
-                {/* ======================================================== */}
-                {/* THIS ROW IS GENUINELY MOBILE-ONLY, and that is the chunk's own gate rather
-                    than a guess made to keep the desktop rail unchanged. `tn` in
-                    index-DuwOs_Mv.js is
-
-                      <Show when={m.mobile || N.lite}>          <- the card itself
-                        ...
-                        <Show when={m.mobile}>                  <- the description under it
-                          Reduces effects. Enables Turbo Mode for games.
-
-                    so the desktop rail draws it only once lite mode is ALREADY on — an escape
-                    hatch for turning it back off, not part of the rail's normal content — and
-                    never draws the description. There is no lite setting in this build, so the
-                    card renders in the drawer and nowhere else, which is what `m.mobile` means
-                    on a phone anyway.
-
-                    It sits INSIDE the theme toggle's `w-full overflow-hidden` wrapper because
-                    that is where the template puts it: `B` holds `[Je, tn]` under one
-                    `<Show when={!fold}>`, so folding the rail takes both away together.
-
-                    The switch is inert — `N.lite` drives GSAP and the games' own effects, and
-                    neither exists here. It carries local state so the control still answers to
-                    a tap rather than looking broken. */}
-                <div className="Sidebar-Unit_bg mt-2 w-full rounded-lg p-3 lg:hidden">
-                  <div className="flex w-full items-center">
-                    <BoltSvg />
-                    <span className="ml-1 font-extrabold text-primary">Turbo Mode</span>
-                    {/* `size: "small"` is `.switch-xs`, the same primitive Do Not Disturb and
-                        Hide Small use. A <div> with role=switch, not a <button>: it is the
-                        original's own markup and the rules in index.css key off aria-checked. */}
-                    <div
-                      className="switch switch-xs ml-auto"
-                      role="switch"
-                      aria-checked={turboMode}
-                      aria-label="Turbo Mode"
-                      tabIndex={0}
-                      onClick={() => setTurboMode(v => !v)}
-                      onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setTurboMode(v => !v)}
-                    >
-                      <div />
-                    </div>
-                  </div>
-                  <div className="mt-2 text-xs text-tertiary">
-                    <p>Reduces effects. Enables Turbo Mode for games.</p>
-                  </div>
-                </div>
               </div>
 
               {/* ============================================================ */}
@@ -927,7 +869,7 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
 
                   so it is drawer-only AND signed-out-only, and both halves are reproduced.
                   Being outside the theme toggle's wrapper is the template's own arrangement:
-                  it is a child of <nav>, not of `B`, so unlike Turbo Mode it does not
+                  it is a child of <nav>, not of `B`, so it does not
                   disappear with the fold — which never comes up here, since it cannot render
                   at a width where the rail exists.
 

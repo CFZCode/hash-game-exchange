@@ -286,8 +286,10 @@ export default function Header({
       <div
         className="page-header alpha-layer4 left-0 top-0 w-full fixed z-[99] flex lg:hidden"
         style={{
+          /* With the drawer open the bar goes solid in its own layer4 token (white on the light
+             theme, #323738 on dark) — a hard-coded #323738 here left a dark bar over the light
+             drawer, where the inverted owner logo turned unreadable. */
           "--tw-bg-opacity": mobileMenuOpen ? 1 : headerBgOpacity,
-          backgroundColor: mobileMenuOpen ? '#323738' : undefined,
         }}
       >
         {/* `ks()` wraps this whole bar in `Show when={b.login} fallback={<SignedOut/>}`, so the
