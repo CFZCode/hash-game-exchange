@@ -1,4 +1,5 @@
-import { Navigate, useNavigate, useParams } from 'react-router-dom';
+import { useEffect, useRef } from 'react';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { getReferral, getInvitationCode, getAffiliateDashboard } from '../../services/referral';
 import { useResource } from '../../hooks/useResource';
 import Loading from '../../components/shared/Loading';
@@ -286,7 +287,9 @@ function Activities({ dashboard, topCommissions, copy }) {
 export default function ReferralDashboard() {
   const { session } = useSession();
   const navigate = useNavigate();
-  const params = useParams();
+  /* The pathname, not `useParams()`: on a phone this renders inside `ReferralDialog`, which App
+     mounts beside `<Routes>`, where there are no params — every tab would read as Dashboard. */
+  const { pathname } = useLocation();
 
   const { data } = useResource(getReferral);
   const { data: invite } = useResource(getInvitationCode);
@@ -302,6 +305,21 @@ export default function ReferralDashboard() {
      the two early returns below, because it is a hook: called after them it would be skipped on
      the render where the guard fires and the hook order would change between renders. */
   const dialog = useIsDialog();
+
+  /* On a phone the four tabs overflow the strip, and a deep link such as `/referral/rules` would
+     leave its own tab off the right edge. Scroll the strip (only the strip, so not
+     `scrollIntoView`, which would also move the dialog) until the selected tab is in view. Keyed on
+     `ready` too, since the strip only mounts once the three reads settle. */
+  const strip = useRef(null);
+  const ready = Boolean(data && invite && dashboardInfo);
+  useEffect(() => {
+    const el = strip.current;
+    const tab = el?.querySelector('[aria-selected="true"]');
+    if (!el || !tab) return;
+    const box = el.getBoundingClientRect();
+    const at = tab.getBoundingClientRect();
+    el.scrollLeft += at.left - box.left - (box.width - at.width) / 2;
+  }, [pathname, ready]);
 
   /* `guards: [() => !b.login && "/referral-exhibition"]` — the route's own, and the mirror image
      of the guard the exhibition page now carries. */
@@ -320,7 +338,8 @@ export default function ReferralDashboard() {
 
   /* `G1(pathname)` — the tab is the FIRST segment after `/referral`, or `referral` when there is
      none, which is how `/referral/my-rewards/commission` still lights My Rewards. */
-  const active = TABS.some((t) => t.id === params.section) ? params.section : 'referral';
+  const section = pathname.split('/')[2];
+  const active = TABS.some((t) => t.id === section) ? section : 'referral';
   const { paneClass } = TABS.find((t) => t.id === active);
   const { program, faq, live } = data;
   const amount = printCurrency(REFERRAL_AMOUNT);
@@ -380,6 +399,7 @@ export default function ReferralDashboard() {
                             `.tabs-content`'s own `margin-top: .5rem`, which is the space between
                             the strip and the invite card. */}
       <div
+        ref={strip}
         role="tablist"
         className="scroll-x tabs-title hide-scroll mt-3 flex-none rounded-xl p-1 font-semibold sm:mt-0 sm:w-[800px]"
       >
