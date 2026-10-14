@@ -1,5 +1,8 @@
 // controller/user/UserStatementController.js — mssports core, moved unchanged
-import { Wallet_default } from "../../../models/admin/Wallet.mjs";
+// Wallets → credits: point_ledger.wallet_id now holds the player's credits.id.
+// import { Wallet_default } from "../../../models/admin/Wallet.mjs";
+import { Credits_default } from "../../../models/user/Credits.mjs";
+import { User_default } from "../../../models/user/User.mjs";
 import { UserStatementService_default } from "../services/UserStatementService.mjs";
 
 var UserStatementController = {
@@ -15,19 +18,32 @@ var UserStatementController = {
       if (!["ALL", "TRANSACTION", "SPORTS"].includes(rt)) {
         return res.status(400).json({ success: false, message: "reportType must be ALL, TRANSACTION or SPORTS" });
       }
+      // OLD (Wallets.wallet_id):
+      /*
       const wallet = await Wallet_default.findOne({
         where: { user_id: id },
         attributes: ["wallet_id", "username", "createdAt"],
         raw: true
       });
+      */
+      // NEW (credits.id): the wallet id point_ledger stores; the account's start date comes from
+      // the mssports user row (credits has no timestamps).
+      const wallet = await Credits_default.findOne({
+        where: { uid: id },
+        attributes: ["uid", "id"],
+        raw: true
+      });
       if (!wallet) {
         return res.status(404).json({ success: false, message: "Wallet not found" });
       }
+      const account = await User_default.findByPk(id, { attributes: ["createdAt"], raw: true });
       const target = {
         id,
         username: req.user.username,
-        walletId: wallet.wallet_id,
-        createdAt: wallet.createdAt,
+        // OLD: walletId: wallet.wallet_id,
+        // OLD: createdAt: wallet.createdAt,
+        walletId: wallet.id,
+        createdAt: account?.createdAt || null,
         isDemo: !!req.user.isDemo
       };
       const result = await UserStatementService_default.getAccountStatementV2(target, { reportType: rt, fromDate, toDate, search, page, limit });

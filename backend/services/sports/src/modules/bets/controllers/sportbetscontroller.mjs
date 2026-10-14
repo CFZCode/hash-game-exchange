@@ -4,7 +4,9 @@ import { TotalExposure_default, init_TotalExposure } from "../../../models/user/
 import { User_default } from "../../../models/user/User.mjs";
 import { Staff_default } from "../../../models/admin/Staff.mjs";
 import { BetLock_default } from "../../../models/admin/BetLock.mjs";
-import { Wallet_default } from "../../../models/admin/Wallet.mjs";
+// Wallets → credits: the player's sports balance is the platform wallet, credits.inr.
+// import { Wallet_default } from "../../../models/admin/Wallet.mjs";
+import { Credits_default } from "../../../models/user/Credits.mjs";
 import { SportsBet_default } from "../../../models/user/SportsBet.mjs";
 import { BettingConfigService_default } from "../../../lib/services/BettingConfigService.mjs";
 import { CricketService_default } from "../../../lib/services/CricketService.mjs";
@@ -419,6 +421,8 @@ var walletUpdate = async (wallet, balanceChange, transaction, context = {}) => {
     console.error(`[walletUpdate] \u274C Critical: balanceChange is NaN for user ${user_id}. Context:`, context);
     return;
   }
+  // OLD (Wallets.cash):
+  /*
   let currentCash = Number(wallet.cash || 0);
   if (balanceChange < 0) {
     const amountToAdd = Math.abs(balanceChange);
@@ -436,6 +440,25 @@ var walletUpdate = async (wallet, balanceChange, transaction, context = {}) => {
     await wallet.save({ transaction });
   }
   const newBalance = Number(wallet.cash || 0);
+  */
+  // NEW (credits.inr): `wallet` is the player's credits row, locked by the caller.
+  let currentCash = Number(wallet.inr || 0);
+  if (balanceChange < 0) {
+    const amountToAdd = Math.abs(balanceChange);
+    wallet.inr = currentCash + amountToAdd;
+    await wallet.save({ transaction });
+  } else if (balanceChange > 0) {
+    const amountToDeduct = balanceChange;
+    if (currentCash >= amountToDeduct) {
+      wallet.inr = currentCash - amountToDeduct;
+    }
+    if (isNaN(wallet.inr)) {
+      console.error(`[walletUpdate] \u274C Resulting balance is NaN! Reverting. Curr: ${currentCash}, Ded: ${amountToDeduct}`);
+      throw new Error("Balance calculation resulted in NaN");
+    }
+    await wallet.save({ transaction });
+  }
+  const newBalance = Number(wallet.inr || 0);
   if (balanceChange > 0) {
     await DebitLedger_default.create({
       user_id,
@@ -455,7 +478,7 @@ var walletUpdate = async (wallet, balanceChange, transaction, context = {}) => {
   if (balanceChange < 0) {
     const releaseAmount = Math.abs(balanceChange);
   }
-  console.log(`[walletUpdate] Delta: ${balanceChange}, Cash: ${wallet.cash}`);
+  console.log(`[walletUpdate] Delta: ${balanceChange}, INR: ${wallet.inr}`);
 };
 var placeBet = async (req, res, opts) => {
   const options = opts && typeof opts === "object" && !Array.isArray(opts) ? opts : {};
@@ -726,9 +749,14 @@ var placeBet = async (req, res, opts) => {
     } else {
       if (!Number.isFinite(oddN) || oddN < 1) throw new Error("Invalid odds");
     }
-    const wallet = await Wallet_default.findOne({ where: { user_id }, transaction, lock: transaction.LOCK.UPDATE });
+    // OLD (Wallets.cash):
+    // const wallet = await Wallet_default.findOne({ where: { user_id }, transaction, lock: transaction.LOCK.UPDATE });
+    // if (!wallet) throw new Error("Wallet not found");
+    // const currentInr = Number(wallet.cash);
+    // NEW (credits.inr):
+    const wallet = await Credits_default.findOne({ where: { uid: user_id }, transaction, lock: transaction.LOCK.UPDATE });
     if (!wallet) throw new Error("Wallet not found");
-    const currentInr = Number(wallet.cash);
+    const currentInr = Number(wallet.inr || 0);
     console.log("Current wallet balance:", currentInr);
     const isBadlo = isBadloBet({ badlo }) || String(market_type || "").toLowerCase() === "badlo";
     const exposureIds = exposureIdentity({ marketType: market_type, selectionName: selection_name, badlo: isBadlo });
@@ -2315,6 +2343,8 @@ var cancelBet = async (req, res) => {
     const newMax = newNegs.length ? Math.abs(Math.min(...newNegs)) : 0;
     const refund = Number((oldMax - newMax).toFixed(2));
     console.log(`[cancelBet] Liability: old=${oldMax} new=${newMax} refund=${refund}`);
+    // OLD (Wallets.cash):
+    /*
     const wallet = await Wallet_default.findOne({
       where: { user_id },
       transaction,
@@ -2327,6 +2357,20 @@ var cancelBet = async (req, res) => {
       await wallet.save({ transaction });
     }
     const newBalance = Number(wallet.cash || 0);
+    */
+    // NEW (credits.inr): the cancelled liability goes back to the player's inr.
+    const wallet = await Credits_default.findOne({
+      where: { uid: user_id },
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    });
+    if (!wallet) throw new Error("Wallet not found");
+    if (refund > 0) {
+      wallet.inr = Number(wallet.inr || 0) + refund;
+      if (isNaN(wallet.inr)) throw new Error("Balance calculation resulted in NaN");
+      await wallet.save({ transaction });
+    }
+    const newBalance = Number(wallet.inr || 0);
     const exposureResults = await db_default.query(TOTAL_EXPOSURE_SQL, {
       replacements: { user_id },
       type: db_default.QueryTypes.SELECT,

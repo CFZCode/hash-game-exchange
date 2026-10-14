@@ -1,6 +1,8 @@
 // services/settlement/sportsCommissionService.js — mssports settlement worker, moved unchanged
 import { db_default } from "../../config/db.mjs";
-import { Wallet_default } from "../../models/admin/Wallet.mjs";
+// Wallets → credits: the player's sports balance is the platform wallet, credits.inr.
+// import { Wallet_default } from "../../models/admin/Wallet.mjs";
+import { Credits_default } from "../../models/user/Credits.mjs";
 import { CreditsLedger_default } from "../../models/user/CreditsLedger.mjs";
 import { User_default } from "../../models/user/User.mjs";
 import { walletService_default } from "../walletService.mjs";
@@ -47,6 +49,8 @@ async function applyWinCommission(p) {
     const description = `${p.description || ""}${COMMISSION_SUFFIX}`;
     let newCash = 0, newInr = 0, ledgerId = null;
     await db_default.transaction(async (transaction) => {
+      // OLD (Wallets.cash + Wallets.inr_balance):
+      /*
       const wallet = await Wallet_default.findOne({
         where: { user_id: String(p.user_id) },
         transaction,
@@ -56,6 +60,17 @@ async function applyWinCommission(p) {
       newCash = round2(Number(wallet.cash || 0) - comm);
       newInr = round2(Number(wallet.inr_balance || 0) - comm);
       await wallet.update({ cash: newCash, inr_balance: newInr }, { transaction });
+      */
+      // NEW (credits.inr): the commission comes off the winnings in inr.
+      const wallet = await Credits_default.findOne({
+        where: { uid: p.user_id },
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      });
+      if (!wallet) throw new Error(`wallet not found for user ${p.user_id}`);
+      newCash = round2(Number(wallet.inr || 0) - comm);
+      newInr = newCash;
+      await wallet.update({ inr: newCash }, { transaction });
       await User_default.increment(
         { net_loss: -comm, profit: -comm },
         { where: { user_id: p.user_id }, transaction }
@@ -94,6 +109,8 @@ async function applyWinCommission(p) {
       }, { transaction });
       ledgerId = row.id;
     });
+    // Commission points chain (same hierarchy walk as updateAllPointHierarchy) switched off for now.
+    /*
     const pts = await walletService_default.applyCommissionPoints({
       betId: Number(bet.id),
       userId: Number(p.user_id),
@@ -105,6 +122,7 @@ async function applyWinCommission(p) {
     if (!pts.success) {
       log2.error("[Commission] points chain failed", { user_id: p.user_id, bet_id: bet.id, error: pts.error });
     }
+    */
     log2.info("[Commission] charged", {
       user_id: p.user_id,
       bet_id: bet.id,

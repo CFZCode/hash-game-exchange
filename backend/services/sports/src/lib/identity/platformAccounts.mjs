@@ -23,6 +23,7 @@
 // full powers.
 //
 // A new account starts with an empty mssports wallet (cash 0). Funding it is not done here.
+// A PLAYER's bets no longer use that wallet: placement and settlement debit and pay public.credits.inr.
 import { createRequire } from 'node:module';
 
 import { db_default as sequelize, init_db } from '../config/db.mjs';
@@ -241,5 +242,10 @@ export async function ensureUser(userId) {
     await user.update(state);
   }
   await ensureWallet(userId, 'USER', user.username);
+  // A player's sports balance is the platform wallet, credits.inr (bets debit it, settlement pays
+  // into it). Every player normally has the row already; this covers one that does not.
+  await sequelize.query('INSERT INTO public.credits (uid) VALUES (:id) ON CONFLICT (uid) DO NOTHING', {
+    replacements: { id: userId },
+  });
   markFresh(key);
 }

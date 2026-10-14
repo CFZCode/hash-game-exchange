@@ -3,6 +3,7 @@ import { db_default, init_db } from "../config/db.mjs";
 import { User_default } from "../../models/user/User.mjs";
 import { Staff_default } from "../../models/admin/Staff.mjs";
 import { Wallet_default } from "../../models/admin/Wallet.mjs";
+import { Credits_default } from "../../models/user/Credits.mjs";
 import { SportsBet_default } from "../../models/user/SportsBet.mjs";
 import { Owner_default } from "../../models/admin/Owner.mjs";
 import { MESSAGES } from "../constants/messages.mjs";
@@ -629,6 +630,8 @@ var WalletService = {
     }
   },
   updateAllPointHierarchy: async (betId, betType) => {
+    // Switched off for now (Wallets → credits move): no points roll-up until it runs on credits ids.
+    return { success: true, skipped: true, reason: "points roll-up switched off" };
     if (!betId) return { success: false, error: "betId is required" };
     const category = (betType || "").toString().toUpperCase();
     if (!Object.values(POINT_CATEGORY).includes(category)) {
@@ -1207,6 +1210,14 @@ var WalletService = {
   // GET USER WALLET
   // -----------------------------------------------------------------------
   getUserWallet: async (entityId, userType) => {
+    // NEW (credits.inr): a player's sports balance is the platform wallet. Staff and owner
+    // still read Wallets below until their wallets move into credits.
+    if (String(userType || "").toUpperCase() === "USER") {
+      const c = await Credits_default.findOne({ where: { uid: entityId }, attributes: ["uid", "inr"], raw: true });
+      if (!c) throw new Error("Wallet not found");
+      const inr = parseFloat(c.inr || 0);
+      return { username: null, user_type: "USER", cash: inr, inr_balance: inr, cash_received: 0 };
+    }
     const idField = WalletService.getWalletQueryField(userType);
     const w = await Wallet_default.findOne({ where: { [idField]: entityId, user_type: userType } });
     if (!w) throw new Error("Wallet not found");

@@ -1,7 +1,9 @@
 // services/admin/sportsMarketVoidService.js — mssports core, moved unchanged
 import { db_default, init_db } from "../../../lib/config/db.mjs";
 import { TotalExposure_default, init_TotalExposure } from "../../../models/user/TotalExposure.mjs";
-import { Wallet_default } from "../../../models/admin/Wallet.mjs";
+// Wallets → credits: the player's sports balance is the platform wallet, credits.inr.
+// import { Wallet_default } from "../../../models/admin/Wallet.mjs";
+import { Credits_default } from "../../../models/user/Credits.mjs";
 import { SportsBet_default } from "../../../models/user/SportsBet.mjs";
 import { UserExposure_default } from "../../../models/user/UserExposure.mjs";
 import { exposureIdentity } from "../../../lib/helper/lineMarket.mjs";
@@ -17,9 +19,15 @@ import { Op as Op11 } from "sequelize";
 init_TotalExposure();
 var recordVoidRefund = async ({ uid, refundAmount, bet, actor, source = "manual_void", label = "MANUAL VOID" }, t) => {
   if (!(Number(refundAmount) > 0)) return null;
-  const wallet = await Wallet_default.findOne({
-    where: { user_id: uid },
-    attributes: ["wallet_id", "cash"],
+  // OLD (Wallets.cash):
+  // const wallet = await Wallet_default.findOne({
+  //   where: { user_id: uid },
+  //   attributes: ["wallet_id", "cash"],
+  //   transaction: t
+  // });
+  const wallet = await Credits_default.findOne({
+    where: { uid },
+    attributes: ["uid", "id", "inr"],
     transaction: t
   });
   const marketType = bet?.market_type || null;
@@ -41,7 +49,8 @@ var recordVoidRefund = async ({ uid, refundAmount, bet, actor, source = "manual_
       exposure_released: Number(refundAmount)
     },
     netamount: refundAmount,
-    closing: wallet ? Number(wallet.cash) : null,
+    // OLD: closing: wallet ? Number(wallet.cash) : null,
+    closing: wallet ? Number(wallet.inr) : null,
     profit: null,
     loss: null,
     category: "SPORTS"
@@ -93,9 +102,15 @@ var voidOpenMarket = async ({
     const actorName = auditCtx.actor || null;
     const auditPending = [];
     for (const uid of userIds) {
-      const walletBefore = await Wallet_default.findOne({
-        where: { user_id: uid },
-        attributes: ["cash", "inr_balance"],
+      // OLD (Wallets.cash + Wallets.inr_balance):
+      // const walletBefore = await Wallet_default.findOne({
+      //   where: { user_id: uid },
+      //   attributes: ["cash", "inr_balance"],
+      //   transaction: t
+      // });
+      const walletBefore = await Credits_default.findOne({
+        where: { uid },
+        attributes: ["uid", "inr"],
         transaction: t
       });
       const snapBefore = await TotalExposure_default.findOne({
@@ -172,9 +187,16 @@ var voidOpenMarket = async ({
         exposureBefore = minExp;
         if (minExp < 0) {
           refundAmount = Math.abs(minExp);
-          await Wallet_default.increment("cash", {
+          // OLD (Wallets.cash):
+          // await Wallet_default.increment("cash", {
+          //   by: refundAmount,
+          //   where: { user_id: uid },
+          //   transaction: t
+          // });
+          // NEW (credits.inr): the voided liability goes back to inr.
+          await Credits_default.increment("inr", {
             by: refundAmount,
-            where: { user_id: uid },
+            where: { uid },
             transaction: t
           });
           const repBet = await SportsBet_default.findOne({
@@ -237,9 +259,15 @@ var voidOpenMarket = async ({
     }
     let auditedBets = 0;
     for (const a of auditPending) {
-      const walletAfter = await Wallet_default.findOne({
-        where: { user_id: a.uid },
-        attributes: ["cash", "inr_balance"],
+      // OLD (Wallets.cash + Wallets.inr_balance):
+      // const walletAfter = await Wallet_default.findOne({
+      //   where: { user_id: a.uid },
+      //   attributes: ["cash", "inr_balance"],
+      //   transaction: t
+      // });
+      const walletAfter = await Credits_default.findOne({
+        where: { uid: a.uid },
+        attributes: ["uid", "inr"],
         transaction: t
       });
       await recordVoidAudit({
@@ -250,16 +278,20 @@ var voidOpenMarket = async ({
         before: {
           status: "open",
           resultStatus: "pending",
-          cash: a.walletBefore?.cash,
-          inr: a.walletBefore?.inr_balance,
+          // OLD: cash: a.walletBefore?.cash,
+          // OLD: inr: a.walletBefore?.inr_balance,
+          cash: a.walletBefore?.inr,
+          inr: a.walletBefore?.inr,
           exposure: a.exposureBefore,
           totalExposure: a.snapBefore?.total_exposure
         },
         after: {
           status: "closed",
           resultStatus: "refunded",
-          cash: walletAfter?.cash,
-          inr: walletAfter?.inr_balance,
+          // OLD: cash: walletAfter?.cash,
+          // OLD: inr: walletAfter?.inr_balance,
+          cash: walletAfter?.inr,
+          inr: walletAfter?.inr,
           exposure: a.exposureRowsDeleted > 0 ? 0 : a.exposureBefore,
           totalExposure: totalsAfter[a.uid]
         },

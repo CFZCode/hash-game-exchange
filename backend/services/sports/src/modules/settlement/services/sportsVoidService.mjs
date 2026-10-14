@@ -1,7 +1,9 @@
 // services/admin/sportsVoidService.js — mssports core, moved unchanged
 import { db_default, init_db } from "../../../lib/config/db.mjs";
 import { User_default } from "../../../models/user/User.mjs";
-import { Wallet_default } from "../../../models/admin/Wallet.mjs";
+// Wallets → credits: the player's sports balance is the platform wallet, credits.inr.
+// import { Wallet_default } from "../../../models/admin/Wallet.mjs";
+import { Credits_default } from "../../../models/user/Credits.mjs";
 import { SportsBet_default } from "../../../models/user/SportsBet.mjs";
 import { CreditsLedger_default } from "../../../models/user/CreditsLedger.mjs";
 import { recalcTotalExposure } from "../../../lib/helper/totalExposure.mjs";
@@ -190,6 +192,8 @@ var voidSettledLedgerEntry = async (ledgerId, outerTx = null, { writeStatement =
     }
     const userId = Number(row.user_id);
     const net = netOf(row);
+    // OLD (Wallets.cash + Wallets.inr_balance):
+    /*
     const wallet = await Wallet_default.findOne({
       where: { user_id: String(userId) },
       lock: transaction.LOCK.UPDATE,
@@ -200,6 +204,20 @@ var voidSettledLedgerEntry = async (ledgerId, outerTx = null, { writeStatement =
     const inrBefore = Number(wallet.inr_balance || 0);
     await wallet.update(
       { cash: round22(cashBefore - net), inr_balance: round22(inrBefore - net) },
+      { transaction }
+    );
+    */
+    // NEW (credits.inr): the settlement's payout is taken back out of inr.
+    const wallet = await Credits_default.findOne({
+      where: { uid: userId },
+      lock: transaction.LOCK.UPDATE,
+      transaction
+    });
+    if (!wallet) throw new Error(`Wallet not found for user ${userId}`);
+    const cashBefore = Number(wallet.inr || 0);
+    const inrBefore = cashBefore;
+    await wallet.update(
+      { inr: round22(cashBefore - net) },
       { transaction }
     );
     const counters = { profit: -net };
@@ -305,11 +323,17 @@ var voidSettledLedgerEntry = async (ledgerId, outerTx = null, { writeStatement =
       commissionRemark = c.description || null;
       commissionSportId = c.sport_id || null;
       commissionGtype = c.meta?.gtype || null;
+      // OLD (Wallets.cash + Wallets.inr_balance):
+      // await wallet.update(
+      //   {
+      //     cash: round22(Number(wallet.cash || 0) + comm),
+      //     inr_balance: round22(Number(wallet.inr_balance || 0) + comm)
+      //   },
+      //   { transaction }
+      // );
+      // NEW (credits.inr): the voided commission goes back to inr.
       await wallet.update(
-        {
-          cash: round22(Number(wallet.cash || 0) + comm),
-          inr_balance: round22(Number(wallet.inr_balance || 0) + comm)
-        },
+        { inr: round22(Number(wallet.inr || 0) + comm) },
         { transaction }
       );
       await User_default.increment({ net_loss: comm, profit: comm }, { where: { user_id: userId }, transaction });
@@ -322,7 +346,8 @@ var voidSettledLedgerEntry = async (ledgerId, outerTx = null, { writeStatement =
             reason: COMMISSION_VOID_REASON,
             description: withVoidSuffix(c.description || ""),
             netamount: comm,
-            closing: round22(Number(wallet.cash || 0)),
+            // OLD: closing: round22(Number(wallet.cash || 0)),
+            closing: round22(Number(wallet.inr || 0)),
             market_type: c.market_type || null,
             sport_id: c.sport_id || null,
             eventid: c.eventid || null,
@@ -408,13 +433,17 @@ var reversePointsAndEmit = async (summary) => {
       del.commission = cdel;
     }
     try {
-      const fresh = await Wallet_default.findOne({ where: { user_id: String(summary.userId) }, raw: true });
-      emitBalanceUpdate(summary.userId, { inr_balance: fresh?.inr_balance, cash: fresh?.cash });
+      // OLD: const fresh = await Wallet_default.findOne({ where: { user_id: String(summary.userId) }, raw: true });
+      // OLD: emitBalanceUpdate(summary.userId, { inr_balance: fresh?.inr_balance, cash: fresh?.cash });
+      const fresh = await Credits_default.findOne({ where: { uid: summary.userId }, raw: true });
+      emitBalanceUpdate(summary.userId, { inr_balance: fresh?.inr, cash: fresh?.inr });
     } catch (err) {
       console.error("[sportsVoid] balance emit failed:", summary.userId, err.message);
     }
     return del;
   }
+  // Points roll-up is switched off (Wallets → credits move), so there is nothing to reverse.
+  /*
   const res = await walletService_default.reverseAllPointHierarchy(summary.betId, POINT_CATEGORY.SPORTS);
   if (!res.success) console.error("[sportsVoid] point reversal failed:", summary.betId, res.error);
   if (Number(summary.commissionVoided) > 0) {
@@ -429,9 +458,13 @@ var reversePointsAndEmit = async (summary) => {
     if (!cres.success) console.error("[sportsVoid] commission point reversal failed:", summary.betId, cres.error);
     res.commission = cres;
   }
+  */
+  const res = { success: true, skipped: true, reason: "points roll-up switched off" };
   try {
-    const fresh = await Wallet_default.findOne({ where: { user_id: String(summary.userId) }, raw: true });
-    emitBalanceUpdate(summary.userId, { inr_balance: fresh?.inr_balance, cash: fresh?.cash });
+    // OLD: const fresh = await Wallet_default.findOne({ where: { user_id: String(summary.userId) }, raw: true });
+    // OLD: emitBalanceUpdate(summary.userId, { inr_balance: fresh?.inr_balance, cash: fresh?.cash });
+    const fresh = await Credits_default.findOne({ where: { uid: summary.userId }, raw: true });
+    emitBalanceUpdate(summary.userId, { inr_balance: fresh?.inr, cash: fresh?.inr });
   } catch (err) {
     console.error("[sportsVoid] balance emit failed:", summary.userId, err.message);
   }

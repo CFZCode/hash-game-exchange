@@ -10,7 +10,9 @@ import { newVoidGroupId, recordVoidAudit } from "../../services/admin/voidAuditS
 import { VOID_TYPES } from "../../models/admin/BetVoidAudit.mjs";
 import { db_default } from "../../config/db.mjs";
 import { SportsSettlementReport_default } from "../../models/user/SportsSettlementReport.mjs";
-import { Wallet_default } from "../../models/admin/Wallet.mjs";
+// Wallets → credits: the player's sports balance is the platform wallet, credits.inr.
+// import { Wallet_default } from "../../models/admin/Wallet.mjs";
+import { Credits_default } from "../../models/user/Credits.mjs";
 import { CreditsLedger_default } from "../../models/user/CreditsLedger.mjs";
 import { UserExposure_default } from "../../models/user/UserExposure.mjs";
 import { TotalExposure_default } from "../../models/user/TotalExposure.mjs";
@@ -42,6 +44,8 @@ process.on("unhandledRejection", (err) => {
   console.error("[Settlement] Unhandled Rejection:", err);
   process.exit(1);
 });
+// OLD (Wallets.cash + Wallets.inr_balance):
+/*
 async function applyWalletDeltaWithLedger(user_id, { cashDelta = 0, inrDelta = 0, ledger }) {
   return db_default.transaction(async (t) => {
     const w = await Wallet_default.findOne({
@@ -58,6 +62,24 @@ async function applyWalletDeltaWithLedger(user_id, { cashDelta = 0, inrDelta = 0
     );
     const ledgerRow = await CreditsLedger_default.create({ ...ledger, closing: newCash }, { transaction: t });
     return { ledgerRow, newCash, newInr };
+  });
+}
+*/
+// NEW (credits.inr): one balance. Placement took the liability out of inr, so inr gets what
+// cash got — the released liability plus the market result (a win pays in, a full loss adds 0).
+// `inrDelta` (the old inr_balance P/L) has no column any more and is ignored.
+async function applyWalletDeltaWithLedger(user_id, { cashDelta = 0, inrDelta = 0, ledger }) {
+  return db_default.transaction(async (t) => {
+    const w = await Credits_default.findOne({
+      where: { uid: user_id },
+      transaction: t,
+      lock: t.LOCK.UPDATE
+    });
+    if (!w) return null;
+    const newCash = Number(w.inr || 0) + Number(cashDelta || 0);
+    await w.update({ inr: newCash }, { transaction: t });
+    const ledgerRow = await CreditsLedger_default.create({ ...ledger, closing: newCash }, { transaction: t });
+    return { ledgerRow, newCash, newInr: newCash };
   });
 }
 console.log("[Settlement] Process started");
@@ -569,9 +591,11 @@ async function recalcTotalExposure(user_id) {
     const total = parseFloat(exposureResults[0]?.total_exposure) || 0;
     await TotalExposure_default.upsert({ user_id: Number(user_id), total_exposure: total });
     log.info("[Settlement] TotalExposure recalculated", { user_id, total });
-    const wallet = await Wallet_default.findOne({ where: { user_id: String(user_id) } });
+    // OLD: const wallet = await Wallet_default.findOne({ where: { user_id: String(user_id) } });
+    const wallet = await Credits_default.findOne({ where: { uid: user_id } });
     await emitBalanceUpdate(Number(user_id), {
-      inr_balance: wallet?.inr_balance,
+      // OLD: inr_balance: wallet?.inr_balance,
+      inr_balance: wallet?.inr,
       exposure: total
     });
   } catch (e) {
@@ -977,7 +1001,8 @@ async function initiateRefund({ job_id, user_id, eventid, match_id, bet, market_
       log.warn("[Settlement] refund skipped \u2014 bet already closed", { bet_id, user_id, job_id });
       return;
     }
-    const wallet = await Wallet_default.findOne({ where: { user_id } });
+    // OLD: const wallet = await Wallet_default.findOne({ where: { user_id } });
+    const wallet = await Credits_default.findOne({ where: { uid: user_id } });
     if (!wallet) {
       log.error("[Settlement] No wallet found for user", { bet_id, user_id });
       throw new Error(`No wallet found for user_id=${user_id}`);
@@ -1403,12 +1428,15 @@ async function processMobmGroup({ job_id, user_id, eventid, match_id, bets, even
   await closeBetsForMatch(user_id, match_id, false, resultStatus, job_id);
   await clearExposuresForMatch(user_id, match_id, market_type);
   if (!allFixed && Number(marketNetAmount) !== 0) {
+    // Points roll-up switched off for now (Wallets → credits move); comes back on the credits ids.
+    /*
     try {
       const pointRes = await walletService_default.updateAllPointHierarchy(Number(firstBet.id), POINT_CATEGORY.SPORTS);
       if (!pointRes.success) log.error("[Settlement] all_point update failed", { user_id, error: pointRes.error });
     } catch (err) {
       log.error("[Settlement] all_point update error", { user_id, error: err.message });
     }
+    */
   }
   if (moSettlementLedgerRow && Number(marketNetAmount) > 0) {
     await applyWinCommission({
@@ -1618,12 +1646,15 @@ async function processnonfancy({ job_id, user_id, eventid, match_id, bet, eventN
   await closeBetsForMatch(user_id, match_id, false, resultStatus, job_id);
   await clearExposuresForMatch(user_id, match_id, market_type);
   if (bet.fixed != 1 && Number(marketNetAmount) !== 0) {
+    // Points roll-up switched off for now (Wallets → credits move); comes back on the credits ids.
+    /*
     try {
       const pointRes = await walletService_default.updateAllPointHierarchy(Number(bet.id), POINT_CATEGORY.SPORTS);
       if (!pointRes.success) log.error("[Settlement] all_point update failed", { user_id, error: pointRes.error });
     } catch (err) {
       log.error("[Settlement] all_point update error", { user_id, error: err.message });
     }
+    */
   }
   if (nfSettlementLedgerRow && Number(marketNetAmount) > 0) {
     await applyWinCommission({
@@ -1790,19 +1821,30 @@ async function processFanBet({ job_id, bet, eventName, marketId, marketName }) {
       console.log("OLD EXPOSURES:", oldExposure);
       let releaseexposure = Math.abs(oldExposure);
       if (releaseexposure > 0) {
+        // OLD (Wallets.cash):
+        /*
         const creditRecord = await Wallet_default.findOne({
           where: { user_id: String(user_id) },
+          transaction,
+          lock: transaction.LOCK.UPDATE
+        });
+        */
+        // NEW (credits.inr): the fancy liability placement took comes back to inr.
+        const creditRecord = await Credits_default.findOne({
+          where: { uid: user_id },
           transaction,
           lock: transaction.LOCK.UPDATE
         });
         if (!creditRecord) {
           console.log("{exposure release} No credit record for user", { user_id });
         } else {
-          const currentBal = Number(creditRecord.cash || 0);
+          // OLD: const currentBal = Number(creditRecord.cash || 0);
+          const currentBal = Number(creditRecord.inr || 0);
           const addAmt = Number(releaseexposure);
           const newBal = currentBal + addAmt;
           await creditRecord.update(
-            { cash: newBal },
+            // OLD: { cash: newBal },
+            { inr: newBal },
             { transaction }
           );
           console.log("newBal after exposure release", newBal);
@@ -1829,6 +1871,8 @@ async function processFanBet({ job_id, bet, eventName, marketId, marketName }) {
       if (Number(netamount) !== 0) {
         const amt = Number(num2(netamount));
         try {
+          // OLD (Wallets.cash + Wallets.inr_balance):
+          /*
           const creditRecord = await Wallet_default.findOne({
             where: { user_id: String(user_id) },
             transaction,
@@ -1844,6 +1888,25 @@ async function processFanBet({ job_id, bet, eventName, marketId, marketName }) {
           const newInr = currentInr + amt;
           await creditRecord.update(
             { cash: newCash, inr_balance: newInr },
+            { transaction }
+          );
+          */
+          // NEW (credits.inr): the fancy result (+win / -loss) on inr.
+          const creditRecord = await Credits_default.findOne({
+            where: { uid: user_id },
+            transaction,
+            lock: transaction.LOCK.UPDATE
+          });
+          if (!creditRecord) {
+            log.error("[Settlement] No credit record for user", { user_id });
+            return;
+          }
+          const currentCash = Number(creditRecord.inr || 0);
+          const currentInr = currentCash;
+          const newCash = currentCash + amt;
+          const newInr = newCash;
+          await creditRecord.update(
+            { inr: newCash },
             { transaction }
           );
           console.log("[Settlement wallet]");
@@ -1879,8 +1942,10 @@ async function processFanBet({ job_id, bet, eventName, marketId, marketName }) {
     await user.increment("profit", { by: netamount });
     await user.increment("net_loss", { by: winner ? 0 : netamount });
     console.log("user", user);
-    const walletForClosing = await Wallet_default.findOne({ where: { user_id: String(user_id) } });
-    let closing = walletForClosing ? Number(walletForClosing.cash || 0) : 0;
+    // OLD: const walletForClosing = await Wallet_default.findOne({ where: { user_id: String(user_id) } });
+    // OLD: let closing = walletForClosing ? Number(walletForClosing.cash || 0) : 0;
+    const walletForClosing = await Credits_default.findOne({ where: { uid: user_id } });
+    let closing = walletForClosing ? Number(walletForClosing.inr || 0) : 0;
     const fanSettlementLedgerRow = await CreditsLedger_default.create({
       user_id,
       currency: "INR",
@@ -1916,12 +1981,15 @@ async function processFanBet({ job_id, bet, eventName, marketId, marketName }) {
     }
     const fanNet = Number(num2(netamount));
     if (fanNet !== 0) {
+      // Points roll-up switched off for now (Wallets → credits move); comes back on the credits ids.
+      /*
       try {
         const pointRes = await walletService_default.updateAllPointHierarchy(Number(bet_id), POINT_CATEGORY.SPORTS);
         if (!pointRes.success) log.error("[Settlement] all_point update failed", { user_id, error: pointRes.error });
       } catch (err) {
         log.error("[Settlement] all_point update error", { user_id, error: err.message });
       }
+      */
     }
     if (fanSettlementLedgerRow && winner && fanNet > 0) {
       await applyWinCommission({

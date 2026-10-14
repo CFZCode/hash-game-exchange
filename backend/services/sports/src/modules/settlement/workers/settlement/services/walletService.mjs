@@ -628,6 +628,8 @@ var WalletService = {
     }
   },
   updateAllPointHierarchy: async (betId, betType) => {
+    // Switched off for now (Wallets → credits move): no points roll-up until it runs on credits ids.
+    return { success: true, skipped: true, reason: "points roll-up switched off" };
     if (!betId) return { success: false, error: "betId is required" };
     const category = (betType || "").toString().toUpperCase();
     if (!Object.values(POINT_CATEGORY).includes(category)) {
