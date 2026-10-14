@@ -15,6 +15,8 @@
  *   await describe('USDT')      // one coin, or null
  *   await isEnabled('USDT')     // owner AND site on, not retired
  *   await networksOf('USDT')    // enabled networks [{ key, name }]
+ *   await disabledCodes()       // Set of the codes switched off now
+ *   await assertCurrencyEnabled('USDT')   // 422 CURRENCY_DISABLED when off
  *
  * ── FAILS OPEN, LIKE ENTITLEMENTS ──────────────────────────────────────────
  * No reader, or admin-service unreachable with no copy yet: `listCurrencies()`
@@ -25,6 +27,8 @@
  * The registry is display and switches only. It never turns a code into a
  * `credits` column.
  */
+
+const { AppError } = require('./errors');
 
 const DEFAULT_TTL_MS = 5_000;
 
@@ -132,6 +136,28 @@ async function isEnabled(code) {
 }
 
 /**
+ * The codes the registry says are switched off (owner, site or retired), as a
+ * Set. Empty when the registry cannot be read — fails open like `isEnabled`.
+ * One read for a whole balance list, rather than one `isEnabled` per coin.
+ */
+async function disabledCodes() {
+  return new Set((await listCurrencies()).filter((c) => c.enabled === false).map((c) => c.code));
+}
+
+/**
+ * Refuse a coin the registry has switched off: 422 `CURRENCY_DISABLED`. For
+ * the paths that put money INTO a coin or start a payment in it (deposits,
+ * payment orders, vault-in, withdrawals). Taking money OUT of a switched-off
+ * coin (a swap from it, a bet already settled) is left to the caller. An
+ * unknown code or a registry outage passes (fails open).
+ */
+async function assertCurrencyEnabled(code) {
+  if (await isEnabled(code)) return;
+  const currency = String(code ?? '').trim().toUpperCase();
+  throw new AppError(`${currency} is switched off on this site`, 422, 'CURRENCY_DISABLED', { currency });
+}
+
+/**
  * The networks a coin may be deposited / withdrawn on: `[{ key, name }]`,
  * enabled ones only. `null` when the registry has no entry for the coin (the
  * caller keeps its own list).
@@ -160,6 +186,8 @@ module.exports = {
   listCurrencies,
   describe,
   isEnabled,
+  disabledCodes,
+  assertCurrencyEnabled,
   networksOf,
   invalidateCurrencyRegistry,
   resetCurrencyRegistry,

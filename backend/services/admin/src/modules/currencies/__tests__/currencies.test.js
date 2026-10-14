@@ -15,11 +15,13 @@ const {
   entitlements,
   configureCurrencyRegistry,
   currencyRegistry,
+  isDefaultCurrencyChoice,
 } = require('@ibitplay/common');
 
 const { resetCurrencyRegistry } = currencyRegistry;
 
 const { CurrenciesService } = require('../currencies.service');
+const { SiteConfigService } = require('../../site-config/siteConfig.service');
 const { checkSvg } = require('../coinImage');
 const { KNOWN_CURRENCIES } = require('../../../../../user/src/modules/wallet/wallet.constants');
 const { networksFor } = require('../../../../../user/src/modules/crypto/crypto.networks');
@@ -313,6 +315,25 @@ test('coin registry (currencies)', async (t) => {
     const ok = await call('GET', '/currencies/owner', { headers: { 'x-owner-key': 'owner-test-key' } });
     assert.strictEqual(ok.status, 200);
     assert.ok(ok.body.data.some((c) => c.code === 'BJB' && c.retired));
+  });
+
+  await t.test("the public default coin falls back when the owner's choice is switched off", async () => {
+    const siteConfig = new SiteConfigService({ ...deps, clients: null });
+    const [before] = await models.Currency.findAll({ where: { code: 'LTC' }, attributes: ['owner_enabled'], raw: true });
+    // The stored choice (site_features) is left alone; only what a browser reads moves.
+    siteConfig.defaultCurrency = async () => 'LTC';
+    try {
+      await models.Currency.update({ owner_enabled: true, site_enabled: true }, { where: { code: 'LTC' } });
+      assert.strictEqual((await siteConfig.publicSettings()).defaultCurrency, 'LTC');
+
+      await models.Currency.update({ owner_enabled: false }, { where: { code: 'LTC' } });
+      const served = (await siteConfig.publicSettings()).defaultCurrency;
+      const firstOn = (await service.list()).find((c) => c.enabled && isDefaultCurrencyChoice(c.code));
+      assert.notStrictEqual(served, 'LTC');
+      assert.strictEqual(served, firstOn.code, 'the first enabled choice, in the registry order');
+    } finally {
+      await models.Currency.update({ owner_enabled: before.owner_enabled }, { where: { code: 'LTC' } });
+    }
   });
 
   await t.test('crypto network list follows the registry, keys stay the contract', async () => {

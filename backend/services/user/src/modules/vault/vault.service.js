@@ -1,6 +1,6 @@
 'use strict';
 
-const { money } = require('@ibitplay/common');
+const { money, currencyRegistry } = require('@ibitplay/common');
 const { Op, fn, col } = require('@ibitplay/db');
 
 const errors = require('./vault.errors');
@@ -70,6 +70,9 @@ class VaultService {
    * @legacy POST /vaultpro/transfer-in
    */
   async transferIn({ userId, coin, amount, lockPeriod }) {
+    // A coin the owner or the site switched off takes no new vault deposits
+    // (CURRENCY_DISABLED); one already locked still matures and comes out.
+    await currencyRegistry.assertCurrencyEnabled(coin);
     if (money.lt(amount, this.minimum)) {
       throw errors.BELOW_MINIMUM({ minimum: this.minimum, amount });
     }

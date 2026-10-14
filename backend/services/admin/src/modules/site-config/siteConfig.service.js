@@ -1,6 +1,8 @@
 'use strict';
 
-const { money, Mailer, entitlements, rewardCurrencyOf, defaultCurrencyOf, REWARD_CURRENCY_NAMES } = require('@ibitplay/common');
+const {
+  money, Mailer, entitlements, currencyRegistry, rewardCurrencyOf, defaultCurrencyOf, isDefaultCurrencyChoice, REWARD_CURRENCY_NAMES,
+} = require('@ibitplay/common');
 
 const errors = require('./siteConfig.errors');
 const ownerErrors = require('../features/owner.errors');
@@ -517,6 +519,20 @@ class SiteConfigService {
     return defaultCurrencyOf(row?.variant);
   }
 
+  /**
+   * The default coin as a browser is told it: the owner's choice while the
+   * registry has it on, else the first coin in the registry's order that is on
+   * and is an allowed choice. The stored value is untouched, so switching the
+   * coin back on restores it. A registry outage serves the stored choice.
+   */
+  async #publicDefaultCurrency() {
+    const chosen = await this.defaultCurrency();
+    if (await currencyRegistry.isEnabled(chosen)) return chosen;
+    const fallback = (await currencyRegistry.listCurrencies())
+      .find((c) => c.enabled !== false && isDefaultCurrencyChoice(c.code));
+    return fallback?.code ?? chosen;
+  }
+
   /** True when an owner panel manages this site (same rule as FeaturesService.ownerManaged). */
   #ownerManaged() {
     return Boolean(this.config?.OWNER_PANEL_URL);
@@ -630,7 +646,7 @@ class SiteConfigService {
 
     // What the site may promise a new player. Only the terms when it is on.
     const tiers = this.#tiers(row?.first_deposit_bonus_tiers);
-    const [rewardCurrency, defaultCurrency] = await Promise.all([this.rewardCurrency(), this.defaultCurrency()]);
+    const [rewardCurrency, defaultCurrency] = await Promise.all([this.rewardCurrency(), this.#publicDefaultCurrency()]);
     const firstDepositBonus = row?.first_deposit_bonus_enabled && tiers.length
       ? { enabled: true, currency: rewardCurrency, payoutCurrency: rewardCurrency, tiers }
       : { enabled: false };

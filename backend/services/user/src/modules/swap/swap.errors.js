@@ -21,7 +21,7 @@ module.exports = defineErrors('SWAP', {
     // converts to zero — the player loses the input and receives nothing.
     message: 'The amount is too small to convert into the target currency',
   },
-  /** A custom coin the owner or the site switched off: not a swap target. */
+  /** A coin the owner or the site switched off: not a swap target. */
   CURRENCY_DISABLED: {
     status: 422,
     message: 'That coin is switched off and cannot be swapped into',

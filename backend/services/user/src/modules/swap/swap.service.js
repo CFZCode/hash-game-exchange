@@ -8,7 +8,7 @@ const errors = require('./swap.errors');
 const { feeRateFor } = require('./swap.constants');
 const { WalletRepository } = require('../wallet/wallet.repository');
 const { ExchangeRateService } = require('../exchange-rate/exchangeRate.service');
-const { REASON, CURRENCY_COLUMN, isCustomCurrency } = require('../wallet/wallet.constants');
+const { REASON, CURRENCY_COLUMN } = require('../wallet/wallet.constants');
 const { ownerWhere, assertPlayerVisible } = require('../directory/playerScope');
 
 /**
@@ -91,9 +91,9 @@ class SwapService {
     // SUBMIT_NEW_SWAP socket in particular.
     await assertPlayerCapability(userId, 'swap');
     if (fromCurrency === toCurrency) throw errors.SAME_CURRENCY({ currency: fromCurrency });
-    // A custom coin (065) switched off by the owner or the site is not a swap
-    // target; a balance in one can still be swapped OUT.
-    if (isCustomCurrency(toCurrency) && !(await currencyRegistry.isEnabled(toCurrency))) {
+    // A coin switched off by the owner or the site (built-in or custom, 065)
+    // is not a swap target; a balance in one can still be swapped OUT.
+    if (!(await currencyRegistry.isEnabled(toCurrency))) {
       throw errors.CURRENCY_DISABLED({ currency: toCurrency });
     }
 

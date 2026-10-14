@@ -2,7 +2,7 @@
 
 const crypto = require('crypto');
 
-const { money, sitePolicy, operatorSettings, withdrawBlock } = require('@ibitplay/common');
+const { money, sitePolicy, operatorSettings, withdrawBlock, currencyRegistry } = require('@ibitplay/common');
 
 const errors = require('./paymentOrders.errors');
 const { FLOW, userIdFor } = require('./paymentOrders.constants');
@@ -108,6 +108,9 @@ class PaymentOrdersService {
    */
   async createDeposit({ userId, provider: providerName, currency, amount, method, returnUrl, phone, userName, chain }) {
     await sitePolicy.assertAllowed(this.models, 'deposit_mode', 'automatic', this.logger);
+    // The coin registry (061): a coin the owner or the site switched off takes
+    // no new deposits (CURRENCY_DISABLED). A registry outage fails open.
+    await currencyRegistry.assertCurrencyEnabled(currency);
     const gateway = this.#gateway(providerName);
 
     if (!gateway.supports(currency, FLOW.PAY_IN, this.config)) {
@@ -199,6 +202,8 @@ class PaymentOrdersService {
       // single most damaging thing to leave running during an incident.
       throw errors.WITHDRAWALS_DISABLED();
     }
+    // A switched-off coin is not paid out, as on the crypto rail (CURRENCY_DISABLED).
+    await currencyRegistry.assertCurrencyEnabled(currency);
 
     const gateway = this.#gateway(providerName);
 

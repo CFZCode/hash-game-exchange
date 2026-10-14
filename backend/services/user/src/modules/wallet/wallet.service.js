@@ -2,7 +2,7 @@
 
 const crypto = require('node:crypto');
 
-const { money } = require('@ibitplay/common');
+const { money, currencyRegistry } = require('@ibitplay/common');
 const { EVENTS, roomForUser, encode } = require('@ibitplay/socket');
 
 const errors = require('./wallet.errors');
@@ -101,13 +101,15 @@ class WalletService {
     /*
      * A retired coin (BJB) is listed only while it still holds something, so
      * a player who never had one does not see it and one who does can still
-     * spend or swap it out.
+     * spend or swap it out. A built-in coin the owner or site switched off in
+     * the registry follows the same rule (a registry outage hides nothing).
      */
+    const disabled = await currencyRegistry.disabledCodes();
     const builtin = Object.entries(balances)
       // Only the coin columns: `credits` also carries `credit_limit` (062).
       .filter(([column]) => Object.prototype.hasOwnProperty.call(CURRENCY_COLUMN, column.toUpperCase()))
       .map(([code, value]) => [code.toUpperCase(), money.fromStored(value ?? '0')])
-      .filter(([code, value]) => !isRetiredCurrency(code) || money.gt(value, '0'));
+      .filter(([code, value]) => (!isRetiredCurrency(code) && !disabled.has(code)) || money.gt(value, '0'));
 
     /*
      * Custom coins (migration 065), by the same rule as a retired one: an
@@ -151,9 +153,10 @@ class WalletService {
     });
 
     // Custom coins (065): every one the registry knows, read for the page in one query.
-    const [customCodes, customRows] = await Promise.all([
+    const [customCodes, customRows, disabled] = await Promise.all([
       this.repo.listCustomCodes(),
       this.repo.listCustomBalancesFor(rows.map((r) => r.uid)),
+      currencyRegistry.disabledCodes(),
     ]);
     const customOf = new Map(customRows.map((r) => [`${Number(r.uid)}:${r.currency}`, r.balance]));
 
@@ -163,7 +166,9 @@ class WalletService {
         name,
         // Every supported currency on every row, so the table can switch
         // currency without a refetch — and a player with no wallet row reads
-        // as zeros rather than as gaps.
+        // as zeros rather than as gaps. A coin switched off in the registry
+        // is left out of a row where it holds nothing (the screen reads a
+        // missing coin as zero).
         balances: Object.fromEntries([
           ...Object.entries(CURRENCY_COLUMN).map(([code, column]) => [
             code,
@@ -171,7 +176,7 @@ class WalletService {
             money.fromStored(wallet?.[column] ?? '0'),
           ]),
           ...customCodes.map((code) => [code, money.fromStored(customOf.get(`${uid}:${code}`) ?? '0')]),
-        ]),
+        ].filter(([code, value]) => !disabled.has(code) || money.gt(value, '0'))),
       })),
       total,
     };

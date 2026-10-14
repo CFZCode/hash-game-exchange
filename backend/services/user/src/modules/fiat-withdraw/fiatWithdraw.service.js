@@ -2,7 +2,7 @@
 
 const crypto = require('node:crypto');
 
-const { money, sitePolicy, withdrawBlock } = require('@ibitplay/common');
+const { money, sitePolicy, withdrawBlock, currencyRegistry } = require('@ibitplay/common');
 const { Op } = require('@ibitplay/db');
 
 const errors = require('./fiatWithdraw.errors');
@@ -69,6 +69,8 @@ class FiatWithdrawService {
     await sitePolicy.assertAllowed(this.models, 'withdrawal_mode', 'manual', this.logger);
     // The operator's withdrawal block (migration 091) — WITHDRAW_BLOCKED before anything else.
     await withdrawBlock.assertWithdrawAllowed(this.models, { userId });
+    // A switched-off coin is not paid out, as on the crypto rail (CURRENCY_DISABLED).
+    await currencyRegistry.assertCurrencyEnabled(details.currency);
     if (money.lt(details.amount, this.minimum)) {
       throw errors.BELOW_MINIMUM({ minimum: this.minimum, amount: details.amount });
     }

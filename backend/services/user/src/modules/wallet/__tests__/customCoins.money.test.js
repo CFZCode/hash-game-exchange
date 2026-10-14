@@ -6,11 +6,16 @@ const assert = require('node:assert');
 const db = require('@ibitplay/db');
 const {
   createLogger, money, BUILTIN_CURRENCIES, refuseCustomCurrencies, assertCurrencySupportedFor,
+  configureCurrencyRegistry, currencyRegistry,
 } = require('@ibitplay/common');
 
 const { WalletService } = require('../wallet.service');
 const { SwapService } = require('../../swap/swap.service');
 const { ExchangeRateService } = require('../../exchange-rate/exchangeRate.service');
+const { VaultService } = require('../../vault/vault.service');
+const { PaymentOrdersService } = require('../../payment-orders/paymentOrders.service');
+const { FiatDepositService } = require('../../fiat-deposit/fiatDeposit.service');
+const { FiatWithdrawService } = require('../../fiat-withdraw/fiatWithdraw.service');
 const { REASON, CURRENCY_COLUMN, isWalletCurrency } = require('../wallet.constants');
 const v = require('../wallet.validators');
 const swapV = require('../../swap/swap.validators');
@@ -317,6 +322,87 @@ test('custom coins in the wallet', async (t) => {
     assert.equal(vaultV.transferIn.body.safeParse({ coin: COIN_A, amount: '1', lockPeriod: '7d' }).success, true);
     // Tips stay built-in only.
     assert.equal(v.transfer.body.safeParse({ fromUserId: 1, toUserId: 2, currency: COIN_A, amount: '1', idempotencyKey: 'abcdefgh' }).success, false);
+  });
+
+  await t.test('a built-in coin the owner switched off: hidden at zero, refused as a target, still spendable', async () => {
+    // The registry as user-service reads it, straight from the table (no TTL),
+    // so a switch below is seen at once. Reset after: other tests run without one.
+    configureCurrencyRegistry({
+      read: () => q('SELECT code, (owner_enabled AND site_enabled AND NOT retired) AS enabled FROM currencies'),
+      config: { CURRENCY_REGISTRY_TTL_MS: 0 },
+    });
+    const OFF = 'LTC';
+    const [before] = await q('SELECT owner_enabled FROM currencies WHERE code = :code', { code: OFF });
+    await q('UPDATE currencies SET owner_enabled = false WHERE code = :code RETURNING code', { code: OFF });
+    try {
+      const empty = await player();
+      const holder = await player();
+      await wallet.credit({ userId: holder, currency: OFF, amount: '2', reason: REASON.ADMIN_CREDIT, idempotencyKey: `off-seed-${holder}` });
+
+      assert.equal(OFF in (await wallet.getBalances(empty)), false, 'a switched-off coin at zero is hidden');
+      assert.equal((await wallet.getBalances(empty)).INR, '0.00000000', 'an enabled built-in at zero stays');
+      assert.equal((await wallet.getBalances(holder))[OFF], '2.00000000', 'a switched-off coin with a balance stays');
+
+      // The staff listing: the same rule per row (rows built from the repo directly
+      // when the synthetic uids have no users row — see the listing test above).
+      const scoped = new WalletService({ ...deps, config: { ...deps.config, ROOT_STAFF_ID: 1 }, clients: { admin: { get: async () => ({ ids: [1] }) } } });
+      scoped.repo.listPlayerWallets = async () => ({
+        rows: [
+          { uid: empty, name: 'e', wallet: await scoped.repo.findWallet(empty) },
+          { uid: holder, name: 'h', wallet: await scoped.repo.findWallet(holder) },
+        ],
+        total: 2,
+      });
+      const { rows } = await scoped.listBalances({ staffId: 1, limit: 10, offset: 0 });
+      assert.equal(OFF in rows[0].balances, false);
+      assert.equal(rows[0].balances.INR, '0.00000000');
+      assert.equal(rows[1].balances[OFF], '2.00000000');
+
+      // Not a swap target (built-in now, not only custom) — refused before any lock.
+      await assert.rejects(
+        () => swap.swap({ userId: holder, fromCurrency: 'INR', toCurrency: OFF, amount: '1' }),
+        (e) => e.code === 'SWAP_CURRENCY_DISABLED' && e.status === 422
+      );
+      await assert.rejects(
+        () => swap.swap({ userId: holder, fromCurrency: COIN_A, toCurrency: OFF, amount: '1' }),
+        (e) => e.code === 'SWAP_CURRENCY_DISABLED'
+      );
+
+      // Deposits, payouts and vault-in in it are refused: 422 CURRENCY_DISABLED.
+      // No SiteFeature model: the site policy reads its permissive default here.
+      const open = { ...deps, models: { ...connection.models, SiteFeature: undefined }, config: { ...deps.config, AUTO_WITHDRAWALS_ENABLED: true } };
+      const disabled = (e) => e.code === 'CURRENCY_DISABLED' && e.status === 422 && e.details?.currency === OFF;
+      await assert.rejects(() => new VaultService(open).transferIn({ userId: holder, coin: OFF, amount: '1', lockPeriod: '7d' }), disabled);
+      await assert.rejects(() => new PaymentOrdersService(open).createDeposit({ userId: holder, provider: 'ccpayment', currency: OFF, amount: '1' }), disabled);
+      await assert.rejects(() => new PaymentOrdersService(open).createWithdrawal({ userId: holder, provider: 'ccpayment', currency: OFF, amount: '1' }), disabled);
+      await assert.rejects(() => new FiatDepositService(open).create({ userId: holder, details: { currency: OFF, amount: '1', transactionId: `off-${holder}` } }), disabled);
+      await assert.rejects(() => new FiatWithdrawService(open).create({ userId: holder, details: { currency: OFF, amount: '1' } }), disabled);
+      // An enabled coin passes the registry check (and fails later, on the screenshot).
+      await assert.rejects(
+        () => new FiatDepositService(open).create({ userId: holder, details: { currency: 'INR', amount: '1', transactionId: `on-${holder}` } }),
+        (e) => e.code !== 'CURRENCY_DISABLED'
+      );
+
+      // The balance itself still moves: a player can spend the coin down.
+      const spent = await wallet.debit({ userId: holder, currency: OFF, amount: '2', reason: REASON.BET_STAKE, idempotencyKey: `off-spend-${holder}` });
+      assert.equal(spent.newBalance, '0.00000000');
+      assert.equal(OFF in (await wallet.getBalances(holder)), false, 'hidden again once it is empty');
+    } finally {
+      await q('UPDATE currencies SET owner_enabled = :on WHERE code = :code RETURNING code', { code: OFF, on: before?.owner_enabled ?? true });
+      currencyRegistry.resetCurrencyRegistry();
+    }
+  });
+
+  await t.test('a registry outage hides and refuses nothing (fails open)', async () => {
+    configureCurrencyRegistry({ read: () => { throw new Error('admin-service down'); }, config: { CURRENCY_REGISTRY_TTL_MS: 0 } });
+    try {
+      assert.equal((await currencyRegistry.disabledCodes()).size, 0);
+      await currencyRegistry.assertCurrencyEnabled('LTC');
+      const uid = await player();
+      assert.equal((await wallet.getBalances(uid)).LTC, '0.00000000');
+    } finally {
+      currencyRegistry.resetCurrencyRegistry();
+    }
   });
 });
 
