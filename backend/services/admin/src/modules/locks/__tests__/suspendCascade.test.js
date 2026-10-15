@@ -84,7 +84,7 @@ test('suspension cascade and agent-tree locks', async (t) => {
     await models.StaffHierarchy.destroy({ where: { [Op.or]: [{ ancestor_id: id }, { descendant_id: id }] } });
     await connection.sequelize.query('UPDATE staff SET parent_id = NULL WHERE parent_id = :id', { replacements: { id } });
     await connection.sequelize.query('UPDATE users SET parent_staff_id = NULL WHERE parent_staff_id = :id', { replacements: { id } });
-    await models.StaffBalances.destroy({ where: { staff_id: id } });
+    await models.StaffCredits.destroy({ where: { staff_id: id } });
     await models.Staff.destroy({ where: { id } });
     await models.Staff.create({
       id, name: `sc-${id}`, email: `sc-${id}@test.invalid`, password: 'x', transaction_password: txnHash,

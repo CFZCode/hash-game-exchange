@@ -303,8 +303,8 @@ class DashboardService {
     const scope = await this.#scope(actor);
     let owners = null;
     if (userId != null) {
-      owners = !scope || scope.userIds.includes(String(userId)) ? [String(userId)] : [];
-    } else if (scope) {
+      owners = scope.userIds.includes(String(userId)) ? [String(userId)] : [];
+    } else {
       owners = scope.userIds;
     }
 
@@ -814,47 +814,46 @@ class DashboardService {
   // ══════════════════════════════════════════════════════════════════════
 
   /**
-   * The players this caller's dashboard covers — `null` meaning all of them.
+   * The players this dashboard covers: DIRECT USERS ONLY.
    *
-   * The same question the reports, player directory and notifications ask,
-   * answered by the same helper: `visibleStaffIds` gives the staff whose
-   * players the caller may see, and a tree that contains the platform root
-   * (staff 1 — the owner, and the back office that `visibleStaffIds` widens to
-   * the whole site) sees everyone, direct signups included.
+   * This is the admin "Direct Users" tab. A direct user is a player with no
+   * parent (`parent_staff_id IS NULL`) — a site signup, referral signups
+   * included (a referral sets `refree`, never a parent). A player WITH a
+   * parent belongs to an agent and is shown on the "Client Management" tab
+   * (Sports Exchange), never here.
    *
-   * Before this, every figure here was site-wide: an agent opening the
-   * dashboard saw the platform's deposit volume and, on the drill-downs, every
-   * player's name and email.
+   * Only a tree that contains the platform root (staff 1 — the owner, and the
+   * back office `visibleStaffIds` widens to the whole site) sees direct users;
+   * every other tree holds agent players only, so it gets an empty scope.
    *
    * No actor is an empty scope rather than everything — failing open is the
    * leak this exists to close.
    */
   async #scope(actor) {
-    if (!actor?.id) return { staffIds: [], userIds: [] };
+    const none = { empty: true, userIds: [] };
+    if (!actor?.id) return none;
 
     const staffIds = (await visibleStaffIds(this.models, actor.id, { logger: this.logger })).map(Number);
     const root = Number(this.config?.ROOT_STAFF_ID ?? 1);
-    if (staffIds.includes(root)) return null;
+    if (!staffIds.includes(root)) return none;
 
-    const users = staffIds.length
-      ? await this.models.Users.findAll({
-          where: { parent_staff_id: staffIds },
-          attributes: ['id'],
-          raw: true,
-        })
-      : [];
+    const users = await this.models.Users.findAll({
+      where: { parent_staff_id: null },
+      attributes: ['id'],
+      raw: true,
+    });
 
-    return { staffIds, userIds: users.map((u) => String(u.id)) };
+    return { empty: false, userIds: users.map((u) => String(u.id)) };
   }
 
-  /** `users` rows inside the scope. */
+  /** `users` rows inside the scope — direct users, or nobody. */
   #playerWhere(scope) {
-    return scope ? { parent_staff_id: scope.staffIds } : {};
+    return scope.empty ? { id: [] } : { parent_staff_id: null };
   }
 
-  /** Rows of another table whose owner column is inside the scope. */
+  /** Rows of another table whose owner column belongs to a direct user. */
   #ownerWhere(scope, column) {
-    return scope ? { [column]: scope.userIds } : {};
+    return { [column]: scope.userIds };
   }
 
   /**

@@ -119,12 +119,14 @@ test('admin notifications', async (t) => {
 
   const seedStaff = async () => {
     await connection.sequelize.query(
-      `INSERT INTO roles (id, name, level) VALUES (:roleId, :name, 3) ON CONFLICT (id) DO NOTHING`,
+      // DO UPDATE: another test may have left this role id at a different level (e.g. 1 = owner).
+      `INSERT INTO roles (id, name, level) VALUES (:roleId, :name, 3) ON CONFLICT (id) DO UPDATE SET level = EXCLUDED.level`,
       { replacements: { roleId, name: `notif-role-${roleId}` } }
     );
     await connection.sequelize.query(
       `INSERT INTO staff (id, name, email, password, role_id)
-       VALUES (:id, :name, :email, 'x', :roleId) ON CONFLICT (id) DO NOTHING`,
+       VALUES (:id, :name, :email, 'x', :roleId)
+       ON CONFLICT (id) DO UPDATE SET role_id = EXCLUDED.role_id, parent_id = NULL`,
       {
         replacements: {
           id: STAFF_ID, name: `notif-staff-${STAFF_ID}`,

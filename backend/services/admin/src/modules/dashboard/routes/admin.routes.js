@@ -21,7 +21,8 @@ const { createControllers } = require('../controllers');
  */
 module.exports = function adminRoutes(deps) {
   const ctrl = createControllers({ service: new DashboardService(deps) });
-  const stats = createStatsControllers({ service: new DashboardStatsService(deps) });
+  // Direct Users tab: only players with no parent (agent clients are on Client Management).
+  const stats = createStatsControllers({ service: new DashboardStatsService({ ...deps, directOnly: true }) });
 
   const router = Router();
   const canRead = deps.auth.requirePermission(PERMISSIONS.REPORTS_READ);

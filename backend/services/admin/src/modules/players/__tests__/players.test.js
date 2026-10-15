@@ -112,15 +112,15 @@ test('players against a database', async (t) => {
   const created = [];
 
   t.before(async () => {
-    await models.StaffBalances.destroy({ where: { staff_id: [agent, rival] } });
+    await models.StaffCredits.destroy({ where: { staff_id: [agent, rival] } });
     await models.Staff.destroy({ where: { id: [agent, rival] } });
 
     await models.Staff.bulkCreate([
       { id: agent, name: `pa-${agent}`, email: `pa${agent}@t.test`, password: 'x', role_id: roleId, parent_id: null, transaction_password: OWN_TXN },
       { id: rival, name: `pr-${rival}`, email: `pr${rival}@t.test`, password: 'x', role_id: roleId, parent_id: null, transaction_password: OWN_TXN },
     ]);
-    await models.StaffBalances.create({ staff_id: agent, inr: '10000' });
-    await models.StaffBalances.create({ staff_id: rival, inr: '0' });
+    await models.StaffCredits.create({ staff_id: agent, inr: '10000' });
+    await models.StaffCredits.create({ staff_id: rival, inr: '0' });
   });
 
   t.after(async () => {
@@ -136,7 +136,7 @@ test('players against a database', async (t) => {
     await models.StaffTransfers.destroy({
       where: { [require('sequelize').Op.or]: [{ from_id: agent }, { to_id: agent }] },
     });
-    await models.StaffBalances.destroy({ where: { staff_id: [agent, rival] } });
+    await models.StaffCredits.destroy({ where: { staff_id: [agent, rival] } });
     await models.Staff.destroy({ where: { id: [agent, rival] } });
     if (connection) await connection.close();
   });
@@ -145,7 +145,7 @@ test('players against a database', async (t) => {
   const asRival = { id: rival, permissions: ['*'] };
 
   const balanceOf = async (staffId) => {
-    const row = await models.StaffBalances.findOne({ where: { staff_id: staffId }, raw: true });
+    const row = await models.StaffCredits.findOne({ where: { staff_id: staffId }, raw: true });
     return money.toDecimalString(money.toMinor(row?.inr ?? '0'));
   };
 

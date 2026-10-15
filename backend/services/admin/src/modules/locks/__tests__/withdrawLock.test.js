@@ -99,7 +99,7 @@ test('withdraw lock against a database', async (t) => {
     await models.WalletHistory?.destroy({ where: { uid: player } }).catch(() => {});
     await models.Credits.destroy({ where: { uid: player } });
     await models.Users.destroy({ where: { id: player } });
-    await models.StaffBalances.destroy({ where: { staff_id: staffIds } });
+    await models.StaffCredits.destroy({ where: { staff_id: staffIds } });
     await models.Staff.destroy({ where: { id: staffIds } });
 
     const txn = await hashPassword(TXN, 4);
@@ -107,7 +107,7 @@ test('withdraw lock against a database', async (t) => {
       { id: root, name: `wlr-${root}`, email: `wlr${root}@t.test`, password: 'x', transaction_password: txn, role_id: roleId, parent_id: null },
       { id: agent, name: `wla-${agent}`, email: `wla${agent}@t.test`, password: 'x', transaction_password: txn, role_id: roleId, parent_id: root },
     ]);
-    await models.StaffBalances.bulkCreate([
+    await models.StaffCredits.bulkCreate([
       { staff_id: root, inr: '1000' },
       { staff_id: agent, inr: '1000' },
     ]);
@@ -119,7 +119,7 @@ test('withdraw lock against a database', async (t) => {
     await reset().catch(() => {});
     await models.Credits.destroy({ where: { uid: player } });
     await models.Users.destroy({ where: { id: player } });
-    await models.StaffBalances.destroy({ where: { staff_id: staffIds } });
+    await models.StaffCredits.destroy({ where: { staff_id: staffIds } });
     await models.Staff.destroy({ where: { id: staffIds } });
     await connection.close();
   });

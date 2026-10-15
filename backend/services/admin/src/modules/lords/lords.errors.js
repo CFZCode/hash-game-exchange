@@ -24,7 +24,7 @@ module.exports = defineErrors('ACCOUNTS', {
 
   CANNOT_ACT_ON_SELF: { status: 422, message: 'An account cannot do that to itself' },
 
-  /** An agent's float is INR (`staff_balances.inr`); there is nothing else to draw from. */
+  /** An agent's float is INR (the staff `credits.inr`); there is nothing else to draw from. */
   FLOAT_CURRENCY_ONLY: {
     status: 422,
     message: 'Agent balance moves are in INR only',

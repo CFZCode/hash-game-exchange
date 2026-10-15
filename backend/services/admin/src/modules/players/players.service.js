@@ -18,6 +18,7 @@ const { PLAYER_ROLE_ID, PASSWORD_ROUNDS, CLOSED_STATUS, WALLET_SEED } = require(
 const { visibleStaffIds, resolveStaff } = require('../staff-directory/staffDirectory.service');
 const { assertTransactionPassword } = require('../staff-auth/transactionPassword');
 const { insufficientStaffBalance } = require('../lords/staffFloat');
+const { addPointEntry } = require('../lords/pointLedger');
 
 /**
  * Player accounts, from an operator's side.
@@ -265,7 +266,7 @@ class PlayersService {
           { where: { uid: player.id }, transaction }
         );
 
-        await this.models.StaffBalances.increment(
+        await this.models.StaffCredits.increment(
           { inr: money.toDecimalString(remaining) },
           { where: { staff_id: actor.id }, transaction }
         );
@@ -281,6 +282,20 @@ class PlayersService {
             transfer_type: 'transfer',
             note: 'Account closed — balance returned',
             created_at: new Date(),
+          },
+          { transaction }
+        );
+
+        // Point ledger: bacha hua paisa player se wapas parent ke paas.
+        await addPointEntry(
+          this.models,
+          {
+            child: { type: 'user', id: player.id },
+            parent: { type: 'staff', id: actor.id },
+            amount: money.toDecimalString(remaining),
+            isDeposit: false,
+            transferId: transfer.id,
+            remark: 'Account closed',
           },
           { transaction }
         );
@@ -373,7 +388,7 @@ class PlayersService {
   async #fund({ actor, userId, username, amount, transaction }) {
     const decimal = money.toDecimalString(amount);
 
-    const [affected] = await this.models.StaffBalances.update(
+    const [affected] = await this.models.StaffCredits.update(
       { inr: literal(`inr - ${decimal}`) },
       { where: { staff_id: actor.id, inr: { [Op.gte]: decimal } }, transaction }
     );
@@ -393,6 +408,20 @@ class PlayersService {
         transfer_type: 'transfer',
         note: 'Opening balance',
         created_at: new Date(),
+      },
+      { transaction }
+    );
+
+    // Point ledger: parent ne naye player ko opening balance diya.
+    await addPointEntry(
+      this.models,
+      {
+        child: { type: 'user', id: userId },
+        parent: { type: 'staff', id: actor.id },
+        amount: decimal,
+        isDeposit: true,
+        transferId: transfer.id,
+        remark: 'Opening balance',
       },
       { transaction }
     );

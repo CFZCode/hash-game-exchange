@@ -109,8 +109,6 @@ async function applyWinCommission(p) {
       }, { transaction });
       ledgerId = row.id;
     });
-    // Commission points chain (same hierarchy walk as updateAllPointHierarchy) switched off for now.
-    /*
     const pts = await walletService_default.applyCommissionPoints({
       betId: Number(bet.id),
       userId: Number(p.user_id),
@@ -122,7 +120,6 @@ async function applyWinCommission(p) {
     if (!pts.success) {
       log2.error("[Commission] points chain failed", { user_id: p.user_id, bet_id: bet.id, error: pts.error });
     }
-    */
     log2.info("[Commission] charged", {
       user_id: p.user_id,
       bet_id: bet.id,

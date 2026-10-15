@@ -1,0 +1,106 @@
+'use strict';
+
+const { z } = require('@ibitplay/common');
+
+const id = z.coerce.number().int().positive();
+const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'use YYYY-MM-DD');
+
+/** "Search By Client Name" me chuna account — player ya staff. */
+const client = {
+  clientType: z.enum(['user', 'staff']).optional(),
+  clientId: id.optional(),
+};
+
+const days = (q) => (new Date(q.toDate) - new Date(q.fromDate)) / 86_400_000;
+
+/** Zip ka dateRangeMiddleware: max 10 din, aur pichhle 3 mahine ke andar. */
+const RANGE_MESSAGE = 'Sorry for inconvenience! You will see statement of 10 days date range in 3 months timeslot.';
+function inTenDayWindow(q) {
+  const threeMonthsAgo = new Date();
+  threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+  threeMonthsAgo.setHours(0, 0, 0, 0);
+  return days(q) >= 0 && days(q) <= 10 && new Date(`${q.fromDate}T00:00:00`) >= threeMonthsAgo;
+}
+
+/** GET /exchange/reports/clients?search=abc */
+const clients = {
+  query: z.object({ search: z.string().trim().min(1).max(100) }).strict(),
+};
+
+/** POST /exchange/reports/statement — zip statementv2, max 7 din (maxDateRange(7)). */
+const statement = {
+  body: z
+    .object({
+      ...client,
+      reportType: z.enum(['TRANSACTION', 'SPORTS'], { message: 'reportType required' }),
+      fromDate: day,
+      toDate: day,
+      page: z.coerce.number().int().min(1).default(1),
+      limit: z.coerce.number().int().min(1).max(150).default(25),
+      statement: z.string().trim().max(20).default('all'),
+      sportId: z.string().trim().max(10).optional(),
+      gameType: z.string().trim().max(30).optional(),
+    })
+    .strict()
+    .refine((q) => days(q) >= 0, { message: 'fromDate cannot be after toDate.' })
+    .refine((q) => days(q) <= 7, { message: 'Date range cannot be more than 7 days.' }),
+};
+
+/** POST /exchange/reports/statement/bet-detail | bet-export — statement ki game row. */
+const statementRow = {
+  body: z.object({ betId: id, category: z.literal('SPORTS') }).strict(),
+};
+
+/** GET /exchange/reports/party-win-loss */
+const partyWinLoss = {
+  query: z
+    .object({
+      type: z.enum(['all', 'user']).default('all'),
+      search: z.string().trim().max(100).optional(),
+    })
+    .strict(),
+};
+
+/** POST /exchange/reports/user-win-loss — zip point-category-report. */
+const userWinLoss = {
+  body: z
+    .object({ ...client, fromDate: day, toDate: day })
+    .strict()
+    .refine(inTenDayWindow, { message: RANGE_MESSAGE }),
+};
+
+/** POST /exchange/reports/total-profit-loss — type: 0 All, 2 Sports, 5 Sportbook. */
+const totalProfitLoss = {
+  body: z
+    .object({ ...client, fromDate: day, toDate: day, type: z.enum(['0', '2', '5']).default('0') })
+    .strict()
+    .refine(inTenDayWindow, { message: RANGE_MESSAGE }),
+};
+
+/** POST /exchange/reports/turnover — sirf sports (sport_id zaroori). */
+const turnover = {
+  body: z
+    .object({
+      ...client,
+      fromDate: day,
+      toDate: day,
+      sportId: z.string().trim().min(1, 'sport_id is required for sports type').max(10),
+      gtype: z.string().trim().max(30).optional(),
+    })
+    .strict()
+    .refine(inTenDayWindow, { message: RANGE_MESSAGE }),
+};
+
+/** POST /exchange/reports/sportbook-report */
+const sportbookReport = {
+  body: z
+    .object({
+      ...client,
+      vendor: z.string().trim().max(50).optional(),
+      date: z.string().trim().max(10).optional(),
+      status: z.enum(['settled', 'unsettled']),
+    })
+    .strict(),
+};
+
+module.exports = { clients, statement, statementRow, partyWinLoss, userWinLoss, totalProfitLoss, turnover, sportbookReport };

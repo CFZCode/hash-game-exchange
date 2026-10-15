@@ -111,7 +111,10 @@ test('parent funds its direct child staff', async (t) => {
     await models.StaffTransfers.destroy({
       where: { [Op.or]: [{ from_type: 'staff', from_id: id }, { to_type: 'staff', to_id: id }] },
     });
-    await models.StaffBalances.destroy({ where: { staff_id: id } });
+    await models.StaffCredits.destroy({ where: { staff_id: id } });
+    // Ids come from the pid: an earlier run may have left child staff / players under this id.
+    await models.Staff.update({ parent_id: null }, { where: { parent_id: id } });
+    await models.Users.update({ parent_staff_id: null }, { where: { parent_staff_id: id } });
     await models.Staff.destroy({ where: { id } });
 
     await models.Staff.create({
@@ -124,7 +127,7 @@ test('parent funds its direct child staff', async (t) => {
       parent_id: parentId,
       status: 'active',
     });
-    await models.StaffBalances.create({ staff_id: id, inr, credit_limit: creditLimit });
+    await models.StaffCredits.create({ staff_id: id, inr, credit_limit: creditLimit });
 
     const rows = [{ ancestor_id: id, descendant_id: id, depth: 0 }];
     if (parentId) {
@@ -145,7 +148,7 @@ test('parent funds its direct child staff', async (t) => {
   };
 
   const floatOf = async (id) => {
-    const row = await models.StaffBalances.findOne({ where: { staff_id: id }, raw: true });
+    const row = await models.StaffCredits.findOne({ where: { staff_id: id }, raw: true });
     return money.toDecimalString(money.toMinorQuantised(row?.inr ?? '0'));
   };
 
@@ -204,7 +207,7 @@ test('parent funds its direct child staff', async (t) => {
   });
 
   await t.test('a supermaster funds its master the same way', async () => {
-    await models.StaffBalances.update({ inr: '50' }, { where: { staff_id: sm } });
+    await models.StaffCredits.update({ inr: '50' }, { where: { staff_id: sm } });
     await move(treeActor(sm, 4), master, '20');
     assert.equal(await floatOf(sm), '30.00000000');
     assert.equal(await floatOf(master), '120.00000000');
@@ -214,7 +217,7 @@ test('parent funds its direct child staff', async (t) => {
 
   await t.test('direct child only: sibling, grandchild and parent are not in your tree', async () => {
     const notInTree = (err) => err.code === 'STAFF_NOT_IN_YOUR_TREE' && err.status === 404;
-    await models.StaffBalances.update({ inr: '100' }, { where: { staff_id: agentA } });
+    await models.StaffCredits.update({ inr: '100' }, { where: { staff_id: agentA } });
 
     await assert.rejects(() => move(treeActor(agentA, 6), agentB, '5'), notInTree, 'sibling');
     await assert.rejects(() => move(treeActor(agentA, 6), master, '5'), notInTree, 'parent');
@@ -224,7 +227,7 @@ test('parent funds its direct child staff', async (t) => {
 
     assert.equal(await floatOf(agentA), '100.00000000');
     assert.equal(await floatOf(agentB), '0.00000000');
-    await models.StaffBalances.update({ inr: '0' }, { where: { staff_id: agentA } });
+    await models.StaffCredits.update({ inr: '0' }, { where: { staff_id: agentA } });
   });
 
   await t.test('no self-transfer, no player target, and the wallet grant is needed', async () => {
@@ -253,9 +256,9 @@ test('parent funds its direct child staff', async (t) => {
       (err) => err.code === 'INSUFFICIENT_FUNDS' && err.status === 422 && err.details?.party === 'staff'
     );
     // A credit line funds players, never another staff account.
-    await models.StaffBalances.update({ credit_limit: '500' }, { where: { staff_id: master } });
+    await models.StaffCredits.update({ credit_limit: '500' }, { where: { staff_id: master } });
     await assert.rejects(() => move(treeActor(master, 5), agentA, '150'), (err) => err.code === 'INSUFFICIENT_FUNDS');
-    await models.StaffBalances.update({ credit_limit: '0' }, { where: { staff_id: master } });
+    await models.StaffCredits.update({ credit_limit: '0' }, { where: { staff_id: master } });
 
     // Pulling back more than the child holds is the child's shortfall.
     await assert.rejects(
@@ -287,7 +290,7 @@ test('parent funds its direct child staff', async (t) => {
     assert.equal(await floatOf(agentA), '0.00000000');
   });
 
-  await t.test('wallet:adjust alone is no longer the wide path: an Admin is a parent like any other; only the owner mints', async () => {
+  await t.test('wallet:adjust alone is no longer the wide path: an Admin is a parent like any other; only the owner reaches past its children', async () => {
     const admin = await seedStaff(2, { inr: '100' });
     const sMaster = await seedStaff(4, { parentId: admin });
     const mMaster = await seedStaff(5, { parentId: sMaster });
@@ -313,12 +316,12 @@ test('parent funds its direct child staff', async (t) => {
       (err) => err.code === 'INSUFFICIENT_FUNDS' && err.status === 422
     );
 
-    // The owner issues funds without a balance to draw down, to any account in scope.
-    await models.StaffBalances.update({ inr: '0' }, { where: { staff_id: admin } });
+    // The owner reaches any account in scope, paid from its own wallet (migration 099).
+    await models.StaffCredits.update({ inr: '100' }, { where: { staff_id: admin } });
     await service.transfer({
       actor: adminActor(admin, { level: 1, canIssueFunds: true }), toType: 'staff', toId: mMaster, amount: '40', direction: 'deposit', transactionPassword: TXN,
     });
-    assert.equal(await floatOf(admin), '0.00000000');
+    assert.equal(await floatOf(admin), '60.00000000');
     assert.equal(await floatOf(mMaster), '40.00000000');
   });
 });

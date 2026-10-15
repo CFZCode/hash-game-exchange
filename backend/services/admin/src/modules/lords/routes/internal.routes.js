@@ -10,7 +10,7 @@ const { LordsService } = require('../lords.service');
  *
  * `POST /internal/admin/accounts/player-adjust` — the wallet adjust route lives
  * in user-service, but for an agent-tree caller it is a transfer between the
- * agent's float (`staff_balances`, admin domain) and the player's wallet, and
+ * agent's float (the staff `credits` row, StaffCredits) and the player's wallet, and
  * only this service loads both. user-service forwards the verified staff id
  * from the token; the transaction password and the tree are checked again
  * here, so this route trusts the internal key for the CALLER, not for the

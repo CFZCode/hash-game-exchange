@@ -98,6 +98,16 @@ const EXTENSIONS = {
   // dropped the attribute and the route reported success storing nothing.
   Credits: {
     credit_limit: { type: DataTypes.DECIMAL, allowNull: true, defaultValue: '0', field: 'credit_limit' },
+    // ── migration 095-credits-sports-wallet: the wallet's own id (BIGSERIAL;
+    // `point_ledger.wallet_id` stores it). Postgres fills it — never written here.
+    id: { type: DataTypes.BIGINT, allowNull: true, field: 'id' },
+    // the zip's points columns.
+    // `credit` = jitna parent ne diya (deposit − withdraw), `all_point` = point ledger ka jod.
+    credit: { type: DataTypes.DECIMAL(18, 2), allowNull: false, defaultValue: '0', field: 'credit' },
+    all_point: { type: DataTypes.DECIMAL(18, 2), allowNull: false, defaultValue: '0', field: 'all_point' },
+    // ── migration 099-credits-for-everyone: player row = 'USER' (uid set).
+    // Staff/owner rows are read through the `StaffCredits` model (extended/).
+    user_type: { type: DataTypes.STRING(10), allowNull: false, defaultValue: 'USER', field: 'user_type' },
   },
 
   // ── migration 065-custom-coins ───────────────────────────────────────

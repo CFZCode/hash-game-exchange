@@ -103,12 +103,12 @@ test('dashboard stats against a database', async (t) => {
 
   const ownerId = newId();
   const agentId = newId();
-  const playerA = newId(); // under the agent
-  const playerB = newId(); // a direct signup — the owner's only
+  const playerA = newId(); // a direct signup (no parent) — the only one this dashboard counts
+  const playerB = newId(); // under the agent — a client, never on the Direct Users dashboard
   const COIN = `T${String(process.pid % 100_000).padStart(5, '0')}`.slice(0, 8);
   const GIS_COIN = `G${COIN.slice(1)}`;
   const PAY_COIN = `P${COIN.slice(1)}`;
-  const service = new DashboardStatsService({ models, db: connection, logger, config: { ROOT_STAFF_ID: ownerId } });
+  const service = new DashboardStatsService({ models, db: connection, logger, config: { ROOT_STAFF_ID: ownerId }, directOnly: true });
 
   // A quiet stretch of the past, so other tests' rows cannot land in the window.
   const day = (d) => new Date(`2001-03-${d}T10:00:00.000Z`);
@@ -130,8 +130,8 @@ test('dashboard stats against a database', async (t) => {
     await cleanup();
     await models.Staff.create({ id: ownerId, name: `s-owner-${ownerId}`, email: `o${ownerId}@t.test`, password: 'x', role_id: agentRoleId, parent_id: null });
     await models.Staff.create({ id: agentId, name: `s-agent-${agentId}`, email: `a${agentId}@t.test`, password: 'x', role_id: agentRoleId, parent_id: ownerId });
-    await models.Users.create({ id: playerA, name: `sa-${playerA}`, password: 'x', status: 'active', parent_staff_id: agentId, created: day('03') });
-    await models.Users.create({ id: playerB, name: `sb-${playerB}`, password: 'x', status: 'active', parent_staff_id: null, created: day('20') });
+    await models.Users.create({ id: playerA, name: `sa-${playerA}`, password: 'x', status: 'active', parent_staff_id: null, created: day('03') });
+    await models.Users.create({ id: playerB, name: `sb-${playerB}`, password: 'x', status: 'active', parent_staff_id: agentId, created: day('20') });
     await models.Exchangerate.create({ currency: COIN, usd_rate: '2' });
     await models.Exchangerate.create({ currency: GIS_COIN, usd_rate: '1' });
 
@@ -187,37 +187,37 @@ test('dashboard stats against a database', async (t) => {
     await connection.close?.();
   });
 
-  await t.test('the root sees the whole site, bucketed by day, in the asked currency', async () => {
+  await t.test('the root sees the direct users only, bucketed by day, in the asked currency', async () => {
     const r = await service.series({ actor: { id: ownerId }, ...window, granularity: 'day', currency: COIN });
 
     assert.equal(r.converted, false);
-    assert.equal(r.totals.deposits, '1150.00000000');
-    assert.equal(r.totals.depositCount, 3);
+    // playerB's 1000 is a client's deposit — not on this dashboard.
+    assert.equal(r.totals.deposits, '150.00000000');
+    assert.equal(r.totals.depositCount, 2);
     assert.equal(r.totals.withdrawals, '537.00000000', 'done 30 + Paid 7 + Approved 500, each once');
     assert.equal(r.totals.withdrawalCount, 3);
-    assert.equal(r.totals.registrations, 2);
+    assert.equal(r.totals.registrations, 1);
     assert.equal(r.totals.sportsStaked, '40.00000000', 'void and refunded sports bets are not turnover');
-    assert.equal(r.totals.casinoWagered, '30.00000000');
-    // Stakes 10 + 20, one win paying stake + profit = 15.
-    assert.equal(r.totals.casinoGgr, '15.00000000');
+    assert.equal(r.totals.casinoWagered, '10.00000000', 'the client’s 20 is not counted');
+    // Stake 10, one win paying stake + profit = 15.
+    assert.equal(r.totals.casinoGgr, '-5.00000000');
 
     const d4 = r.buckets.find((b) => b.bucket === '2001-03-04');
     assert.equal(d4.deposits, '50.00000000');
     assert.equal(d4.net, '-487.00000000');
   });
 
-  await t.test('a sub-staff sees their own tree and nothing else', async () => {
+  await t.test('an agent sees nothing here — its players are clients, not direct users', async () => {
     const r = await service.series({ actor: { id: agentId }, ...window, granularity: 'month', currency: COIN });
 
-    assert.equal(r.buckets.length, 1);
-    assert.equal(r.buckets[0].bucket, '2001-03-01');
-    assert.equal(r.totals.deposits, '150.00000000');
-    assert.equal(r.totals.registrations, 1);
-    assert.equal(r.totals.casinoWagered, '10.00000000');
+    assert.equal(r.totals.deposits, '0.00000000');
+    assert.equal(r.totals.depositCount, 0);
+    assert.equal(r.totals.registrations, 0);
+    assert.equal(r.totals.casinoWagered, '0.00000000');
   });
 
   await t.test('without a currency the figures are converted to USD at the current rate', async () => {
-    const r = await service.series({ actor: { id: agentId }, ...window, granularity: 'week' });
+    const r = await service.series({ actor: { id: ownerId }, ...window, granularity: 'week' });
 
     assert.equal(r.converted, true);
     assert.equal(r.currency, 'USD');
@@ -232,7 +232,7 @@ test('dashboard stats against a database', async (t) => {
     assert.equal(r.totals.deposits, '0.00000000');
     assert.equal(r.totals.casinoWagered, '0.00000000');
     // Registrations have no currency, so they are not narrowed by one.
-    assert.equal(r.totals.registrations, 2);
+    assert.equal(r.totals.registrations, 1);
     assert.ok(r.buckets.every((b) => b.deposits === '0.00000000'));
   });
 
@@ -247,12 +247,12 @@ test('dashboard stats against a database', async (t) => {
     const owner = await service.top({ actor: { id: ownerId }, ...window, currency: COIN, limit: 5 });
     assert.equal(owner.games[0].key, 'inhouse:dice');
     assert.ok(!owner.games.some((g) => g.key === 'inhouse:fake-sim'), 'a fake bot round is not a top game');
-    assert.equal(owner.games[0].wagered, '30.00000000');
-    assert.equal(owner.games[0].bets, 2);
+    assert.equal(owner.games[0].wagered, '10.00000000');
+    assert.equal(owner.games[0].bets, 1);
     assert.deepEqual(owner.sports.map((s) => [s.key, s.name, s.wagered]), [['4', 'Cricket', '40.00000000']], 'by sport, not by market');
 
     const agent = await service.top({ actor: { id: agentId }, ...window, currency: COIN });
-    assert.equal(agent.games[0].wagered, '10.00000000');
+    assert.deepEqual(agent.games, []);
   });
 
   await t.test('Slotegrator stakes are read whatever their sign (the handler stores bets negative)', async () => {

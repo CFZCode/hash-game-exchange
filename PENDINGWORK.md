@@ -15,15 +15,28 @@ Jo kaam baad me karna hai. Kaam ho jaye to yahan se hata do aur `WORKLOG.md` (ya
 - **Dikkat:** Jo unmatched bet market settle hone tak match nahi hui, wo `result_status = 'void'` likhi jaati hai, par settlement uski liability exposure me loss ki tarah ginta hai. Settlement ledger amount 0 aata hai aur paisa wapas nahi milta. Test me: bet 10, 100 ki liability, settled-void ke baad hi wapas aayi.
 - **Karna:** Settlement (`settlementv2.mjs`, MO/BM market-level hisaab) me unmatched open bets ka exposure alag karke refund karna. Ye mssports ka purana logic hai, `Wallets.cash` ke time bhi aisa hi tha.
 
-### 3. Points roll-up wapas chalu karna (`credits.id` pe)
+### 3. ~~Points roll-up wapas chalu karna (`credits.id` pe)~~ — ho gaya 2026-10-15 (`creditsPoints.mjs`, dono walletService copies)
 - Abhi `updateAllPointHierarchy`, `applyCommissionPoints`, `reverseAllPointHierarchy` aur `reverseCommissionPoints` band hain (calls comment, function me early return).
 - **Karna:** In functions ko `Wallets` ki jagah `credits` pe chalana: `point_ledger.wallet_id = credits.id`; `all_point`, `sports_pts`, `upper_point`, `down_point` `credits` se. Iske liye staff/owner ki `credits` rows chahiye (point 4).
 - **Asar abhi:** sports statement `point_ledger` se banta hai, isliye naye settlements statement me nahi dikhte (sirf "Opening pts" row aati hai).
 
-### 4. Staff/owner wallets `credits` me shift karna
-- Abhi sirf player ka paisa `credits.inr` pe hai. Staff/owner abhi bhi `mssports."Wallets"` me hain.
-- **Decide karna:** `credits` me staff/owner ki row kaise pehchani jaye. Abhi `uid` = player id hai, aur staff ids player ids se takra sakte hain. Option: `user_type`, `staff_id`, `owner_id` columns, staff rows me `uid` NULL. Platform ke jo reports `credits` ka SUM/COUNT lete hain, unpe asar check karna.
-- Staff → player transfer routes (`addCash`, `addDeposit`, `withdrawFromChild`, `settlePointsFromChild` in `lib/services/walletService.mjs`) abhi bhi player ka `Wallets` badalte hain. Shift ke time inhe bhi `credits.inr` pe lana.
+### 4. Sports service ko staff/owner ke `credits` rows pe lana
+- **Ho gaya (2026-10-15, migration 099):** `credits` me staff/owner ki rows (`user_type`, `staff_id`, uid NULL). Admin-service ke saare paise ke raaste inhi pe hain.
+- **Baaki:** sports service (`services/sports`) abhi bhi staff/owner ke liye `mssports."Wallets"` padhta hai — hierarchy (`hierarchyUtility.mjs`, `uplineLevelNo.mjs`) aur staff → player routes (`addCash`, `addDeposit`, `withdrawFromChild`, `settlePointsFromChild` in `lib/services/walletService.mjs`). Inhe `credits` (staff_id) pe lana, phir points roll-up (item 3) chalu karna.
+
+### Exchange section — ~~zip ke baaki screens port karna~~ — ho gaya 2026-10-15 (sab screens, WORKLOG dekho). Bache hue chhote kaam:
+- Staff logins DB me save karna (User History me staff ki login history ke liye).
+- More modal ka Edit Profile (full name) — users/staff me full name column chahiye to.
+
+### (purana) Exchange section — zip (msadmin) ke baaki screens port karna
+Sidebar me **"Sports Exchange"** section ban gaya hai, zip ke poore menu ke saath (2026-10-15). Jo screen port nahi hua uska page "not ported yet" dikhata hai — sahi list `admin/src/views/exchange/screens.ts` hai (har entry: zip page, backend ready ya nahi). Zip ke jo screens abhi aane hain — **casino wala kuch nahi** (user ka faisla: is project me table casino games nahi hain; CasinoSettlement, CasinoSettledVoid, CasinoResult, LiveCasinoReport, casino/*, Casino-games, casino manage, table-casino locks chhodne hain):
+- ~~**Points settlement**~~ — ho gaya 2026-10-15: `POST /admin/exchange/points/settle`, Account List / Active Users (D/W) aur Bank screens.
+- **Users:** Users / Active users / Insert user / Assign agent (zip `pages/users`, `AssignAgent.jsx`) — hamare Users + Staff screens se milana, jo nahi hai wo Exchange me.
+- **Settlement:** Match settlement, Fancy settlement, Void bets (backend `services/sports` me `/declareresult`, `/void`, `/settled-*` pehle se hai; abhi Sports > Settlement screen hai — Exchange me laana ya link karna).
+- **Settings:** Bet limits, Buffer time, Max odds, Auto void, Virtual bet limits, Commission, Fixtures, User lock (backend sports `betting-config/*`, `commission-config/*`, `sports-lock/*` pehle se).
+- **Reports:** Account statement, Profit/Loss, Total P/L, Sportbook report, Current bets, Turnover, User win-loss, User history, User register detail, Fraud report, Bank, Auth list.
+- **Market analysis**, game details, System tracker (owner).
+- Har screen: zip jaisa simple code, wallet ki jagah `credits`.
 
 ### 5. Sports ki entries platform ke `public.credits_ledger` me nahi jaati
 - Sports `credits.inr` me seedha likhta hai. Sports ka hisaab sirf `mssports.credits_ledger` / `debit_ledger` me hai, platform ke ledger me nahi. Platform ka wallet-vs-ledger reconcile check (seed ka "wallets reconcile with their ledger") sports wale players pe mismatch dikha sakta hai.

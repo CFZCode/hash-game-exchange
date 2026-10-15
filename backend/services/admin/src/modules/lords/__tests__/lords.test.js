@@ -120,7 +120,17 @@ test('admin account controls', async (t) => {
     await connection.models.StaffHierarchy.destroy({
       where: { [Op.or]: [{ ancestor_id: id }, { descendant_id: id }] },
     });
-    await connection.models.StaffBalances.destroy({ where: { staff_id: id } });
+    await connection.models.StaffCredits.destroy({ where: { staff_id: id } });
+    // Ids come from the pid, so an earlier run can have left players / child staff under
+    // this same id — clear them first, or the delete below hits users_parent_staff_id_fkey.
+    const leftovers = await connection.models.Users.findAll({ where: { parent_staff_id: id }, attributes: ['id'], raw: true });
+    for (const { id: uid } of leftovers) {
+      await connection.models.Credits.destroy({ where: { uid } });
+      await connection.models.Users.destroy({ where: { id: uid } }).catch(() =>
+        connection.models.Users.update({ parent_staff_id: null }, { where: { id: uid } })
+      );
+    }
+    await connection.models.Staff.update({ parent_id: null }, { where: { parent_id: id } });
     await connection.models.Staff.destroy({ where: { id } });
 
     await connection.models.Staff.create({
@@ -136,7 +146,7 @@ test('admin account controls', async (t) => {
       parent_id: parentId,
       status: 'active',
     });
-    await connection.models.StaffBalances.create({ staff_id: id, inr });
+    await connection.models.StaffCredits.create({ staff_id: id, inr });
 
     const rows = [{ ancestor_id: id, descendant_id: id, depth: 0 }];
     if (parentId) {
@@ -171,7 +181,7 @@ test('admin account controls', async (t) => {
     return money.toDecimalString(money.toMinor(row?.inr ?? '0'));
   };
   const staffBalance = async (id) => {
-    const row = await connection.models.StaffBalances.findOne({ where: { staff_id: id }, raw: true });
+    const row = await connection.models.StaffCredits.findOne({ where: { staff_id: id }, raw: true });
     return money.toDecimalString(money.toMinor(row?.inr ?? '0'));
   };
 
@@ -265,24 +275,57 @@ test('admin account controls', async (t) => {
     assert.equal(await staffBalance(staff), '0.00000000', 'never negative');
   });
 
-  await t.test('the platform owner issues funds without a balance', async () => {
+  await t.test('the platform owner refills its child player from the owner wallet', async () => {
+    // Migration 099: the owner's balance is in `credits` and a refill draws on it.
     const owner = await seedStaff(newStaffId(), { inr: '0' });
     const player = await seedPlayer(newUid(), owner, '0');
+    const actor = actorFor(owner, { canIssueFunds: true, level: 0 });
 
-    const result = await service.refill({
-      actor: actorFor(owner, { canIssueFunds: true, level: 0 }),
-      accountId: player, amount: '5000', transactionPassword: TXN_PASSWORD,
-    });
+    await assert.rejects(
+      () => service.refill({ actor, accountId: player, amount: '5000', transactionPassword: TXN_PASSWORD }),
+      (err) => err.code === 'INSUFFICIENT_FUNDS'
+    );
 
-    assert.equal(result.issued, true);
+    await connection.models.StaffCredits.update({ inr: '8000' }, { where: { staff_id: owner } });
+    const result = await service.refill({ actor, accountId: player, amount: '5000', transactionPassword: TXN_PASSWORD });
+
+    assert.equal(result.issued, false);
     assert.equal(await playerBalance(player), '5000.00000000');
-    assert.equal(await staffBalance(owner), '0.00000000');
+    assert.equal(await staffBalance(owner), '3000.00000000');
 
-    // And the transfer row says which it was.
     const row = await connection.models.StaffTransfers.findOne({
       where: { to_type: 'user', to_id: player }, order: [['id', 'DESC']], raw: true,
     });
-    assert.equal(row.transfer_type, 'issuance');
+    assert.equal(row.transfer_type, 'refill');
+  });
+
+  await t.test('the platform owner refilling a DIRECT user (no parent) does not touch the owner wallet', async () => {
+    const owner = await seedStaff(newStaffId(), { inr: '0' });
+    const player = await seedPlayer(newUid(), owner, '0');
+    await connection.models.Users.update({ parent_staff_id: null }, { where: { id: player } });
+
+    const result = await service.refill({
+      actor: actorFor(owner, { canIssueFunds: true, level: 0 }),
+      accountId: player, amount: '700', transactionPassword: TXN_PASSWORD,
+    });
+
+    assert.equal(result.issued, false);
+    assert.equal(await playerBalance(player), '700.00000000');
+    assert.equal(await staffBalance(owner), '0.00000000', 'a direct user is not paid from the owner wallet');
+
+    const row = await connection.models.StaffTransfers.findOne({
+      where: { to_type: 'user', to_id: player }, order: [['id', 'DESC']], raw: true,
+    });
+    assert.equal(row.transfer_type, 'direct');
+
+    // Point ledger: the direct user's own history, as "Bank Deposite".
+    const wallet = await connection.models.Credits.findOne({ where: { uid: player }, attributes: ['id'], raw: true });
+    const [entry] = await connection.sequelize.query(
+      'SELECT event_type, delta FROM mssports.point_ledger WHERE wallet_id = :id ORDER BY id DESC LIMIT 1',
+      { replacements: { id: wallet.id }, type: 'SELECT' }
+    );
+    assert.equal(entry.event_type, 'Bank Deposite');
+    assert.equal(Number(entry.delta), 700);
   });
 
   await t.test('a refill above the ceiling is refused', async () => {

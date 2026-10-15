@@ -42,11 +42,19 @@ const { gisKindSql, gisSideAmountSql, gisBetCountSql, gisPlayFilterSql } = requi
  *
  * ── WHOSE FIGURES ────────────────────────────────────────────────────────
  *
- * The caller's tree, decided exactly as the dashboard's other routes decide
- * it: `visibleStaffIds`, and a tree containing the platform root sees the
- * whole site. Anyone else sees the players whose `parent_staff_id` is in
- * their tree. Applied as a sub-select on `users` inside each query rather
- * than a list of ids pulled into memory.
+ * The admin dashboard builds this with `directOnly: true`: DIRECT USERS ONLY —
+ * players with no parent (`parent_staff_id IS NULL`), i.e. site signups
+ * (referral signups included). Players with a parent are agent clients and
+ * live on the "Client Management" tab, never there. Only a tree containing
+ * the platform root sees them; anyone else gets an empty scope.
+ *
+ * Without `directOnly` (the P&L report reuses this service) it is the
+ * caller's tree: `visibleStaffIds`, and a tree containing the platform root
+ * sees the whole site; anyone else sees the players whose `parent_staff_id`
+ * is in their tree.
+ *
+ * Either way it is applied as a sub-select on `users` inside each query
+ * rather than a list of ids pulled into memory.
  *
  * ── CURRENCY ─────────────────────────────────────────────────────────────
  *
@@ -123,11 +131,13 @@ const MONEY_SOURCES = Object.freeze([
 const sportName = (id) => (id === 'other' ? 'Other' : SPORT_NAMES[id] ?? `Sport ${id}`);
 
 class DashboardStatsService {
-  constructor({ models, db, logger, config }) {
+  constructor({ models, db, logger, config, directOnly = false }) {
     this.models = models;
     this.db = db;
     this.logger = logger;
     this.config = config;
+    /** Dashboard "Direct Users" tab: only players with no parent. */
+    this.directOnly = directOnly;
   }
 
   /**
@@ -306,7 +316,11 @@ class DashboardStatsService {
   }
 
   async #registrationRows(ctx) {
-    const scope = ctx.scope.all ? '' : 'AND parent_staff_id IN (:staffIds)';
+    const scope = ctx.scope.all
+      ? ''
+      : ctx.scope.direct
+        ? 'AND parent_staff_id IS NULL'
+        : 'AND parent_staff_id IN (:staffIds)';
     return this.#query(
       `SELECT ${this.#bucket('created')} AS bucket, COUNT(*) AS n
          FROM users
@@ -471,7 +485,7 @@ class DashboardStatsService {
         fromTz: f.toISOString(),
         toTz: t.toISOString(),
         ...(currency ? { currency } : {}),
-        ...(scope.all ? {} : { staffIds: scope.staffIds }),
+        ...(scope.all || scope.direct ? {} : { staffIds: scope.staffIds }),
       },
     };
   }
@@ -486,12 +500,13 @@ class DashboardStatsService {
     return `${column} >= CAST(:fromTz AS timestamptz) AND ${column} < CAST(:toTz AS timestamptz)`;
   }
 
-  /** The owner column inside the caller's tree, or nothing for the root. */
+  /** The owner column inside the scope: direct users, the caller's tree, or nothing for the root. */
   #owned(ctx, column, isText = false) {
     if (ctx.scope.all) return '';
+    const players = ctx.scope.direct ? 'u.parent_staff_id IS NULL' : 'u.parent_staff_id IN (:staffIds)';
     return isText
-      ? `AND ${column} IN (SELECT u.id::text FROM users u WHERE u.parent_staff_id IN (:staffIds))`
-      : `AND ${column} IN (SELECT u.id FROM users u WHERE u.parent_staff_id IN (:staffIds))`;
+      ? `AND ${column} IN (SELECT u.id::text FROM users u WHERE ${players})`
+      : `AND ${column} IN (SELECT u.id FROM users u WHERE ${players})`;
   }
 
   #gisCurrencyExpr(column) {
@@ -543,15 +558,19 @@ class DashboardStatsService {
   }
 
   /**
-   * The players this caller's figures cover — the dashboard's rule (see
-   * `DashboardService#scope`). No actor is an empty scope, never everything.
+   * The players this caller's figures cover. `directOnly` (the dashboard, see
+   * `DashboardService#scope`): the direct users, and only for a tree that
+   * contains the platform root. Otherwise the caller's tree, the root's being
+   * the whole site. No actor is an empty scope, never everything.
    */
   async #scope(actor) {
-    if (!actor?.id) return { all: false, empty: true, staffIds: [] };
+    if (!actor?.id) return { all: false, direct: false, empty: true, staffIds: [] };
     const staffIds = (await visibleStaffIds(this.models, actor.id, { logger: this.logger })).map(Number);
     const root = Number(this.config?.ROOT_STAFF_ID ?? 1);
-    if (staffIds.includes(root)) return { all: true, empty: false, staffIds: [] };
-    return { all: false, empty: staffIds.length === 0, staffIds };
+    const isRoot = staffIds.includes(root);
+    if (this.directOnly) return { all: false, direct: true, empty: !isRoot, staffIds: [] };
+    if (isRoot) return { all: true, direct: false, empty: false, staffIds: [] };
+    return { all: false, direct: false, empty: staffIds.length === 0, staffIds };
   }
 }
 

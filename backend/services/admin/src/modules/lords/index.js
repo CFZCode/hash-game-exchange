@@ -47,7 +47,7 @@ module.exports = {
   name: 'lords',
   service: 'admin',
   basePath: '/accounts',
-  models: ['admin', 'core'],
+  models: ['admin', 'core', 'extended'],
   routers: {
     admin: require('./routes/admin.routes'),
     // user-service forwards an agent-tree wallet adjust here — see the file.

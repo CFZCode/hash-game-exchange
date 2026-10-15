@@ -351,7 +351,9 @@ test('dashboard against a database', async (t) => {
 });
 
 /**
- * Every dashboard figure is scoped to the caller's tree.
+ * Every dashboard figure is DIRECT USERS ONLY (no parent), and only the
+ * root's tree sees them. Players with a parent are agent clients — the
+ * "Client Management" tab — and never appear here.
  *
  * Confirmed live: an agent's dashboard showed the site's totals, and the
  * registrations and movements drill-downs named every player on the site.
@@ -421,54 +423,60 @@ async function scopeTests(t, conn, logger) {
   const regIds = async (actor) =>
     (await service.registrations({ actor, search: tag, limit: 50, offset: 0 })).rows.map((r) => r.id).sort();
 
-  await t.test('an agent’s headline figures cover only their own players', async () => {
+  await t.test('an agent sees no figures here — their players are clients, not direct users', async () => {
     const overview = await service.overview({ actor: { id: agentA } });
-    assert.equal(overview.users.total, 1);
+    assert.equal(overview.users.total, 0);
     const seen = currencies(overview);
-    assert.ok(seen.has('SCPA'), 'their own player’s deposit is counted');
-    assert.equal(seen.has('SCPB'), false, 'a rival tree’s deposit is not');
-    assert.equal(seen.has('SCPD'), false, 'a direct signup’s deposit is not');
+    for (const c of ['SCPA', 'SCPB', 'SCPD']) assert.equal(seen.has(c), false, `${c} is not counted`);
 
     const stats = await service.userStats({ actor: { id: agentA } });
-    assert.equal(stats.total, 1);
+    assert.equal(stats.total, 0);
   });
 
-  await t.test('registrations list only the caller’s players', async () => {
-    assert.deepEqual(await regIds({ id: agentA }), [String(playerA)]);
-    assert.deepEqual(await regIds({ id: agentB }), [String(playerB)]);
-    // A master sees down through their agents.
-    assert.deepEqual(await regIds({ id: master }), [String(playerA)]);
+  await t.test('registrations list only direct users, and only to the root', async () => {
+    assert.deepEqual(await regIds({ id: agentA }), []);
+    assert.deepEqual(await regIds({ id: agentB }), []);
+    assert.deepEqual(await regIds({ id: master }), []);
+    // A player with a parent is never on the Direct Users tab, not even the root's.
+    assert.deepEqual(await regIds({ id: ownerId }), [String(playerD)]);
   });
 
-  await t.test('movements show only the caller’s players, even when another is named', async () => {
-    const mine = await service.movements({ actor: { id: agentA }, kind: 'deposits', limit: 50, offset: 0 });
-    assert.ok(mine.rows.length >= 1);
-    assert.ok(mine.rows.every((r) => r.userId === String(playerA)), 'no out-of-tree row');
-    assert.equal(mine.rows[0].user.email, `${tag}-a@t.test`);
+  await t.test('movements show only direct users, even when a client is named', async () => {
+    const direct = await service.movements({ actor: { id: ownerId }, kind: 'deposits', userId: playerD, limit: 50, offset: 0 });
+    assert.ok(direct.rows.length >= 1);
+    assert.ok(direct.rows.every((r) => r.userId === String(playerD)));
+    assert.equal(direct.rows[0].user.email, `${tag}-d@t.test`);
 
-    const theirs = await service.movements({ actor: { id: agentA }, kind: 'deposits', userId: playerB, limit: 50, offset: 0 });
-    assert.equal(theirs.total, 0);
-    assert.equal(theirs.rows.length, 0);
+    const client = await service.movements({ actor: { id: ownerId }, kind: 'deposits', userId: playerA, limit: 50, offset: 0 });
+    assert.equal(client.total, 0);
+    assert.equal(client.rows.length, 0);
+
+    const agent = await service.movements({ actor: { id: agentA }, kind: 'deposits', limit: 50, offset: 0 });
+    assert.equal(agent.total, 0);
   });
 
-  await t.test('an out-of-tree player’s team is not found', async () => {
+  await t.test('a client player’s team is not found; a direct user’s is', async () => {
     await assert.rejects(
-      () => service.memberTeam({ actor: { id: agentA }, userId: playerB }),
+      () => service.memberTeam({ actor: { id: ownerId }, userId: playerA }),
       (err) => err.code === 'DASHBOARD_PLAYER_NOT_FOUND' && err.status === 404
     );
-    const own = await service.memberTeam({ actor: { id: agentA }, userId: playerA });
-    assert.equal(own.owner, `${tag}-a`);
+    await assert.rejects(
+      () => service.memberTeam({ actor: { id: agentA }, userId: playerD }),
+      (err) => err.code === 'DASHBOARD_PLAYER_NOT_FOUND' && err.status === 404
+    );
+    const own = await service.memberTeam({ actor: { id: ownerId }, userId: playerD });
+    assert.equal(own.owner, `${tag}-d`);
   });
 
-  await t.test('the root keeps the site-wide view, direct signups included; an admin sees only its own subtree', async () => {
-    // Only the Super Admin widens to every root's tree (the Addaplay rule): an
-    // Admin is scoped to its own subtree like every other level, and this
-    // admin has nothing beneath it.
+  await t.test('the root sees the direct users only; an admin outside the root’s tree sees nothing', async () => {
+    // Only the Super Admin widens to the root's tree (the Addaplay rule): this
+    // Admin is scoped to its own subtree, which holds no direct users.
     assert.deepEqual(await regIds({ id: adminId }), []);
-    assert.deepEqual(await regIds({ id: ownerId }), players.map(String).sort());
 
     const seen = currencies(await service.overview({ actor: { id: ownerId } }));
-    for (const c of ['SCPA', 'SCPB', 'SCPD']) assert.ok(seen.has(c), `${c} is in the site-wide total`);
+    assert.ok(seen.has('SCPD'), 'the direct user’s deposit is counted');
+    assert.equal(seen.has('SCPA'), false, 'a client’s deposit is not');
+    assert.equal(seen.has('SCPB'), false, 'a client’s deposit is not');
   });
 
   await t.test('no caller is an empty dashboard, not the whole site', async () => {

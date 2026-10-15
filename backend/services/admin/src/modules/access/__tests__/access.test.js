@@ -114,7 +114,7 @@ test('admin access', async (t) => {
 
   const seedStaff = async (id) => {
     await connection.sequelize.query(
-      `INSERT INTO roles (id, name, level) VALUES (:roleId, :name, 3) ON CONFLICT (id) DO NOTHING`,
+      `INSERT INTO roles (id, name, level) VALUES (:roleId, :name, 3) ON CONFLICT (id) DO UPDATE SET level = EXCLUDED.level`,
       { replacements: { roleId, name: `access-test-role-${roleId}` } }
     );
     // Ids repeat across runs (they derive from the pid), and a previous run may

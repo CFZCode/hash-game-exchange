@@ -162,7 +162,7 @@ class StatementsService {
       };
     });
 
-    const balances = await this.models.StaffBalances.findOne({
+    const balances = await this.models.StaffCredits.findOne({
       where: { staff_id: agent.id },
       raw: true,
     });
@@ -1258,7 +1258,7 @@ class StatementsService {
   async #staffBalances(staffIds) {
     const unique = [...new Set(staffIds.map(Number).filter(Number.isInteger))];
     if (!unique.length) return new Map();
-    const rows = await this.models.StaffBalances.findAll({
+    const rows = await this.models.StaffCredits.findAll({
       where: { staff_id: unique },
       attributes: ['staff_id', 'inr'],
       raw: true,

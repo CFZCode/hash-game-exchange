@@ -15,6 +15,7 @@ const errors = require('./staff.errors');
 const { TRANSFER_DIRECTION, TARGET_TYPE, BALANCE_CURRENCY, PASSWORD_ROUNDS } = require('./staff.constants');
 const { descendantIds, manageableStaffIds } = require('../staff-directory/staffDirectory.service');
 const { debitStaffFloat, insufficientStaffBalance, insufficientFunds } = require('../lords/staffFloat');
+const { addPointEntry } = require('../lords/pointLedger');
 const { assertTransactionPassword } = require('../staff-auth/transactionPassword');
 const { cascadeSuspension } = require('../locks/suspendCascade');
 
@@ -108,7 +109,7 @@ class StaffService {
     });
     if (!row) throw errors.NOT_FOUND({ staffId });
 
-    const balance = await this.models.StaffBalances.findOne({ where: { staff_id: staffId }, raw: true });
+    const balance = await this.models.StaffCredits.findOne({ where: { staff_id: staffId }, raw: true });
     return {
       ...this.#shapeStaff(row),
       balance: this.#shapeBalance(balance),
@@ -408,7 +409,7 @@ class StaffService {
       : [Number(staffId)];
 
     const [balances, players, staffCount] = await Promise.all([
-      this.models.StaffBalances.findAll({ where: { staff_id: ids }, raw: true }),
+      this.models.StaffCredits.findAll({ where: { staff_id: ids }, raw: true }),
       this.models.Users.count({ where: { parent_staff_id: ids } }),
       this.models.Staff.count({ where: { id: ids } }),
     ]);
@@ -507,7 +508,7 @@ class StaffService {
      * Two ways in.
      *
      *   the Super Admin (`canIssueFunds`, holding `wallet:adjust`) — any
-     *     account in scope, staff or player; the platform owner mints.
+     *     account in scope, staff or player, paid from the owner's own wallet.
      *
      *   everyone else, Admin and Sub Admin included — a PARENT settling with a
      *     DIRECT CHILD STAFF account out of its own float (the addaplay rule).
@@ -570,6 +571,20 @@ class StaffService {
           direction,
           transfer_type: 'transfer',
           created_at: new Date(),
+        },
+        { transaction }
+      );
+
+      // Point ledger (zip jaisa): child ke wallet me entry — deposit pe +, withdraw pe −.
+      await addPointEntry(
+        this.models,
+        {
+          child: { type: toType, id: target },
+          parent: { type: TARGET_TYPE.STAFF, id: actor.id },
+          amount,
+          isDeposit: !isWithdraw,
+          transferId: row.id,
+          remark: isWithdraw ? 'Withdraw' : 'Deposit',
         },
         { transaction }
       );
@@ -676,7 +691,7 @@ class StaffService {
         { transaction, ignoreDuplicates: true }
       );
 
-      await this.models.StaffBalances.findOrCreate({
+      await this.models.StaffCredits.findOrCreate({
         where: { staff_id: row.id },
         defaults: { staff_id: row.id, inr: '0' },
         transaction,
@@ -810,7 +825,7 @@ class StaffService {
       throw errors.CANNOT_DELETE_WITH_DESCENDANTS({ staffId });
     }
 
-    const balance = await this.models.StaffBalances.findOne({ where: { staff_id: staffId }, raw: true });
+    const balance = await this.models.StaffCredits.findOne({ where: { staff_id: staffId }, raw: true });
     if (balance && !money.isZero(money.toMinorQuantised(balance.inr ?? '0'))) {
       throw errors.CANNOT_DELETE_WITH_BALANCE({ staffId, balance: String(balance.inr) });
     }
@@ -835,7 +850,7 @@ class StaffService {
         where: { [Op.or]: [{ ancestor_id: staffId }, { descendant_id: staffId }] },
         transaction,
       });
-      await this.models.StaffBalances.destroy({ where: { staff_id: staffId }, transaction });
+      await this.models.StaffCredits.destroy({ where: { staff_id: staffId }, transaction });
       await this.models.Staff.destroy({ where: { id: staffId }, transaction });
 
       this.logger?.warn({ actorStaffId: actor.id, staffId }, 'Staff account deleted');
@@ -932,21 +947,10 @@ class StaffService {
 
   async #debit(party, amount, { actor, transaction, allowCredit = false }) {
     /**
-     * The platform owner is the source of funds and has no balance to draw
-     * down — legacy expressed this as `req.staff.level !== 0`, skipping the
-     * check for level 0. Kept, because the alternative is that the top of the
-     * tree cannot fund anyone; but it is now an explicit capability on the
-     * actor rather than a magic number in the middle of a handler, and it is
-     * logged as the issuance it is.
+     * Owner bhi apne wallet se deta hai (migration 099). Pehle owner yahan se
+     * bina kate paisa bana deta tha; ab owner pehle "Add balance" se apne
+     * credits me paisa daalta hai, aur har transfer usi se katta hai.
      */
-    if (party.type === TARGET_TYPE.STAFF && Number(party.id) === Number(actor.id) && actor.canIssueFunds) {
-      this.logger?.warn(
-        { actorStaffId: actor.id, amount },
-        'Funds ISSUED by the platform owner — this transfer is not drawn from an existing balance'
-      );
-      return;
-    }
-
     const [affected] = party.type === TARGET_TYPE.STAFF
       ? [Number(await debitStaffFloat(this.models, party.id, amount, { transaction, allowCredit }))]
       : await this.models.Credits.update(
@@ -970,7 +974,7 @@ class StaffService {
   }
 
   async #credit(party, amount, { transaction }) {
-    const model = party.type === TARGET_TYPE.STAFF ? this.models.StaffBalances : this.models.Credits;
+    const model = party.type === TARGET_TYPE.STAFF ? this.models.StaffCredits : this.models.Credits;
     const key = party.type === TARGET_TYPE.STAFF ? 'staff_id' : 'uid';
 
     const [, created] = await model.findOrCreate({
@@ -1144,7 +1148,7 @@ class StaffService {
    * ── `fromStored`, NOT `toMinor` ───────────────────────────────────────
    *
    * Every money column here is bare `numeric` in the baseline —
-   * `staff_balances.inr`, `.credit_limit`, `.exposure_limit` and
+   * the staff `credits` row (`inr`, `credit_limit`, `exposure_limit`) and
    * `staff_transfers.amount` — so Postgres has always accepted whatever
    * precision legacy's float arithmetic produced, and real rows carry well
    * past eight decimal places.

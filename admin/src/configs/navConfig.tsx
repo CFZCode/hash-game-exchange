@@ -5,7 +5,17 @@ import {
   ArrowUpFromLineIcon,
   BellIcon,
   BellRingIcon,
+  BanIcon,
   BookOpenIcon,
+  ChartColumnIcon,
+  GaugeIcon,
+  GavelIcon,
+  ListTreeIcon,
+  MonitorPlayIcon,
+  PercentIcon,
+  SlidersHorizontalIcon,
+  TimerIcon,
+  UserPlusIcon,
   CircleDollarSignIcon,
   CoinsIcon,
   CreditCardIcon,
@@ -50,6 +60,16 @@ import {
  * loads — the bulk of the slow first load. Add an icon here to use it below.
  */
 export const navIcons = {
+  Ban: BanIcon,
+  ChartColumn: ChartColumnIcon,
+  Gauge: GaugeIcon,
+  Gavel: GavelIcon,
+  ListTree: ListTreeIcon,
+  MonitorPlay: MonitorPlayIcon,
+  Percent: PercentIcon,
+  SlidersHorizontal: SlidersHorizontalIcon,
+  Timer: TimerIcon,
+  UserPlus: UserPlusIcon,
   ArrowDownToLine: ArrowDownToLineIcon,
   ArrowLeftRight: ArrowLeftRightIcon,
   ArrowUpFromLine: ArrowUpFromLineIcon,
@@ -163,6 +183,9 @@ export type MenuItem = {
 
 export type NavItem = {
   groupLabel?: string
+
+  /** true: group ka label click karke poora section khulta / band hota hai (dropdown jaisa). */
+  collapsible?: boolean
   items: MenuItem[]
 }
 
@@ -174,9 +197,80 @@ export type NavItem = {
  * loads first — most promotion reads (bonus, codes, gift cards, wheel, VIP,
  * affiliate, races, vault) are `reports:read`, P2P reads are `config:write`.
  */
+/** Wallet dekhne ki koi bhi permission (Client Management dashboard tab, bank, point ledger). */
+const WALLET_ANY = ['wallet:credit', 'wallet:debit', 'wallet:adjust', 'users:read']
+
+/** Zip ke owner-only screens: `wallet:adjust` sirf Super Admin (owner) ke paas hai. */
+const OWNER_ONLY = 'wallet:adjust'
+
 export const navItems: NavItem[] = [
   {
-    items: [{ icon: 'LayoutDashboard', label: 'Dashboard', href: '/dashboard', permission: 'reports:read' }]
+    // Ek hi Dashboard: Direct Users (reports:read) + Client Management (Sports Exchange) tab.
+    items: [{ icon: 'LayoutDashboard', label: 'Dashboard', href: '/dashboard', permission: ['reports:read', ...WALLET_ANY] }]
+  },
+  {
+    /*
+     * Sports Exchange — zip (msadmin) ke admin panel ke saare screens, usi order me jaise zip ke
+     * sidebar me the; jo zip me sub-menu the (Account, Reports, Settlement) wo yahan bhi sub-menu
+     * hain. Casino ka kuch nahi. Sabka balance `credits` table me hai (owner, staff, player).
+     */
+    groupLabel: 'Sports Exchange',
+    collapsible: true,
+    items: [
+      { icon: 'ChartColumn', label: 'Market Analysis', href: '/exchange/market-analysis', permission: 'sports:read' },
+      { icon: 'KeyRound', label: 'Multi Login Account', href: '/exchange/multi-login', permission: 'staff:read' },
+      {
+        icon: 'Users',
+        label: 'Account',
+        permission: ['users:read', 'staff:read'],
+        childItems: [
+          { label: 'Account List For Active Users', href: '/exchange/users/active' },
+          { label: 'Account List', href: '/exchange/users' },
+          { label: 'Create Account', href: '/exchange/users/create', permission: ['users:write', 'staff:write'] }
+        ]
+      },
+      { icon: 'UserPlus', label: 'Assign Agent', href: '/exchange/assign-agent', permission: 'staff:write' },
+      { icon: 'Landmark', label: 'Bank', href: '/exchange/bank', permission: WALLET_ANY },
+      {
+        icon: 'FileBarChart',
+        label: 'Reports',
+        permission: 'reports:read',
+        childItems: [
+          { label: 'Account Statement', href: '/exchange/reports/account-statement' },
+          { label: 'Party Win Loss', href: '/exchange/reports/party-win-loss' },
+          { label: 'Current Bets', href: '/exchange/reports/current-bets' },
+          { label: 'User History', href: '/exchange/reports/user-history' },
+          { label: 'General Lock', href: '/exchange/reports/general-lock' },
+          { label: 'Sportbook Report', href: '/exchange/reports/sportbook-report' },
+          { label: 'Turn Over', href: '/exchange/reports/turnover' },
+          { label: 'User Authentication', href: '/exchange/reports/user-authentication' },
+          { label: 'Fraud Report', href: '/exchange/reports/fraud' },
+          { label: 'User Register Detail', href: '/exchange/reports/user-register-detail' },
+          { label: 'Total Profit Loss', href: '/exchange/reports/total-profit-loss' },
+          { label: 'User Win Loss', href: '/exchange/reports/user-win-loss' }
+        ]
+      },
+      {
+        // Zip me owner only. Casino Settlement nahi.
+        icon: 'Gavel',
+        label: 'Settlement',
+        permission: OWNER_ONLY,
+        childItems: [
+          { label: 'Match Settlement', href: '/exchange/settlement/match' },
+          { label: 'Fancy Settlement', href: '/exchange/settlement/fancy' },
+          { label: 'Void Bets', href: '/exchange/settlement/void-bets' }
+        ]
+      },
+
+      // Zip me owner only (sports config).
+      { icon: 'Timer', label: 'Buffer Time', href: '/exchange/settings/buffer-time', permission: OWNER_ONLY },
+      { icon: 'Percent', label: 'Commission', href: '/exchange/settings/commission', permission: OWNER_ONLY },
+      { icon: 'Gauge', label: 'Max Odds', href: '/exchange/settings/max-odds', permission: OWNER_ONLY },
+      { icon: 'Ban', label: 'Auto Void', href: '/exchange/settings/auto-void', permission: OWNER_ONLY },
+      { icon: 'MonitorPlay', label: 'Virtual Bet Limits', href: '/exchange/settings/virtual-limits', permission: OWNER_ONLY },
+      { icon: 'SlidersHorizontal', label: 'Bet Limits', href: '/exchange/settings/bet-limits', permission: OWNER_ONLY },
+      { icon: 'ListTree', label: 'Events', href: '/exchange/events', permission: 'sports:read' }
+    ]
   },
   {
     groupLabel: 'Users',
@@ -229,6 +323,7 @@ export const navItems: NavItem[] = [
 
       // Player-to-player tips (read-only). Hidden when the owner left `tips` out of the plan.
       { icon: 'HandCoins', label: 'Tips', href: '/tips', permission: 'reports:read', feature: 'tips' },
+
       // Hidden when the owner left `p2p` out of the plan (the /admin/p2p routes refuse it too).
       { icon: 'Handshake', label: 'P2P trading', href: '/p2p', permission: 'config:write', feature: 'p2p' }
     ]

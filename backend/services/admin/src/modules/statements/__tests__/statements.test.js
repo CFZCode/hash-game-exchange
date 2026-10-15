@@ -67,14 +67,14 @@ test('statements against a database', async (t) => {
     });
     await models.Credits.destroy({ where: { uid: player } });
     await models.Users.destroy({ where: { id: player } });
-    await models.StaffBalances.destroy({ where: { staff_id: [agent, outsider] } });
+    await models.StaffCredits.destroy({ where: { staff_id: [agent, outsider] } });
     await models.Staff.destroy({ where: { id: [agent, outsider] } });
 
     await models.Staff.bulkCreate([
       { id: agent, name: `sa-${agent}`, email: `sa${agent}@t.test`, password: 'x', role_id: roleId, parent_id: null },
       { id: outsider, name: `so-${outsider}`, email: `so${outsider}@t.test`, password: 'x', role_id: roleId, parent_id: null },
     ]);
-    await models.StaffBalances.create({ staff_id: agent, inr: '5000' });
+    await models.StaffCredits.create({ staff_id: agent, inr: '5000' });
 
     await models.Users.create({ id: player, name: 'Statement Player', password: 'x', status: 'active', parent_staff_id: agent });
     await models.Credits.create({ uid: player, inr: '1200' });
@@ -113,7 +113,7 @@ test('statements against a database', async (t) => {
     });
     await models.Credits.destroy({ where: { uid: player } });
     await models.Users.destroy({ where: { id: player } });
-    await models.StaffBalances.destroy({ where: { staff_id: [agent, outsider] } });
+    await models.StaffCredits.destroy({ where: { staff_id: [agent, outsider] } });
     await models.Staff.destroy({ where: { id: [agent, outsider] } });
     if (connection) await connection.close();
   });

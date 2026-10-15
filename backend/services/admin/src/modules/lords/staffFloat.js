@@ -4,13 +4,18 @@ const { Op, literal, where: sqlWhere } = require('sequelize');
 const { money, AppError } = require('@ibitplay/common');
 
 /**
- * A staff member's own float — `staff_balances.inr` — and the credit line that
- * lets it go below zero.
+ * A staff member's own float — their `credits` row, read through the
+ * `StaffCredits` model (migration 099; before that it was `staff_balances.inr`)
+ * — and the credit line that lets it go below zero.
+ *
+ * The owner (Super Admin) has a row here too and pays from it like everyone
+ * else. Only a DIRECT user (signed up on their own, no parent) is funded by the
+ * owner without a debit — see `ownerWallet.js`.
  *
  * ═════════════════════════════════════════════════════════════════════════
  * THE CREDIT LIMIT
  *
- * `staff_balances.credit_limit` is how far below zero an agent's float may go
+ * `credits.credit_limit` (the staff row) is how far below zero an agent's float may go
  * when it FUNDS A PLAYER (a refill, a transfer to a player, an agent-tree
  * balance credit). The house extends the agent credit; the agent settles it
  * later. So the guard is
@@ -64,7 +69,7 @@ async function debitStaffFloat(models, staffId, amount, { transaction, allowCred
     ? sqlWhere(literal('inr + COALESCE(credit_limit, 0)'), Op.gte, minor)
     : { inr: { [Op.gte]: minor } };
 
-  const [affected] = await models.StaffBalances.update(
+  const [affected] = await models.StaffCredits.update(
     { inr: literal(`inr - ${minor}`) },
     { where: { [Op.and]: [{ staff_id: staffId }, guard] }, transaction }
   );
@@ -74,19 +79,19 @@ async function debitStaffFloat(models, staffId, amount, { transaction, allowCred
 /** Add `amount` to a staff float, creating the row if the account has none. */
 async function creditStaffFloat(models, staffId, amount, { transaction } = {}) {
   const minor = money.toDecimalString(money.toMinor(amount));
-  const [, created] = await models.StaffBalances.findOrCreate({
+  const [, created] = await models.StaffCredits.findOrCreate({
     where: { staff_id: staffId },
     defaults: { staff_id: staffId, inr: minor },
     transaction,
   });
   if (!created) {
-    await models.StaffBalances.increment({ inr: minor }, { where: { staff_id: staffId }, transaction });
+    await models.StaffCredits.increment({ inr: minor }, { where: { staff_id: staffId }, transaction });
   }
 }
 
 /** `{ balance, creditLimit, available }` for one staff float, as decimal strings. */
 async function readStaffFloat(models, staffId, { transaction } = {}) {
-  const row = await models.StaffBalances.findOne({
+  const row = await models.StaffCredits.findOne({
     where: { staff_id: staffId },
     attributes: ['inr', 'credit_limit'],
     transaction,

@@ -3,6 +3,7 @@
 import { useMemo, type ReactNode } from 'react'
 
 import Link from 'next/link'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
 import { ArrowDownToLineIcon, ArrowUpFromLineIcon, DicesIcon, ScaleIcon, TrophyIcon, UserPlusIcon } from 'lucide-react'
 
@@ -28,10 +29,12 @@ import ErrorState from '@/components/shared/ErrorState'
 import Money from '@/components/shared/Money'
 import PageHeader from '@/components/shared/PageHeader'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useSession } from '@/contexts/SessionContext'
 import { useApi, usePagedApi } from '@/hooks/use-api'
 import { formatMoney, formatNumber } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import ExchangeDashboard from '@/views/exchange/ExchangeDashboard'
 import { useCurrencyCodes } from '@/views/finance/useCurrencyCodes'
 
 /** One bucket of `admin/dashboard/stats/series`. Money keys are decimal strings, in `currency`. */
@@ -228,7 +231,8 @@ const n = (v: string | number | null | undefined) => {
   return Number.isFinite(x) ? x : 0
 }
 
-const Dashboard = () => {
+/** "Direct Users" tab — site ke apne players: deposit, withdrawal, casino, sports, registrations. */
+const DirectUserDashboard = () => {
   // Agent-tree logins (no promotions) see their own network, not the whole site.
   const inNetwork = useSession().actor?.promotions === false
   const f = useStatsFilters({ defaultPreset: '30d' })
@@ -311,14 +315,10 @@ const Dashboard = () => {
 
   return (
     <div>
-      <PageHeader
-        title='Dashboard'
-        description={
-          s?.converted
-            ? s.valuation?.note
-            : `Figures in ${unit}, for rows in that currency only.`
-        }
-      />
+      <p className='text-muted-foreground mb-4 max-w-prose text-sm'>
+        Direct users only — players who signed up on the site and have no parent.{' '}
+        {s?.converted ? s.valuation?.note : `Figures in ${unit}, for rows in that currency only.`}
+      </p>
 
       <div className='flex flex-col gap-6'>
         <FilterBar filters={f} currencies={currencies} />
@@ -593,6 +593,71 @@ const Dashboard = () => {
           />
         </section>
       </div>
+    </div>
+  )
+}
+
+/** Sports Exchange wallet dekhne ki koi bhi permission — navConfig ke WALLET_ANY jaisa. */
+const WALLET_ANY = ['wallet:credit', 'wallet:debit', 'wallet:adjust', 'users:read']
+
+type Tab = 'direct' | 'client'
+
+/**
+ * Ek hi Dashboard page, do tab: "Direct Users" (site ke players) aur "Client Management"
+ * (Sports Exchange ka points / P&L dashboard). Tab URL me `?tab=client` se rehta hai, taaki
+ * refresh / link pe wahi tab khule. Jis tab ki permission nahi, wo tab nahi dikhta.
+ */
+const Dashboard = () => {
+  const { can } = useSession()
+  const router = useRouter()
+  const pathname = usePathname()
+  const params = useSearchParams()
+
+  const tabs = (
+    [
+      { value: 'direct', label: 'Direct Users', allowed: can('reports:read') },
+      { value: 'client', label: 'Client Management', allowed: can(WALLET_ANY) }
+    ] as const
+  ).filter(t => t.allowed)
+
+  const asked = params.get('tab')
+  const tab: Tab = tabs.find(t => t.value === asked)?.value ?? tabs[0]?.value ?? 'direct'
+  const has = (value: Tab) => tabs.some(t => t.value === value)
+
+  const select = (value: Tab) => {
+    const next = new URLSearchParams(params.toString())
+
+    if (value === 'direct') next.delete('tab')
+    else next.set('tab', value)
+    const qs = next.toString()
+
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+  }
+
+  return (
+    <div>
+      <PageHeader title='Dashboard' />
+      <Tabs value={tab} onValueChange={v => select(v as Tab)}>
+        {tabs.length > 1 && (
+          <TabsList className='mb-4'>
+            {tabs.map(t => (
+              <TabsTrigger key={t.value} value={t.value}>
+                {t.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        )}
+        {has('direct') && (
+          <TabsContent value='direct'>
+            <DirectUserDashboard />
+          </TabsContent>
+        )}
+        {has('client') && (
+          <TabsContent value='client'>
+            <ExchangeDashboard />
+          </TabsContent>
+        )}
+      </Tabs>
     </div>
   )
 }

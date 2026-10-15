@@ -55,7 +55,7 @@ test('staff password route against a database', async (t) => {
   const NEXT = 'brand-new-password-2';
 
   const cleanup = async () => {
-    await models.StaffBalances.destroy({ where: { staff_id: ids } });
+    await models.StaffCredits.destroy({ where: { staff_id: ids } });
     await models.Staff.destroy({ where: { id: ids } });
   };
   await cleanup();

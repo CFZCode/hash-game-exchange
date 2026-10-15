@@ -1,0 +1,292 @@
+'use strict';
+
+const { Op, QueryTypes } = require('sequelize');
+const { money, AppError } = require('@ibitplay/common');
+
+const { manageableStaffIds } = require('../staff-directory/staffDirectory.service');
+const { assertTransactionPassword } = require('../staff-auth/transactionPassword');
+const { addOwnerBalance } = require('../lords/ownerWallet');
+const { TRANSFER_TYPE } = require('../lords/lords.constants');
+const { listChildren } = require('./accountList');
+const { settlePoints } = require('./pointsSettle');
+
+/**
+ * Exchange section (admin panel) — zip (msadmin) ke wallet screens ka backend.
+ *
+ * Sabka balance `credits` table me hai (migration 099):
+ *   owner  → user_type 'OWNER', staff_id
+ *   staff  → user_type 'STAFF', staff_id
+ *   player → user_type 'USER',  uid
+ *
+ * Yahan sirf padhna hai, aur ek likhne wala kaam: owner apne wallet me balance add kare.
+ * Baaki paisa move karne wale raaste pehle jaise hain (staff transfer, refill, adjust).
+ */
+
+const onlyOwner = () =>
+  new AppError('Only the owner (Super Admin) can add balance to their own wallet', 403, 'EXCHANGE_OWNER_ONLY');
+const notInTree = () => new AppError('This account is not in your tree', 404, 'EXCHANGE_NOT_IN_YOUR_TREE');
+
+/** NUMERIC → "123.45" (2 decimals) — dashboard ke liye. */
+const show = (value) => money.fromStored(value ?? '0', { field: 'balance' });
+
+class ExchangeService {
+  constructor({ models, db, logger, config }) {
+    this.models = models;
+    this.db = db;
+    this.logger = logger;
+    this.config = config;
+  }
+
+  get sequelize() {
+    return this.models.Credits.sequelize;
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
+  //  Dashboard
+  // ══════════════════════════════════════════════════════════════════════
+
+  /**
+   * Exchange dashboard — upar ke cards.
+   *
+   *   myWallet   — login wale ka apna wallet (owner ho to owner ka)
+   *   staff      — neeche ke staff/agents: kitne hain, unke paas kitna balance
+   *   players    — child players (jinka parent hai) aur direct users (sirf owner dekhta hai)
+   *   ownerTopups — owner ne ab tak apne wallet me kitna daala (sirf owner)
+   *   recent     — last 10 len-den (tree ke andar)
+   */
+  async dashboard({ actor }) {
+    const staffIds = await this.#treeStaffIds(actor);
+    const belowMe = staffIds.filter((id) => id !== Number(actor.id));
+
+    const [myWallet, staffTotals, childPlayers, directPlayers, ownerTopups, recent] = await Promise.all([
+      this.#wallet(actor.id),
+      this.#staffTotals(belowMe),
+      this.#playerTotals({ parent_staff_id: { [Op.in]: staffIds } }),
+      actor.canIssueFunds ? this.#playerTotals({ parent_staff_id: null }) : null,
+      actor.canIssueFunds ? this.#ownerTopupTotal(actor.id) : null,
+      this.#recentTransfers(staffIds),
+    ]);
+
+    return {
+      isOwner: Boolean(actor.canIssueFunds),
+      myWallet,
+      staff: staffTotals,
+      players: { child: childPlayers, direct: directPlayers },
+      ownerTopups,
+      recent,
+    };
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
+  //  Owner wallet
+  // ══════════════════════════════════════════════════════════════════════
+
+  /** Owner ka wallet — Add Balance popup ka "Current Balance". */
+  async ownerWallet({ actor }) {
+    if (!actor.canIssueFunds) throw onlyOwner();
+    return { wallet: await this.#wallet(actor.id) };
+  }
+
+  /**
+   * Owner apne wallet me balance add karta hai.
+   * Sirf owner, sirf apne wallet me, aur transaction password zaroori hai.
+   */
+  async ownerAddBalance({ actor, amount, note, transactionPassword }) {
+    if (!actor.canIssueFunds) throw onlyOwner();
+
+    await assertTransactionPassword(this.models, actor.id, transactionPassword, { required: true });
+
+    const result = await this.db.transaction((transaction) =>
+      addOwnerBalance(this.models, { ownerId: actor.id, amount, note }, { transaction })
+    );
+
+    this.logger?.warn({ actorStaffId: actor.id, amount: result.amount }, 'Owner added balance to own wallet');
+    return result;
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
+  //  Account list + points settlement (zip: Account List, Active Users, Bank)
+  // ══════════════════════════════════════════════════════════════════════
+
+  /**
+   * Direct children ki list (zip `users/all-details`).
+   * `parentId` do to us staff ke children — wo staff login wale ke tree me hona chahiye.
+   */
+  async accounts({ actor, parentId, search, limit, offset }) {
+    let listOf = Number(actor.id);
+    if (parentId && Number(parentId) !== listOf) {
+      const staffIds = await this.#treeStaffIds(actor);
+      if (!staffIds.includes(Number(parentId))) throw notInTree();
+      listOf = Number(parentId);
+    }
+
+    // Direct users (koi parent nahi) owner ke apne children hain.
+    const withDirectUsers = Boolean(actor.canIssueFunds) && listOf === Number(actor.id);
+    const result = await listChildren(this.sequelize, { parentId: listOf, withDirectUsers, search, limit, offset });
+
+    // `me` — D/W modal ki pehli line (parent ka naam aur balance).
+    const staff = await this.models.Staff.findByPk(actor.id, { attributes: ['name'], raw: true });
+    return { ...result, me: { ...(await this.#wallet(actor.id)), username: staff?.name ?? String(actor.id) } };
+  }
+
+  /**
+   * Points settlement (zip `POST /admin/wallet/points/settle`).
+   * + points = parent deta hai (D), − points = parent leta hai (W).
+   */
+  async settle({ actor, accountType, accountId, points, remark, transactionPassword }) {
+    // Owner ka password set ho to zaroori, baaki sab ke liye hamesha (adjust jaisa).
+    await assertTransactionPassword(this.models, actor.id, transactionPassword, {
+      required: !actor.canIssueFunds,
+      executiveId: actor.executiveId ?? null,
+    });
+
+    const result = await this.db.transaction((transaction) =>
+      settlePoints(this.models, { actor, accountType, accountId, points, remark }, { transaction })
+    );
+
+    this.logger?.info({ actorStaffId: actor.id, accountType, accountId, points: result.points }, 'Points settled');
+    return result;
+  }
+
+  /**
+   * Credit History — zip ka `POST /admin/ledger/user/history` (Credit Activity aur More modal).
+   * Us wallet ki 'Bank Deposite' entries; remark ka "#sender/receiver" hissa batata hai kisne diya.
+   */
+  async creditHistory({ actor, accountType, accountId, limit, offset }) {
+    const ids = accountType === 'staff' ? { staffId: accountId } : { userId: accountId };
+    const walletId = await this.#walletIdInTree(actor, ids);
+    if (!walletId) return { rows: [], total: 0 };
+
+    const replacements = { walletId, eventType: 'Bank Deposite', limit, offset };
+    const where = 'FROM mssports.point_ledger WHERE wallet_id = :walletId AND event_type = :eventType';
+    const [rows, [{ total }]] = await Promise.all([
+      this.sequelize.query(`SELECT id, username, delta, closing_inr_balance, remark, created_at ${where} ORDER BY created_at DESC, id DESC LIMIT :limit OFFSET :offset`, {
+        replacements,
+        type: QueryTypes.SELECT,
+      }),
+      this.sequelize.query(`SELECT COUNT(*)::int AS total ${where}`, { replacements, type: QueryTypes.SELECT }),
+    ]);
+
+    return {
+      rows: rows.map((r) => {
+        // remark: "...#from/to" — # ke baad sender/receiver
+        const from = r.remark && r.remark.includes('#') ? r.remark.split('#').pop().split('/')[0] : null;
+        return {
+          id: String(r.id),
+          superUser: from, // jisne diya
+          user: r.username, // jisko mila
+          transferFrom: from,
+          amount: show(r.delta),
+          balance: r.closing_inr_balance == null ? null : show(r.closing_inr_balance),
+          createdAt: r.created_at,
+        };
+      }),
+      total,
+    };
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
+  //  Point ledger
+  // ══════════════════════════════════════════════════════════════════════
+
+  // ══════════════════════════════════════════════════════════════════════
+  //  Helpers
+  // ══════════════════════════════════════════════════════════════════════
+
+  /** Login wale ke neeche ke saare staff ids (khud bhi). Owner = poori site. */
+  async #treeStaffIds(actor) {
+    const ids = await manageableStaffIds(this.models, actor.id, { logger: this.logger, level: actor.level });
+    return ids.map(Number);
+  }
+
+  /** Ek staff/owner ka wallet. Row na ho to sab 0. */
+  async #wallet(staffId) {
+    const row = await this.models.StaffCredits.findOne({ where: { staff_id: staffId }, raw: true });
+    return {
+      staffId: Number(staffId),
+      userType: row?.user_type ?? 'STAFF',
+      balance: show(row?.inr),
+      creditLimit: show(row?.credit_limit),
+      credit: show(row?.credit),
+      allPoint: show(row?.all_point),
+    };
+  }
+
+  async #staffTotals(staffIds) {
+    if (!staffIds.length) return { count: 0, balance: show(0) };
+    const [row] = await this.sequelize.query(
+      'SELECT COUNT(*)::int AS count, COALESCE(SUM(inr), 0) AS balance FROM credits WHERE staff_id IN (:staffIds)',
+      { replacements: { staffIds }, type: QueryTypes.SELECT }
+    );
+    return { count: row.count, balance: show(row.balance) };
+  }
+
+  /** Players ki ginti aur unka total balance (`credits.inr`). */
+  async #playerTotals(userWhere) {
+    if (Array.isArray(userWhere.parent_staff_id?.[Op.in]) && !userWhere.parent_staff_id[Op.in].length) {
+      return { count: 0, balance: show(0) };
+    }
+    const players = await this.models.Users.findAll({ where: userWhere, attributes: ['id'], raw: true });
+    if (!players.length) return { count: 0, balance: show(0) };
+
+    const [row] = await this.sequelize.query(
+      'SELECT COALESCE(SUM(inr), 0) AS balance FROM credits WHERE uid IN (:ids)',
+      { replacements: { ids: players.map((p) => p.id) }, type: QueryTypes.SELECT }
+    );
+    return { count: players.length, balance: show(row.balance) };
+  }
+
+  async #ownerTopupTotal(ownerId) {
+    const total = await this.models.StaffTransfers.sum('amount', {
+      where: { to_type: 'staff', to_id: ownerId, transfer_type: TRANSFER_TYPE.OWNER_TOPUP },
+    });
+    return { total: show(total ?? 0) };
+  }
+
+  /** Last 10 len-den jisme tree ka koi staff shaamil ho. */
+  async #recentTransfers(staffIds) {
+    if (!staffIds.length) return [];
+    const rows = await this.models.StaffTransfers.findAll({
+      where: {
+        [Op.or]: [
+          { from_type: 'staff', from_id: { [Op.in]: staffIds } },
+          { to_type: 'staff', to_id: { [Op.in]: staffIds } },
+        ],
+      },
+      order: [['created_at', 'DESC'], ['id', 'DESC']],
+      limit: 10,
+      raw: true,
+    });
+    return rows.map((r) => ({
+      id: String(r.id),
+      from: { type: r.from_type, id: String(r.from_id) },
+      to: { type: r.to_type, id: String(r.to_id) },
+      amount: show(r.amount),
+      direction: r.direction ?? null,
+      transferType: r.transfer_type ?? null,
+      note: r.note ?? null,
+      createdAt: r.created_at,
+    }));
+  }
+
+  /** Wallet id (credits.id) — sirf agar account login wale ke tree me hai. */
+  async #walletIdInTree(actor, { staffId, userId }) {
+    const staffIds = await this.#treeStaffIds(actor);
+
+    if (userId) {
+      const user = await this.models.Users.findByPk(userId, { attributes: ['id', 'parent_staff_id'], raw: true });
+      const visible = user && (staffIds.includes(Number(user.parent_staff_id))
+        || (user.parent_staff_id == null && actor.canIssueFunds));
+      if (!visible) throw notInTree();
+      const wallet = await this.models.Credits.findOne({ where: { uid: userId }, attributes: ['id'], raw: true });
+      return wallet?.id ?? null;
+    }
+
+    const target = Number(staffId ?? actor.id);
+    if (!staffIds.includes(target)) throw notInTree();
+    const wallet = await this.models.StaffCredits.findOne({ where: { staff_id: target }, attributes: ['id'], raw: true });
+    return wallet?.id ?? null;
+  }
+}
+
+module.exports = { ExchangeService };

@@ -14,7 +14,7 @@ const TRANSFER_DIRECTIONS = Object.freeze(Object.values(TRANSFER_DIRECTION));
 const TARGET_TYPE = Object.freeze({ STAFF: 'staff', USER: 'user' });
 const TARGET_TYPES = Object.freeze(Object.values(TARGET_TYPE));
 
-/** Staff balances are INR only — `staff_balances` has one money column. */
+/** Staff balances are INR only — the staff `credits` row uses `inr` alone. */
 const BALANCE_CURRENCY = 'INR';
 
 const STAFF_STATUS = Object.freeze(['active', 'suspended', 'inactive']);

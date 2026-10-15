@@ -9,6 +9,8 @@ import { Owner_default } from "../models/admin/Owner.mjs";
 import { Transaction_default } from "../models/admin/Transaction.mjs";
 import { PointLedger_default } from "../models/admin/PointLedger.mjs";
 import { POINT_EVENT, POINT_CATEGORY, pointEntryRef, LEDGER_CATEGORY_ALIASES } from "../constants/pointLedger.mjs";
+import { creditsChain, addPoints } from "../../../../../lib/services/creditsPoints.mjs";
+import { QueryTypes } from "sequelize";
 import { emitBalanceUpdate } from "../utils/socketUtils.mjs";
 import { withVoidSuffix } from "../helper/voidLabel.mjs";
 import { MESSAGES } from "../constants/messages.mjs";
@@ -628,8 +630,6 @@ var WalletService = {
     }
   },
   updateAllPointHierarchy: async (betId, betType) => {
-    // Switched off for now (Wallets → credits move): no points roll-up until it runs on credits ids.
-    return { success: true, skipped: true, reason: "points roll-up switched off" };
     if (!betId) return { success: false, error: "betId is required" };
     const category = (betType || "").toString().toUpperCase();
     if (!Object.values(POINT_CATEGORY).includes(category)) {
@@ -665,51 +665,15 @@ var WalletService = {
     const tx = await db_default.transaction();
     try {
       const user = await User_default.findByPk(userId, { transaction: tx });
-      if (!user) throw new Error(`user ${userId} not found`);
-      if (user.is_demo) {
+      if (user?.is_demo) {
         await credit.update({ points_applied: true }, { transaction: tx });
         await tx.commit();
         return { success: true, skipped: true, reason: `bet ${betId} belongs to demo user ${userId} \u2014 points not rolled up` };
       }
-      const staffIds = [];
-      let ownerId = user.parent_owner_id || null;
-      let staffId = user.parent_staff_id;
-      const visited = /* @__PURE__ */ new Set();
-      while (staffId) {
-        if (visited.has(staffId)) break;
-        visited.add(staffId);
-        const staff = await Staff_default.findByPk(staffId, { transaction: tx });
-        if (!staff) throw new Error(`staff ${staffId} not found (user ${userId} ki hierarchy)`);
-        staffIds.push(staff.staff_id);
-        if (staff.parent_owner_id) ownerId = staff.parent_owner_id;
-        staffId = staff.parent_id;
-      }
-      const wallets = [];
-      const userWallet = await Wallet_default.findOne({ where: { user_id: userId, user_type: "USER" }, transaction: tx });
-      if (!userWallet) throw new Error(`wallet not found for user ${userId}`);
-      wallets.push(userWallet);
-      for (const id of staffIds) {
-        const staffWallet = await Wallet_default.findOne({ where: { staff_id: id }, transaction: tx });
-        if (!staffWallet) throw new Error(`wallet not found for staff ${id}`);
-        wallets.push(staffWallet);
-      }
-      if (ownerId) {
-        const ownerWallet = await Wallet_default.findOne({ where: { owner_id: ownerId, user_type: "OWNER" }, transaction: tx });
-        if (!ownerWallet) throw new Error(`wallet not found for owner ${ownerId}`);
-        wallets.push(ownerWallet);
-      }
-      const walletIds = wallets.map((w) => w.wallet_id);
-      const categoryColumn = {
-        SPORTS: "sports_pts"
-      }[category];
-      const incFields = { all_point: net };
-      if (categoryColumn) incFields[categoryColumn] = net;
-      await Wallet_default.increment(incFields, { where: { wallet_id: walletIds }, transaction: tx });
-      const updated = await Wallet_default.findAll({
-        where: { wallet_id: walletIds },
-        attributes: ["wallet_id", "user_id", "staff_id", "owner_id", "username", "all_point", "inr_balance"],
-        transaction: tx
-      });
+      // Chain: player + upar ke saare staff, sabke `credits` rows (Wallets ki jagah).
+      const walletIds = await creditsChain(db_default, userId, tx);
+      const updated = await addPoints(db_default, walletIds, net, { transaction: tx });
+      const wallets = updated;
       await PointLedger_default.bulkCreate(
         updated.map((w) => ({
           entry_ref: entryRef,
@@ -786,47 +750,10 @@ var WalletService = {
     const entryRef = pointEntryRef.betReversal(category, betId);
     const tx = await db_default.transaction();
     try {
-      const user = await User_default.findByPk(userId, { transaction: tx });
-      if (!user) throw new Error(`user ${userId} not found`);
-      const staffIds = [];
-      let ownerId = user.parent_owner_id || null;
-      let staffId = user.parent_staff_id;
-      const visited = /* @__PURE__ */ new Set();
-      while (staffId) {
-        if (visited.has(staffId)) break;
-        visited.add(staffId);
-        const staff = await Staff_default.findByPk(staffId, { transaction: tx });
-        if (!staff) throw new Error(`staff ${staffId} not found (user ${userId} ki hierarchy)`);
-        staffIds.push(staff.staff_id);
-        if (staff.parent_owner_id) ownerId = staff.parent_owner_id;
-        staffId = staff.parent_id;
-      }
-      const wallets = [];
-      const userWallet = await Wallet_default.findOne({ where: { user_id: userId, user_type: "USER" }, transaction: tx });
-      if (!userWallet) throw new Error(`wallet not found for user ${userId}`);
-      wallets.push(userWallet);
-      for (const id of staffIds) {
-        const staffWallet = await Wallet_default.findOne({ where: { staff_id: id }, transaction: tx });
-        if (!staffWallet) throw new Error(`wallet not found for staff ${id}`);
-        wallets.push(staffWallet);
-      }
-      if (ownerId) {
-        const ownerWallet = await Wallet_default.findOne({ where: { owner_id: ownerId, user_type: "OWNER" }, transaction: tx });
-        if (!ownerWallet) throw new Error(`wallet not found for owner ${ownerId}`);
-        wallets.push(ownerWallet);
-      }
-      const walletIds = wallets.map((w) => w.wallet_id);
-      const categoryColumn = {
-        SPORTS: "sports_pts"
-      }[category];
-      const incFields = { all_point: delta };
-      if (categoryColumn) incFields[categoryColumn] = delta;
-      await Wallet_default.increment(incFields, { where: { wallet_id: walletIds }, transaction: tx });
-      const updated = await Wallet_default.findAll({
-        where: { wallet_id: walletIds },
-        attributes: ["wallet_id", "user_id", "staff_id", "owner_id", "username", "all_point", "inr_balance"],
-        transaction: tx
-      });
+      // Chain: player + upar ke saare staff, sabke `credits` rows (Wallets ki jagah).
+      const walletIds = await creditsChain(db_default, userId, tx);
+      const updated = await addPoints(db_default, walletIds, delta, { transaction: tx });
+      const wallets = updated;
       await PointLedger_default.bulkCreate(
         updated.map((w) => ({
           entry_ref: entryRef,
@@ -890,18 +817,19 @@ var WalletService = {
       const touched = [];
       for (const r of rows) {
         const delta = Math.round((parseFloat(r.delta) || 0) * 100) / 100;
-        const wallet = await Wallet_default.findOne({
-          where: { wallet_id: r.wallet_id },
-          transaction: tx,
-          lock: tx.LOCK.UPDATE
-        });
+        // wallet = credits row (point_ledger.wallet_id = credits.id)
+        const [wallet] = await db_default.query(
+          "SELECT id, uid AS user_id FROM public.credits WHERE id = :w FOR UPDATE",
+          { replacements: { w: r.wallet_id }, type: QueryTypes.SELECT, transaction: tx }
+        );
         if (!wallet) throw new Error(`wallet ${r.wallet_id} not found (${entryRef})`);
         const categoryColumn = {
           SPORTS: "sports_pts"
         }[String(r.category || "").toUpperCase()];
-        const decFields = { all_point: -delta };
-        if (categoryColumn) decFields[categoryColumn] = -delta;
-        await Wallet_default.increment(decFields, { where: { wallet_id: r.wallet_id }, transaction: tx });
+        await db_default.query(
+          `UPDATE public.credits SET all_point = all_point - :d${categoryColumn ? `, ${categoryColumn} = ${categoryColumn} - :d` : ""} WHERE id = :w`,
+          { replacements: { d: delta, w: r.wallet_id }, transaction: tx }
+        );
         await db_default.query(
           `UPDATE point_ledger SET all_point_after = all_point_after - :d
             WHERE wallet_id = :w AND id > :id AND all_point_after IS NOT NULL`,
@@ -919,11 +847,10 @@ var WalletService = {
       }
       await tx.commit();
       for (const walletId of touched) {
-        const w = await Wallet_default.findOne({
-          where: { wallet_id: walletId },
-          attributes: ["wallet_id", "user_id", "staff_id", "owner_id", "all_point"],
-          raw: true
-        });
+        const [w] = await db_default.query(
+          "SELECT id AS wallet_id, uid AS user_id, staff_id, all_point FROM public.credits WHERE id = :w",
+          { replacements: { w: walletId }, type: QueryTypes.SELECT }
+        );
         const entityId = w?.user_id || w?.staff_id || w?.owner_id;
         if (entityId) emitBalanceUpdate(entityId, { all_point: parseFloat(w.all_point || 0) });
       }
@@ -976,8 +903,7 @@ var WalletService = {
     const tx = await db_default.transaction();
     try {
       const user = await User_default.findByPk(userId, { transaction: tx });
-      if (!user) throw new Error(`user ${userId} not found`);
-      if (user.is_demo) {
+      if (user?.is_demo) {
         await tx.commit();
         return { success: true, skipped: true, reason: `bet ${betId} belongs to demo user ${userId} \u2014 commission points not rolled up` };
       }
@@ -986,40 +912,10 @@ var WalletService = {
         await tx.commit();
         return { success: true, duplicate: true, reason: `${entryRef} already written` };
       }
-      const staffIds = [];
-      let ownerId = user.parent_owner_id || null;
-      let staffId = user.parent_staff_id;
-      const visited = /* @__PURE__ */ new Set();
-      while (staffId) {
-        if (visited.has(staffId)) break;
-        visited.add(staffId);
-        const staff = await Staff_default.findByPk(staffId, { transaction: tx });
-        if (!staff) throw new Error(`staff ${staffId} not found (user ${userId} ki hierarchy)`);
-        staffIds.push(staff.staff_id);
-        if (staff.parent_owner_id) ownerId = staff.parent_owner_id;
-        staffId = staff.parent_id;
-      }
-      const wallets = [];
-      const userWallet = await Wallet_default.findOne({ where: { user_id: userId, user_type: "USER" }, transaction: tx });
-      if (!userWallet) throw new Error(`wallet not found for user ${userId}`);
-      wallets.push(userWallet);
-      for (const id of staffIds) {
-        const staffWallet = await Wallet_default.findOne({ where: { staff_id: id }, transaction: tx });
-        if (!staffWallet) throw new Error(`wallet not found for staff ${id}`);
-        wallets.push(staffWallet);
-      }
-      if (ownerId) {
-        const ownerWallet = await Wallet_default.findOne({ where: { owner_id: ownerId, user_type: "OWNER" }, transaction: tx });
-        if (!ownerWallet) throw new Error(`wallet not found for owner ${ownerId}`);
-        wallets.push(ownerWallet);
-      }
-      const walletIds = wallets.map((w) => w.wallet_id);
-      await Wallet_default.increment({ all_point: delta, sports_pts: delta }, { where: { wallet_id: walletIds }, transaction: tx });
-      const updated = await Wallet_default.findAll({
-        where: { wallet_id: walletIds },
-        attributes: ["wallet_id", "user_id", "staff_id", "owner_id", "username", "all_point", "inr_balance"],
-        transaction: tx
-      });
+      // Chain: player + upar ke saare staff, sabke `credits` rows (Wallets ki jagah).
+      const walletIds = await creditsChain(db_default, userId, tx);
+      const updated = await addPoints(db_default, walletIds, delta, { transaction: tx });
+      const wallets = updated;
       await PointLedger_default.bulkCreate(
         updated.map((w) => ({
           entry_ref: entryRef,

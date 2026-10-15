@@ -48,7 +48,14 @@ async function forward(req: NextRequest, ctx: { params: Promise<{ path: string[]
     cache: 'no-store'
   }
 
-  if (hasBody) {
+  if (hasBody && req.method === 'DELETE') {
+    // A DELETE body must go with a Content-Length. Streamed (chunked), the gateway's
+    // http.request does not chunk-encode a DELETE, so the upstream never sees the body
+    // and answers 400 — e.g. the sports config "reset to Inherit" routes.
+    const buf = await req.arrayBuffer()
+
+    if (buf.byteLength) init.body = buf
+  } else if (hasBody) {
     init.body = req.body
     init.duplex = 'half'
   }

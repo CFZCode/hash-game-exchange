@@ -123,7 +123,7 @@ test('admin staff', async (t) => {
         },
         // `transfers()` resolves counterparty names for the page it returns.
         Users: { count: async () => 0, findAll: async () => [] },
-        StaffBalances: {
+        StaffCredits: {
           findAll: async () => [{ staff_id: 1, inr: OVER_PRECISE }],
           findOne: async () => ({ staff_id: 1, inr: OVER_PRECISE, credit_limit: OVER_PRECISE }),
         },
@@ -214,7 +214,7 @@ test('admin staff', async (t) => {
     // delete trips `staff_parent_id_fkey` / `users_parent_staff_id_fkey`.
     await connection.sequelize.query('UPDATE staff SET parent_id = NULL WHERE parent_id = :id', { replacements: { id } });
     await connection.sequelize.query('UPDATE users SET parent_staff_id = NULL WHERE parent_staff_id = :id', { replacements: { id } });
-    await connection.models.StaffBalances.destroy({ where: { staff_id: id } });
+    await connection.models.StaffCredits.destroy({ where: { staff_id: id } });
     await connection.models.Staff.destroy({ where: { id } });
 
     await connection.models.Staff.create({
@@ -227,7 +227,7 @@ test('admin staff', async (t) => {
       status: 'active',
       transaction_password: TXN,
     });
-    await connection.models.StaffBalances.create({ staff_id: id, inr });
+    await connection.models.StaffCredits.create({ staff_id: id, inr });
 
     // The closure table: self, plus every ancestor of the parent one deeper.
     const rows = [{ ancestor_id: id, descendant_id: id, depth: 0 }];
@@ -273,7 +273,7 @@ test('admin staff', async (t) => {
   };
 
   const staffBalance = async (id) => {
-    const row = await connection.models.StaffBalances.findOne({ where: { staff_id: id }, raw: true });
+    const row = await connection.models.StaffCredits.findOne({ where: { staff_id: id }, raw: true });
     return money.toDecimalString(money.toMinor(row?.inr ?? '0'));
   };
   const playerBalance = async (uid) => {
@@ -374,7 +374,7 @@ test('admin staff', async (t) => {
     assert.equal(await staffBalance(boss), '0.00000000');
   });
 
-  await t.test('only the platform owner moves money to a player here — and it mints', async () => {
+  await t.test('only the platform owner moves money to a player here — paid from the owner wallet', async () => {
     const owner = await seedStaff(newStaffId(), { inr: '500', level: 1 });
     const agent = await seedStaff(newStaffId(), { parentId: owner });
     const player = await seedPlayer(newUid(), agent, '0');
@@ -384,7 +384,8 @@ test('admin staff', async (t) => {
     });
 
     assert.equal(await playerBalance(player), '75.00000000');
-    assert.equal(await staffBalance(owner), '500.00000000', 'the owner draws on nothing');
+    // Migration 099: the owner's balance is in `credits` and a transfer draws on it.
+    assert.equal(await staffBalance(owner), '425.00000000');
   });
 
   await t.test('a transfer to or from a player writes the player\'s ledger + history, so the wallet reconciles', async () => {
@@ -447,20 +448,26 @@ test('admin staff', async (t) => {
     assert.equal(await playerBalance(player), '0.00000000');
   });
 
-  await t.test('the platform owner issues funds, and it is logged as issuance', async () => {
-    // Legacy expressed this as `req.staff.level !== 0` in the middle of the
-    // handler. It is an explicit capability here, and the debit is skipped
-    // rather than silently succeeding against a balance of zero.
+  await t.test('the platform owner pays from its own wallet, and cannot give more than it holds', async () => {
+    // Migration 099: the owner no longer mints here. It adds balance to its own
+    // wallet first (Exchange > Owner wallet) and every transfer draws on it.
     const owner = await seedStaff(newStaffId(), { inr: '0' });
     const agent = await seedStaff(newStaffId(), { parentId: owner, inr: '0' });
 
-    await service.transfer({ transactionPassword: TXN,
-      actor: ownerActor(owner),
-      toType: 'staff', toId: agent, amount: '1000', direction: 'deposit',
-    });
+    await assert.rejects(
+      () => service.transfer({ transactionPassword: TXN,
+        actor: ownerActor(owner), toType: 'staff', toId: agent, amount: '1000', direction: 'deposit',
+      }),
+      (err) => err.code === 'INSUFFICIENT_FUNDS' && err.status === 422
+    );
+    assert.equal(await staffBalance(agent), '0.00000000', 'nothing moved');
 
+    await connection.models.StaffCredits.update({ inr: '1500' }, { where: { staff_id: owner } });
+    await service.transfer({ transactionPassword: TXN,
+      actor: ownerActor(owner), toType: 'staff', toId: agent, amount: '1000', direction: 'deposit',
+    });
     assert.equal(await staffBalance(agent), '1000.00000000');
-    assert.equal(await staffBalance(owner), '0.00000000', 'the owner draws on nothing');
+    assert.equal(await staffBalance(owner), '500.00000000');
   });
 
   // ── The tree ──────────────────────────────────────────────────────────

@@ -51,7 +51,9 @@ async function up({ sequelize, transaction, logger }) {
   }
 
   const [, credit] = await sequelize.query(
-    `UPDATE credits SET credit_limit = 0 WHERE credit_limit IS NULL OR credit_limit <> 0`,
+    // `uid IS NOT NULL`: player rows only. Since 099 staff/owner wallets live in
+    // `credits` too (uid NULL) and their credit_limit is the agent's real credit line.
+    `UPDATE credits SET credit_limit = 0 WHERE uid IS NOT NULL AND (credit_limit IS NULL OR credit_limit <> 0)`,
     { transaction }
   );
   const zeroed = credit?.rowCount ?? 0;

@@ -36,6 +36,17 @@ function createAdminController({ service }) {
         return response.ok(res, await service.agentAdjust(req.body, { staffId: req.staff.id, executiveId: req.staff.executiveId ?? null }));
       }
 
+      /**
+       * Owner, INR: owner ka balance ab `credits` me hai (migration 099), isliye
+       * ye bhi admin-service se jaata hai. Wahan decide hota hai:
+       *   - player ka parent hai → owner ke wallet se katega
+       *   - direct user (koi parent nahi) → owner ka wallet nahi katega
+       * Doosre coins (BTC, USDT …) pehle jaise operator adjustment hi rehte hain.
+       */
+      if (String(req.body.currency).toUpperCase() === 'INR') {
+        return response.ok(res, await service.agentAdjust(req.body, { staffId: req.staff.id }));
+      }
+
       await service.checkTransactionPassword(req.staff.id, req.body.transactionPassword, {
         required: false,
         executiveId: req.staff.executiveId ?? null,

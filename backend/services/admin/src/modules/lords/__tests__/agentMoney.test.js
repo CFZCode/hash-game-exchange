@@ -83,7 +83,7 @@ test('agent-tree money', async (t) => {
     );
     const { Op } = require('sequelize');
     await models.StaffHierarchy.destroy({ where: { [Op.or]: [{ ancestor_id: id }, { descendant_id: id }] } });
-    await models.StaffBalances.destroy({ where: { staff_id: id } });
+    await models.StaffCredits.destroy({ where: { staff_id: id } });
     await models.Staff.destroy({ where: { id } });
 
     await models.Staff.create({
@@ -96,7 +96,7 @@ test('agent-tree money', async (t) => {
       parent_id: parentId,
       status: 'active',
     });
-    await models.StaffBalances.create({ staff_id: id, inr, credit_limit: creditLimit });
+    await models.StaffCredits.create({ staff_id: id, inr, credit_limit: creditLimit });
 
     const rows = [{ ancestor_id: id, descendant_id: id, depth: 0 }];
     if (parentId) {
@@ -122,7 +122,7 @@ test('agent-tree money', async (t) => {
     return money.toDecimalString(money.toMinorQuantised(row?.inr ?? '0'));
   };
   const floatOf = async (id) => {
-    const row = await models.StaffBalances.findOne({ where: { staff_id: id }, raw: true });
+    const row = await models.StaffCredits.findOne({ where: { staff_id: id }, raw: true });
     return money.toDecimalString(money.toMinorQuantised(row?.inr ?? '0'));
   };
 
@@ -374,7 +374,7 @@ test('agent-tree money', async (t) => {
     await models.Credits.update({ credit_limit: '500' }, { where: { uid: player } });
     await models.Users.update({ password2: '' }, { where: { id: player } });
     await models.Staff.update({ password2: '' }, { where: { id: agent } });
-    await models.StaffBalances.update({ credit_limit: '300' }, { where: { staff_id: agent } });
+    await models.StaffCredits.update({ credit_limit: '300' }, { where: { staff_id: agent } });
 
     const migration = require('../../../../../../packages/db/migrations/068-no-plaintext-passwords-no-player-credit');
     await connection.sequelize.transaction((transaction) => migration.up({ sequelize: connection.sequelize, transaction }));
@@ -384,7 +384,7 @@ test('agent-tree money', async (t) => {
     assert.equal((await models.Users.findByPk(player, { raw: true })).password2, null);
     assert.equal((await models.Staff.findByPk(agent, { raw: true })).password2, null);
     // An agent's credit line is a different thing and is left alone.
-    const bal = await models.StaffBalances.findOne({ where: { staff_id: agent }, raw: true });
+    const bal = await models.StaffCredits.findOne({ where: { staff_id: agent }, raw: true });
     assert.equal(money.toDecimalString(money.toMinorQuantised(bal.credit_limit)), '300.00000000');
   });
 
@@ -476,7 +476,7 @@ test('agent-tree money', async (t) => {
 
     const row = await models.Staff.findByPk(agent, { raw: true });
     assert.ok(await require('@ibitplay/auth').verifyPassword(LOGIN_PASSWORD, row.password), 'own password untouched');
-    const bal = await models.StaffBalances.findOne({ where: { staff_id: agent }, raw: true });
+    const bal = await models.StaffCredits.findOne({ where: { staff_id: agent }, raw: true });
     assert.equal(money.toDecimalString(money.toMinorQuantised(bal.exposure_limit ?? '0')), '0.00000000');
     assert.equal(money.toDecimalString(money.toMinorQuantised(bal.credit_limit ?? '0')), '0.00000000');
 
@@ -554,7 +554,7 @@ test('agent-tree money', async (t) => {
       direction: 'deposit', transfer_type: 'transfer', created_at: new Date(),
     });
     await models.Credits.increment({ inr: '20' }, { where: { uid: player } });
-    await models.StaffBalances.decrement({ inr: '20' }, { where: { staff_id: agent } });
+    await models.StaffCredits.decrement({ inr: '20' }, { where: { staff_id: agent } });
 
     const row = await models.StaffTransfers.findOne({ where: { to_type: 'user', to_id: player }, order: [['id', 'ASC']], raw: true });
     assert.equal(row.transfer_type, 'refill');

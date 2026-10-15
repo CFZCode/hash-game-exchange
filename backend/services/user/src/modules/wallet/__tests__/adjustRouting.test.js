@@ -15,9 +15,10 @@ const { WalletService } = require('../wallet.service');
 /**
  * `POST /admin/user/wallet/adjust` — who gets which path (B2B fix 1).
  *
- * ONLY the platform owner (Super Admin, level 1, its own session) creates
- * money: it keeps the operator adjustment, behind its transaction password
- * once one is set. Everyone else — Admin and Sub Admin included, and every
+ * ONLY the platform owner (Super Admin, level 1, its own session) keeps the
+ * operator adjustment, for coins other than INR, behind its transaction
+ * password once one is set. Owner INR goes to admin-service (migration 099):
+ * the owner's `credits` wallet pays for a child, a direct user is not charged. Everyone else — Admin and Sub Admin included, and every
  * executive — goes to admin-service as a transfer from its own float to its
  * DIRECT player, with the transaction password REQUIRED there.
  */
@@ -68,14 +69,24 @@ test('wallet adjust routing', async (t) => {
     assert.ok(!service.calls.some((c) => c[0] === 'adminAdjust'));
   });
 
-  await t.test('the Super Admin adjusts (mints), after the transaction-password check', async () => {
+  await t.test('the Super Admin adjusts a non-INR coin (operator adjustment), after the transaction-password check', async () => {
+    const service = fakeService();
+    const ctrl = createAdminController({ service });
+    await call(ctrl.adjust, { body: { ...body, currency: 'USDT' }, staff: { id: 3, level: STAFF_LEVELS.SUPER_ADMIN } });
+
+    const names = service.calls.map((c) => c[0]);
+    assert.deepEqual(names, ['visible', 'checkTxn', 'adminAdjust']);
+    assert.deepEqual(service.calls[1].slice(1), [3, 'tp', { required: false, executiveId: null }]);
+  });
+
+  await t.test('the Super Admin adjusting INR goes to admin-service (owner wallet / direct user)', async () => {
     const service = fakeService();
     const ctrl = createAdminController({ service });
     await call(ctrl.adjust, { body, staff: { id: 3, level: STAFF_LEVELS.SUPER_ADMIN } });
 
     const names = service.calls.map((c) => c[0]);
-    assert.deepEqual(names, ['visible', 'checkTxn', 'adminAdjust']);
-    assert.deepEqual(service.calls[1].slice(1), [3, 'tp', { required: false, executiveId: null }]);
+    assert.deepEqual(names, ['visible', 'agentAdjust']);
+    assert.deepEqual(service.calls[1][2], { staffId: 3 });
   });
 
   await t.test("an executive acting for the Super Admin does not mint", async () => {
@@ -95,7 +106,7 @@ test('wallet adjust routing', async (t) => {
       throw err;
     };
     const ctrl = createAdminController({ service });
-    await assert.rejects(() => call(ctrl.adjust, { body, staff: { id: 3, level: STAFF_LEVELS.SUPER_ADMIN } }), (e) => e.code === 'TXN_PASSWORD_INVALID');
+    await assert.rejects(() => call(ctrl.adjust, { body: { ...body, currency: 'USDT' }, staff: { id: 3, level: STAFF_LEVELS.SUPER_ADMIN } }), (e) => e.code === 'TXN_PASSWORD_INVALID');
     assert.ok(!service.calls.some((c) => c[0] === 'adminAdjust'));
   });
 

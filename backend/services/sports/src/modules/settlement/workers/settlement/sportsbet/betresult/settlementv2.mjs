@@ -1428,15 +1428,12 @@ async function processMobmGroup({ job_id, user_id, eventid, match_id, bets, even
   await closeBetsForMatch(user_id, match_id, false, resultStatus, job_id);
   await clearExposuresForMatch(user_id, match_id, market_type);
   if (!allFixed && Number(marketNetAmount) !== 0) {
-    // Points roll-up switched off for now (Wallets → credits move); comes back on the credits ids.
-    /*
     try {
       const pointRes = await walletService_default.updateAllPointHierarchy(Number(firstBet.id), POINT_CATEGORY.SPORTS);
       if (!pointRes.success) log.error("[Settlement] all_point update failed", { user_id, error: pointRes.error });
     } catch (err) {
       log.error("[Settlement] all_point update error", { user_id, error: err.message });
     }
-    */
   }
   if (moSettlementLedgerRow && Number(marketNetAmount) > 0) {
     await applyWinCommission({
@@ -1646,15 +1643,12 @@ async function processnonfancy({ job_id, user_id, eventid, match_id, bet, eventN
   await closeBetsForMatch(user_id, match_id, false, resultStatus, job_id);
   await clearExposuresForMatch(user_id, match_id, market_type);
   if (bet.fixed != 1 && Number(marketNetAmount) !== 0) {
-    // Points roll-up switched off for now (Wallets → credits move); comes back on the credits ids.
-    /*
     try {
       const pointRes = await walletService_default.updateAllPointHierarchy(Number(bet.id), POINT_CATEGORY.SPORTS);
       if (!pointRes.success) log.error("[Settlement] all_point update failed", { user_id, error: pointRes.error });
     } catch (err) {
       log.error("[Settlement] all_point update error", { user_id, error: err.message });
     }
-    */
   }
   if (nfSettlementLedgerRow && Number(marketNetAmount) > 0) {
     await applyWinCommission({
@@ -1981,15 +1975,12 @@ async function processFanBet({ job_id, bet, eventName, marketId, marketName }) {
     }
     const fanNet = Number(num2(netamount));
     if (fanNet !== 0) {
-      // Points roll-up switched off for now (Wallets → credits move); comes back on the credits ids.
-      /*
       try {
         const pointRes = await walletService_default.updateAllPointHierarchy(Number(bet_id), POINT_CATEGORY.SPORTS);
         if (!pointRes.success) log.error("[Settlement] all_point update failed", { user_id, error: pointRes.error });
       } catch (err) {
         log.error("[Settlement] all_point update error", { user_id, error: err.message });
       }
-      */
     }
     if (fanSettlementLedgerRow && winner && fanNet > 0) {
       await applyWinCommission({

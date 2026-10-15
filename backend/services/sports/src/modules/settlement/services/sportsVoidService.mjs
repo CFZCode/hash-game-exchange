@@ -442,8 +442,6 @@ var reversePointsAndEmit = async (summary) => {
     }
     return del;
   }
-  // Points roll-up is switched off (Wallets → credits move), so there is nothing to reverse.
-  /*
   const res = await walletService_default.reverseAllPointHierarchy(summary.betId, POINT_CATEGORY.SPORTS);
   if (!res.success) console.error("[sportsVoid] point reversal failed:", summary.betId, res.error);
   if (Number(summary.commissionVoided) > 0) {
@@ -458,8 +456,6 @@ var reversePointsAndEmit = async (summary) => {
     if (!cres.success) console.error("[sportsVoid] commission point reversal failed:", summary.betId, cres.error);
     res.commission = cres;
   }
-  */
-  const res = { success: true, skipped: true, reason: "points roll-up switched off" };
   try {
     // OLD: const fresh = await Wallet_default.findOne({ where: { user_id: String(summary.userId) }, raw: true });
     // OLD: emitBalanceUpdate(summary.userId, { inr_balance: fresh?.inr_balance, cash: fresh?.cash });

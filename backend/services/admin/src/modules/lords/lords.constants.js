@@ -25,6 +25,10 @@ const PASSWORD_ROUNDS = 12;
  *   issuance  — the same by the platform owner: new money, no float debited
  *   adjust    — an agent-tree "adjust balance" (`/admin/user/wallet/adjust`),
  *               which is a transfer between the agent's float and the player
+ *   direct    — owner ↔ DIRECT user (no parent). The player's balance moves,
+ *               the owner's wallet does not (migration 099 rules)
+ *   owner_topup — the owner adding balance to their own wallet (from 'system')
+ *   points_settle — zip ka points settlement: parent ↔ direct child ka P/L cash me barabar
  *   gt/casino — historical settlement rows; P&L, never money handed over
  */
 const TRANSFER_TYPE = Object.freeze({
@@ -32,6 +36,9 @@ const TRANSFER_TYPE = Object.freeze({
   REFILL: 'refill',
   ISSUANCE: 'issuance',
   ADJUST: 'adjust',
+  DIRECT: 'direct',
+  OWNER_TOPUP: 'owner_topup',
+  POINTS_SETTLE: 'points_settle',
 });
 
 /**
@@ -44,6 +51,8 @@ const PLAYER_FUNDING_TYPES = Object.freeze([
   TRANSFER_TYPE.REFILL,
   TRANSFER_TYPE.ISSUANCE,
   TRANSFER_TYPE.ADJUST,
+  TRANSFER_TYPE.DIRECT,
+  TRANSFER_TYPE.POINTS_SETTLE, // player ka cash sach me badla, isliye statement me aata hai
 ]);
 
 module.exports = {

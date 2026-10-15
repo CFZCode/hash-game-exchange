@@ -1399,7 +1399,7 @@ class ReportsService {
         ? this.models.Staff.findAll({ where: { id: chainIds }, attributes: ['id', 'name', 'email', 'role_id'], raw: true })
         : [],
       this.models.Roles.findAll({ attributes: ['id', 'name', 'level'], raw: true }),
-      this.models.StaffBalances.findOne({ where: { staff_id: staffId }, raw: true }),
+      this.models.StaffCredits.findOne({ where: { staff_id: staffId }, raw: true }),
       this.models.Staff.count({ where: { parent_id: staffId } }),
       this.models.Users.findAll({
         where: { parent_staff_id: subtreeIds },
@@ -1445,7 +1445,7 @@ class ReportsService {
         // password it was created with.
         firstLoginPending: Boolean(subject.first_login),
         createdAt: subject.created_at ?? null,
-        // `fromStored` — `staff_balances.inr` is a bare numeric and real rows
+        // `fromStored` — the staff `credits.inr` is a bare numeric and real rows
         // carry more than eight places.
         balance: money.fromStored(balance?.inr ?? '0'),
       },

@@ -263,11 +263,11 @@ test('push notifications (OneSignal)', async (t) => {
   const staff = { id: STAFF_ID };
   const config = { SERVICE_NAME: 'admin-service', PUBLIC_SITE_URL: 'https://play.example.test' };
 
-  await sql.query(`INSERT INTO roles (id, name, level) VALUES (:roleId, :name, 3) ON CONFLICT (id) DO NOTHING`, {
+  await sql.query(`INSERT INTO roles (id, name, level) VALUES (:roleId, :name, 3) ON CONFLICT (id) DO UPDATE SET level = EXCLUDED.level`, {
     replacements: { roleId, name: `push-role-${roleId}` },
   });
   await sql.query(
-    `INSERT INTO staff (id, name, email, password, role_id) VALUES (:id, :name, :email, 'x', :roleId) ON CONFLICT (id) DO NOTHING`,
+    `INSERT INTO staff (id, name, email, password, role_id) VALUES (:id, :name, :email, 'x', :roleId) ON CONFLICT (id) DO UPDATE SET role_id = EXCLUDED.role_id, parent_id = NULL`,
     { replacements: { id: STAFF_ID, name: `push-staff-${STAFF_ID}`, email: `push-${STAFF_ID}@test.invalid`, roleId } }
   );
   await connection.models.StaffHierarchy.findOrCreate({

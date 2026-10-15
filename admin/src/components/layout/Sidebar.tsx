@@ -13,7 +13,16 @@ import { usePathname, useSearchParams } from 'next/navigation'
 import { ChevronRightIcon, SquareArrowOutUpRightIcon } from 'lucide-react'
 
 // Type Imports
-import { firstNavHref, navIcons, navItems, type MenuGroupSubItem, type MenuItem, type MenuLeafSubItem, type MenuSubItem, type NavItem } from '@/configs/navConfig'
+import {
+  firstNavHref,
+  navIcons,
+  navItems,
+  type MenuGroupSubItem,
+  type MenuItem,
+  type MenuLeafSubItem,
+  type MenuSubItem,
+  type NavItem
+} from '@/configs/navConfig'
 
 // Component Imports
 import LogoSvg from '@/assets/svg/logo'
@@ -90,6 +99,9 @@ const isExternalLink = (href: string) => href.startsWith('http://') || href.star
 // so two sub-groups sharing a label in different parents never collide.
 const subGroupKey = (itemLabel: string, subItemLabel: string) => `${itemLabel}::${subItemLabel}`
 
+// Collapsible sidebar group (section) ka key — item labels se takraye nahi.
+const groupKey = (groupLabel: string) => `group::${groupLabel}`
+
 function isLinkActive(
   href: string,
   activePath: string | undefined,
@@ -128,6 +140,9 @@ function getActiveBranchKeys(
   const keys = new Set<string>()
 
   groups.forEach(group => {
+    const before = keys.size
+    let leafHit = false
+
     group.items.forEach(item => {
       item.childItems?.forEach(subItem => {
         if (isSubGroup(subItem)) {
@@ -139,7 +154,12 @@ function getActiveBranchKeys(
           keys.add(item.label)
         }
       })
+
+      if (!item.childItems && isLinkActive(item.href, undefined, pathname, searchParams)) leafHit = true
     })
+
+    // Group ke andar ka page khula hai to group bhi khula rahe.
+    if (group.groupLabel && (leafHit || keys.size > before)) keys.add(groupKey(group.groupLabel))
   })
 
   return keys
@@ -243,6 +263,7 @@ const FlyoutMenuItem = ({
 const SidebarGroupedMenuItems = ({
   data,
   groupLabel,
+  collapsible,
   pathname,
   searchParams,
   isIconMode,
@@ -251,209 +272,239 @@ const SidebarGroupedMenuItems = ({
 }: {
   data: MenuItem[]
   groupLabel?: string
+  collapsible?: boolean
   pathname: string
   searchParams: Pick<URLSearchParams, 'get'>
   isIconMode: boolean
   isBranchOpen: (key: string) => boolean
   setOpenItem: (key: string, open: boolean) => void
 }) => {
-  return (
-    <SidebarGroup className='gap-1 px-2 py-1.5'>
-      {groupLabel && (
-        <SidebarGroupLabel className='text-sidebar-foreground/55 px-2 text-[11px] font-semibold tracking-[0.09em] uppercase'>
-          {groupLabel}
-        </SidebarGroupLabel>
-      )}
-      <SidebarGroupContent>
-        <SidebarMenu>
-          {data.map(item => {
-            const Tag = item.icon ? (navIcons[item.icon] as ComponentType) : null
+  const labelClass = 'text-sidebar-foreground/55 px-2 text-[11px] font-semibold tracking-[0.09em] uppercase'
 
-            const isChildActive =
-              item.childItems?.some(subItem =>
-                isSubGroup(subItem)
-                  ? subItem.childItems.some(leaf => isLinkActive(leaf.href, leaf.activePath, pathname, searchParams))
-                  : isLinkActive(subItem.href, subItem.activePath, pathname, searchParams)
-              ) ?? false
+  const menu = (
+    <SidebarGroupContent>
+      <SidebarMenu>
+        {data.map(item => {
+          const Tag = item.icon ? (navIcons[item.icon] as ComponentType) : null
 
-            if (item.childItems && isIconMode) {
-              return (
-                <FlyoutMenuItem
-                  key={item.label}
-                  item={item}
-                  childItems={item.childItems}
-                  isChildActive={isChildActive}
-                  pathname={pathname}
-                  searchParams={searchParams}
-                />
-              )
-            }
+          const isChildActive =
+            item.childItems?.some(subItem =>
+              isSubGroup(subItem)
+                ? subItem.childItems.some(leaf => isLinkActive(leaf.href, leaf.activePath, pathname, searchParams))
+                : isLinkActive(subItem.href, subItem.activePath, pathname, searchParams)
+            ) ?? false
 
-            return item.childItems ? (
-              <Collapsible
-                className='group/collapsible'
+          if (item.childItems && isIconMode) {
+            return (
+              <FlyoutMenuItem
                 key={item.label}
-                open={isBranchOpen(item.label)}
-                onOpenChange={open => setOpenItem(item.label, open)}
-              >
-                <SidebarMenuItem>
-                  <CollapsibleTrigger
-                    render={
-                      <SidebarMenuButton
-                        tooltip={item.label}
-                        isActive={isChildActive}
-                        className={cn(menuRowClass, menuRowBranchClass)}
-                      />
-                    }
-                  >
-                    {Tag && <Tag />}
-                    <span className={cn('min-w-0 flex-1 truncate', item.badge && 'pr-14')}>{item.label}</span>
-                    {item.badge && (
-                      <SidebarMenuBadge className={cn(badgeClass, item.badgeClassName)}>{item.badge}</SidebarMenuBadge>
-                    )}
-                    <ChevronRightIcon className='ml-auto transition-transform duration-200 group-data-open/collapsible:rotate-90' />
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className='h-(--collapsible-panel-height) overflow-hidden transition-all duration-200 data-ending-style:h-0 data-starting-style:h-0'>
-                    <SidebarMenuSub>
-                      {item.childItems.map(subItem =>
-                        isSubGroup(subItem) ? (
-                          <Collapsible
-                            className='group/subcollapsible'
-                            key={subItem.label}
-                            open={isBranchOpen(subGroupKey(item.label, subItem.label))}
-                            onOpenChange={open => setOpenItem(subGroupKey(item.label, subItem.label), open)}
-                          >
-                            <SidebarMenuSubItem>
-                              <CollapsibleTrigger
-                                nativeButton={false}
-                                render={
-                                  <SidebarMenuSubButton
-                                    className={subBranchClass}
-                                    isActive={subItem.childItems.some(leaf =>
-                                      isLinkActive(leaf.href, leaf.activePath, pathname, searchParams)
-                                    )}
-                                  />
-                                }
-                              >
-                                {subItem.label}
-                                <ChevronRightIcon className='ml-auto shrink-0 transition-transform duration-200 group-data-open/subcollapsible:rotate-90' />
-                              </CollapsibleTrigger>
-                              <CollapsibleContent className='h-(--collapsible-panel-height) overflow-hidden transition-all duration-200 data-ending-style:h-0 data-starting-style:h-0'>
-                                <SidebarMenuSub className='mx-0'>
-                                  {subItem.childItems.map(leaf => (
-                                    <SidebarMenuSubItem key={leaf.label}>
-                                      <SidebarMenuSubButton
-                                        className={subRowClass}
-                                        render={<Link href={leaf.href} target={leaf.target} />}
-                                        isActive={isLinkActive(leaf.href, leaf.activePath, pathname, searchParams)}
-                                      >
-                                        <span
-                                          className={cn(
-                                            'min-w-0 flex-1 truncate',
-                                            leaf.badge && isExternalLink(leaf.href) && 'pr-8',
-                                            leaf.badge && !isExternalLink(leaf.href) && 'pr-14',
-                                            !leaf.badge && isExternalLink(leaf.href) && 'pr-6'
-                                          )}
-                                        >
-                                          {leaf.label}
-                                        </span>
-                                        {leaf.badge && (
-                                          <SidebarMenuBadge
-                                            className={cn(
-                                              badgeClass,
-                                              'top-1.5!',
-                                              isExternalLink(leaf.href) && 'right-6',
-                                              leaf.badgeClassName
-                                            )}
-                                          >
-                                            {leaf.badge}
-                                          </SidebarMenuBadge>
-                                        )}
-                                        {isExternalLink(leaf.href) && (
-                                          <SquareArrowOutUpRightIcon className='ml-auto size-3.5! shrink-0 opacity-50' />
-                                        )}
-                                      </SidebarMenuSubButton>
-                                    </SidebarMenuSubItem>
-                                  ))}
-                                </SidebarMenuSub>
-                              </CollapsibleContent>
-                            </SidebarMenuSubItem>
-                          </Collapsible>
-                        ) : (
-                          <SidebarMenuSubItem key={subItem.label}>
-                            <SidebarMenuSubButton
-                              className={subRowClass}
-                              render={<Link href={subItem.href} target={subItem.target} />}
-                              isActive={isLinkActive(subItem.href, subItem.activePath, pathname, searchParams)}
-                            >
-                              <span
-                                className={cn(
-                                  'min-w-0 flex-1 truncate',
-                                  subItem.badge && isExternalLink(subItem.href) && 'pr-8',
-                                  subItem.badge && !isExternalLink(subItem.href) && 'pr-14',
-                                  !subItem.badge && isExternalLink(subItem.href) && 'pr-6'
-                                )}
-                              >
-                                {subItem.label}
-                              </span>
-                              {subItem.badge && (
-                                <SidebarMenuBadge
-                                  className={cn(
-                                    badgeClass,
-                                    'top-1.5!',
-                                    isExternalLink(subItem.href) && 'right-6',
-                                    subItem.badgeClassName
-                                  )}
-                                >
-                                  {subItem.badge}
-                                </SidebarMenuBadge>
-                              )}
-                              {isExternalLink(subItem.href) && (
-                                <SquareArrowOutUpRightIcon className='ml-auto size-3.5! shrink-0 opacity-50' />
-                              )}
-                            </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>
-                        )
-                      )}
-                    </SidebarMenuSub>
-                  </CollapsibleContent>
-                </SidebarMenuItem>
-              </Collapsible>
-            ) : (
-              <SidebarMenuItem key={item.label}>
-                <SidebarMenuButton
-                  tooltip={item.label}
-                  render={<Link href={item.href} target={item.target} />}
-                  isActive={pathname === item.href}
-                  className={cn(menuRowClass, menuRowActiveClass)}
+                item={item}
+                childItems={item.childItems}
+                isChildActive={isChildActive}
+                pathname={pathname}
+                searchParams={searchParams}
+              />
+            )
+          }
+
+          return item.childItems ? (
+            <Collapsible
+              className='group/collapsible'
+              key={item.label}
+              open={isBranchOpen(item.label)}
+              onOpenChange={open => setOpenItem(item.label, open)}
+            >
+              <SidebarMenuItem>
+                <CollapsibleTrigger
+                  render={
+                    <SidebarMenuButton
+                      tooltip={item.label}
+                      isActive={isChildActive}
+                      className={cn(menuRowClass, menuRowBranchClass)}
+                    />
+                  }
                 >
                   {Tag && <Tag />}
-                  <span
-                    className={cn(
-                      'min-w-0 flex-1 truncate',
-                      item.badge && isExternalLink(item.href) && 'pr-8',
-                      item.badge && !isExternalLink(item.href) && 'pr-14',
-                      !item.badge && isExternalLink(item.href) && 'pr-6'
-                    )}
-                  >
-                    {item.label}
-                  </span>
+                  <span className={cn('min-w-0 flex-1 truncate', item.badge && 'pr-14')}>{item.label}</span>
                   {item.badge && (
-                    <SidebarMenuBadge
-                      className={cn(badgeClass, isExternalLink(item.href) && 'right-6', item.badgeClassName)}
-                    >
-                      {item.badge}
-                    </SidebarMenuBadge>
+                    <SidebarMenuBadge className={cn(badgeClass, item.badgeClassName)}>{item.badge}</SidebarMenuBadge>
                   )}
-                  {isExternalLink(item.href) && (
-                    <SquareArrowOutUpRightIcon className='ml-auto size-3.5! shrink-0 opacity-50' />
-                  )}
-                </SidebarMenuButton>
+                  <ChevronRightIcon className='ml-auto transition-transform duration-200 group-data-open/collapsible:rotate-90' />
+                </CollapsibleTrigger>
+                <CollapsibleContent className='h-(--collapsible-panel-height) overflow-hidden transition-all duration-200 data-ending-style:h-0 data-starting-style:h-0'>
+                  <SidebarMenuSub>
+                    {item.childItems.map(subItem =>
+                      isSubGroup(subItem) ? (
+                        <Collapsible
+                          className='group/subcollapsible'
+                          key={subItem.label}
+                          open={isBranchOpen(subGroupKey(item.label, subItem.label))}
+                          onOpenChange={open => setOpenItem(subGroupKey(item.label, subItem.label), open)}
+                        >
+                          <SidebarMenuSubItem>
+                            <CollapsibleTrigger
+                              nativeButton={false}
+                              render={
+                                <SidebarMenuSubButton
+                                  className={subBranchClass}
+                                  isActive={subItem.childItems.some(leaf =>
+                                    isLinkActive(leaf.href, leaf.activePath, pathname, searchParams)
+                                  )}
+                                />
+                              }
+                            >
+                              {subItem.label}
+                              <ChevronRightIcon className='ml-auto shrink-0 transition-transform duration-200 group-data-open/subcollapsible:rotate-90' />
+                            </CollapsibleTrigger>
+                            <CollapsibleContent className='h-(--collapsible-panel-height) overflow-hidden transition-all duration-200 data-ending-style:h-0 data-starting-style:h-0'>
+                              <SidebarMenuSub className='mx-0'>
+                                {subItem.childItems.map(leaf => (
+                                  <SidebarMenuSubItem key={leaf.label}>
+                                    <SidebarMenuSubButton
+                                      className={subRowClass}
+                                      render={<Link href={leaf.href} target={leaf.target} />}
+                                      isActive={isLinkActive(leaf.href, leaf.activePath, pathname, searchParams)}
+                                    >
+                                      <span
+                                        className={cn(
+                                          'min-w-0 flex-1 truncate',
+                                          leaf.badge && isExternalLink(leaf.href) && 'pr-8',
+                                          leaf.badge && !isExternalLink(leaf.href) && 'pr-14',
+                                          !leaf.badge && isExternalLink(leaf.href) && 'pr-6'
+                                        )}
+                                      >
+                                        {leaf.label}
+                                      </span>
+                                      {leaf.badge && (
+                                        <SidebarMenuBadge
+                                          className={cn(
+                                            badgeClass,
+                                            'top-1.5!',
+                                            isExternalLink(leaf.href) && 'right-6',
+                                            leaf.badgeClassName
+                                          )}
+                                        >
+                                          {leaf.badge}
+                                        </SidebarMenuBadge>
+                                      )}
+                                      {isExternalLink(leaf.href) && (
+                                        <SquareArrowOutUpRightIcon className='ml-auto size-3.5! shrink-0 opacity-50' />
+                                      )}
+                                    </SidebarMenuSubButton>
+                                  </SidebarMenuSubItem>
+                                ))}
+                              </SidebarMenuSub>
+                            </CollapsibleContent>
+                          </SidebarMenuSubItem>
+                        </Collapsible>
+                      ) : (
+                        <SidebarMenuSubItem key={subItem.label}>
+                          <SidebarMenuSubButton
+                            className={subRowClass}
+                            render={<Link href={subItem.href} target={subItem.target} />}
+                            isActive={isLinkActive(subItem.href, subItem.activePath, pathname, searchParams)}
+                          >
+                            <span
+                              className={cn(
+                                'min-w-0 flex-1 truncate',
+                                subItem.badge && isExternalLink(subItem.href) && 'pr-8',
+                                subItem.badge && !isExternalLink(subItem.href) && 'pr-14',
+                                !subItem.badge && isExternalLink(subItem.href) && 'pr-6'
+                              )}
+                            >
+                              {subItem.label}
+                            </span>
+                            {subItem.badge && (
+                              <SidebarMenuBadge
+                                className={cn(
+                                  badgeClass,
+                                  'top-1.5!',
+                                  isExternalLink(subItem.href) && 'right-6',
+                                  subItem.badgeClassName
+                                )}
+                              >
+                                {subItem.badge}
+                              </SidebarMenuBadge>
+                            )}
+                            {isExternalLink(subItem.href) && (
+                              <SquareArrowOutUpRightIcon className='ml-auto size-3.5! shrink-0 opacity-50' />
+                            )}
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      )
+                    )}
+                  </SidebarMenuSub>
+                </CollapsibleContent>
               </SidebarMenuItem>
-            )
-          })}
-        </SidebarMenu>
-      </SidebarGroupContent>
+            </Collapsible>
+          ) : (
+            <SidebarMenuItem key={item.label}>
+              <SidebarMenuButton
+                tooltip={item.label}
+                render={<Link href={item.href} target={item.target} />}
+                isActive={pathname === item.href}
+                className={cn(menuRowClass, menuRowActiveClass)}
+              >
+                {Tag && <Tag />}
+                <span
+                  className={cn(
+                    'min-w-0 flex-1 truncate',
+                    item.badge && isExternalLink(item.href) && 'pr-8',
+                    item.badge && !isExternalLink(item.href) && 'pr-14',
+                    !item.badge && isExternalLink(item.href) && 'pr-6'
+                  )}
+                >
+                  {item.label}
+                </span>
+                {item.badge && (
+                  <SidebarMenuBadge
+                    className={cn(badgeClass, isExternalLink(item.href) && 'right-6', item.badgeClassName)}
+                  >
+                    {item.badge}
+                  </SidebarMenuBadge>
+                )}
+                {isExternalLink(item.href) && (
+                  <SquareArrowOutUpRightIcon className='ml-auto size-3.5! shrink-0 opacity-50' />
+                )}
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )
+        })}
+      </SidebarMenu>
+    </SidebarGroupContent>
+  )
+
+  // Collapsible group (jaise Sports Exchange): label pe click = poora section khule / band ho.
+  // Icon rail me label dikhta hi nahi, wahan items hamesha dikhte hain.
+  if (collapsible && groupLabel && !isIconMode) {
+    const key = groupKey(groupLabel)
+
+    return (
+      <Collapsible className='group/section' open={isBranchOpen(key)} onOpenChange={open => setOpenItem(key, open)}>
+        <SidebarGroup className='gap-1 px-2 py-1.5'>
+          <CollapsibleTrigger
+            nativeButton={false}
+            render={
+              <SidebarGroupLabel
+                className={cn(labelClass, 'hover:text-sidebar-foreground hover:bg-sidebar-accent cursor-pointer')}
+              />
+            }
+          >
+            <span className='min-w-0 flex-1 truncate'>{groupLabel}</span>
+            <ChevronRightIcon className='ml-auto transition-transform duration-200 group-data-open/section:rotate-90' />
+          </CollapsibleTrigger>
+          <CollapsibleContent className='h-(--collapsible-panel-height) overflow-hidden transition-all duration-200 data-ending-style:h-0 data-starting-style:h-0'>
+            {menu}
+          </CollapsibleContent>
+        </SidebarGroup>
+      </Collapsible>
+    )
+  }
+
+  return (
+    <SidebarGroup className='gap-1 px-2 py-1.5'>
+      {groupLabel && <SidebarGroupLabel className={labelClass}>{groupLabel}</SidebarGroupLabel>}
+      {menu}
     </SidebarGroup>
   )
 }
@@ -559,6 +610,7 @@ const SidebarLayout = () => {
               key={navItem.groupLabel || index}
               data={navItem.items}
               groupLabel={navItem.groupLabel}
+              collapsible={navItem.collapsible}
               pathname={pathname}
               searchParams={searchParams}
               isIconMode={isIconMode}

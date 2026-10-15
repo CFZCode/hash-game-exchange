@@ -416,10 +416,11 @@ const OpenBets = () => {
   )
 }
 
-const Settlement = () => (
+/** `defaultTab`: Sports Exchange > Settlement opens Match (mo), Fancy (fancy) or Void bets (open). */
+const Settlement = ({ defaultTab = 'mo' }: { defaultTab?: 'mo' | 'fancy' | 'open' | 'settled' }) => (
   <div>
     <PageHeader title='Sports settlement' description='Markets waiting for a result, the bets open on them, and what has already been settled.' />
-    <Tabs defaultValue='mo'>
+    <Tabs defaultValue={defaultTab}>
       <TabsList className='mb-4 flex-wrap'>
         <TabsTrigger value='mo'>Match odds &amp; bookmaker</TabsTrigger>
         <TabsTrigger value='fancy'>Fancy</TabsTrigger>

@@ -22,8 +22,10 @@ const {
   insufficientPlayerBalance,
 } = require('./staffFloat');
 const { TRANSFER_TYPE } = require('./lords.constants');
+const { addPointEntry, POINT_EVENT } = require('./pointLedger');
+const { isOwnerStaff, isDirectUser } = require('./ownerWallet');
 
-/** The only currency a staff float holds (`staff_balances.inr`). */
+/** The only currency a staff float holds (`credits.inr` on the staff row). */
 const FLOAT_CURRENCY = 'INR';
 
 /** A NUMERIC that arrived as a string, as a plain number. Missing reads as 0. */
@@ -170,7 +172,7 @@ class LordsService {
     await this.#assertTransactionPassword(actor, transactionPassword);
 
     if (accountType === ACCOUNT_TYPE.STAFF) {
-      await this.models.StaffBalances.update(
+      await this.models.StaffCredits.update(
         { exposure_limit: exposureLimit },
         { where: { staff_id: accountId } }
       );
@@ -190,7 +192,7 @@ class LordsService {
    *
    * Set an AGENT's credit line — how far below zero their float may go.
    *
-   *   staff → `staff_balances.credit_limit`: the agent's credit line. ENFORCED
+   *   staff → `credits.credit_limit` (staff row): the agent's credit line. ENFORCED
    *           on every movement that funds a player from the agent's float
    *           (refill, agent-tree balance credit, a transfer to a player) —
    *           see `staffFloat.js`.
@@ -206,7 +208,7 @@ class LordsService {
     await this.#assertInTree(actor, accountType, accountId, { excludeSelf: 'you cannot set your own credit line' });
     await this.#assertTransactionPassword(actor, transactionPassword);
 
-    const [row, created] = await this.models.StaffBalances.findOrCreate({
+    const [row, created] = await this.models.StaffCredits.findOrCreate({
       where: { staff_id: accountId },
       defaults: { staff_id: accountId, inr: '0', credit_limit: creditLimit },
     });
@@ -233,14 +235,13 @@ class LordsService {
    * ─────────────────────────────────────────────────────────────────────
    * WHERE THE MONEY COMES FROM
    *
-   * An ordinary operator funds it from their own balance — a guarded debit
-   * that refuses rather than going negative. The platform owner does not: the
-   * house is where money enters the system, so there is nothing to draw down.
+   * Everyone funds it from their own balance (`credits` row) — the owner too,
+   * since migration 099: the owner first puts money into their own wallet
+   * (`ownerAddBalance`) and every refill draws it down. A guarded debit that
+   * refuses rather than going negative.
    *
-   * Legacy modelled both correctly and recorded neither distinctly, so an
-   * owner-issued refill looked exactly like an agent moving their own float.
-   * Issuance is logged as issuance here and carries a per-refill ceiling that
-   * legacy had no equivalent of.
+   * One exception: the owner refilling a DIRECT user (no parent) — the player
+   * gets it and the owner's wallet is not touched (`ownerWallet.js`).
    * ─────────────────────────────────────────────────────────────────────
    */
   async refill({ actor, accountId, amount, note, transactionPassword }) {
@@ -250,20 +251,18 @@ class LordsService {
     const ceiling = String(this.config.ADMIN_MAX_REFILL ?? '1000000');
     if (money.gt(amount, ceiling)) throw errors.REFILL_TOO_LARGE({ amount, ceiling });
 
+    // Owner aur direct user: owner ka wallet nahi katega.
+    const ownerToDirectUser = actor.canIssueFunds && (await isDirectUser(this.models, accountId));
+
     return this.db.transaction(async (transaction) => {
-      if (actor.canIssueFunds) {
-        this.logger?.warn(
-          { actorStaffId: actor.id, accountId, amount, note },
-          'Funds ISSUED by the platform owner — not drawn from an existing balance'
-        );
-      } else {
-        /**
-         * The guarded debit. `inr >= :amount` in the WHERE means Postgres
-         * decides under its own row lock and the row count is the answer —
-         * legacy read the balance with `FOR UPDATE` inside a transaction shared
-         * by every concurrent request, which is a lock whose scope nobody can
-         * reason about.
-         */
+      /**
+       * The guarded debit. `inr >= :amount` in the WHERE means Postgres
+       * decides under its own row lock and the row count is the answer —
+       * legacy read the balance with `FOR UPDATE` inside a transaction shared
+       * by every concurrent request, which is a lock whose scope nobody can
+       * reason about.
+       */
+      if (!ownerToDirectUser) {
         const debited = await debitStaffFloat(this.models, actor.id, amount, { transaction, allowCredit: true });
         if (!debited) throw insufficientStaffBalance({ amount });
       }
@@ -280,7 +279,7 @@ class LordsService {
         );
       }
 
-      await this.models.StaffTransfers.create(
+      const transfer = await this.models.StaffTransfers.create(
         {
           from_type: ACCOUNT_TYPE.STAFF,
           from_id: actor.id,
@@ -290,10 +289,26 @@ class LordsService {
           direction: 'deposit',
           // Its own type, so a statement can say "Refill" rather than passing
           // it off as an ordinary transfer. Rows written before this are
-          // 'transfer' and still read as one.
-          transfer_type: actor.canIssueFunds ? TRANSFER_TYPE.ISSUANCE : TRANSFER_TYPE.REFILL,
+          // 'transfer' and still read as one. ('issuance' rows are history:
+          // the owner refilled without paying before migration 099.)
+          transfer_type: ownerToDirectUser ? TRANSFER_TYPE.DIRECT : TRANSFER_TYPE.REFILL,
           note: note ?? null,
           created_at: new Date(),
+        },
+        { transaction }
+      );
+
+      // Point ledger: parent ne player ko diya.
+      await addPointEntry(
+        this.models,
+        {
+          child: { type: ACCOUNT_TYPE.USER, id: accountId },
+          parent: { type: ACCOUNT_TYPE.STAFF, id: actor.id },
+          amount,
+          isDeposit: true,
+          transferId: transfer.id,
+          eventType: ownerToDirectUser ? POINT_EVENT.BANK_DEPOSIT : undefined,
+          remark: note ?? 'Refill',
         },
         { transaction }
       );
@@ -305,7 +320,7 @@ class LordsService {
       });
 
       this.logger?.info(
-        { actorStaffId: actor.id, accountId, amount, issued: Boolean(actor.canIssueFunds) },
+        { actorStaffId: actor.id, accountId, amount },
         'Wallet refilled'
       );
 
@@ -314,7 +329,7 @@ class LordsService {
         amount: money.toDecimalString(money.toMinor(amount)),
         balance: money.fromStored(after?.inr ?? '0'),
         currency: 'INR',
-        issued: Boolean(actor.canIssueFunds),
+        issued: false,
       };
     });
   }
@@ -332,7 +347,7 @@ class LordsService {
    * transaction password and nothing on either statement. An agent-tree
    * player's money comes ONLY from their agent, so here:
    *
-   *   credit — the agent's float pays: guarded debit of `staff_balances.inr`
+   *   credit — the agent's float pays: guarded debit of the staff `credits.inr`
    *            (down to −credit_limit), credit of the player's INR wallet
    *   debit  — the player's wallet pays (guarded at >= amount), and the agent's
    *            float receives it
@@ -349,21 +364,37 @@ class LordsService {
    * reads that reason as a house adjustment, and this movement is already on
    * it through `staff_transfers`.
    *
-   * INR only: an agent's float is `staff_balances.inr`, and there is no float
+   * INR only: an agent's float is the staff `credits.inr`, and there is no float
    * in any other currency to draw from.
+   *
+   * OWNER (migration 099): the owner comes through here too, for INR.
+   *   - player has a parent → the owner's wallet pays, exactly like an agent
+   *   - DIRECT user (no parent) → the player's balance moves, the owner's
+   *     wallet does NOT; recorded as transfer_type 'direct' and point events
+   *     'Bank Deposite' / 'Bank Withdraw' (see `ownerWallet.js`)
    * ─────────────────────────────────────────────────────────────────────
    */
   async adjustPlayer({
     actor, userId, currency, amount, operation, description, idempotencyKey, username, transactionPassword,
   }) {
+    // user-service forwards only the staff id; owner hai ya nahi, DB se dekho.
+    // (Owner ka executive owner nahi hai — wo sirf apne parent ka kaam karta hai.)
+    if (actor.canIssueFunds === undefined) {
+      actor = { ...actor, canIssueFunds: !actor.executiveId && (await isOwnerStaff(this.models, actor.id)) };
+    }
+
     // Tree scope FIRST: an account outside the caller's tree is a 404 whatever
     // password came with it, so the password check is never an oracle (or a
     // spent attempt) for a probe at someone else's player.
     await this.#assertMoneyTarget(actor, userId);
     await assertTransactionPassword(this.models, actor.id, transactionPassword, {
-      required: true,
+      // Owner: required once set (the old house-adjust rule). Everyone else: always.
+      required: !actor.canIssueFunds,
       executiveId: actor.executiveId ?? null,
     });
+
+    // Owner aur direct user: owner ka wallet nahi badlega.
+    const ownerToDirectUser = actor.canIssueFunds && (await isDirectUser(this.models, userId));
 
     if (String(currency).toUpperCase() !== FLOAT_CURRENCY) {
       throw errors.FLOAT_CURRENCY_ONLY({ currency, allowed: FLOAT_CURRENCY });
@@ -428,13 +459,16 @@ class LordsService {
       const previous = money.toMinorQuantised(wallet.inr ?? '0');
 
       // ── 3. Move it. Each side is a guarded/atomic UPDATE decided by Postgres.
+      //       Owner → direct user: sirf player ka balance badalta hai.
       if (isCredit) {
-        const debited = await debitStaffFloat(this.models, actor.id, decimal, { transaction, allowCredit: true });
-        if (!debited) {
-          throw insufficientStaffBalance({
-            requested: decimal,
-            ...(await readStaffFloat(this.models, actor.id, { transaction })),
-          });
+        if (!ownerToDirectUser) {
+          const debited = await debitStaffFloat(this.models, actor.id, decimal, { transaction, allowCredit: true });
+          if (!debited) {
+            throw insufficientStaffBalance({
+              requested: decimal,
+              ...(await readStaffFloat(this.models, actor.id, { transaction })),
+            });
+          }
         }
         await this.models.Credits.increment({ inr: decimal }, { where: { uid: userId }, transaction });
       } else {
@@ -445,7 +479,7 @@ class LordsService {
         if (!affected) {
           throw insufficientPlayerBalance({ requested: decimal, available: money.toDecimalString(previous) });
         }
-        await creditStaffFloat(this.models, actor.id, decimal, { transaction });
+        if (!ownerToDirectUser) await creditStaffFloat(this.models, actor.id, decimal, { transaction });
       }
 
       const previousBalance = money.toDecimalString(previous);
@@ -460,9 +494,25 @@ class LordsService {
           to_id: isCredit ? userId : actor.id,
           amount: decimal,
           direction: isCredit ? 'deposit' : 'withdraw',
-          transfer_type: TRANSFER_TYPE.ADJUST,
+          transfer_type: ownerToDirectUser ? TRANSFER_TYPE.DIRECT : TRANSFER_TYPE.ADJUST,
           note: description ?? null,
           created_at: new Date(),
+        },
+        { transaction }
+      );
+
+      // Point ledger: parent ne player ko diya (credit) ya player se liya (debit).
+      await addPointEntry(
+        this.models,
+        {
+          child: { type: ACCOUNT_TYPE.USER, id: userId },
+          parent: { type: ACCOUNT_TYPE.STAFF, id: actor.id },
+          amount: decimal,
+          isDeposit: isCredit,
+          transferId: transfer.id,
+          // Direct user ki history alag naam se, taaki pata rahe owner ka balance nahi kata.
+          eventType: ownerToDirectUser ? (isCredit ? POINT_EVENT.BANK_DEPOSIT : POINT_EVENT.BANK_WITHDRAW) : undefined,
+          remark: description || (isCredit ? 'Deposit' : 'Withdraw'),
         },
         { transaction }
       );
@@ -691,7 +741,7 @@ class LordsService {
     const userIds = userRows.map((u) => Number(u.id));
 
     const [balances, credits, downline, subtrees] = await Promise.all([
-      this.models.StaffBalances.findAll({ where: { staff_id: staffIds }, raw: true }),
+      this.models.StaffCredits.findAll({ where: { staff_id: staffIds }, raw: true }),
       this.models.Credits.findAll({ where: { uid: userIds }, raw: true }),
       this.#hasDownline(staffIds),
       this.#subtreePlayers(staffIds, visible),
@@ -904,7 +954,11 @@ class LordsService {
    * the transaction password like every other scope check here.
    */
   async #assertMoneyTarget(actor, userId) {
-    if (actor.canIssueFunds) return this.#assertInTree(actor, ACCOUNT_TYPE.USER, userId);
+    if (actor.canIssueFunds) {
+      // Owner: apne tree ka koi bhi player, ya DIRECT user (jiska koi parent nahi).
+      if (await isDirectUser(this.models, userId)) return Number(userId);
+      return this.#assertInTree(actor, ACCOUNT_TYPE.USER, userId);
+    }
 
     const player = await this.models.Users.findOne({
       where: { id: userId, parent_staff_id: actor.id },
