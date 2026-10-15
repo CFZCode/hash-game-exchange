@@ -1,6 +1,6 @@
 // pm2 layout for the live parker567 stack (hash-game-exchange).
 //   parker567.com -> frontend :5190   api.parker567.com -> gateway :4700   admin.parker567.com -> admin :3080
-// Owner panel :3085 stays on 127.0.0.1 (never proxied). Ports come from scripts/stack.config.mjs.
+// Owner panel :3085 binds 127.0.0.1; Apache proxies admin.parker567.com/owner to it (BASEPATH=/owner in owner-panel/.env.local). Ports come from scripts/stack.config.mjs.
 // Backend processes run with cwd = backend so packages/common/src/env.js finds backend/.env.
 //   pm2 start ecosystem.config.cjs && pm2 save
 const path = require('path');

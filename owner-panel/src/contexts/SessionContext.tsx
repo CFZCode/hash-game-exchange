@@ -2,6 +2,8 @@
 
 import { createContext, useCallback, useContext, useMemo, type ReactNode } from 'react'
 
+import { withBase } from '@/lib/basePath'
+
 import { useQueryClient } from '@tanstack/react-query'
 
 type SessionValue = {
@@ -17,9 +19,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const qc = useQueryClient()
 
   const signOut = useCallback(async () => {
-    await fetch('/api/auth/logout', { method: 'POST' }).catch(() => undefined)
+    await fetch(withBase('/api/auth/logout'), { method: 'POST' }).catch(() => undefined)
     qc.clear()
-    location.assign('/login')
+    location.assign(withBase('/login'))
   }, [qc])
 
   const value = useMemo<SessionValue>(() => ({ can: () => true, flags: {}, signOut }), [signOut])

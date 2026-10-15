@@ -1,3 +1,4 @@
+import { BASE_PATH, withBase } from '../basePath'
 import type { Envelope, Query } from './types'
 
 /** Owner panel HTTP seam: same-origin `/api/owner/...` route handlers. */
@@ -23,7 +24,7 @@ export function buildQuery(query?: Query) {
 }
 
 export async function request<T>(path: string, opts: { method?: string; body?: unknown; query?: Query; signal?: AbortSignal } = {}): Promise<T> {
-  const res = await fetch(path + buildQuery(opts.query), {
+  const res = await fetch(withBase(path) + buildQuery(opts.query), {
     method: opts.method ?? 'GET',
     headers: opts.body !== undefined ? { 'content-type': 'application/json' } : undefined,
     body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
@@ -36,7 +37,7 @@ export async function request<T>(path: string, opts: { method?: string; body?: u
   if (!json) throw new ApiError(res.status, 'BAD_RESPONSE', res.statusText)
 
   if (!json.success) {
-    if (res.status === 401 && typeof window !== 'undefined' && !location.pathname.startsWith('/login')) location.assign('/login')
+    if (res.status === 401 && typeof window !== 'undefined' && !location.pathname.startsWith(`${BASE_PATH}/login`)) location.assign(withBase('/login'))
     throw new ApiError(res.status, json.error.code, json.error.message)
   }
 

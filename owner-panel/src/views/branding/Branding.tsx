@@ -17,6 +17,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
 import { useApi, useApiMutation } from '@/hooks/use-api'
 import { api, ApiError } from '@/lib/api/client'
+import { withBase } from '@/lib/basePath'
 import {
   BRANDING_LABELS,
   brandingProblem,
@@ -41,7 +42,7 @@ async function upload(slot: BrandingSlot, file: File): Promise<BrandingAsset> {
   const body = new FormData()
 
   body.set('file', file)
-  const res = await fetch(`/api/owner/branding/upload?slot=${slot}`, { method: 'POST', body, cache: 'no-store' })
+  const res = await fetch(withBase(`/api/owner/branding/upload?slot=${slot}`), { method: 'POST', body, cache: 'no-store' })
   const json = (await res.json().catch(() => null)) as { success: boolean; data?: BrandingAsset; error?: { code: string; message: string } } | null
 
   if (!json?.success || !json.data) throw new ApiError(res.status, json?.error?.code ?? 'BAD_RESPONSE', json?.error?.message ?? res.statusText)
