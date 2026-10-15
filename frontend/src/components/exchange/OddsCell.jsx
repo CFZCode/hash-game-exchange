@@ -90,8 +90,9 @@ export default function OddsCell({
         {locked ? '—' : formatPrice(price)}
       </span>
       {/* Rendered (invisibly) whenever the market carries sizes, so a cell whose size blinks
-          out keeps its text position; `size={null}` (bookmaker style) drops the line. */}
-      {size !== null && (
+          out keeps its text position; `size={null}` (bookmaker style) drops the line. A locked
+          cell drops it too, so its "—" sits in the vertical centre. */}
+      {size !== null && !locked && (
       <span
         className={cx(
           'mt-0.5 font-semibold opacity-80',

@@ -1,4 +1,4 @@
-import { useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import logoPureImg from '../../../assets/footer/logo-pure.png';
 import logoPureLightImg from '../../../assets/footer/logo-pure_w.png';
 import { COLUMNS, SEO, legal } from './links';
@@ -72,11 +72,16 @@ function NavLink({ label, href, external, button }) {
     );
   }
 
-  return (
-    <a href={href} {...(external ? { target: '_blank', rel: 'noreferrer' } : {})}>
-      {inner}
-    </a>
-  );
+  if (external) {
+    return (
+      <a href={href} target="_blank" rel="noreferrer">
+        {inner}
+      </a>
+    );
+  }
+
+  /* In-app links go through the router: a plain <a> reloaded the whole page. */
+  return <Link to={href}>{inner}</Link>;
 }
 
 /* `oe` in index-BPci0vXA.js. The original writes each mark as a bare

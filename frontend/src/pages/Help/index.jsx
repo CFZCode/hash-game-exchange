@@ -183,13 +183,23 @@ function toSections(html) {
   const out = [];
   SECTION_RE.lastIndex = 0;
   let match;
+  /* String-only (no DOM), so it is safe wherever this runs. */
+  const decodeEntities = (text) =>
+    text
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;|&apos;/g, "'")
+      .replace(/&amp;/g, '&');
   while ((match = SECTION_RE.exec(html)) !== null) {
     const inner = match[1];
     const heading = inner.match(H2_RE);
     if (!heading) continue;
     out.push({
-      /* The heading can carry inline markup; the trigger wants text. */
-      title: heading[1].replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim(),
+      /* The heading can carry inline markup and entities; the trigger wants text, so tags are
+         dropped and entities decoded (`&amp;` printed literally in "Gamble Aware & …"). */
+      title: decodeEntities(heading[1].replace(/<[^>]*>/g, '')).replace(/\s+/g, ' ').trim(),
       body: inner.replace(H2_RE, '').trim(),
     });
   }

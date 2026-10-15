@@ -88,7 +88,7 @@ const HeadphonesSvg = () => (
 // a long time and is not any more; see the note over the sprite block in Sidebar.css.
 const SubNavLink = ({ item, flyoutOpen, onFlyout, onCloseMobile, onAction }) => {
   const { pathname } = useLocation();
-  const active = Boolean(item.href) && pathname === item.href;
+  const active = isRowActive(pathname, item);
 
   const className = `nav-link-item relative flex h-10 w-full cursor-pointer items-center rounded-lg px-3 lg:pl-0 lg:pr-2 overflow-hidden mt-1 ${
     active ? 'nav-link-active' : ''
@@ -224,7 +224,22 @@ const SUBMENU_ROUTES = [
      you are signed in; the entry is harmless either way. */
   ['casino', '/favorite'],
   ['casino', '/recent'],
+  /* The game lists the Casino rows and the footer open — `/section/exclusive` is a Casino row
+     itself — and the two Promotions pages that are not under `/promotions/promotion`. Without
+     these the group stayed shut on those pages and the row that should light up was hidden. */
+  ['casino', '/section'],
+  ['casino', '/gamelist'],
+  ['casino', '/tagname'],
+  ['promotions', '/promotions'],
 ];
+
+/* A row is lit on its own path, and on any path listed in its `match` (and below it): the
+   same list under another URL — `/gamelist/slots` is Slots — or a page with sub-pages, like
+   `/referral/*` or `/responsible/*`. */
+const isRowActive = (pathname, item) =>
+  Boolean(item.href) &&
+  (pathname === item.href ||
+    (item.match ?? []).some((path) => pathname === path || pathname.startsWith(`${path}/`)));
 
 /* `guard: { needLogin: !0 }` in the original's menu definition, which is
    `index-DuwOs_Mv.js` — a module that IS in the mirror and is the authority for every row in
@@ -386,16 +401,18 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
            chevron and open nothing, which is what they already did. */
         { label: brandLabel('BC Originals'), icon: 'bc-originals-svg', href: '/casino/brand', hasSubArrow: true, flyout: 'originals' },
         { label: brandLabel('BC Exclusive'), menuIcon: 'bc_exlusive', href: '/section/exclusive' },
-        { label: 'Hot Games', menuIcon: 'hotgame', href: '/casino/hot' },
-        { label: 'Slots', menuIcon: 'slots', href: '/casino/slots' },
-        { label: 'Live Casino', menuIcon: 'liveevents', href: '/casino/live' },
+        { label: 'Hot Games', menuIcon: 'hotgame', href: '/casino/hot', match: ['/section/hot_games'] },
+        { label: 'Slots', menuIcon: 'slots', href: '/casino/slots', match: ['/gamelist/slots'] },
+        { label: 'Live Casino', menuIcon: 'liveevents', href: '/casino/live', match: ['/gamelist/live'] },
         { label: 'Game Shows', menuIcon: 'game_shows', href: '/casino/game-shows' },
-        { label: 'New Releases', menuIcon: 'newreleases', href: '/casino/new' },
+        { label: 'New Releases', menuIcon: 'newreleases', href: '/casino/new', match: ['/section/new'] },
         // Pachinko, Pachislot and Crash Games exist in the bundle's menu definition
         // but do not render on the live site — they are gated off by brand/region
         // config. Do not "restore the missing items" from the bundle alone.
-        { label: 'Bingo', menuIcon: 'bingo_home', href: '/bingo' },
-        { label: 'Table Games', menuIcon: 'tablegame', href: '/casino/table-game' },
+        /* `/bingo` is not a page here (App redirects it); the row points at the bingo tag list
+           the home page's "All Bingo Games" row opens. */
+        { label: 'Bingo', menuIcon: 'bingo_home', href: '/tagname/bingo?label=All%20Bingo%20Games', match: ['/tagname/bingo'] },
+        { label: 'Table Games', menuIcon: 'tablegame', href: '/casino/table-game', match: ['/section/table_games'] },
         { label: 'Providers', menuIcon: 'favorites', href: '/casino/provider' },
       ]
     },
@@ -456,7 +473,7 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
        above: the row should carry the path that actually renders, so `pathname === href` lights
        it up without chasing a redirect. `/referral` is the signed-in dashboard and is not
        built — see the routes in App.jsx. */
-    { id: 'referral',     label: 'Referral',              menuIcon: 'affiliate',      href: '/referral-exhibition' },
+    { id: 'referral',     label: 'Referral',              menuIcon: 'affiliate',      href: '/referral-exhibition', match: ['/referral'] },
     /* THE EXTERNAL ROWS CARRY THEIR REAL URL. They were `external: true` with no
        href, which rendered `<a href="#" target="_blank">` — a row that opened a blank tab on
        the current page, which is worse than an inert one.
@@ -481,7 +498,7 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
        on the user's request too, as is the Sponsorships group that sat below this block. A deliberate departure; see the note over the
        Predictions gap above. */
     { id: 'fair',         label: 'Provably Fair',         menuIcon: 'fair',           href: '/help/provably-fair' },
-    { id: 'responsible',  label: 'Responsible Gambling',  menuIcon: 'account',        href: '/responsible/faq' },
+    { id: 'responsible',  label: 'Responsible Gambling',  menuIcon: 'account',        href: '/responsible/faq', match: ['/responsible'] },
     /* Blog (blog.bc.game) removed: BC.GAME's blog, no Parker567 equivalent. */
   ];
 
@@ -669,7 +686,7 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
                   to the catch-all would silently show Home. VIP Club is the only one so far. */}
               <div className="Sidebar-Unit_bg relative my-3 w-full rounded-lg px-0 pb-2 pt-1 lg:my-2 lg:p-0">
                 {shown(bottomItems).map(item => {
-                  const active = Boolean(item.href) && pathname === item.href;
+                  const active = isRowActive(pathname, item);
                   const className = `nav-link-item relative flex h-10 w-full cursor-pointer items-center rounded-lg px-3 lg:pl-0 lg:pr-2 overflow-hidden mt-1 ${
                     active ? 'nav-link-active' : 'inactive'
                   }`;

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { CHAT_AVAILABLE } from './services/availability';
+import { referralCodeFromPath, savePendingReferral } from './services/referralCapture';
 import { Link, Navigate, Route, Routes, useLocation, useNavigate, useNavigationType } from 'react-router-dom';
 import MainLayout from './layouts/MainLayout/MainLayout';
 import Home from './pages/Home';
@@ -159,7 +160,27 @@ function AppShell() {
   const navigationType = useNavigationType();
   const { pathname } = location;
   const authMode = pathname.startsWith('/login/') ? pathname.slice('/login/'.length) : null;
-  const showAuth = authMode === 'signin' || authMode === 'regist';
+  /* `forgot` (Sign In's "Forgot your password?") and `reset` (the emailed link, `?token=`) are
+     two more screens of the same dialog. */
+  const showAuth = ['signin', 'regist', 'forgot', 'reset'].includes(authMode);
+
+  /* A referral link (`/i-<code>-n/`, or the platform's `/referal/<code>`): keep the code for
+     the Sign Up form and open it. A signed-in visitor already has an account, so they just
+     land on the home page. */
+  const referralFromLink = referralCodeFromPath(pathname);
+  React.useEffect(() => {
+    if (!referralFromLink) return;
+    if (session.login) {
+      navigate('/', { replace: true });
+      return;
+    }
+    savePendingReferral(referralFromLink);
+    /* Home replaces the link first and the dialog is pushed over it, so closing the dialog (or
+       signing up, which closes it) steps back to Home — not past the link to whatever was
+       before this site in the tab. */
+    navigate('/', { replace: true });
+    navigate('/login/regist');
+  }, [referralFromLink, session.login, navigate]);
 
   /* `/deposit` is a DIALOG ROUTE on the original — `info.dialog = { size: [30, 44] }` — so it
      renders over whatever page you were on rather than replacing it, exactly as the auth
@@ -957,6 +978,11 @@ function AppShell() {
               }
             />
           )}
+          {/* Two links that pointed at pages this build never had: the sidebar's Casino › Bingo
+              and the home page's Racing card. Bingo is the bingo tag list (the home page's own
+              "All Bingo Games" row); racing lives in the sports exchange. */}
+          <Route path="/bingo" element={<Navigate to="/tagname/bingo?label=All%20Bingo%20Games" replace />} />
+          <Route path="/racing" element={<Navigate to="/sports" replace />} />
           <Route path="*" element={<Home />} />
         </Routes>
         </RouteGate>

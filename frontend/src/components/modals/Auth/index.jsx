@@ -2,6 +2,8 @@ import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useSession } from '../../../context/session';
 import { useGates } from '../../../context/gates';
+import { requestPasswordReset, completePasswordReset } from '../../../services/auth';
+import { readPendingReferral, clearPendingReferral } from '../../../services/referralCapture';
 import useDialogScrollLock from '../../../hooks/useDialogScrollLock';
 import { useIsDesktop } from '../../../hooks/useMediaQuery';
 import Loading from '../../shared/Loading';
@@ -214,7 +216,7 @@ function DirectRow({ heading, children }) {
   );
 }
 
-function SignInForm({ onSubmit, pending, error }) {
+function SignInForm({ onSubmit, pending, error, onForgot }) {
   /* Password vs One-time Code. The default `tabs-title` variant — no `data-type` — so the
      selected tab is a raised pill on a tab_nopadding track, the same strip the bet table uses. */
   const [method, setMethod] = React.useState(0);
@@ -356,6 +358,11 @@ function SignInForm({ onSubmit, pending, error }) {
             <div className="flex w-full justify-end">
               <a
                 href="/login/forgot"
+                onClick={(event) => {
+                  /* In-app, so the dialog swaps screens instead of reloading the page. */
+                  event.preventDefault();
+                  onForgot?.();
+                }}
                 className="mt-2 font-extrabold text-secondary hover:text-primary hover:underline"
               >
                 <span>Forgot your password?</span>
@@ -416,8 +423,12 @@ function SignUpForm({ onSubmit, error, onClearError }) {
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [revealed, setRevealed] = React.useState(false);
-  const [referralOpen, setReferralOpen] = React.useState(false);
-  const [referral, setReferral] = React.useState('');
+  /* A code the visitor arrived with on a referral link (services/referralCapture.js) starts in
+     the field, with the panel open so they can see it is applied. */
+  const [referral, setReferral] = React.useState(readPendingReferral);
+  const [referralOpen, setReferralOpen] = React.useState(() => Boolean(readPendingReferral()));
+  /* A refusal about the password belongs under the password box, not the email one. */
+  const passwordError = Boolean(error) && /password/i.test(error);
   /* Pre-ticked on the live dialog — `aria-selected="true"` on a freshly opened one. */
   const [agreed, setAgreed] = React.useState(true);
   const [moreOpen, setMoreOpen] = React.useState(false);
@@ -460,8 +471,8 @@ function SignUpForm({ onSubmit, error, onClearError }) {
               /* `J(t.errorMsg && "border-error", "!mt-0")` on the original's EmailPhoneInput: the
                  box turns red while a refusal is showing, and focusing it clears the refusal —
                  `onFocus: () => { …; t.errorMsg && t.setStore({errorMsg: ""}) }`. */
-              className={error ? 'border-error' : ''}
-              onFocus={error ? onClearError : undefined}
+              className={error && !passwordError ? 'border-error' : ''}
+              onFocus={error && !passwordError ? onClearError : undefined}
             />
           </div>
         </div>
@@ -479,15 +490,18 @@ function SignUpForm({ onSubmit, error, onClearError }) {
             there is no 4xxx range to branch on: every refusal that keeps the visitor on this tab
             prints here, through the same `messageOf` the Sign In tab uses, and no toast doubles
             it. The three site-level refusals still move to Sign In (`SIGNUP_REFUSALS`). */}
-        {error ? <p className="mt-1 text-xs text-error">{error}</p> : null}
+        {error && !passwordError ? <p className="mt-1 text-xs text-error">{error}</p> : null}
 
         <div className="mt-6">
           <Label>Password</Label>
           <Field
             type={revealed ? 'text' : 'password'}
             value={password}
-            onChange={setPassword}
-            className="w-full !pr-3"
+            onChange={(value) => {
+              setPassword(value);
+              if (passwordError) onClearError();
+            }}
+            className={`w-full !pr-3 ${passwordError ? 'border-error' : ''}`}
             trailing={
               <div
                 className="center h-8 w-8 cursor-pointer"
@@ -497,6 +511,7 @@ function SignUpForm({ onSubmit, error, onClearError }) {
               </div>
             }
           />
+          {passwordError ? <p className="mt-1 text-xs text-error">{error}</p> : null}
         </div>
 
         {/* The referral row is NOT a field — it is a layer3 panel with a 38px header and a
@@ -657,6 +672,130 @@ function SignUpForm({ onSubmit, error, onClearError }) {
         </div>
       </DirectRow>
     </>
+  );
+}
+
+/* "Forgot your password?" — ask for a reset link. The reply is the same for a registered and an
+   unregistered address (see `requestPasswordReset`), so success always reads "if that address is
+   registered…". Built from the Sign In tab's own pieces: Label, Field, the error slot, the brand
+   submit. */
+function ForgotForm({ onBack }) {
+  const [email, setEmail] = React.useState('');
+  const [pending, setPending] = React.useState(false);
+  const [sent, setSent] = React.useState(false);
+  const [error, setError] = React.useState('');
+
+  const ready = email.length > 0 && !pending;
+
+  return (
+    <form
+      onSubmit={async (event) => {
+        event.preventDefault();
+        if (!ready) return;
+        setError('');
+        setPending(true);
+        try {
+          await requestPasswordReset({ email });
+          setSent(true);
+        } catch (failure) {
+          setError(messageOf(failure, 'Could not send the reset link. Please try again.'));
+        } finally {
+          setPending(false);
+        }
+      }}
+    >
+      <p className="mb-4 text-base font-extrabold text-primary">Reset your password</p>
+      {sent ? (
+        <p className="font-semibold text-secondary">
+          If that address is registered, a link to reset your password is on its way. Check your email.
+        </p>
+      ) : (
+        <>
+          <Label>Email</Label>
+          <Field autoFocus type="email" value={email} onChange={setEmail} />
+          {error ? <p className="mt-1 text-xs text-error">{error}</p> : null}
+          <button
+            type="submit"
+            disabled={!ready}
+            className="button button-brand button-l mt-6 h-14 w-full rounded-xl shadow-[0px_2px_4px_rgba(0,0,0,0.10)]"
+          >
+            {pending ? <Loading className="text-current dark:text-alw_white" /> : <span className="text-base">Send Reset Link</span>}
+          </button>
+        </>
+      )}
+      <div className="mt-4 flex w-full justify-center">
+        <button type="button" onClick={onBack} className="font-extrabold text-secondary hover:text-primary hover:underline">
+          Back to Sign In
+        </button>
+      </div>
+    </form>
+  );
+}
+
+/* The emailed link's screen: `/login/reset?token=…` — a new password, twice. */
+function ResetForm({ token, onDone }) {
+  const [password, setPassword] = React.useState('');
+  const [confirm, setConfirm] = React.useState('');
+  const [revealed, setRevealed] = React.useState(false);
+  const [pending, setPending] = React.useState(false);
+  const [done, setDone] = React.useState(false);
+  const [error, setError] = React.useState('');
+
+  const mismatch = confirm.length > 0 && password !== confirm;
+  const ready = Boolean(token) && password.length > 0 && password === confirm && !pending;
+  const eye = (
+    <div className="center h-8 w-8 cursor-pointer" onClick={() => setRevealed((value) => !value)}>
+      <EyeIcon className="size-6 fill-tertiary" />
+    </div>
+  );
+
+  return (
+    <form
+      onSubmit={async (event) => {
+        event.preventDefault();
+        if (!ready) return;
+        setError('');
+        setPending(true);
+        try {
+          await completePasswordReset({ token, newPassword: password });
+          setDone(true);
+        } catch (failure) {
+          setError(messageOf(failure, 'Could not reset your password. Please try again.'));
+        } finally {
+          setPending(false);
+        }
+      }}
+    >
+      <p className="mb-4 text-base font-extrabold text-primary">Set a new password</p>
+      {!token ? (
+        <p className="font-semibold text-error">This reset link is incomplete. Request a new one from Sign In.</p>
+      ) : done ? (
+        <p className="font-semibold text-secondary">Your password has been changed. You can sign in with it now.</p>
+      ) : (
+        <>
+          <Label>New Password</Label>
+          <Field autoFocus type={revealed ? 'text' : 'password'} value={password} onChange={setPassword} className="!pr-3" trailing={eye} />
+          <div className="mt-6">
+            <Label>Confirm Password</Label>
+            <Field type={revealed ? 'text' : 'password'} value={confirm} onChange={setConfirm} className={`!pr-3 ${mismatch ? 'border-error' : ''}`} />
+            {mismatch ? <p className="mt-1 text-xs text-error">The passwords do not match.</p> : null}
+            {error ? <p className="mt-1 text-xs text-error">{error}</p> : null}
+          </div>
+          <button
+            type="submit"
+            disabled={!ready}
+            className="button button-brand button-l mt-6 h-14 w-full rounded-xl shadow-[0px_2px_4px_rgba(0,0,0,0.10)]"
+          >
+            {pending ? <Loading className="text-current dark:text-alw_white" /> : <span className="text-base">Reset Password</span>}
+          </button>
+        </>
+      )}
+      <div className="mt-4 flex w-full justify-center">
+        <button type="button" onClick={onDone} className="font-extrabold text-secondary hover:text-primary hover:underline">
+          Back to Sign In
+        </button>
+      </div>
+    </form>
   );
 }
 
@@ -823,7 +962,7 @@ export default function Auth({ mode: requested, onClose, enter = 'open' }) {
   const gates = useGates();
   const signUpClosed = gates.ready && !gates.canSignUp();
   const mode = signUpClosed && requested === SIGN_UP ? SIGN_IN : requested;
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   React.useEffect(() => {
     if (signUpClosed && pathname === '/login/regist') navigate('/login/signin', { replace: true });
   }, [signUpClosed, pathname, navigate]);
@@ -838,9 +977,10 @@ export default function Auth({ mode: requested, onClose, enter = 'open' }) {
     { key: SIGN_IN, label: 'Sign In', path: '/login/signin' },
     { key: SIGN_UP, label: 'Sign Up', path: '/login/regist' },
   ].filter((tab) => !(signUpClosed && tab.key === SIGN_UP));
+  /* `forgot` and `reset` are Sign In's own sub-screens, so its tab stays selected. */
   const active = Math.max(
     0,
-    tabs.findIndex((tab) => tab.key === mode),
+    tabs.findIndex((tab) => tab.key === (mode === 'forgot' || mode === 'reset' ? SIGN_IN : mode)),
   );
 
   /* Handed down from App so that closing returns to the page the dialog opened OVER rather
@@ -950,6 +1090,7 @@ export default function Auth({ mode: requested, onClose, enter = 'open' }) {
       setPending(true);
       try {
         const session = await signUp(credentials);
+        clearPendingReferral();
         runClose(() => {
           signIn(session);
           dismiss();
@@ -1116,11 +1257,22 @@ export default function Auth({ mode: requested, onClose, enter = 'open' }) {
                   <div className="px-6 pt-14 sm:px-9 sm:pt-12">
                     {mode === SIGN_UP ? (
                       <SignUpForm onSubmit={submit} error={error} onClearError={() => setError('')} />
+                    ) : mode === 'forgot' ? (
+                      <ForgotForm onBack={() => navigate('/login/signin', { replace: true })} />
+                    ) : mode === 'reset' ? (
+                      <ResetForm
+                        token={new URLSearchParams(search).get('token') || ''}
+                        onDone={() => navigate('/login/signin', { replace: true })}
+                      />
                     ) : (
                       <SignInForm
                         onSubmit={submit}
                         pending={pending}
                         error={error}
+                        onForgot={() => {
+                          setError('');
+                          navigate('/login/forgot', { replace: true });
+                        }}
                       />
                     )}
                     <div className="mt-auto px-6 sm:px-8" />

@@ -43,16 +43,16 @@ export const COLUMNS = [
       { label: 'VIP Club', href: '/vip' },
       { label: 'Referral', href: '/referral' },
       { label: 'Promotions', href: '/promotions/promotion' },
-      /* A button (it opens the share dialog, not a page), but it belongs to the referral
-         section — the `href` is read only by the footer's gate filter, so an account or site
-         with affiliate off does not get the entry. */
-      { label: 'Refer a friend', button: true, href: '/referral' },
+      /* A dead button here before (the original opens a share dialog this footer never wired);
+         it now goes to the Referral page, where the link and code are. Still gated on the
+         affiliate section through `href`. */
+      { label: 'Refer a friend', href: '/referral' },
     ],
   },
   {
     title: 'Support/Legal',
     links: [
-      { label: 'Licenses', href: '/licenses' },
+      /* Licenses removed: no such page exists, and Parker567 has no licence text to show. */
       { label: 'Help Center', href: '/help' },
       { label: 'Gamble Aware', href: '/help/gameble-aware' },
       { label: 'Fairness', href: '/help/provably-fair' },
@@ -68,16 +68,10 @@ export const COLUMNS = [
       ...(LIVE_SUPPORT_AVAILABLE ? [{ label: 'Live Support', button: true }] : []),
     ],
   },
-  {
-    title: 'About Us',
-    links: [
-      /* News (blog.bc.game) and Help Desk (help.bc.support) removed: both are BC.GAME's own
-         sites and Parker567 has no equivalent. Help Center above covers support. */
-      { label: 'Business Contacts', button: true },
-      { label: 'Verify Representative', href: '/verify_representative' },
-      { label: 'Verify This Site', button: true },
-    ],
-  },
+  /* The "About Us" column is not drawn. Its rows were News and Help Desk (BC.GAME's blog and
+     help sites), Business Contacts and Verify This Site (dead buttons) and Verify Representative
+     (no page), and Parker567 publishes no business contact yet. Bring the column back with a
+     real contact row once there is one. */
 ];
 
 /* The two prose blocks that open the footer, on the home page only — see `BLURB_SHOWN_ON` in
