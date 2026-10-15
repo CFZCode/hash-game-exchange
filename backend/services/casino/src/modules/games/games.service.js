@@ -489,8 +489,7 @@ class GamesService {
   // ══════════════════════════════════════════════════════════════════════
 
   /**
-   * @legacy GET /api/gis/hotgames, /livecasino, /popularslots, /crashgames,
-   *         /indiangames
+   * @legacy GET /api/gis/hotgames, /livecasino, /popularslots, /crashgames
    */
   async collection({ collection, page, limit }) {
     const { model, key } = this.#collection(collection);

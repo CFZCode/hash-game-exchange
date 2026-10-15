@@ -126,7 +126,7 @@ const PUBLIC_FLAGS = Object.freeze([
   'giftcards', 'welcomepack', 'wheelspin', 'provablyfair',
   // game categories
   'crash', 'originals', 'livegames', 'slotsgames', 'alllivegames', 'allslotsgames',
-  'lotterygames', 'indiangames', 'cards', 'instantgames',
+  'lotterygames', 'cards', 'instantgames',
   // providers
   'spribe', 'evolution', 'pragmaticslots', 'pragmaticlive', 'ideal', 'microgaming',
   'pgsoft', 'hacksawgaming', 'jili', 'jilli', 'netent',

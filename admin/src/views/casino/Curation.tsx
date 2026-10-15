@@ -128,13 +128,12 @@ const LobbyTab = () => {
   )
 }
 
-/** Aggregator collections — the five GIS home rows. */
+/** Aggregator collections — the four GIS home rows. */
 const GIS_COLLECTIONS = [
   { value: 'hot', label: 'Hot games' },
   { value: 'live-casino', label: 'Live casino' },
   { value: 'popular-slots', label: 'Popular slots' },
-  { value: 'crash', label: 'Crash games' },
-  { value: 'indian', label: 'Indian games' }
+  { value: 'crash', label: 'Crash games' }
 ]
 
 const gisSearch = async (q: string) => (await api.get<GisGame[]>('admin/casino/games/catalogue/search', { q, limit: 100 })).map(gisItem)

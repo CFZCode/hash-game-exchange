@@ -66,8 +66,7 @@ function createControllers({ service }) {
     providers: asyncHandler(async (req, res) => response.ok(res, await service.listProviders(req.query))),
 
     /**
-     * @legacy GET /api/gis/hotgames, /livecasino, /popularslots, /crashgames,
-     *         /indiangames
+     * @legacy GET /api/gis/hotgames, /livecasino, /popularslots, /crashgames
      */
     collection: asyncHandler(async (req, res) =>
       paged(req, await service.collection({ ...req.query, collection: req.params.collection }))

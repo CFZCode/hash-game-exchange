@@ -83,8 +83,10 @@ function categoryFlag(type) {
   if (t.includes('live')) return 'livegames';
   if (t.includes('slot')) return 'slotsgames';
   if (t.includes('lottery')) return 'lotterygames';
-  if (t.includes('india')) return 'indiangames';
-  if (t.includes('card')) return 'cards';
+  // `India Poker Game` (Teen Patti, Andar Bahar, Rummy, Callbreak…) had an
+  // Indian games flag of its own. The site dropped that section; they are card
+  // games, so Card games is the switch that closes them now.
+  if (t.includes('card') || t.includes('india')) return 'cards';
   return null;
 }
 
@@ -169,8 +171,7 @@ const CATEGORY_PATTERNS = {
   livegames: ['live'],
   slotsgames: ['slot'],
   lotterygames: ['lottery'],
-  indiangames: ['india'],
-  cards: ['card'],
+  cards: ['card', 'india'],
 };
 
 /** The flags the owner switched off, from the document. */

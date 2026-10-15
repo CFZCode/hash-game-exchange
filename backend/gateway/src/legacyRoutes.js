@@ -942,7 +942,6 @@ const EXACT = {
   'GET /api/gis/livecasino': '/api/v1/casino/games/collections/live-casino',
   'GET /api/gis/popularslots': '/api/v1/casino/games/collections/popular-slots',
   'GET /api/gis/crashgames': '/api/v1/casino/games/collections/crash',
-  'GET /api/gis/indiangames': '/api/v1/casino/games/collections/indian',
   'GET /api/gis/games/recently-played': '/api/v1/casino/games/recently-played',
 
   // Every one of these was unauthenticated in legacy, under a comment reading
@@ -951,7 +950,6 @@ const EXACT = {
   'PUT /api/gis/admin/gis/livecasino': '/api/v1/admin/casino/games/collections/live-casino',
   'PUT /api/gis/admin/gis/popularslots': '/api/v1/admin/casino/games/collections/popular-slots',
   'PUT /api/gis/admin/gis/crashgames': '/api/v1/admin/casino/games/collections/crash',
-  'PUT /api/gis/admin/gis/indiangames': '/api/v1/admin/casino/games/collections/indian',
   'GET /api/gis/admin/gis/vendors': '/api/v1/admin/casino/games/vendors',
   'GET /api/gis/admin/gis/vendor-search': '/api/v1/admin/casino/games/vendor-search',
   'GET /api/gis/admin/gis/types': '/api/v1/admin/casino/games/types',

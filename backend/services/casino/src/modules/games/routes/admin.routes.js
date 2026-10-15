@@ -58,7 +58,6 @@ module.exports = function adminRoutes(deps) {
    * @legacy POST /api/gis/admin/gis/livecasino
    * @legacy POST /api/gis/admin/gis/popularslots
    * @legacy POST /api/gis/admin/gis/crashgames
-   * @legacy POST /api/gis/admin/gis/indiangames
    */
   router.put('/collections/:collection', canManage, validate(v.writeCollection), ctrl.setCollection);
   router.get('/collections/:collection', canRead, validate(v.readCollection), ctrl.collection);

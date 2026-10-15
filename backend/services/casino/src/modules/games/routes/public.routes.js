@@ -31,13 +31,12 @@ module.exports = function publicRoutes(deps) {
   router.get('/image/:name', validate(v.artworkName), ctrl.artwork);
 
   /**
-   * The five curated lobby collections.
+   * The four curated lobby collections.
    *
    * @legacy GET /api/gis/hotgames
    * @legacy GET /api/gis/livecasino
    * @legacy GET /api/gis/popularslots
    * @legacy GET /api/gis/crashgames
-   * @legacy GET /api/gis/indiangames
    */
   router.get('/collections/:collection', validate(v.readCollection), ctrl.collection);
 

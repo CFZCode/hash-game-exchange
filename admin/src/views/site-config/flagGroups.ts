@@ -13,7 +13,7 @@ export const FLAG_GROUPS: { title: string; description: string; keys: string[] }
   {
     title: 'Game categories',
     description: 'Casino lobby tabs.',
-    keys: ['crash', 'originals', 'livegames', 'slotsgames', 'alllivegames', 'allslotsgames', 'lotterygames', 'indiangames', 'cards', 'instantgames']
+    keys: ['crash', 'originals', 'livegames', 'slotsgames', 'alllivegames', 'allslotsgames', 'lotterygames', 'cards', 'instantgames']
   },
   {
     title: 'Providers',
@@ -75,7 +75,6 @@ export const FLAG_LABELS: Record<string, string> = {
   alllivegames: 'All live games tab',
   allslotsgames: 'All slots tab',
   lotterygames: 'Lottery games',
-  indiangames: 'Indian games',
   cards: 'Card games',
   instantgames: 'Instant games',
   pragmaticslots: 'Pragmatic (slots)',
