@@ -482,7 +482,7 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
        Predictions gap above. */
     { id: 'fair',         label: 'Provably Fair',         menuIcon: 'fair',           href: '/help/provably-fair' },
     { id: 'responsible',  label: 'Responsible Gambling',  menuIcon: 'account',        href: '/responsible/faq' },
-    /* Blog (blog.bc.game) removed: BC.GAME's blog, no Jumbo Flush equivalent. */
+    /* Blog (blog.bc.game) removed: BC.GAME's blog, no Parker567 equivalent. */
   ];
 
   return (
@@ -515,7 +515,7 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
               {/* ============================================================ */}
               {/* HIDDEN: its artwork (`pwa.png` / `pwa_w.png`) is a phone mock of BC.GAME's own
                   site, and `/events/app-download-recall` is not built, so it was another brand's
-                  marketing linking to the catch-all. Jumbo Flush ships no app; turn this back on
+                  marketing linking to the catch-all. Parker567 ships no app; turn this back on
                   with our own artwork and page if one is ever made. */}
               {isExpanded && SHOW_APP_CARD && (
               <div className="sidebar-banner-block mb-2">
@@ -884,7 +884,7 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
                   own final entry. `De` is IconGlobal, the same mark the footer prints under
                   "Join Our Local Community". */}
               {/* The signed-out community card (BC.GAME's socials + hash.game/telegram) is removed:
-                  Jumbo Flush has no social channels to list. */}
+                  Parker567 has no social channels to list. */}
 
             </div>
           </nav>

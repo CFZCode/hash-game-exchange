@@ -107,23 +107,21 @@ export function logoFor(name, { own } = {}) {
 /** The site's name (the logo's alt text), or null. */
 export const siteName = () => runtime?.siteName ?? null;
 /**
- * The name to PRINT in copy ("Jumbo Flush"): the owner's `siteName`, cased and spaced as the
- * title spells it (the panel stores the key lower-case, `jumboflush`, while the title reads
- * "Jumbo Flush — …"). Falls back to the build-time title's first part, then to "Jumbo Flush".
- * Never the original's "BC.GAME".
+ * The name to PRINT in copy ("Parker567"): the owner's `siteName`, cased as the title spells it
+ * (the panel stores the key lower-case, `parker567`, while the title reads "Parker567 — …").
+ * Falls back to the build-time title's first word, then to "Parker567". Never
+ * the original's "BC.GAME".
  */
 export function brandName() {
   const name = runtime?.siteName ?? null;
   const title = runtime?.title ?? env('NEXT_PUBLIC_SITE_TITLE') ?? '';
   if (name) {
-    // The key's letters in order, spaces allowed between them: `jumboflush` finds "Jumbo Flush".
-    const letters = [...name.replace(/\s+/g, '')].map((c) => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-    const found = letters.length ? title.match(new RegExp(letters.join('\\s*'), 'i')) : null;
-    if (found) return found[0];
+    const at = title.toLowerCase().indexOf(name.toLowerCase());
+    if (at >= 0) return title.slice(at, at + name.length);
     return name.charAt(0).toUpperCase() + name.slice(1);
   }
   const first = title.split(/\s+[—–|·-]\s+/)[0]?.trim();
-  return first || 'Jumbo Flush';
+  return first || 'Parker567';
 }
 /**
  * The placeholders the help/responsible documents ship with (`q()` in createHtmlFile), filled
@@ -133,17 +131,16 @@ export function brandName() {
 export function brandTokens() {
   const name = brandName();
   const host = typeof window !== 'undefined' ? window.location.host : '';
-  const small = name.toLowerCase().replace(/\s+/g, ''); // "Jumbo Flush" → "jumboflush"
   return {
     __BC_HOST__: name,
-    __SMALL_BC_HOST__: host || small,
+    __SMALL_BC_HOST__: host || name.toLowerCase(),
     __BC_SITENAME__: name,
-    __SMALL_BC_MAIL_ADDRESS__: `support@${(host || small).replace(/:\d+$/, '')}`,
+    __SMALL_BC_MAIL_ADDRESS__: `support@${(host || name.toLowerCase()).replace(/:\d+$/, '')}`,
   };
 }
 
 /** "BC Originals" / "BC Exclusive" / "BC.GAME: Originals" as this site prints them: the bare
- *  word, "Originals" / "Exclusive", with no brand prefix (the user's call — not "Jumbo Flush
+ *  word, "Originals" / "Exclusive", with no brand prefix (the user's call — not "Parker567
  *  Originals"). For labels that double as keys (tag hrefs, tag searches) — rename at DISPLAY only. */
 export const brandLabel = (label) =>
   typeof label === 'string'

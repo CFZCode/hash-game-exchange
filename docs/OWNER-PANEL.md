@@ -267,7 +267,7 @@ restores the client's own choice.
   - every game launch (`/casino/js-games/v1|v2/launch`, `/casino/gis/launch` and `launch-demo`,
     `/casino/catalogue/launch`, `/casino/x-casino/launch`, `/casino/seamless/launch`): a
     sportsbook or esports book needs `sports`; any other game needs `casino` plus its provider
-    flag and its category flag (crash / livegames / slotsgames / lotterygames / cards; an `India…` type counts as cards)
+    flag and its category flag (crash / livegames / slotsgames / lotterygames / indiangames / cards)
     where the catalogue row names one; in-house games (`vendor = 'in-house'`) need `originals`;
   - the catalogue lists (`/casino/js-games/v1/games`, `/v1/games/search`, `/v1/collections/:c`)
     drop rows whose provider or category flag is off, and a list asked for by a switched-off
@@ -382,7 +382,7 @@ branded: the site keeps the UI's own title and logo. Rules: `owner-panel/src/lib
 
 ```json
 "branding": {
-  "siteName": "jumboflush", "title": "Jumbo Flush — Casino & Sports", "titleTemplate": "%s · Jumbo Flush",
+  "siteName": "parker567", "title": "Parker567 — Casino & Sports", "titleTemplate": "%s · Parker567",
   "description": "…", "keywords": ["…"], "ogTitle": "", "ogDescription": "", "themeColor": "",
   "logo": { "file": "<sha256>.png", "type": "image/png", "bytes": 7959, "width": 576, "height": 128 },
   "mark": { "file": "<sha256>.png", "type": "image/png", "bytes": 4786, "width": 256, "height": 256 },

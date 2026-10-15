@@ -1,6 +1,6 @@
 ---
 name: qa-betting-budget
-description: Hard money limits for any test that places a bet or plays a game on Jumbo Flush. Third-party provider games cost real money, so they have a fixed total budget. Read this before any casino, sports or wager test, manual or scripted, and pass the limits to every sub-agent that will play.
+description: Hard money limits for any test that places a bet or plays a game on Parker567. Third-party provider games cost real money, so they have a fixed total budget. Read this before any casino, sports or wager test, manual or scripted, and pass the limits to every sub-agent that will play.
 ---
 
 # Betting budget for tests

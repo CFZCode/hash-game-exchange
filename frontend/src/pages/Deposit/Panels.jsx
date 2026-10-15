@@ -108,7 +108,7 @@ export default function DepositPanels() {
           <>
             <CryptoTab />
             {/* The Cwallet band ("Connect Cwallet to earn bonus") is not drawn: Cwallet is
-                BC.GAME's partner wallet and Jumbo Flush has no such integration. */}
+                BC.GAME's partner wallet and Parker567 has no such integration. */}
           </>
         ) : (
           /* `lt.updateCurrency(lt.state.cryptoCurrency)` — the fiat tab's "Deposit Crypto" row

@@ -392,7 +392,7 @@ function SignInForm({ onSubmit, pending, error }) {
       </div>
 
       <DirectRow heading="Log in directly with">
-        {/* Cwallet (BC.GAME's partner wallet) sign-in is not drawn — no Jumbo Flush integration. */}
+        {/* Cwallet (BC.GAME's partner wallet) sign-in is not drawn — no Parker567 integration. */}
         <button
           type="button"
           className="button button-m mt-4 h-12 w-full border border-third bg-black_alpha5 shadow-[0px_2px_4px_rgba(0,0,0,0.10)]"

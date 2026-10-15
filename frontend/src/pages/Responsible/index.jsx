@@ -42,7 +42,7 @@ import { brandTokens } from '../../services/siteBranding';
 const docs = globMaps.docs;
 
 /* The remote's own substitution — see the note in pages/Help/index.jsx. */
-/* Filled with Jumbo Flush's identity (services/siteBranding), never bc.game's. */
+/* Filled with Parker567's identity (services/siteBranding), never bc.game's. */
 
 const docHtml = (element) => {
   const raw = element && docs[`../Help/topics/${element}.html`];

@@ -46,7 +46,7 @@ const topicDocs = globMaps.topicDocs;
    substitutes them at render. Missing this leaves raw `__BC_HOST__` in the middle of the terms
    of service. The mail address is a CONDITIONAL there: `compliance@bcgame.com` when the host is
    `bc.game`, `support@<host>` otherwise — the first branch is the one this build takes. */
-/* Filled with Jumbo Flush's identity (services/siteBranding), never bc.game's. */
+/* Filled with Parker567's identity (services/siteBranding), never bc.game's. */
 
 const topicHtml = (element) => {
   const raw = element && topicDocs[`./topics/${element}.html`];
