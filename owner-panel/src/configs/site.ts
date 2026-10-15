@@ -20,7 +20,7 @@ export const serverConfig = {
   // Ed25519 private key (base64 PKCS8 DER). The backend holds only the public half.
   signingKey: process.env.OWNER_SIGNING_KEY ?? '',
   siteKey: process.env.SITE_KEY || 'hash-game-exchange',
-  siteName: process.env.SITE_NAME || 'Hash Game Exchange',
+  siteName: process.env.SITE_NAME || 'Jumbo Flush',
   gatewayUrl: process.env.SITE_GATEWAY_URL ?? '',
   adminUrl: process.env.SITE_ADMIN_URL ?? '',
   frontendUrl: process.env.SITE_FRONTEND_URL ?? '',

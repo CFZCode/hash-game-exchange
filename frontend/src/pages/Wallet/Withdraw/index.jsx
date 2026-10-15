@@ -781,7 +781,7 @@ export function WithdrawPanels() {
       {/* `da` — the divider is the withdraw wrapper's, not the row's. The second arm (withdraw
           straight to a linked Cwallet) needs a `cwallet.state.cwalletId` this build has no feed
           for; the unlinked row is what both captures show. */}
-      {/* The Cwallet band is not drawn: BC.GAME's partner wallet, no Parker567 equivalent. */}
+      {/* The Cwallet band is not drawn: BC.GAME's partner wallet, no Jumbo Flush equivalent. */}
 
       {confirm && !placed && (
         <WithdrawConfirm

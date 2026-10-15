@@ -206,7 +206,7 @@ test('rate limiting', async (t) => {
 });
 
 /**
- * Parker567 bug #10: the staff sign-in bucket kept answering 429 after its
+ * Jumbo Flush bug #10: the staff sign-in bucket kept answering 429 after its
  * Redis key was deleted, and no key reappeared — it was counting in the
  * admin process's heap (the root `.env` ships `REDIS_URL` blank), silently,
  * and it counted successful sign-ins too.

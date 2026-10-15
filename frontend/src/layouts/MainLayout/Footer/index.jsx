@@ -129,7 +129,7 @@ export default function Footer() {
      awards, partners, link columns, licence — is unchanged on every route. */
   const { pathname } = useLocation();
   const showBlurb = BLURB_SHOWN_ON.includes(pathname);
-  /* Parker567 branding: the printed name comes from the owner panel's branding payload. */
+  /* Jumbo Flush branding: the printed name comes from the owner panel's branding payload. */
   const brand = useBrandName();
   const LEGAL = legal(brand);
 
@@ -156,11 +156,11 @@ export default function Footer() {
           </div>
 
           {/* The feedback band (BC.GAME's feedback@/security@bcgame.com mailboxes) is not drawn:
-              Parker567 publishes no such addresses. */}
+              Jumbo Flush publishes no such addresses. */}
         </div>
       )}
 
-      {/* BC.GAME's SiGMA/AIBC award strip is not drawn — those awards are not Parker567's. */}
+      {/* BC.GAME's SiGMA/AIBC award strip is not drawn — those awards are not Jumbo Flush's. */}
 
       {/* Certifiers, then sponsorships. The vertical rule between them is `divide-x` on the
           wrapper — the same mechanism as the horizontal rules, not a border on either group.
@@ -182,7 +182,7 @@ export default function Footer() {
               <PartnerLogo key={item.name} {...item} />
             ))}
           </div>
-          {/* BC.GAME's sponsorships (clubs, artists) are not drawn — not Parker567's. */}
+          {/* BC.GAME's sponsorships (clubs, artists) are not drawn — not Jumbo Flush's. */}
         </div>
       </div>
 
@@ -220,7 +220,7 @@ export default function Footer() {
         ))}
 
         {/* "Join Our Global/Local Community" (BC.GAME's socials and hash.game/telegram) is not
-            drawn: Parker567 has no social channels to list. */}
+            drawn: Jumbo Flush has no social channels to list. */}
       </div>
 
       {/* Legal. `text-xs` here is the whole answer to the 12px question — the logo row, both

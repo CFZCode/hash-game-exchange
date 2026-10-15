@@ -114,7 +114,7 @@ export default function Header({
   const brandLogo = useSiteLogo({ own: 'hash-games' });
   const logo = brandLogo ?? (darken ? logoImg : logoLightImg);
   const logoAlt = (brandLogo && siteName()) || 'logo';
-  /* The owner uploads ONE logo, drawn for the dark theme (white "PARKER"); on the light theme it
+  /* The owner uploads ONE logo, drawn for the dark theme (white "JUMBO"); on the light theme it
      vanishes against the light header, so it is inverted there (index.css `.brand-logo-on-light`). */
   const logoTone = brandLogo && !darken ? ' brand-logo-on-light' : '';
 

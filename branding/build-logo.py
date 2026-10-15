@@ -1,4 +1,4 @@
-"""Build the parker567 wordmark and square mark as pure-path SVGs (no font needed to render).
+"""Build the Jumbo Flush wordmark and square mark as pure-path SVGs (no font needed to render).
 
   python3 branding/build-logo.py <path to Poppins-ExtraBold.ttf>
 
@@ -55,45 +55,58 @@ def bounds(text, size, tracking=0.0):
 
 
 # Wordmark: 288x64 (the 4.5:1 box the bc.game wordmark fills, so it drops into every slot).
+# "JUMBO" in the light ink, "FLUSH" in the accent, a narrow gap (not a full space) between them.
 W, H = 288, 64
 TRACK = 0.01
+GAP = 0.16   # the gap between the two words, as a fraction of the size
+FIRST, SECOND = 'JUMBO', 'FLUSH'
+
+
+def word_bounds(size):
+    """Ink box of the two words set with the gap between them."""
+    lo, hi1 = bounds(FIRST, size, TRACK)
+    _, adv = run(FIRST, size, 0, 0, TRACK)
+    lo2, hi2 = bounds(SECOND, size, TRACK)
+    return lo, adv + (TRACK + GAP) * size + hi2
+
+
 size = 10.0
 # Largest size whose ink fits 280 wide and whose caps are <= 40 tall.
 while True:
-    lo, hi = bounds('PARKER567', size + 0.25, TRACK)
+    lo, hi = word_bounds(size + 0.25)
     if hi - lo > W - 8 or (size + 0.25) * cap / upm > 40:
         break
     size += 0.25
-lo, hi = bounds('PARKER567', size, TRACK)
+lo, hi = word_bounds(size)
 x0 = (W - (hi - lo)) / 2 - lo
 baseline = H / 2 + (size * cap / upm) / 2
-d1, adv = run('PARKER', size, x0, baseline, TRACK)
-d2, _ = run('567', size, x0 + adv + TRACK * size, baseline, TRACK)
-wordmark = f'''<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" role="img" aria-label="PARKER567">
-<title>PARKER567</title>
+d1, adv = run(FIRST, size, x0, baseline, TRACK)
+d2, _ = run(SECOND, size, x0 + adv + (TRACK + GAP) * size, baseline, TRACK)
+wordmark = f'''<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" role="img" aria-label="JUMBO FLUSH">
+<title>JUMBO FLUSH</title>
 <path fill="{INK}" d="{d1}"/>
 <path fill="{ACCENT}" d="{d2}"/>
 </svg>
 '''
-(here / 'parker567-logo.svg').write_text(wordmark)
+(here / 'jumboflush-logo.svg').write_text(wordmark)
 
-# Square mark: "P5" in the accent on a dark rounded tile (reads on dark and light tabs alike).
+# Square mark: "JF" in the accent on a dark rounded tile (reads on dark and light tabs alike).
 S = 128
 size = 10.0
 while True:
-    lo, hi = bounds('P5', size + 0.25)
+    lo, hi = bounds('JF', size + 0.25)
     if hi - lo > S - 36 or (size + 0.25) * cap / upm > 62:
         break
     size += 0.25
-lo, hi = bounds('P5', size)
+lo, hi = bounds('JF', size)
 x0 = (S - (hi - lo)) / 2 - lo
 baseline = S / 2 + (size * cap / upm) / 2
-dm, _ = run('P5', size, x0, baseline)
-mark = f'''<svg xmlns="http://www.w3.org/2000/svg" width="{S}" height="{S}" viewBox="0 0 {S} {S}" role="img" aria-label="P5">
-<title>PARKER567</title>
+dm, _ = run('JF', size, x0, baseline)
+mark = f'''<svg xmlns="http://www.w3.org/2000/svg" width="{S}" height="{S}" viewBox="0 0 {S} {S}" role="img" aria-label="JF">
+<title>JUMBO FLUSH</title>
 <rect width="{S}" height="{S}" rx="28" fill="{TILE}"/>
 <path fill="{ACCENT}" d="{dm}"/>
 </svg>
 '''
-(here / 'parker567-mark.svg').write_text(mark)
-print('wrote', here / 'parker567-logo.svg', here / 'parker567-mark.svg')
+(here / 'jumboflush-mark.svg').write_text(mark)
+print('wrote', here / 'jumboflush-logo.svg', here / 'jumboflush-mark.svg')

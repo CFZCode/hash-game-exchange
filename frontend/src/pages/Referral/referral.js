@@ -34,7 +34,7 @@ import { brandName } from '../../services/siteBranding';
 
 /* The one substitution the page performs. Kept next to the strings it fills rather than in the
    component, because which token maps to what is a property of this copy. */
-/* Parker567's printed name (owner-panel branding), never the original's "BC.GAME". There is no
+/* Jumbo Flush's printed name (owner-panel branding), never the original's "BC.GAME". There is no
    business mailbox to print (the original's was bc.game's), so `__email__` reads as Live Support. */
 export const HOST = brandName();
 export const BUSINESS_EMAIL = '';

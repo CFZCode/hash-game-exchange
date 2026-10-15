@@ -37,9 +37,9 @@ const mark = ref(SVG, 'svg', 'image/svg+xml');
 const evil = ref(EVIL, 'svg', 'image/svg+xml');
 
 const branding = (over = {}) => ({
-  siteName: 'parker567',
-  title: 'Parker567 — Casino & Sports',
-  titleTemplate: '%s · Parker567',
+  siteName: 'jumboflush',
+  title: 'Jumbo Flush — Casino & Sports',
+  titleTemplate: '%s · Jumbo Flush',
   description: 'Crypto casino and sports.',
   keywords: ['casino', 'Casino', 'sports'],
   ogTitle: '',
@@ -117,8 +117,8 @@ test('branding: signed document → fetched images → public read → served by
     answer = doc(2, branding());
     await poller.pollOnce();
     const before = await read();
-    assert.equal(before.siteName, 'parker567');
-    assert.equal(before.titleTemplate, '%s · Parker567');
+    assert.equal(before.siteName, 'jumboflush');
+    assert.equal(before.titleTemplate, '%s · Jumbo Flush');
     assert.deepEqual(before.keywords, ['casino', 'sports']);
     assert.equal(before.themeColor, '#24EE89');
     // The read kicked a fetch; wait for the explicit sync too.

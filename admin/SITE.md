@@ -1,4 +1,4 @@
-# Hash Game Exchange — admin
+# Jumbo Flush — admin
 
 A copy of the hub's `cfz/admins/site-admin`, set up the way `agents/push-admin.mjs` pushes it
 (site key `hash-game-exchange`, port pinned in `package.json`, `.env.local` from `.env.example`).

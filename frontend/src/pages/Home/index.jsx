@@ -132,7 +132,7 @@ export default function Home() {
       {gates.on('originals') && <GameSection title={brandLabel('BC Originals')} {...section('originals')} />}
       <GameSection title="Hot Games" {...section('hotGames')} />
       <Highlights />
-      {/* BC.GAME's exclusive tables have no Parker567 equivalent; the live feed answers []. Drawn
+      {/* BC.GAME's exclusive tables have no Jumbo Flush equivalent; the live feed answers []. Drawn
           only when it has games, so an empty "Exclusive" heading never shows. */}
       {section('exclusive').games?.length !== 0 && <GameSection title={brandLabel('BC Exclusive')} {...section('exclusive')} />}
       <GameSection title="Slots" {...section('slots')} />

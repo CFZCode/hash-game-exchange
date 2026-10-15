@@ -40,7 +40,7 @@ const PLACEMENT_PREFIX = 'home_top_';
 
 /* LIVE MODE BUILDS THE STRIP FROM THE PLATFORM'S ROWS ONLY. The captured slides in `banners.js`
  * are bc.game's own campaigns (Soaked by Sea Men, €20/€10 free spins, Knockoin, a $500 soccer
- * freebet) — another brand's marketing in another currency — so they must never reach Parker567's
+ * freebet) — another brand's marketing in another currency — so they must never reach Jumbo Flush's
  * players. A `home_top_<n>` row is one slide: its image, plus the copy migration 037 added
  * (`title`, `subtitle`, `cta`). No rows, a 500 or a refused fetch is an EMPTY strip, and the
  * carousel then renders nothing (Banner's `if (!count) return null`). Fixture mode keeps the

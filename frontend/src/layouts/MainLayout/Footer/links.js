@@ -62,7 +62,7 @@ export const COLUMNS = [
       { label: 'Law Enforcement', href: '/help/law-enforcement' },
       { label: 'Responsible Gambling', href: '/responsible/faq' },
       { label: 'AML', href: '/help/aml' },
-      /* Design Resources (BC.GAME's Google Drive brand kit) removed: not Parker567's. */
+      /* Design Resources (BC.GAME's Google Drive brand kit) removed: not Jumbo Flush's. */
       /* Live Support: no support provider on this platform, so the inert button is left out
          (services/availability.js). */
       ...(LIVE_SUPPORT_AVAILABLE ? [{ label: 'Live Support', button: true }] : []),
@@ -72,7 +72,7 @@ export const COLUMNS = [
     title: 'About Us',
     links: [
       /* News (blog.bc.game) and Help Desk (help.bc.support) removed: both are BC.GAME's own
-         sites and Parker567 has no equivalent. Help Center above covers support. */
+         sites and Jumbo Flush has no equivalent. Help Center above covers support. */
       { label: 'Business Contacts', button: true },
       { label: 'Verify Representative', href: '/verify_representative' },
       { label: 'Verify This Site', button: true },
@@ -92,11 +92,11 @@ export const SEO = {
 };
 
 /* The original's feedback band listed BC.GAME's own mailboxes (feedback@ / security@bcgame.com);
-   Parker567 publishes none, so the band is not drawn (see index.jsx). */
+   Jumbo Flush publishes none, so the band is not drawn (see index.jsx). */
 
 /* The legal band. `brand` is the site's printed name (services/siteBranding `brandName()`), so
    no operator's name is baked in here. BC.GAME's operator/licence paragraphs (Twocent
-   Technology Limited, Anjouan licence ALSI-202410011-FI1) are NOT Parker567's and are gone. */
+   Technology Limited, Anjouan licence ALSI-202410011-FI1) are NOT Jumbo Flush's and are gone. */
 export const legal = (brand) => ({
   brand: [
     'The ultimate crypto gaming destination. We bring bold entertainment, cutting-edge experiences, and a thriving community together for non-stop thrills. Play, win, and stay untamed.',

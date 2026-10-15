@@ -9,7 +9,7 @@ import { brandingProblem, cleanBranding, diffBranding, EMPTY_BRANDING, inspectBr
 const enc = s => new TextEncoder().encode(s)
 const HASH = 'a'.repeat(64)
 const asset = (over = {}) => ({ file: `${HASH}.png`, type: 'image/png', bytes: 1200, width: 576, height: 128, ...over })
-const good = (over = {}) => ({ ...EMPTY_BRANDING, siteName: 'parker567', title: 'Parker567 — Casino & Sports', keywords: ['casino'], logo: asset(), ...over })
+const good = (over = {}) => ({ ...EMPTY_BRANDING, siteName: 'jumboflush', title: 'Jumbo Flush — Casino & Sports', keywords: ['casino'], logo: asset(), ...over })
 
 /** A minimal PNG header of the given size (signature + IHDR); enough for the magic-byte sniff. */
 function png(width, height, total = 200) {
@@ -25,7 +25,7 @@ const svg = body => enc(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28
 test('a full, valid block passes; all-empty (not branded) passes', () => {
   assert.equal(brandingProblem(good()), null)
   assert.equal(brandingProblem(EMPTY_BRANDING), null)
-  assert.equal(brandingProblem(good({ titleTemplate: '%s · Parker567', themeColor: '#24EE89', mark: asset({ file: `${'b'.repeat(64)}.svg`, type: 'image/svg+xml', width: 128, height: 128 }) })), null)
+  assert.equal(brandingProblem(good({ titleTemplate: '%s · Jumbo Flush', themeColor: '#24EE89', mark: asset({ file: `${'b'.repeat(64)}.svg`, type: 'image/svg+xml', width: 128, height: 128 }) })), null)
 })
 
 test('fields are strict', () => {
@@ -34,7 +34,7 @@ test('fields are strict', () => {
   assert.match(brandingProblem(good({ title: 'x'.repeat(71) })), /at most 70/)
   assert.match(brandingProblem(good({ title: '<script>alert(1)</script>' })), /< >/)
   assert.match(brandingProblem(good({ description: 'a\u0000b' })), /control/)
-  assert.match(brandingProblem(good({ titleTemplate: 'Parker567' })), /%s exactly once/)
+  assert.match(brandingProblem(good({ titleTemplate: 'Jumbo Flush' })), /%s exactly once/)
   assert.match(brandingProblem(good({ titleTemplate: '%s %s' })), /%s exactly once/)
   assert.match(brandingProblem(good({ themeColor: 'red' })), /#1A2B3C/)
   assert.match(brandingProblem(good({ keywords: 'a,b' })), /list/)
@@ -52,8 +52,8 @@ test('an image reference must be an upload name of the right type and size', () 
 })
 
 test('clean reads malformed values as unset; keywords are trimmed and de-duplicated', () => {
-  const c = cleanBranding({ siteName: '  parker567 ', title: '<b>', themeColor: '#24ee89', keywords: [' Casino ', 'casino', '', 'Sports'], logo: { file: 'nope' }, extra: 1 })
-  assert.equal(c.siteName, 'parker567')
+  const c = cleanBranding({ siteName: '  jumboflush ', title: '<b>', themeColor: '#24ee89', keywords: [' Casino ', 'casino', '', 'Sports'], logo: { file: 'nope' }, extra: 1 })
+  assert.equal(c.siteName, 'jumboflush')
   assert.equal(c.title, '')
   assert.equal(c.themeColor, '#24EE89')
   assert.deepEqual(c.keywords, ['Casino', 'Sports'])
@@ -140,8 +140,8 @@ test('SVG: scripts, event attributes and external references are refused', () =>
   assert.equal(inspectBrandingImage(svg('<image href="data:image/png;base64,iVBORw0KGgo="/>'), 'logo').ok, true)
 })
 
-test('the committed parker567 files pass as they are', () => {
-  for (const [file, slot] of [['parker567-logo.svg', 'logo'], ['parker567-mark.svg', 'mark'], ['parker567-logo@2x.png', 'logo'], ['parker567-mark@2x.png', 'mark']]) {
+test('the committed jumboflush files pass as they are', () => {
+  for (const [file, slot] of [['jumboflush-logo.svg', 'logo'], ['jumboflush-mark.svg', 'mark'], ['jumboflush-logo@2x.png', 'logo'], ['jumboflush-mark@2x.png', 'mark']]) {
     const r = inspectBrandingImage(new Uint8Array(readFileSync(new URL(`../../branding/${file}`, import.meta.url))), slot)
     assert.equal(r.ok, true, `${file}: ${r.reason}`)
   }
