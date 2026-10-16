@@ -2,6 +2,7 @@ import { request, USE_FIXTURES } from './client';
 import ENDPOINTS, { PLATFORM } from './endpoints';
 import { toBetRow } from './betHistory';
 import { getOriginals, slugFor } from './originals';
+import { isHouseGame } from './game';
 import { publicGates } from './gates';
 import { getSportEvents } from './exchange/feed';
 import { getCasinoSet, toCatalogGame } from './catalog';
@@ -130,9 +131,15 @@ const LIVE_BETS = 30;
  */
 const toLatestBet = (row) => {
   const mapped = toBetRow(row);
+  const gameUnique = String(row.game ?? row.game_uid ?? '');
+  const slug = slugFor(gameUnique);
   return {
     betId: mapped.distributeId,
-    gameUnique: String(row.game ?? row.game_uid ?? ''),
+    gameUnique,
+    /* The row links to its game page; a game the originals' icon map does not know (a
+       third-party title) draws its catalogue art when the build has it. */
+    slug: slug || undefined,
+    icon: isHouseGame(gameUnique) ? undefined : assetExact(slug),
     fullName: mapped.type,
     userName: HIDDEN_NAME,
     currencyName: mapped.currencyName,

@@ -64,7 +64,7 @@ const HOUSE_SLUGS = new Set([
   ...GAMES.filter((game) => game.provider === 'BC Originals').map((game) => game.slug),
   ...ORIGINAL_GAMES.filter((game) => !game.slug.endsWith('-by-croco-gaming')).map((game) => game.slug),
 ]);
-const isHouseGame = (ref) => HOUSE_SLUGS.has(ref) || HOUSE_SLUGS.has(slugFor(ref));
+export const isHouseGame = (ref) => HOUSE_SLUGS.has(ref) || HOUSE_SLUGS.has(slugFor(ref));
 
 /* ── THE LAUNCH ─────────────────────────────────────────────────────────────────────────────
  *

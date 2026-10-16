@@ -18,6 +18,10 @@
    13 more live at /assets/*.png and are not in the mirror, so those slugs also fall back. */
 import iconMap from '../../../assets/gameicons/_map.json';
 import * as globMaps from './bets.globs.js';
+import { printCurrency, getAlias } from '../../../utils/currency';
+import { HIDDEN_NAME } from '../../../context/account';
+import { isShownOriginal, slugFor } from '../../../services/originals';
+import { isHouseGame } from '../../../services/game';
 
 const icons = globMaps.icons;
 const coins = globMaps.coins;
@@ -46,6 +50,50 @@ export function formatAmount(value, precision = 5) {
   if (!Number.isFinite(n)) return String(value);
   return n.toFixed(precision).replace(/0+$/, '').replace(/\.$/, '');
 }
+
+/* ── The table row, in the shape bc.game's current markup prints ─────────────────────────────
+ *
+ * Every source — the live `bet-history/live` / `top-wins` rows (`services/home.js` toLatestBet),
+ * the static showcase (`data/staticShowcase.js`) and the fixture capture below — arrives as the
+ * same bet record ({gameUnique, fullName, slug?, icon?, userName, userId?, currencyName,
+ * throwAmount, profitAmount, payout}). This turns one into exactly what a row cell needs, so the
+ * table cannot look different depending on where its rows came from.
+ *
+ * Amounts are printed in USD, as bc.game now does ("$22.45", "-$22.45", "+$2,075.77") with the
+ * bet's own coin icon beside them: `printCurrency` to `USDFIAT` with no alias, which converts
+ * through the usdPrice table and formats with Intl's currency style. */
+const toUsd = (amount, coin) =>
+  printCurrency(Math.abs(Number(amount) || 0), coin || 'USDFIAT', { target: 'USDFIAT', hasAlias: false });
+
+export function toTableRow(bet) {
+  const mult = multiplier(bet.payout);
+  const won = mult >= 1;
+  const profit = Number(bet.profitAmount) || 0;
+  const hidden = !bet.userName || bet.userName === HIDDEN_NAME || bet.userName === 'Hidden';
+  return {
+    key: bet.betId,
+    game: bet.fullName || bet.gameUnique,
+    /* A row that knows its game page links to it; `icon` is catalogue art for a third-party game
+       the originals' icon map does not know. */
+    href: bet.slug ? `/game/${bet.slug}` : null,
+    gameIcon: bet.icon || gameIcon(String(bet.gameUnique ?? '')),
+    player: hidden ? null : bet.userName,
+    playerHref: !hidden && bet.userId != null ? `/user/profile/${bet.userId}` : null,
+    coin: getAlias(String(bet.currencyName ?? '')),
+    coinIcon: coinIcon(bet.currencyName),
+    bet: toUsd(bet.throwAmount, bet.currencyName),
+    multiplier: `${mult.toFixed(2)}x`,
+    profit: `${won ? '+' : profit < 0 ? '-' : ''}${toUsd(profit, bet.currencyName)}`,
+    won,
+  };
+}
+
+/* Only the five Originals this site offers are advertised (hidden-features skill): a bet on any
+   other in-house game is left out of the ticker. Third-party games always pass. */
+export const isAdvertised = (bet) => {
+  const ref = String(bet?.gameUnique ?? '');
+  return !isHouseGame(ref) || isShownOriginal(slugFor(ref));
+};
 
 export const bets = [
   {
