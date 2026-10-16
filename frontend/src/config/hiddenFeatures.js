@@ -12,3 +12,7 @@ export const PASSKEY_ENABLED = false;
  * defined in components/modals/Auth and come back by adding their label here. With one entry
  * the Sign In row is a single full-width button and Sign Up's "More" toggle is not drawn. */
 export const SOCIAL_LOGINS = ['Google'];
+
+/* The fiat currencies the deposit dialog's Fiat tab offers (user's request, 2026-10-16: INR only),
+ * intersected with the owner's enabled list. Add a code here to offer another. */
+export const DEPOSIT_FIATS = ['INR'];

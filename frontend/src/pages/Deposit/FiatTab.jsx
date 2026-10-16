@@ -2,6 +2,8 @@ import React from 'react';
 import Select from '../../components/shared/Select';
 import { useSession } from '../../context/session';
 import { getCurrency } from '../../data/currencies';
+import { ownerKind } from '../../services/currencies';
+import { DEPOSIT_FIATS } from '../../config/hiddenFeatures';
 import { getAlias, printCurrency, toFiatStr } from '../../utils/currency';
 import { coinIcon } from '../../utils/coinArt';
 import { useIsDialog } from '../../context/dialogRoute';
@@ -385,9 +387,11 @@ export default function FiatTab({ onDepositCrypto }) {
   /* `G1(currencyName, isFiat, !isFiat)` the other way round — the fiat half of the wallet.
      Seeded from the account's own currency when that is a fiat, which it is not in this
      fixture (BCD), so it falls to the first row. */
+  /* Only the fiats this site offers for deposit (config/hiddenFeatures.js DEPOSIT_FIATS — INR). */
   const fiatOptions = balances
-    .filter((coin) => getCurrency(coin.currencyName)?.currencyType === 'FIAT')
-    .map((coin) => coin.currencyName);
+    .filter((coin) => getCurrency(coin.currencyName)?.currencyType === 'FIAT' || ownerKind(coin.currencyName) === 'fiat')
+    .map((coin) => coin.currencyName)
+    .filter((name) => DEPOSIT_FIATS.includes(String(name).toUpperCase().replace(/FIAT$/, '')));
 
   /* A fiat site default coin comes first for a player who has not picked one (`depositDefault`). */
   const siteDefault = depositDefault(session);
