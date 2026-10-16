@@ -16,15 +16,22 @@ import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
 import { useApi, useApiMutation } from '@/hooks/use-api'
-import { api, ApiError } from '@/lib/api/client'
+import { api, ApiError, errorMessage, readEnvelope, send } from '@/lib/api/client'
+import { toastError, toastSaved, type SaveResult } from '@/lib/api/feedback'
 import { withBase } from '@/lib/basePath'
 import {
+  BAD_TEXT,
   BRANDING_LABELS,
+  BRANDING_SLOTS,
   brandingProblem,
   diffBranding,
+  inspectBrandingImage,
   keywordList,
   MAX_IMAGE_BYTES,
+  MAX_IMAGE_SIDE,
+  MAX_KEYWORD_LENGTH,
   MAX_KEYWORDS,
+  TEXT_KEYS,
   TEXT_LIMITS,
   type Branding as BrandingDoc,
   type BrandingAsset,
@@ -35,19 +42,64 @@ import type { Change, EditableDoc, EntitlementsDoc } from '@/lib/entitlements/ty
 import { cn } from '@/lib/utils'
 import ChangeList from '../entitlements/ChangeList'
 
-const assetUrl = (a: BrandingAsset | null) => (a ? `/api/owner/branding/asset/${a.file}` : null)
+const assetUrl = (a: BrandingAsset | null) => (a ? withBase(`/api/owner/branding/asset/${a.file}`) : null)
 
 /** `{ success, data }` from the multipart upload (the JSON client does not send FormData). */
 async function upload(slot: BrandingSlot, file: File): Promise<BrandingAsset> {
   const body = new FormData()
 
   body.set('file', file)
-  const res = await fetch(withBase(`/api/owner/branding/upload?slot=${slot}`), { method: 'POST', body, cache: 'no-store' })
-  const json = (await res.json().catch(() => null)) as { success: boolean; data?: BrandingAsset; error?: { code: string; message: string } } | null
+  const res = await send(`/api/owner/branding/upload?slot=${slot}`, { method: 'POST', body, cache: 'no-store' })
 
-  if (!json?.success || !json.data) throw new ApiError(res.status, json?.error?.code ?? 'BAD_RESPONSE', json?.error?.message ?? res.statusText)
+  return readEnvelope<BrandingAsset>(res)
+}
 
-  return json.data
+/**
+ * The upload rules, checked in the browser before anything is sent: the same `inspectBrandingImage`
+ * the server runs (PNG / WebP by magic bytes, inert SVG, KB per slot, sides ≤ 4096, the logo ≥ 1.5:1,
+ * the mark 0.8–1.25). Null = fine; the server checks again on receipt.
+ */
+async function precheck(slot: BrandingSlot, file: File): Promise<string | null> {
+  const max = MAX_IMAGE_BYTES[slot]
+
+  if (file.size > max) return `${file.name} is ${(file.size / 1024).toFixed(0)} KB; ${BRANDING_LABELS[slot]} is at most ${max / 1024} KB`
+  const image = inspectBrandingImage(new Uint8Array(await file.arrayBuffer()), slot)
+
+  return image.ok ? null : image.reason
+}
+
+/** Each field's problem, the same rules as the save (brandingProblem), so it is shown under the field. */
+function fieldProblems(b: BrandingDoc): Partial<Record<keyof BrandingDoc, string>> {
+  const out: Partial<Record<keyof BrandingDoc, string>> = {}
+
+  for (const key of TEXT_KEYS) {
+    const v = b[key]
+
+    if (v.trim().length > TEXT_LIMITS[key]) out[key] = `At most ${TEXT_LIMITS[key]} characters (now ${v.trim().length})`
+    else if (BAD_TEXT.test(v)) out[key] = 'No < > or control characters'
+  }
+
+  const anythingElse = (Object.keys(b) as (keyof BrandingDoc)[]).some(k => {
+    const v = b[k]
+
+    return k !== 'siteName' && (Array.isArray(v) ? v.length > 0 : typeof v === 'string' ? !!v.trim() : !!v)
+  })
+
+  if (!out.siteName && anythingElse && !b.siteName.trim()) out.siteName = 'Required once anything is branded (it is also the logo alt text)'
+
+  const template = b.titleTemplate.trim()
+
+  if (!out.titleTemplate && template && template.split('%s').length !== 2)
+    out.titleTemplate = template.includes('%s') ? 'Use %s only once' : 'Must contain %s (where the page title goes)'
+
+  if (b.keywords.length > MAX_KEYWORDS) out.keywords = `At most ${MAX_KEYWORDS} keywords (now ${b.keywords.length})`
+  else if (b.keywords.some(w => w.length > MAX_KEYWORD_LENGTH))
+    out.keywords = `Each keyword is at most ${MAX_KEYWORD_LENGTH} characters: “${b.keywords.find(w => w.length > MAX_KEYWORD_LENGTH)!.slice(0, 20)}…”`
+  else if (b.keywords.some(w => BAD_TEXT.test(w))) out.keywords = 'No < > or control characters'
+
+  if (b.themeColor.trim() && !/^#[0-9a-fA-F]{6}$/.test(b.themeColor.trim())) out.themeColor = 'Must look like #1A2B3C, or be empty'
+
+  return out
 }
 
 const SLOT_HELP: Record<BrandingSlot, string> = {
@@ -56,20 +108,48 @@ const SLOT_HELP: Record<BrandingSlot, string> = {
   ogImage: 'The picture a shared link shows (1200x630 is the usual size). Optional.'
 }
 
-const ImageSlot = ({ slot, value, onChange }: { slot: BrandingSlot; value: BrandingAsset | null; onChange: (a: BrandingAsset | null) => void }) => {
+const ImageSlot = ({
+  slot,
+  value,
+  onChange,
+  error,
+  onError
+}: {
+  slot: BrandingSlot
+  value: BrandingAsset | null
+  onChange: (a: BrandingAsset | null) => void
+  error?: string
+  onError: (message: string | null) => void
+}) => {
   const input = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
   const url = assetUrl(value)
+  const label = BRANDING_LABELS[slot]
 
   const pick = async (file: File | undefined) => {
     if (!file) return
     setBusy(true)
+    onError(null)
 
     try {
-      onChange(await upload(slot, file))
-      toast.success(`${BRANDING_LABELS[slot]} uploaded — save to put it live`)
+      const refused = await precheck(slot, file)
+
+      if (refused) {
+        onError(refused)
+        toast.error(`${label} not uploaded`, { description: refused })
+
+        return
+      }
+
+      const asset = await upload(slot, file)
+
+      onChange(asset)
+      toast.success(`${label} uploaded`, {
+        description: `${asset.width && asset.height ? `${asset.width}x${asset.height}, ` : ''}${(asset.bytes / 1024).toFixed(1)} KB. Review and save to put it live.`
+      })
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : String(e))
+      onError(errorMessage(e))
+      toastError(e, `${label} not uploaded`)
     } finally {
       setBusy(false)
       if (input.current) input.current.value = ''
@@ -100,10 +180,21 @@ const ImageSlot = ({ slot, value, onChange }: { slot: BrandingSlot; value: Brand
         <div className='flex flex-col gap-1.5'>
           <div className='flex gap-2'>
             <Button type='button' variant='outline' size='sm' disabled={busy} onClick={() => input.current?.click()}>
-              {busy ? <Loader2Icon className='animate-spin' /> : <UploadIcon />} {value ? 'Replace' : 'Upload'}
+              {busy ? <Loader2Icon className='animate-spin' /> : <UploadIcon />} {busy ? 'Uploading…' : value ? 'Replace' : 'Upload'}
             </Button>
             {value && (
-              <Button type='button' variant='ghost' size='sm' onClick={() => onChange(null)} aria-label={`Remove ${BRANDING_LABELS[slot]}`}>
+              <Button
+                type='button'
+                variant='ghost'
+                size='sm'
+                disabled={busy}
+                onClick={() => {
+                  onChange(null)
+                  onError(null)
+                  toast.info(`${label} removed`, { description: 'Review and save to put it live; empty keeps the UI’s own.' })
+                }}
+                aria-label={`Remove ${label}`}
+              >
                 <Trash2Icon /> Remove
               </Button>
             )}
@@ -125,16 +216,22 @@ const ImageSlot = ({ slot, value, onChange }: { slot: BrandingSlot; value: Brand
         data-slot={slot}
         onChange={e => void pick(e.target.files?.[0])}
       />
+      {error && (
+        <p className='text-destructive text-xs' role='alert' data-error={`branding-${slot}`}>
+          {error}
+        </p>
+      )}
       <FieldDescription>
-        {SLOT_HELP[slot]} PNG, WebP or SVG, at most {MAX_IMAGE_BYTES[slot] / 1024} KB. Checked by its bytes; an SVG with script, event attributes or external references is refused.
+        {SLOT_HELP[slot]} PNG, WebP or SVG, at most {MAX_IMAGE_BYTES[slot] / 1024} KB, each side at most {MAX_IMAGE_SIDE} px. Checked by its bytes; an SVG with script, event
+        attributes or external references is refused.
       </FieldDescription>
     </Field>
   )
 }
 
-type TextFieldProps = { name: BrandingTextKey; value: string; onChange: (v: string) => void; placeholder?: string; help?: string; multiline?: boolean }
+type TextFieldProps = { name: BrandingTextKey; value: string; onChange: (v: string) => void; placeholder?: string; help?: string; multiline?: boolean; error?: string }
 
-const TextField = ({ name, value, onChange, placeholder, help, multiline }: TextFieldProps) => {
+const TextField = ({ name, value, onChange, placeholder, help, multiline, error }: TextFieldProps) => {
   const id = `branding-${name}`
   const Control = multiline ? Textarea : Input
 
@@ -142,11 +239,25 @@ const TextField = ({ name, value, onChange, placeholder, help, multiline }: Text
     <Field>
       <div className='flex items-baseline justify-between gap-2'>
         <FieldLabel htmlFor={id}>{BRANDING_LABELS[name]}</FieldLabel>
-        <span className={cn('text-xs tabular-nums', value.length > TEXT_LIMITS[name] ? 'text-destructive' : 'text-muted-foreground')}>
+        <span className={cn('text-xs tabular-nums', value.trim().length > TEXT_LIMITS[name] ? 'text-destructive' : 'text-muted-foreground')}>
           {value.length}/{TEXT_LIMITS[name]}
         </span>
       </div>
-      <Control id={id} name={name} value={value} placeholder={placeholder} autoComplete='off' onChange={e => onChange(e.target.value)} />
+      <Control
+        id={id}
+        name={name}
+        value={value}
+        placeholder={placeholder}
+        autoComplete='off'
+        aria-invalid={!!error}
+        aria-describedby={error ? `${id}-error` : undefined}
+        onChange={e => onChange(e.target.value)}
+      />
+      {error && (
+        <p id={`${id}-error`} className='text-destructive text-xs' role='alert' data-error={id}>
+          {error}
+        </p>
+      )}
       {help && <FieldDescription>{help}</FieldDescription>}
     </Field>
   )
@@ -158,40 +269,47 @@ const TextField = ({ name, value, onChange, placeholder, help, multiline }: Text
  * it within seconds. Uploads are stored here and only go live with the save.
  */
 const Branding = () => {
-  const { data: doc, error, isLoading, refetch } = useApi<EditableDoc>('/api/owner/entitlements')
+  const { data: doc, error, isLoading, refetch, isRefetching } = useApi<EditableDoc>('/api/owner/entitlements')
   const [draft, setDraft] = useState<BrandingDoc | null>(null)
+  const [slotErrors, setSlotErrors] = useState<Partial<Record<BrandingSlot, string>>>({})
   const [keywordsText, setKeywordsText] = useState<string | null>(null)
   const [reviewing, setReviewing] = useState(false)
 
   const saved = doc?.branding ?? null
   const current: BrandingDoc | null = draft ?? saved
   const changes: Change[] = saved && current ? diffBranding(saved, current) : []
-  const problem = current ? brandingProblem(current) : null
+  const fields = current ? fieldProblems(current) : {}
+  const fieldCount = Object.keys(fields).length
+  const problem = fieldCount ? `Fix ${fieldCount} field${fieldCount === 1 ? '' : 's'} before saving: ${Object.values(fields)[0]}` : current ? brandingProblem(current) : null
+  const slotError = (slot: BrandingSlot) => (msg: string | null) => setSlotErrors(prev => ({ ...prev, [slot]: msg ?? undefined }))
 
   const set = <K extends keyof BrandingDoc>(key: K, value: BrandingDoc[K]) => setDraft(prev => ({ ...(prev ?? saved!), [key]: value }))
 
   const discard = () => {
     setDraft(null)
     setKeywordsText(null)
+    setSlotErrors({})
   }
 
-  const save = useApiMutation<void, { doc: EntitlementsDoc; changes: Change[]; live?: { live: boolean; reason?: string } }>({
+  const save = useApiMutation<void, SaveResult & { doc: EntitlementsDoc; changes: Change[] }>({
     // Only `branding` changes; features, flags, variants and the template stay as stored.
     fn: () => api.put('/api/owner/entitlements', { version: doc!.version, features: {}, flags: {}, branding: current }),
     invalidate: [['api']],
-    success: r =>
-      !r.changes.length
-        ? 'Nothing to save'
-        : r.live?.live
-          ? `Saved as version ${r.doc.version} — live on the site now`
-          : `Saved as version ${r.doc.version} — the backend picks it up on its next poll`,
-    onSuccess: () => {
+    errorTitle: 'Branding not saved',
+    onSuccess: r => {
+      toastSaved(r, 'Branding saved')
       discard()
       setReviewing(false)
     }
   })
 
-  if (error) return <ErrorState error={error} />
+  if (error)
+    return (
+      <>
+        <PageHeader title='Branding' />
+        <ErrorState error={error} title='Could not load the branding' onRetry={refetch} retrying={isRefetching} />
+      </>
+    )
 
   const pageTitle = current?.title || current?.siteName || ''
   const sample = current?.titleTemplate ? current.titleTemplate.replace('%s', 'Casino') : pageTitle
@@ -217,20 +335,21 @@ const Branding = () => {
               <CardDescription>The browser tab, search results and the site&apos;s own mentions of its name.</CardDescription>
             </CardHeader>
             <CardContent className='flex flex-col gap-4'>
-              <TextField name='siteName' value={current.siteName} onChange={v => set('siteName', v)} placeholder='parker567' help='Required once branded. Also the alt text of the logo.' />
-              <TextField name='title' value={current.title} onChange={v => set('title', v)} placeholder='Parker567 — Casino & Sports' help='The home page title (and the default for every page).' />
+              <TextField error={fields.siteName} name='siteName' value={current.siteName} onChange={v => set('siteName', v)} placeholder='parker567' help='Required once branded. Also the alt text of the logo.' />
+              <TextField error={fields.title} name='title' value={current.title} onChange={v => set('title', v)} placeholder='Parker567 — Casino & Sports' help='The home page title (and the default for every page).' />
               <TextField
                 name='titleTemplate'
+                error={fields.titleTemplate}
                 value={current.titleTemplate}
                 onChange={v => set('titleTemplate', v)}
                 placeholder='%s · Parker567'
                 help='How a page with its own title is named; %s is that title. Empty = the page title alone.'
               />
-              <TextField name='description' value={current.description} onChange={v => set('description', v)} multiline help='<meta name="description">, shown under the title in search results.' />
+              <TextField error={fields.description} name='description' value={current.description} onChange={v => set('description', v)} multiline help='<meta name="description">, shown under the title in search results.' />
               <Field>
                 <div className='flex items-baseline justify-between gap-2'>
                   <FieldLabel htmlFor='branding-keywords'>{BRANDING_LABELS.keywords}</FieldLabel>
-                  <span className='text-muted-foreground text-xs tabular-nums'>
+                  <span className={cn('text-xs tabular-nums', current.keywords.length > MAX_KEYWORDS ? 'text-destructive' : 'text-muted-foreground')}>
                     {current.keywords.length}/{MAX_KEYWORDS}
                   </span>
                 </div>
@@ -238,6 +357,7 @@ const Branding = () => {
                   id='branding-keywords'
                   name='keywords'
                   autoComplete='off'
+                  aria-invalid={!!fields.keywords}
                   placeholder='crypto casino, sports betting, originals'
                   value={keywordsText ?? current.keywords.join(', ')}
                   onChange={e => {
@@ -245,7 +365,12 @@ const Branding = () => {
                     set('keywords', keywordList(e.target.value))
                   }}
                 />
-                <FieldDescription>Comma-separated.</FieldDescription>
+                {fields.keywords && (
+                  <p className='text-destructive text-xs' role='alert' data-error='branding-keywords'>
+                    {fields.keywords}
+                  </p>
+                )}
+                <FieldDescription>Comma-separated; at most {MAX_KEYWORDS}, each at most {MAX_KEYWORD_LENGTH} characters.</FieldDescription>
               </Field>
             </CardContent>
           </Card>
@@ -256,8 +381,8 @@ const Branding = () => {
               <CardDescription>Only the image changes: each one is drawn in the original&apos;s box, at the same size and place.</CardDescription>
             </CardHeader>
             <CardContent className='flex flex-col gap-5'>
-              <ImageSlot slot='logo' value={current.logo} onChange={a => set('logo', a)} />
-              <ImageSlot slot='mark' value={current.mark} onChange={a => set('mark', a)} />
+              <ImageSlot slot='logo' value={current.logo} onChange={a => set('logo', a)} error={slotErrors.logo} onError={slotError('logo')} />
+              <ImageSlot slot='mark' value={current.mark} onChange={a => set('mark', a)} error={slotErrors.mark} onError={slotError('mark')} />
               <Field>
                 <FieldLabel htmlFor='branding-themeColor'>{BRANDING_LABELS.themeColor}</FieldLabel>
                 <div className='flex items-center gap-2'>
@@ -268,13 +393,27 @@ const Branding = () => {
                     value={/^#[0-9a-fA-F]{6}$/.test(current.themeColor) ? current.themeColor : '#232626'}
                     onChange={e => set('themeColor', e.target.value.toUpperCase())}
                   />
-                  <Input id='branding-themeColor' name='themeColor' className='w-32 font-mono' placeholder='#232626' value={current.themeColor} onChange={e => set('themeColor', e.target.value)} />
+                  <Input
+                    id='branding-themeColor'
+                    name='themeColor'
+                    className='w-32 font-mono'
+                    placeholder='#232626'
+                    maxLength={7}
+                    aria-invalid={!!fields.themeColor}
+                    value={current.themeColor}
+                    onChange={e => set('themeColor', e.target.value)}
+                  />
                   {current.themeColor && (
                     <Button type='button' variant='ghost' size='sm' onClick={() => set('themeColor', '')}>
                       Clear
                     </Button>
                   )}
                 </div>
+                {fields.themeColor && (
+                  <p className='text-destructive text-xs' role='alert' data-error='branding-themeColor'>
+                    {fields.themeColor}
+                  </p>
+                )}
                 <FieldDescription>Optional: the mobile browser bar&apos;s colour. Empty keeps the UI&apos;s own.</FieldDescription>
               </Field>
             </CardContent>
@@ -286,9 +425,9 @@ const Branding = () => {
               <CardDescription>What a link to the site shows in chats and social posts. Empty fields fall back to the title and description.</CardDescription>
             </CardHeader>
             <CardContent className='flex flex-col gap-4'>
-              <TextField name='ogTitle' value={current.ogTitle} onChange={v => set('ogTitle', v)} placeholder={current.title || 'Page title'} />
-              <TextField name='ogDescription' value={current.ogDescription} onChange={v => set('ogDescription', v)} multiline placeholder={current.description} />
-              <ImageSlot slot='ogImage' value={current.ogImage} onChange={a => set('ogImage', a)} />
+              <TextField error={fields.ogTitle} name='ogTitle' value={current.ogTitle} onChange={v => set('ogTitle', v)} placeholder={current.title || 'Page title'} />
+              <TextField error={fields.ogDescription} name='ogDescription' value={current.ogDescription} onChange={v => set('ogDescription', v)} multiline placeholder={current.description} />
+              <ImageSlot slot='ogImage' value={current.ogImage} onChange={a => set('ogImage', a)} error={slotErrors.ogImage} onError={slotError('ogImage')} />
             </CardContent>
           </Card>
 
@@ -329,11 +468,18 @@ const Branding = () => {
       {changes.length > 0 && (
         <div className='bg-background/95 fixed inset-x-0 bottom-0 z-20 border-t backdrop-blur'>
           <div className='mx-auto flex max-w-7xl items-center justify-between gap-3 px-6 py-3'>
-            <span className={cn('text-sm', problem && 'text-destructive')}>
+            <span className={cn('text-sm', problem && 'text-destructive')} role={problem ? 'alert' : undefined} data-save-blocked={problem ? '' : undefined}>
               {problem ?? `${changes.length} unsaved change${changes.length === 1 ? '' : 's'}`}
             </span>
             <div className='flex gap-2'>
-              <Button variant='outline' onClick={discard}>
+              <Button
+                variant='outline'
+                disabled={save.isPending}
+                onClick={() => {
+                  discard()
+                  toast.info('Changes discarded')
+                }}
+              >
                 Discard
               </Button>
               <Button disabled={!!problem} onClick={() => setReviewing(true)}>
@@ -360,13 +506,21 @@ const Branding = () => {
               Cancel
             </Button>
             <Button
-              disabled={save.isPending}
+              disabled={save.isPending || !!problem}
               onClick={() =>
                 save.mutate(undefined, {
                   onError: e => {
                     if (e instanceof ApiError && e.code === 'VERSION_CONFLICT') {
                       toast.info('Reloaded the latest version; your edits are kept on top of it.')
                       void refetch()
+                    }
+
+                    // "logo: <file> was not uploaded here" → under that image.
+                    if (e instanceof ApiError && e.code === 'BRANDING_FILE_MISSING') {
+                      const slot = BRANDING_SLOTS.find(x => e.message.startsWith(`${x}:`))
+
+                      if (slot) slotError(slot)('This image is not stored on the panel any more — upload it again.')
+                      setReviewing(false)
                     }
                   }
                 })

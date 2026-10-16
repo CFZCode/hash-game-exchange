@@ -28,7 +28,9 @@ const SUCCESS = [
   'paid',
   'credited'
 ]
+
 const WARNING = ['pending', 'processing', 'open', 'submitted', 'review', 'awaiting', 'partial']
+
 const DANGER = [
   'suspended',
   'rejected',
@@ -41,6 +43,8 @@ const DANGER = [
   'blocked',
   'expired'
 ]
+
+
 /** In the system, but not in play — no colour, because nothing is happening. */
 const NEUTRAL = ['void', 'inactive', 'draft', 'archived', 'unknown']
 

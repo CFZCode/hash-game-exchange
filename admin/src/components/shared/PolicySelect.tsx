@@ -42,6 +42,7 @@ const PolicySelect = ({
   const confirm = async () => {
     if (!pending) return
     setBusy(true)
+
     try {
       await onChange(pending)
       setPending(null)

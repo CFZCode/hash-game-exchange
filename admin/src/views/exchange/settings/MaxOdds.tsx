@@ -12,6 +12,8 @@ import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 import { CONFIG_API, Note, ToggleGroupButtons, ToneBadge, errorText, useZip, zipApi } from './shared'
+import { Loader2Icon } from 'lucide-react'
+import { check } from '@/lib/validate'
 
 /**
  * Max Odds — zip `pages/settings/MaxOdds.jsx` (sirf owner).
@@ -109,7 +111,7 @@ const MaxOdds = () => {
       const maxOdds = rule.max_odds === '' ? 0 : Number(rule.max_odds)
 
       if (!Number.isFinite(maxOdds) || maxOdds < 0 || maxOdds > maxValue) {
-        toast.error(`Max odds must be between 0 and ${maxValue}`)
+        toast.error(`${label}: max odds must be between 0 and ${maxValue}`)
 
         return
       }
@@ -152,6 +154,7 @@ const MaxOdds = () => {
     const inheriting = !league.is_default && rule.state === 'inherit'
     const dirty = isDirty(key, saved)
     const busy = savingKey === key
+    const problem = !inheriting && dirty ? check.number(rule.max_odds, 'Max odds', { min: 0, max: maxValue, optional: true }) : undefined
 
     return (
       <TableCell key={category} className={cn('whitespace-normal', dirty && 'bg-warning-soft')}>
@@ -182,7 +185,7 @@ const MaxOdds = () => {
             </small>
             {dirty && (
               <Button size='sm' disabled={busy} onClick={() => save(sport, league, category)}>
-                {busy ? '…' : 'Save'}
+                {busy ? <Loader2Icon className='animate-spin' /> : 'Save'}
               </Button>
             )}
           </div>
@@ -195,14 +198,16 @@ const MaxOdds = () => {
                 max={maxValue}
                 step={0.01}
                 className='h-8 w-[100px]'
+                aria-invalid={problem ? true : undefined}
                 placeholder='0 = no limit'
                 value={rule.max_odds}
                 onChange={e => setDraft(key, saved, { state: 'set', max_odds: e.target.value })}
               />
-              <Button size='sm' disabled={!dirty || busy} onClick={() => save(sport, league, category)}>
-                {busy ? '…' : 'Save'}
+              <Button size='sm' disabled={!dirty || busy || Boolean(problem)} onClick={() => save(sport, league, category)}>
+                {busy ? <Loader2Icon className='animate-spin' /> : 'Save'}
               </Button>
             </div>
+            {problem && <small className='text-destructive mt-1 block'>{problem}</small>}
             {sport.sport_id === limitedOversSportId && (
               <label className='mt-1 flex items-center gap-2 text-xs'>
                 <Checkbox

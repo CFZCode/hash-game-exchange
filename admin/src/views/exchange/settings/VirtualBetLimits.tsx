@@ -10,6 +10,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { CONFIG_API, Note, errorText, useZip, zipApi } from './shared'
+import { Loader2Icon } from 'lucide-react'
+import { check } from '@/lib/validate'
 
 /**
  * Virtual Bet Limits — zip `pages/settings/VirtualBetLimits.jsx` (sirf owner).
@@ -53,21 +55,25 @@ const VirtualBetLimits = () => {
     setEdits(prev => ({ ...prev, [rowKey(r)]: { ...prev[rowKey(r)], [field]: value } }))
   }
 
+  /** 0 = not set; otherwise a whole number ≥ 0 and Min not above Max (server: `saveVirtualLimits`). */
+  const rowError = (r: LimitRow) => {
+    const bad = check.number(r.min_stake, 'Min', { min: 0, optional: true }) || check.number(r.max_stake, 'Max', { min: 0, optional: true })
+
+    if (bad) return bad
+    const min = Number(r.min_stake)
+    const max = Number(r.max_stake)
+
+    return min > 0 && max > 0 && min > max ? 'Min cannot be more than Max' : undefined
+  }
+
   const handleSave = async (e: FormEvent) => {
     e.preventDefault()
 
     for (const r of rows) {
-      const min = Number(r.min_stake)
-      const max = Number(r.max_stake)
+      const problem = rowError(r)
 
-      if (!Number.isFinite(min) || min < 0 || !Number.isFinite(max) || max < 0) {
-        toast.error(`${r.label}: Min and Max must be 0 or more`)
-
-        return
-      }
-
-      if (min > 0 && max > 0 && min > max) {
-        toast.error(`${r.label}: Min cannot be more than Max`)
+      if (problem) {
+        toast.error(`${r.label}: ${problem}`)
 
         return
       }
@@ -126,10 +132,11 @@ const VirtualBetLimits = () => {
                         <TableCell>{r.sport_name}</TableCell>
                         <TableCell>{r.label}</TableCell>
                         <TableCell>
-                          <Input type='number' min={0} step={1} value={r.min_stake} onChange={e => setField(r, 'min_stake', e.target.value)} />
+                          <Input type='number' min={0} step={1} aria-invalid={rowError(r) ? true : undefined} value={r.min_stake} onChange={e => setField(r, 'min_stake', e.target.value)} />
                         </TableCell>
                         <TableCell>
-                          <Input type='number' min={0} step={1} value={r.max_stake} onChange={e => setField(r, 'max_stake', e.target.value)} />
+                          <Input type='number' min={0} step={1} aria-invalid={rowError(r) ? true : undefined} value={r.max_stake} onChange={e => setField(r, 'max_stake', e.target.value)} />
+                          {rowError(r) && <small className='text-destructive mt-1 block'>{rowError(r)}</small>}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -142,6 +149,7 @@ const VirtualBetLimits = () => {
               </p>
 
               <Button type='submit' disabled={saving}>
+                {saving && <Loader2Icon className='animate-spin' />}
                 {saving ? 'Saving…' : 'Save'}
               </Button>
             </form>

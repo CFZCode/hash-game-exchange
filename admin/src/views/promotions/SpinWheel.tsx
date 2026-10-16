@@ -1,8 +1,10 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 
 import Link from 'next/link'
+
+import { toast } from 'sonner'
 
 import { ArrowDownIcon, ArrowUpIcon, Loader2Icon, PlusIcon, RotateCcwIcon, SaveIcon, Trash2Icon } from 'lucide-react'
 
@@ -24,6 +26,7 @@ import { useSession } from '@/contexts/SessionContext'
 import { useApi, useApiMutation, usePagedApi } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
 import { formatNumber } from '@/lib/format'
+import { check, cleanErrors, firstError } from '@/lib/validate'
 import type { SpinClaim, SpinConfig, SpinSlice } from './types'
 import { useLocalList } from './useLocalList'
 
@@ -38,16 +41,15 @@ const polar = (cx: number, cy: number, r: number, deg: number) => {
 /** The wheel as the user sees it, sliced by weight so a heavy slice looks heavy. */
 const Wheel = ({ slices }: { slices: SpinSlice[] }) => {
   const total = slices.reduce((s, x) => s + Math.max(0, x.weight), 0)
-  let angle = 0
+  const shareOf = (x: SpinSlice) => (total ? Math.max(0, x.weight) / total : 1 / slices.length)
+  const starts = slices.map((_, i) => slices.slice(0, i).reduce((sum, x) => sum + shareOf(x) * 360, 0))
 
   return (
     <svg viewBox='0 0 200 200' className='mx-auto size-56'>
       {slices.map((s, i) => {
-        const share = total ? Math.max(0, s.weight) / total : 1 / slices.length
-        const start = angle
-        const end = angle + share * 360
-
-        angle = end
+        const share = shareOf(s)
+        const start = starts[i]
+        const end = start + share * 360
         const a = polar(100, 100, 96, start)
         const b = polar(100, 100, 96, end)
         const mid = polar(100, 100, 64, (start + end) / 2)
@@ -73,12 +75,20 @@ const Wheel = ({ slices }: { slices: SpinSlice[] }) => {
 
 const Config = ({ canWrite }: { canWrite: boolean }) => {
   const q = useApi<SpinConfig>('admin/user/spin-wheel/config')
-  const [draft, setDraft] = useState<SpinConfig | null>(null)
+  const [edited, setDraft] = useState<SpinConfig | null>(null)
+  const draft = edited ?? q.data ?? null
   const { code: cur } = useRewardCurrency()
 
-  useEffect(() => {
-    if (q.data) setDraft(q.data)
-  }, [q.data])
+  // Mirrors the platform's `updateConfig` validator (spin-wheel.validators.js).
+  const errors = draft
+    ? cleanErrors({
+        'sw-min': check.amount(draft.minDeposit, 'Minimum deposit'),
+        'sw-cd': check.number(draft.claimCooldownDays, 'Cooldown', { integer: true, min: 0, max: 3650 }),
+        'sw-max': check.amount(draft.maxBonus, 'Max bonus', { optional: true }),
+        'sw-wager': draft.wagerMultiplier == null ? undefined : check.number(draft.wagerMultiplier, 'Wagering multiplier', { min: 0, max: 100 }),
+        'sw-expiry': check.number(draft.bonusExpiryDays ?? 30, 'Days to wager', { integer: true, min: 0, max: 3650 })
+      })
+    : {}
 
   const dirty = !!draft && !!q.data && (Object.keys(draft) as (keyof SpinConfig)[]).some(k => draft[k] !== q.data?.[k])
 
@@ -99,8 +109,16 @@ const Config = ({ canWrite }: { canWrite: boolean }) => {
       return api.put<SpinConfig>('admin/user/spin-wheel/config', body)
     },
     invalidate: [['api', 'admin/user/spin-wheel/config']],
-    success: 'Wheel settings saved'
+    success: 'Wheel settings saved',
+    onSuccess: () => setDraft(null)
   })
+
+  const submit = () => {
+    const problem = firstError(errors)
+
+    if (problem) return void toast.error(problem)
+    save.mutate()
+  }
 
   return (
     <Card className='shadow-none'>
@@ -118,12 +136,13 @@ const Config = ({ canWrite }: { canWrite: boolean }) => {
         ) : (
           <>
             <div className='grid grid-cols-2 gap-4'>
-              <TextField id='sw-min' label='Minimum deposit' hint={`${cur}, decimal string`} value={draft.minDeposit} disabled={!canWrite} onChange={e => setDraft({ ...draft, minDeposit: e.target.value })} />
-              <TextField id='sw-cd' label='Cooldown (days)' type='number' min={0} max={3650} value={String(draft.claimCooldownDays)} disabled={!canWrite} onChange={e => setDraft({ ...draft, claimCooldownDays: Number(e.target.value) })} />
-              <TextField id='sw-max' label='Max bonus per deposit' hint={`${cur}, decimal string. A won code adds its % of the deposit, up to this.`} value={draft.maxBonus ?? ''} disabled={!canWrite} onChange={e => setDraft({ ...draft, maxBonus: e.target.value })} />
+              <TextField id='sw-min' label='Minimum deposit' error={errors['sw-min']} hint={`${cur}, decimal string`} value={draft.minDeposit} disabled={!canWrite} onChange={e => setDraft({ ...draft, minDeposit: e.target.value })} />
+              <TextField id='sw-cd' label='Cooldown (days)' error={errors['sw-cd']} type='number' min={0} max={3650} value={Number.isNaN(draft.claimCooldownDays) ? '' : String(draft.claimCooldownDays)} disabled={!canWrite} onChange={e => setDraft({ ...draft, claimCooldownDays: e.target.value === '' ? NaN : Number(e.target.value) })} />
+              <TextField id='sw-max' label='Max bonus per deposit' error={errors['sw-max']} hint={`${cur}, decimal string. A won code adds its % of the deposit, up to this.`} value={draft.maxBonus ?? ''} disabled={!canWrite} onChange={e => setDraft({ ...draft, maxBonus: e.target.value })} />
               <TextField
                 id='sw-wager'
                 label='Bonus wagering multiplier'
+                error={errors['sw-wager']}
                 hint='The spin bonus stays in the locked bonus balance until the player wagers this × the bonus. Empty = same as the first deposit bonus; 0 = paid straight to cash.'
                 inputMode='decimal'
                 value={draft.wagerMultiplier == null ? '' : String(draft.wagerMultiplier)}
@@ -134,15 +153,15 @@ const Config = ({ canWrite }: { canWrite: boolean }) => {
                   setDraft({ ...draft, wagerMultiplier: v === '' ? null : Number(v) })
                 }}
               />
-              <TextField id='sw-expiry' label='Days to wager the bonus' hint='An unwagered spin bonus is forfeited after this. 0 = never.' type='number' min={0} max={3650} value={String(draft.bonusExpiryDays ?? 30)} disabled={!canWrite} onChange={e => setDraft({ ...draft, bonusExpiryDays: Number(e.target.value) })} />
+              <TextField id='sw-expiry' label='Days to wager the bonus' error={errors['sw-expiry']} hint='An unwagered spin bonus is forfeited after this. 0 = never.' type='number' min={0} max={3650} value={Number.isNaN(draft.bonusExpiryDays) ? '' : String(draft.bonusExpiryDays ?? 30)} disabled={!canWrite} onChange={e => setDraft({ ...draft, bonusExpiryDays: e.target.value === '' ? NaN : Number(e.target.value) })} />
             </div>
             <SwitchField id='sw-active' label='Wheel is live' hint='Off hides the wheel for every user.' checked={draft.isActive} disabled={!canWrite} onChange={isActive => setDraft({ ...draft, isActive })} />
             <SwitchField id='sw-unl' label='Unlimited spins' hint='Ignore the cooldown entirely.' checked={draft.unlimitedSpin} disabled={!canWrite} onChange={unlimitedSpin => setDraft({ ...draft, unlimitedSpin })} />
             <div className='flex justify-end gap-2'>
-              <Button variant='outline' disabled={!dirty || save.isPending} onClick={() => q.data && setDraft(q.data)}>
+              <Button variant='outline' disabled={!dirty || save.isPending} onClick={() => setDraft(null)}>
                 <RotateCcwIcon /> Reset
               </Button>
-              <Button disabled={!dirty || save.isPending || !canWrite} onClick={() => save.mutate()}>
+              <Button disabled={!dirty || save.isPending || !canWrite} onClick={submit}>
                 {save.isPending ? <Loader2Icon className='animate-spin' /> : <SaveIcon />} Save
               </Button>
             </div>
@@ -155,14 +174,27 @@ const Config = ({ canWrite }: { canWrite: boolean }) => {
 
 const Slices = ({ canWrite }: { canWrite: boolean }) => {
   const q = useApi<SpinSlice[]>('admin/user/spin-wheel/slices')
-  const [draft, setDraft] = useState<SpinSlice[] | null>(null)
+  const [edited, setEdited] = useState<SpinSlice[] | null>(null)
+  const draft = edited ?? q.data ?? null
 
-  useEffect(() => {
-    if (q.data) setDraft(q.data.map(s => ({ ...s })))
-  }, [q.data])
+  const setDraft = (fn: (d: SpinSlice[] | null) => SpinSlice[] | null) => setEdited(prev => fn(prev ?? q.data?.map(s => ({ ...s })) ?? null))
 
-  const dirty = useMemo(() => JSON.stringify(draft) !== JSON.stringify(q.data), [draft, q.data])
+  const dirty = useMemo(() => edited !== null && JSON.stringify(edited) !== JSON.stringify(q.data), [edited, q.data])
   const total = draft?.reduce((s, x) => s + Math.max(0, x.weight), 0) ?? 0
+
+  // Mirrors `bulkSlices` (spin-wheel.validators.js): 1–60 segments, label 1–50 chars, reward % like "12.5", integer weight 0–1,000,000.
+  const rowErrors = (draft ?? []).map((s, i) => {
+    const n = `Segment ${i + 1}`
+
+    return (
+      check.required(s.label, `${n} label`) ||
+      check.length(s.label, `${n} label`, { max: 50 }) ||
+      (s.rewardPct && !/^\d{1,3}(\.\d{1,2})?$/.test(s.rewardPct.trim()) ? `${n}: reward % must be a percentage like 12.5` : undefined) ||
+      check.number(Number.isNaN(s.weight) ? '' : s.weight, `${n} weight`, { integer: true, min: 0, max: 1_000_000 })
+    )
+  })
+
+  const sliceProblem = rowErrors.find(Boolean) || (draft && total === 0 ? 'At least one segment must have a weight above 0' : undefined)
 
   const save = useApiMutation({
     fn: () =>
@@ -177,8 +209,14 @@ const Slices = ({ canWrite }: { canWrite: boolean }) => {
         }))
       }),
     invalidate: [['api', 'admin/user/spin-wheel/slices']],
-    success: 'Wheel segments replaced'
+    success: 'Wheel segments replaced',
+    onSuccess: () => setEdited(null)
   })
+
+  const submit = () => {
+    if (sliceProblem) return void toast.error(sliceProblem)
+    save.mutate()
+  }
 
   const update = (i: number, patch: Partial<SpinSlice>) => setDraft(d => (d ? d.map((s, j) => (j === i ? { ...s, ...patch } : s)) : d))
 
@@ -236,9 +274,9 @@ const Slices = ({ canWrite }: { canWrite: boolean }) => {
               </div>
               {draft.map((s, i) => (
                 <div key={i} className='grid grid-cols-2 items-center gap-2 rounded-md border p-2 sm:grid-cols-[1fr_5.5rem_5rem_5rem_4.5rem_6rem] sm:border-0 sm:p-0'>
-                  <Input value={s.label} maxLength={50} disabled={!canWrite} onChange={e => update(i, { label: e.target.value })} />
-                  <Input value={s.rewardPct} placeholder='0' disabled={!canWrite} onChange={e => update(i, { rewardPct: e.target.value })} />
-                  <Input type='number' min={0} max={1000000} value={String(s.weight)} disabled={!canWrite} onChange={e => update(i, { weight: Number(e.target.value) })} />
+                  <Input value={s.label} maxLength={50} disabled={!canWrite} aria-invalid={rowErrors[i]?.includes('label') || undefined} onChange={e => update(i, { label: e.target.value })} />
+                  <Input value={s.rewardPct} placeholder='0' disabled={!canWrite} aria-invalid={rowErrors[i]?.includes('reward') || undefined} onChange={e => update(i, { rewardPct: e.target.value })} />
+                  <Input type='number' min={0} max={1000000} value={Number.isNaN(s.weight) ? '' : String(s.weight)} disabled={!canWrite} aria-invalid={rowErrors[i]?.includes('weight') || undefined} onChange={e => update(i, { weight: e.target.value === '' ? NaN : Number(e.target.value) })} />
                   <div className='flex items-center gap-1'>
                     <input type='color' value={s.color || PALETTE[i % PALETTE.length]} disabled={!canWrite} onChange={e => update(i, { color: e.target.value })} className='size-8 cursor-pointer rounded border bg-transparent p-0.5' aria-label='Colour' />
                   </div>
@@ -252,15 +290,16 @@ const Slices = ({ canWrite }: { canWrite: boolean }) => {
                   </div>
                 </div>
               ))}
+              {dirty && sliceProblem && <p role='alert' className='text-destructive text-sm'>{sliceProblem}</p>}
               <div className='mt-2 flex flex-wrap justify-between gap-2'>
                 <Button variant='outline' size='sm' disabled={!canWrite || draft.length >= 60} onClick={() => setDraft(d => [...(d ?? []), { label: 'New', rewardPct: '5', color: PALETTE[(d?.length ?? 0) % PALETTE.length], sortOrder: d?.length ?? 0, isBadLuck: false, weight: 10 }])}>
                   <PlusIcon /> Add segment
                 </Button>
                 <div className='flex gap-2'>
-                  <Button variant='outline' size='sm' disabled={!dirty || save.isPending} onClick={() => q.data && setDraft(q.data.map(s => ({ ...s })))}>
+                  <Button variant='outline' size='sm' disabled={!dirty || save.isPending} onClick={() => setEdited(null)}>
                     <RotateCcwIcon /> Reset
                   </Button>
-                  <Button size='sm' disabled={!dirty || save.isPending || !canWrite || total === 0} onClick={() => save.mutate()}>
+                  <Button size='sm' disabled={!dirty || save.isPending || !canWrite} onClick={submit}>
                     {save.isPending ? <Loader2Icon className='animate-spin' /> : <SaveIcon />} Save segments
                   </Button>
                 </div>

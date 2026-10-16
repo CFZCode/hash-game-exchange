@@ -2,11 +2,15 @@
 
 import { Fragment, useState } from 'react'
 
+import { Loader2Icon } from 'lucide-react'
+import { toast } from 'sonner'
+
 import PageHeader from '@/components/shared/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { errorMessage } from '@/lib/api/client'
 import { OpenBetsPanel, SETTLE_API, TabBar, useZipQuery, zipCall, type OpenBet } from './shared'
 
 /** `GET internalsettle/momatches` ki ek row */
@@ -69,9 +73,10 @@ const SettlementModal = ({ mode, match, onClose }: { mode: 'declare' | 'void'; m
         })
       }
 
+      toast.success(mode === 'void' ? `${titleOf(match)} voided — stakes refunded` : `Result declared: ${runners[selected ?? -1] ?? ''}`)
       onClose(true)
     } catch (e) {
-      alert((e as Error).message)
+      toast.error(errorMessage(e))
     } finally {
       setSubmitting(false)
     }
@@ -128,6 +133,7 @@ const SettlementModal = ({ mode, match, onClose }: { mode: 'declare' | 'void'; m
             Cancel
           </Button>
           <Button variant={mode === 'void' ? 'destructive' : 'default'} disabled={!canSubmit || submitting} onClick={submit}>
+            {submitting && <Loader2Icon className='animate-spin' />}
             {submitting ? 'Submitting...' : mode === 'void' ? 'Confirm Void' : 'Submit'}
           </Button>
         </DialogFooter>
@@ -162,8 +168,9 @@ const MatchSettlement = () => {
       const res = await zipCall<{ data?: OpenBet[] }>('GET', `${SETTLE_API}/open-bets`, { match_id: m.matchId, market_type: m.marketType, game_type: m.gameType })
 
       setOpenBets(res.data ?? [])
-    } catch {
+    } catch (e) {
       setOpenBets([])
+      toast.error(`Could not load open bets: ${errorMessage(e)}`)
     } finally {
       setBetsLoading(false)
     }
@@ -217,6 +224,12 @@ const MatchSettlement = () => {
                 <TableRow>
                   <TableCell colSpan={4} className='text-center'>
                     Loading...
+                  </TableCell>
+                </TableRow>
+              ) : list.error && !list.data ? (
+                <TableRow>
+                  <TableCell colSpan={4} className='text-destructive text-center'>
+                    Could not load matches: {errorMessage(list.error)}
                   </TableCell>
                 </TableRow>
               ) : rows.length === 0 ? (

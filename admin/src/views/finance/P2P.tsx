@@ -7,7 +7,6 @@ import Link from 'next/link'
 import { BanIcon, CheckIcon, EyeIcon, GavelIcon, PlusIcon } from 'lucide-react'
 
 import Can from '@/components/shared/Can'
-import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import DataTable, { type Column } from '@/components/shared/DataTable'
 import DateTime from '@/components/shared/DateTime'
 import FormDialog from '@/components/shared/FormDialog'
@@ -24,6 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useApi, useApiMutation, useListState } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
 import { truncateId } from '@/lib/format'
+import { check } from '@/lib/validate'
 import { ALL_CURRENCIES } from '@/components/shared/charts'
 import { useDefaultCurrency } from '@/components/shared/DefaultCurrency'
 import { Details, ImageDialog, ViewDialog, stop, usePageNumbered } from './shared'
@@ -44,6 +44,9 @@ import { useOwnerCoinFilter } from './useCurrencyCodes'
 
 const BASE = 'admin/user/p2p'
 const ALL_LISTS = [['paged', `${BASE}/orders`], ['paged', `${BASE}/sell-orders`], ['paged', `${BASE}/disputes`], ['paged', `${BASE}/offers`]]
+
+/** p2p.validators.js `amount`: a decimal > 0 with up to 8 places. */
+const p2pAmount = (v: string, label: string, optional = false) => check.number(v, label, { positive: true, decimals: 8, optional })
 
 const s = (v: unknown) => (v === null || v === undefined ? undefined : String(v))
 const at = (r: Record<string, unknown>) => s(r.created_at ?? r.createdAt)
@@ -98,6 +101,10 @@ const NoteAction = ({ path, title, description, label, icon, destructive, succes
       description={description}
       submitLabel={label}
       destructive={destructive}
+      validate={() => ({
+        [`na-${path}`]: check.length(note, 'Note', { max: 2000 }),
+        [`nf-${path}`]: file && !['image/png', 'image/jpeg'].includes(file.type) ? 'Payment proof must be a PNG or JPEG image' : undefined
+      })}
       onSubmit={() => run.mutateAsync()}
     >
       <TextAreaField id={`na-${path}`} label='Note' value={note} onChange={e => setNote(e.target.value)} />
@@ -132,6 +139,7 @@ const OrderStatus = ({ id }: { id: string | number }) => {
       title={`Order #${id} — set status`}
       description='Only the two transitions that move no money. Releasing and cancelling have their own actions.'
       submitLabel='Set status'
+      validate={() => ({ [`on-${id}`]: check.length(form.note, 'Note', { max: 2000 }) })}
       onSubmit={() => set.mutateAsync()}
     >
       <SelectField id={`os-${id}`} label='Status' value={form.status} onChange={status => setForm({ ...form, status })} options={['DISPUTED', 'EXPIRED'].map(v => ({ value: v, label: v }))} />
@@ -308,6 +316,7 @@ const DisputeStatus = ({ row }: { row: P2pDisputeRow }) => {
       title={`Dispute #${row.id} — ${row.order_no ?? `order ${row.order_id}`}`}
       description='Resolving takes the order out of DISPUTED so it can be released or cancelled. No money moves here.'
       submitLabel='Apply'
+      validate={() => ({ [`dn-${row.id}`]: check.length(form.adminNote, 'Admin note', { max: 4000 }) })}
       onSubmit={() => set.mutateAsync()}
     >
       <SelectField id={`ds-${row.id}`} label='Status' value={form.status} onChange={status => setForm({ ...form, status })} options={P2P_DISPUTE_STATUSES.map(v => ({ value: v, label: v.replace(/_/g, ' ') }))} />
@@ -367,7 +376,7 @@ const OfferStatus = ({ row }: { row: P2pOfferRow }) => {
   const set = useApiMutation({
     fn: () => api.patch(`${BASE}/offers/${row.id}/status`, { status }),
     invalidate: ALL_LISTS,
-    success: 'Offer status updated'
+    success: `Offer #${row.id} set to ${status}`
   })
 
   return (
@@ -429,24 +438,46 @@ const CreateOffer = ({ accounts }: { accounts: P2pPaymentAccount[] }) => {
       description='A house offer users trade against. Amounts and price are decimal strings.'
       submitLabel='Create'
       wide
+      validate={() => {
+        const ids = form.paymentAccountIds.split(/[\s,]+/).filter(Boolean)
+
+        return {
+          coin: coin ? undefined : 'No P2P coin is enabled for this site',
+          price: p2pAmount(form.price, 'Price'),
+          availableAmount: p2pAmount(form.availableAmount, 'Available amount'),
+          minLimit: p2pAmount(form.minLimit, 'Min limit', true),
+          maxLimit:
+            p2pAmount(form.maxLimit, 'Max limit', true) ??
+            (form.minLimit && form.maxLimit && Number(form.minLimit) > Number(form.maxLimit) ? 'Max limit cannot be below the min limit' : undefined),
+          paymentTime: check.number(form.paymentTime, 'Payment window', { integer: true, min: 5, max: 1440, optional: true }),
+          username: check.required(form.username, 'Merchant display name') ?? check.length(form.username, 'Merchant display name', { max: 255 }),
+          paymentAccountIds: !ids.length
+            ? 'Payment account ids are required'
+            : ids.some(x => !/^\d+$/.test(x) || Number(x) <= 0)
+              ? 'Payment account ids must be positive numbers, comma-separated'
+              : ids.length > 20
+                ? 'At most 20 payment accounts'
+                : undefined
+        }
+      }}
       onSubmit={() => create.mutateAsync()}
     >
       <div className='grid grid-cols-3 gap-4'>
-        <SelectField id='of-coin' label='Coin' value={coin} onChange={coin => setForm({ ...form, coin })} options={coins.map(c => ({ value: c, label: c }))} />
+        <SelectField id='of-coin' name='coin' label='Coin' value={coin} onChange={coin => setForm({ ...form, coin })} options={coins.map(c => ({ value: c, label: c }))} />
         <SelectField id='of-fiat' label='Fiat' value={form.fiat} onChange={fiat => setForm({ ...form, fiat })} options={P2P_FIAT.map(c => ({ value: c, label: c }))} />
         <SelectField id='of-seg' label='Segment' value={form.segment} onChange={segment => setForm({ ...form, segment })} options={[{ value: 'BUY', label: 'BUY (user buys crypto)' }, { value: 'SELL', label: 'SELL (user sells crypto)' }]} />
       </div>
       <div className='grid grid-cols-2 gap-4'>
-        <TextField id='of-price' label={`Price (${form.fiat} per ${coin})`} required value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} />
-        <TextField id='of-avail' label={`Available (${coin})`} required value={form.availableAmount} onChange={e => setForm({ ...form, availableAmount: e.target.value })} />
+        <TextField id='of-price' name='price' inputMode='decimal' label={`Price (${form.fiat} per ${coin})`} required value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} />
+        <TextField id='of-avail' name='availableAmount' inputMode='decimal' label={`Available (${coin})`} required value={form.availableAmount} onChange={e => setForm({ ...form, availableAmount: e.target.value })} />
       </div>
       <div className='grid grid-cols-3 gap-4'>
-        <TextField id='of-min' label='Min limit' value={form.minLimit} onChange={e => setForm({ ...form, minLimit: e.target.value })} />
-        <TextField id='of-max' label='Max limit' value={form.maxLimit} onChange={e => setForm({ ...form, maxLimit: e.target.value })} />
-        <TextField id='of-time' label='Payment window (min)' type='number' min={5} max={1440} value={form.paymentTime} onChange={e => setForm({ ...form, paymentTime: e.target.value })} />
+        <TextField id='of-min' name='minLimit' inputMode='decimal' label='Min limit' value={form.minLimit} onChange={e => setForm({ ...form, minLimit: e.target.value })} />
+        <TextField id='of-max' name='maxLimit' inputMode='decimal' label='Max limit' value={form.maxLimit} onChange={e => setForm({ ...form, maxLimit: e.target.value })} />
+        <TextField id='of-time' name='paymentTime' label='Payment window (min)' type='number' min={5} max={1440} value={form.paymentTime} onChange={e => setForm({ ...form, paymentTime: e.target.value })} />
       </div>
-      <TextField id='of-user' label='Merchant display name' required value={form.username} onChange={e => setForm({ ...form, username: e.target.value })} />
-      <TextField id='of-acc' label='Payment account ids' required placeholder='1, 2' hint={accounts.length ? `Known: ${accounts.map(a => `#${a.id} ${a.accountName ?? a.upiId ?? a.accountNumber ?? ''}`).join(', ')}` : 'Comma-separated ids from the Payment accounts tab'} value={form.paymentAccountIds} onChange={e => setForm({ ...form, paymentAccountIds: e.target.value })} />
+      <TextField id='of-user' name='username' label='Merchant display name' required value={form.username} onChange={e => setForm({ ...form, username: e.target.value })} />
+      <TextField id='of-acc' name='paymentAccountIds' label='Payment account ids' required placeholder='1, 2' hint={accounts.length ? `Known: ${accounts.map(a => `#${a.id} ${a.accountName ?? a.upiId ?? a.accountNumber ?? ''}`).join(', ')}` : 'Comma-separated ids from the Payment accounts tab'} value={form.paymentAccountIds} onChange={e => setForm({ ...form, paymentAccountIds: e.target.value })} />
       <div className='grid grid-cols-3 gap-2'>
         <SwitchField id='of-feat' label='Featured' checked={form.isFeatured} onChange={isFeatured => setForm({ ...form, isFeatured })} />
         <SwitchField id='of-ver' label='Verified' checked={form.isVerified} onChange={isVerified => setForm({ ...form, isVerified })} />
@@ -532,10 +563,17 @@ const CreateType = () => {
       }
       title='New payment type'
       submitLabel='Add'
+      validate={() => ({
+        name: check.required(form.name, 'Name') ?? check.length(form.name, 'Name', { max: 100 }),
+        code:
+          check.required(form.code, 'Code') ??
+          check.length(form.code, 'Code', { max: 50 }) ??
+          (/^[a-z0-9][a-z0-9_-]*$/.test(form.code.trim()) ? undefined : 'Code must be lowercase letters, digits, dash and underscore')
+      })}
       onSubmit={() => create.mutateAsync()}
     >
-      <TextField id='pt-name' label='Name' required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
-      <TextField id='pt-code' label='Code' required placeholder='upi' hint='Lowercase letters, digits, dash, underscore' value={form.code} onChange={e => setForm({ ...form, code: e.target.value })} />
+      <TextField id='pt-name' name='name' label='Name' required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
+      <TextField id='pt-code' name='code' label='Code' required placeholder='upi' hint='Lowercase letters, digits, dash, underscore' value={form.code} onChange={e => setForm({ ...form, code: e.target.value })} />
     </FormDialog>
   )
 }
@@ -548,7 +586,7 @@ const CreateAccount = ({ types }: { types: P2pPaymentType[] }) => {
     fn: () => {
       const fd = new FormData()
 
-      fd.append('paymentTypeId', form.paymentTypeId)
+      fd.append('paymentTypeId', form.paymentTypeId || String(types[0]?.id ?? ''))
       for (const k of ['accountName', 'accountNumber', 'ifscCode', 'upiId', 'extraDetails'] as const) if (form[k]) fd.append(k, form[k])
       if (file) fd.append('qr_image', file)
 
@@ -568,16 +606,25 @@ const CreateAccount = ({ types }: { types: P2pPaymentType[] }) => {
       title='New payment account'
       description='A house account users pay into. Needs an account number or a UPI id.'
       submitLabel='Add'
+      validate={() => ({
+        paymentTypeId: form.paymentTypeId || types[0]?.id ? undefined : 'Create a payment type first',
+        accountName: check.length(form.accountName, 'Account name', { max: 255 }),
+        accountNumber: !form.accountNumber.trim() && !form.upiId.trim() ? 'A payment account needs an account number or a UPI id' : check.length(form.accountNumber, 'Account number', { max: 100 }),
+        ifscCode: check.length(form.ifscCode, 'IFSC', { max: 50 }),
+        upiId: check.length(form.upiId, 'UPI id', { max: 255 }),
+        extraDetails: check.length(form.extraDetails, 'Extra details', { max: 2000 }),
+        'pa-qr': file && !['image/png', 'image/jpeg'].includes(file.type) ? 'QR image must be a PNG or JPEG' : undefined
+      })}
       onSubmit={() => create.mutateAsync()}
     >
-      <SelectField id='pa-type' label='Payment type' value={form.paymentTypeId} onChange={paymentTypeId => setForm({ ...form, paymentTypeId })} options={types.map(t => ({ value: String(t.id), label: `${t.name ?? t.code ?? t.id}` }))} placeholder='Create a payment type first' />
-      <TextField id='pa-name' label='Account name' value={form.accountName} onChange={e => setForm({ ...form, accountName: e.target.value })} />
+      <SelectField id='pa-type' name='paymentTypeId' label='Payment type' required value={form.paymentTypeId || String(types[0]?.id ?? '')} onChange={paymentTypeId => setForm({ ...form, paymentTypeId })} options={types.map(t => ({ value: String(t.id), label: `${t.name ?? t.code ?? t.id}` }))} placeholder='Create a payment type first' />
+      <TextField id='pa-name' name='accountName' label='Account name' value={form.accountName} onChange={e => setForm({ ...form, accountName: e.target.value })} />
       <div className='grid grid-cols-2 gap-4'>
-        <TextField id='pa-num' label='Account number' value={form.accountNumber} onChange={e => setForm({ ...form, accountNumber: e.target.value })} />
-        <TextField id='pa-ifsc' label='IFSC' value={form.ifscCode} onChange={e => setForm({ ...form, ifscCode: e.target.value })} />
+        <TextField id='pa-num' name='accountNumber' label='Account number' value={form.accountNumber} onChange={e => setForm({ ...form, accountNumber: e.target.value })} />
+        <TextField id='pa-ifsc' name='ifscCode' label='IFSC' value={form.ifscCode} onChange={e => setForm({ ...form, ifscCode: e.target.value })} />
       </div>
-      <TextField id='pa-upi' label='UPI id' value={form.upiId} onChange={e => setForm({ ...form, upiId: e.target.value })} />
-      <TextAreaField id='pa-extra' label='Extra details' value={form.extraDetails} onChange={e => setForm({ ...form, extraDetails: e.target.value })} />
+      <TextField id='pa-upi' name='upiId' label='UPI id' value={form.upiId} onChange={e => setForm({ ...form, upiId: e.target.value })} />
+      <TextAreaField id='pa-extra' name='extraDetails' label='Extra details' value={form.extraDetails} onChange={e => setForm({ ...form, extraDetails: e.target.value })} />
       <div className='grid gap-2'>
         <label htmlFor='pa-qr' className='text-sm font-medium'>
           QR image

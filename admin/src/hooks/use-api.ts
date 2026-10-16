@@ -6,8 +6,9 @@ import { useMutation, useQuery, useQueryClient, type UseQueryOptions } from '@ta
 import { parseAsInteger, parseAsString, useQueryStates } from 'nuqs'
 import { toast } from 'sonner'
 
-import { api, errorMessage } from '@/lib/api/client'
+import { api } from '@/lib/api/client'
 import type { Paged, Query } from '@/lib/api/types'
+import { notifyError } from '@/lib/notify'
 
 /** GET a single resource. `path` is a gateway path (`admin/dashboard`). */
 export function useApi<T>(path: string | null, query?: Query, options?: Partial<UseQueryOptions<T>>) {
@@ -77,6 +78,7 @@ export function useListState(extraKeys: string[] = [], defaults: Record<string, 
 
 type MutationSpec<TVars, TResult> = {
   fn: (vars: TVars) => Promise<TResult>
+
   /** Query-key prefixes to refetch on success (`['paged', 'admin/staff']`). */
   invalidate?: (string | null)[][]
   success?: string | ((result: TResult, vars: TVars) => string)
@@ -94,7 +96,7 @@ export function useApiMutation<TVars = void, TResult = unknown>(spec: MutationSp
       if (spec.success) toast.success(typeof spec.success === 'function' ? spec.success(result, vars) : spec.success)
       spec.onSuccess?.(result, vars)
     },
-    onError: error => toast.error(errorMessage(error))
+    onError: error => notifyError(error)
   })
 }
 

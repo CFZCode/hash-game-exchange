@@ -2,6 +2,9 @@
 
 import { Fragment, useState } from 'react'
 
+import { Loader2Icon } from 'lucide-react'
+import { toast } from 'sonner'
+
 import PageHeader from '@/components/shared/PageHeader'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -11,6 +14,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { errorMessage } from '@/lib/api/client'
 import { BetTypeBadge, fixed2, MARKETS_FOR_FANCY, SETTLE_API, TabBar, useZipQuery, zipCall } from './shared'
 
 /** `GET internalsettle/settled-markets` ki ek row */
@@ -119,8 +123,9 @@ const VoidBets = () => {
       const res = await zipCall<{ data?: SettledBet[] }>('GET', `${SETTLE_API}/settled-bets`, { match_id: matchId, market_type: marketType })
 
       setBets(Array.isArray(res.data) ? res.data : [])
-    } catch {
+    } catch (e) {
       setBets([])
+      toast.error(`Could not load settled bets: ${errorMessage(e)}`)
     } finally {
       setBetsLoading(false)
     }
@@ -162,22 +167,24 @@ const VoidBets = () => {
           transactionPassword: txnPassword
         })
 
-        alert('Market voided successfully. Affected users: ' + (res.affectedUsers || 0))
+        toast.success(`Market voided — ${res.affectedUsers || 0} user(s) affected`)
       } else {
         await zipCall('POST', `${SETTLE_API}/void-bet-after-settlement`, {
           ledger_id: confirm.data.ledgerId,
           write_statement: writeStatement,
           transactionPassword: txnPassword
         })
-        alert('Bet voided successfully for user: ' + (confirm.data.username || confirm.data.userId))
+        toast.success(`Bet voided for ${confirm.data.username || confirm.data.userId}`)
       }
-    } catch (err) {
-      alert('Error: ' + (err as Error).message)
-    } finally {
-      setBusy(false)
+
       setConfirm(null)
       void list.refresh()
       if (expanded) void fetchBets(expanded.matchId, expanded.marketType)
+    } catch (err) {
+      // e.g. a wrong transaction password — keep the dialog open to retry
+      toast.error(errorMessage(err))
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -227,6 +234,12 @@ const VoidBets = () => {
                 <TableRow>
                   <TableCell colSpan={6} className='text-center'>
                     Loading...
+                  </TableCell>
+                </TableRow>
+              ) : list.error && !list.data ? (
+                <TableRow>
+                  <TableCell colSpan={6} className='text-destructive text-center'>
+                    Could not load settled markets: {errorMessage(list.error)}
                   </TableCell>
                 </TableRow>
               ) : rows.length === 0 ? (
@@ -377,6 +390,7 @@ const VoidBets = () => {
               Cancel
             </Button>
             <Button variant='destructive' disabled={busy || !txnPassword} onClick={doVoid}>
+              {busy && <Loader2Icon className='animate-spin' />}
               {busy ? 'Processing...' : 'Confirm Void'}
             </Button>
           </DialogFooter>

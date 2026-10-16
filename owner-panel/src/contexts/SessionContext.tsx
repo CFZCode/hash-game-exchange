@@ -2,9 +2,12 @@
 
 import { createContext, useCallback, useContext, useMemo, type ReactNode } from 'react'
 
-import { withBase } from '@/lib/basePath'
-
 import { useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
+
+import { request } from '@/lib/api/client'
+import { toastError } from '@/lib/api/feedback'
+import { withBase } from '@/lib/basePath'
 
 type SessionValue = {
   can: (permission?: string | string[]) => boolean
@@ -19,9 +22,20 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const qc = useQueryClient()
 
   const signOut = useCallback(async () => {
-    await fetch(withBase('/api/auth/logout'), { method: 'POST' }).catch(() => undefined)
+    const pending = toast.loading('Signing out…')
+
+    try {
+      await request('/api/auth/logout', { method: 'POST' })
+    } catch (error) {
+      // The session cookie is still set: say so instead of landing on /login and bouncing back.
+      toast.dismiss(pending)
+      toastError(error, 'Sign out failed')
+
+      return
+    }
+
     qc.clear()
-    location.assign(withBase('/login'))
+    location.assign(withBase('/login?signedOut=1'))
   }, [qc])
 
   const value = useMemo<SessionValue>(() => ({ can: () => true, flags: {}, signOut }), [signOut])

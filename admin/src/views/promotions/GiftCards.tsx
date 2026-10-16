@@ -25,6 +25,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useApi, useApiMutation, useListState, usePagedApi } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
 import { formatNumber } from '@/lib/format'
+import { check } from '@/lib/validate'
 import type { GiftCard, GiftCardAnalytics, GiftCardRecord } from './types'
 import { useLocalList } from './useLocalList'
 
@@ -86,25 +87,34 @@ const CreateCard = () => {
       description='A promise to pay every eligible user a fixed amount once they meet the conditions. Amounts are USDT.'
       submitLabel='Create'
       onSubmit={() => create.mutateAsync()}
+      validate={() => ({
+        'gc-key': check.required(f.uniqueKey, 'Code') || check.length(f.uniqueKey, 'Code', { max: 80 }),
+        'gc-amount': check.amount(f.amount),
+        'gc-desc': check.length(f.description, 'Description', { max: 500 }),
+        'gc-period': check.number(f.periodDays, 'Window', { integer: true, min: 1, max: 3650, optional: true }),
+        'gc-end': f.endDate && new Date(f.endDate).getTime() < new Date(new Date().toDateString()).getTime() ? 'End date cannot be in the past' : undefined,
+        'gc-dep-amt': f.depositRequired ? check.amount(f.depositAmount, 'Deposit amount') : undefined,
+        'gc-wag-x': f.wagerRequired ? check.number(f.wagerTimes, 'Wager multiple', { integer: true, min: 0, max: 10000 }) : undefined
+      })}
       wide
     >
       <div className='grid grid-cols-2 gap-4'>
-        <TextField id='gc-key' label='Code' required maxLength={80} placeholder='WELCOME50' value={f.uniqueKey} onChange={e => setF({ ...f, uniqueKey: e.target.value })} />
-        <TextField id='gc-amount' label='Amount' required placeholder='50.00' value={f.amount} onChange={e => setF({ ...f, amount: e.target.value })} />
+        <TextField id='gc-key' name='uniqueKey' label='Code' required maxLength={80} placeholder='WELCOME50' value={f.uniqueKey} onChange={e => setF({ ...f, uniqueKey: e.target.value })} />
+        <TextField id='gc-amount' name='amount' label='Amount' required placeholder='50.00' value={f.amount} onChange={e => setF({ ...f, amount: e.target.value })} />
       </div>
       <TextAreaField id='gc-desc' label='Description' maxLength={500} rows={2} value={f.description} onChange={e => setF({ ...f, description: e.target.value })} />
       <div className='grid grid-cols-2 gap-4'>
-        <TextField id='gc-period' label='Window (days)' type='number' min={1} max={3650} hint='How long after activation the conditions stay open.' value={f.periodDays} onChange={e => setF({ ...f, periodDays: e.target.value })} />
+        <TextField id='gc-period' name='periodDays' label='Window (days)' type='number' min={1} max={3650} hint='How long after activation the conditions stay open.' value={f.periodDays} onChange={e => setF({ ...f, periodDays: e.target.value })} />
         <DateField id='gc-end' label='End date' hint='Last day the card can be activated.' value={f.endDate} onChange={endDate => setF({ ...f, endDate })} />
       </div>
       <div className='grid gap-3 sm:grid-cols-2'>
         <div className='grid gap-3'>
           <SwitchField id='gc-dep' label='Deposit required' checked={f.depositRequired} onChange={depositRequired => setF({ ...f, depositRequired })} />
-          {f.depositRequired && <TextField id='gc-dep-amt' label='Deposit amount' required placeholder='100.00' value={f.depositAmount} onChange={e => setF({ ...f, depositAmount: e.target.value })} />}
+          {f.depositRequired && <TextField id='gc-dep-amt' name='depositAmount' label='Deposit amount' required placeholder='100.00' value={f.depositAmount} onChange={e => setF({ ...f, depositAmount: e.target.value })} />}
         </div>
         <div className='grid gap-3'>
           <SwitchField id='gc-wag' label='Wager required' checked={f.wagerRequired} onChange={wagerRequired => setF({ ...f, wagerRequired })} />
-          {f.wagerRequired && <TextField id='gc-wag-x' label='Wager × amount' type='number' min={0} max={10000} required value={f.wagerTimes} onChange={e => setF({ ...f, wagerTimes: e.target.value })} />}
+          {f.wagerRequired && <TextField id='gc-wag-x' name='wagerTimes' label='Wager × amount' type='number' min={0} max={10000} required value={f.wagerTimes} onChange={e => setF({ ...f, wagerTimes: e.target.value })} />}
         </div>
       </div>
       <div className='grid gap-3 sm:grid-cols-2'>

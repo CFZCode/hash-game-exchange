@@ -2,7 +2,7 @@
 
 import { Fragment, useMemo, useState } from 'react'
 
-import { ChevronDownIcon, ChevronRightIcon } from 'lucide-react'
+import { ChevronDownIcon, ChevronRightIcon, Loader2Icon } from 'lucide-react'
 import { toast } from 'sonner'
 
 import PageHeader from '@/components/shared/PageHeader'
@@ -11,6 +11,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
+import { check } from '@/lib/validate'
 import { CONFIG_API, Note, ToneBadge, errorText, useZip, zipApi } from './shared'
 
 /**
@@ -127,9 +128,30 @@ const BetLimits = () => {
       return next
     })
 
+  /** Same rules as the server (`parseLimit`): empty = feed default, else ≥ 0, and Min below Max. */
+  const limitError = (market: EventMarket) => {
+    const draft = drafts[market.market_id] || {}
+    const min = draft.min !== undefined ? draft.min : boxValue(market.min_stake)
+    const max = draft.max !== undefined ? draft.max : boxValue(market.max_stake)
+
+    const bad = check.number(min, 'Min', { min: 0, decimals: 2, optional: true }) || check.number(max, 'Max', { min: 0, decimals: 2, optional: true })
+
+    if (bad) return bad
+    if (Number(min) > 0 && Number(max) > 0 && Number(min) >= Number(max)) return 'Min must be lower than Max'
+
+    return undefined
+  }
+
   const saveMarket = async (market: EventMarket) => {
     const key = market.market_id
     const draft = drafts[key] || {}
+    const problem = limitError(market)
+
+    if (problem) {
+      toast.error(`${market.market_name || 'Market'}: ${problem}`)
+
+      return
+    }
 
     setSavingKey(key)
 
@@ -162,7 +184,7 @@ const BetLimits = () => {
       await zipApi('DELETE', `${LIMITS_API}/event/${market.override_id}`)
       await marketsQuery.refetch()
       clearDraft(market.market_id)
-      toast.success('Back to feed default')
+      toast.success(`${market.market_name || 'Market'} back to feed default`)
     } catch (error) {
       toast.error(errorText(error))
     } finally {
@@ -211,11 +233,12 @@ const BetLimits = () => {
     setOpenEvent(null)
   }
 
-  const limitCell = (key: string, side: 'min' | 'max', saved: number | null, placeholder: string) => (
+  const limitCell = (key: string, side: 'min' | 'max', saved: number | null, placeholder: string, invalid?: boolean) => (
     <Input
       type='number'
       min={0}
       step={1}
+      aria-invalid={invalid ? true : undefined}
       className='h-8 w-[110px]'
       placeholder={placeholder}
       value={drafts[key]?.[side] !== undefined ? drafts[key][side] : boxValue(saved)}
@@ -244,6 +267,7 @@ const BetLimits = () => {
           <TableBody>
             {markets.map(market => {
               const busy = savingKey === market.market_id
+              const problem = drafts[market.market_id] ? limitError(market) : undefined
 
               return (
                 <TableRow key={market.market_id}>
@@ -258,12 +282,15 @@ const BetLimits = () => {
                   <TableCell className='text-muted-foreground'>
                     {market.feed_min || 0} – {market.feed_max || 0}
                   </TableCell>
-                  <TableCell>{limitCell(market.market_id, 'min', market.min_stake, String(market.feed_min || 0))}</TableCell>
-                  <TableCell>{limitCell(market.market_id, 'max', market.max_stake, String(market.feed_max || 0))}</TableCell>
+                  <TableCell>{limitCell(market.market_id, 'min', market.min_stake, String(market.feed_min || 0), Boolean(problem))}</TableCell>
+                  <TableCell>
+                    {limitCell(market.market_id, 'max', market.max_stake, String(market.feed_max || 0), Boolean(problem))}
+                    {problem && <small className='text-destructive mt-1 block'>{problem}</small>}
+                  </TableCell>
                   <TableCell>
                     <div className='flex gap-1'>
-                      <Button size='sm' disabled={busy} onClick={() => saveMarket(market)}>
-                        {busy ? '…' : 'Save'}
+                      <Button size='sm' disabled={busy || Boolean(problem)} onClick={() => saveMarket(market)}>
+                        {busy ? <Loader2Icon className='animate-spin' /> : 'Save'}
                       </Button>
                       <Button size='sm' variant='outline' disabled={!market.override_id || busy} onClick={() => resetMarket(market)}>
                         Reset

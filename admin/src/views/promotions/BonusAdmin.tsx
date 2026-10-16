@@ -28,6 +28,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useApi, useApiMutation, usePagedApi } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
 import { formatNumber } from '@/lib/format'
+import { check, type FieldErrors } from '@/lib/validate'
 import RewardStats from './RewardStats'
 import { BONUS_TYPES, GAME_COUNTERS, type BonusAward, type BonusDashboard, type BonusEvent, type BonusGameRow, type BonusRecord, type BonusType, type BonusUserInspect, type GameCounter } from './types'
 import { useLocalList } from './useLocalList'
@@ -169,6 +170,14 @@ const Records = ({ userId }: { userId: string }) => {
               title={`Pending bonus for #${r.userId}`}
               description='Sets the pending daily / weekly / monthly figure the user can claim once they reach the VIP threshold (20 / 25 / 30). Leave a field blank to keep it.'
               onSubmit={() => updateM.mutateAsync()}
+              validate={() => {
+                const errs: FieldErrors = {}
+
+                for (const t of BONUS_TYPES) errs[`rec-${t}`] = check.amount(edit[t], t[0].toUpperCase() + t.slice(1), { optional: true })
+                if (!BONUS_TYPES.some(t => edit[t].trim())) errs[`rec-${BONUS_TYPES[0]}`] = 'Enter at least one amount'
+
+                return errs
+              }}
               onOpenChange={o => o && setEdit({ userId: String(r.userId), daily: '', weekly: '', monthly: '' })}
             >
               {BONUS_TYPES.map(t => (
@@ -210,9 +219,10 @@ const Records = ({ userId }: { userId: string }) => {
               description='One row per user. Everything starts at zero; set amounts afterwards with Edit.'
               submitLabel='Create'
               onSubmit={() => createM.mutateAsync()}
+              validate={() => ({ 'rec-uid': check.id(create.userId, 'User id'), 'rec-name': check.length(create.name, 'Display name', { max: 120 }) })}
             >
               <TextField id='rec-uid' label='User id' required inputMode='numeric' value={create.userId} onChange={e => setCreate({ ...create, userId: e.target.value.replace(/\D/g, '') })} />
-              <TextField id='rec-name' label='Display name' value={create.name} onChange={e => setCreate({ ...create, name: e.target.value })} />
+              <TextField id='rec-name' label='Display name' maxLength={120} value={create.name} onChange={e => setCreate({ ...create, name: e.target.value })} />
             </FormDialog>
           </Can>
         }
@@ -277,6 +287,16 @@ const CounterFields = ({ value, onChange, prefix }: { value: Record<string, stri
   </div>
 )
 
+/** Every counter typed must be a positive amount; `need` = at least one must be given (grant). */
+const counterErrors = (v: Record<string, string>, prefix: string, need: boolean): FieldErrors => {
+  const errs: FieldErrors = {}
+
+  for (const c of GAME_COUNTERS) errs[`${prefix}-${c}`] = check.amount(v[c], COUNTER_LABEL[c], { optional: true })
+  if (need && !GAME_COUNTERS.some(c => v[c]?.trim())) errs[`${prefix}-${GAME_COUNTERS[0]}`] = 'Enter at least one counter amount'
+
+  return errs
+}
+
 const pickCounters = (v: Record<string, string>) => {
   const out: Record<string, string> = {}
 
@@ -333,6 +353,7 @@ const Games = ({ userId }: { userId: string }) => {
               description='Adds to the counters AND credits the sum to the user balance. This moves money.'
               submitLabel='Grant & credit'
               onSubmit={() => grantM.mutateAsync()}
+              validate={() => ({ ...counterErrors(grant, 'grant', true), 'grant-note': check.length(grant.note, 'Note', { max: 200 }) })}
               onOpenChange={o => o && setGrant({ userId: String(r.userId), note: '' })}
               wide
             >
@@ -375,6 +396,7 @@ const Games = ({ userId }: { userId: string }) => {
             description='Records what has been granted from each source. Creating a row does not pay anything — use Grant for that.'
             submitLabel='Create'
             onSubmit={() => createM.mutateAsync()}
+            validate={() => ({ 'game-uid': check.id(create.userId, 'User id'), ...counterErrors(create, 'create', false) })}
             wide
           >
             <TextField id='game-uid' label='User id' required inputMode='numeric' value={create.userId ?? ''} onChange={e => setCreate({ ...create, userId: e.target.value.replace(/\D/g, '') })} />
@@ -429,6 +451,10 @@ const Events = ({ userId }: { userId: string }) => {
               trigger={<Button variant='ghost' size='icon-sm' aria-label='Edit'><PencilIcon /></Button>}
               title={`Edit event #${r.id}`}
               onSubmit={() => updateM.mutateAsync()}
+              validate={() => ({
+                'ev-name': edit.event.trim() || edit.amount.trim() ? check.length(edit.event, 'Event', { max: 200 }) : 'Give an event name, an amount, or both',
+                'ev-amount': check.amount(edit.amount, 'Amount', { optional: true })
+              })}
               onOpenChange={o => o && setEdit({ id: r.id, event: r.event, amount: r.amount })}
             >
               <TextField id='ev-name' label='Event' value={edit.event} onChange={e => setEdit({ ...edit, event: e.target.value })} />
@@ -467,6 +493,11 @@ const Events = ({ userId }: { userId: string }) => {
             description='A line in the user-visible bonus history. Does not move money.'
             submitLabel='Record'
             onSubmit={() => createM.mutateAsync()}
+            validate={() => ({
+              'ev-uid': check.id(create.userId, 'User id'),
+              'ev-event': check.required(create.event, 'Event') || check.length(create.event, 'Event', { max: 200 }),
+              'ev-amt': check.amount(create.amount)
+            })}
           >
             <TextField id='ev-uid' label='User id' required inputMode='numeric' value={create.userId} onChange={e => setCreate({ ...create, userId: e.target.value.replace(/\D/g, '') })} />
             <TextField id='ev-event' label='Event' required maxLength={200} value={create.event} onChange={e => setCreate({ ...create, event: e.target.value })} />

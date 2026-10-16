@@ -13,6 +13,7 @@ import FormDialog from '@/components/shared/FormDialog'
 import { SelectField, TextAreaField, TextField } from '@/components/shared/FormField'
 import Money from '@/components/shared/Money'
 import { FilterBar } from '@/components/shared/charts'
+import ErrorState from '@/components/shared/ErrorState'
 import PageHeader from '@/components/shared/PageHeader'
 import StatCard from '@/components/shared/StatCard'
 import StatusBadge from '@/components/shared/StatusBadge'
@@ -23,6 +24,7 @@ import { useSession } from '@/contexts/SessionContext'
 import { useApi, useApiMutation, useListState, usePagedApi } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
 import { formatNumber, truncateId } from '@/lib/format'
+import { check } from '@/lib/validate'
 import { allConvertedLabel, useCurrencyChoices, useFinanceFilters } from './currencyFilter'
 import FinanceStatsPanel from './FinanceStatsPanel'
 import { Details, ViewDialog, stop } from './shared'
@@ -67,11 +69,22 @@ const Decide = ({ row }: { row: CryptoWithdrawalRow }) => {
       }
       submitLabel='Apply'
       destructive={form.status === 'Rejected'}
+      validate={() => ({
+        status: form.status ? undefined : 'Pick the new status',
+        // cryptoWithdraw validators: txid 16–120 alphanumerics; comment ≤ 500.
+        txid:
+          form.status === 'Sent' && !form.txid.trim()
+            ? 'Transaction hash is required when marking as Sent'
+            : form.txid.trim() && !/^[A-Za-z0-9]{16,120}$/.test(form.txid.trim())
+              ? 'Transaction hash must be 16–120 letters or digits'
+              : undefined,
+        comment: check.length(form.comment, 'Note', { max: 500 })
+      })}
       onSubmit={() => decide.mutateAsync()}
     >
-      <SelectField id={`cw-st-${row.id}`} label='New status' value={form.status} onChange={status => setForm({ ...form, status })} options={options.map(v => ({ value: v, label: v }))} />
-      <TextField id={`cw-tx-${row.id}`} label='Transaction hash' hint='16–120 alphanumerics; record it when marking as Sent' value={form.txid} onChange={e => setForm({ ...form, txid: e.target.value })} required={form.status === 'Sent'} />
-      <TextAreaField id={`cw-c-${row.id}`} label='Note' hint='The user can read this (it is the reason a payout was refused)' value={form.comment} onChange={e => setForm({ ...form, comment: e.target.value })} />
+      <SelectField id={`cw-st-${row.id}`} name='status' label='New status' value={form.status} onChange={status => setForm({ ...form, status })} options={options.map(v => ({ value: v, label: v }))} />
+      <TextField id={`cw-tx-${row.id}`} name='txid' label='Transaction hash' hint='16–120 alphanumerics; record it when marking as Sent' value={form.txid} onChange={e => setForm({ ...form, txid: e.target.value })} required={form.status === 'Sent'} />
+      <TextAreaField id={`cw-c-${row.id}`} name='comment' label='Note' hint='The user can read this (it is the reason a payout was refused)' value={form.comment} onChange={e => setForm({ ...form, comment: e.target.value })} />
     </FormDialog>
   )
 }
@@ -166,6 +179,11 @@ const CryptoWithdrawals = () => {
       {can('reports:read') && (
         <FinanceStatsPanel kind='withdrawals' rail='crypto' filters={filters} statusLabels={{ success: 'Sent', pending: 'In queue / approved', failed: 'Rejected' }} />
       )}
+      {summary.error ? (
+        <div className='mb-4'>
+          <ErrorState error={summary.error} title='Could not load the queue summary' />
+        </div>
+      ) : null}
       <p className='text-muted-foreground mb-2 text-xs font-medium'>Queue right now, all dates · {filters.currency || 'all coins'}</p>
       <div className='mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4'>
         {CRYPTO_WITHDRAW_STATUSES.map(s => {

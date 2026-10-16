@@ -26,6 +26,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useApi, useApiMutation, useListState, usePagedApi } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
+import { check } from '@/lib/validate'
 import { formatMoney, formatNumber } from '@/lib/format'
 import RewardStats from './RewardStats'
 import type { Club, ClubEarning, ClubMember, VipLadder, VipLevel } from './types'
@@ -179,6 +180,11 @@ const ClubDetail = ({ club, onClose }: { club: Club; onClose: () => void }) => {
               trigger={<Button variant='outline' size='sm'><PencilIcon /> Edit</Button>}
               title='Edit club'
               onSubmit={() => update.mutateAsync()}
+              validate={() => ({
+                'cl-name': check.required(edit.name, 'Name') || check.length(edit.name, 'Name', { min: 2, max: 120 }),
+                'cl-desc': check.length(edit.description, 'Description', { max: 1000 }),
+                'cl-max': check.number(edit.maxMembers, 'Max members', { integer: true, min: 1, max: 100000, optional: true })
+              })}
               onOpenChange={o => o && setEdit({ name: c.name, description: c.description ?? '', maxMembers: c.maxMembers ? String(c.maxMembers) : '', isActive: c.isActive })}
             >
               <TextField id='cl-name' label='Name' minLength={2} maxLength={120} value={edit.name} onChange={e => setEdit({ ...edit, name: e.target.value })} />
@@ -191,6 +197,18 @@ const ClubDetail = ({ club, onClose }: { club: Club; onClose: () => void }) => {
               title='Earnings split'
               description='What the platform pays the owner, agents and members on every wager the club generates. Percentages like "12.5"; leave blank to keep.'
               onSubmit={() => setConfig.mutateAsync()}
+              validate={() => {
+                const pct = (v: string, label: string) => check.number(v, label, { min: 0, max: 100, decimals: 2, optional: true })
+                const any = Object.values(cfg).some(v => v.trim())
+
+                return {
+                  'ec-o': any ? pct(cfg.ownerPercentage, 'Owner %') : 'Change at least one value',
+                  'ec-a': pct(cfg.agentPercentage, 'Agent %'),
+                  'ec-m': pct(cfg.memberPercentage, 'Member %'),
+                  'ec-ap': check.number(cfg.activePlayerThreshold, 'Min active users', { integer: true, min: 0, max: 1000000, optional: true }),
+                  'ec-wt': check.number(cfg.wagerThreshold, 'Wager threshold', { min: 0, decimals: 2, optional: true })
+                }
+              }}
               onOpenChange={o => o && setCfg({ ownerPercentage: '', agentPercentage: '', memberPercentage: '', activePlayerThreshold: '', wagerThreshold: '' })}
             >
               <div className='grid grid-cols-3 gap-3'>

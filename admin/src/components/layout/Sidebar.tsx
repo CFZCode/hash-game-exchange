@@ -596,7 +596,7 @@ const SidebarLayout = () => {
                   {themeConfig.templateName}
                 </span>
                 <span className='text-muted-foreground text-xs font-normal text-nowrap'>
-                  {siteConfig.tagline} · {siteConfig.environment}
+                  {siteConfig.tagline}
                 </span>
               </div>
             </SidebarMenuButton>

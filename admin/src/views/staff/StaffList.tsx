@@ -9,6 +9,7 @@ import { ChevronRightIcon, PlusIcon } from 'lucide-react'
 
 import Can from '@/components/shared/Can'
 import DataTable, { type Column } from '@/components/shared/DataTable'
+import ErrorState from '@/components/shared/ErrorState'
 import FormDialog from '@/components/shared/FormDialog'
 import { SelectField, TextField } from '@/components/shared/FormField'
 import PageHeader from '@/components/shared/PageHeader'
@@ -22,6 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useSession } from '@/contexts/SessionContext'
 import { useApi, useApiMutation, useListState, usePagedApi } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
+import { check } from '@/lib/validate'
 import { ROLE_NAMES, STAFF_STATUSES, type StaffNode, type StaffRow } from './types'
 
 /** Executives are created on the Executives screen (`/access/executives`), never from New staff. */
@@ -135,18 +137,27 @@ const CreateStaff = () => {
       title='Create a staff account'
       description='The new account reports to you. Password must be at least 12 characters; the new account signs in with it.'
       submitLabel='Create'
+      validate={() => ({
+        name: check.required(form.name, 'Name') || check.length(form.name, 'Name', { max: 120 }),
+        email: check.email(form.email),
+        password: !form.password ? 'Password is required' : check.length(form.password, 'Password', { min: 12, max: 200 }),
+        roleId: !form.roleId && 'Choose a role',
+        percentage: check.number(form.percentage, 'Share %', { min: 0, max: 100, decimals: 4, optional: true }),
+        phone: check.length(form.phone, 'Phone', { max: 30 }),
+        country: check.length(form.country, 'Country', { max: 60 })
+      })}
       onSubmit={() => create.mutateAsync()}
     >
-      <TextField id='s-name' label='Name' required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
-      <TextField id='s-email' label='Email' type='email' required value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
-      <TextField id='s-password' label='Password' type='password' required minLength={12} value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} />
+      <TextField id='s-name' name='name' label='Name' required maxLength={120} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
+      <TextField id='s-email' name='email' label='Email' type='email' required value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
+      <TextField id='s-password' name='password' label='Password' type='password' required minLength={12} hint='At least 12 characters' value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} />
       <div className='grid grid-cols-2 gap-4'>
-        <SelectField id='s-role' label='Role' value={form.roleId} onChange={roleId => setForm({ ...form, roleId })} options={roles.map(([v, l]) => ({ value: v, label: `${l} (level ${v})` }))} />
-        <TextField id='s-pct' label='Share %' hint='0–100, up to 4 decimals' value={form.percentage} onChange={e => setForm({ ...form, percentage: e.target.value })} />
+        <SelectField id='s-role' name='roleId' label='Role' value={form.roleId} onChange={roleId => setForm({ ...form, roleId })} options={roles.map(([v, l]) => ({ value: v, label: `${l} (level ${v})` }))} />
+        <TextField id='s-pct' name='percentage' label='Share %' inputMode='decimal' hint='0–100, up to 4 decimals' value={form.percentage} onChange={e => setForm({ ...form, percentage: e.target.value })} />
       </div>
       <div className='grid grid-cols-2 gap-4'>
-        <TextField id='s-phone' label='Phone' value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
-        <TextField id='s-country' label='Country' value={form.country} onChange={e => setForm({ ...form, country: e.target.value })} />
+        <TextField id='s-phone' name='phone' label='Phone' maxLength={30} value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
+        <TextField id='s-country' name='country' label='Country' maxLength={60} value={form.country} onChange={e => setForm({ ...form, country: e.target.value })} />
       </div>
     </FormDialog>
   )
@@ -196,6 +207,7 @@ const StaffTree = () => {
       </CardHeader>
       <CardContent>
         {tree.isLoading && <Skeleton className='h-40' />}
+        {tree.error && <ErrorState error={tree.error} />}
         {tree.data?.map(n => (
           <TreeNode key={n.id} node={n} depth={0} selfId={actor ? Number(actor.staffId) : undefined} />
         ))}

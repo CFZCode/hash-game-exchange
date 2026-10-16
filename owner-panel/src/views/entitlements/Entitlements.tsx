@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { CheckIcon, InfoIcon, Loader2Icon, SearchIcon } from 'lucide-react'
 import { toast } from 'sonner'
@@ -29,6 +29,7 @@ import { HIDDEN_OPTIONS, pinToUi, UI_LABEL, uiSupport } from '@/configs/siteUi'
 import { TEMPLATE_CATALOGUE, type TemplateEntry } from '@/configs/templateCatalogue'
 import { useApi, useApiMutation } from '@/hooks/use-api'
 import { api, ApiError } from '@/lib/api/client'
+import { toastSaved, type SaveResult } from '@/lib/api/feedback'
 import { buildDraft, isOwnerPick, type Draft } from '@/lib/entitlements/draft'
 import { COUNTRY_CODES, LIST_TYPES, parseCountries, REGION_FEATURE, regionProblem, type RegionListType, type RegionSetting } from '@/lib/entitlements/region'
 import {
@@ -144,13 +145,35 @@ const VariantSelect = ({ feature, value, onChange, label }: { feature: string; v
   )
 }
 
+/** Clears an input's reported problem when it unmounts (filtered away, switched off): its typed text goes with it. */
+const useClearOnUnmount = (onProblem: (problem: string | null) => void) => {
+  const ref = useRef(onProblem)
+
+  useEffect(() => {
+    ref.current = onProblem
+  })
+  useEffect(() => () => ref.current(null), [])
+}
+
 /**
  * Region restriction's list type and countries, under its mode dropdown. Codes are typed as text
  * ("US, GB"); an unknown code is named here and refused by the save (422).
  */
-const RegionEditor = ({ value, onChange, changed }: { value: RegionSetting; onChange: (r: RegionSetting) => void; changed: boolean }) => {
+const RegionEditor = ({
+  value,
+  onChange,
+  changed,
+  onProblem
+}: {
+  value: RegionSetting
+  onChange: (r: RegionSetting) => void
+  changed: boolean
+  onProblem: (problem: string | null) => void
+}) => {
   const [text, setText] = useState<string | null>(null)
   const shown = text ?? value.countries.join(', ')
+
+  useClearOnUnmount(onProblem)
   const parsed = parseCountries(shown)
   const problem = regionProblem({ listType: value.listType, countries: parsed })
 
@@ -188,6 +211,7 @@ const RegionEditor = ({ value, onChange, changed }: { value: RegionSetting; onCh
             setText(e.target.value)
             const countries = parseCountries(e.target.value)
 
+            onProblem(regionProblem({ listType: value.listType, countries }))
             if (countries.every(c => COUNTRY_CODES.includes(c))) onChange({ ...value, countries: [...countries].sort() })
           }}
           onBlur={() => !problem && setText(null)}
@@ -210,9 +234,23 @@ const RegionEditor = ({ value, onChange, changed }: { value: RegionSetting; onCh
 }
 
 /** A multiplier typed by the owner: a positive number, at most 2 decimals, at most MAX_MULTIPLIER. */
-const MultiplierInput = ({ value, onChange, label, disabled }: { value: number; onChange: (n: number) => void; label: string; disabled?: boolean }) => {
+const MultiplierInput = ({
+  value,
+  onChange,
+  label,
+  disabled,
+  onProblem
+}: {
+  value: number
+  onChange: (n: number) => void
+  label: string
+  disabled?: boolean
+  onProblem: (problem: string | null) => void
+}) => {
   const [text, setText] = useState<string | null>(null)
   const shown = text ?? String(value)
+
+  useClearOnUnmount(onProblem)
   const parsed = /^\d+(\.\d{1,2})?$/.test(shown.trim()) ? Number(shown.trim()) : NaN
   const bad = !isMultiplier(parsed)
 
@@ -231,6 +269,7 @@ const MultiplierInput = ({ value, onChange, label, disabled }: { value: number; 
             const t = e.target.value.trim()
             const n = /^\d+(\.\d{1,2})?$/.test(t) ? Number(t) : NaN
 
+            onProblem(isMultiplier(n) ? null : `${label}: above 0, at most ${MAX_MULTIPLIER}, 2 decimals`)
             if (isMultiplier(n)) onChange(n)
           }}
           onBlur={() => !bad && setText(null)}
@@ -267,7 +306,8 @@ const WithdrawalRequirementsEditor = ({
   onVariant,
   onCap,
   changedVariant,
-  changedCap
+  changedCap,
+  onProblem
 }: {
   variant: string
   cap: WithdrawalCap
@@ -275,6 +315,7 @@ const WithdrawalRequirementsEditor = ({
   onCap: (c: WithdrawalCap) => void
   changedVariant: boolean
   changedCap: boolean
+  onProblem: (key: string, problem: string | null) => void
 }) => {
   const sw = switchesOf(variant)
 
@@ -308,10 +349,24 @@ const WithdrawalRequirementsEditor = ({
           <div className='ml-12 flex flex-col gap-2'>
             <div className='flex flex-wrap items-center gap-2'>
               <span className='text-xs font-medium'>Deposit multiplier</span>
-              <MultiplierInput label='Deposit multiplier' value={cap.depositMultiplier} onChange={n => onCap({ ...cap, depositMultiplier: n })} />
+              <MultiplierInput
+                label='Deposit multiplier'
+                value={cap.depositMultiplier}
+                onChange={n => onCap({ ...cap, depositMultiplier: n })}
+                onProblem={p => onProblem('depositMultiplier', p)}
+              />
             </div>
             <label className='flex items-center gap-2'>
-              <Switch size='sm' checked={cap.wagerBonus} onCheckedChange={v => onCap({ ...cap, wagerBonus: v })} aria-label='Wager bonus' />
+              <Switch
+                size='sm'
+                checked={cap.wagerBonus}
+                onCheckedChange={v => {
+                  // Off: its multiplier is not used, so a half-typed one no longer blocks the save.
+                  if (!v) onProblem('wagerMultiplier', null)
+                  onCap({ ...cap, wagerBonus: v })
+                }}
+                aria-label='Wager bonus'
+              />
               <span className='text-xs font-medium'>Wager bonus</span>
               <span className='text-muted-foreground text-xs'>adds the amount wagered, up to</span>
               <MultiplierInput
@@ -319,6 +374,7 @@ const WithdrawalRequirementsEditor = ({
                 value={cap.wagerMultiplier}
                 disabled={!cap.wagerBonus}
                 onChange={n => onCap({ ...cap, wagerMultiplier: n })}
+                onProblem={p => onProblem('wagerMultiplier', cap.wagerBonus ? p : null)}
               />
               <span className='text-muted-foreground text-xs'>deposits</span>
             </label>
@@ -367,12 +423,37 @@ const TemplateCard = ({ template, selected, saved, onSelect }: { template: Templ
 )
 
 const Entitlements = () => {
-  const { data: doc, error, isLoading, refetch } = useApi<EditableDoc>('/api/owner/entitlements')
+  const { data: doc, error, isLoading, refetch, isRefetching } = useApi<EditableDoc>('/api/owner/entitlements')
 
   // Edits on top of the loaded document; null = nothing touched yet.
   const [edits, setEdits] = useState<Draft | null>(null)
   const [query, setQuery] = useState('')
   const [reviewing, setReviewing] = useState(false)
+
+  // Inputs whose text is not a valid value yet (the draft keeps the last valid one): they block the save.
+  const [invalid, setInvalid] = useState<Record<string, string>>({})
+
+  // Bumped on discard / save so the typed-text inputs drop what they held.
+  const [epoch, setEpoch] = useState(0)
+
+  const report = (key: string, problem: string | null) =>
+    setInvalid(prev => {
+      if ((prev[key] ?? null) === problem) return prev
+      const next = { ...prev }
+
+      if (problem) next[key] = problem
+      else delete next[key]
+
+      return next
+    })
+
+  const invalidProblem = Object.values(invalid)[0] ?? null
+
+  const reset = () => {
+    setEdits(null)
+    setInvalid({})
+    setEpoch(e => e + 1)
+  }
 
   // Pinned to this UI the way the save pins it (store.ts), so the screen shows what will be stored.
   const draft: Draft | null = doc ? (d => ({ ...d, ...pinToUi(d.features, d.variants) }))(buildDraft(doc, edits)) : null
@@ -437,7 +518,7 @@ const Entitlements = () => {
       next.template = key === doc?.template ? undefined : key
     })
 
-  const save = useApiMutation<void, { doc: EntitlementsDoc; changes: Change[]; live?: { live: boolean; reason?: string } }>({
+  const save = useApiMutation<void, SaveResult & { doc: EntitlementsDoc; changes: Change[] }>({
     fn: () =>
       api.put('/api/owner/entitlements', {
         version: doc!.version,
@@ -450,14 +531,10 @@ const Entitlements = () => {
         withdrawalCap: draft!.withdrawalCap
       }),
     invalidate: [['api']],
-    success: r =>
-      !r.changes.length
-        ? 'Nothing to save'
-        : r.live?.live
-          ? `Saved as version ${r.doc.version} — live on the site now`
-          : `Saved as version ${r.doc.version} — the backend picks it up on its next poll`,
-    onSuccess: () => {
-      setEdits(null)
+    errorTitle: 'Features & plan not saved',
+    onSuccess: r => {
+      toastSaved(r)
+      reset()
       setReviewing(false)
     }
   })
@@ -488,7 +565,7 @@ const Entitlements = () => {
         }
       />
       {error ? (
-        <ErrorState error={error} />
+        <ErrorState error={error} title='Could not load the entitlements document' onRetry={refetch} retrying={isRefetching} />
       ) : isLoading || !draft ? (
         <div className='grid gap-4 lg:grid-cols-2'>
           {Array.from({ length: 4 }, (_, i) => (
@@ -523,6 +600,11 @@ const Entitlements = () => {
               ))}
             </div>
           </section>
+          {q && !GROUPS.some(({ groups }) => groups.some(g => g.rows.some(match))) && (
+            <p className='text-muted-foreground rounded-md border border-dashed p-6 text-center text-sm' data-empty='search'>
+              Nothing matches “{query.trim()}”. Search by a feature or flag key, its label, or a variant.
+            </p>
+          )}
           {GROUPS.map(({ section, description, groups }) => {
             const visible = groups.map(g => ({ ...g, shown: g.rows.filter(match) })).filter(g => g.shown.length > 0)
 
@@ -624,6 +706,8 @@ const Entitlements = () => {
                                   )}
                                   {r.key === REGION_FEATURE && (
                                     <RegionEditor
+                                      key={`region-${epoch}`}
+                                      onProblem={p => report('region', p)}
                                       value={draft.region ?? { listType: 'blocklist', countries: [] }}
                                       changed={changed.has('region:region')}
                                       onChange={region => edit(next => void (next.region = region))}
@@ -631,6 +715,8 @@ const Entitlements = () => {
                                   )}
                                   {r.key === WITHDRAWAL_REQUIREMENTS && variant && (
                                     <WithdrawalRequirementsEditor
+                                      key={`withdrawal-${epoch}`}
+                                      onProblem={report}
                                       variant={variant}
                                       cap={draft.withdrawalCap ?? DEFAULT_WITHDRAWAL_CAP}
                                       changedVariant={changed.has(rowKey)}
@@ -680,17 +766,35 @@ const Entitlements = () => {
         </div>
       )}
 
-      {changes.length > 0 && (
+      {(changes.length > 0 || invalidProblem) && (
         <div className='bg-card fixed inset-x-0 bottom-0 z-40 border-t shadow-lg'>
           <div className='mx-auto flex max-w-360 items-center justify-between gap-4 px-4 py-3 sm:px-6'>
-            <p className='text-sm'>
-              <span className='font-semibold'>{changes.length}</span> unsaved change{changes.length === 1 ? '' : 's'}
-            </p>
+            {invalidProblem ? (
+              <p className='text-destructive text-sm' role='alert' data-save-blocked>
+                Fix before saving: {invalidProblem}
+              </p>
+            ) : (
+              <p className='text-sm'>
+                <span className='font-semibold'>{changes.length}</span> unsaved change{changes.length === 1 ? '' : 's'}
+              </p>
+            )}
             <div className='flex gap-2'>
-              <Button variant='outline' onClick={() => setEdits(null)} disabled={save.isPending}>
+              <Button
+                variant='outline'
+                onClick={() => {
+                  reset()
+                  toast.info('Changes discarded')
+                }}
+                disabled={save.isPending}
+              >
                 Discard
               </Button>
-              <Button onClick={() => setReviewing(true)}>Review and save</Button>
+              <Button
+                disabled={!!invalidProblem}
+                onClick={() => (changes.length ? setReviewing(true) : toast.info('Nothing to save', { description: 'No change from the stored version.' }))}
+              >
+                Review and save
+              </Button>
             </div>
           </div>
         </div>
@@ -712,7 +816,7 @@ const Entitlements = () => {
               Cancel
             </Button>
             <Button
-              disabled={save.isPending}
+              disabled={save.isPending || !!invalidProblem}
               onClick={() =>
                 save.mutate(undefined, {
                   onError: e => {

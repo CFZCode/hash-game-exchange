@@ -2,6 +2,9 @@
 
 import { Fragment, useState } from 'react'
 
+import { Loader2Icon } from 'lucide-react'
+import { toast } from 'sonner'
+
 import PageHeader from '@/components/shared/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -9,6 +12,8 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { errorMessage } from '@/lib/api/client'
+import { check } from '@/lib/validate'
 import { isRunResultMarket, MARKETS_FOR_FANCY, OpenBetsPanel, SETTLE_API, TabBar, useZipQuery, zipCall, type OpenBet } from './shared'
 
 /** `GET internalsettle/fanmatches` → `{ [marketType]: FancyRow[] }` */
@@ -63,7 +68,16 @@ const FancyModal = ({ mode, row, onClose }: { mode: 'declare' | 'void'; row: Fan
   const teamOne = row.teamOne || firstBet?.teamOne || 'Team 1'
   const teamTwo = row.teamTwo || firstBet?.teamTwo || 'Team 2'
 
+  // Run markets settle on a run count — a whole number, 0 or more.
+  const winnerError = mode === 'declare' && !useTeamSelection && !isBinaryFancy && isRunResultMarket(marketType) && winnerId.trim() !== '' ? check.number(winnerId, 'Winner id', { integer: true, min: 0 }) : undefined
+
   const submit = async () => {
+    if (winnerError) {
+      toast.error(winnerError)
+
+      return
+    }
+
     setSubmitting(true)
 
     try {
@@ -89,9 +103,10 @@ const FancyModal = ({ mode, row, onClose }: { mode: 'declare' | 'void'; row: Fan
         await zipCall('POST', `${SETTLE_API}/declareresult`, payload)
       }
 
+      toast.success(mode === 'void' ? `${marketType || 'Market'} voided — stakes refunded` : `Result declared for ${row.selectionName || marketType || matchTitle}`)
       onClose()
     } catch (e) {
-      alert((e as Error).message)
+      toast.error(errorMessage(e))
     } finally {
       setSubmitting(false)
     }
@@ -104,7 +119,7 @@ const FancyModal = ({ mode, row, onClose }: { mode: 'declare' | 'void'; row: Fan
   )
 
   const ready = useTeamSelection ? selected != null : winnerId.trim() !== ''
-  const disabled = (mode === 'declare' && !ready) || submitting
+  const disabled = (mode === 'declare' && (!ready || Boolean(winnerError))) || submitting
 
   return (
     <Dialog open onOpenChange={open => !open && onClose()}>
@@ -154,7 +169,10 @@ const FancyModal = ({ mode, row, onClose }: { mode: 'declare' | 'void'; row: Fan
                 ))}
               </div>
             ) : (
-              <Input value={winnerId} onChange={e => setWinnerId(e.target.value)} placeholder='Enter winner id' autoFocus />
+              <>
+                <Input value={winnerId} onChange={e => setWinnerId(e.target.value)} placeholder='Enter winner id' aria-invalid={winnerError ? true : undefined} autoFocus />
+                {winnerError && <p className='text-destructive text-sm'>{winnerError}</p>}
+              </>
             )}
           </div>
         )}
@@ -170,6 +188,7 @@ const FancyModal = ({ mode, row, onClose }: { mode: 'declare' | 'void'; row: Fan
             Cancel
           </Button>
           <Button variant={mode === 'void' ? 'destructive' : 'default'} disabled={disabled} onClick={submit}>
+            {submitting && <Loader2Icon className='animate-spin' />}
             {submitting ? 'Submitting...' : mode === 'void' ? 'Confirm Void' : 'Submit'}
           </Button>
         </DialogFooter>
@@ -233,8 +252,9 @@ const FancySettlement = () => {
       })
 
       setOpenBets(res.data ?? [])
-    } catch {
+    } catch (e) {
       setOpenBets([])
+      toast.error(`Could not load open bets: ${errorMessage(e)}`)
     } finally {
       setBetsLoading(false)
     }
@@ -275,6 +295,12 @@ const FancySettlement = () => {
                 <TableRow>
                   <TableCell colSpan={4} className='text-center'>
                     Loading...
+                  </TableCell>
+                </TableRow>
+              ) : list.error && !list.data ? (
+                <TableRow>
+                  <TableCell colSpan={4} className='text-destructive text-center'>
+                    Could not load fancy markets: {errorMessage(list.error)}
                   </TableCell>
                 </TableRow>
               ) : pageRows.length === 0 ? (

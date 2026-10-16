@@ -25,6 +25,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useSession } from '@/contexts/SessionContext'
 import { useApi, useApiMutation, useListState, usePagedApi } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
+import { check } from '@/lib/validate'
 import { formatNumber } from '@/lib/format'
 import { useIsAgentTree, TxnPasswordLabel } from '@/views/finance/StaffFloat'
 import WithdrawBlockAction, { WithdrawBlockedBadge, type AccountLocks } from '@/views/players/WithdrawBlockAction'
@@ -89,18 +90,20 @@ const StaffDetail = ({ id }: { id: string }) => {
   const [transfer, setTransfer] = useState({ toType: 'staff', amount: '', direction: 'deposit', transactionPassword: '' })
   const [newPassword, setNewPassword] = useState('')
 
+  const editBody = () => {
+    const body: Record<string, string> = {}
+
+    if (edit.name && edit.name !== s?.name) body.name = edit.name
+    if (edit.phone && edit.phone !== s?.phone) body.phone = edit.phone
+    if (edit.country && edit.country !== s?.country) body.country = edit.country
+    if (edit.status && edit.status !== s?.status) body.status = edit.status
+    if (edit.percentage && edit.percentage !== s?.percentage) body.percentage = edit.percentage
+
+    return body
+  }
+
   const update = useApiMutation({
-    fn: () => {
-      const body: Record<string, string> = {}
-
-      if (edit.name && edit.name !== s?.name) body.name = edit.name
-      if (edit.phone && edit.phone !== s?.phone) body.phone = edit.phone
-      if (edit.country && edit.country !== s?.country) body.country = edit.country
-      if (edit.status && edit.status !== s?.status) body.status = edit.status
-      if (edit.percentage && edit.percentage !== s?.percentage) body.percentage = edit.percentage
-
-      return api.patch(`admin/staff/${id}`, body)
-    },
+    fn: () => api.patch(`admin/staff/${id}`, editBody()),
     invalidate: [['api', `admin/staff/${id}`], ['paged', 'admin/staff'], ['api', 'admin/staff/tree']],
     success: 'Staff updated'
   })
@@ -164,11 +167,15 @@ const StaffDetail = ({ id }: { id: string }) => {
                   title='Transfer with this account'
                   description='Moves balance between you and this account. Deposit adds to them from your balance; withdraw takes it back.'
                   submitLabel='Transfer'
+                  validate={() => ({
+                    amount: check.amount(transfer.amount, 'Amount', { decimals: 8 }),
+                    transactionPassword: txnRequired && !transfer.transactionPassword && 'Transaction password is required'
+                  })}
                   onSubmit={() => move.mutateAsync()}
                 >
                   <SelectField id='t-dir' label='Direction' value={transfer.direction} onChange={direction => setTransfer({ ...transfer, direction })} options={[{ value: 'deposit', label: 'Deposit to them' }, { value: 'withdraw', label: 'Withdraw from them' }]} />
-                  <TextField id='t-amt' label='Amount' required placeholder='1000.00' value={transfer.amount} onChange={e => setTransfer({ ...transfer, amount: e.target.value })} />
-                  <TextField id='t-tp' label={<TxnPasswordLabel />} type='password' required={txnRequired} hint={txnRequired ? 'Required for every balance move' : 'Required (if your account uses one)'} value={transfer.transactionPassword} onChange={e => setTransfer({ ...transfer, transactionPassword: e.target.value })} />
+                  <TextField id='t-amt' name='amount' label='Amount' required inputMode='decimal' placeholder='1000.00' value={transfer.amount} onChange={e => setTransfer({ ...transfer, amount: e.target.value })} />
+                  <TextField id='t-tp' name='transactionPassword' label={<TxnPasswordLabel />} type='password' required={txnRequired} hint={txnRequired ? 'Required for every balance move' : 'Required (if your account uses one)'} value={transfer.transactionPassword} onChange={e => setTransfer({ ...transfer, transactionPassword: e.target.value })} />
                 </FormDialog>
               )}
               <Can permission='users:write'>
@@ -182,18 +189,30 @@ const StaffDetail = ({ id }: { id: string }) => {
                     </Button>
                   }
                   title='Edit staff account'
+                  validate={() => {
+                    const errors = {
+                      name: check.length(edit.name, 'Name', { max: 120 }),
+                      percentage: check.number(edit.percentage, 'Share %', { min: 0, max: 100, decimals: 4, optional: true }),
+                      phone: check.length(edit.phone, 'Phone', { max: 30 }),
+                      country: check.length(edit.country, 'Country', { max: 60 })
+                    }
+
+                    if (Object.values(errors).some(Boolean)) return errors
+
+                    return Object.keys(editBody()).length ? null : 'Nothing changed — edit a field first'
+                  }}
                   onSubmit={() => update.mutateAsync()}
                   onOpenChange={o => o && setEdit({ name: s.name, phone: s.phone ?? '', country: s.country ?? '', status: s.status, percentage: s.percentage })}
                   open={undefined}
                 >
-                  <TextField id='se-name' label='Name' value={edit.name} onChange={e => setEdit({ ...edit, name: e.target.value })} />
+                  <TextField id='se-name' name='name' label='Name' maxLength={120} value={edit.name} onChange={e => setEdit({ ...edit, name: e.target.value })} />
                   <div className='grid grid-cols-2 gap-4'>
                     <SelectField id='se-status' label='Status' value={edit.status || s.status} onChange={status => setEdit({ ...edit, status })} options={STAFF_STATUSES.map(v => ({ value: v, label: v }))} />
-                    <TextField id='se-pct' label='Share %' value={edit.percentage} onChange={e => setEdit({ ...edit, percentage: e.target.value })} />
+                    <TextField id='se-pct' name='percentage' label='Share %' inputMode='decimal' hint='0–100, up to 4 decimals' value={edit.percentage} onChange={e => setEdit({ ...edit, percentage: e.target.value })} />
                   </div>
                   <div className='grid grid-cols-2 gap-4'>
-                    <TextField id='se-phone' label='Phone' value={edit.phone} onChange={e => setEdit({ ...edit, phone: e.target.value })} />
-                    <TextField id='se-country' label='Country' value={edit.country} onChange={e => setEdit({ ...edit, country: e.target.value })} />
+                    <TextField id='se-phone' name='phone' label='Phone' maxLength={30} value={edit.phone} onChange={e => setEdit({ ...edit, phone: e.target.value })} />
+                    <TextField id='se-country' name='country' label='Country' maxLength={60} value={edit.country} onChange={e => setEdit({ ...edit, country: e.target.value })} />
                   </div>
                 </FormDialog>
                 <FormDialog
@@ -205,9 +224,10 @@ const StaffDetail = ({ id }: { id: string }) => {
                   title='Reset their password'
                   description='At least 12 characters. They are asked to change it on next sign-in.'
                   submitLabel='Reset'
+                  validate={() => ({ newPassword: !newPassword ? 'New password is required' : check.length(newPassword, 'New password', { min: 12, max: 200 }) })}
                   onSubmit={() => resetPw.mutateAsync()}
                 >
-                  <TextField id='rp' label='New password' type='password' required minLength={12} value={newPassword} onChange={e => setNewPassword(e.target.value)} />
+                  <TextField id='rp' name='newPassword' label='New password' type='password' required minLength={12} value={newPassword} onChange={e => setNewPassword(e.target.value)} />
                 </FormDialog>
                 <ConfirmDialog
                   trigger={

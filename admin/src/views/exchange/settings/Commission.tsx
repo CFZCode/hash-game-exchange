@@ -27,6 +27,8 @@ import {
   type League,
   type Market
 } from './shared'
+import { Loader2Icon } from 'lucide-react'
+import { check } from '@/lib/validate'
 
 /**
  * Commission — zip `pages/settings/Commission.jsx` (sirf owner).
@@ -238,6 +240,7 @@ const Commission = () => {
               step={0.5}
               className='h-8 w-20'
               disabled={rule.state !== 'on'}
+              aria-invalid={rule.state === 'on' && check.number(rule.percent, 'Percent', { min: 0, max: maxPercent }) ? true : undefined}
               value={rule.percent}
               onChange={e => setDraft(key, saved, { percent: e.target.value })}
             />
@@ -349,6 +352,7 @@ const Commission = () => {
                 </Button>
               )}
               <Button size='sm' disabled={dirtyCount === 0 || saving} onClick={saveAll}>
+                {saving && <Loader2Icon className='animate-spin' />}
                 {saving ? 'Saving…' : `Save changes${dirtyCount ? ` (${dirtyCount})` : ''}`}
               </Button>
             </div>

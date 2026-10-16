@@ -14,6 +14,7 @@ import {
   DialogTitle,
   DialogTrigger
 } from '@/components/ui/dialog'
+import { notifyError } from '@/lib/notify'
 
 type Props = {
   trigger: ReactNode
@@ -31,11 +32,15 @@ const ConfirmDialog = ({ trigger, title, description, confirmLabel = 'Confirm', 
   const [busy, setBusy] = useState(false)
 
   const run = async () => {
+    if (busy) return
     setBusy(true)
 
     try {
       await onConfirm()
       setOpen(false)
+    } catch (error) {
+      // Stay open; a mutation has already toasted — anything else is toasted here, never swallowed.
+      notifyError(error)
     } finally {
       setBusy(false)
     }

@@ -2,9 +2,10 @@
 
 import { useState } from 'react'
 
-import { KeyRoundIcon, LockKeyholeIcon, ShieldCheckIcon, ShieldOffIcon } from 'lucide-react'
+import { KeyRoundIcon, Loader2Icon, LockKeyholeIcon, ShieldCheckIcon, ShieldOffIcon } from 'lucide-react'
 import { toast } from 'sonner'
 
+import ErrorState from '@/components/shared/ErrorState'
 import FormDialog from '@/components/shared/FormDialog'
 import { TextField } from '@/components/shared/FormField'
 import PageHeader from '@/components/shared/PageHeader'
@@ -14,6 +15,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useSession } from '@/contexts/SessionContext'
 import { useApi, useApiMutation } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
+import { check, cleanErrors, firstError, serverFieldErrors, type FieldErrors } from '@/lib/validate'
 
 type TwoFactor = { enabled: boolean; enrolledAt?: string | null; pending?: boolean; required?: boolean }
 type Begin = { secret?: string; otpauthUrl?: string; otpauth?: string; qr?: string; qrDataUrl?: string }
@@ -27,8 +29,26 @@ const MyAccount = () => {
   const [disable, setDisable] = useState({ password: '', code: '' })
   const txnStatus = useApi<{ set: boolean; mode?: 'login' | 'separate' }>('admin/auth/transaction-password')
   const [txn, setTxn] = useState({ currentPassword: '', transactionPassword: '', confirm: '' })
+  const [pwErrors, setPwErrors] = useState<Record<string, string>>({})
+  const [txnErrors, setTxnErrors] = useState<Record<string, string>>({})
 
-  const begin = useApiMutation({ fn: () => api.post<Begin>('admin/auth/2fa/begin'), onSuccess: r => setSetup(r) })
+  /** Shows the messages inline and toasts the first; true when the form may be sent. */
+  const passes = (errors: FieldErrors, show: (e: Record<string, string>) => void) => {
+    const found = cleanErrors(errors)
+
+    show(found)
+    if (Object.keys(found).length) toast.error(firstError(found))
+
+    return Object.keys(found).length === 0
+  }
+
+  const begin = useApiMutation({
+    fn: () => api.post<Begin>('admin/auth/2fa/begin'),
+    onSuccess: r => {
+      setSetup(r)
+      toast.info('Scan the code with your authenticator app, then enter the 6-digit code')
+    }
+  })
 
   const confirm = useApiMutation({
     fn: () => api.post('admin/auth/2fa/confirm', { code }),
@@ -47,27 +67,13 @@ const MyAccount = () => {
   })
 
   const changePassword = useApiMutation({
-    fn: () => {
-      if (pw.newPassword !== pw.confirm) {
-        toast.error('The two new passwords do not match')
-        throw new Error('mismatch')
-      }
-
-      return api.patch('admin/staff/password', { oldPassword: pw.oldPassword, newPassword: pw.newPassword })
-    },
+    fn: () => api.patch('admin/staff/password', { oldPassword: pw.oldPassword, newPassword: pw.newPassword }),
     success: 'Password changed',
     onSuccess: () => setPw({ oldPassword: '', newPassword: '', confirm: '' })
   })
 
   const setTxnPassword = useApiMutation({
-    fn: () => {
-      if (txn.transactionPassword !== txn.confirm) {
-        toast.error('The two transaction passwords do not match')
-        throw new Error('mismatch')
-      }
-
-      return api.post('admin/auth/transaction-password', { currentPassword: txn.currentPassword, transactionPassword: txn.transactionPassword })
-    },
+    fn: () => api.post('admin/auth/transaction-password', { currentPassword: txn.currentPassword, transactionPassword: txn.transactionPassword }),
     invalidate: [['api', 'admin/auth/transaction-password']],
     success: 'Transaction password saved',
     onSuccess: () => setTxn({ currentPassword: '', transactionPassword: '', confirm: '' })
@@ -112,8 +118,10 @@ const MyAccount = () => {
             </CardDescription>
           </CardHeader>
           <CardContent className='grid gap-3'>
-            {!status.data?.enabled && !setup && (
+            {status.error && <ErrorState error={status.error} title='Could not load your two-factor status' />}
+            {!status.error && !status.data?.enabled && !setup && (
               <Button onClick={() => begin.mutate()} disabled={begin.isPending}>
+                {begin.isPending && <Loader2Icon className='animate-spin' />}
                 Start enrolment
               </Button>
             )}
@@ -125,6 +133,7 @@ const MyAccount = () => {
                 <TextField id='code' label='Code from the app' inputMode='numeric' maxLength={6} value={code} onChange={e => setCode(e.target.value.replace(/\D/g, ''))} />
                 <div className='flex gap-2'>
                   <Button onClick={() => confirm.mutate()} disabled={code.length !== 6 || confirm.isPending}>
+                    {confirm.isPending && <Loader2Icon className='animate-spin' />}
                     Confirm
                   </Button>
                   <Button variant='outline' onClick={() => setSetup(null)}>
@@ -140,10 +149,14 @@ const MyAccount = () => {
                 description='Needs your password and a current code, so a stolen session alone cannot remove it.'
                 submitLabel='Turn off'
                 destructive
+                validate={() => ({
+                  password: check.required(disable.password, 'Password'),
+                  code: !/^\d{6}$/.test(disable.code.trim()) && 'Enter the 6-digit code from your authenticator app'
+                })}
                 onSubmit={() => turnOff.mutateAsync()}
               >
-                <TextField id='d-pw' label='Password' type='password' required value={disable.password} onChange={e => setDisable({ ...disable, password: e.target.value })} />
-                <TextField id='d-code' label='Current code' inputMode='numeric' maxLength={6} required value={disable.code} onChange={e => setDisable({ ...disable, code: e.target.value })} />
+                <TextField id='d-pw' name='password' label='Password' type='password' required value={disable.password} onChange={e => setDisable({ ...disable, password: e.target.value })} />
+                <TextField id='d-code' name='code' label='Current code' inputMode='numeric' maxLength={6} required value={disable.code} onChange={e => setDisable({ ...disable, code: e.target.value.replace(/\D/g, '') })} />
               </FormDialog>
             )}
           </CardContent>
@@ -161,13 +174,24 @@ const MyAccount = () => {
               className='grid gap-3'
               onSubmit={e => {
                 e.preventDefault()
-                changePassword.mutate()
+
+                const ok = passes(
+                  {
+                    oldPassword: check.required(pw.oldPassword, 'Current password'),
+                    newPassword: !pw.newPassword ? 'New password is required' : check.length(pw.newPassword, 'New password', { min: 12, max: 200 }) || (pw.newPassword === pw.oldPassword && 'Choose a password different from the current one'),
+                    confirm: !pw.confirm ? 'Repeat the new password' : check.match(pw.newPassword, pw.confirm, 'The two new passwords do not match')
+                  },
+                  setPwErrors
+                )
+
+                if (ok) changePassword.mutate(undefined, { onError: err => setPwErrors(serverFieldErrors(err)) })
               }}
             >
-              <TextField id='p-old' label='Current password' type='password' required value={pw.oldPassword} onChange={e => setPw({ ...pw, oldPassword: e.target.value })} />
-              <TextField id='p-new' label='New password' type='password' required minLength={12} value={pw.newPassword} onChange={e => setPw({ ...pw, newPassword: e.target.value })} />
-              <TextField id='p-confirm' label='Repeat new password' type='password' required minLength={12} value={pw.confirm} onChange={e => setPw({ ...pw, confirm: e.target.value })} />
+              <TextField id='p-old' label='Current password' type='password' required error={pwErrors.oldPassword} value={pw.oldPassword} onChange={e => setPw({ ...pw, oldPassword: e.target.value })} />
+              <TextField id='p-new' label='New password' type='password' required minLength={12} hint='At least 12 characters' error={pwErrors.newPassword} value={pw.newPassword} onChange={e => setPw({ ...pw, newPassword: e.target.value })} />
+              <TextField id='p-confirm' label='Repeat new password' type='password' required minLength={12} error={pwErrors.confirm} value={pw.confirm} onChange={e => setPw({ ...pw, confirm: e.target.value })} />
               <Button type='submit' disabled={changePassword.isPending} className='justify-self-start'>
+                {changePassword.isPending && <Loader2Icon className='animate-spin' />}
                 Change password
               </Button>
             </form>
@@ -192,13 +216,24 @@ const MyAccount = () => {
               className='grid gap-3'
               onSubmit={e => {
                 e.preventDefault()
-                setTxnPassword.mutate()
+
+                const ok = passes(
+                  {
+                    currentPassword: check.required(txn.currentPassword, 'Current login password'),
+                    transactionPassword: !txn.transactionPassword ? 'Transaction password is required' : check.length(txn.transactionPassword, 'Transaction password', { min: 6, max: 128 }) || (txn.transactionPassword === txn.currentPassword && 'Must differ from your login password'),
+                    confirm: !txn.confirm ? 'Repeat the transaction password' : check.match(txn.transactionPassword, txn.confirm, 'The two transaction passwords do not match')
+                  },
+                  setTxnErrors
+                )
+
+                if (ok) setTxnPassword.mutate(undefined, { onError: err => setTxnErrors(serverFieldErrors(err)) })
               }}
             >
-              <TextField id='t-cur' label='Current login password' type='password' required value={txn.currentPassword} onChange={e => setTxn({ ...txn, currentPassword: e.target.value })} />
-              <TextField id='t-new' label={txnStatus.data?.set ? 'New transaction password' : 'Transaction password'} type='password' required minLength={6} value={txn.transactionPassword} onChange={e => setTxn({ ...txn, transactionPassword: e.target.value })} />
-              <TextField id='t-confirm' label='Repeat it' type='password' required minLength={6} value={txn.confirm} onChange={e => setTxn({ ...txn, confirm: e.target.value })} />
+              <TextField id='t-cur' label='Current login password' type='password' required error={txnErrors.currentPassword} value={txn.currentPassword} onChange={e => setTxn({ ...txn, currentPassword: e.target.value })} />
+              <TextField id='t-new' label={txnStatus.data?.set ? 'New transaction password' : 'Transaction password'} type='password' required minLength={6} error={txnErrors.transactionPassword} value={txn.transactionPassword} onChange={e => setTxn({ ...txn, transactionPassword: e.target.value })} />
+              <TextField id='t-confirm' label='Repeat it' type='password' required minLength={6} error={txnErrors.confirm} value={txn.confirm} onChange={e => setTxn({ ...txn, confirm: e.target.value })} />
               <Button type='submit' disabled={setTxnPassword.isPending || Boolean(actor?.executiveId)} className='justify-self-start'>
+                {setTxnPassword.isPending && <Loader2Icon className='animate-spin' />}
                 {txnStatus.data?.set ? 'Change transaction password' : 'Set transaction password'}
               </Button>
             </form>
