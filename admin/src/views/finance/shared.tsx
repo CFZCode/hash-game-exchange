@@ -147,7 +147,7 @@ export const AdjustWalletDialog = ({ userId, userName, currencies, invalidate = 
 
       return api.post<{ replayed?: boolean }>('admin/user/wallet/adjust', body)
     },
-    invalidate: [['paged', 'admin/user/wallet/balances'], ['api', `admin/reports/players/${userId}`], ['api', `admin/user/wallet/${userId}/balances`], ['paged', `admin/user/wallet/${userId}/history`], ['api', 'admin/accounts/float'], ...invalidate],
+    invalidate: [['paged', 'admin/user/wallet/balances'], ['api', `admin/reports/players/${userId}`], ['api', `admin/user/wallet/${userId}/balances`], ['paged', `admin/user/wallet/${userId}/history`], ['api', 'admin/accounts/float'], ['api', 'admin/exchange/owner/wallet'], ...invalidate],
     onSuccess: result => {
       submitKey.current = null
       if (result?.replayed) toast.info('Already processed — this adjustment was applied once; nothing was moved again')

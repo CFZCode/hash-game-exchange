@@ -13,7 +13,7 @@ import type { AccountRow, AccountsResponse } from './types'
 export const fmt = (value: string | number) => Number(value || 0).toLocaleString()
 
 /** List ke saath ye queries bhi refresh hon. */
-export const SETTLE_INVALIDATE = [['api', 'admin/exchange/accounts'], ['api', 'admin/exchange/dashboard'], ['api', 'admin/exchange/user-reports/home']]
+export const SETTLE_INVALIDATE = [['api', 'admin/exchange/accounts'], ['api', 'admin/exchange/dashboard'], ['api', 'admin/exchange/user-reports/home'], ['api', 'admin/exchange/owner/wallet']]
 
 /** Zip ka settle API: points + = parent deta hai (D), − = parent leta hai (W). */
 export const settleApi = (row: AccountRow, points: number, transactionPassword: string, remark?: string) =>
@@ -50,8 +50,9 @@ const SettleDialog = ({ mode, row, me, trigger }: Props) => {
   const amount = Math.abs(Number(form.amount) || 0)
   const points = mode === 'deposit' ? amount : -amount
 
-  // Owner ↔ direct user: owner ka balance nahi badalta.
-  const parentAfter = row.isDirectUser ? Number(me.balance) : Number(me.balance) - points
+  // Owner ↔ direct user: owner ka Direct Users balance badalta hai, Client Management nahi.
+  const parentNow = row.isDirectUser ? Number(me.directBalance ?? 0) : Number(me.balance)
+  const parentAfter = parentNow - points
   const childAfter = Number(row.available) + points
   const plAfter = Number(row.settlementPoints) + points
 
@@ -78,7 +79,7 @@ const SettleDialog = ({ mode, row, me, trigger }: Props) => {
       onSubmit={() => settle.mutateAsync()}
     >
       <div className='grid gap-2 rounded-md border p-3'>
-        {line(me.username, Number(me.balance), parentAfter)}
+        {line(row.isDirectUser ? `${me.username} (Direct Users bal.)` : me.username, parentNow, parentAfter)}
         {line(row.username, Number(row.available), childAfter)}
         {line('Profit/Loss', Number(row.settlementPoints), plAfter)}
       </div>

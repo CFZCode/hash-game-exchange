@@ -37,7 +37,13 @@ export type ExchangeDashboard = {
 }
 
 /** `GET admin/exchange/owner/wallet` */
-export type OwnerWallet = { wallet: ExchangeWallet }
+export type OwnerWallet = {
+  /** Client Management balance (`credits`) — staff, agents aur unke players ke liye */
+  wallet: ExchangeWallet
+
+  /** Direct Users balance (`staff_balances`) — sirf direct users ke liye */
+  directBalance: string
+}
 
 /** `GET admin/exchange/accounts` — ek direct child (zip `users/all-details` ki row). */
 export type AccountRow = {
@@ -64,7 +70,7 @@ export type AccountRow = {
   userLocked: boolean
   hasChildren: boolean
 
-  /** Owner ka direct user (koi parent nahi) — owner ka wallet iske len-den me nahi aata */
+  /** Owner ka direct user (koi parent nahi) — iska len-den owner ke Direct Users balance se hota hai */
   isDirectUser: boolean
 
   /** More modal (zip "Additional Information") */
@@ -89,6 +95,11 @@ export type CreditHistoryRow = {
 
 export type AccountsResponse = {
   rows: AccountRow[]
-  me: ExchangeWallet & { username: string }
+  me: ExchangeWallet & {
+    username: string
+
+    /** Owner ka Direct Users balance (owner nahi to null) */
+    directBalance: string | null
+  }
   pagination: { page: number; limit: number; total: number }
 }
