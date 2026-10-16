@@ -2,9 +2,10 @@ import { useNavigate } from 'react-router-dom';
 import { useSession } from '../../../context/session';
 import { useCanSignUp } from '../../../context/gates';
 import Banner from './Banner';
-import { siteName, useSiteMark } from '../../../services/siteBranding';
 import { getSignupHeroArt } from '../../../services/banner';
 import { useResource } from '../../../hooks/useResource';
+
+const DEFAULT_HERO_ART = '/brand/parker567-hero.jpg';
 import googleIcon from '../../../assets/google.png';
 import telegramIcon from '../../../assets/telegram.png';
 import './Hero.css';
@@ -78,31 +79,24 @@ const HeroCopy = () => {
 function SignedOutHero() {
   /* THE ORIGINAL'S ARTWORK IS GONE: `banner.png` / `banner_mobile.png` are bc.game's esports team
      in "BC GAME ESPORTS / JB.COM" shirts and `banner_logo*.png` is the 3D BC mark — another
-     brand's marketing. The panel keeps its own fill and copy; the right-hand art is the owner's
-     square mark (branding/public) when one is uploaded, and nothing otherwise. */
-  const mark = useSiteMark();
+     brand's marketing. The panel keeps its own fill and copy; the art is Parker567's own banner
+     (public/brand/parker567-hero.jpg) unless the admin uploads one. */
   /* The operator's own hero art (site admin › Banners, placements `home` /
      `home_mobile`), placed exactly as the original's banner.png / banner_mobile.png were.
-     With none uploaded the owner's mark stands in, as before. */
+     With none uploaded the bundled Parker567 banner shows. */
   const { data: art } = useResource(getSignupHeroArt);
+  /* Parker567's own banner (Figma "Frame 145", 1276×270 @2x) when the admin has uploaded none. */
+  const desktopArt = art?.desktop ?? DEFAULT_HERO_ART;
+  const mobileArt = art?.mobile ?? DEFAULT_HERO_ART;
   return (
     <div dir="ltr" className="w-full px-4 sm:px-0">
       <div className="hero-panel relative h-[14.375rem] w-full overflow-hidden rounded-lg pl-2.5 sm:h-[260px]">
-        {art && (
-          <>
-            <img alt="banner" className="absolute right-0 top-0 h-full w-auto max-w-none lg:hidden" src={art.mobile} />
-            <img alt="banner" className="absolute right-0 top-0 hidden h-full w-auto lg:block" src={art.desktop} />
-          </>
-        )}
-        {!art && mark && (
-          <img
-            alt={siteName() || 'logo'}
-            className="absolute right-6 top-1/2 h-3/5 w-auto -translate-y-1/2 rounded-2xl object-contain opacity-90 lg:right-16"
-            src={mark}
-          />
-        )}
+        {/* A finished full-width banner, so it covers the panel: anchored left on desktop (the
+            crowned P), right on a phone (the players) where the panel is too narrow for both. */}
+        <img alt="banner" className="absolute inset-0 h-full w-full object-cover object-right lg:hidden" src={mobileArt} />
+        <img alt="banner" className="absolute inset-0 hidden h-full w-full object-cover object-left lg:block" src={desktopArt} />
 
-        <div className="relative hidden h-full w-[50%] items-center justify-center lg:flex">
+        <div className="relative hidden h-full w-[50%] items-center justify-center lg:ml-[12%] lg:flex">
           <HeroCopy />
         </div>
         <div className="contents lg:hidden">
