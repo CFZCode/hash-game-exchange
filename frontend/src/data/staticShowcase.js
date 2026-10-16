@@ -234,3 +234,36 @@ export const STATIC_LATEST_BETS = LATEST.map((row, i) => toBet(row, i, 'lb'));
 
 /** High Roller: 30 big wins, biggest (in USD terms) first. */
 export const STATIC_HIGH_ROLLERS = HIGH.map((row, i) => toBet(row, i, 'hr')).sort((a, b) => usdProfit(b) - usdProfit(a));
+
+/* ── The game page's High win / Lucky win board ──────────────────────────────────────────── */
+
+/* A small string hash, so a game's showcase is the same on every visit and differs per game. */
+const seedOf = (text) => [...String(text)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
+
+/* [coin, stake] pairs the board draws from; payouts are percent-of-stake like the tables above. */
+const GAME_STAKES = [
+  ['INRFIAT', 22754.68], ['USDT', 250], ['INRFIAT', 3320.97], ['USDT', 40], ['INRFIAT', 5788.44],
+  ['USDT', 1200], ['INRFIAT', 1500], ['USDT', 75], ['INRFIAT', 980], ['USDT', 15],
+];
+const GAME_PAYOUTS = [14333, 77143, 43148, 2560, 9850, 1240, 18800, 6400, 3150, 52000];
+
+/**
+ * Ten winning rounds for one game, in the `LatestBets` bet shape. Shown ONLY when the live
+ * `top-wins?game=` board for that game is empty (the same static-showcase rule as the home
+ * tables, user's request). Deterministic per slug.
+ */
+export function staticGameWins(slug) {
+  const seed = seedOf(slug);
+  return GAME_STAKES.map(([coin, stake], i) => {
+    const payout = GAME_PAYOUTS[(i + seed) % GAME_PAYOUTS.length];
+    const scaled = Number((stake * (0.6 + ((seed >> i) % 9) / 10)).toFixed(2));
+    return {
+      betId: `gw-${slug}-${i}`,
+      userName: player(seed + i * 5),
+      currencyName: coin,
+      throwAmount: String(scaled),
+      profitAmount: String(Number((scaled * (payout / 100 - 1)).toFixed(2))),
+      payout,
+    };
+  });
+}

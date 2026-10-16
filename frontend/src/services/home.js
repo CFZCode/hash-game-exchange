@@ -24,7 +24,7 @@ import {
 import { bets } from '../pages/Home/LatestBets/bets';
 import { bigWinsByTab, vipTier, displayName } from '../pages/Home/RecentBigWins/data';
 import { matches } from '../pages/Home/Highlights/matches';
-import { staticBigWins, STATIC_LATEST_BETS, STATIC_HIGH_ROLLERS } from '../data/staticShowcase';
+import { staticBigWins, staticGameWins, STATIC_LATEST_BETS, STATIC_HIGH_ROLLERS } from '../data/staticShowcase';
 
 /* The home page's data.
  *
@@ -220,6 +220,19 @@ export function getHighRollers() {
         request(PLATFORM.casino.topWins, { live: true, params: { limit: LIVE_BETS }, fixture: [] }),
       ).then((rows) => (rows ?? []).map(toLatestBet)),
     staticBets(STATIC_HIGH_ROLLERS),
+  );
+}
+
+/* The game page's High win / Lucky win board: the public biggest-wins board narrowed to one game
+   (`top-wins?game=<platform game id>`), with that game's static showcase when it has no rows. */
+export function getGameTopWins(ref, slug) {
+  if (USE_FIXTURES) return Promise.resolve(staticGameWins(slug));
+  return orStatic(
+    () =>
+      Promise.resolve(
+        request(PLATFORM.casino.topWins, { live: true, params: { limit: 20, game: ref }, fixture: [] }),
+      ).then((rows) => (rows ?? []).map(toLatestBet)),
+    () => Promise.resolve(staticGameWins(slug)),
   );
 }
 

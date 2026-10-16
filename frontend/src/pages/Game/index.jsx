@@ -15,6 +15,9 @@ import { getAlias, printCurrency } from '../../utils/currency';
 import { addFavoriteGame, isFavoriteGame, removeFavoriteGame } from '../../services/collection';
 import { formatOnlineUsers } from '../../utils/gameArt';
 import RecommendList from '../GameCollection/RecommendList';
+import LatestBets from '../Home/LatestBets';
+import { getGameTopWins } from '../../services/home';
+import { displayName } from '../../context/account';
 import './Game.css';
 
 /* `/game/:gameUnique` — where every game tile points, and the original's own path and param name
@@ -312,6 +315,74 @@ function enterFullscreen() {
   }
   const request = frame.requestFullscreen ?? frame.webkitRequestFullscreen;
   Promise.resolve(request?.call(frame)).catch(() => {});
+}
+
+/* The "High win / Lucky win" board under the frame, as hash.game's game page has it (user's
+   request, 2026-10-16). High win: this game's biggest payouts; Lucky win: the same rounds by
+   multiplier. Live `top-wins?game=` first, the game's static showcase when that is empty
+   (services/home.js). hash.game's third tab, Review, is not drawn — there are no reviews here. */
+const WIN_TABS = ['High win', 'Lucky win'];
+
+function GameWins({ game, gameUnique, settings }) {
+  const ref = game?.ref ?? gameUnique;
+  const read = React.useCallback(() => getGameTopWins(ref, gameUnique), [ref, gameUnique]);
+  const { data, loading } = useResource(read);
+  const [tab, setTab] = React.useState(0);
+  const gross = (row) => Number(row.throwAmount) * (Number(row.payout) / 100);
+  /* Text only, like hash.game's board: no coin icon beside each figure. */
+  const money = (amount, name) => printCurrency(Number(amount) || 0, name, { settings: settings ?? {}, hasAlias: true });
+  const rows = React.useMemo(() => {
+    const list = [...(data ?? [])];
+    return tab === 0
+      ? list.sort((a, b) => gross(b) - gross(a))
+      : list.sort((a, b) => Number(b.payout) - Number(a.payout));
+  }, [data, tab]);
+
+  return (
+    <section className="game-wins mt-4 rounded-xl bg-layer4 p-4 font-semibold">
+      <div role="tablist" className="scroll-x tabs-title hide-scroll mr-auto max-w-100">
+        <div className="tabs-btn-group">
+          {WIN_TABS.map((title, i) => (
+            <button
+              key={title}
+              type="button"
+              role="tab"
+              className="tabs-btn btn-like"
+              aria-selected={tab === i ? 'true' : undefined}
+              onClick={() => setTab(i)}
+            >
+              <span className="font-semibold">{title}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="mt-3 grid grid-cols-[0.9fr_1.7fr_1.2fr_0.8fr] gap-x-2 px-2 text-sm text-secondary">
+        <span>Player</span>
+        <span className="text-right">Payout</span>
+        <span className="text-right">Wager</span>
+        <span className="text-right">Mult</span>
+      </div>
+      {loading ? (
+        <div className="center h-40"><Loading /></div>
+      ) : rows.length === 0 ? (
+        <EmptyPlaceholder className="w-full" />
+      ) : (
+        <div className="mt-1">
+          {rows.slice(0, 10).map((row) => (
+            <div
+              key={row.betId}
+              className="grid h-10 grid-cols-[0.9fr_1.7fr_1.2fr_0.8fr] items-center gap-x-2 rounded-lg px-2 text-sm odd:bg-layer3"
+            >
+              <span className="truncate text-primary">{displayName(row.userName)}</span>
+              <span className="truncate text-right text-brand">+{money(gross(row), row.currencyName)}</span>
+              <span className="truncate text-right text-primary">{money(row.throwAmount, row.currencyName)}</span>
+              <span className="text-right text-primary">{(Number(row.payout) / 100).toFixed(2)}×</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
 }
 
 const SHOW_INFO_CARD = false;
@@ -652,9 +723,17 @@ export default function GamePage() {
         )}
       </section>
       ) : (
-        <div className="game-recommend -mx-4 mt-6 sm:mx-0">
-          <RecommendList />
-        </div>
+        <>
+          {game ? <GameWins game={game} gameUnique={gameUnique} settings={session.setting} /> : null}
+          <div className="game-recommend -mx-4 mt-6 sm:mx-0">
+            <RecommendList />
+          </div>
+          {/* All bets / High Roller, the board hash.game's game page ends on. LatestBets carries
+              its own `px-4 sm:px-0` gutter, so it is pulled out of the page's the same way. */}
+          <div className="game-latest -mx-4 mt-6 sm:mx-0">
+            <LatestBets />
+          </div>
+        </>
       )}
       <GameUnavailable open={unavailableOpen} onClose={closeUnavailable} />
     </div>
