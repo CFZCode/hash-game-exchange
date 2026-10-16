@@ -819,7 +819,7 @@ class DashboardService {
    * This is the admin "Direct Users" tab. A direct user is a player with no
    * parent (`parent_staff_id IS NULL`) — a site signup, referral signups
    * included (a referral sets `refree`, never a parent). A player WITH a
-   * parent belongs to an agent and is shown on the "Client Management" tab
+   * parent belongs to an agent and is shown on the "Agent System" tab
    * (Sports Exchange), never here.
    *
    * Only a tree that contains the platform root (staff 1 — the owner, and the

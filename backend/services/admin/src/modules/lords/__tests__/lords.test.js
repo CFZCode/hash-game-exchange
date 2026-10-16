@@ -299,19 +299,29 @@ test('admin account controls', async (t) => {
     assert.equal(row.transfer_type, 'refill');
   });
 
-  await t.test('the platform owner refilling a DIRECT user (no parent) does not touch the owner wallet', async () => {
+  await t.test('the platform owner refilling a DIRECT user (no parent) pays from the Direct User balance, not credits', async () => {
     const owner = await seedStaff(newStaffId(), { inr: '0' });
     const player = await seedPlayer(newUid(), owner, '0');
     await connection.models.Users.update({ parent_staff_id: null }, { where: { id: player } });
+    const actor = actorFor(owner, { canIssueFunds: true, level: 0 });
+    const directBalance = async () =>
+      String((await connection.models.StaffBalances.findOne({ where: { staff_id: owner }, raw: true }))?.inr ?? '0');
 
-    const result = await service.refill({
-      actor: actorFor(owner, { canIssueFunds: true, level: 0 }),
-      accountId: player, amount: '700', transactionPassword: TXN_PASSWORD,
-    });
+    // No Direct User balance yet: refused, nothing moves.
+    await connection.models.StaffBalances.destroy({ where: { staff_id: owner } });
+    await assert.rejects(
+      () => service.refill({ actor, accountId: player, amount: '700', transactionPassword: TXN_PASSWORD }),
+      (err) => err.code === 'INSUFFICIENT_FUNDS' && err.details?.party === 'owner_direct'
+    );
+    assert.equal(await playerBalance(player), '0.00000000');
+
+    await connection.models.StaffBalances.create({ staff_id: owner, inr: '1000' });
+    const result = await service.refill({ actor, accountId: player, amount: '700', transactionPassword: TXN_PASSWORD });
 
     assert.equal(result.issued, false);
     assert.equal(await playerBalance(player), '700.00000000');
-    assert.equal(await staffBalance(owner), '0.00000000', 'a direct user is not paid from the owner wallet');
+    assert.equal(Number(await directBalance()), 300, 'paid from staff_balances');
+    assert.equal(await staffBalance(owner), '0.00000000', 'a direct user is not paid from the owner credits wallet');
 
     const row = await connection.models.StaffTransfers.findOne({
       where: { to_type: 'user', to_id: player }, order: [['id', 'DESC']], raw: true,

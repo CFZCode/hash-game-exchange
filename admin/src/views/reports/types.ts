@@ -22,46 +22,6 @@ export type PlayerReportRow = {
   vip: { level: number; card: string; nextLevel: number | null; wagerToNextLevel: string; progressPct: string } | null
 }
 
-export type AgentUserRow = {
-  id: string
-  name: string
-  email: string | null
-  country: string | null
-  phone: string | null
-  isLocked: boolean
-  sportsBetlocked: boolean
-  staffId: string | null
-  staffName: string | null
-  staffEmail: string | null
-  totalDeposit: string
-  totalWithdrawal: string
-  sportsPnl: string
-  casinoPnl: string
-  pnl: string
-}
-
-export type AgentStaffRow = {
-  id: string
-  name: string
-  email: string | null
-  roleId: number
-  roleName: string
-  roleLevel: number
-  parentId: string | null
-  parentName: string | null
-  systemLocked: boolean
-  sportsBetlocked: boolean
-  createdAt: string | null
-}
-
-export type AgentUsersReport = {
-  currency: string
-  scope: { isSuperAdmin: boolean; staffId: number }
-  total: number
-  users: AgentUserRow[]
-  staff: AgentStaffRow[]
-}
-
 /** `admin/accounts/statement` — one transfer between two accounts. */
 export type TransferRow = {
   id: number
@@ -118,15 +78,6 @@ export type UserRisk = {
   locks: Record<string, boolean>
   financials: { totalDeposit: string; totalWithdrawal: string; net: string }
   activity: { distinctIpCount: number; distinctIps: string[]; ipBreakdown: Record<string, unknown>[]; recentLogins: Record<string, unknown>[]; recentBets: Record<string, unknown>[] }
-  riskFlags: Record<string, boolean>
-}
-
-export type StaffRisk = {
-  currency: string
-  staff: Record<string, unknown> & { id: string; name: string; email: string | null; roleName: string; parentName: string | null; balance: string; percentage: string }
-  locks: Record<string, boolean>
-  parentChain: { id: number; name: string; email: string; roleName: string; depth: number }[]
-  downline: { directStaffCount: number; subtreeStaffCount: number; playersCount: number; lockedPlayers: number; totalDeposits: string; totalWithdrawals: string; net: string }
   riskFlags: Record<string, boolean>
 }
 

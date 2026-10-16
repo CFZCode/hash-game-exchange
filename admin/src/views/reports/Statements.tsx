@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 
 import Link from 'next/link'
 
-import { DownloadIcon, SearchIcon } from 'lucide-react'
+import { DownloadIcon, Loader2Icon, SearchIcon } from 'lucide-react'
 import { toast } from 'sonner'
 
 import DataTable, { type Column } from '@/components/shared/DataTable'
@@ -28,12 +28,17 @@ import { api, errorMessage } from '@/lib/api/client'
 import { formatMoney, formatNumber } from '@/lib/format'
 import { ACCOUNT_TYPES, STATEMENT_CATEGORIES, STATEMENT_CATEGORY_LABEL as CATEGORY_LABEL, daysAgo, downloadBlob, type Statement, type StatementRow, type TransferRow } from './types'
 
-const party = (p: TransferRow['from']) => (
-  <Link href={p.type === 'staff' ? `/staff/${p.id}` : `/users/${p.id}`} className='hover:underline'>
-    {p.name ?? `${p.type} #${p.id}`}
-    <span className='text-muted-foreground text-xs'> ({p.type})</span>
-  </Link>
-)
+// Staff ka alag page nahi (agent wala system Sports Exchange me hai) — sirf naam; user ka link.
+const party = (p: TransferRow['from']) => {
+  const label = (
+    <>
+      {p.name ?? `${p.type} #${p.id}`}
+      <span className='text-muted-foreground text-xs'> ({p.type})</span>
+    </>
+  )
+
+  return p.type === 'staff' ? <span>{label}</span> : <Link href={`/users/${p.id}`} className='hover:underline'>{label}</Link>
+}
 
 const transferColumns: Column<TransferRow>[] = [
   { key: 'at', header: 'When', cell: r => <DateTime value={r.createdAt} /> },
@@ -138,8 +143,9 @@ const StatementTab = () => {
       const blob = await api.blob(`${base}/pdf`, { ...range, category: applied.category })
 
       downloadBlob(blob, `statement-${applied.subject}-${applied.id}.pdf`)
+      toast.success('Statement PDF downloaded')
     } catch (e) {
-      toast.error(errorMessage(e))
+      toast.error(`PDF download failed: ${errorMessage(e)}`)
     } finally {
       setDownloading(false)
     }
@@ -187,7 +193,7 @@ const StatementTab = () => {
             <SearchIcon /> Load statement
           </Button>
           <Button variant='outline' disabled={!applied || downloading} onClick={pdf}>
-            <DownloadIcon /> PDF
+            {downloading ? <Loader2Icon className='animate-spin' /> : <DownloadIcon />} PDF
           </Button>
         </CardContent>
       </Card>
@@ -200,9 +206,13 @@ const StatementTab = () => {
           <Card className='shadow-none'>
             <CardHeader>
               <CardTitle className='flex flex-wrap items-center gap-2 text-base'>
-                <Link href={s.subject.type === 'USER' ? `/users/${s.subject.id}` : `/staff/${s.subject.id}`} className='hover:underline'>
-                  {s.subject.name}
-                </Link>
+                {s.subject.type === 'USER' ? (
+                  <Link href={`/users/${s.subject.id}`} className='hover:underline'>
+                    {s.subject.name}
+                  </Link>
+                ) : (
+                  <span>{s.subject.name}</span>
+                )}
                 <Badge variant='secondary'>{s.subject.role}</Badge>
                 {s.subject.parentName && <span className='text-muted-foreground text-sm font-normal'>under {s.subject.parentName}</span>}
                 <span className='text-muted-foreground ml-auto text-sm font-normal'>

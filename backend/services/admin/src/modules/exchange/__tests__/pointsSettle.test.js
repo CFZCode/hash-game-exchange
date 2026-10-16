@@ -185,14 +185,32 @@ test('points settlement and the account list', async (t) => {
     await assert.rejects(() => settle(ownerActor(owner), player, -100), /not your direct child/);
   });
 
-  await t.test('owner and a DIRECT user: the owner wallet does not move', async () => {
+  await t.test('owner and a DIRECT user: paid from the Direct User balance, the credits wallet does not move', async () => {
     const owner = await seedStaff(newStaffId(), { owner: true, inr: '0' });
-    const player = await seedPlayer(newUid(), null, { inr: '700', credit: '1000', pl: -300 });
+    const directBalance = async () => dec((await models.StaffBalances.findOne({ where: { staff_id: owner }, raw: true }))?.inr);
+    const lost = await seedPlayer(newUid(), null, { inr: '700', credit: '1000', pl: -300 });
+    const won = await seedPlayer(newUid(), null, { inr: '1100', credit: '1000', pl: 100 });
 
-    await settle(ownerActor(owner), player, 300);
+    // Direct User balance kam hai → refuse, kuch nahi badla.
+    await models.StaffBalances.destroy({ where: { staff_id: owner } });
+    await models.StaffBalances.create({ staff_id: owner, inr: '100' });
+    await assert.rejects(() => settle(ownerActor(owner), lost, 300), /Direct User balance/);
+    assert.equal(dec((await playerWallet(lost)).inr), 700, 'nothing moved');
 
-    assert.equal(dec((await playerWallet(player)).inr), 1000);
-    assert.equal(dec((await staffWallet(owner)).inr), 0, 'owner not charged');
+    await models.StaffBalances.update({ inr: '500' }, { where: { staff_id: owner } });
+    const paid = await settle(ownerActor(owner), lost, 300);
+    assert.equal(dec((await playerWallet(lost)).inr), 1000);
+    assert.equal(await directBalance(), 200, 'Direct User balance paid');
+    assert.equal(Number(paid.parentBalance), 200);
+
+    // Direct user jeeta → W −100: paisa Direct User balance me wapas.
+    await settle(ownerActor(owner), won, -100);
+    assert.equal(dec((await playerWallet(won)).inr), 1000);
+    assert.equal(await directBalance(), 300);
+
+    const ownerRow = await staffWallet(owner);
+    assert.equal(dec(ownerRow.inr), 0, 'credits wallet not charged');
+    assert.equal(dec(ownerRow.down_point), 0, 'credits points not touched');
   });
 
   await t.test('a ledger mismatch blocks the settlement', async () => {

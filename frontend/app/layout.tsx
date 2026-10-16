@@ -20,6 +20,13 @@ const ORIGINAL_METADATA: Metadata = {
   icons: { icon: { url: '/favicon.svg', type: 'image/svg+xml' } },
 };
 
+/* Live mode with no owner mark yet: Parker567's own square mark (public/brand/, the same
+   fallback services/siteBranding.js uses), never the original's favicon and loader art. */
+const FALLBACK_MARK = LIVE ? '/brand/parker567-mark.png' : null;
+const FALLBACK_ICONS: Metadata['icons'] = FALLBACK_MARK
+  ? { icon: { url: FALLBACK_MARK, type: 'image/png' }, apple: FALLBACK_MARK }
+  : ORIGINAL_METADATA.icons;
+
 const ORIGINAL_VIEWPORT: Viewport = {
   width: 'device-width',
   initialScale: 1,
@@ -51,7 +58,7 @@ const typeOf = (url: string) => (url.endsWith('.svg') ? 'image/svg+xml' : url.en
 
 export async function generateMetadata(): Promise<Metadata> {
   const b = await serverBranding();
-  if (!b) return ORIGINAL_METADATA;
+  if (!b) return { ...ORIGINAL_METADATA, icons: FALLBACK_ICONS };
   const title = b.title ?? b.siteName;
   const mark = assetUrl(b.markUrl);
   const ogImage = assetUrl(b.ogImageUrl);
@@ -60,7 +67,7 @@ export async function generateMetadata(): Promise<Metadata> {
     description: b.description ?? undefined,
     keywords: b.keywords.length ? b.keywords : undefined,
     applicationName: b.siteName,
-    icons: mark ? { icon: { url: mark, type: typeOf(mark) }, apple: mark } : ORIGINAL_METADATA.icons,
+    icons: mark ? { icon: { url: mark, type: typeOf(mark) }, apple: mark } : FALLBACK_ICONS,
     openGraph: {
       siteName: b.siteName,
       title: b.ogTitle ?? title,
@@ -81,7 +88,7 @@ export async function generateViewport(): Promise<Viewport> {
    theme (context/settings.js), hence suppressHydrationWarning. */
 export default async function RootLayout({ children }: { children: ReactNode }) {
   /* Live mode: the owner's square mark as the pre-boot loader's picture (same 11rem box). */
-  const mark = assetUrl((await serverBranding())?.markUrl ?? null);
+  const mark = assetUrl((await serverBranding())?.markUrl ?? null) ?? FALLBACK_MARK;
   return (
     <html lang="en" dir="ltr" suppressHydrationWarning>
       <head>

@@ -22,6 +22,7 @@ import { useSession } from '@/contexts/SessionContext'
 import { useApiMutation, useListState } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
 import { truncateId } from '@/lib/format'
+import { check } from '@/lib/validate'
 import { allConvertedLabel, useCurrencyChoices, useFinanceFilters } from './currencyFilter'
 import FinanceStatsPanel from './FinanceStatsPanel'
 import { usePageNumbered } from './shared'
@@ -56,13 +57,19 @@ const RecordInrDeposit = () => {
       title='Record an INR deposit'
       description='Enters a deposit the user made out of band. Audited under your name; only "success" counts as money that arrived.'
       submitLabel='Record'
+      validate={() => ({
+        userId: check.id(form.userId, 'User id'),
+        amount: check.amount(form.amount, 'Amount', { decimals: 8 }),
+        transactionId: check.required(form.transactionId, 'Transaction id') ?? check.length(form.transactionId, 'Transaction id', { max: 120 }),
+        'ir-date': form.date && new Date(form.date).getTime() > Date.now() ? 'Date cannot be in the future' : undefined
+      })}
       onSubmit={() => record.mutateAsync()}
     >
       <div className='grid grid-cols-2 gap-4'>
-        <TextField id='ir-user' label='User id' required inputMode='numeric' value={form.userId} onChange={e => setForm({ ...form, userId: e.target.value.replace(/\D/g, '') })} />
-        <TextField id='ir-amt' label='Amount (INR)' required placeholder='1000.00' value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} />
+        <TextField id='ir-user' name='userId' label='User id' required inputMode='numeric' value={form.userId} onChange={e => setForm({ ...form, userId: e.target.value.replace(/\D/g, '') })} />
+        <TextField id='ir-amt' name='amount' inputMode='decimal' label='Amount (INR)' required placeholder='1000.00' value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} />
       </div>
-      <TextField id='ir-tx' label='Transaction id' required value={form.transactionId} onChange={e => setForm({ ...form, transactionId: e.target.value })} />
+      <TextField id='ir-tx' name='transactionId' label='Transaction id' required value={form.transactionId} onChange={e => setForm({ ...form, transactionId: e.target.value })} />
       <div className='grid grid-cols-2 gap-4'>
         <SelectField id='ir-status' label='Status' value={form.status} onChange={status => setForm({ ...form, status })} options={['pending', 'success', 'failed'].map(v => ({ value: v, label: v }))} />
         <DateField id='ir-date' label='Date' value={form.date} onChange={date => setForm({ ...form, date })} />

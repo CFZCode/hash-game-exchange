@@ -105,4 +105,32 @@ function computeCap({ currency, deposited, withdrawn, wagered, settings }) {
   };
 }
 
-module.exports = { DEFAULTS, MAX_MULTIPLIER, FIELDS, cleanWithdrawalCap, withdrawalCapProblem, computeCap, isMultiplier };
+/**
+ * The ADMIN's own deposit-cap settings (Admin → Users → Financial → Withdrawal), stored in
+ * `withdrawal_control` (migrations 108 / 109). Once the Super Admin has saved them they are the
+ * rule in force; until then (NULL columns, or an older database without the table) this answers
+ * null and the owner's document applies as before.
+ */
+async function readAdminWithdrawalCap(sequelize, { transaction } = {}) {
+  if (!sequelize?.query) return null;
+  try {
+    const [rows] = await sequelize.query(
+      'SELECT limit_enabled, deposit_multiplier, wager_bonus_enabled, wager_multiplier FROM withdrawal_control WHERE id = 1',
+      { transaction }
+    );
+    const r = rows[0];
+    if (!r || r.limit_enabled == null) return null;
+    return cleanWithdrawalCap({
+      enabled: r.limit_enabled === true,
+      depositMultiplier: r.deposit_multiplier == null ? undefined : Number(r.deposit_multiplier),
+      wagerBonus: r.wager_bonus_enabled == null ? undefined : r.wager_bonus_enabled === true,
+      wagerMultiplier: r.wager_multiplier == null ? undefined : Number(r.wager_multiplier),
+    });
+  } catch (error) {
+    const code = error?.original?.code ?? error?.parent?.code;
+    if (code === '42P01' || code === '42703') return null; // no table / no columns yet
+    throw error;
+  }
+}
+
+module.exports = { DEFAULTS, MAX_MULTIPLIER, FIELDS, cleanWithdrawalCap, withdrawalCapProblem, computeCap, isMultiplier, readAdminWithdrawalCap };

@@ -10,6 +10,7 @@ const {
   readOwnerDirectBalance,
   debitOwnerDirectBalance,
   creditOwnerDirectBalance,
+  LEDGER_TYPE,
 } = require('../lords/ownerWallet');
 
 /**
@@ -142,10 +143,14 @@ async function settlePoints(models, { actor, accountType, accountId, points, rem
       'UPDATE credits SET inr = inr - :delta, down_point = down_point - :delta WHERE id = :walletId',
       { replacements: { delta, walletId: parentWallet.id }, transaction }
     );
-  } else if (taking) {
-    await creditOwnerDirectBalance(models, actor.id, Math.abs(delta), { transaction });
-  } else if (!(await debitOwnerDirectBalance(models, actor.id, delta, { transaction }))) {
-    throw fail(`${parentName} has not enough Direct User balance to pay ${delta}`);
+  } else {
+    // Owner ↔ direct user: owner ka Direct User wallet, ledger entry ke saath.
+    const entry = { type: LEDGER_TYPE.POINTS_SETTLE, userId: child.id, note: remark || 'Points settlement' };
+    if (taking) {
+      await creditOwnerDirectBalance(models, actor.id, Math.abs(delta), { transaction, entry });
+    } else if (!(await debitOwnerDirectBalance(models, actor.id, delta, { transaction, entry }))) {
+      throw fail(`${parentName} has not enough Direct User balance to pay ${delta}`);
+    }
   }
 
   // 6. Record: staff_transfers (paisa kahan se kahan gaya).

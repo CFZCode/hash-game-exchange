@@ -2,9 +2,11 @@
 
 import { Fragment, useRef, useState, type ReactNode } from 'react'
 
+import { Loader2Icon } from 'lucide-react'
 import { toast } from 'sonner'
 
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
+import ErrorState from '@/components/shared/ErrorState'
 import PageHeader from '@/components/shared/PageHeader'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -14,7 +16,8 @@ import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useApi } from '@/hooks/use-api'
-import { api, errorMessage } from '@/lib/api/client'
+import { api } from '@/lib/api/client'
+import { toastError } from '@/lib/api/feedback'
 import { cn } from '@/lib/utils'
 
 /**
@@ -163,10 +166,10 @@ type Suggestion = { user_id: string; username: string; role: string; kind: strin
 
 /** Har watchdog finding kaunsi Settlement screen se theek hota hai. */
 const ACTION_PAGE: Record<string, { to: string; label: string }> = {
-  resultDeclaredNotSettled: { to: '/exchange/settlement/match', label: 'Open Match Settlement' },
-  staleOpenMarket: { to: '/exchange/settlement/match', label: 'Open Match Settlement' },
-  staleFancy: { to: '/exchange/settlement/fancy', label: 'Open Fancy Settlement' },
-  resultNeverDeclared: { to: '/exchange/settlement/match', label: 'Open Match Settlement' }
+  resultDeclaredNotSettled: { to: '/exchange/settlement', label: 'Open Match Settlement' },
+  staleOpenMarket: { to: '/exchange/settlement', label: 'Open Match Settlement' },
+  staleFancy: { to: '/exchange/settlement?tab=fancy', label: 'Open Fancy Settlement' },
+  resultNeverDeclared: { to: '/exchange/settlement', label: 'Open Match Settlement' }
 }
 
 /** critical = laal, high = peela, info/review = grey. */
@@ -438,23 +441,43 @@ const TraceTab = ({
   suggestions: Suggestion[]
   onPick: (who: string) => void
   loading: boolean
-}) => (
+}) => {
+  const [queryError, setQueryError] = useState<string | null>(null)
+
+  const trace = () => {
+    const who = query.trim()
+
+    if (!who) return setQueryError('Type a username or user ID to trace')
+    if (loading) return
+    onPick(who)
+  }
+
+  return (
   <div className='space-y-4'>
     <div className='relative max-w-xl'>
       <div className='flex gap-2'>
         <Input
           placeholder='Search username or ID…'
           value={query}
+          aria-invalid={!!queryError}
           onChange={e => {
             setQuery(e.target.value)
+            setQueryError(null)
             onSearch(e.target.value)
           }}
           onKeyDown={e => {
-            if (e.key === 'Enter' && query.trim()) onPick(query.trim())
+            if (e.key === 'Enter') trace()
           }}
         />
-        <Button onClick={() => query.trim() && onPick(query.trim())}>Trace</Button>
+        <Button onClick={trace} disabled={loading}>
+          {loading && <Loader2Icon className='animate-spin' />} Trace
+        </Button>
       </div>
+      {queryError && (
+        <p className='text-destructive mt-1 text-xs' role='alert' data-error='trace-query'>
+          {queryError}
+        </p>
+      )}
       {suggestions.length > 0 && (
         <div className='bg-popover absolute z-20 mt-1 w-full overflow-hidden rounded-md border shadow-md'>
           {suggestions.map(s => (
@@ -579,7 +602,8 @@ const TraceTab = ({
       </>
     )}
   </div>
-)
+  )
+}
 
 /* ---------------------------------------------------------------- Watchdog tab */
 const WatchdogTab = ({
@@ -733,9 +757,12 @@ const SystemTracker = ({ adminUrl }: { adminUrl: string }) => {
 
     try {
       await api.post(`${TRACKER}/scan`)
-      await alerts.refetch()
+      const r = await alerts.refetch()
+
+      if (r.error) toastError(r.error, 'Scanned, but the alerts did not reload')
+      else toast.success('Scan finished', { description: `${r.data?.actionable ?? 0} actionable finding(s) on ${r.data?.actionableUsers ?? 0} account(s)` })
     } catch (err) {
-      toast.error(`Scan failed: ${errorMessage(err)}`)
+      toastError(err, 'Scan failed')
     } finally {
       setScanning(false)
     }
@@ -746,9 +773,12 @@ const SystemTracker = ({ adminUrl }: { adminUrl: string }) => {
 
     try {
       await api.post(`${TRACKER}/watchdog/scan`)
-      await watchdog.refetch()
+      const r = await watchdog.refetch()
+
+      if (r.error) toastError(r.error, 'Swept, but the watchdog did not reload')
+      else toast.success('Sweep finished', { description: `${r.data?.count ?? 0} open finding(s)` })
     } catch (err) {
-      toast.error(`Sweep failed: ${errorMessage(err)}`)
+      toastError(err, 'Sweep failed')
     } finally {
       setScanning(false)
     }
@@ -792,8 +822,9 @@ const SystemTracker = ({ adminUrl }: { adminUrl: string }) => {
       ])
 
       if (rep.status === 'fulfilled') setReport(rep.value)
-      else toast.warning(`Not found: ${errorMessage(rep.reason)}`)
+      else toastError(rep.reason, `Could not trace “${who}”`)
       if (pr.status === 'fulfilled') setProv(pr.value)
+      else if (rep.status === 'fulfilled') toastError(pr.reason, 'Balance provenance did not load')
     } finally {
       setTraceLoading(false)
     }
@@ -802,9 +833,10 @@ const SystemTracker = ({ adminUrl }: { adminUrl: string }) => {
   const doAck = async (row: Finding) => {
     try {
       await api.post(`${TRACKER}/watchdog/${row.id}/acknowledge`)
-      await watchdog.refetch()
+      toast.success('Marked as being handled', { description: row.title || row.ref_key })
+      void watchdog.refetch()
     } catch (err) {
-      toast.error(`Failed: ${errorMessage(err)}`)
+      toastError(err, 'Could not mark it as handled')
       throw err
     }
   }
@@ -829,8 +861,15 @@ const SystemTracker = ({ adminUrl }: { adminUrl: string }) => {
 
       <Card>
         <CardContent>
-          {(alerts.error || watchdog.error) && (
-            <p className='text-destructive mb-3 text-sm'>{errorMessage(alerts.error || watchdog.error)}</p>
+          {alerts.error && (
+            <div className='mb-3'>
+              <ErrorState error={alerts.error} title='Could not load the alerts' onRetry={alerts.refetch} retrying={alerts.isFetching} />
+            </div>
+          )}
+          {watchdog.error && (
+            <div className='mb-3'>
+              <ErrorState error={watchdog.error} title='Could not load the watchdog' onRetry={watchdog.refetch} retrying={watchdog.isFetching} />
+            </div>
           )}
           <Tabs value={tab} onValueChange={v => setTab(String(v))}>
             <TabsList className='mb-4'>

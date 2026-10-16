@@ -9,7 +9,7 @@ import { useIsDialog } from '../../context/dialogRoute';
 import { IconCopy, IconArrow, IconSearch, IconClose, IconInform } from '../../components/shared/icons';
 import useResource from '../../hooks/useResource';
 import { USE_FIXTURES } from '../../services/client';
-import { depositQuickPicks, inWallet } from '../../services/currencies';
+import { depositQuickPicks, inWallet, ownerKind } from '../../services/currencies';
 import Notice from '../../components/shared/Notice';
 import {
   depositDefault,
@@ -161,7 +161,7 @@ export default function CryptoTab() {
      ETH and is the original's order, not this site's default. */
   /* `inWallet`: the fallback must be a coin the owner enabled, i.e. one the (cut) wallet carries —
      always true in fixture mode. Failing all named ones, the wallet's first crypto row. */
-  const cryptoOk = (name) => Boolean(name) && name !== 'BCD' && getCurrency(name)?.currencyType !== 'FIAT' && Boolean(networksFor(name)) && inWallet(balances, name);
+  const cryptoOk = (name) => Boolean(name) && name !== 'BCD' && getCurrency(name)?.currencyType !== 'FIAT' && ownerKind(name) !== 'fiat' && Boolean(networksFor(name)) && inWallet(balances, name);
   const initial = cryptoOk(seed)
     ? seed
     : [session.defaultCurrency, 'USDT', DEFAULT_CURRENCIES[0], ...balances.map((coin) => coin.currencyName)].find(cryptoOk) ?? DEFAULT_CURRENCIES[0];
@@ -188,8 +188,10 @@ export default function CryptoTab() {
 
   /* Every depositable coin in the wallet, which is what the Currency select lists —
      `G1(currencyName, isFiat, !isFiat)` keeps the crypto half. */
+  /* The owner's `kind` decides too: MVR, AED… are not in the local catalogue, so `getCurrency`
+     alone let them through as crypto. */
   const options = balances
-    .filter((coin) => getCurrency(coin.currencyName)?.currencyType !== 'FIAT')
+    .filter((coin) => getCurrency(coin.currencyName)?.currencyType !== 'FIAT' && ownerKind(coin.currencyName) !== 'fiat')
     .map((coin) => coin.currencyName);
 
   /* `P(item, needle)` in utils-CG1cE_om.js — the layer's own search, matching the ticker and the

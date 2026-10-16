@@ -36,9 +36,28 @@ export type ExchangeDashboard = {
   recent: ExchangeTransfer[]
 }
 
+/** `GET admin/exchange/owner/direct-ledger` — owner ke Direct User wallet ki ek entry. */
+export type DirectLedgerRow = {
+  id: string
+  type: 'add' | 'user_deposit' | 'user_withdraw' | 'points_settle' | string
+  direction: 'credit' | 'debit'
+  amount: string
+  balanceBefore: string
+  balanceAfter: string
+  user: { id: string; name: string | null } | null
+  note: string | null
+
+  /** Direct User Wallet: user ko kis currency me kitna (amount upar INR me). Baaki entries me null. */
+  currency: string | null
+  currencyAmount: string | null
+  rate: string | null
+  createdAt: string
+}
+
 /** `GET admin/exchange/owner/wallet` */
 export type OwnerWallet = {
-  /** Client Management balance (`credits`) — staff, agents aur unke players ke liye */
+
+  /** Agent System balance (`credits`) — staff, agents aur unke players ke liye */
   wallet: ExchangeWallet
 
   /** Direct Users balance (`staff_balances`) — sirf direct users ke liye */

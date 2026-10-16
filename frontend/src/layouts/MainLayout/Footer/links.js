@@ -68,10 +68,15 @@ export const COLUMNS = [
       ...(LIVE_SUPPORT_AVAILABLE ? [{ label: 'Live Support', button: true }] : []),
     ],
   },
-  /* The "About Us" column is not drawn. Its rows were News and Help Desk (BC.GAME's blog and
-     help sites), Business Contacts and Verify This Site (dead buttons) and Verify Representative
-     (no page), and Parker567 publishes no business contact yet. Bring the column back with a
-     real contact row once there is one. */
+  /* "About Us" carries only News now: on the original that is BC.GAME's external blog, and here
+     it is the site's own `/blog` (a deliberate departure, the user's request) — so the column
+     comes and goes with the owner's `blog` feature through the route gate. Its other rows stay
+     out: Help Desk (BC.GAME's help site), Business Contacts and Verify This Site (dead buttons)
+     and Verify Representative (no page). */
+  {
+    title: 'About Us',
+    links: [{ label: 'News', href: '/blog' }],
+  },
 ];
 
 /* The two prose blocks that open the footer, on the home page only — see `BLURB_SHOWN_ON` in

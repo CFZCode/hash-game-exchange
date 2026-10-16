@@ -54,8 +54,17 @@ const Login = () => {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setBusy(true)
     setError(null)
+
+    if (!identifier.trim() || !password) return setError(`Enter your ${mode === 'staff' ? 'email' : 'username'} and password.`)
+    if (needsCode && code && !/^\d{6}$/.test(code.trim())) return setError('The two-factor code is the 6 digits from your authenticator app.')
+
+    if (mustChange) {
+      if (newPassword.length < 12) return setError('The new password must be at least 12 characters.')
+      if (newPassword === password) return setError('Choose a new password different from the current one.')
+    }
+
+    setBusy(true)
 
     try {
       if (mustChange) {
@@ -144,7 +153,7 @@ const Login = () => {
           <div>
             <CardTitle className='mb-2 text-2xl font-semibold'>Sign in to {siteConfig.name}</CardTitle>
             <CardDescription className='text-base'>
-              Staff sign-in for <span className='font-mono'>{siteConfig.key}</span> · {siteConfig.environment}
+              Staff sign-in
             </CardDescription>
           </div>
         </CardHeader>

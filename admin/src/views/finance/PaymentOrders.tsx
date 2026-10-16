@@ -6,6 +6,8 @@ import Link from 'next/link'
 
 import { SearchIcon, WrenchIcon } from 'lucide-react'
 
+import { toast } from 'sonner'
+
 import Can from '@/components/shared/Can'
 import DataTable, { type Column } from '@/components/shared/DataTable'
 import DateTime from '@/components/shared/DateTime'
@@ -26,6 +28,7 @@ import { useSession } from '@/contexts/SessionContext'
 import { useApi, useApiMutation, useListState, usePagedApi } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
 import { truncateId } from '@/lib/format'
+import { check } from '@/lib/validate'
 import { PSP_PROVIDERS, type PaymentOrderRow, type RailTransactionRow } from './types'
 import { CurrencySelect, useCurrencyChoices, useCurrencyParam } from './currencyFilter'
 
@@ -34,7 +37,7 @@ const UtrRepair = ({ reference: initial = '' }: { reference?: string }) => {
   const [form, setForm] = useState({ reference: initial, utr: '' })
 
   const repair = useApiMutation({
-    fn: () => api.post('admin/user/payments/utr-repair', { reference: form.reference, utr: form.utr }),
+    fn: () => api.post('admin/user/payments/utr-repair', { reference: form.reference.trim(), utr: form.utr.trim() }),
     invalidate: [['paged']],
     success: 'UTR attached to the order',
     onSuccess: () => setForm(f => ({ ...f, utr: '' }))
@@ -50,10 +53,15 @@ const UtrRepair = ({ reference: initial = '' }: { reference?: string }) => {
       title='Attach a bank UTR to an order'
       description='Use when a user paid but the gateway callback never carried the bank reference. Audited: a UTR is the evidence a payment happened.'
       submitLabel='Attach UTR'
+      validate={() => ({
+        // paymentOrders.validators.js repairUtr: reference 1–255; utr 6–40 alphanumerics.
+        reference: check.required(form.reference, 'Order reference') ?? check.length(form.reference, 'Order reference', { max: 255 }),
+        utr: check.required(form.utr, 'Bank UTR') ?? (/^[A-Za-z0-9]{6,40}$/.test(form.utr.trim()) ? undefined : 'Bank UTR must be 6–40 letters and digits')
+      })}
       onSubmit={() => repair.mutateAsync()}
     >
-      <TextField id='utr-ref' label='Order reference' required value={form.reference} onChange={e => setForm({ ...form, reference: e.target.value })} />
-      <TextField id='utr-utr' label='Bank UTR' required minLength={6} maxLength={40} hint='6–40 letters and digits' value={form.utr} onChange={e => setForm({ ...form, utr: e.target.value })} />
+      <TextField id='utr-ref' name='reference' label='Order reference' required value={form.reference} onChange={e => setForm({ ...form, reference: e.target.value })} />
+      <TextField id='utr-utr' name='utr' label='Bank UTR' required minLength={6} maxLength={40} hint='6–40 letters and digits' value={form.utr} onChange={e => setForm({ ...form, utr: e.target.value })} />
     </FormDialog>
   )
 }
@@ -193,7 +201,14 @@ const PspProbe = () => {
           className='flex flex-wrap items-end gap-2'
           onSubmit={e => {
             e.preventDefault()
-            if (form.reference.trim()) setProbe({ provider: form.provider, reference: form.reference.trim() })
+
+            if (!form.reference.trim()) {
+              toast.error('Enter the order reference to probe')
+
+              return
+            }
+
+            setProbe({ provider: form.provider, reference: form.reference.trim() })
           }}
         >
           <Select value={form.provider} onValueChange={v => v && setForm({ ...form, provider: v })}>

@@ -14,11 +14,11 @@ import googleImg from '../../../assets/google.png';
 import {
   ArrowIcon,
   CloseIcon,
-  DeviceIcon,
+  MailIcon,
   EyeIcon,
   GoogleIcon,
   LineIcon,
-  LockIcon,
+  UserIcon,
   MetaMaskIcon,
   PasskeyIcon,
   SteamIcon,
@@ -31,6 +31,7 @@ import './Auth.css';
    imports them: the motion belongs to the router's shell, and this dialog is one more of its
    arms. */
 import '../../shared/DialogShell/DialogShell.css';
+import { PASSKEY_ENABLED, SOCIAL_LOGINS } from '../../../config/hiddenFeatures';
 
 /* The sign-in / sign-up dialog.
  *
@@ -182,13 +183,18 @@ const THIRD_PARTY = [
   { label: 'Steam', Icon: SteamIcon },
 ];
 
-const ThirdPartyButton = ({ label, Icon }) => (
+/* Only the social logins this site offers (config/hiddenFeatures.js SOCIAL_LOGINS). */
+const SHOWN_THIRD_PARTY = THIRD_PARTY.filter((item) => SOCIAL_LOGINS.includes(item.label));
+
+/* `labelled`: a lone button spans the row, so it carries its name beside the icon. */
+const ThirdPartyButton = ({ label, Icon, labelled = false }) => (
   <button
     type="button"
     aria-label={label}
     className="button button-m h-11 flex-1 rounded-lg border border-solid border-third p-0 shadow-[0px_2px_4px_rgba(0,0,0,0.10)]"
   >
     <Icon className="size-5 fill-secondary" />
+    {labelled && <span className="ml-2 text-base font-extrabold text-primary">{label}</span>}
   </button>
 );
 
@@ -217,20 +223,24 @@ function DirectRow({ heading, children }) {
 }
 
 function SignInForm({ onSubmit, pending, error, onForgot }) {
-  /* Password vs One-time Code. The default `tabs-title` variant — no `data-type` — so the
-     selected tab is a raised pill on a tab_nopadding track, the same strip the bet table uses. */
+  /* Username vs Email — THIS BUILD'S TABS (user's request, 2026-10-16), in place of bc.game's
+     Password / One-time Code: the platform has no one-time code, and its login takes either an
+     email or a username in the same `identifier` field. Both tabs are the Password capture's form;
+     only the field's label, input type and autofill hint change. The default `tabs-title` variant —
+     no `data-type` — so the selected tab is a raised pill on a tab_nopadding track. */
   const [method, setMethod] = React.useState(0);
   const [account, setAccount] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [revealed, setRevealed] = React.useState(false);
 
-  const otp = method === 1;
+  /* Username first (user's request), Email second. */
+  const byUsername = method === 0;
   /* The captured submit carries `disabled`, on a dialog that had just opened with both fields
      empty — so the button is gated on the form, not permanently dead. `pending` joins it once a
      submit is in flight, which is this build's rather than the capture's: the original has a
      backend and a request that takes time, and a second click on a login form is a second login
      attempt against a rate limiter that counts them. */
-  const ready = (otp ? account.length > 0 : account.length > 0 && password.length > 0) && !pending;
+  const ready = account.trim().length > 0 && password.length > 0 && !pending;
 
   return (
     <>
@@ -241,8 +251,8 @@ function SignInForm({ onSubmit, pending, error, onForgot }) {
       >
         <div className="tabs-btn-group">
           {[
-            { label: 'Password', Icon: LockIcon },
-            { label: 'One-time Code', Icon: DeviceIcon },
+            { label: 'Username', Icon: UserIcon },
+            { label: 'Email', Icon: MailIcon },
           ].map((item, index) => (
             <button
               key={item.label}
@@ -263,55 +273,27 @@ function SignInForm({ onSubmit, pending, error, onForgot }) {
       </div>
 
       <div className="tabs-content bg-transparent">
-        {/* Two captures, two structures — kept separate rather than branched inside one form,
-            because they differ in more than their fields. The One-time Code tab moves the 1rem
-            gap from a wrapper div onto the label, drops the label's weight, KEEPS the input's
-            own `mt-4` (the Password tab cancels it with `!mt-0`, which is why its label sits
-            tight to its box and this one does not), centres its helper line, and its submit
-            carries no `rounded-xl` — so it falls back to `button-l`'s radius. */}
-        {otp ? (
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              /* NO `password`, so this arm never reaches the platform — `POST /user/email/otp`
-                 and its `/verify` sibling exist, but they are a two-step flow and this dialog
-                 has no screen to enter the code on. It stays a fixture sign-in and says so
-                 rather than sending a login the server would refuse. */
-              if (ready) onSubmit({ identifier: account });
-            }}
-          >
-            <Label className="mb-1 mt-4">Email / Phone Number</Label>
-            <div className="relative">
-              <Field autoFocus autoComplete="off" className="mt-4" value={account} onChange={setAccount} />
-            </div>
-
-            <div className="flex w-full justify-center">
-              <p className="mt-4 font-semibold text-secondary">
-                <span>We&apos;ll send a code to your device</span>
-              </p>
-            </div>
-
-            <button
-              type="submit"
-              disabled={!ready}
-              className="button button-brand button-l mt-6 h-14 w-full shadow-[0px_2px_4px_rgba(0,0,0,0.10)]"
-            >
-              <span className="text-base">Send One-time Code</span>
-            </button>
-          </form>
-        ) : (
+        {/* One form for both tabs — the Password capture's structure. bc.game's One-time Code
+            arm is gone with the tab. */}
           <form
             onSubmit={(event) => {
               event.preventDefault();
               /* `identifier` is the platform's own field name and it takes a username, an email
                  or a phone — which is exactly what this label offers. */
-              if (ready) onSubmit({ identifier: account, password });
+              if (ready) onSubmit({ identifier: account.trim(), password });
             }}
           >
             <div className="mt-4">
-              <Label>Email / Phone Number</Label>
+              <Label>{byUsername ? 'Username' : 'Email'}</Label>
               <div className="relative">
-                <Field autoFocus autoComplete="off" value={account} onChange={setAccount} />
+                <Field
+                  key={byUsername ? 'username' : 'email'}
+                  autoFocus
+                  type={byUsername ? 'text' : 'email'}
+                  autoComplete={byUsername ? 'username' : 'email'}
+                  value={account}
+                  onChange={setAccount}
+                />
               </div>
             </div>
 
@@ -395,22 +377,24 @@ function SignInForm({ onSubmit, pending, error, onForgot }) {
               )}
             </button>
           </form>
-        )}
       </div>
 
       <DirectRow heading="Log in directly with">
         {/* Cwallet (BC.GAME's partner wallet) sign-in is not drawn — no Parker567 integration. */}
-        <button
-          type="button"
-          className="button button-m mt-4 h-12 w-full border border-third bg-black_alpha5 shadow-[0px_2px_4px_rgba(0,0,0,0.10)]"
-        >
-          <PasskeyIcon className="size-5 fill-secondary" />
-          <span className="ml-2 text-base font-extrabold text-primary">Sign In with Passkey</span>
-        </button>
+        {/* Hidden: no WebAuthn on the platform (config/hiddenFeatures.js). */}
+        {PASSKEY_ENABLED && (
+          <button
+            type="button"
+            className="button button-m mt-4 h-12 w-full border border-third bg-black_alpha5 shadow-[0px_2px_4px_rgba(0,0,0,0.10)]"
+          >
+            <PasskeyIcon className="size-5 fill-secondary" />
+            <span className="ml-2 text-base font-extrabold text-primary">Sign In with Passkey</span>
+          </button>
+        )}
 
         <div className="third-group-wrap mt-6 flex h-11 w-full items-center gap-2">
-          {THIRD_PARTY.map((item) => (
-            <ThirdPartyButton key={item.label} {...item} />
+          {SHOWN_THIRD_PARTY.map((item) => (
+            <ThirdPartyButton key={item.label} {...item} labelled={SHOWN_THIRD_PARTY.length === 1} />
           ))}
         </div>
       </DirectRow>
@@ -419,7 +403,13 @@ function SignInForm({ onSubmit, pending, error, onForgot }) {
 }
 
 /* Transcribed from the live dialog's rendered DOM, like the Sign In tab. */
+/* The platform's username rule (profile.validators.js): 3–30 of letters, digits, `_ . -`. */
+const USERNAME_RULE = /^[A-Za-z0-9_.-]{3,30}$/;
+
 function SignUpForm({ onSubmit, error, onClearError }) {
+  /* Username vs Email, as on the Sign In tab (user's request): Username first. */
+  const [method, setMethod] = React.useState(0);
+  const byUsername = method === 0;
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [revealed, setRevealed] = React.useState(false);
@@ -433,7 +423,8 @@ function SignUpForm({ onSubmit, error, onClearError }) {
   const [agreed, setAgreed] = React.useState(true);
   const [moreOpen, setMoreOpen] = React.useState(false);
 
-  const ready = email.length > 0 && password.length > 0 && agreed;
+  const usernameBad = byUsername && email.trim().length > 0 && !USERNAME_RULE.test(email.trim());
+  const ready = email.trim().length > 0 && !usernameBad && password.length > 0 && agreed;
 
   return (
     <>
@@ -454,18 +445,55 @@ function SignUpForm({ onSubmit, error, onClearError }) {
                arms take different fields and answer the same shape, so one flag beats a second
                handler. The referral is passed only when the visitor opened that panel and typed
                one; an empty string would be stored as a referrer who does not exist. */
-            if (ready) onSubmit({ signUp: true, email, password, referral: referral || undefined });
+            if (ready) {
+              onSubmit({
+                signUp: true,
+                ...(byUsername ? { username: email.trim() } : { email: email.trim() }),
+                password,
+                referral: referral || undefined,
+              });
+            }
           }
         }}
       >
-        <Label>Email</Label>
+        <div
+          role="tablist"
+          className="scroll-x tabs-title hide-scroll mb-4"
+          style={indicatorVars(method, 2)}
+        >
+          <div className="tabs-btn-group">
+            {[
+              { label: 'Username', Icon: UserIcon },
+              { label: 'Email', Icon: MailIcon },
+            ].map((item, index) => (
+              <button
+                key={item.label}
+                type="button"
+                role="tab"
+                className="tabs-btn btn-like"
+                aria-selected={method === index ? 'true' : undefined}
+                onClick={() => setMethod(index)}
+              >
+                <div className="flex items-center justify-center">
+                  <item.Icon className="size-4" />
+                  <p className="ml-1 font-extrabold">{item.label}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+          <div className="tabs-indicator" />
+        </div>
+
+        <Label>{byUsername ? 'Username' : 'Email'}</Label>
         {/* Two nested `relative` wrappers in the capture. Kept — that is presumably where a
             validation popover anchors, and dropping them is a change, not a tidy-up. */}
         <div className="relative">
           <div className="relative">
             <Field
+              key={byUsername ? 'username' : 'email'}
               autoFocus
-              type="email"
+              type={byUsername ? 'text' : 'email'}
+              autoComplete={byUsername ? 'username' : 'email'}
               value={email}
               onChange={setEmail}
               /* `J(t.errorMsg && "border-error", "!mt-0")` on the original's EmailPhoneInput: the
@@ -491,6 +519,10 @@ function SignUpForm({ onSubmit, error, onClearError }) {
             prints here, through the same `messageOf` the Sign In tab uses, and no toast doubles
             it. The three site-level refusals still move to Sign In (`SIGNUP_REFUSALS`). */}
         {error && !passwordError ? <p className="mt-1 text-xs text-error">{error}</p> : null}
+        {/* Our own hint, in the same slot and style: the platform refuses these anyway. */}
+        {!error && usernameBad ? (
+          <p className="mt-1 text-xs text-error">3–30 characters: letters, digits, _ . - only</p>
+        ) : null}
 
         <div className="mt-6">
           <Label>Password</Label>
@@ -638,6 +670,7 @@ function SignUpForm({ onSubmit, error, onClearError }) {
               <span className="ml-2 text-base font-extrabold text-primary">Google</span>
             </button>
 
+            {SHOWN_THIRD_PARTY.some((item) => item.label !== 'Google') && (
             <button
               type="button"
               aria-expanded={moreOpen}
@@ -651,6 +684,7 @@ function SignUpForm({ onSubmit, error, onClearError }) {
                 }`}
               />
             </button>
+            )}
           </div>
 
           {/* Always rendered, never unmounted — the row fades and slides rather than appearing,
@@ -664,7 +698,7 @@ function SignUpForm({ onSubmit, error, onClearError }) {
           >
             <div className="third-group-wrap mt-4 flex h-11 w-full items-center gap-2">
               {/* Six, not seven: Google has its own button above. */}
-              {THIRD_PARTY.filter((item) => item.label !== 'Google').map((item) => (
+              {SHOWN_THIRD_PARTY.filter((item) => item.label !== 'Google').map((item) => (
                 <ThirdPartyButton key={item.label} {...item} />
               ))}
             </div>

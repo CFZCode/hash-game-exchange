@@ -18,6 +18,7 @@ import { useSession } from '@/contexts/SessionContext'
 import { useApi, useApiMutation } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
 import { cn } from '@/lib/utils'
+import { check } from '@/lib/validate'
 
 import type { CoinNetwork, CurrencyRow } from './types'
 import { CURRENCIES_PATH } from './useCurrencyCodes'
@@ -55,15 +56,19 @@ const CoinImage = ({ row, size = 28 }: { row: CurrencyRow; size?: number }) => {
   return <img src={src} alt='' width={size} height={size} style={{ width: size, height: size }} className='rounded-full object-contain' />
 }
 
-const useUpdate = (code: string, success?: string) =>
+/** currencies.validators.js `text()`: printable, no angle brackets. */
+const displayText = (v: string, label: string, max: number) =>
+  check.required(v, label) ?? check.length(v, label, { max }) ?? (/[<>\u0000-\u001f\u007f]/.test(v) ? `${label} cannot contain < > or control characters` : undefined)
+
+const useUpdate = (code: string, success?: string | ((patch: Patch) => string)) =>
   useApiMutation<Patch>({
     fn: patch => api.put<CurrencyRow>(`${CURRENCIES_PATH}/${code}`, patch),
     invalidate: INVALIDATE,
-    success: success ?? `${code} saved`
+    success: (_r, patch) => (typeof success === 'function' ? success(patch) : success ?? `${code} saved`)
   })
 
 const EnabledSwitch = ({ row }: { row: CurrencyRow }) => {
-  const update = useUpdate(row.code)
+  const update = useUpdate(row.code, p => `${row.code} switched ${p.enabled ? 'on' : 'off'}`)
   const title = row.retired ? 'Retired: never offered again' : row.siteEnabled ? 'Switch off' : 'Switch on'
 
   return (
@@ -103,6 +108,11 @@ const EditCoin = ({ row }: { row: CurrencyRow }) => {
       }
       title={`Edit ${row.code}`}
       description='What players see in the wallet, the header balance and the cashier. The code, kind and decimals are fixed.'
+      validate={() => ({
+        name: displayText(form.name, 'Display name', 60),
+        symbol: displayText(form.symbol, 'Symbol', 12),
+        networks: form.networks.map(n => displayText(n.name, `Network ${n.key} name`, 40)).find(Boolean)
+      })}
       onSubmit={() =>
         update.mutateAsync({
           name: form.name.trim(),
@@ -112,8 +122,8 @@ const EditCoin = ({ row }: { row: CurrencyRow }) => {
       }
     >
       <div className='grid grid-cols-[1fr_8rem] gap-4'>
-        <TextField id={`c-name-${row.code}`} label='Display name' required maxLength={60} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
-        <TextField id={`c-sym-${row.code}`} label='Symbol' required maxLength={12} value={form.symbol} onChange={e => setForm({ ...form, symbol: e.target.value })} />
+        <TextField id={`c-name-${row.code}`} name='name' label='Display name' required maxLength={60} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
+        <TextField id={`c-sym-${row.code}`} name='symbol' label='Symbol' required maxLength={12} value={form.symbol} onChange={e => setForm({ ...form, symbol: e.target.value })} />
       </div>
       {form.networks.length > 0 && (
         <Field className='gap-2'>
@@ -185,11 +195,8 @@ const UploadImage = ({ row }: { row: CurrencyRow }) => {
       title={`${row.code} image`}
       description='PNG, SVG or WebP, at most 200 KB, square works best. An SVG with script, event handlers or external links is refused.'
       submitLabel='Upload'
-      onSubmit={() => {
-        if (!file || problem) throw new Error(problem ?? 'Choose a file')
-
-        return upload.mutateAsync()
-      }}
+      validate={() => (!file ? 'Choose an image file' : problem ? problem : !ACCEPT.split(',').includes(file.type) ? 'The image must be PNG, SVG or WebP' : undefined)}
+      onSubmit={() => upload.mutateAsync()}
     >
       <div className='flex items-center gap-6'>
         <div className='grid justify-items-center gap-1'>
@@ -231,7 +238,8 @@ const Reorder = ({ row, rows, index }: { row: CurrencyRow; rows: CurrencyRow[]; 
       await api.put(`${CURRENCIES_PATH}/${row.code}`, { sortOrder: b })
       await api.put(`${CURRENCIES_PATH}/${other.code}`, { sortOrder: a })
     },
-    invalidate: INVALIDATE
+    invalidate: INVALIDATE,
+    success: (_r, delta) => `${row.code} moved ${delta < 0 ? 'up' : 'down'}`
   })
 
   return (

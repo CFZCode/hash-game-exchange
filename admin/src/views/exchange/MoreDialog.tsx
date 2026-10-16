@@ -2,6 +2,8 @@
 
 import { useState, type ReactNode } from 'react'
 
+import { Loader2Icon } from 'lucide-react'
+
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -9,8 +11,8 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { useApiMutation } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
-import { CreditHistory } from './CreditActivityDialog'
-import { fmt, SETTLE_INVALIDATE } from './SettleDialog'
+import { CreditHistory } from './CreditDialog'
+import { fmt, SETTLE_INVALIDATE } from './accountMoney'
 import type { AccountRow } from './types'
 
 const info = (rows: [string, ReactNode][]) => (
@@ -75,7 +77,7 @@ const PasswordTab = ({ row, onDone }: { row: AccountRow; onDone: () => void }) =
         newPassword: form.password,
         transactionPassword: form.txn
       }),
-    success: 'Password change successful.',
+    success: `Password changed for ${row.username}`,
     onSuccess: onDone
   })
 
@@ -83,6 +85,10 @@ const PasswordTab = ({ row, onDone }: { row: AccountRow; onDone: () => void }) =
     e.preventDefault()
     setError('')
     if (!form.password) return setError('The Password field is required')
+
+    // Server (`lords.validators.js setPassword`): 12–200 characters.
+    if (form.password.length < 12) return setError('The Password must be at least 12 characters')
+    if (form.password.length > 200) return setError('The Password must be at most 200 characters')
     if (form.password !== form.confirm) return setError('The Confirm Password confirmation does not match')
     if (!form.txn) return setError('The Transaction Code field is required')
     void save.mutateAsync().catch(() => {})
@@ -105,6 +111,7 @@ const PasswordTab = ({ row, onDone }: { row: AccountRow; onDone: () => void }) =
       {error && <div className='text-destructive text-right text-sm'>{error}</div>}
       <div className='text-right'>
         <Button type='submit' disabled={save.isPending}>
+          {save.isPending && <Loader2Icon className='animate-spin' />}
           submit
         </Button>
       </div>
@@ -129,7 +136,7 @@ const LockTab = ({ row, onDone }: { row: AccountRow; onDone: () => void }) => {
         transactionPassword: txn
       }),
     invalidate: SETTLE_INVALIDATE,
-    success: 'Status updated successfully',
+    success: () => `${row.username}: bet ${betLock ? 'locked' : 'unlocked'}, user ${userLock ? 'locked' : 'unlocked'}`,
     onSuccess: onDone
   })
 
@@ -157,6 +164,7 @@ const LockTab = ({ row, onDone }: { row: AccountRow; onDone: () => void }) => {
       {error && <div className='text-destructive text-right text-sm'>{error}</div>}
       <div className='text-right'>
         <Button type='submit' disabled={save.isPending}>
+          {save.isPending && <Loader2Icon className='animate-spin' />}
           submit
         </Button>
       </div>

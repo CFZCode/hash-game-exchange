@@ -27,8 +27,8 @@ const PASSWORD_ROUNDS = 12;
  *               which is a transfer between the agent's float and the player
  *   direct    — owner ↔ DIRECT user (no parent). Paid from / back into the
  *               owner's Direct User balance (`staff_balances.inr`), never the
- *               owner's Client Management balance (`credits`)
- *   owner_topup — the owner adding to their Client Management balance (`credits`, from 'system')
+ *               owner's Agent System balance (`credits`)
+ *   owner_topup — the owner adding to their Agent System balance (`credits`, from 'system')
  *   owner_direct_topup — the owner adding to their Direct User balance (`staff_balances`, from 'system')
  *   points_settle — zip ka points settlement: parent ↔ direct child ka P/L cash me barabar
  *   gt/casino — historical settlement rows; P&L, never money handed over

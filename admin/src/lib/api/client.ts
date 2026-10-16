@@ -119,7 +119,7 @@ export async function request<T>(path: string, opts: RequestOptions = {}): Promi
       location.assign('/change-password')
     }
 
-    throw new ApiError(res.status, error.code ?? `HTTP_${res.status}`, error.message ?? 'Request failed', error.details)
+    throw new ApiError(res.status, typeof error.code === 'string' ? error.code : `HTTP_${res.status}`, typeof error.message === 'string' && error.message ? error.message : 'Request failed', error.details)
   }
 
   return { data: json.data, meta: json.meta }
@@ -179,7 +179,26 @@ export const api = {
   blob: async (path: string, query?: Query) => {
     const res = await fetch(`${API_V1}/${path.replace(/^\/+/, '')}${buildQuery(query)}`, { cache: 'no-store' })
 
-    if (!res.ok) throw new ApiError(res.status, 'DOWNLOAD_FAILED', `${res.status} ${res.statusText}`)
+    if (!res.ok) {
+      // The failure body is the usual JSON envelope — surface its message, not just "404 Not Found".
+      let code = 'DOWNLOAD_FAILED'
+      let message = `Download failed (${res.status} ${res.statusText})`
+
+      try {
+        const json = (await res.json()) as { error?: { code?: unknown; message?: unknown } | string; message?: unknown }
+        const err = json?.error
+
+        if (err && typeof err === 'object') {
+          if (typeof err.code === 'string') code = err.code
+          if (typeof err.message === 'string' && err.message) message = err.message
+        } else if (typeof err === 'string' && err) message = err
+        else if (typeof json?.message === 'string' && json.message) message = json.message
+      } catch {
+        // not JSON — keep the status line
+      }
+
+      throw new ApiError(res.status, code, message)
+    }
 
     return res.blob()
   },
@@ -203,16 +222,49 @@ export function errorMessage(error: unknown): string {
       return 'Features are managed by the platform. Contact support to change them.'
     }
 
-    const details = error.details?.issues ?? error.details?.errors
+    // 422 from the platform's `validate()` middleware: `details.fields = [{ field, message }]`
+    // (older routes: `issues`/`errors` with `path`). Show what was wrong, not just "Validation failed".
+    const details = error.details?.fields ?? error.details?.issues ?? error.details?.errors
 
     if (Array.isArray(details) && details.length) {
-      return details.map((d: { path?: string[] | string; message?: string }) => `${Array.isArray(d.path) ? d.path.join('.') : d.path ?? ''}: ${d.message ?? ''}`).join('; ')
+      const parts = (details as { field?: unknown; path?: unknown; message?: unknown }[])
+        .map(d => {
+          const raw = typeof d.field === 'string' ? d.field : Array.isArray(d.path) ? d.path.join('.') : typeof d.path === 'string' ? d.path : ''
+          const field = raw.replace(/^(body|query|params)\./, '')
+          const message = typeof d.message === 'string' ? d.message : ''
+
+          if (!message) return field
+          if (!field || message.toLowerCase().includes(field.toLowerCase())) return message
+
+          return `${field}: ${message}`
+        })
+        .filter(Boolean)
+
+      if (parts.length) return Array.from(new Set(parts)).slice(0, 4).join('; ')
     }
 
-    return error.message
+    if (error.status === 403 && (!error.message || error.message === 'Request failed')) return 'You do not have permission to do this.'
+    if (error.status === 429) return error.message && error.message !== 'Request failed' ? error.message : 'Too many requests — wait a moment and try again.'
+    if (error.status >= 500 && (!error.message || error.message === 'Request failed')) return 'Server error — please try again.'
+
+    return readable(error.message, 'Request failed')
   }
 
-  if (error instanceof Error) return error.message
+  if (error instanceof TypeError && /fetch|network/i.test(error.message)) return 'Network error — check your connection and try again.'
+  if (error instanceof Error) return readable(error.message, 'Something went wrong')
 
-  return String(error)
+  return readable(error, 'Something went wrong')
+}
+
+/** Never show `[object Object]` or an empty toast. */
+function readable(value: unknown, fallback: string): string {
+  if (typeof value === 'string') return value.trim() && value !== '[object Object]' ? value : fallback
+
+  if (value && typeof value === 'object') {
+    const m = (value as { message?: unknown }).message
+
+    if (typeof m === 'string' && m.trim()) return m
+  }
+
+  return fallback
 }

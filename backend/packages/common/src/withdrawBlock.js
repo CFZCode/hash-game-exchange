@@ -34,7 +34,27 @@ const errors = defineErrors('WITHDRAW', {
     status: 403,
     message: 'Withdrawals are blocked on this account. Contact support.',
   },
+  /** Code `WITHDRAW_DISABLED` — the global switch (Admin → Users → Financial) is OFF. */
+  DISABLED: {
+    status: 403,
+    message: 'Withdrawals are switched off right now. Please try again later.',
+  },
 });
+
+/**
+ * Global withdrawals ON / OFF (`withdrawal_control`, migration 108). No table yet (an older
+ * database) reads as ON — nothing changes until an operator switches it off.
+ */
+async function withdrawalsEnabled(sequelize, transaction) {
+  if (!sequelize?.query) return true;
+  try {
+    const [rows] = await sequelize.query('SELECT withdrawals_enabled FROM withdrawal_control WHERE id = 1', { transaction });
+    return rows[0] ? rows[0].withdrawals_enabled !== false : true;
+  } catch (error) {
+    if (error?.original?.code === '42P01' || error?.parent?.code === '42P01') return true;
+    throw error;
+  }
+}
 
 /**
  * Refuse when the account may not move money out.
@@ -43,7 +63,8 @@ const errors = defineErrors('WITHDRAW', {
  * @param {object} target   `{ userId }` or `{ staffId }`
  * @param {object} [options]
  * @param {import('sequelize').Transaction} [options.transaction]
- * @throws {AppError} WITHDRAW_BLOCKED (403), `details.reason` 'withdraw' | 'system'
+ * @throws {AppError} WITHDRAW_BLOCKED (403), `details.reason` 'withdraw' | 'system';
+ *         WITHDRAW_DISABLED (403) for a player while the global switch is OFF
  *
  * An account that does not exist is not refused here; the caller's own lookup
  * answers that with its own error.
@@ -53,6 +74,9 @@ async function assertWithdrawAllowed(models, { userId, staffId } = {}, { transac
   const model = isStaff ? models.Staff : models.Users;
   const id = isStaff ? staffId : userId;
   if (!model || id == null) throw new Error('assertWithdrawAllowed needs a userId or a staffId');
+
+  // Global switch: OFF = no player withdraws by any rail. (Staff / agent cash-outs are not players.)
+  if (!isStaff && !(await withdrawalsEnabled(model.sequelize, transaction))) throw errors.DISABLED({ reason: 'global' });
 
   const row = await model.findByPk(id, {
     attributes: ['id', 'withdraw_locked', 'system_locked'],
@@ -65,4 +89,4 @@ async function assertWithdrawAllowed(models, { userId, staffId } = {}, { transac
   if (row.system_locked) throw errors.BLOCKED({ reason: 'system' });
 }
 
-module.exports = { assertWithdrawAllowed, errors, WITHDRAW_BLOCKED: 'WITHDRAW_BLOCKED' };
+module.exports = { assertWithdrawAllowed, withdrawalsEnabled, errors, WITHDRAW_BLOCKED: 'WITHDRAW_BLOCKED', WITHDRAW_DISABLED: 'WITHDRAW_DISABLED' };

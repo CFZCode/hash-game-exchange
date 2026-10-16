@@ -20,6 +20,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useSession } from '@/contexts/SessionContext'
 import { useApiMutation, useListState, usePagedApi } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
+import { check } from '@/lib/validate'
 import { NOTIFICATION_TYPES, type Device, type NotificationRow } from './types'
 
 const TYPE_OPTIONS = NOTIFICATION_TYPES.map(t => ({ value: t, label: t[0].toUpperCase() + t.slice(1) }))
@@ -42,7 +43,8 @@ const Compose = () => {
     onSuccess: () => setForm({ ...form, title: '', body: '' })
   })
 
-  const ready = form.title.trim().length > 0 && (mode === 'broadcast' || /^\d+$/.test(form.userId))
+  const userIdError = mode === 'user' && form.userId ? check.id(form.userId, 'User id') : undefined
+  const ready = form.title.trim().length > 0 && form.title.length <= 200 && form.body.length <= 1000 && (mode === 'broadcast' || (!!form.userId && !userIdError))
 
   return (
     <Card className='max-w-2xl shadow-none'>
@@ -60,7 +62,7 @@ const Compose = () => {
           </TabsList>
         </Tabs>
         {mode === 'user' && (
-          <TextField id='n-uid' label='User id' required inputMode='numeric' value={form.userId} onChange={e => setForm({ ...form, userId: e.target.value.replace(/\D/g, '') })} />
+          <TextField id='n-uid' label='User id' required inputMode='numeric' error={userIdError} value={form.userId} onChange={e => setForm({ ...form, userId: e.target.value.replace(/\D/g, '') })} />
         )}
         <TextField id='n-title' label='Title' required maxLength={200} value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
         <TextAreaField id='n-body' label='Body' rows={3} maxLength={1000} value={form.body} onChange={e => setForm({ ...form, body: e.target.value })} />
@@ -79,6 +81,7 @@ const Compose = () => {
             onConfirm={() => send.mutateAsync()}
           />
         </Can>
+        {!ready && <p className='text-muted-foreground -mt-2 text-xs'>{mode === 'user' && !form.userId ? 'Enter a user id and a title to send.' : 'A title is required to send.'}</p>}
       </CardContent>
     </Card>
   )

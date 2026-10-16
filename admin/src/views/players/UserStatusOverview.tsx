@@ -78,7 +78,6 @@ type UserStatusStats = {
 /** Status meaning → status tokens; anything the table holds that is not listed takes a categorical slot. */
 const STATUS_COLORS: Record<string, ChartColor> = { active: 'success', restricted: 'warning', locked: 'danger', closed: 'muted-foreground' }
 const KYC_COLORS: Record<string, ChartColor> = { none: 'muted-foreground', pending: 'warning', verified: 'success', rejected: 'danger' }
-const CHANNEL_COLORS: Record<string, ChartColor> = { direct: 'chart-1', agent: 'chart-2' }
 
 const colorsFor = (slices: Slice[], known: Record<string, ChartColor>): ChartColor[] => {
   let next = 3
@@ -90,22 +89,21 @@ const pct = (v: number | null | undefined) => (v === null || v === undefined ? '
 
 type Props = {
 
-  /** The users table's channel filter ('all' | 'direct' | 'agent'). */
-  channel: string
-  onChannelChange: (channel: string) => void
-
   /** Agent-tree logins see no VIP figures (the backend sends `null` for them too). */
   showVip: boolean
+
+  /** Kaunse users: 'direct' (parent nahi) ya 'agent' (parent hai). */
+  channel?: 'direct' | 'agent'
 }
 
-/** Account-status charts above the users table, driven by the FilterBar and the table's channel filter. */
-const UserStatusOverview = ({ channel, onChannelChange, showVip }: Props) => {
+/** Account-status charts for the Users page, driven by the FilterBar — ek channel (direct / agent) ke users. */
+const UserStatusOverview = ({ showVip, channel = 'direct' }: Props) => {
   const f = useStatsFilters({ defaultPreset: '30d' })
-  const query = { ...f.apiRange, granularity: f.granularity, channel: channel || 'all' }
+  const query = { ...f.apiRange, granularity: f.granularity, channel }
   const q = useApi<UserStatusStats>(PATH, query, { placeholderData: prev => prev, retry: false })
 
   // Deltas only need the totals: the window right before, in one bucket per month.
-  const prev = useApi<UserStatusStats>(PATH, { ...f.previous.apiRange, granularity: 'month', channel: channel || 'all' }, { retry: false })
+  const prev = useApi<UserStatusStats>(PATH, { ...f.previous.apiRange, granularity: 'month', channel }, { retry: false })
 
   const s = q.data
   const k = s?.kpis
@@ -195,17 +193,6 @@ const UserStatusOverview = ({ channel, onChannelChange, showVip }: Props) => {
       <div className='grid gap-4 lg:grid-cols-2 xl:grid-cols-3'>
         <SliceDonut title='Account status' description='Every account now, by its strongest restriction.' slices={b?.status} colors={STATUS_COLORS} loading={loading} error={q.error} />
         <SliceDonut title='KYC status' description='Identity verification, now.' slices={b?.kyc} colors={KYC_COLORS} loading={loading} error={q.error} />
-        <SliceDonut
-          title='Channel'
-          description='Click a channel to filter the users table.'
-          slices={b?.channel}
-          colors={CHANNEL_COLORS}
-          loading={loading}
-          error={q.error}
-          selected={channel && channel !== 'all' ? channel : undefined}
-          onSelect={key => onChannelChange(key === channel ? 'all' : key)}
-        />
-
         {showVip && b?.vip !== null && (
           <SliceBar title='VIP tiers' description='Accounts per tier, by lifetime wager.' slices={b?.vip ?? []} name='Users' color='chart-5' loading={loading} error={q.error} />
         )}

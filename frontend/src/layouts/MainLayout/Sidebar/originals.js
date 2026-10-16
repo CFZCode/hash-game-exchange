@@ -1,3 +1,5 @@
+import { isShownOriginal } from '../../../services/originals';
+
 /* The BC Originals flyout's list — what the sidebar's Casino > BC Originals row opens on hover.
  *
  * TRANSCRIBED FROM THE RENDERED DOM, in its order. On the live site this is a feed, not a
@@ -89,6 +91,7 @@ export const ORIGINALS = [
 
 /* Keyed so a second flyout (Sports' two Provider rows also carry the chevron) can be added
    beside this one without the component learning about either list. */
-export const FLYOUTS = { originals: ORIGINALS };
+/* Only the originals this site offers (services/originals.js, SHOWN_ORIGINALS). */
+export const FLYOUTS = { originals: ORIGINALS.filter((game) => isShownOriginal(game.href.replace('/game/', ''))) };
 
 export default FLYOUTS;

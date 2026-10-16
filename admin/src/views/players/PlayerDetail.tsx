@@ -27,6 +27,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useSession } from '@/contexts/SessionContext'
 import { useApi, useApiMutation, useListState, usePagedApi } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
+import { check } from '@/lib/validate'
 import { formatAmount, formatNumber } from '@/lib/format'
 import { AdjustWalletDialog } from '@/views/finance/shared'
 import { PlayerBonusesTab } from '@/views/promotions/BonusBalances'
@@ -49,18 +50,20 @@ type Prefs = { email_notifications: boolean; push_notifications: boolean; theme:
 const EditPlayer = ({ player }: { player: Report }) => {
   const [form, setForm] = useState({ username: player.name, email: player.email ?? '', phone: player.phone ?? '', country: player.country ?? '', password: '' })
 
+  const changes = () => {
+    const body: Record<string, string> = {}
+
+    if (form.username !== player.name) body.username = form.username
+    if (form.email && form.email !== player.email) body.email = form.email
+    if (form.phone && form.phone !== player.phone) body.phone = form.phone
+    if (form.country && form.country !== player.country) body.country = form.country
+    if (form.password) body.password = form.password
+
+    return body
+  }
+
   const update = useApiMutation({
-    fn: () => {
-      const body: Record<string, string> = {}
-
-      if (form.username !== player.name) body.username = form.username
-      if (form.email && form.email !== player.email) body.email = form.email
-      if (form.phone && form.phone !== player.phone) body.phone = form.phone
-      if (form.country && form.country !== player.country) body.country = form.country
-      if (form.password) body.password = form.password
-
-      return api.patch(`admin/players/${player.id}`, body)
-    },
+    fn: () => api.patch(`admin/players/${player.id}`, changes()),
     invalidate: [['api', `admin/reports/players/${player.id}`]],
     success: 'User updated'
   })
@@ -73,15 +76,28 @@ const EditPlayer = ({ player }: { player: Report }) => {
         </Button>
       }
       title='Edit user'
+      validate={() => {
+        const errors = {
+          username: check.required(form.username, 'Username') || check.length(form.username, 'Username', { min: 3, max: 60 }),
+          email: check.email(form.email, 'Email', true) || check.length(form.email, 'Email', { max: 160 }),
+          phone: check.length(form.phone, 'Phone', { max: 30 }),
+          country: check.length(form.country, 'Country', { max: 80 }),
+          password: form.password && check.length(form.password, 'New password', { min: 8, max: 200 })
+        }
+
+        if (Object.values(errors).some(Boolean)) return errors
+
+        return Object.keys(changes()).length ? null : 'Nothing changed — edit a field first'
+      }}
       onSubmit={() => update.mutateAsync()}
     >
-      <TextField id='e-user' label='Username' minLength={3} value={form.username} onChange={e => setForm({ ...form, username: e.target.value })} />
-      <TextField id='e-email' label='Email' type='email' value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
+      <TextField id='e-user' name='username' label='Username' minLength={3} maxLength={60} value={form.username} onChange={e => setForm({ ...form, username: e.target.value })} />
+      <TextField id='e-email' name='email' label='Email' type='email' value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
       <div className='grid grid-cols-2 gap-4'>
-        <TextField id='e-phone' label='Phone' value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
-        <TextField id='e-country' label='Country' value={form.country} onChange={e => setForm({ ...form, country: e.target.value })} />
+        <TextField id='e-phone' name='phone' label='Phone' maxLength={30} value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
+        <TextField id='e-country' name='country' label='Country' maxLength={80} value={form.country} onChange={e => setForm({ ...form, country: e.target.value })} />
       </div>
-      <TextField id='e-pw' label='New password' type='password' hint='Leave blank to keep' value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} />
+      <TextField id='e-pw' name='password' label='New password' type='password' hint='Leave blank to keep' value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} />
     </FormDialog>
   )
 }
@@ -110,6 +126,11 @@ const Locks = ({ userId, current, invalidate }: { userId: string; current?: Acco
       title='User locks'
       description='Turning a lock on blocks that product for this user immediately; turning it off lifts it. The switches show the current state.'
       submitLabel='Apply locks'
+      validate={() => {
+        const was = fromCurrent()
+
+        return was.system === locks.system && was.casino === locks.casino && was.sports === locks.sports ? 'Nothing changed — flip a lock first' : null
+      }}
       onSubmit={() => apply.mutateAsync()}
       onOpenChange={o => o && setLocks(fromCurrent())}
     >
@@ -403,7 +424,10 @@ const ReportDetail = ({ id }: { id: string }) => {
     fn: (reason: string) => api.delete(`admin/players/${id}`, { reason }),
     invalidate: [['paged', 'admin/reports/players']],
     success: 'Account closed',
-    onSuccess: () => router.push('/users')
+    onSuccess: () => {
+      setReason('')
+      router.push('/users')
+    }
   })
 
   const [reason, setReason] = useState('')
@@ -477,9 +501,10 @@ const ReportDetail = ({ id }: { id: string }) => {
                   description='The user will no longer be able to sign in. Funds stay on the ledger.'
                   confirmLabel='Close account'
                   destructive
-                  onConfirm={() => close.mutateAsync(reason)}
+                  confirmDisabled={reason.trim().length < 3}
+                  onConfirm={() => close.mutateAsync(reason.trim())}
                 >
-                  <TextAreaField id='close-reason' label='Reason' required minLength={3} value={reason} onChange={e => setReason(e.target.value)} />
+                  <TextAreaField id='close-reason' label='Reason' required minLength={3} maxLength={300} hint='3–300 characters, kept in the audit log' error={reason.length > 0 && reason.trim().length < 3 && 'Reason must be at least 3 characters'} value={reason} onChange={e => setReason(e.target.value)} />
                 </ConfirmDialog>
               </Can>
             </>

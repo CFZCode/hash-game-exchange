@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { useApiMutation } from '@/hooks/use-api'
 import { api, request } from '@/lib/api/client'
 import type { Paged, Query } from '@/lib/api/types'
+import { check } from '@/lib/validate'
 import { StaffFloatNote, useIsAgentTree, TxnPasswordLabel } from './StaffFloat'
 import { useCurrencyCodes, useOwnerCoinFilter } from './useCurrencyCodes'
 
@@ -74,9 +75,16 @@ export const ViewDialog = ({ trigger, title, description, children, wide }: { tr
 /** An image served by a gateway route (the proxy adds the staff token). Loaded only once the dialog opens. */
 export const ImageDialog = ({ path, title, label = 'View' }: { path: string; title: string; label?: string }) => {
   const [open, setOpen] = useState(false)
+  const [failed, setFailed] = useState(false)
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={next => {
+        if (next) setFailed(false)
+        setOpen(next)
+      }}
+    >
       <DialogTrigger nativeButton={false} render={<span />}>
         <Button variant='outline' size='sm'>
           <ImageIcon /> {label}
@@ -86,10 +94,10 @@ export const ImageDialog = ({ path, title, label = 'View' }: { path: string; tit
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
-        {open && (
-           
-          <img src={api.url(path)} alt={title} className='max-h-[70vh] w-full rounded-md object-contain' />
+        {open && !failed && (
+          <img src={api.url(path)} alt={title} className='max-h-[70vh] w-full rounded-md object-contain' onError={() => setFailed(true)} />
         )}
+        {failed && <p className='text-destructive text-sm'>Could not load the image — it may not exist or you may not have access.</p>}
         <a href={api.url(path)} target='_blank' rel='noreferrer' className='text-muted-foreground text-xs underline'>
           Open in a new tab
         </a>
@@ -172,6 +180,12 @@ export const AdjustWalletDialog = ({ userId, userName, currencies, invalidate = 
           : `Writes a ledger entry against user #${userId}. INR comes out of (and goes back to) your own wallet, except for a direct user (signed up on their own), who is not charged to you. A reason is required and audited.`
       }
       submitLabel='Apply'
+      validate={() => ({
+        // wallet.validators.js adminAdjust: amount > 0, ≤ 8 decimals; reason 1–500 chars.
+        amount: check.amount(form.amount, 'Amount', { decimals: 8 }),
+        description: check.required(form.description, 'Reason') ?? check.length(form.description, 'Reason', { max: 500 }),
+        transactionPassword: agentTree && !form.transactionPassword ? 'Transaction password is required' : undefined
+      })}
       onSubmit={() => adjust.mutateAsync()}
     >
       {agentTree && <StaffFloatNote />}
@@ -179,9 +193,9 @@ export const AdjustWalletDialog = ({ userId, userName, currencies, invalidate = 
         <SelectField id='aw-op' label='Operation' value={form.operation} onChange={operation => setForm({ ...form, operation })} options={[{ value: 'credit', label: 'Credit (add)' }, { value: 'debit', label: 'Debit (remove)' }]} />
         <SelectField id='aw-cur' label='Currency' value={agentTree ? 'INR' : form.currency} onChange={currency => setForm({ ...form, currency })} options={list.map(c => ({ value: c, label: c }))} />
       </div>
-      <TextField id='aw-amt' label='Amount' required placeholder='100.00' value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} />
-      <TextAreaField id='aw-desc' label='Reason' required value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
-      <TextField id='aw-tp' label={<TxnPasswordLabel />} type='password' required={agentTree} hint={agentTree ? 'Required for every balance move' : 'Required (if your account uses one)'} value={form.transactionPassword} onChange={e => setForm({ ...form, transactionPassword: e.target.value })} />
+      <TextField id='aw-amt' name='amount' label='Amount' required inputMode='decimal' placeholder='100.00' value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} />
+      <TextAreaField id='aw-desc' name='description' label='Reason' required value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
+      <TextField id='aw-tp' name='transactionPassword' label={<TxnPasswordLabel />} type='password' required={agentTree} hint={agentTree ? 'Required for every balance move' : 'Required (if your account uses one)'} value={form.transactionPassword} onChange={e => setForm({ ...form, transactionPassword: e.target.value })} />
     </FormDialog>
   )
 }

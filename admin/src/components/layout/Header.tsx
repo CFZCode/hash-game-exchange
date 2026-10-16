@@ -8,8 +8,8 @@ import { usePathname } from 'next/navigation'
 
 // Component Imports
 import ModeToggle from '@/components/layout/ModeToggle'
+import OwnerBalance from '@/components/layout/OwnerBalance'
 import ProfileDropdown from '@/components/shared/ProfileDropdown'
-import { Badge } from '@/components/ui/badge'
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -20,9 +20,6 @@ import {
 } from '@/components/ui/breadcrumb'
 import { Separator } from '@/components/ui/separator'
 import { SidebarTrigger } from '@/components/ui/sidebar'
-
-// Config Imports
-import { siteConfig } from '@/configs/site'
 
 /**
  * Breadcrumbs title-case each URL segment; these segments would read wrong
@@ -74,12 +71,7 @@ const Header = () => {
           </Breadcrumb>
         </div>
         <div className='flex items-center gap-2'>
-          <Badge
-            variant='outline'
-            className='text-muted-foreground border-border hidden font-mono text-xs font-normal sm:inline-flex'
-          >
-            {siteConfig.key} · {siteConfig.environment}
-          </Badge>
+          <OwnerBalance />
           <ModeToggle />
           <ProfileDropdown />
         </div>

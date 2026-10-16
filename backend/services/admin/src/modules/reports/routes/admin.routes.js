@@ -62,26 +62,25 @@ module.exports = function adminRoutes(deps) {
   /** @legacy GET /reports/users */
   router.get('/players', canRead, validate(v.listPlayers), ctrl.listPlayers);
 
-  /**
-   * @legacy GET /api/admin/agent-users
-   *
-   * The caller's agent tree — the players below them and the staff who anchor
-   * those players. Legacy served it from `adminRiskRoutes`, which never got
-   * ported; the panel's Agent System tab has 404'd since the cutover.
-   */
-  router.get('/agent-users', canRead, validate(v.agentUsers), ctrl.agentUsers);
+  /** Users page ke cards (channel = direct | agent | all). players/:userId se pehle. */
+  router.get('/players/summary', canRead, validate(v.playersSummary), ctrl.playersSummary);
+
+  /** Users page ki table (players jaisa + email, phone, parent staff, locks). */
+  router.get('/user-list', canRead, validate(v.userList), ctrl.userList);
+
+  /** Client user (parent wala) ki balance sheet — point ledger se. */
+  router.get('/client-balance-sheet/:userId', canRead, validate(v.clientBalanceSheet), ctrl.clientBalanceSheet);
 
   /**
    * Risk review.
    *
    * `@legacy GET /api/admin/user-risk/:userId` came from the same unported
-   * `adminRiskRoutes` file; the staff view never existed on either side.
+   * `adminRiskRoutes` file; the staff view was removed with the outside agent system.
    *
-   * Both are declared before `/players/:userId` and carry their own literal
-   * prefix, so neither can be captured by a sibling parameter route.
+   * Declared before `/players/:userId` and carries its own literal
+   * prefix, so it cannot be captured by a sibling parameter route.
    */
   router.get('/user-risk/:userId', canRead, validate(v.userRisk), ctrl.userRisk);
-  router.get('/staff-risk/:staffId', canRead, validate(v.staffRisk), ctrl.staffRisk);
 
   /**
    * The IP tracker: every login event in the caller's tree, and the addresses

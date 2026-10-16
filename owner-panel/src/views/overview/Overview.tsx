@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 
+import { toast } from 'sonner'
 import { ActivityIcon, BanIcon, PaletteIcon, RefreshCwIcon, ShieldCheckIcon, TagIcon } from 'lucide-react'
 
 import DateTime from '@/components/shared/DateTime'
@@ -15,6 +16,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { templateByKey, templateLabel } from '@/configs/templateCatalogue'
 import { useApi } from '@/hooks/use-api'
+import { toastError } from '@/lib/api/feedback'
 import type { Overview as OverviewData, Probe } from '@/lib/entitlements/types'
 
 const ProbeRow = ({ label, probe }: { label: string; probe: Probe }) => (
@@ -35,19 +37,31 @@ const Overview = () => {
   const { data, error, isLoading, refetch, isFetching } = useApi<OverviewData>('/api/owner/overview')
   const template = templateByKey(data?.entitlements.template)
 
+  const refresh = async () => {
+    const r = await refetch()
+
+    if (r.error) toastError(r.error, 'Could not refresh the overview')
+    else {
+      const down = r.data ? Object.values(r.data.health).filter(p => !p.ok).length : 0
+
+      if (down) toast.warning('Refreshed', { description: `${down} app${down === 1 ? '' : 's'} not answering — see Reachability.` })
+      else toast.success('Refreshed', { description: 'Every app answers.' })
+    }
+  }
+
   return (
     <>
       <PageHeader
         title={data?.site.name ?? 'Overview'}
         description={data ? `Site key ${data.site.key}. What this site is entitled to, and whether its apps answer.` : 'Loading…'}
         actions={
-          <Button variant='outline' onClick={() => void refetch()} disabled={isFetching}>
+          <Button variant='outline' onClick={() => void refresh()} disabled={isFetching}>
             <RefreshCwIcon className={isFetching ? 'animate-spin' : undefined} /> Refresh
           </Button>
         }
       />
       {error ? (
-        <ErrorState error={error} />
+        <ErrorState error={error} title='Could not load the overview' onRetry={refetch} retrying={isFetching} />
       ) : (
         <div className='flex flex-col gap-6'>
           <div className='grid gap-4 sm:grid-cols-2 xl:grid-cols-5'>

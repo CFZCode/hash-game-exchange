@@ -59,4 +59,12 @@ const creditHistory = {
   query: z.object({ ...paging, accountType: z.enum(['user', 'staff']), accountId: id }).strict(),
 };
 
-module.exports = { ownerAddBalance, accounts, settle, creditHistory };
+/** GET /exchange/owner/direct-ledger — owner ke Direct User wallet ka ledger (from / to optional). */
+const directLedger = {
+  query: z
+    .object({ ...paging, from: z.coerce.date().optional(), to: z.coerce.date().optional() })
+    .strict()
+    .refine((q) => !q.from || !q.to || q.from <= q.to, { message: 'from must be before to', path: ['from'] }),
+};
+
+module.exports = { ownerAddBalance, accounts, settle, creditHistory, directLedger };

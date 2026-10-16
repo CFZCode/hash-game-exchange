@@ -171,7 +171,7 @@ class PlayersService {
    *
    * Edit a player inside the caller's tree.
    */
-  async update({ actor, playerId, username, email, phone, country, password, parentId }) {
+  async update({ actor, playerId, username, email, phone, country, password }) {
     const player = await this.#assertVisible(actor, playerId);
 
     const changes = {};
@@ -179,15 +179,6 @@ class PlayersService {
     if (email !== undefined) changes.email = email;
     if (phone !== undefined) changes.phone = phone;
     if (country !== undefined) changes.country = country;
-
-    if (parentId !== undefined) {
-      /**
-       * Legacy wrote `parent_staff_id` straight from the body with no check, so
-       * an agent could move a player to ANY staff id — up the tree, or across
-       * to a rival, taking the player's balance and future turnover with them.
-       */
-      changes.parent_staff_id = await this.#resolveParent(actor, parentId);
-    }
 
     if (password !== undefined) {
       changes.password = await hashPassword(password, PASSWORD_ROUNDS);

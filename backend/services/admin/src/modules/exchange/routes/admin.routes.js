@@ -20,8 +20,9 @@ const actorFrom = (req) => ({
  *
  *   GET  /admin/exchange/dashboard          upar ke cards
  *   GET  /admin/exchange/owner/wallet       owner ka wallet (Add Balance popup ka Current Balance)
- *   POST /admin/exchange/owner/add-balance  owner apne Client Management balance (credits) me add kare
+ *   POST /admin/exchange/owner/add-balance  owner apne Agent System balance (credits) me add kare
  *   POST /admin/exchange/owner/add-direct-balance  owner apne Direct User balance (staff_balances) me add kare
+ *   GET  /admin/exchange/owner/direct-ledger       us Direct User wallet ka ledger (har badlav, pehle / baad ka balance)
  *   GET  /admin/exchange/accounts           direct children (Account List / Active Users / Bank)
  *   POST /admin/exchange/points/settle      points settlement (D / W, Bank submit)
  */
@@ -75,6 +76,18 @@ module.exports = function adminRoutes(deps) {
     asyncHandler(async (req, res) =>
       response.created(res, await service.ownerAddDirectBalance({ ...req.body, actor: actorFrom(req) }))
     )
+  );
+
+  // Owner ke Direct User wallet ka ledger (Add Balance, direct user ko diya / liya, points settle).
+  router.get(
+    '/owner/direct-ledger',
+    auth.requirePermission(PERMISSIONS.WALLET_ADJUST),
+    validate(v.directLedger),
+    asyncHandler(async (req, res) => {
+      const { limit, offset, from, to } = req.query;
+      const result = await service.ownerDirectLedger({ actor: actorFrom(req), limit, offset, from, to });
+      return response.paginated(res, result.rows, { page: Math.floor(offset / limit) + 1, limit, total: result.total });
+    })
   );
 
   // Zip ka users/all-details — Account List, Active Users aur Bank teeno isi se.

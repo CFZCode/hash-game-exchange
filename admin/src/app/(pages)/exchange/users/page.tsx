@@ -7,7 +7,7 @@ export const metadata = { title: 'Account List' }
 export default function Page() {
   return (
     <Suspense>
-      <AccountList variant='list' />
+      <AccountList />
     </Suspense>
   )
 }

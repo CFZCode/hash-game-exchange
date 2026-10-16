@@ -17,6 +17,7 @@ import pwaLightImg from '../../../assets/pwa_w.png';
 import { languageName } from '../../../components/modals/LanguageCurrencyModal/languages';
 import { getAlias } from '../../../utils/currency';
 import { coinIcon } from '../../../utils/coinArt';
+import { useSiteCurrency } from '../../../hooks/useSiteCurrency';
 
 /* The Application card — see its call site for why it is off. */
 const SHOW_APP_CARD = false;
@@ -28,10 +29,11 @@ const ArrowSvg = ({ className }) => (
   </svg>
 );
 
-// BC Originals SVG icon
+// Originals icon: the P of Parker567 (user's request, 2026-10-16). The outline is bc.game's "b" logo
+// flipped top to bottom; its inner coin and diamond are replaced by a plain round counter, r = 5.
 const BCOriginalsSvg = () => (
   <svg viewBox="0 0 32 32" className="icon pt-0.5 size-7 menu-game-icon-svg">
-    <path fillRule="evenodd" clipRule="evenodd" d="M22.3989 7.848C20.3229 6.648 18.8739 6.009 17.4609 5.943H17.1279C15.9939 6 14.8389 6.414 13.3539 7.2C13.2819 4.008 12.1869 3 8.78787 3H7.60587C6.81687 3 6.77487 3.126 7.04787 3.774C7.24696 4.28438 7.33096 4.83242 7.29387 5.379V16.839C7.32687 21.6 7.96887 22.668 12.3399 25.113C14.5869 26.37 15.8949 27 17.2929 27C18.6909 27 19.9929 26.37 22.2489 25.113C26.7399 22.602 27.2949 21.537 27.2949 16.437C27.2949 11.337 26.7159 10.347 22.3989 7.848ZM14.1339 16.614L17.0079 19.461C17.0762 19.5273 17.1677 19.5645 17.2629 19.5645C17.3581 19.5645 17.4496 19.5273 17.5179 19.461L19.8309 17.169C19.9498 17.0513 20.1105 16.9855 20.2779 16.986H23.8419C23.8644 16.9859 23.8866 16.9905 23.9072 16.9996C23.9278 17.0087 23.9462 17.022 23.9612 17.0387C23.9762 17.0555 23.9875 17.0752 23.9944 17.0966C24.0012 17.118 24.0034 17.1407 24.0009 17.163C23.7964 18.8586 22.9522 20.4122 21.6409 21.5064C20.3296 22.6006 18.6499 23.1529 16.9451 23.0504C15.2403 22.948 13.6389 22.1986 12.468 20.9552C11.2971 19.7119 10.6451 18.0684 10.6451 16.3605C10.6451 14.6526 11.2971 13.0091 12.468 11.7658C13.6389 10.5224 15.2403 9.773 16.9451 9.67057C18.6499 9.56813 20.3296 10.1204 21.6409 11.2146C22.9522 12.3088 23.7964 13.8624 24.0009 15.558C24.003 15.5805 24.0003 15.6032 23.9931 15.6246C23.9859 15.646 23.9743 15.6657 23.9591 15.6824C23.9438 15.699 23.9252 15.7123 23.9045 15.7214C23.8838 15.7305 23.8615 15.7351 23.8389 15.735H20.2779C20.1105 15.7355 19.9498 15.6697 19.8309 15.552L17.5179 13.26C17.4496 13.1937 17.3581 13.1565 17.2629 13.1565C17.1677 13.1565 17.0762 13.1937 17.0079 13.26L14.1339 16.107C14.1004 16.1402 14.0738 16.1797 14.0557 16.2232C14.0376 16.2667 14.0282 16.3134 14.0282 16.3605C14.0282 16.4076 14.0376 16.4543 14.0557 16.4978C14.0738 16.5413 14.1004 16.5808 14.1339 16.614Z" />
+    <path transform="matrix(1 0 0 -1 0 30)" fillRule="evenodd" clipRule="evenodd" d="M22.3989 7.848C20.3229 6.648 18.8739 6.009 17.4609 5.943H17.1279C15.9939 6 14.8389 6.414 13.3539 7.2C13.2819 4.008 12.1869 3 8.78787 3H7.60587C6.81687 3 6.77487 3.126 7.04787 3.774C7.24696 4.28438 7.33096 4.83242 7.29387 5.379V16.839C7.32687 21.6 7.96887 22.668 12.3399 25.113C14.5869 26.37 15.8949 27 17.2929 27C18.6909 27 19.9929 26.37 22.2489 25.113C26.7399 22.602 27.2949 21.537 27.2949 16.437C27.2949 11.337 26.7159 10.347 22.3989 7.848ZM22.29 16.36A5 5 0 1 0 12.29 16.36A5 5 0 1 0 22.29 16.36Z" />
   </svg>
 );
 
@@ -86,11 +88,13 @@ const HeadphonesSvg = () => (
 // ACTIVE STATE. The label turns brand green, the row gets the raised background, and the icon
 // swaps to the green sprite sheet — all three, as the original does. The sheet was missing for
 // a long time and is not any more; see the note over the sprite block in Sidebar.css.
-const SubNavLink = ({ item, flyoutOpen, onFlyout, onCloseMobile, onAction }) => {
+// `topLevel` is the Originals row, which stands on its own between Casino and Sports (see
+// mainNavItems): no `mt-1` inside its unit, and the chevron folds away with the label.
+const SubNavLink = ({ item, flyoutOpen, onFlyout, onCloseMobile, onAction, topLevel = false }) => {
   const { pathname } = useLocation();
   const active = isRowActive(pathname, item);
 
-  const className = `nav-link-item relative flex h-10 w-full cursor-pointer items-center rounded-lg px-3 lg:pl-0 lg:pr-2 overflow-hidden mt-1 ${
+  const className = `nav-link-item relative flex h-10 w-full cursor-pointer items-center rounded-lg px-3 lg:pl-0 lg:pr-2 overflow-hidden ${topLevel ? '' : 'mt-1'} ${
     active ? 'nav-link-active' : ''
   } ${flyoutOpen ? 'nav-flyout-open' : ''}`;
 
@@ -120,7 +124,7 @@ const SubNavLink = ({ item, flyoutOpen, onFlyout, onCloseMobile, onAction }) => 
           never reachable — the row is just a link to its casino tab. Rows with the chevron
           and no panel (the two Sports Provider ones) keep it at every width, as before. */}
       {item.hasSubArrow && (
-        <div className={`ml-auto mr-0.5 size-4 ${item.flyout ? 'hidden lg:block' : ''}`}>
+        <div className={`ml-auto mr-0.5 size-4 ${item.flyout ? 'hidden lg:block' : ''} ${topLevel ? 'sidebar-collapse-hide' : ''}`}>
           <ArrowSvg className="rotate-180" />
         </div>
       )}
@@ -210,9 +214,14 @@ const Flyout = ({ games, onClose }) => (
    because the arrays live inside the component, and this has to be readable before they are.
    One entry per built page; add to it as pages land. */
 const SUBMENU_ROUTES = [
+  /* Originals is its own row now, not a Casino child, so its page must not open the Casino group.
+     First, because `find` takes the first match and '/casino' would claim it. */
+  ['originals', '/casino/brand'],
   ['casino', '/casino'],
   ['sports', '/sports'],
   ['promotions', '/promotions/promotion'],
+  /* One promotion's page (`/promotion/:segment/:slug`) opens the same group as the list. */
+  ['promotions', '/promotion'],
   /* A group may claim more than one route — `find` takes the first match and nothing here
      cares which entry won. Deposit Bonus is a row inside the Promotions group but its path is
      a top-level sibling on the original (`/deposit-offer`, not `/promotions/…`), so a prefix
@@ -263,6 +272,8 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
      owner took out of the plan, or promotions for an agent's player. External links are gated
      only by an explicit `gate` (Blog); Refer and Earn has no href and follows the affiliate section. All on with fixtures. */
   const gates = useGates();
+  /* The owner's default currency, printed where "None" was (see hooks/useSiteCurrency). */
+  const siteCurrency = useSiteCurrency();
   const shown = (items) =>
     visibleItems(items, session.login).filter((i) =>
       i.action === 'refer' ? gates.on('affiliate')
@@ -399,7 +410,6 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
         /* `flyout` names a list in originals.js. `hasSubArrow` only draws the chevron — the
            two Sports Provider rows carry it too and have no list here, so they render the
            chevron and open nothing, which is what they already did. */
-        { label: brandLabel('BC Originals'), icon: 'bc-originals-svg', href: '/casino/brand', hasSubArrow: true, flyout: 'originals' },
         { label: brandLabel('BC Exclusive'), menuIcon: 'bc_exlusive', href: '/section/exclusive' },
         { label: 'Hot Games', menuIcon: 'hotgame', href: '/casino/hot', match: ['/section/hot_games'] },
         { label: 'Slots', menuIcon: 'slots', href: '/casino/slots', match: ['/gamelist/slots'] },
@@ -415,6 +425,13 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
         { label: 'Table Games', menuIcon: 'tablegame', href: '/casino/table-game', match: ['/section/table_games'] },
         { label: 'Providers', menuIcon: 'favorites', href: '/casino/provider' },
       ]
+    },
+    /* DELIBERATE DEPARTURE, on the user's request (2026-10-16): BC Originals is taken out of the
+       Casino group and stands on its own between Casino and Sports — the same row, flyout and
+       /casino/brand link it had as a Casino child, drawn in its own unit. */
+    {
+      id: 'originals', single: true,
+      row: { label: brandLabel('BC Originals'), icon: 'bc-originals-svg', href: '/casino/brand', hasSubArrow: true, flyout: 'originals' },
     },
     {
       id: 'sports', label: 'Sports', colorIcon: 'sports', hasArrow: true, href: '/sports',
@@ -435,7 +452,7 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
       subItems: [
         { label: 'Deposit Bonus', menuIcon: 'deposit_offer', href: '/deposit-offer' },
         { label: 'Daily Contest', menuIcon: 'dailycontest', href: '/promotions/daily-contest' },
-        { label: 'Weekly Raffle', menuIcon: 'weekly_raffle', href: '/promotions/weekly-raffle' },
+        /* Weekly Raffle removed on the user's request (2026-10-16): the platform does not run one. */
         /* The one row in the whole menu whose `link` is NOT a path: `link: "refer"` with
            `label: () => ""`. It is a marker the row renderer special-cases, not a route — `le`
            in `NavItem--aJiS2FS.js` tests `buttonName !== "sidebar_promotion_refer"` and takes a
@@ -499,7 +516,10 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
        Predictions gap above. */
     { id: 'fair',         label: 'Provably Fair',         menuIcon: 'fair',           href: '/help/provably-fair' },
     { id: 'responsible',  label: 'Responsible Gambling',  menuIcon: 'account',        href: '/responsible/faq', match: ['/responsible'] },
-    /* Blog (blog.bc.game) removed: BC.GAME's blog, no Parker567 equivalent. */
+    /* Blog: bc.game's row goes to the external blog.bc.game; here it is the site's own `/blog`
+       (pages/Blog), on the user's request — a deliberate departure. A plain internal row, so the
+       route gate (`/blog` → the owner's `blog` feature) decides whether it is drawn. */
+    { id: 'blog',         label: 'Blog',                  menuIcon: 'blog',           href: '/blog', match: ['/blog'] },
   ];
 
   return (
@@ -624,7 +644,18 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
               {/* ============================================================ */}
               {/* 3. MAIN NAV ITEMS (color_icon_img sprite)                     */}
               {/* ============================================================ */}
-              {mainNavItems.filter((item) => gates.routeOn(item.href)).map(item => (
+              {mainNavItems.filter((item) => gates.routeOn(item.single ? item.row.href : item.href)).map(item => item.single ? (
+                <div key={item.id} className="Sidebar-Unit_bg mt-1 overflow-hidden rounded-lg">
+                  <SubNavLink
+                    item={item.row}
+                    topLevel
+                    flyoutOpen={item.row.flyout === flyout}
+                    onFlyout={setFlyout}
+                    onCloseMobile={onCloseMobile}
+                    onAction={handleAction}
+                  />
+                </div>
+              ) : (
                 <div key={item.id} className="Sidebar-Unit_bg mt-1 overflow-hidden rounded-lg">
                   {/* Header row */}
                   <div
@@ -808,6 +839,8 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
                           off) draws the picker's own None disc. */}
                       {session.setting.enableLocaleCurrency ? (
                         <img alt="coin" className="h-6 lg:h-5" src={coinIcon(session.setting.localeCurrencyName)} />
+                      ) : siteCurrency && coinIcon(siteCurrency) ? (
+                        <img alt="coin" className="h-6 lg:h-5" src={coinIcon(siteCurrency)} />
                       ) : (
                         <span className="flex size-6 items-center justify-center rounded-full bg-[#6b7280] text-[0.625rem] font-black leading-none text-white lg:size-5">★</span>
                       )}
@@ -815,7 +848,7 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
                     <span className="sidebar-collapse-hide ms-2 whitespace-nowrap text-base font-semibold text-primary lg:ms-0 lg:text-sm">
                       {session.setting.enableLocaleCurrency
                         ? getAlias(session.setting.localeCurrencyName).replace(/FIAT$/, '')
-                        : 'None'}
+                        : siteCurrency ?? 'None'}
                     </span>
                     <div className="sidebar-collapse-hide arrow-button ms-auto flex size-6 items-center justify-center rounded p-0 lg:me-2 lg:size-5">
                       <ArrowSvg className="rotate-180" />

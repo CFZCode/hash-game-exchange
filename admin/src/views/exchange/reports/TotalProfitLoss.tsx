@@ -19,7 +19,8 @@ import {
   ReportTable,
   withMinimumDelay,
   type Client,
-  type ReportColumn
+  type ReportColumn,
+  rangeError
 } from './reportKit'
 
 type SportsRow = { event_name: string; game_type: string; opening: number; closing: number; profit_loss: number }
@@ -61,6 +62,14 @@ const TotalProfitLoss = () => {
 
   const handleLoad = async (e: FormEvent) => {
     e.preventDefault()
+    const badRange = rangeError(range)
+
+    if (badRange) {
+      toast.error(badRange)
+
+      return
+    }
+
     setLoading(true)
 
     try {

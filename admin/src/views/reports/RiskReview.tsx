@@ -23,8 +23,9 @@ import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useApi, useApiMutation } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
+import { check } from '@/lib/validate'
 import { formatNumber } from '@/lib/format'
-import { LOCK_KINDS, type Exposure, type StaffRisk, type UserRisk } from './types'
+import { LOCK_KINDS, type Exposure, type UserRisk } from './types'
 
 const Flags = ({ flags, title = 'Risk flags' }: { flags: Record<string, boolean> | undefined; title?: string }) => (
   <Card className='shadow-none'>
@@ -65,27 +66,27 @@ const IdLookup = ({ label, onSubmit }: { label: string; onSubmit: (id: string) =
 }
 
 type LockChoice = 'unchanged' | 'lock' | 'unlock'
+
 const LOCK_OPTIONS = [
   { value: 'unchanged', label: 'Leave as is' },
   { value: 'lock', label: 'Lock' },
   { value: 'unlock', label: 'Unlock' }
 ]
 
-/** POST admin/locks — one user (userId) or one agent and their subtree (staffId). */
-const LocksDialog = ({ target, id: presetId }: { target: 'user' | 'staff'; id?: string }) => {
+/** POST admin/locks — ek user (userId). Agent ke locks Sports Exchange me hain. */
+const LocksDialog = ({ id: presetId }: { id?: string }) => {
   const [id, setId] = useState(presetId ?? '')
   const [choice, setChoice] = useState<Record<(typeof LOCK_KINDS)[number], LockChoice>>({ system: 'unchanged', casino: 'unchanged', sports: 'unchanged' })
 
   const apply = useApiMutation({
     fn: () => {
-      const body: Record<string, number | boolean> = { [target === 'user' ? 'userId' : 'staffId']: Number(id) }
+      const body: Record<string, number | boolean> = { userId: Number(id) }
 
       for (const k of LOCK_KINDS) if (choice[k] !== 'unchanged') body[k] = choice[k] === 'lock'
-      if (Object.keys(body).length === 1) return Promise.reject(new Error('Choose at least one lock to change'))
 
       return api.post('admin/locks', body)
     },
-    invalidate: [['api', `admin/reports/user-risk/${id}`], ['api', `admin/reports/staff-risk/${id}`]],
+    invalidate: [['api', `admin/reports/user-risk/${id}`]],
     success: 'Locks updated'
   })
 
@@ -93,20 +94,27 @@ const LocksDialog = ({ target, id: presetId }: { target: 'user' | 'staff'; id?: 
     <FormDialog
       trigger={
         <Button variant='outline'>
-          <LockIcon /> {target === 'user' ? 'Lock user' : 'Lock agent'}
+          <LockIcon /> Lock user
         </Button>
       }
-      title={target === 'user' ? 'User locks' : 'Agent locks (whole subtree)'}
+      title='User locks'
       description='System lock blocks sign-in; casino and sports locks block betting in that area.'
       submitLabel='Apply'
       destructive={Object.values(choice).includes('lock')}
       onOpenChange={o => o && setId(presetId ?? id)}
+      validate={() => {
+        const idError = check.id(id, 'User id')
+
+        if (idError) return { 'lk-user': idError }
+
+        return LOCK_KINDS.some(k => choice[k] !== 'unchanged') ? null : 'Choose at least one lock to change'
+      }}
       onSubmit={() => apply.mutateAsync()}
     >
-      <TextField id={`lk-${target}`} label={target === 'user' ? 'User id' : 'Staff id'} required value={id} onChange={e => setId(e.target.value.replace(/\D/g, ''))} />
+      <TextField id='lk-user' label='User id' required value={id} onChange={e => setId(e.target.value.replace(/\D/g, ''))} />
       <div className='grid grid-cols-3 gap-3'>
         {LOCK_KINDS.map(k => (
-          <SelectField key={k} id={`lk-${target}-${k}`} label={k} value={choice[k]} onChange={v => setChoice({ ...choice, [k]: v as LockChoice })} options={LOCK_OPTIONS} />
+          <SelectField key={k} id={`lk-user-${k}`} label={k} value={choice[k]} onChange={v => setChoice({ ...choice, [k]: v as LockChoice })} options={LOCK_OPTIONS} />
         ))}
       </div>
     </FormDialog>
@@ -123,7 +131,7 @@ const UserRiskTab = () => {
       <div className='flex flex-wrap items-center gap-2'>
         <IdLookup label='User id' onSubmit={setId} />
         <Can permission='users:write'>
-          <LocksDialog target='user' id={id || undefined} />
+          <LocksDialog id={id || undefined} />
         </Can>
       </div>
       {risk.error && <ErrorState error={risk.error} />}
@@ -131,7 +139,7 @@ const UserRiskTab = () => {
         <>
           <div className='grid grid-cols-2 gap-4 lg:grid-cols-4'>
             <StatCard label='User' value={<Link href={`/users/${d.user.id}`} className='hover:underline'>{d.user.name}</Link>} hint={d.user.email ?? `#${d.user.id}`} />
-            <StatCard label='Agent' value={d.user.staffId ? <Link href={`/staff/${d.user.staffId}`} className='hover:underline'>{d.user.staffName ?? `#${d.user.staffId}`}</Link> : 'direct'} hint={d.user.lastIp ? `last IP ${d.user.lastIp}` : 'no login IP'} />
+            <StatCard label='Agent' value={d.user.staffId ? (d.user.staffName ?? `#${d.user.staffId}`) : 'direct'} hint={d.user.lastIp ? `last IP ${d.user.lastIp}` : 'no login IP'} />
             <StatCard label='Deposits' value={<Money value={d.financials.totalDeposit} currency={d.currency} />} hint={<>withdrawals <Money value={d.financials.totalWithdrawal} /></>} />
             <StatCard label='Net' value={<Money value={d.financials.net} signed />} hint={`${formatNumber(d.activity.distinctIpCount)} distinct IPs`} />
           </div>
@@ -177,60 +185,9 @@ const UserRiskTab = () => {
   )
 }
 
-const StaffRiskTab = () => {
-  const [id, setId] = useState('')
-  const risk = useApi<StaffRisk>(id ? `admin/reports/staff-risk/${id}` : null)
-  const d = risk.data
-
-  return (
-    <div className='grid gap-4'>
-      <div className='flex flex-wrap items-center gap-2'>
-        <IdLookup label='Staff id' onSubmit={setId} />
-        <Can permission='users:write'>
-          <LocksDialog target='staff' id={id || undefined} />
-        </Can>
-      </div>
-      {risk.error && <ErrorState error={risk.error} />}
-      {d && (
-        <>
-          <div className='grid grid-cols-2 gap-4 lg:grid-cols-4'>
-            <StatCard label='Staff' value={<Link href={`/staff/${d.staff.id}`} className='hover:underline'>{d.staff.name}</Link>} hint={`${d.staff.roleName}${d.staff.parentName ? ` · under ${d.staff.parentName}` : ''}`} />
-            <StatCard label='Balance' value={<Money value={d.staff.balance} currency={d.currency} />} hint={`share ${d.staff.percentage}%`} />
-            <StatCard label='Downline' value={`${formatNumber(d.downline.subtreeStaffCount)} staff · ${formatNumber(d.downline.playersCount)} users`} hint={`${formatNumber(d.downline.lockedPlayers)} locked users`} />
-            <StatCard label='Downline net' value={<Money value={d.downline.net} signed />} hint={<>in <Money value={d.downline.totalDeposits} /> · out <Money value={d.downline.totalWithdrawals} /></>} />
-          </div>
-          <div className='grid gap-4 lg:grid-cols-2'>
-            <Flags flags={d.riskFlags} />
-            <Card className='shadow-none'>
-              <CardHeader>
-                <CardTitle className='text-base'>Chain of command</CardTitle>
-              </CardHeader>
-              <CardContent className='flex flex-wrap items-center gap-1 text-sm'>
-                {d.parentChain.map(p => (
-                  <span key={p.id} className='flex items-center gap-1'>
-                    <Link href={`/staff/${p.id}`} className='hover:underline'>{p.name}</Link>
-                    <Badge variant='secondary' className='font-normal'>{p.roleName}</Badge>
-                    <span className='text-muted-foreground'>›</span>
-                  </span>
-                ))}
-                <span className='font-medium'>{d.staff.name}</span>
-                <span className='ml-auto flex gap-2'>
-                  {Object.entries(d.locks).map(([k, v]) => (
-                    <span key={k}>{k}: <StatusBadge value={v ? 'locked' : 'open'} /></span>
-                  ))}
-                </span>
-              </CardContent>
-            </Card>
-          </div>
-          <JsonView value={d} className='max-h-96' />
-        </>
-      )}
-    </div>
-  )
-}
-
 const GenericTable = ({ rows }: { rows: Record<string, unknown>[] | undefined }) => {
   const keys = rows?.length ? Object.keys(rows[0]) : []
+
   const columns: Column<Record<string, unknown>>[] = keys.map(k => ({
     key: k,
     header: k,
@@ -257,18 +214,14 @@ const ExposureTab = () => {
 
 const RiskReview = () => (
   <div>
-    <PageHeader title='Risk review' description='Exposure, velocity and flags for one user or one staff subtree; net sports exposure; and account locks.' />
+    <PageHeader title='Risk review' description='Exposure, velocity and flags for one user; net sports exposure; and account locks.' />
     <Tabs defaultValue='user'>
       <TabsList className='mb-4'>
         <TabsTrigger value='user'>User risk</TabsTrigger>
-        <TabsTrigger value='staff'>Staff risk</TabsTrigger>
         <TabsTrigger value='exposure'>Net exposure</TabsTrigger>
       </TabsList>
       <TabsContent value='user'>
         <UserRiskTab />
-      </TabsContent>
-      <TabsContent value='staff'>
-        <StaffRiskTab />
       </TabsContent>
       <TabsContent value='exposure'>
         <ExposureTab />

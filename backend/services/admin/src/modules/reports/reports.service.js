@@ -1,6 +1,6 @@
 'use strict';
 
-const { Op, fn, col, literal, where: sqlWhere } = require('sequelize');
+const { Op, QueryTypes, fn, col, literal, where: sqlWhere } = require('sequelize');
 const { money, resolveVipLadder, rewardCurrencyOf } = require('@ibitplay/common');
 const { canManagePromotions, AGENT_TREE_LEVELS } = require('@ibitplay/auth');
 
@@ -13,7 +13,6 @@ const {
   SPORTS_LEDGER_REASONS,
   OPEN_BET_STATUSES,
   MAX_EXPORT_ROWS,
-  MAX_PAGE_SIZE,
   RISK_LOGIN_ROWS,
   RISK_IP_ROWS,
   RISK_BET_ROWS,
@@ -25,10 +24,10 @@ const { isPrivateIp, deviceFromUA } = require('./ipTracker');
 const { playerScope } = require('./audienceStats.helpers');
 const { COIN_IDS, DEPOSIT_SUCCESS } = require('../dashboard/dashboard.constants');
 const { WITHDRAWAL_DONE: STATS_WITHDRAWAL_DONE } = require('./audienceStats.constants');
-const { descendantIds, visibleStaffIds } = require('../staff-directory/staffDirectory.service');
+const { visibleStaffIds } = require('../staff-directory/staffDirectory.service');
 // transfer, refill, issuance, adjust — money handed over; never 'gt'/'casino'.
 const { PLAYER_FUNDING_TYPES } = require('../lords/lords.constants');
-const { GIS_AMOUNT_SQL, gisMagnitude } = require('../statements/statements.constants');
+const { gisMagnitude } = require('../statements/statements.constants');
 const { casinoRoundsSql, INHOUSE_UNLEDGERED } = require('../statements/casinoRounds');
 // The one "withdrawn" rule (bank Approved or Paid) — see dashboard.constants.js.
 const { WITHDRAWAL_DONE } = require('../dashboard/dashboard.constants');
@@ -142,6 +141,137 @@ class ReportsService {
           }
         )
       ),
+    };
+  }
+
+  /**
+   * GET /reports/user-list — Users page (Direct Users / Agent System / Financial) ki table.
+   *
+   * `listPlayers` jaisa hi (wahi scope, wahi totals), bas har row me email, phone, country,
+   * parent staff aur locks bhi; search email / phone pe bhi; `withdrawLocked` filter (Financial).
+   * Alag endpoint taaki `/reports/players` waisa hi rahe.
+   */
+  async userList({ staff, channel = 'all', search, withdrawLocked, limit = 25, offset = 0 }) {
+    const scope = await this.#visibleUserScope(staff, channel);
+    if (scope.empty) return { total: 0, rows: [] };
+
+    const where = { ...scope.where };
+    // Users → Financial: sirf withdrawal-locked users.
+    if (withdrawLocked) where.withdraw_locked = true;
+
+    if (search) {
+      const term = `%${this.#escapeLike(String(search).trim())}%`;
+      where[Op.or] = [
+        { name: { [Op.iLike]: term } },
+        { referalcode: { [Op.iLike]: term } },
+        { email: { [Op.iLike]: term } },
+        { phone: { [Op.iLike]: term } },
+        ...(/^\d+$/.test(search.trim()) ? [{ id: Number(search.trim()) }] : []),
+      ];
+    }
+
+    const { rows, count } = await this.models.Users.findAndCountAll({
+      where,
+      attributes: [
+        'id', 'name', 'avatar', 'level', 'games_played', 'referalcode', 'parent_staff_id', 'status',
+        // Users page: email, phone, country aur locks (Status / Financial).
+        'email', 'phone', 'country', 'system_locked', 'is_locked', 'casino_locked', 'sports_betlocked', 'withdraw_locked',
+      ],
+      order: [['id', 'DESC']],
+      limit,
+      offset,
+      raw: true,
+    });
+
+    const ids = rows.map((r) => r.id);
+    // VIP standing is house-only (as on `reward-stats/vip` and the P&L costs):
+    // an agent-tree caller gets `vip: null`, and the ladder is not even read.
+    const house = canManagePromotions(staff);
+    const [credits, wagers, totals, ladder, bets, agentParents, parents] = await Promise.all([
+      this.#creditsFor(ids),
+      this.#wagersFor(ids),
+      this.#lifetimeTotalsFor(ids),
+      house ? resolveVipLadder(this.models, { logger: this.logger }) : null,
+      this.#betCountsFor(ids),
+      this.#agentTreeParents(rows.map((r) => r.parent_staff_id)),
+      this.#parentStaff(rows.map((r) => r.parent_staff_id)),
+    ]);
+
+    return {
+      total: count,
+      rows: rows.map((user) => ({
+        ...this.#describePlayer(
+          user,
+          credits.get(String(user.id)),
+          wagers.get(String(user.id)),
+          {
+            totals: totals.get(String(user.id)),
+            ladder,
+            bets: bets.get(String(user.id)) ?? 0,
+            agentTree: agentParents.has(Number(user.parent_staff_id)),
+          }
+        ),
+        email: user.email ?? null,
+        phone: user.phone ?? null,
+        country: user.country ?? null,
+        // Agent System table ka "Parent Staff".
+        parentStaff: parents.get(Number(user.parent_staff_id)) ?? null,
+        locks: {
+          system: Boolean(user.system_locked || user.is_locked),
+          casino: Boolean(user.casino_locked),
+          sports: Boolean(user.sports_betlocked),
+          withdraw: Boolean(user.withdraw_locked),
+        },
+      })),
+    };
+  }
+
+  /** Parent staff ka naam / email (Agent System table). */
+  async #parentStaff(parentIds) {
+    const ids = [...new Set(parentIds.filter((id) => id != null).map(Number))].filter(Number.isSafeInteger);
+    if (!ids.length) return new Map();
+    const rows = await this.models.Staff.findAll({ where: { id: ids }, attributes: ['id', 'name', 'email'], raw: true });
+    return new Map(rows.map((r) => [Number(r.id), { id: String(r.id), name: r.name ?? null, email: r.email ?? null }]));
+  }
+
+  /**
+   * Users page ke upar ke cards — ek channel ke saare users
+   * (direct = parent nahi, agent = parent hai, all = dono). Reference admin jaisa:
+   *   activeUsers = jinhone kuch deposit kiya, lockedUsers = account lock,
+   *   withdrawLocked = withdrawal block, totalDeposits / totalWithdrawals = lifetime (list wale hi).
+   */
+  async playersSummary({ staff, channel = 'all' }) {
+    const zero = '0.00000000';
+    const empty = { totalUsers: 0, activeUsers: 0, lockedUsers: 0, withdrawLocked: 0, totalDeposits: zero, totalWithdrawals: zero };
+
+    const scope = await this.#visibleUserScope(staff, channel);
+    if (scope.empty) return empty;
+
+    const users = await this.models.Users.findAll({
+      where: scope.where,
+      attributes: ['id', 'system_locked', 'is_locked', 'withdraw_locked'],
+      raw: true,
+    });
+    if (!users.length) return empty;
+
+    const totals = await this.#lifetimeTotalsFor(users.map((u) => u.id));
+    let deposits = 0n;
+    let withdrawals = 0n;
+    let active = 0;
+    for (const t of totals.values()) {
+      const dep = money.toMinor(t.deposited);
+      deposits += dep;
+      withdrawals += money.toMinor(t.withdrawn);
+      if (dep > 0n) active += 1;
+    }
+
+    return {
+      totalUsers: users.length,
+      activeUsers: active,
+      lockedUsers: users.filter((u) => u.system_locked || u.is_locked).length,
+      withdrawLocked: users.filter((u) => u.withdraw_locked).length,
+      totalDeposits: money.toDecimalString(deposits),
+      totalWithdrawals: money.toDecimalString(withdrawals),
     };
   }
 
@@ -274,278 +404,6 @@ class ReportsService {
     ]);
 
     return { csv: csv.build(headers, body), rows: rows.length };
-  }
-
-  // ══════════════════════════════════════════════════════════════════════
-  //  The agent system
-  // ══════════════════════════════════════════════════════════════════════
-
-  /**
-   * @legacy GET /api/admin/agent-users
-   *
-   * The caller's agent tree in one read: the players anchored to a staff
-   * account somewhere at or below the caller, and the staff accounts below the
-   * caller who anchor them.
-   *
-   * ── WHY DEPOSITS ARE NOT JUST THE BANK RAIL ───────────────────────────
-   *
-   * An agent-system player is normally funded by their agent through
-   * `staff_transfers`, not by a bank transfer of their own. Counting only
-   * `fiat_deposits` and `apaydeposits` reports every one of them as having
-   * deposited nothing. Agent funding is added to the two payment rails, which
-   * is what legacy did here and what the balance sheet does.
-   *
-   * ── AND PNL IS NOT DEPOSITS MINUS WITHDRAWALS ─────────────────────────
-   *
-   * Those are funding. PNL is the betting result: the sports ledger plus the
-   * casino ledger.
-   *
-   * ── ONE THING THIS DOES DIFFERENTLY FROM LEGACY ───────────────────────
-   *
-   * Legacy summed EVERY row of `credits_ledger` as sports PNL, because in
-   * legacy the settlement worker was the only writer. In this platform
-   * deposits, bonuses and swaps write there too, so a deposit counted as a bet
-   * won. The reason filter is the same one the balance sheet uses — see
-   * SPORTS_LEDGER_REASONS. Figures here will therefore disagree with the old
-   * screen for any player who has ever been credited outside a bet, and the
-   * new figure is the correct one.
-   *
-   * Legacy also capped the player list at a bare `LIMIT 1000` with no total, so
-   * an agent with a larger book saw a truncated page presented as the whole
-   * book. This pages properly and reports the count.
-   */
-  async agentUsers({ staff, search, limit = MAX_PAGE_SIZE, offset = 0 }) {
-    /**
-     * `channel: 'agent'` — an agent-system listing is by definition the players
-     * with a `parent_staff_id`. Unassigned direct signups belong to the
-     * customer report, not to this one, and legacy excluded them here too
-     * (`WHERE u.parent_staff_id IS NOT NULL`).
-     */
-    const scope = await this.#visibleUserScope(staff, 'agent');
-    const staffIds = (await visibleStaffIds(this.models, staff.id, { logger: this.logger })).map(Number);
-
-    const where = { ...scope.where };
-    if (search) {
-      const term = `%${this.#escapeLike(String(search).trim())}%`;
-      where[Op.or] = [
-        { name: { [Op.iLike]: term } },
-        { email: { [Op.iLike]: term } },
-        ...(/^\d+$/.test(search.trim()) ? [{ id: Number(search.trim()) }] : []),
-      ];
-    }
-
-    const { rows: users, count } = await this.models.Users.findAndCountAll({
-      where,
-      attributes: [
-        'id', 'name', 'email', 'country', 'phone',
-        'parent_staff_id', 'system_locked', 'sports_betlocked',
-      ],
-      order: [['id', 'DESC']],
-      limit,
-      offset,
-      raw: true,
-    });
-
-    const ids = users.map((u) => u.id);
-
-    // Four set-based reads for the page, not four per player.
-    const [funding, totals, pnl, staffRows] = await Promise.all([
-      this.#agentFundingFor(ids),
-      this.#lifetimeTotalsFor(ids),
-      this.#tradingPnlFor(ids),
-      this.models.Staff.findAll({
-        where: { id: staffIds },
-        attributes: [
-          'id', 'name', 'email', 'country', 'phone', 'role_id', 'parent_id',
-          'system_locked', 'sports_betlocked', 'created_at',
-        ],
-        order: [['id', 'ASC']],
-        raw: true,
-      }),
-    ]);
-
-    const roles = await this.models.Roles.findAll({
-      where: { id: [...new Set(staffRows.map((s) => s.role_id))] },
-      attributes: ['id', 'name', 'level'],
-      raw: true,
-    });
-    const roleById = new Map(roles.map((r) => [Number(r.id), r]));
-    const staffById = new Map(staffRows.map((s) => [Number(s.id), s]));
-
-    return {
-      currency: 'INR',
-      scope: {
-        // Legacy read this off `req.staff.level === 0`. The level still says who
-        // sits at the root; it is not what grants the read — the permission is.
-        // Levels start at 1 (SUPER_ADMIN); `=== 0` was never true.
-        isSuperAdmin: Number(staff.level) === 1,
-        staffId: Number(staff.id),
-      },
-      total: count,
-      users: users.map((u) => {
-        const agent = staffById.get(Number(u.parent_staff_id)) ?? null;
-        const funded = funding.get(String(u.id)) ?? { in: '0.00000000', out: '0.00000000' };
-        const lifetime = totals.get(String(u.id)) ?? { deposited: '0.00000000', withdrawn: '0.00000000' };
-        const result = pnl.get(String(u.id)) ?? { sports: '0.00000000', casino: '0.00000000' };
-
-        return {
-          id: String(u.id),
-          name: u.name ?? null,
-          email: u.email ?? null,
-          country: u.country ?? null,
-          phone: u.phone ?? null,
-          isLocked: Boolean(u.system_locked),
-          sportsBetlocked: Boolean(u.sports_betlocked),
-          staffId: u.parent_staff_id != null ? String(u.parent_staff_id) : null,
-          staffName: agent?.name ?? null,
-          staffEmail: agent?.email ?? null,
-          totalDeposit: money.toDecimalString(
-            money.toMinor(funded.in) + money.toMinor(lifetime.deposited)
-          ),
-          totalWithdrawal: money.toDecimalString(
-            money.toMinor(funded.out) + money.toMinor(lifetime.withdrawn)
-          ),
-          sportsPnl: result.sports,
-          casinoPnl: result.casino,
-          pnl: money.toDecimalString(money.toMinor(result.sports) + money.toMinor(result.casino)),
-        };
-      }),
-      /**
-       * The downline, WITHOUT the caller.
-       *
-       * `descendantIds` includes the account it is asked about, and an operator
-       * listing their downline does not mean themselves.
-       */
-      staff: staffRows
-        .filter((s) => Number(s.id) !== Number(staff.id))
-        .map((s) => {
-          const role = roleById.get(Number(s.role_id)) ?? null;
-          const parent = staffById.get(Number(s.parent_id)) ?? null;
-          return {
-            id: String(s.id),
-            name: s.name ?? null,
-            email: s.email ?? null,
-            country: s.country ?? null,
-            phone: s.phone ?? null,
-            roleId: s.role_id,
-            roleName: role?.name ?? null,
-            roleLevel: role?.level ?? null,
-            parentId: s.parent_id != null ? String(s.parent_id) : null,
-            parentName: parent?.name ?? null,
-            systemLocked: Boolean(s.system_locked),
-            sportsBetlocked: Boolean(s.sports_betlocked),
-            createdAt: s.created_at ?? null,
-          };
-        })
-        // Seniors first, as the old screen ordered them.
-        .sort((a, b) => (a.roleLevel ?? 99) - (b.roleLevel ?? 99) || Number(a.id) - Number(b.id)),
-    };
-  }
-
-  /**
-   * What each player's agent has put in and taken back out.
-   *
-   * INR only, because `staff_transfers` has no currency column — see
-   * `#collectEvents`.
-   */
-  async #agentFundingFor(ids) {
-    if (!ids.length) return new Map();
-
-    const rows = await this.models.StaffTransfers.findAll({
-      where: {
-        transfer_type: PLAYER_FUNDING_TYPES,
-        [Op.or]: [
-          { to_type: 'user', to_id: ids },
-          { from_type: 'user', from_id: ids },
-        ],
-      },
-      attributes: ['to_type', 'to_id', 'from_type', 'from_id', 'amount'],
-      raw: true,
-    });
-
-    const totals = new Map(ids.map((id) => [String(id), { in: 0n, out: 0n }]));
-    for (const row of rows) {
-      // A transfer BETWEEN two players in the page counts on both sides, so
-      // this is two independent checks rather than an if/else.
-      if (row.to_type === 'user') {
-        const entry = totals.get(String(row.to_id));
-        if (entry) entry.in += money.toMinorQuantised(row.amount ?? '0');
-      }
-      if (row.from_type === 'user') {
-        const entry = totals.get(String(row.from_id));
-        if (entry) entry.out += money.toMinorQuantised(row.amount ?? '0');
-      }
-    }
-
-    return new Map(
-      [...totals].map(([id, value]) => [
-        id,
-        { in: money.toDecimalString(value.in), out: money.toDecimalString(value.out) },
-      ])
-    );
-  }
-
-  /**
-   * Betting result per player — sports settlement plus casino, in INR.
-   *
-   * Both halves are grouped in the database. The casino half groups by action
-   * as well, because a bet is money out and everything else is money in, and
-   * `gis_transactions` stores a bet as a debit (negative) — or, on older rows, a
-   * magnitude — so bets are summed through `GIS_AMOUNT_SQL` (ABS) and subtracted.
-   */
-  async #tradingPnlFor(ids) {
-    if (!ids.length) return new Map();
-
-    const [sports, casino] = await Promise.all([
-      this.models.CreditsLedger.findAll({
-        where: {
-          user_id: ids.map(String),
-          currency: { [Op.iLike]: 'INR' },
-          // See SPORTS_LEDGER_REASONS — this table is no longer sports-only.
-          reason: { [Op.in]: SPORTS_LEDGER_REASONS },
-        },
-        attributes: [
-          'user_id',
-          // `netamount` is the settled result; `amount` is the fallback for
-          // rows written before that column was populated.
-          [fn('COALESCE', fn('SUM', fn('COALESCE', col('netamount'), col('amount'))), 0), 'total'],
-        ],
-        group: ['user_id'],
-        raw: true,
-      }),
-      this.models.GisTransactions.findAll({
-        where: {
-          user_id: ids,
-          // The provider labels this platform's INR wallet 'PKR'. Asking for
-          // 'INR' alone drops every casino round ever played.
-          currency: { [Op.in]: PROVIDER_CURRENCY_ALIASES.inr },
-        },
-        attributes: ['user_id', 'action', [fn('COALESCE', fn('SUM', literal(GIS_AMOUNT_SQL)), 0), 'total']],
-        group: ['user_id', 'action'],
-        raw: true,
-      }),
-    ]);
-
-    const result = new Map(ids.map((id) => [String(id), { sports: 0n, casino: 0n }]));
-
-    for (const row of sports) {
-      const entry = result.get(String(row.user_id));
-      if (entry) entry.sports += money.toMinorQuantised(row.total ?? '0');
-    }
-
-    for (const row of casino) {
-      const entry = result.get(String(row.user_id));
-      if (!entry) continue;
-      const total = money.toMinorQuantised(row.total ?? '0');
-      entry.casino += row.action === 'bet' ? -total : total;
-    }
-
-    return new Map(
-      [...result].map(([id, value]) => [
-        id,
-        { sports: money.toDecimalString(value.sports), casino: money.toDecimalString(value.casino) },
-      ])
-    );
   }
 
   // ══════════════════════════════════════════════════════════════════════
@@ -1361,126 +1219,6 @@ class ReportsService {
     return `(${clauses.join(' OR ')})`;
   }
 
-  /**
-   * An agent, as a risk reviewer needs to see them.
-   *
-   * There was never a legacy route for this — the screen was written against
-   * one that did not exist, on either side of the port.
-   */
-  async staffRisk({ staff, staffId }) {
-    const visible = (await visibleStaffIds(this.models, staff.id, { logger: this.logger })).map(Number);
-    if (!visible.includes(Number(staffId))) throw errors.AGENT_NOT_FOUND({ staffId });
-
-    const subject = await this.models.Staff.findByPk(staffId, {
-      attributes: [
-        'id', 'name', 'email', 'country', 'phone', 'role_id', 'parent_id',
-        'percentage', 'first_login', 'system_locked', 'sports_betlocked', 'created_at',
-      ],
-      raw: true,
-    });
-    if (!subject) throw errors.AGENT_NOT_FOUND({ staffId });
-
-    // Everyone at or below the subject, and everyone above them up to the root.
-    const [subtree, ancestors] = await Promise.all([
-      descendantIds(this.models, staffId, { logger: this.logger }),
-      this.models.StaffHierarchy.findAll({
-        where: { descendant_id: staffId },
-        attributes: ['ancestor_id', 'depth'],
-        order: [['depth', 'DESC']],
-        raw: true,
-      }),
-    ]);
-
-    const subtreeIds = subtree.map(Number);
-    const chainIds = ancestors.map((a) => Number(a.ancestor_id)).filter((id) => id !== Number(staffId));
-
-    const [chainRows, roles, balance, directCount, players] = await Promise.all([
-      chainIds.length
-        ? this.models.Staff.findAll({ where: { id: chainIds }, attributes: ['id', 'name', 'email', 'role_id'], raw: true })
-        : [],
-      this.models.Roles.findAll({ attributes: ['id', 'name', 'level'], raw: true }),
-      this.models.StaffCredits.findOne({ where: { staff_id: staffId }, raw: true }),
-      this.models.Staff.count({ where: { parent_id: staffId } }),
-      this.models.Users.findAll({
-        where: { parent_staff_id: subtreeIds },
-        attributes: ['id', 'system_locked'],
-        raw: true,
-      }),
-    ]);
-
-    const roleById = new Map(roles.map((r) => [Number(r.id), r]));
-    const role = roleById.get(Number(subject.role_id)) ?? null;
-    const chainById = new Map(chainRows.map((s) => [Number(s.id), s]));
-    const parent = subject.parent_id != null ? chainById.get(Number(subject.parent_id)) ?? null : null;
-
-    const playerIds = players.map((p) => p.id);
-    const totals = await this.#lifetimeTotalsFor(playerIds);
-
-    let deposited = 0n;
-    let withdrawn = 0n;
-    for (const id of playerIds) {
-      const entry = totals.get(String(id));
-      if (!entry) continue;
-      deposited += money.toMinor(entry.deposited);
-      withdrawn += money.toMinor(entry.withdrawn);
-    }
-
-    return {
-      currency: 'INR',
-      staff: {
-        id: String(subject.id),
-        name: subject.name ?? '',
-        email: subject.email ?? '',
-        country: subject.country ?? '',
-        phone: subject.phone ?? '',
-        roleId: subject.role_id,
-        roleName: role?.name ?? null,
-        roleLevel: role?.level ?? null,
-        parentId: subject.parent_id != null ? String(subject.parent_id) : null,
-        parentName: parent?.name ?? null,
-        parentEmail: parent?.email ?? null,
-        // A commission share, as a string — it multiplies money.
-        percentage: subject.percentage != null ? String(subject.percentage) : null,
-        // `true` means the account has never signed in and still holds the
-        // password it was created with.
-        firstLoginPending: Boolean(subject.first_login),
-        createdAt: subject.created_at ?? null,
-        // `fromStored` — the staff `credits.inr` is a bare numeric and real rows
-        // carry more than eight places.
-        balance: money.fromStored(balance?.inr ?? '0'),
-      },
-      locks: {
-        systemLocked: Boolean(subject.system_locked),
-        sportsBetlocked: Boolean(subject.sports_betlocked),
-      },
-      parentChain: ancestors
-        .map((a) => ({ row: chainById.get(Number(a.ancestor_id)), depth: a.depth }))
-        .filter((entry) => entry.row)
-        .map(({ row, depth }) => ({
-          id: row.id,
-          name: row.name,
-          email: row.email,
-          roleName: roleById.get(Number(row.role_id))?.name ?? null,
-          depth,
-        })),
-      downline: {
-        directStaffCount: directCount,
-        // `descendantIds` includes the subject, who is not their own downline.
-        subtreeStaffCount: Math.max(subtreeIds.length - 1, 0),
-        playersCount: players.length,
-        lockedPlayers: players.filter((p) => p.system_locked).length,
-        totalDeposits: money.toDecimalString(deposited),
-        totalWithdrawals: money.toDecimalString(withdrawn),
-        net: money.toDecimalString(deposited - withdrawn),
-      },
-      riskFlags: {
-        firstLoginPending: Boolean(subject.first_login),
-        locked: Boolean(subject.system_locked),
-        noDownline: subtreeIds.length <= 1 && players.length === 0,
-      },
-    };
-  }
-
   // ══════════════════════════════════════════════════════════════════════
   //  The balance sheet
   // ══════════════════════════════════════════════════════════════════════
@@ -1598,6 +1336,96 @@ class ReportsService {
       },
       total: ordered.length,
       rows: ordered.slice(offset, offset + limit),
+    };
+  }
+
+  /**
+   * GET /reports/client-balance-sheet/:userId — client user (parent wala, Agent System) ki
+   * balance sheet, `mssports.point_ledger` se (direct user wali `/balance-sheet` waisi hi rahi),
+   * user ki apni wallet (`credits.id`) ki entries. INR only (points = INR).
+   *
+   *   Credit / Debit / User creation → "Agent" (parent ne diya / liya)
+   *   Bank Deposite / Bank Withdraw   → "Deposit" / "Withdrawal" (D/W settlement)
+   *   bet wali entries (BET_SETTLEMENT, COMMISSION, REVERSAL) → "Sports"
+   *
+   * Row ka balance = `all_point_after` (ledger ka running total). Shape direct user wali sheet jaisi,
+   * taaki admin ka ek hi dialog dono dikhaye; `source: 'point_ledger'`.
+   */
+  async clientBalanceSheet({ staff, userId, limit = 50, offset = 0 }) {
+    const user = await this.#assertVisible(staff, userId);
+    const creditsRow = await this.models.Credits.findOne({ where: { uid: user.id }, raw: true });
+    return this.#pointLedgerSheet(user, creditsRow, { limit, offset });
+  }
+
+  async #pointLedgerSheet(user, creditsRow, { limit, offset }) {
+    const sequelize = this.models.Credits.sequelize;
+    const show = (v) => money.fromStored(v ?? '0');
+    const subject = { id: String(user.id), name: user.name, email: user.email ?? null, agent: null };
+    if (user.parent_staff_id != null) {
+      const parent = await this.models.Staff.findByPk(user.parent_staff_id, { attributes: ['name'], raw: true });
+      subject.agent = parent?.name ?? null;
+    }
+
+    const walletId = creditsRow?.id;
+    const zero = show(0);
+    if (!walletId) {
+      return {
+        subject, currency: 'INR', source: 'point_ledger',
+        balance: { live: zero, ledger: zero, openExposure: zero, unexplained: zero, credited: zero, debited: zero },
+        total: 0, rows: [],
+      };
+    }
+
+    const select = (sql, replacements) => sequelize.query(sql, { replacements, type: QueryTypes.SELECT });
+    const [[agg], rows] = await Promise.all([
+      select(
+        `SELECT COUNT(*)::int AS total,
+                COALESCE(SUM(delta) FILTER (WHERE delta > 0), 0) AS credited,
+                COALESCE(SUM(delta) FILTER (WHERE delta < 0), 0) AS debited,
+                COALESCE(SUM(delta), 0) AS net
+           FROM mssports.point_ledger WHERE wallet_id = :walletId`,
+        { walletId }
+      ),
+      select(
+        `SELECT id, created_at, event_type, remark, delta, all_point_after, bet_id, entry_ref
+           FROM mssports.point_ledger WHERE wallet_id = :walletId
+          ORDER BY created_at DESC, id DESC LIMIT :limit OFFSET :offset`,
+        { walletId, limit, offset }
+      ),
+    ]);
+
+    const categoryOf = (r) => {
+      if (r.bet_id != null || ['BET_SETTLEMENT', 'COMMISSION', 'REVERSAL'].includes(r.event_type)) return 'Sports';
+      if (r.event_type === 'Bank Deposite') return 'Deposit';
+      if (r.event_type === 'Bank Withdraw') return 'Withdrawal';
+      return 'Agent';
+    };
+
+    // Ledger ka jod wallet ke all_point se match hona chahiye (points settle wala hi check).
+    const ledger = show(agg.net);
+    const unexplained = money.toDecimalString(money.toMinorQuantised(String(creditsRow.all_point ?? '0')) - money.toMinorQuantised(String(agg.net)));
+
+    return {
+      subject,
+      currency: 'INR',
+      source: 'point_ledger',
+      balance: {
+        live: show(creditsRow.inr),
+        ledger,
+        openExposure: zero,
+        unexplained,
+        credited: show(agg.credited),
+        debited: show(agg.debited),
+      },
+      total: agg.total,
+      rows: rows.map((r) => ({
+        ts: r.created_at,
+        category: categoryOf(r),
+        type: Number(r.delta) >= 0 ? 'CREDIT' : 'DEBIT',
+        description: r.remark || r.event_type,
+        amount: show(r.delta),
+        balance: show(r.all_point_after),
+      })),
     };
   }
 

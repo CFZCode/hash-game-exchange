@@ -22,6 +22,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useSession } from '@/contexts/SessionContext'
 import { useApiMutation, useListState, usePagedApi } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
+import { check } from '@/lib/validate'
 import { EXECUTIVE_STATUSES, PERMISSION_GROUPS, type ExecutiveActivity, type ExecutiveRow } from './types'
 
 type Kind = 'executive' | 'marketing'
@@ -71,11 +72,7 @@ const CreateSubLogin = ({ kind }: { kind: Kind }) => {
   const [permissions, setPermissions] = useState<string[]>(kind === 'marketing' ? ['reports:read'] : [])
 
   const create = useApiMutation({
-    fn: () => {
-      if (form.password !== form.confirm) return Promise.reject(new Error('Passwords do not match'))
-
-      return api.post(BASE[kind], { username: form.username, password: form.password, permissions })
-    },
+    fn: () => api.post(BASE[kind], { username: form.username.trim(), password: form.password, permissions }),
     invalidate: [['paged', BASE[kind]]],
     success: kind === 'marketing' ? 'Marketing user created' : 'Executive created',
     onSuccess: () => {
@@ -95,12 +92,21 @@ const CreateSubLogin = ({ kind }: { kind: Kind }) => {
       description='A sub-login under your account. Username: letters, digits and . _ - only. Password at least 12 characters.'
       submitLabel='Create'
       wide
+      validate={() => ({
+        username:
+          check.required(form.username, 'Username') ||
+          check.length(form.username, 'Username', { min: 3, max: 100 }) ||
+          (!/^[A-Za-z0-9._-]+$/.test(form.username.trim()) && 'Username may contain letters, digits and . _ - only'),
+        password: !form.password ? 'Password is required' : check.length(form.password, 'Password', { min: 12, max: 200 }),
+        confirm: !form.confirm ? 'Confirm the password' : check.match(form.password, form.confirm, 'Passwords do not match'),
+        permissions: permissions.length === 0 && 'Give at least one permission'
+      })}
       onSubmit={() => create.mutateAsync()}
     >
-      <TextField id='x-user' label='Username' required minLength={3} value={form.username} onChange={e => setForm({ ...form, username: e.target.value })} />
+      <TextField id='x-user' name='username' label='Username' required minLength={3} maxLength={100} value={form.username} onChange={e => setForm({ ...form, username: e.target.value })} />
       <div className='grid grid-cols-2 gap-4'>
-        <TextField id='x-pw' label='Password' type='password' required minLength={12} value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} />
-        <TextField id='x-pw2' label='Confirm password' type='password' required minLength={12} value={form.confirm} onChange={e => setForm({ ...form, confirm: e.target.value })} />
+        <TextField id='x-pw' name='password' label='Password' type='password' required minLength={12} value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} />
+        <TextField id='x-pw2' name='confirm' label='Confirm password' type='password' required minLength={12} value={form.confirm} onChange={e => setForm({ ...form, confirm: e.target.value })} />
       </div>
       <PermissionPicker value={permissions} onChange={setPermissions} />
     </FormDialog>
@@ -147,6 +153,7 @@ const RowActions = ({ row, kind }: { row: ExecutiveRow; kind: Kind }) => {
             title={`Permissions for ${row.username}`}
             wide
             onOpenChange={o => o && setPermissions(row.permissions)}
+            validate={() => (permissions.length === 0 ? 'Give at least one permission' : null)}
             onSubmit={() => editAccess.mutateAsync()}
           >
             <PermissionPicker value={permissions} onChange={setPermissions} />
@@ -161,9 +168,10 @@ const RowActions = ({ row, kind }: { row: ExecutiveRow; kind: Kind }) => {
           title={`Reset password for ${row.username}`}
           description='At least 12 characters.'
           submitLabel='Reset'
+          validate={() => ({ password: !password ? 'New password is required' : check.length(password, 'New password', { min: 12, max: 200 }) })}
           onSubmit={() => resetPw.mutateAsync()}
         >
-          <TextField id={`pw-${row.id}`} label='New password' type='password' required minLength={12} value={password} onChange={e => setPassword(e.target.value)} />
+          <TextField id={`pw-${row.id}`} name='password' label='New password' type='password' required minLength={12} value={password} onChange={e => setPassword(e.target.value)} />
         </FormDialog>
         <ConfirmDialog
           trigger={
@@ -186,6 +194,7 @@ const RowActions = ({ row, kind }: { row: ExecutiveRow; kind: Kind }) => {
           title={`Status for ${row.username}`}
           submitLabel='Apply'
           onOpenChange={o => o && setStatus(row.status)}
+          validate={() => (status === row.status ? `Already ${status} — pick a different status` : null)}
           onSubmit={() => setStatusM.mutateAsync(status)}
         >
           <SelectField id={`st-${row.id}`} label='Status' value={status} onChange={setStatus} options={EXECUTIVE_STATUSES.map(s => ({ value: s, label: s }))} />

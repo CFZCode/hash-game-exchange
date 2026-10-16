@@ -251,6 +251,7 @@ const GeneralLock = () => {
 
     try {
       await saveSportsLock(args, !wasLocked)
+      toast.success(`${wasLocked ? 'Unlocked' : 'Locked'} for ${targetUser.username}`)
     } catch (err) {
       flipKey(args.key, wasLocked)
       toast.error(errorText(err) || 'Failed to update lock')

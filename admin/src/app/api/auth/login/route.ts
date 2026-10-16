@@ -15,7 +15,9 @@ export async function POST(req: NextRequest) {
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>
   const mode = body.mode === 'executive' ? 'executive' : 'staff'
   const path = mode === 'executive' ? '/api/v1/admin/auth/executive/login' : '/api/v1/admin/auth/login'
-  const { mode: _mode, ...payload } = body
+  const payload = { ...body }
+
+  delete payload.mode
 
   let upstream: Response
 
@@ -43,7 +45,9 @@ export async function POST(req: NextRequest) {
 
   await writeSessionToken(json.data.token)
 
-  const { token: _token, ...rest } = json.data
+  const rest: Record<string, unknown> = { ...json.data }
+
+  delete rest.token
 
   return Response.json({ success: true, data: rest })
 }

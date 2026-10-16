@@ -27,7 +27,8 @@ import {
   SPORTS_LIST,
   withMinimumDelay,
   type Client,
-  type ReportColumn
+  type ReportColumn,
+  rangeError
 } from './reportKit'
 import StatementBetDetail, { type BetDetail } from './StatementBetDetail'
 
@@ -155,8 +156,11 @@ const AccountStatement = () => {
   const handleLoad = (e: FormEvent) => {
     e.preventDefault()
 
-    if (daysBetween(range.from, range.to) > 10) {
-      toast.error(RANGE_NOTICE)
+    // Server (`statement` validator): From ≤ To and at most 7 days.
+    const badRange = daysBetween(range.from, range.to) > 10 ? RANGE_NOTICE : rangeError(range, { maxDays: 7, threeMonths: false })
+
+    if (badRange) {
+      toast.error(badRange)
       setData(null)
       setPage(1)
 

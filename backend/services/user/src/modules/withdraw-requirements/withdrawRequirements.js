@@ -125,9 +125,14 @@ function createWithdrawRequirements(deps) {
   const kycSwitch = config?.WITHDRAW_REQUIRE_KYC !== false;
   const capFigures = deps.capFigures ?? createCapFigures(deps);
 
-  /** The owner's deposit-cap settings (the signed document's `withdrawalCap`, defaults filled). */
+  /**
+   * The deposit-cap settings in force: the Super Admin's own (Admin → Users → Financial, saved in
+   * `withdrawal_control`) once saved, else the owner's (the signed document's `withdrawalCap`,
+   * defaults filled).
+   */
   async function capSettings() {
-    return withdrawalCap.cleanWithdrawalCap((await entitlements.getEntitlements()).withdrawalCap);
+    const admin = await withdrawalCap.readAdminWithdrawalCap(models?.Users?.sequelize ?? deps.db?.sequelize);
+    return admin ?? withdrawalCap.cleanWithdrawalCap((await entitlements.getEntitlements()).withdrawalCap);
   }
 
   /**

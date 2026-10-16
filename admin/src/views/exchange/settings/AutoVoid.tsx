@@ -6,6 +6,8 @@ import Link from 'next/link'
 
 import { toast } from 'sonner'
 
+import { Loader2Icon } from 'lucide-react'
+
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import PageHeader from '@/components/shared/PageHeader'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -20,6 +22,7 @@ import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 import { CONFIG_API, ToneBadge, errorText, useZip, zipApi, type Tone } from './shared'
+import { check } from '@/lib/validate'
 
 /**
  * Auto Void — zip `pages/settings/AutoVoid.jsx` (sirf owner).
@@ -160,8 +163,8 @@ const marketTitle = (m: TrackerMarket) => (isLineMarket(m.market_type) ? m.marke
 // Fancy markets Fancy Settlement me (market type ke tab me), baaki Match Settlement me.
 const whereToDeclare = (m: TrackerMarket) =>
   m.game_type === 'FAN'
-    ? { to: '/exchange/settlement/fancy', text: `Fancy Settlement → ${m.market_type} tab` }
-    : { to: '/exchange/settlement/match', text: 'Match Settlement' }
+    ? { to: '/exchange/settlement?tab=fancy', text: `Fancy Settlement → ${m.market_type} tab` }
+    : { to: '/exchange/settlement', text: 'Match Settlement' }
 
 // Bets kin positions pe hain — taaki team ko pata ho kaunse number maayne rakhte hain.
 const positions = (m: TrackerMarket, kind: Kind) => {
@@ -416,11 +419,11 @@ const PendingResultTracker = () => {
       <CardContent className='space-y-3'>
         <p className='text-muted-foreground text-sm'>
           Match Odds / Bookmaker already declared, but these bets still have no result. Find the result and settle them in{' '}
-          <Link href='/exchange/settlement/fancy' className='text-primary hover:underline'>
+          <Link href='/exchange/settlement?tab=fancy' className='text-primary hover:underline'>
             Fancy
           </Link>{' '}
           /{' '}
-          <Link href='/exchange/settlement/match' className='text-primary hover:underline'>
+          <Link href='/exchange/settlement' className='text-primary hover:underline'>
             Match
           </Link>{' '}
           Settlement before the countdown ends
@@ -517,18 +520,42 @@ const ResultLinksManager = () => {
 
   const load = () => links.refetch()
 
-  const set = (patch: Partial<LinkForm>) => setForm(f => ({ ...f, ...patch }))
+  const set = (patch: Partial<LinkForm>) => {
+    setForm(f => ({ ...f, ...patch }))
+    setErrors(prev => {
+      const next = { ...prev }
+
+      for (const k of Object.keys(patch)) delete next[k as keyof typeof next]
+
+      return next
+    })
+  }
 
   const reset = () => {
     setForm(EMPTY_LINK)
     setEditId(null)
+    setErrors({})
   }
+
+  // Server rules (`linkPayload`): name 1–60 chars, URL http(s)://… without spaces, ≤ 1000 chars.
+  const [errors, setErrors] = useState<{ name?: string; url?: string; sort_order?: string }>({})
 
   const handleSave = async (e: FormEvent) => {
     e.preventDefault()
 
-    if (!/^https?:\/\//i.test(form.url.trim())) {
-      toast.error('URL must start with http:// or https://')
+    const url = form.url.trim()
+
+    const next = {
+      name: check.required(form.name, 'Name') || check.length(form.name, 'Name', { max: 60 }),
+      url: !url ? 'URL is required' : !/^https?:\/\/[^\s]+$/i.test(url) ? 'URL must start with http:// or https:// and have no spaces' : check.length(url, 'URL', { max: 1000 }),
+      sort_order: check.number(form.sort_order, 'Order', { integer: true, optional: true })
+    }
+
+    setErrors(next)
+    const first = next.name || next.url || next.sort_order
+
+    if (first) {
+      toast.error(first)
 
       return
     }
@@ -542,7 +569,7 @@ const ResultLinksManager = () => {
         ? await zipApi<{ message?: string }>('PUT', `${AUTO_VOID_API}/links/${editId}`, payload)
         : await zipApi<{ message?: string }>('POST', `${AUTO_VOID_API}/links`, payload)
 
-      toast.success(r.message || 'Saved')
+      toast.success(r.message || (editId ? 'Link saved' : 'Link added'))
       reset()
       void load()
     } catch (e2) {
@@ -557,23 +584,28 @@ const ResultLinksManager = () => {
     setForm({ name: l.name, url: l.url, sport_id: l.sport_id || '', sort_order: l.sort_order ?? 0, active: !!l.active })
   }
 
+  const [togglingId, setTogglingId] = useState<number | null>(null)
+
   const handleToggle = async (l: ResultLink) => {
+    setTogglingId(l.id)
+
     try {
       await zipApi('PUT', `${AUTO_VOID_API}/links/${l.id}`, { active: !l.active })
+      toast.success(`${l.name} turned ${l.active ? 'off' : 'on'}`)
       void load()
     } catch (e) {
       toast.error(errorText(e))
+    } finally {
+      setTogglingId(null)
     }
   }
 
+  // No catch: ConfirmDialog stays open and toasts the server's message.
   const handleDelete = async (l: ResultLink) => {
-    try {
-      await zipApi('DELETE', `${AUTO_VOID_API}/links/${l.id}`)
-      if (editId === l.id) reset()
-      void load()
-    } catch (e) {
-      toast.error(errorText(e))
-    }
+    await zipApi('DELETE', `${AUTO_VOID_API}/links/${l.id}`)
+    toast.success(`Link "${l.name}" deleted`)
+    if (editId === l.id) reset()
+    void load()
   }
 
   return (
@@ -591,11 +623,13 @@ const ResultLinksManager = () => {
         <form onSubmit={handleSave} className='grid items-end gap-3 md:grid-cols-12'>
           <div className='space-y-1 md:col-span-2'>
             <Label className='text-xs'>Name</Label>
-            <Input value={form.name} onChange={e => set({ name: e.target.value })} maxLength={60} placeholder='Cricbuzz' required />
+            <Input value={form.name} onChange={e => set({ name: e.target.value })} maxLength={60} placeholder='Cricbuzz' required aria-invalid={errors.name ? true : undefined} />
+            {errors.name && <p className='text-destructive text-xs'>{errors.name}</p>}
           </div>
           <div className='space-y-1 md:col-span-4'>
             <Label className='text-xs'>URL</Label>
-            <Input value={form.url} onChange={e => set({ url: e.target.value })} placeholder='https://www.cricbuzz.com/...' required />
+            <Input value={form.url} onChange={e => set({ url: e.target.value })} placeholder='https://www.cricbuzz.com/...' required aria-invalid={errors.url ? true : undefined} />
+            {errors.url && <p className='text-destructive text-xs'>{errors.url}</p>}
           </div>
           <div className='space-y-1 md:col-span-2'>
             <Label className='text-xs'>Sport</Label>
@@ -615,7 +649,8 @@ const ResultLinksManager = () => {
           </div>
           <div className='space-y-1 md:col-span-1'>
             <Label className='text-xs'>Order</Label>
-            <Input type='number' value={form.sort_order} onChange={e => set({ sort_order: e.target.value })} />
+            <Input type='number' step={1} value={form.sort_order} onChange={e => set({ sort_order: e.target.value })} aria-invalid={errors.sort_order ? true : undefined} />
+            {errors.sort_order && <p className='text-destructive text-xs'>{errors.sort_order}</p>}
           </div>
           <label className='flex h-9 items-center gap-2 text-xs md:col-span-1'>
             <Checkbox checked={form.active} onCheckedChange={v => set({ active: v === true })} />
@@ -623,6 +658,7 @@ const ResultLinksManager = () => {
           </label>
           <div className='flex gap-1 md:col-span-2'>
             <Button type='submit' size='sm' disabled={saving}>
+              {saving && <Loader2Icon className='animate-spin' />}
               {editId ? 'Save' : 'Add link'}
             </Button>
             {editId && (
@@ -647,12 +683,20 @@ const ResultLinksManager = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {!rows.length && (
+              {links.error ? (
                 <TableRow>
-                  <TableCell colSpan={7} className='text-muted-foreground'>
-                    No links yet.
+                  <TableCell colSpan={7} className='text-danger'>
+                    Could not load links: {errorText(links.error)}
                   </TableCell>
                 </TableRow>
+              ) : (
+                !rows.length && (
+                  <TableRow>
+                    <TableCell colSpan={7} className='text-muted-foreground'>
+                      {links.isLoading ? 'Loading…' : 'No links yet.'}
+                    </TableCell>
+                  </TableRow>
+                )
               )}
               {rows.map(l => (
                 <TableRow key={l.id} className={cn(!l.active && 'text-muted-foreground')}>
@@ -668,6 +712,7 @@ const ResultLinksManager = () => {
                       size='sm'
                       variant={l.active ? 'default' : 'outline'}
                       className={cn(l.active && 'bg-success hover:bg-success/80 text-white')}
+                      disabled={togglingId === l.id}
                       onClick={() => handleToggle(l)}
                     >
                       {l.active ? 'On' : 'Off'}
@@ -725,7 +770,7 @@ const SettingsForm = ({ current, onSaved }: { current: Settings; onSaved: () => 
         on_bookmaker: onBookmaker
       })
 
-      toast.success(response.message || 'Saved')
+      toast.success(response.message || 'Auto void settings saved')
       await onSaved()
     } catch (error) {
       toast.error(errorText(error))
@@ -734,12 +779,13 @@ const SettingsForm = ({ current, onSaved }: { current: Settings; onSaved: () => 
     }
   }
 
+  const delayError = check.number(delay, 'Delay', { integer: true, min: bounds.min, max: bounds.max })
+
   const handleSave = (e: FormEvent) => {
     e.preventDefault()
-    const n = Number(delay)
 
-    if (!Number.isInteger(n) || n < bounds.min || n > bounds.max) {
-      toast.error(`Delay must be ${bounds.min}–${bounds.max} seconds`)
+    if (delayError) {
+      toast.error(`${delayError} (${bounds.min}–${bounds.max} seconds)`)
 
       return
     }
@@ -778,12 +824,14 @@ const SettingsForm = ({ current, onSaved }: { current: Settings; onSaved: () => 
             max={bounds.max}
             step={1}
             value={delay}
+            aria-invalid={delayError ? true : undefined}
             onChange={e => setDelay(e.target.value)}
           />
           <span className='bg-muted flex h-9 items-center rounded-r-md border border-l-0 px-3 text-sm whitespace-nowrap'>
             = {fmtDelay(delay)}
           </span>
         </div>
+        {delayError && <p className='text-destructive text-xs'>{delayError}</p>}
         <small className='text-muted-foreground block text-xs'>
           Counted from the moment the results cron first sees the Match Odds / Bookmaker result. Allowed {bounds.min}–{bounds.max} seconds
           (600 = 10 minutes).
@@ -806,6 +854,7 @@ const SettingsForm = ({ current, onSaved }: { current: Settings; onSaved: () => 
       </div>
 
       <Button type='submit' disabled={saving}>
+        {saving && <Loader2Icon className='animate-spin' />}
         {saving ? 'Saving…' : 'Save'}
       </Button>
 

@@ -302,10 +302,8 @@ test('P&L against a database', async (t) => {
 
   // ── Slotegrator refunds and rollbacks: every screen nets them the old reports' way ──
   const { WagerStatsService } = require('../wagerStats.service');
-  const { ReportsService } = require('../reports.service');
 
   const wager = new WagerStatsService(deps);
-  const reports = new ReportsService(deps);
 
   // Two agents outside the owner's tree, one player each, so each scenario is
   // read on its own and the house figures above are untouched.
@@ -356,21 +354,17 @@ test('P&L against a database', async (t) => {
   const read = async (agentId) => {
     const staff = { id: agentId, level: 6, permissions: ['*'] };
     const q = { ...gisWindow, currency: 'INR' };
-    const [d, s, b, w, old] = await Promise.all([
+    const [d, s, b, w] = await Promise.all([
       dashboard.series({ actor: staff, ...q, granularity: 'day' }),
       pnl.summary({ staff, ...q, granularity: 'day' }),
       pnl.breakdown({ staff, ...q, granularity: 'day' }),
       wager.stats({ staff, area: 'casino', ...q, granularity: 'day', tz: 'UTC' }),
-      reports.agentUsers({ staff }),
     ]);
-    return { d, s, b, w, old };
+    return { d, s, b, w };
   };
 
   await t.test('a bet and its refund: 0 turnover, 0 wins, 0 GGR', async () => {
-    const { d, s, b, w, old } = await read(agentC);
-
-    // The old reports' #tradingPnlFor (agent P&L): −40 + 40 = 0.
-    assert.equal(old.users.find((u) => u.id === String(playerC)).casinoPnl, '0.00000000');
+    const { d, s, b, w } = await read(agentC);
 
     assert.equal(m(d.totals.casinoWagered), 0n, 'a refunded bet is not turnover');
     assert.equal(m(d.totals.casinoWon), 0n, 'a refund is not a win');
@@ -384,12 +378,11 @@ test('P&L against a database', async (t) => {
     assert.equal(w.totals.refunds, 1, 'still reported on its own line');
   });
 
-  await t.test('rollbacks: of a win off the wins, of a bet off the turnover — GGR matches #tradingPnlFor', async () => {
-    const { d, s, b, w, old } = await read(agentD);
+  await t.test('rollbacks: of a win off the wins, of a bet off the turnover — GGR is the house side', async () => {
+    const { d, s, b, w } = await read(agentD);
 
     // Player side: −10 + 25 − 25 − 5 + 5 = −10, so the house made 10.
-    const oldCasino = m(old.users.find((u) => u.id === String(playerD)).casinoPnl);
-    assert.equal(oldCasino, m('-10'));
+    const oldCasino = m('-10');
 
     assert.equal(m(d.totals.casinoGgr), -oldCasino);
     assert.equal(m(d.totals.casinoWagered), m('10'), 'the rolled-back bet is not turnover');

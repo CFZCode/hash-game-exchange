@@ -1,12 +1,11 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import SectionHeader from '../../../components/shared/SectionHeader';
-import { gameIcon, coinIcon, multiplier, formatAmount } from './bets';
+import { toTableRow, isAdvertised } from './bets';
 import Loading from '../../../components/shared/Loading';
 import { getLatestBets, getHighRollers } from '../../../services/home';
 import { useResource } from '../../../hooks/useResource';
 import { useIsDesktop } from '../../../hooks/useMediaQuery';
-import { HIDDEN_NAME } from '../../../context/account';
 /* The Wager Contest tab renders the same widget as the /promotions/daily-contest page, so it
    moved to components/shared — see the note at the top of that file for the measurements that
    settled they really are identical. Only the payload stayed local, in ./contest.js. */
@@ -25,8 +24,8 @@ import './LatestBets.css';
 const TABS = ['Latest Bet', 'High Roller', 'Wager Contest'];
 const NO_CONTEST = () => null;
 
-/* Ten rows on screen at a time — `capacity: Ee` where Ee = 10. */
-const VISIBLE = 10;
+/* Ten rows on screen by default — `capacity: Ee` where Ee = 10; the page-size picker raises it. */
+const DEFAULT_CAPACITY = 10;
 
 /* The rolling feed, from `qT` in index-BsFv7ByC.js — the component `ze` mounts as `N` with
  * `initial`, `next` and `capacity`. Its container template `$T` is the shape that makes the
@@ -57,130 +56,182 @@ const SLIDE_EASING = 'cubic-bezier(0, 0, 0.58, 1)'; /* FT */
 const throttleMs = (bufferSize, idle = 2250, floor = 750, decay = 0.15) =>
   bufferSize === 0 ? false : Math.round(floor + (idle - floor) * Math.exp(-decay * bufferSize));
 
-/* 5 columns from lg, 4 below — Bet Amount is the one that drops, gated on `!m.mobile` in
-   the original. Both templates are its verbatim values.
+/* The grid template, bc.game's current capture verbatim (signed-in desktop):
+ *
+ *   grid-cols-[30%_minmax(0,1fr)_minmax(0,1fr)_6rem_7.5rem]   Game · Player · Bet Amount · Multiplier · Profit
+ *
+ * The capture is a desktop one. Below lg this build keeps the four-column arm the original's
+ * `!m.mobile` gate draws (Bet Amount dropped), so a phone row still fits; that template is the
+ * older chunk's own value. Both are literal strings so Tailwind's scanner sees them. */
+const COLS_DESKTOP = 'grid-cols-[30%_minmax(0,1fr)_minmax(0,1fr)_6rem_7.5rem]';
+const COLS_MOBILE = 'grid-cols-[26%_minmax(0,1fr)_5.25rem_6rem]';
 
-   Written out as one literal string rather than composed from constants: Tailwind scans
-   source text, so a class assembled at runtime (`lg:${COLS}`) is never seen and never
-   emitted. That silently cost the desktop 5-column layout the first time round. */
-const ROW_COLS =
-  'grid-cols-[26%_minmax(0,1fr)_5.25rem_6rem] lg:grid-cols-[30%_minmax(0,1fr)_minmax(0,1fr)_6rem_7.5rem]';
+/* The page-size picker's choices; 10 is the default the capture shows. */
+const PAGE_SIZES = [10, 20];
 
-/* Each cell carries its own column label above the value — the table has no header row,
-   which is what lets it reflow to 4 columns without one going missing. */
-const Label = ({ children }) => (
-  <div className="truncate text-xs text-tertiary">{children}</div>
+/* The picker's chevron — the capture's own path, a left chevron turned `-rotate-90`. */
+const Chevron = ({ className = '' }) => (
+  <svg viewBox="0 0 32 32" className={className}>
+    <path d="M20.5603 6.46955C20.0604 5.96968 19.2499 5.96968 18.7501 6.46955L9.99838 15.2212C9.49851 15.7211 9.49851 16.5316 9.99838 17.0314L18.7501 25.7831C19.2499 26.283 20.0604 26.283 20.5603 25.7831L21.8146 24.5287C22.3145 24.0289 22.3145 23.2184 21.8146 22.7185L15.675 16.5789C15.425 16.3289 15.425 15.9237 15.675 15.6738L21.8146 9.53412C22.3145 9.03425 22.3145 8.2238 21.8146 7.72393L20.5603 6.46955Z" />
+  </svg>
 );
 
-/* `seq` is the row's own `index: h++` from the feed, NOT its position in the array. That
-   distinction is the whole zebra pattern: positions shift by one every time the oldest row
-   is dropped, so striping on position would invert the whole list on every push. Striping on
-   the row's own sequence number makes the bands travel down with the content. */
-const GameLink = ({ slug, ...props }) =>
-  slug ? <Link to={`/game/${slug}`} {...props} /> : <a href="#" {...props} />;
+/* `absolute end-0 top-0 hidden sm:block` — the page-size picker right of the tabs. The trigger
+   is the capture's markup; the option list under it is this build's (the capture holds only the
+   closed state). */
+function PageSize({ value, onChange }) {
+  const [open, setOpen] = React.useState(false);
+  const ref = React.useRef(null);
 
-function BetRow({ bet, seq, precision }) {
-  const mult = multiplier(bet.payout);
-  const won = mult >= 1;
+  React.useEffect(() => {
+    if (!open) return undefined;
+    const onDown = (event) => {
+      if (!ref.current?.contains(event.target)) setOpen(false);
+    };
+    const onKey = (event) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('pointerdown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
 
   return (
-    <div style={{ height: '48px' }}>
+    <div ref={ref} className="absolute end-0 top-0 z-10 hidden sm:block">
       <div
-        className={`lf-row grid h-12 items-center rounded-xl px-3 ${ROW_COLS} ${
-          (seq & 1) === 0 ? 'zebra' : ''
+        className="flex h-10 cursor-pointer items-center justify-between rounded-md bg-layer4 px-1 text-quarterary"
+        onClick={() => setOpen((v) => !v)}
+      >
+        <div className="w-8 px-2 text-base font-extrabold text-primary">{value}</div>
+        <button
+          className="button button-m size-8 bg-layer5 px-2 font-extrabold text-primary hover:bg-layer5"
+          type="button"
+          aria-haspopup="listbox"
+          aria-expanded={open}
+        >
+          <Chevron className="icon -rotate-90 font-extrabold text-primary" />
+        </button>
+      </div>
+      {open && (
+        <div role="listbox" className="absolute end-0 mt-1 w-full rounded-md bg-layer4 p-1">
+          {PAGE_SIZES.map((size) => (
+            <button
+              key={size}
+              type="button"
+              role="option"
+              aria-selected={size === value ? 'true' : undefined}
+              className="select-item flex h-8 items-center text-base font-extrabold text-primary hover:bg-layer5"
+              onClick={() => {
+                onChange(size);
+                setOpen(false);
+              }}
+            >
+              {size}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* The column header row — new in bc.game's current markup (the older chunk printed a label
+   inside each cell instead). */
+function HeadRow({ desktop }) {
+  return (
+    <div
+      className={`grid h-12 items-center rounded-lg bg-layer2 px-4 py-3 text-xs font-semibold text-tertiary ${
+        desktop ? COLS_DESKTOP : COLS_MOBILE
+      }`}
+    >
+      <div>Game</div>
+      <div>Player</div>
+      {desktop && <div>Bet Amount</div>}
+      <div>Multiplier</div>
+      <div className="text-right">Profit</div>
+    </div>
+  );
+}
+
+/* One row, the capture's markup cell for cell. `seq` is the row's own `index: h++` from the feed,
+   NOT its position in the array — positions shift by one every time the oldest row is dropped,
+   so striping on position would invert the whole list on every push. Striping on the sequence
+   number makes the bands travel down with the content. The capture's first (bottom) row is
+   `bg-layer2`, the next `bg-layer3_alt`. */
+function BetRow({ row, seq, desktop }) {
+  return (
+    <div
+      style={{ height: `${ROW_HEIGHT}px` }}
+      className={`grid items-center px-4 ${desktop ? COLS_DESKTOP : COLS_MOBILE} ${
+        (seq & 1) === 0 ? 'bg-layer2' : 'bg-layer3_alt'
+      }`}
+    >
+      <div className="min-w-0">
+        {/* `ellipsi` and `inactive` are the capture's own classes (the first a dead typo). */}
+        {row.href ? (
+          <Link to={row.href} className="ellipsi flex items-center font-semibold text-primary hover:underline inactive">
+            <img className="mr-1 inline-block w-5" alt="game icon" src={row.gameIcon} />
+            <span className="ellipsis">{row.game}</span>
+          </Link>
+        ) : (
+          <span className="ellipsi flex items-center font-semibold text-primary">
+            <img className="mr-1 inline-block w-5" alt="game icon" src={row.gameIcon} />
+            <span className="ellipsis">{row.game}</span>
+          </span>
+        )}
+      </div>
+
+      {row.player ? (
+        <div className="ellipsis truncate text-sm font-semibold text-primary" title={row.player}>
+          {row.playerHref ? (
+            <Link to={row.playerHref} className="hover:underline inactive">
+              {row.player}
+            </Link>
+          ) : (
+            <span>{row.player}</span>
+          )}
+        </div>
+      ) : (
+        <div className="ellipsis truncate text-sm font-semibold text-primary" title="Hidden">
+          <span className="text-secondary">Hidden</span>
+        </div>
+      )}
+
+      {desktop && (
+        /* The capture's `center justify-start`, spelled out: this build's unlayered `.center`
+            sets justify-content: center and would beat the `justify-start` utility (the cascade
+            hazard in CLAUDE.md), centring the amount in its column. */
+        <div className="flex items-center justify-start truncate text-sm font-semibold text-secondary">
+          <span className="overflow-hidden text-nowrap">{row.bet}</span>
+          <img className="ml-1 h-5 flex-none" src={row.coinIcon} alt={row.coin} />
+        </div>
+      )}
+
+      <div className="truncate text-sm font-semibold text-secondary">{row.multiplier}</div>
+
+      <div
+        className={`flex items-center justify-end truncate text-sm font-semibold ${
+          row.won ? 'text-brand' : 'text-secondary'
         }`}
       >
-        <div className="min-w-0">
-          {/* A row that knows its game page (the static showcase rows carry `slug`) links to it;
-              `icon` is the catalogue art for a third-party game the icon map does not know. */}
-          <GameLink
-            slug={bet.slug}
-            className="flex items-center font-semibold text-primary hover:underline"
-          >
-            <img
-              className="mr-1 inline-block size-5 rounded-sm object-cover"
-              alt="game icon"
-              src={bet.icon || gameIcon(bet.gameUnique)}
-            />
-            <span className="ellipsis">{bet.fullName || bet.gameUnique}</span>
-          </GameLink>
-        </div>
-
-        <div className="ellipsis font-semibold text-primary">
-          <Label>Player</Label>
-          {/* The API's sentinel for a hidden player is the same `****` Recent Big Wins
-              uses; a hidden name is plain text, a visible one links to the profile. The
-              sentinel is `Os.hiddenName` on the original — one string in one place — so it
-              lives in context/account.js here rather than as a literal at the call site. */}
-          <div className="truncate text-sm">
-            {bet.userName === HIDDEN_NAME ? (
-              <span className="text-secondary">Hidden</span>
-            ) : (
-              <a href="#" className="hover:underline">
-                {bet.userName}
-              </a>
-            )}
-          </div>
-        </div>
-
-        <div className="hidden font-semibold text-secondary lg:block">
-          <Label>Bet Amount</Label>
-          <div className="flex items-center justify-start truncate text-sm">
-            <span className="overflow-hidden text-nowrap">{formatAmount(bet.throwAmount)}</span>
-            <img
-              className="ml-1 h-5 flex-none"
-              src={coinIcon(bet.currencyName)}
-              alt={bet.currencyName}
-            />
-          </div>
-        </div>
-
-        <div className="font-semibold text-secondary">
-          <Label>Multiplier</Label>
-          {/* SUFFIX, not prefix — `1.01x`. The original's template is
-                Ue = i('<div class="truncate text-sm">x')
-             and the number goes in with `s(r, () => e().toFixed(2), t)` where the marker `t`
-             is that template's first child, i.e. the "x" itself. Inserting BEFORE the marker
-             puts the number in front of the x. This read as `x1.01` here until the chunk was
-             checked, at every width, not just on mobile. */}
-          <div className="truncate text-sm">{mult.toFixed(2)}x</div>
-        </div>
-
-        <div className="text-right font-semibold text-secondary">
-          <Label>Profit</Label>
-          <div
-            className={`flex items-center justify-end truncate text-sm ${
-              won ? 'text-brand' : 'text-secondary'
-            }`}
-          >
-            {/* `precision: m.mobile ? 4 : 5` — the profit column is the one cell the original
-                shortens off-desktop, and it is the reason its mobile numbers fit where ours
-                ran past the column and had the minus sign clipped off the left (this cell is
-                `justify-end` inside `truncate`, so overflow is cut from the START). Bet Amount
-                keeps 5 either way — it only renders at lg. */}
-            <span className="text-nowrap">
-              {won ? '+' : ''}
-              {formatAmount(bet.profitAmount, precision)}
-            </span>
-            <img
-              className="ml-1 h-5 flex-none"
-              src={coinIcon(bet.currencyName)}
-              alt={bet.currencyName}
-            />
-          </div>
-        </div>
+        <span className="text-nowrap">{row.profit}</span>
+        <img className="ml-1 h-5 flex-none" src={row.coinIcon} alt={row.coin} />
       </div>
     </div>
   );
 }
 
-function BetFeed({ source }) {
+function BetFeed({ source, capacity = DEFAULT_CAPACITY }) {
+  const VISIBLE = capacity;
   const inner = React.useRef(null);
   const nextSeq = React.useRef(VISIBLE);
 
   /* Resolved once here rather than per row — ten rows asking the same media query ten times
      would give the same answer ten times. */
-  const precision = useIsDesktop() ? 5 : 4;
+  const desktop = useIsDesktop();
 
   /* `initial` is `[...r].reverse().slice(0, D)` for Latest Bet — the API hands back
    * newest-first and the array wants oldest-first, because column-reverse flips it again.
@@ -297,32 +348,41 @@ function BetFeed({ source }) {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [paused, source]);
+  }, [paused, source, VISIBLE]);
+
+  const height = `${Math.min(rows.length, VISIBLE) * ROW_HEIGHT}px`;
 
   return (
-    /* `te` — the panel. The <style> it carries inline lives in LatestBets.css here. */
-    <div className="relative overflow-hidden rounded-lg bg-layer4 p-2 text-secondary">
-      {/* `$T` outer. The height is `min(count, capacity) * rowHeight`, which is what clips
-          the eleventh row while the slide runs — without it the new row would simply appear
-          below and nothing would move. */}
-      <div
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
-        style={{
-          position: 'relative',
-          overflow: 'hidden',
-          overflowAnchor: 'auto',
-          transformOrigin: 'top',
-          height: `${Math.min(rows.length, VISIBLE) * ROW_HEIGHT}px`,
-        }}
-      >
-        <div
-          ref={inner}
-          style={{ display: 'flex', flexDirection: 'column-reverse', willChange: 'transform' }}
-        >
-          {rows.map((row) => (
-            <BetRow key={row.seq} bet={row.bet} seq={row.seq} precision={precision} />
-          ))}
+    /* `te` — the panel, bc.game's current markup: a `layer4_alt` box holding the column header
+       and, under it, the clipped rolling list. */
+    <div className="relative overflow-hidden rounded-lg bg-layer4_alt p-2 text-secondary">
+      <div>
+        <HeadRow desktop={desktop} />
+        <div className="mt-1 overflow-hidden rounded-lg" style={{ overflowAnchor: 'none', height }}>
+          {/* `$T` outer. The height is `min(count, capacity) * rowHeight`, which is what clips
+              the extra row while the slide runs — without it the new row would simply appear
+              below and nothing would move. */}
+          <div
+            onMouseEnter={() => setHovered(true)}
+            onMouseLeave={() => setHovered(false)}
+            className="rounded-lg"
+            style={{
+              position: 'relative',
+              overflow: 'hidden',
+              overflowAnchor: 'auto',
+              transformOrigin: 'center top',
+              height,
+            }}
+          >
+            <div
+              ref={inner}
+              style={{ display: 'flex', flexDirection: 'column-reverse', willChange: 'transform' }}
+            >
+              {rows.map((row) => (
+                <BetRow key={row.seq} row={row.bet} seq={row.seq} desktop={desktop} />
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -349,7 +409,13 @@ export default function LatestBets() {
   const tabs = contestOn && !raceOff ? TABS : TABS.slice(0, 2);
   const tab = chosen < tabs.length ? chosen : 0;
 
-  const feed = tab === 1 ? rollers : bets;
+  const [pageSize, setPageSize] = React.useState(DEFAULT_CAPACITY);
+
+  /* Every source — live rows, the static showcase, the fixture capture — goes through the same
+     filter (only offered games are advertised) and the same row mapper, so the table prints
+     one shape whatever answered. */
+  const rawFeed = tab === 1 ? rollers : bets;
+  const feed = React.useMemo(() => (rawFeed ?? []).filter(isAdvertised).map(toTableRow), [rawFeed]);
   const feedLoading = tab === 1 ? rollersLoading : betsLoading;
 
   return (
@@ -358,28 +424,24 @@ export default function LatestBets() {
           `!mb-0 !h-10` is the original's own override on this one header. */}
       <SectionHeader className="!h-10 px-4 sm:px-0">Latest round &amp; Race</SectionHeader>
 
-      {/* sm:!-mt-10 lifts the tab strip onto the header's line at desktop; below sm it
-          stays underneath. max-w-100 is 25rem.
+      {/* bc.game's current markup (signed-in desktop capture, 2026-10-16): a `relative mt-6`
+          block holding the page-size picker (absolute, top right, sm and up), the tab strip
+          (left, `mr-auto max-w-100`) and the `tabs-content` panel.
 
-          The gutter has to be on a WRAPPER, not on the capped element — that is the whole
-          reason the strip sat pushed to the right below sm. `ml-auto max-w-100` is the
-          original's own class list, and on the original it never binds on a phone: its page
-          wrapper carries the px-4, so the tab div's containing block is already viewport - 32
-          (343 at 375) against a cap of 25rem (348.8 at that root), and the element just fills
-          it. Ours has no page gutter below sm — each section supplies its own — so putting the
-          px-4 HERE left the containing block at the full 375, the cap bound at 348, and
-          `ml-auto` shunted the 348 to the right edge; the padding then indented the strip
-          again inside that. Same two classes, opposite result, purely from where the 32px of
-          gutter lives. */}
-      <div className="px-4 sm:px-0">
-        <div className="ml-auto mt-2 max-w-100 sm:!-mt-10">
-          <div className="tabs-title hide-scroll" role="tablist">
+          `px-4 sm:px-0` is ours: the original inherits this gutter from its page wrapper, and
+          below sm ours has none — each home section supplies its own. It sits on this wrapper
+          rather than on `tabs-content`, whose layer4 fill would otherwise paint into it. */}
+      <div className="relative mt-6 px-4 sm:px-0">
+        {tab !== 2 && <PageSize value={pageSize} onChange={setPageSize} />}
+
+        <div role="tablist" className="scroll-x tabs-title hide-scroll mr-auto max-w-100">
+          <div className="tabs-btn-group">
             {tabs.map((title, i) => (
               <button
                 key={title}
                 type="button"
                 role="tab"
-                className="tabs-btn"
+                className="tabs-btn btn-like"
                 aria-selected={tab === i ? 'true' : undefined}
                 onClick={() => setTab(i)}
               >
@@ -387,46 +449,38 @@ export default function LatestBets() {
               </button>
             ))}
           </div>
+          {/* Drawn unconditionally as on the original; `.tabs-indicator` only shows in the
+              `data-type="indicator"` variant, which this strip is not. */}
+          <div className="tabs-indicator test-indicator-tab" />
         </div>
-      </div>
 
-      {/* The third tab drops the layer4 panel — its own class list is
-          `bg-transparent`, since the contest brings its own cards.
+        {/* The third tab drops the panel fill — the contest brings its own cards.
 
-          `px-4 sm:px-0` is ours, for the same reason as the tab strip above: the original
-          inherits this gutter from its page wrapper, and below sm ours does not have one, so
-          the panel was bleeding to both window edges while the heading above it sat inset.
-
-          `my-3` IS THE ORIGINAL'S OWN AND IS BACK TO IT. This panel is the home page's LAST CHILD
-          and the page root carries no padding and no border, so its bottom margin COLLAPSES
-          THROUGH the root and only the LARGER of the two is ever the gap above the tabbar. That
-          clearance is measured off the reference at 2.75rem and lives in Home.css, which is over
-          three times this, so a mobile arm here would be dead weight — it had one for a couple of
-          passes while the page value was under 0.75rem, and that is the only condition under
-          which anything needs writing here. Check that note before adding one back. */}
-      <div
-        className={`my-3 min-h-96 rounded-xl px-4 font-semibold sm:px-0 ${
-          tab === 2 ? 'bg-transparent' : ''
-        }`}
-      >
-        {/* One spinner for the panel, keyed to whichever feed the open tab reads. `min-h-96` on
-            the wrapper is the original's own, so the box is already the height the rows will
-            fill and nothing below the section moves when they land — which is the whole reason
-            the loader goes inside it rather than replacing it. */}
-        {(tab === 2 ? contestLoading : feedLoading) ? (
-          <div className="center h-96">
-            <Loading />
-          </div>
-        ) : tab === 2 ? (
-          contest && <Contest contest={contest.contest} standings={contest.standings} />
-        ) : (
-          /* KEYED ON THE TAB, so switching between Latest Bet and High Roller REMOUNTS the feed.
-             Without it React keeps the same component instance and its `rows` state — the ten
-             rows already on screen — while only the `source` prop changes, so the panel would go
-             on showing the old tab's bets until the ticker had pushed ten more of the new ones.
-             The original has no equivalent hazard: `ze` is instantiated per type. */
-          <BetFeed key={tab} source={feed ?? []} />
-        )}
+            `my-3` IS THE ORIGINAL'S OWN. This block is the home page's LAST CHILD and the page
+            root carries no padding and no border, so its bottom margin collapses through the
+            root and only the larger of the two is the gap above the tabbar (Home.css). */}
+        <div
+          className={`tabs-content my-3 min-h-96 rounded-xl font-semibold ${
+            tab === 2 ? 'bg-transparent' : ''
+          }`}
+        >
+          {/* One spinner for the panel, keyed to whichever feed the open tab reads. `min-h-96` is
+              the original's own, so the box is already tall and nothing below moves when rows land. */}
+          {(tab === 2 ? contestLoading : feedLoading) ? (
+            <div className="center h-96">
+              <Loading />
+            </div>
+          ) : tab === 2 ? (
+            contest && <Contest contest={contest.contest} standings={contest.standings} />
+          ) : (
+            /* KEYED ON THE TAB AND THE PAGE SIZE, so either change REMOUNTS the feed. Without it
+               React keeps the same instance and its `rows` state while only the props change, so
+               the panel would go on showing the old tab's bets (or the old row count) until the
+               ticker had pushed a screenful of new ones. `ze` is instantiated per type on the
+               original. */
+            <BetFeed key={`${tab}-${pageSize}`} source={feed} capacity={pageSize} />
+          )}
+        </div>
       </div>
     </>
   );

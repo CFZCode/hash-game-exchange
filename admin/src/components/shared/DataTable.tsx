@@ -34,6 +34,7 @@ export type Column<T> = {
   cell: (row: T, index: number) => ReactNode
   className?: string
   headerClassName?: string
+
   /** Set to enable a sort toggle on this column (server-side; the value goes to `?sort=`). */
   sortKey?: string
   align?: 'left' | 'right' | 'center'
@@ -54,6 +55,7 @@ type Props<T> = {
   search?: string
   onSearchChange?: (value: string) => void
   searchPlaceholder?: string
+
   /** Filters, buttons — rendered in the toolbar next to search. */
   toolbar?: ReactNode
   emptyMessage?: ReactNode

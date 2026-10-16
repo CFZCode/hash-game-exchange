@@ -4,27 +4,23 @@ import { useState, type ReactNode } from 'react'
 
 import Link from 'next/link'
 
-import { LockIcon, RefreshCwIcon, ShieldAlertIcon } from 'lucide-react'
-import { toast } from 'sonner'
+import { BanknoteXIcon, DicesIcon, LockIcon, LockOpenIcon, RefreshCwIcon, ShieldAlertIcon, TrophyIcon } from 'lucide-react'
 
 import DataTable, { type Column } from '@/components/shared/DataTable'
 import DateTime from '@/components/shared/DateTime'
 import ErrorState from '@/components/shared/ErrorState'
-import FormDialog from '@/components/shared/FormDialog'
-import { SwitchField, TextField } from '@/components/shared/FormField'
 import Money from '@/components/shared/Money'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Switch } from '@/components/ui/switch'
 import { useSession } from '@/contexts/SessionContext'
 import { useApi, useApiMutation } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
 import { cn } from '@/lib/utils'
-import { TxnPasswordLabel } from '@/views/finance/StaffFloat'
 import GeoAttribution from './GeoAttribution'
-import WithdrawBlockAction from './WithdrawBlockAction'
 import { countryFlag } from './geo'
 import type { PlayerRisk, RiskBet, RiskCasinoBet, RiskIp, RiskLogin } from './types'
 
@@ -239,112 +235,71 @@ const betColumns: Column<AnyBet>[] = [
 const BET_ROWS = 10
 
 /**
- * The account, casino and sports locks and the betting status, through `POST admin/accounts/status`
- * (users:lock, own tree only, the caller's transaction password — the login password while
- * TXN_PASSWORD_MODE=login). Only what changed is sent. The withdrawal block is the user page's own
- * action (`POST admin/locks`, users:write).
+ * Lock Controls — reference admin (admin-structure.zip → RiskManagementDialog) jaisa: har lock ka
+ * apna switch, turant lagta hai (`POST admin/locks`, users:write, audited `account.lock`), aur
+ * neeche "Lock Account" / "Unlock Account". Betting status aur account status sirf dikhte hain.
  */
+const LOCKS = [
+  { key: 'system', field: 'isLocked', label: 'Account Locked', hint: 'Blocks all logins and activity', icon: <LockIcon /> },
+  { key: 'sports', field: 'sportsBetlocked', label: 'Sports Bet Lock', hint: 'Prevents sportsbook wagers', icon: <TrophyIcon /> },
+  { key: 'casino', field: 'casinoLocked', label: 'Casino Lock', hint: 'Prevents casino play', icon: <DicesIcon /> },
+  { key: 'withdraw', field: 'withdrawLocked', label: 'Withdrawal Lock', hint: 'Rejects all withdrawals for this user', icon: <BanknoteXIcon /> }
+] as const
+
 const LockControls = ({ userId, data }: { userId: string; data: PlayerRisk }) => {
   const { can } = useSession()
   const l = data.locks
-  const current = () => ({ system: l.isLocked, casino: l.casinoLocked, sports: l.sportsBetlocked, betting: l.betStatus === 'suspended' })
-  const [form, setForm] = useState(current)
-  const [password, setPassword] = useState('')
-  const invalidate = [['api', riskPath(userId)], ['api', `admin/reports/players/${userId}`], ['api', `admin/reports/players/${userId}/status-stats`]]
+  const canEdit = can('users:write')
+  const invalidate = [['api', riskPath(userId)], ['api', `admin/reports/players/${userId}`], ['api', `admin/reports/players/${userId}/status-stats`], ['paged', 'admin/reports/user-list']]
 
-  const apply = useApiMutation({
-    fn: () => {
-      const was = current()
-      const body: Record<string, unknown> = { accountType: 'user', accountId: Number(userId), transactionPassword: password }
-
-      if (form.system !== was.system) body.systemLocked = form.system
-      if (form.casino !== was.casino) body.casinoLocked = form.casino
-      if (form.sports !== was.sports) body.sportsLocked = form.sports
-      if (form.betting !== was.betting) body.betStatus = form.betting ? 'suspended' : 'active'
-
-      return api.post('admin/accounts/status', body)
-    },
+  const toggle = useApiMutation<{ key: (typeof LOCKS)[number]['key']; value: boolean }>({
+    fn: ({ key, value }) => api.post('admin/locks', { userId: Number(userId), [key]: value }),
     invalidate,
-    success: 'Locks updated',
-    onSuccess: () => setPassword('')
+    success: (_r, v) => `${LOCKS.find(x => x.key === v.key)?.label ?? 'Lock'} ${v.value ? 'enabled' : 'disabled'}`
   })
 
-  const was = current()
-  const changes = (['system', 'casino', 'sports', 'betting'] as const).filter(k => form[k] !== was[k])
-  const canLock = can('users:lock')
-  const canWithdraw = can('users:write')
-
-  const state = (on: boolean, label: string) => (
-    <div className='flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm'>
-      <span>{label}</span>
-      {on ? (
-        <Badge variant='destructive'>
-          <LockIcon /> Locked
-        </Badge>
-      ) : (
-        <Badge variant='outline'>Open</Badge>
-      )}
-    </div>
-  )
-
   return (
-    <Section
-      title='Locks'
-      action={
-        canLock || canWithdraw ? (
-          <span className='flex flex-wrap gap-2'>
-            {canWithdraw && (
-              <WithdrawBlockAction
-                target={{ kind: 'user', id: userId }}
-                locks={{ withdraw: l.withdrawLocked }}
-                invalidate={invalidate}
-              />
-            )}
-            {canLock && (
-              <FormDialog
-                trigger={
-                  <Button variant='outline'>
-                    <LockIcon /> Change locks
-                  </Button>
-                }
-                title={`Change locks · ${data.user.name || `#${userId}`}`}
-                description='Each switch shows the current state. A change takes effect immediately and is audited.'
-                submitLabel={changes.length ? `Apply ${changes.length} change${changes.length === 1 ? '' : 's'}` : 'No changes'}
-                destructive={changes.some(k => form[k])}
-                onOpenChange={o => {
-                  if (o) setForm(current())
-                  setPassword('')
-                }}
-                onSubmit={() => {
-                  if (changes.length) return apply.mutateAsync()
-                  toast.info('Nothing changed')
+    <Section title='Lock Controls'>
+      <div className='grid grid-cols-1 gap-2 sm:grid-cols-2'>
+        {LOCKS.map(lk => {
+          const on = Boolean(l[lk.field])
 
-                  return Promise.reject(new Error('no change'))
-                }}
-              >
-                <SwitchField id='rl-system' label='Account lock' hint='Blocks sign-in and everything else' checked={form.system} onChange={system => setForm({ ...form, system })} />
-                <SwitchField id='rl-sports' label='Sports bet lock' hint='No new sports / exchange bets' checked={form.sports} onChange={sports => setForm({ ...form, sports })} />
-                <SwitchField id='rl-casino' label='Casino lock' hint='No casino games' checked={form.casino} onChange={casino => setForm({ ...form, casino })} />
-                <SwitchField id='rl-betting' label='Betting suspended' hint='Bet status: suspends all betting' checked={form.betting} onChange={betting => setForm({ ...form, betting })} />
-                <TextField id='rl-pw' label={<TxnPasswordLabel />} type='password' autoComplete='current-password' required value={password} onChange={e => setPassword(e.target.value)} />
-              </FormDialog>
-            )}
-          </span>
-        ) : undefined
-      }
-    >
-      <div className='grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3'>
-        {state(l.isLocked, 'Account')}
-        {state(l.sportsBetlocked, 'Sports bets')}
-        {state(l.casinoLocked, 'Casino')}
-        {state(l.betStatus === 'suspended', 'Betting status')}
-        {l.withdrawLocked !== undefined && state(l.withdrawLocked, 'Withdrawals')}
-        <div className='flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm'>
-          <span>Account status</span>
-          <Badge variant={l.status && l.status !== 'active' ? 'destructive' : 'outline'}>{l.status ?? '—'}</Badge>
-        </div>
+          return (
+            <label key={lk.key} className={cn('flex items-center gap-3 rounded-md border px-3 py-2', on && 'border-danger/40 bg-danger/5')}>
+              <Switch
+                checked={on}
+                disabled={!canEdit || toggle.isPending || l[lk.field] === undefined}
+                onCheckedChange={value => toggle.mutate({ key: lk.key, value })}
+                aria-label={lk.label}
+              />
+              <span className='min-w-0'>
+                <span className={cn('flex items-center gap-1 text-sm font-semibold [&_svg]:size-4', on && 'text-danger')}>
+                  {lk.icon} {lk.label}
+                </span>
+                <span className='text-muted-foreground block text-xs'>{lk.hint}</span>
+              </span>
+            </label>
+          )
+        })}
       </div>
-      {!canLock && !canWithdraw && <p className='text-muted-foreground mt-2 text-xs'>Your role can view locks but not change them.</p>}
+
+      <div className='mt-3 flex flex-wrap items-center gap-2'>
+        <Button variant='destructive' disabled={!canEdit || l.isLocked || toggle.isPending} onClick={() => toggle.mutate({ key: 'system', value: true })}>
+          <LockIcon /> Lock Account
+        </Button>
+        <Button variant='outline' disabled={!canEdit || !l.isLocked || toggle.isPending} onClick={() => toggle.mutate({ key: 'system', value: false })}>
+          <LockOpenIcon /> Unlock Account
+        </Button>
+        <span className='text-muted-foreground ml-auto flex flex-wrap gap-2 text-xs'>
+          <span>
+            Betting: <Badge variant={l.betStatus === 'suspended' ? 'destructive' : 'outline'}>{l.betStatus ?? 'active'}</Badge>
+          </span>
+          <span>
+            Status: <Badge variant={l.status && l.status !== 'active' ? 'destructive' : 'outline'}>{l.status ?? '—'}</Badge>
+          </span>
+        </span>
+      </div>
+      {!canEdit && <p className='text-muted-foreground mt-2 text-xs'>Your role can view locks but not change them.</p>}
     </Section>
   )
 }

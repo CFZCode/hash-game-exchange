@@ -20,6 +20,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { useApiMutation, useListState, usePagedApi } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
 import { formatDate } from '@/lib/format'
+import { check } from '@/lib/validate'
 import { DOCUMENT_FIELDS, KYC_STATUSES, type KycApplication, type KycStatus } from './types'
 
 const LIST = 'admin/user/kyc/applications'
@@ -71,7 +72,7 @@ const KycDetail = ({ app, onClose }: { app: KycApplication | null; onClose: () =
   const invalidate = [['paged', LIST]]
 
   const review = useApiMutation({
-    fn: (status: KycStatus) => api.put('admin/user/kyc/review', { userId: Number(app?.userId), status, ...(status === 'Rejected' ? { rejectionReason: reason } : {}) }),
+    fn: (status: KycStatus) => api.put('admin/user/kyc/review', { userId: Number(app?.userId), status, ...(status === 'Rejected' ? { rejectionReason: reason.trim() } : {}) }),
     invalidate,
     success: (_r, status) => `KYC marked ${status}`,
     onSuccess: () => {
@@ -114,7 +115,6 @@ const KycDetail = ({ app, onClose }: { app: KycApplication | null; onClose: () =
                   <p className='text-muted-foreground mb-1 text-xs font-medium'>{d.label}</p>
                   {app.documents?.[d.field] ? (
                     <a href={api.url(`admin/user/kyc/documents/${app.id}/${d.field}`)} target='_blank' rel='noreferrer'>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={api.url(`admin/user/kyc/documents/${app.id}/${d.field}`)} alt={d.label} className='bg-muted h-44 w-full rounded object-contain' />
                     </a>
                   ) : (
@@ -135,9 +135,10 @@ const KycDetail = ({ app, onClose }: { app: KycApplication | null; onClose: () =
                   description='The reason is shown to the user.'
                   submitLabel='Reject'
                   destructive
+                  validate={() => ({ rejectionReason: check.required(reason, 'Reason') ?? check.length(reason, 'Reason', { max: 500 }) })}
                   onSubmit={() => review.mutateAsync('Rejected')}
                 >
-                  <TextAreaField id='kyc-reason' label='Reason' required maxLength={500} value={reason} onChange={e => setReason(e.target.value)} />
+                  <TextAreaField id='kyc-reason' name='rejectionReason' label='Reason' required maxLength={500} value={reason} onChange={e => setReason(e.target.value)} />
                 </FormDialog>
                 <ConfirmDialog
                   trigger={
@@ -166,7 +167,7 @@ const StatusChip = ({ status, active, onClick }: { status: string; active: boole
     <Button size='sm' variant={active ? 'default' : 'outline'} onClick={onClick}>
       {status || 'All'}
       <Badge variant='secondary' className='ml-1'>
-        {count.data?.pagination.total ?? '…'}
+        {count.error ? '–' : (count.data?.pagination.total ?? '…')}
       </Badge>
     </Button>
   )

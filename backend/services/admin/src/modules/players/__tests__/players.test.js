@@ -30,28 +30,6 @@ let nextId = 600_000_000 + (process.pid % 100_000) * 1000;
 const newId = () => (nextId += 1);
 
 test('player validators', async (t) => {
-  await t.test('an opening balance is a positive decimal STRING', () => {
-    /**
-     * `initial_balance` came off the body unvalidated in legacy and was
-     * compared with `>` against a balance read.
-     */
-    const parse = (initialBalance) =>
-      v.create.body.safeParse({ username: 'someone', password: 'correct-horse', initialBalance });
-
-    assert.equal(parse('1000.50').success, true);
-    assert.equal(parse('-500').success, false, 'a negative would run the transfer backwards');
-    assert.equal(parse(1000).success, false, 'a number is not a decimal string');
-    assert.equal(parse('1e5').success, false);
-    assert.equal(parse('abc').success, false);
-  });
-
-  await t.test('the create body accepts a transaction password', () => {
-    assert.equal(
-      v.create.body.safeParse({ username: 'someone', password: 'correct-horse', initialBalance: '10', transactionPassword: 'x' }).success,
-      true
-    );
-  });
-
   await t.test('a close needs a reason', () => {
     // Legacy recorded that a delete happened and nothing about why, for an
     // action that was irreversible.
@@ -67,9 +45,11 @@ test('player validators', async (t) => {
     // `.strict()` — a caller sending `role_id` or `parent_staff_id` directly
     // gets an error rather than having it quietly dropped.
     assert.equal(
-      v.create.body.safeParse({ username: 'x'.repeat(5), password: 'correct-horse', role_id: 1 }).success,
+      v.update.body.safeParse({ username: 'x'.repeat(5), role_id: 1 }).success,
       false
     );
+    // Agent ke neeche daalna (parentId) bahar se nahi — sirf Sports Exchange.
+    assert.equal(v.update.body.safeParse({ parentId: 5 }).success, false);
   });
 });
 
@@ -331,27 +311,6 @@ test('players against a database', async (t) => {
         }),
       (err) => err.code === 'PLAYERS_NOT_PERMITTED'
     );
-  });
-
-  await t.test('a player cannot be re-parented outside the caller\'s tree', async () => {
-    /**
-     * Legacy wrote `parent_staff_id` straight from the body with no check, so
-     * an agent could hand any player they could see to any staff id at all.
-     */
-    const player = await service.create({
-      actor: asAgent,
-      username: `p${newId()}`,
-      password: 'correct-horse-battery',
-    });
-    created.push(Number(player.id));
-
-    await assert.rejects(
-      () => service.update({ actor: asAgent, playerId: player.id, parentId: rival }),
-      (err) => err.code === 'PLAYERS_CANNOT_REPARENT_OUTSIDE_TREE'
-    );
-
-    const row = await models.Users.findOne({ where: { id: player.id }, raw: true });
-    assert.equal(String(row.parent_staff_id), String(agent));
   });
 
   await t.test('an agent cannot edit a rival\'s player', async () => {

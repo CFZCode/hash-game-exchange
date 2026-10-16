@@ -19,8 +19,10 @@ const { StaffService } = require('../../staff/staff.service');
  *
  *   - owner apne wallet me balance add karta hai (sirf owner, password ke saath)
  *   - owner apne child ko deta hai → owner ka balance katta hai
- *   - owner DIRECT user (koi parent nahi) ko deta hai → owner ka balance nahi katta,
- *     history 'direct' + point ledger 'Bank Deposite' / 'Bank Withdraw'
+ *   - owner DIRECT user (koi parent nahi) ko deta hai → owner ke Direct User balance
+ *     (`staff_balances`) se katta hai, credits nahi; history 'direct' + point ledger
+ *     'Bank Deposite' / 'Bank Withdraw'
+ *   - owner apne Direct User balance me add karta hai → 'owner_direct_topup'
  *   - parent ↔ direct child ke har len-den ki point ledger entry (credit/all_point bhi)
  */
 
@@ -125,6 +127,11 @@ test('owner wallet and the point ledger', async (t) => {
   const dec = (value) => money.toDecimalString(money.toMinorQuantised(value ?? '0'));
   const walletOfStaff = (id) => models.StaffCredits.findOne({ where: { staff_id: id }, raw: true });
   const walletOfPlayer = (uid) => models.Credits.findOne({ where: { uid }, raw: true });
+  const directOf = async (id) => dec((await models.StaffBalances.findOne({ where: { staff_id: id }, raw: true }))?.inr);
+  const setDirect = async (id, inr) => {
+    await models.StaffBalances.destroy({ where: { staff_id: id } });
+    if (inr !== null) await models.StaffBalances.create({ staff_id: id, inr });
+  };
   const lastPointEntry = async (walletId) => {
     const [row] = await connection.sequelize.query(
       'SELECT * FROM mssports.point_ledger WHERE wallet_id = :walletId ORDER BY id DESC LIMIT 1',
@@ -191,6 +198,36 @@ test('owner wallet and the point ledger', async (t) => {
     assert.equal(dec((await walletOfStaff(owner)).inr), '0.00000000', 'nothing added');
   });
 
+  await t.test('the owner adds to the Direct User balance (staff_balances), credits untouched', async () => {
+    const owner = await seedStaff(newStaffId(), { owner: true, inr: '50' });
+    await setDirect(owner, null);
+
+    const result = await exchange.ownerAddDirectBalance({ actor: ownerActor(owner), amount: '2500', note: 'direct float', transactionPassword: TXN_PASSWORD });
+
+    assert.equal(dec(result.balance), '2500.00000000');
+    assert.equal(await directOf(owner), '2500.00000000');
+    assert.equal(dec((await walletOfStaff(owner)).inr), '50.00000000', 'Agent System balance not touched');
+
+    const row = await models.StaffTransfers.findByPk(result.transferId, { raw: true });
+    assert.equal(row.transfer_type, 'owner_direct_topup');
+    assert.equal(row.from_type, 'system');
+
+    const wallet = await exchange.ownerWallet({ actor: ownerActor(owner) });
+    assert.equal(dec(wallet.directBalance), '2500.00000000');
+    assert.equal(dec(wallet.wallet.balance), '50.00000000');
+
+    // Sirf owner, password ke saath.
+    await assert.rejects(
+      () => exchange.ownerAddDirectBalance({ actor: { id: owner, level: 6, canIssueFunds: false }, amount: '10', transactionPassword: TXN_PASSWORD }),
+      (err) => err.code === 'EXCHANGE_OWNER_ONLY'
+    );
+    await assert.rejects(
+      () => exchange.ownerAddDirectBalance({ actor: ownerActor(owner), amount: '10', transactionPassword: 'wrong' }),
+      (err) => String(err.code).startsWith('TXN_PASSWORD')
+    );
+    assert.equal(await directOf(owner), '2500.00000000');
+  });
+
   // ══════════════════════════════════════════════════════════════════════
   //  Owner → child: owner ka balance katta hai
   // ══════════════════════════════════════════════════════════════════════
@@ -237,13 +274,16 @@ test('owner wallet and the point ledger', async (t) => {
   //  Owner → direct user: owner ka balance nahi katta
   // ══════════════════════════════════════════════════════════════════════
 
-  await t.test('owner credits a DIRECT user: player gets it, owner wallet untouched, "Bank Deposite"', async () => {
-    const owner = await seedStaff(newStaffId(), { owner: true, inr: '0' });
+  await t.test('owner credits a DIRECT user: paid from the Direct User balance, credits untouched, "Bank Deposite"', async () => {
+    const owner = await seedStaff(newStaffId(), { owner: true, inr: '5000' });
     const player = await seedPlayer(newUid(), null, '0');
+    await setDirect(owner, '1000');
 
     const result = await ownerAdjust(owner, player, 'credit', '400');
 
-    assert.equal(dec((await walletOfStaff(owner)).inr), '0.00000000', 'owner wallet not charged');
+    assert.equal(dec((await walletOfStaff(owner)).inr), '5000.00000000', 'Agent System balance not charged');
+    assert.equal(await directOf(owner), '600.00000000', 'Direct User balance paid');
+    assert.equal(dec(result.directBalance), '600.00000000');
     const wallet = await walletOfPlayer(player);
     assert.equal(dec(wallet.inr), '400.00000000');
 
@@ -256,13 +296,29 @@ test('owner wallet and the point ledger', async (t) => {
     assert.equal(ledger.reason, 'TRANSFER_IN');
   });
 
-  await t.test('owner debits a DIRECT user: player loses it, owner wallet untouched, "Bank Withdraw"', async () => {
+  await t.test('owner cannot give a DIRECT user more than the Direct User balance, even with credits to spare', async () => {
+    const owner = await seedStaff(newStaffId(), { owner: true, inr: '10000' });
+    const player = await seedPlayer(newUid(), null, '0');
+    await setDirect(owner, '100');
+
+    await assert.rejects(
+      () => ownerAdjust(owner, player, 'credit', '500'),
+      (err) => err.code === 'INSUFFICIENT_FUNDS' && err.details?.party === 'owner_direct'
+    );
+    assert.equal(dec((await walletOfPlayer(player)).inr), '0.00000000');
+    assert.equal(await directOf(owner), '100.00000000');
+    assert.equal(dec((await walletOfStaff(owner)).inr), '10000.00000000');
+  });
+
+  await t.test('owner debits a DIRECT user: the money goes to the Direct User balance, "Bank Withdraw"', async () => {
     const owner = await seedStaff(newStaffId(), { owner: true, inr: '50' });
     const player = await seedPlayer(newUid(), null, '400');
+    await setDirect(owner, null);
 
     await ownerAdjust(owner, player, 'debit', '150');
 
-    assert.equal(dec((await walletOfStaff(owner)).inr), '50.00000000', 'owner wallet not credited');
+    assert.equal(dec((await walletOfStaff(owner)).inr), '50.00000000', 'Agent System balance not credited');
+    assert.equal(await directOf(owner), '150.00000000', 'Direct User balance credited');
     const wallet = await walletOfPlayer(player);
     assert.equal(dec(wallet.inr), '250.00000000');
     assert.equal((await lastPointEntry(wallet.id)).event_type, 'Bank Withdraw');

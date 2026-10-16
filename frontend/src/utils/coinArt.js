@@ -1,4 +1,5 @@
 import * as globMaps from './coinArt.globs.js';
+import { ownerImage } from '../services/currencies';
 /* The coin-image glob, in one module for the reason `utils/gameArt.js` is: `import.meta.glob`
  * resolves relative to the file it is written in, so a shared glob can only live in one place.
  *
@@ -58,4 +59,6 @@ const coins = globMaps.coins;
    Cryptocurrency and render with an empty 24px box. Confirmed in a browser against the live
    backend — 28 rows, 5 with `naturalWidth === 0`. Both behaviours are the original's own chunks,
    which is why this is recorded rather than reconciled. */
-export const coinIcon = (currencyName) => coins[`../assets/coins/${currencyName}.png`];
+/* A coin this build has no file for (USDP, MKR, MVR…) falls back to the owner's own artwork from
+   `/admin/currencies/public`, so it never renders as an empty box. */
+export const coinIcon = (currencyName) => coins[`../assets/coins/${currencyName}.png`] ?? ownerImage(currencyName);

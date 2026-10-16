@@ -1,6 +1,6 @@
 'use strict';
 
-const { Op, QueryTypes, literal } = require('sequelize');
+const { QueryTypes } = require('sequelize');
 const { money } = require('@ibitplay/common');
 const { creditStaffFloat, insufficientFunds } = require('./staffFloat');
 const { TRANSFER_TYPE } = require('./lords.constants');
@@ -8,7 +8,7 @@ const { TRANSFER_TYPE } = require('./lords.constants');
 /**
  * Owner (Super Admin, level 1) ke DO balance hain:
  *
- *   Client Management balance → `credits.inr` (user_type 'OWNER', migration 099)
+ *   Agent System balance → `credits.inr` (user_type 'OWNER', migration 099)
  *     Sirf children ke liye: staff/agent aur parent wale players.
  *
  *   Direct User balance → `staff_balances.inr` (owner ki row)
@@ -16,7 +16,7 @@ const { TRANSFER_TYPE } = require('./lords.constants');
  *
  * Rules:
  *
- *   1. Owner khud apne Client Management balance me add karta hai → `addOwnerBalance`
+ *   1. Owner khud apne Agent System balance me add karta hai → `addOwnerBalance`
  *      (inr + credit + all_point badhte hain, point ledger me "Credit" — zip jaisa).
  *
  *   2. Owner khud apne Direct User balance me add karta hai → `addOwnerDirectBalance`
@@ -26,7 +26,7 @@ const { TRANSFER_TYPE } = require('./lords.constants');
  *
  *   4. Owner DIRECT user ko deta hai → `staff_balances.inr` se katta hai;
  *      direct user se leta hai → wapas `staff_balances.inr` me jaata hai.
- *      Client Management balance (credits) is len-den me nahi aata.
+ *      Agent System balance (credits) is len-den me nahi aata.
  *      History: transfer_type 'direct', point ledger 'Bank Deposite' / 'Bank Withdraw'.
  */
 
@@ -45,32 +45,126 @@ async function readOwnerDirectBalance(models, ownerId, { transaction } = {}) {
   return money.toDecimalString(money.toMinorQuantised(row?.inr ?? '0'));
 }
 
+/** Ledger ki entry types (`owner_direct_ledger.entry_type`). */
+const LEDGER_TYPE = Object.freeze({
+  ADD: 'add', // owner ne khud wallet me daala
+  USER_DEPOSIT: 'user_deposit', // direct user ko diya
+  USER_WITHDRAW: 'user_withdraw', // direct user se liya
+  POINTS_SETTLE: 'points_settle', // direct user ke saath points settle
+});
+
+/**
+ * Wallet ke har badlav pe ledger row — usi transaction me, taaki wallet aur ledger
+ * kabhi alag na hon. `after` DB ka naya balance hai, `before` usi se nikalte hain.
+ * `entry` = { type, userId, note, currency?, currencyAmount?, rate? }.
+ */
+async function writeLedger(models, { ownerId, direction, amount, after, entry = {} }, { transaction }) {
+  const afterMinor = money.toMinorQuantised(after);
+  const amountMinor = money.toMinor(amount);
+  const beforeMinor = direction === 'credit' ? afterMinor - amountMinor : afterMinor + amountMinor;
+
+  await models.StaffBalances.sequelize.query(
+    `INSERT INTO owner_direct_ledger
+       (owner_id, entry_type, direction, amount, balance_before, balance_after, user_id, note,
+        currency, currency_amount, rate, created_at)
+     VALUES (:ownerId, :type, :direction, :amount, :before, :after, :userId, :note,
+        :currency, :currencyAmount, :rate, NOW())`,
+    {
+      replacements: {
+        ownerId,
+        type: entry.type ?? (direction === 'credit' ? LEDGER_TYPE.ADD : LEDGER_TYPE.USER_DEPOSIT),
+        direction,
+        amount,
+        before: money.toDecimalString(beforeMinor),
+        after: money.toDecimalString(afterMinor),
+        userId: entry.userId ?? null,
+        note: entry.note ? String(entry.note).slice(0, 255) : null,
+        // Direct User Wallet: user ko kis currency me gaya (INR value upar `amount` me).
+        currency: entry.currency ?? null,
+        currencyAmount: entry.currencyAmount ?? null,
+        rate: entry.rate ?? null,
+      },
+      transaction,
+    }
+  );
+}
+
 /**
  * Direct User balance se `amount` kaato. Guard `inr >= amount` UPDATE ke andar
  * hai (Postgres row lock), isliye do request saath me bhi minus me nahi le ja sakti.
+ * `entry` = ledger ke liye { type, userId, note }.
  *
  * @returns {Promise<boolean>} false = balance kam hai, kuch nahi likha.
  */
-async function debitOwnerDirectBalance(models, ownerId, amount, { transaction } = {}) {
+async function debitOwnerDirectBalance(models, ownerId, amount, { transaction, entry } = {}) {
   const decimal = toDecimal(amount);
-  const [affected] = await models.StaffBalances.update(
-    { inr: literal(`inr - ${decimal}`) },
-    { where: { staff_id: ownerId, inr: { [Op.gte]: decimal } }, transaction }
+  const rows = await models.StaffBalances.sequelize.query(
+    'UPDATE staff_balances SET inr = inr - :amount WHERE staff_id = :ownerId AND inr >= :amount RETURNING inr',
+    { replacements: { amount: decimal, ownerId }, type: QueryTypes.SELECT, transaction }
   );
-  return affected > 0;
+  if (!rows.length) return false;
+
+  await writeLedger(models, { ownerId, direction: 'debit', amount: decimal, after: rows[0].inr, entry }, { transaction });
+  return true;
 }
 
-/** Direct User balance me `amount` jodo (row na ho to banao). */
-async function creditOwnerDirectBalance(models, ownerId, amount, { transaction } = {}) {
+/** Direct User balance me `amount` jodo (row na ho to banao). `entry` = ledger ke liye. */
+async function creditOwnerDirectBalance(models, ownerId, amount, { transaction, entry } = {}) {
   const decimal = toDecimal(amount);
-  const [, created] = await models.StaffBalances.findOrCreate({
-    where: { staff_id: ownerId },
-    defaults: { staff_id: ownerId, inr: decimal },
-    transaction,
+  const [row] = await models.StaffBalances.sequelize.query(
+    `INSERT INTO staff_balances (staff_id, inr) VALUES (:ownerId, :amount)
+     ON CONFLICT (staff_id) DO UPDATE SET inr = staff_balances.inr + EXCLUDED.inr
+     RETURNING inr`,
+    { replacements: { amount: decimal, ownerId }, type: QueryTypes.SELECT, transaction }
+  );
+
+  await writeLedger(models, { ownerId, direction: 'credit', amount: decimal, after: row.inr, entry }, { transaction });
+}
+
+/**
+ * Owner ke Direct User wallet ka ledger, naya pehle. Direct user ka naam bhi saath me.
+ * `from` / `to` = Date (optional).
+ */
+async function listOwnerDirectLedger(models, ownerId, { limit = 25, offset = 0, from, to } = {}) {
+  const where = ['l.owner_id = :ownerId'];
+  if (from) where.push('l.created_at >= :from');
+  if (to) where.push('l.created_at <= :to');
+  const filter = where.join(' AND ');
+  const replacements = { ownerId, limit, offset, from: from ?? null, to: to ?? null };
+
+  const rows = await models.StaffBalances.sequelize.query(
+    `SELECT l.id, l.entry_type, l.direction, l.amount, l.balance_before, l.balance_after,
+            l.user_id, u.name AS username, l.note, l.currency, l.currency_amount, l.rate, l.created_at
+       FROM owner_direct_ledger l
+       LEFT JOIN users u ON u.id = l.user_id
+      WHERE ${filter}
+      ORDER BY l.created_at DESC, l.id DESC
+      LIMIT :limit OFFSET :offset`,
+    { replacements, type: QueryTypes.SELECT }
+  );
+  const [{ total }] = await models.StaffBalances.sequelize.query(`SELECT COUNT(*)::int AS total FROM owner_direct_ledger l WHERE ${filter}`, {
+    replacements,
+    type: QueryTypes.SELECT,
   });
-  if (!created) {
-    await models.StaffBalances.increment({ inr: decimal }, { where: { staff_id: ownerId }, transaction });
-  }
+
+  return {
+    total,
+    rows: rows.map((r) => ({
+      id: String(r.id),
+      type: r.entry_type,
+      direction: r.direction,
+      amount: money.fromStored(r.amount),
+      balanceBefore: money.fromStored(r.balance_before),
+      balanceAfter: money.fromStored(r.balance_after),
+      user: r.user_id ? { id: String(r.user_id), name: r.username ?? null } : null,
+      note: r.note,
+      // User ko kis currency me (sirf Direct User Wallet wali entries me; baaki me null).
+      currency: r.currency ?? null,
+      currencyAmount: r.currency_amount != null ? money.fromStored(r.currency_amount) : null,
+      rate: r.rate != null ? money.fromStored(r.rate) : null,
+      createdAt: r.created_at,
+    })),
+  };
 }
 
 /**
@@ -79,7 +173,10 @@ async function creditOwnerDirectBalance(models, ownerId, amount, { transaction }
  */
 async function addOwnerDirectBalance(models, { ownerId, amount, note }, { transaction }) {
   const decimal = toDecimal(amount);
-  await creditOwnerDirectBalance(models, ownerId, decimal, { transaction });
+  await creditOwnerDirectBalance(models, ownerId, decimal, {
+    transaction,
+    entry: { type: LEDGER_TYPE.ADD, note: note ?? 'Owner added Direct User balance' },
+  });
 
   const row = await models.StaffTransfers.create(
     {
@@ -183,5 +280,7 @@ module.exports = {
   readOwnerDirectBalance,
   debitOwnerDirectBalance,
   creditOwnerDirectBalance,
+  listOwnerDirectLedger,
+  LEDGER_TYPE,
   insufficientDirectBalance,
 };

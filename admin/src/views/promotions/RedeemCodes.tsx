@@ -21,6 +21,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useApi, useApiMutation, useListState, usePagedApi } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
+import { check } from '@/lib/validate'
 import { CODE_STATUSES, type BonusUserId, type RedeemCode } from './types'
 
 const generateCode = () => {
@@ -78,6 +79,11 @@ const CreateCode = () => {
       description='A fixed-amount code for one user. It pays out when they redeem it, in the site’s reward currency (set by the platform owner). Nothing moves now.'
       submitLabel='Issue'
       onSubmit={() => create.mutateAsync()}
+      validate={() => ({
+        'rc-uid': check.id(form.userId, 'User id'),
+        'rc-code': check.required(form.code, 'Code') || check.length(form.code, 'Code', { min: 4, max: 40 }) || (/^[A-Za-z0-9-]+$/.test(form.code.trim()) ? undefined : 'Code may only contain letters, digits and dashes'),
+        'rc-amt': check.amount(form.amount)
+      })}
     >
       <TextField
         id='rc-uid'

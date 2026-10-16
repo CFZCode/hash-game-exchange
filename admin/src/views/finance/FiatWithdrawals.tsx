@@ -21,6 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useSession } from '@/contexts/SessionContext'
 import { useApiMutation, useListState, usePagedApi } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
+import { check } from '@/lib/validate'
 import { allConvertedLabel, useFinanceFilters } from './currencyFilter'
 import FinanceStatsPanel from './FinanceStatsPanel'
 import { Details, ViewDialog, stop } from './shared'
@@ -60,10 +61,14 @@ const Decide = ({ row }: { row: FiatWithdrawalRow }) => {
       }
       submitLabel='Apply status'
       destructive={form.status === 'Rejected'}
+      validate={() => ({
+        status: form.status === row.status ? `Already ${row.status} — pick a different status` : undefined,
+        comment: check.length(form.comment, 'Comment', { max: 500 })
+      })}
       onSubmit={() => decide.mutateAsync()}
     >
-      <SelectField id={`fw-st-${row.withdrawalId}`} label='New status' value={form.status} onChange={status => setForm({ ...form, status })} options={FIAT_WITHDRAW_STATUSES.map(v => ({ value: v, label: v }))} />
-      <TextAreaField id={`fw-c-${row.withdrawalId}`} label='Comment' hint='Recorded on the audit trail' value={form.comment} onChange={e => setForm({ ...form, comment: e.target.value })} />
+      <SelectField id={`fw-st-${row.withdrawalId}`} name='status' label='New status' value={form.status} onChange={status => setForm({ ...form, status })} options={FIAT_WITHDRAW_STATUSES.map(v => ({ value: v, label: v }))} />
+      <TextAreaField id={`fw-c-${row.withdrawalId}`} name='comment' label='Comment' hint='Recorded on the audit trail' value={form.comment} onChange={e => setForm({ ...form, comment: e.target.value })} />
     </FormDialog>
   )
 }

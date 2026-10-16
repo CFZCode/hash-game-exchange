@@ -155,7 +155,8 @@ const LEVEL_PERMISSIONS = {
 };
 
 /**
- * Which staff level each creator level may create through `POST /admin/staff`
+ * Which staff level each creator level may create through Sports Exchange ka
+ * Create Account (`POST /admin/exchange/accounts-admin/create` → `StaffService.create`)
  * (the Addaplay ladder): every level creates ONLY the level directly below it,
  * inside its own tree. The Super Admin may create any level. An agent creates
  * players only. EXECUTIVE (7) is never created as a staff row — executives are

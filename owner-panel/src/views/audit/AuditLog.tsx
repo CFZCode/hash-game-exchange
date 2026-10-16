@@ -1,25 +1,45 @@
 'use client'
 
+import { RefreshCwIcon } from 'lucide-react'
+import { toast } from 'sonner'
+
 import ErrorState from '@/components/shared/ErrorState'
 import DateTime from '@/components/shared/DateTime'
 import PageHeader from '@/components/shared/PageHeader'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { featureLabel, flagLabel } from '@/configs/entitlementCatalogue'
 import { useApi } from '@/hooks/use-api'
+import { toastError } from '@/lib/api/feedback'
 import type { AuditEntry } from '@/lib/entitlements/types'
 import ChangeList from '@/views/entitlements/ChangeList'
 
 const AuditLog = () => {
-  const { data, error, isLoading } = useApi<AuditEntry[]>('/api/owner/audit')
+  const { data, error, isLoading, isFetching, refetch } = useApi<AuditEntry[]>('/api/owner/audit')
+
+  const refresh = async () => {
+    const r = await refetch()
+
+    if (r.error) toastError(r.error, 'Could not refresh the audit log')
+    else toast.success('Audit log refreshed', { description: `${r.data?.length ?? 0} save${r.data?.length === 1 ? '' : 's'}` })
+  }
 
   return (
     <>
-      <PageHeader title='Audit log' description='Every entitlement save, newest first. Stored in owner-panel/data/audit.jsonl only.' />
+      <PageHeader
+        title='Audit log'
+        description='Every entitlement save, newest first. Stored in owner-panel/data/audit.jsonl only.'
+        actions={
+          <Button variant='outline' onClick={() => void refresh()} disabled={isFetching}>
+            <RefreshCwIcon className={isFetching ? 'animate-spin' : undefined} /> Refresh
+          </Button>
+        }
+      />
       {error ? (
-        <ErrorState error={error} />
+        <ErrorState error={error} title='Could not load the audit log' onRetry={refetch} retrying={isFetching} />
       ) : (
         <Card className='py-0 shadow-none'>
           <CardContent className='px-0'>

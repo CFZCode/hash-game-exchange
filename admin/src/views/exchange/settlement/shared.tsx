@@ -3,12 +3,14 @@
 import { useState, type ReactNode } from 'react'
 
 import { useQuery } from '@tanstack/react-query'
+import { Loader2Icon } from 'lucide-react'
+import { toast } from 'sonner'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { API_V1, buildQuery, errorMessage } from '@/lib/api/client'
+import { API_V1, ApiError, buildQuery, errorMessage } from '@/lib/api/client'
 import type { Query } from '@/lib/api/types'
 
 /**
@@ -65,7 +67,15 @@ export async function zipCall<T = { data?: unknown }>(method: 'GET' | 'POST', pa
   if (!res.ok || !json || json.success === false) {
     const err = json?.error
 
-    throw new Error((typeof err === 'object' ? err?.message : err) || json?.message || res.statusText || 'Request failed')
+    const message =
+      (err && typeof err === 'object' && typeof err.message === 'string' && err.message) ||
+      (typeof err === 'string' && err) ||
+      (typeof json?.message === 'string' && json.message) ||
+      res.statusText ||
+      'Request failed'
+
+    // ApiError keeps `code` + 422 `details.fields`, so `errorMessage` can name the bad field.
+    throw new ApiError(res.status, (err && typeof err === 'object' && typeof err.code === 'string' && err.code) || `HTTP_${res.status}`, message, err && typeof err === 'object' && err.details && typeof err.details === 'object' ? err.details : undefined)
   }
 
   return json as T
@@ -89,7 +99,8 @@ export function useZipQuery<T>(path: string, query?: Query, pollMs?: number) {
     }
   }
 
-  return { data: q.data, loading: q.isLoading || manual, refresh }
+  // A failed load must not look like "no rows": the screens show `error` (ErrorState).
+  return { data: q.data, loading: q.isLoading || manual, error: q.error, refresh }
 }
 
 /** BACK / YES = neela, LAY / NO = laal. */
@@ -131,13 +142,14 @@ export const OpenBetsPanel = ({ title, bets, loading, onVoided }: { title: strin
 
     try {
       await zipCall('POST', `${SETTLE_API}/void-single-bet`, { bet_id: confirm.id })
-      alert('Bet voided successfully for user: ' + (confirm.username || confirm.userId))
-    } catch (err) {
-      alert('Error: ' + errorMessage(err))
-    } finally {
-      setBusy(false)
+      toast.success(`Bet #${confirm.id} voided for ${confirm.username || confirm.userId}`)
       setConfirm(null)
       onVoided()
+    } catch (err) {
+      // keep the dialog open so the admin can retry or cancel
+      toast.error(errorMessage(err))
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -212,6 +224,7 @@ export const OpenBetsPanel = ({ title, bets, loading, onVoided }: { title: strin
               Cancel
             </Button>
             <Button variant='destructive' disabled={busy} onClick={voidBet}>
+              {busy && <Loader2Icon className='animate-spin' />}
               {busy ? 'Processing...' : 'Confirm Void'}
             </Button>
           </DialogFooter>

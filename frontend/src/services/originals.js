@@ -58,6 +58,13 @@ const SLUG_ALIAS = {
 const normalise = (uid) => String(uid ?? '').replace(/_/g, '-');
 export const slugFor = (uid) => SLUG_ALIAS[uid] ?? normalise(uid);
 
+/* THE ORIGINALS THIS SITE OFFERS, by this build's slug (user's request, 2026-10-16). The platform's
+   in-house catalogue holds 22; only these are shown anywhere — the lobby row, /casino/brand, the
+   sidebar flyout, Explore — and a direct link to any other one is "not in the catalogue". "Arrow
+   bow" was asked for too and has no row in the catalogue yet; add its slug here once it does. */
+export const SHOWN_ORIGINALS = new Set(['limbo', 'diamond', 'keno', 'mines', 'plinko']);
+export const isShownOriginal = (slug) => SHOWN_ORIGINALS.has(slug);
+
 /* The transcribed tab is still the source for everything the platform does not carry: a name it
    would otherwise print as a raw uid, the studio the Providers filter groups on, and the player
    count. Matched on the resolved slug, so an aliased game finds its row too. */
@@ -99,11 +106,11 @@ function toGame(row) {
    belt and braces rather than a second filter — and it is what stops a deactivated game appearing
    if that route is ever changed to return everything. */
 export function toOriginals(rows) {
-  return (rows ?? []).filter((row) => row.is_active !== false).map(toGame);
+  return (rows ?? []).filter((row) => row.is_active !== false).map(toGame).filter((game) => isShownOriginal(game.slug));
 }
 
 export function getOriginals() {
-  if (USE_FIXTURES) return request(ENDPOINTS.games, { fixture: ORIGINAL_GAMES });
+  if (USE_FIXTURES) return request(ENDPOINTS.games, { fixture: ORIGINAL_GAMES.filter((game) => isShownOriginal(game.slug)) });
   /* Originals switched off (the owner's plan or the site admin's flag): not even asked for — the
      backend would refuse it anyway — and every surface reads an empty list. */
   return publicGates().then((gates) => (gates.on('originals') ? readLive() : []));

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import SectionHeader from '../../../components/shared/SectionHeader';
 import { Controller } from '../GameSection';
 import { flagFor } from './matches';
@@ -7,6 +8,7 @@ import { getHighlights } from '../../../services/home';
 import { useResource } from '../../../hooks/useResource';
 import soccerIcon from '../../../assets/sports/sport-soccer.svg?raw';
 import tennisIcon from '../../../assets/sports/sport-tennis.svg?raw';
+import cricketIcon from '../../../assets/sports/sport-cricket.svg?raw';
 import '../GameSection/GameSection.css';
 import './Highlights.css';
 
@@ -40,7 +42,7 @@ import './Highlights.css';
  * next card starts a whole gap beyond the right edge. */
 const CARD = 'h-[13.375rem] w-full flex-none sm:w-96';
 
-const SPORT_ICONS = { soccer: soccerIcon, tennis: tennisIcon };
+const SPORT_ICONS = { soccer: soccerIcon, tennis: tennisIcon, cricket: cricketIcon };
 
 /* Inlined rather than an <img src>: these SVGs ship with no fill of their own, so they
    render black unless they are in the document where `fill-tertiary` can reach them. The
@@ -52,9 +54,21 @@ const SportIcon = ({ sport }) => (
   />
 );
 
-/* `Qe` -> `ee` -> `Je`: competitor image, else country flag, else the sport icon. */
+/* `Qe` -> `ee` -> `Je`: competitor image, else country flag, else the sport icon.
+   The exchange feed carries neither crests nor countries, so a live competitor shows its NAME in
+   the badge's place instead (user's request, 2026-10-16) — see `hasArt`. */
+const hasArt = (competitor) => Boolean(competitor.image ?? flagFor(competitor.countryCode));
+
 function CompetitorBadge({ competitor, sport }) {
   const src = competitor.image ?? flagFor(competitor.countryCode);
+
+  if (!src && competitor.countryCode === undefined) {
+    return (
+      <div className="flex h-12 min-w-0 items-center justify-center">
+        <p className="line-clamp-2 text-center text-sm font-semibold leading-tight text-primary">{competitor.name}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="sports-banner-match-icon flex h-12 items-center">
@@ -76,18 +90,23 @@ const LiveBadge = () => (
 );
 
 function MatchCard({ match }) {
-  const prematch = !match.live;
+  const navigate = useNavigate();
+  /* A live card with no score on the feed (the exchange's) keeps the kick-off layout. */
+  const scored = match.live && match.homeScore !== undefined;
+  const prematch = !scored;
+  const namesInBadges = !hasArt(match.home) && match.home.countryCode === undefined;
 
   return (
     <div
       className={`${CARD} relative flex cursor-pointer flex-col rounded-xl bg-layer4 py-4`}
+      onClick={match.href ? () => navigate(match.href) : undefined}
     >
       {match.live && <LiveBadge />}
 
       {/* px-14 on a live card, px-4 otherwise — the extra inset is what keeps the
           tournament name from running under the Live badge. */}
       <div
-        className={`flex items-center justify-center gap-2 pb-3 ${prematch ? 'px-4' : 'px-14'}`}
+        className={`flex items-center justify-center gap-2 pb-3 ${match.live ? 'px-14' : 'px-4'}`}
       >
         <div className="flex size-6 flex-none items-center justify-center rounded-full">
           <SportIcon sport={match.sport} />
@@ -109,8 +128,8 @@ function MatchCard({ match }) {
         <div className="row-span-2 flex flex-col items-center justify-center text-center">
           {prematch ? (
             <>
-              <p className="text-2xl font-extrabold text-primary">{match.time}</p>
-              <p className="mt-1 truncate text-xs font-semibold text-secondary">{match.date}</p>
+              <p className="text-2xl font-extrabold text-primary">{match.live ? 'VS' : match.time}</p>
+              <p className="mt-1 truncate text-xs font-semibold text-secondary">{match.live ? match.status : match.date}</p>
             </>
           ) : (
             <>
@@ -126,12 +145,16 @@ function MatchCard({ match }) {
           <CompetitorBadge competitor={match.away} sport={match.sport} />
         </div>
 
-        <p className="col-start-1 mt-2 min-w-0 truncate text-center text-sm font-semibold text-primary">
-          {match.home.name}
-        </p>
-        <p className="col-start-3 mt-2 min-w-0 truncate text-center text-sm font-semibold text-primary">
-          {match.away.name}
-        </p>
+        {!namesInBadges && (
+          <>
+            <p className="col-start-1 mt-2 min-w-0 truncate text-center text-sm font-semibold text-primary">
+              {match.home.name}
+            </p>
+            <p className="col-start-3 mt-2 min-w-0 truncate text-center text-sm font-semibold text-primary">
+              {match.away.name}
+            </p>
+          </>
+        )}
       </div>
 
       <p className="truncate px-3 pb-1.5 text-center text-xs font-semibold text-tertiary">

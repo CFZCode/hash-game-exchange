@@ -2,6 +2,10 @@
 
 import { useState } from 'react'
 
+import { Loader2Icon } from 'lucide-react'
+
+import { toast } from 'sonner'
+
 import ErrorState from '@/components/shared/ErrorState'
 import PageHeader from '@/components/shared/PageHeader'
 import { Badge } from '@/components/ui/badge'
@@ -12,6 +16,7 @@ import { Switch } from '@/components/ui/switch'
 import { useSession } from '@/contexts/SessionContext'
 import { useApi, useApiMutation } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
+import { check, cleanErrors, firstError } from '@/lib/validate'
 
 /**
  * Limits, policy and schedule — the values that used to be environment
@@ -83,11 +88,16 @@ const OperatorSettings = () => {
   const q = useApi<Setting[]>('admin/site-config/settings')
   const [draft, setDraft] = useState<Record<string, string | boolean | null>>({})
 
+  const [errors, setErrors] = useState<Record<string, string>>({})
+
   const save = useApiMutation({
     fn: () => api.put<Setting[]>('admin/site-config/settings', draft),
     invalidate: [['api', 'admin/site-config/settings']],
     success: 'Saved — the services pick it up on their next read',
-    onSuccess: () => setDraft({})
+    onSuccess: () => {
+      setDraft({})
+      setErrors({})
+    }
   })
 
   const header = (
@@ -110,6 +120,68 @@ const OperatorSettings = () => {
   const byKey = Object.fromEntries(rows.map(r => [r.key, r]))
   const dirty = Object.keys(draft)
 
+  /** The value a key will have after the save (the draft, else what is in force). */
+  const effective = (key: string) => (key in draft ? draft[key] : byKey[key]?.value)
+
+  /** Each changed value against its kind and the bounds the platform reports, then min ≤ max pairs. */
+  const validateDraft = () => {
+    const found: Record<string, string | undefined> = {}
+
+    for (const key of dirty) {
+      const s = byKey[key]
+      const v = draft[key]
+
+      if (!s || v === null || s.kind === 'boolean') continue
+
+      if (s.kind === 'timezone') {
+        try {
+          new Intl.DateTimeFormat('en', { timeZone: String(v).trim() })
+          if (!String(v).trim()) found[key] = `${s.label} is required`
+        } catch {
+          found[key] = `${s.label} must be an IANA timezone, e.g. Asia/Kolkata`
+        }
+
+        continue
+      }
+
+      found[key] = check.number(String(v), s.label, { min: s.min ?? 0, max: s.max, integer: s.kind === 'number' })
+    }
+
+    const pairs: [string, string][] = [
+      ['casino_min_bet', 'casino_max_bet'],
+      ['sports_min_stake', 'sports_max_stake'],
+      ['deposit_minimum', 'deposit_maximum']
+    ]
+
+    for (const [lo, hi] of pairs) {
+      if (!(lo in draft) && !(hi in draft)) continue
+      const a = Number(effective(lo))
+      const b = Number(effective(hi))
+
+      if (byKey[lo] && byKey[hi] && effective(lo) !== null && effective(hi) !== null && Number.isFinite(a) && Number.isFinite(b) && a > b) {
+        const key = hi in draft ? hi : lo
+
+        found[key] = found[key] ?? `${byKey[lo].label} cannot be more than ${byKey[hi].label}`
+      }
+    }
+
+    return cleanErrors(found)
+  }
+
+  const submit = () => {
+    const found = validateDraft()
+
+    setErrors(found)
+
+    if (Object.keys(found).length) {
+      toast.error(firstError(found))
+
+      return
+    }
+
+    save.mutate()
+  }
+
   const field = (s: Setting) => {
     const pending = s.key in draft
     const current = pending ? draft[s.key] : s.value
@@ -125,13 +197,34 @@ const OperatorSettings = () => {
     }
 
     return (
-      <Input
-        className='h-8 w-44 font-mono text-xs'
-        value={current === null || current === undefined ? '' : String(current)}
-        placeholder={s.envValue ?? 'not set'}
-        disabled={!canWrite}
-        onChange={e => setDraft(d => ({ ...d, [s.key]: e.target.value }))}
-      />
+      <span className='grid gap-1'>
+        <Input
+          className='h-8 w-44 font-mono text-xs'
+          value={current === null || current === undefined ? '' : String(current)}
+          placeholder={s.envValue ?? 'not set'}
+          disabled={!canWrite}
+          inputMode={s.kind === 'timezone' ? undefined : 'decimal'}
+          aria-invalid={errors[s.key] ? true : undefined}
+          onChange={e => {
+            const value = e.target.value
+
+            setDraft(d => ({ ...d, [s.key]: value }))
+            setErrors(prev => {
+              const next = { ...prev }
+
+              delete next[s.key]
+
+              return next
+            })
+          }}
+        />
+        {errors[s.key] && <span className='text-destructive w-44 text-xs'>{errors[s.key]}</span>}
+        {!errors[s.key] && (s.min !== undefined || s.max !== undefined) && (
+          <span className='text-muted-foreground text-[11px]'>
+            {s.min ?? 0} – {s.max ?? '∞'}
+          </span>
+        )}
+      </span>
     )
   }
 
@@ -141,10 +234,18 @@ const OperatorSettings = () => {
 
       {dirty.length > 0 && (
         <div className='mb-4 flex items-center gap-2'>
-          <Button onClick={() => save.mutateAsync()} disabled={save.isPending}>
+          <Button onClick={submit} disabled={save.isPending}>
+            {save.isPending && <Loader2Icon className='animate-spin' />}
             Save {dirty.length} change{dirty.length > 1 ? 's' : ''}
           </Button>
-          <Button variant='outline' onClick={() => setDraft({})}>
+          <Button
+            variant='outline'
+            disabled={save.isPending}
+            onClick={() => {
+              setDraft({})
+              setErrors({})
+            }}
+          >
             Discard
           </Button>
         </div>

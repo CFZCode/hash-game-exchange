@@ -6,7 +6,7 @@ import { useQuery, type UseQueryOptions } from '@tanstack/react-query'
 import { ChevronDownIcon, ChevronRightIcon } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
-import { API_V1, buildQuery } from '@/lib/api/client'
+import { API_V1, ApiError, buildQuery, errorMessage } from '@/lib/api/client'
 import type { Query } from '@/lib/api/types'
 import { cn } from '@/lib/utils'
 
@@ -43,7 +43,15 @@ export async function zipApi<T = Record<string, unknown>>(
   if (!res.ok || !json || json.success === false) {
     const err = json?.error
 
-    throw new Error((typeof err === 'object' ? err?.message : err) || json?.message || res.statusText || 'Request failed')
+    const message =
+      (err && typeof err === 'object' && typeof err.message === 'string' && err.message) ||
+      (typeof err === 'string' && err) ||
+      (typeof json?.message === 'string' && json.message) ||
+      res.statusText ||
+      'Request failed'
+
+    // ApiError keeps `code` + 422 `details.fields`, so `errorMessage` can name the bad field.
+    throw new ApiError(res.status, (err && typeof err === 'object' && typeof err.code === 'string' && err.code) || `HTTP_${res.status}`, message, err && typeof err === 'object' && err.details && typeof err.details === 'object' ? err.details : undefined)
   }
 
   return json as T
@@ -64,7 +72,7 @@ export function useZip<T>(path: string | null, query?: object, options?: Partial
 }
 
 /** Error ka text, toast ke liye. */
-export const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error))
+export const errorText = (error: unknown) => errorMessage(error)
 
 /** Zip ke badge-soft-* rang — hamare theme ke tone tokens se. */
 const TONES = {

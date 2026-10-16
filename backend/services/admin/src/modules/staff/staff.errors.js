@@ -18,17 +18,6 @@ module.exports = defineErrors('STAFF', {
 
   CANNOT_TRANSFER_TO_SELF: { status: 422, message: 'An account cannot transfer to itself' },
 
-  CANNOT_DELETE_WITH_DESCENDANTS: {
-    status: 409,
-    // Legacy deleted the row and left the subtree pointing at nothing.
-    message: 'This account still has accounts beneath it',
-  },
-
-  CANNOT_DELETE_WITH_BALANCE: {
-    status: 409,
-    message: 'This account still holds a balance — move it first',
-  },
-
   NOT_PERMITTED: { status: 403, message: 'Your role does not permit that' },
 
   /**

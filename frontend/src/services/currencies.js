@@ -1,4 +1,4 @@
-import { request, USE_FIXTURES } from './client';
+import { request, USE_FIXTURES, API_BASE } from './client';
 import { PLATFORM } from './endpoints';
 import { tokensFor as capturedTokensFor } from '../data/currencyTokens';
 
@@ -44,6 +44,23 @@ export function loadEnabledCurrencies({ fresh = false } = {}) {
 
 /** The last list read, or `null` (= everything on). */
 export const enabledCurrencies = () => listed;
+
+/* The owner's row for a wallet name (`INRFIAT`, `MVR`, `USDT`), or null while the list is unread. */
+const ownerRow = (name, list = listed) => {
+  if (!Array.isArray(list)) return null;
+  const want = String(name ?? '').toUpperCase().replace(/FIAT$/, '');
+  return list.find((coin) => String(coin?.code ?? '').toUpperCase() === want) ?? null;
+};
+
+/** The owner's `kind` for a coin — 'fiat' | 'crypto' — or undefined when unknown. */
+export const ownerKind = (name, list = listed) => ownerRow(name, list)?.kind;
+
+/** The owner's artwork for a coin, absolute, or undefined — the fallback for coins this build
+    ships no icon for (USDP, MKR, MVR…). */
+export const ownerImage = (name, list = listed) => {
+  const image = ownerRow(name, list)?.image;
+  return image ? (/^https?:/.test(image) ? image : `${API_BASE}${image}`) : undefined;
+};
 
 /** Seed or clear the store directly — for tests. */
 export const setEnabledCurrencies = (list) => remember(list);

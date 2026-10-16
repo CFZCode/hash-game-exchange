@@ -10,8 +10,6 @@ const { createLogger, money } = require('@ibitplay/common');
 const { hashPassword } = require('@ibitplay/auth');
 
 const { CreateAccountService } = require('../createAccount');
-const { MultiLoginService, PRIVILEGE_PERMISSIONS } = require('../multiLogin');
-const { userCreationCsv } = require('../userCreationCsv');
 const migration104 = require('../../../../../../packages/db/migrations/104-exchange-accounts-tables');
 
 /**
@@ -61,7 +59,6 @@ test('exchange accounts screens', async (t) => {
 
   const deps = { models, db: connection, logger, config: { SERVICE_NAME: 'admin-service' } };
   const accounts = new CreateAccountService(deps);
-  const multiLogin = new MultiLoginService(deps);
 
   const dec = (v) => Number(money.fromStored(v ?? '0'));
 
@@ -188,54 +185,6 @@ test('exchange accounts screens', async (t) => {
       (err) => err.status === 401 || err.status === 403 || err.status === 400 || err.status === 422
     );
     assert.equal(await models.Users.count({ where: { name: `xbad${tag}c` } }), 0, 'nothing created on a wrong code');
-  });
-
-  await t.test('multi login: create with zip privileges, list, edit, on/off, password, delete', async () => {
-    const actor = { id: ownerId, level: 1, executiveId: null, permissions: ['*'] };
-    const created = await multiLogin.create({
-      actor,
-      username: `xexe${tag}a`,
-      full_name: 'Desk Operator',
-      password: 'DeskOperator1234',
-      transactionPassword: TXN,
-      permissions: { userList: true, bank: true, ourCasino: true },
-    });
-    assert.equal(created.executive.full_name, 'Desk Operator');
-    assert.equal(created.executive.permissions.userList, true);
-    assert.equal(created.executive.permissions.ourCasino, undefined, 'casino privilege is not kept');
-
-    const row = await models.Executives.findByPk(created.executive.id, { raw: true });
-    assert.deepEqual([...row.permissions.authority].sort(), [...PRIVILEGE_PERMISSIONS.userList, ...PRIVILEGE_PERMISSIONS.bank].sort());
-
-    const list = await multiLogin.list({ actor });
-    assert.ok(list.executives.some((e) => e.id === created.executive.id && e.active));
-
-    const edited = await multiLogin.updatePrivileges({ actor, executiveId: created.executive.id, permissions: { dashboard: true } });
-    assert.equal(edited.executive.permissions.dashboard, true);
-    assert.equal(edited.executive.permissions.bank, false);
-    assert.equal(edited.executive.full_name, 'Desk Operator', 'full name survives an edit');
-
-    const off = await multiLogin.setActive({ actor, executiveId: created.executive.id });
-    assert.equal(off.executive.active, false);
-    await multiLogin.changePassword({ actor, executiveId: created.executive.id, password: 'AnotherPass1234' });
-    await assert.rejects(() => multiLogin.changePassword({ actor, executiveId: created.executive.id, password: 'weak' }), /at least 8/);
-
-    await assert.rejects(
-      () => multiLogin.create({ actor, username: `xexe${tag}b`, full_name: 'No Privs', password: 'DeskOperator1234', transactionPassword: TXN, permissions: {} }),
-      /Privileges field is required/
-    );
-
-    await multiLogin.remove({ actor, executiveId: created.executive.id });
-    assert.equal(await models.Executives.count({ where: { id: created.executive.id } }), 0);
-  });
-
-  await t.test('assign agent: User Creation CSV lists players created in the window', async () => {
-    const today = new Date().toISOString().slice(0, 10);
-    const { csv, count } = await userCreationCsv(deps, { actor: owner.staffActor, from: today, to: today });
-    assert.ok(count >= 2);
-    assert.match(csv, /^S\.No\.,User Name,Mobile Number,Parent,Created At/);
-    assert.match(csv, new RegExp(`xply${tag}a`));
-    await assert.rejects(() => userCreationCsv(deps, { actor: owner.staffActor, from: '2026-01-01', to: '2026-01-20' }), /at most 7 days/);
   });
 
 });

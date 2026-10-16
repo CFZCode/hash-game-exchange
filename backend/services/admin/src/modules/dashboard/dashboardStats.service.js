@@ -45,7 +45,7 @@ const { gisKindSql, gisSideAmountSql, gisBetCountSql, gisPlayFilterSql } = requi
  * The admin dashboard builds this with `directOnly: true`: DIRECT USERS ONLY —
  * players with no parent (`parent_staff_id IS NULL`), i.e. site signups
  * (referral signups included). Players with a parent are agent clients and
- * live on the "Client Management" tab, never there. Only a tree containing
+ * live on the "Agent System" tab, never there. Only a tree containing
  * the platform root sees them; anyone else gets an empty scope.
  *
  * Without `directOnly` (the P&L report reuses this service) it is the

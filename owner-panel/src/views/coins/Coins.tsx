@@ -21,7 +21,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { flagLabel } from '@/configs/entitlementCatalogue'
 import { useApi, useApiMutation } from '@/hooks/use-api'
 import { api, ApiError } from '@/lib/api/client'
-import { COIN_KINDS, MAX_DECIMALS, cleanCoin, coinProblem, diffCoins, isBuiltinCoin } from '@/lib/entitlements/coins'
+import { toastSaved, type SaveResult } from '@/lib/api/feedback'
+import { COIN_CODE, COIN_KINDS, MAX_DECIMALS, USD_RATE, cleanCoin, coinProblem, diffCoins, isBuiltinCoin } from '@/lib/entitlements/coins'
 import { diffDocs, type Change, type CoinDefinition, type EditableDoc, type EntitlementsDoc, type SiteCoin, type ToggleChange } from '@/lib/entitlements/types'
 import { cn } from '@/lib/utils'
 import ChangeList from '../entitlements/ChangeList'
@@ -67,6 +68,65 @@ const definitionOf = (f: CoinForm): CoinDefinition => ({
   enabled: f.enabled
 })
 
+type FormErrors = Partial<Record<'code' | 'name' | 'symbol' | 'decimals' | 'usdRate' | 'networks', string>>
+
+const UNSAFE_TEXT = /[<>\u0000-\u001f\u007f]/
+const NETWORK_KEY = /^[A-Za-z0-9_-]{1,20}$/
+
+/** Each field's problem, the rules of `coinProblem` (which the save route runs) split per field. */
+function formErrors(f: CoinForm, editing: boolean, taken: (code: string) => boolean): FormErrors {
+  const out: FormErrors = {}
+  const code = f.code.trim().toUpperCase()
+
+  if (!editing) {
+    if (!code) out.code = 'Required'
+    else if (!COIN_CODE.test(code)) out.code = 'A capital letter, then 1–9 capitals or digits (e.g. QAC)'
+    else if (isBuiltinCoin(code)) out.code = `${code} is a built-in coin — switch it in the table instead`
+    else if (taken(code)) out.code = `${code} already exists on this site`
+  }
+
+  if (!f.name.trim()) out.name = 'Required'
+  else if (f.name.trim().length > 60) out.name = 'At most 60 characters'
+  else if (UNSAFE_TEXT.test(f.name)) out.name = 'No < > or control characters'
+
+  if (f.symbol.trim().length > 12) out.symbol = 'At most 12 characters'
+  else if (UNSAFE_TEXT.test(f.symbol)) out.symbol = 'No < > or control characters'
+
+  const d = f.decimals.trim()
+
+  if (!d) out.decimals = 'Required'
+  else if (!/^\d+$/.test(d) || Number(d) > MAX_DECIMALS) out.decimals = `A whole number from 0 to ${MAX_DECIMALS}`
+
+  const rate = f.usdRate.trim()
+
+  if (!rate) out.usdRate = 'Required'
+  else if (!USD_RATE.test(rate)) out.usdRate = 'A number like 0.01 — at most 8 decimal places'
+  else if (!(Number(rate) > 0)) out.usdRate = 'Must be above 0'
+
+  if (f.kind === 'crypto') {
+    const keys = new Set<string>()
+
+    for (const [i, n] of f.networks.entries()) {
+      const key = n.key.trim()
+
+      if (!NETWORK_KEY.test(key)) out.networks = `Network ${i + 1}: the key is 1–20 letters, digits, - or _`
+      else if (!n.name.trim() || n.name.trim().length > 40 || UNSAFE_TEXT.test(n.name)) out.networks = `Network ${key}: needs a name (at most 40 characters, no < >)`
+      else if (keys.has(key)) out.networks = `Network ${key} is listed twice`
+      if (out.networks) break
+      keys.add(key)
+    }
+  }
+
+  return out
+}
+
+const FieldError = ({ id, message }: { id: string; message?: string }) =>
+  message ? (
+    <p id={id} className='text-destructive text-xs' role='alert' data-error={id}>
+      {message}
+    </p>
+  ) : null
+
 /**
  * Add or edit one custom coin. The code is fixed once created (balances are keyed by it); the
  * coin is never deleted — the switch turns it off. Applying only stages the change: it is saved
@@ -89,14 +149,32 @@ const CoinDialog = ({
 }) => {
   const [form, setForm] = useState<CoinForm>(initial)
   const [error, setError] = useState<string | null>(null)
+
+  // Errors show once Apply was pressed, then follow the typing.
+  const [tried, setTried] = useState(false)
   const set = <K extends keyof CoinForm>(key: K, value: CoinForm[K]) => setForm(prev => ({ ...prev, [key]: value }))
+  const errors = formErrors(form, editing, taken)
+  const shown: FormErrors = tried ? errors : {}
+  const errorCount = Object.keys(errors).length
 
   const apply = () => {
+    setTried(true)
+    if (errorCount) return
     const def = definitionOf(form)
-    const problem = !editing && taken(def.code) ? `${def.code} already exists on this site` : coinProblem(def)
+    const problem = coinProblem(def)
 
     if (problem) return setError(problem)
-    onApply(cleanCoin(def))
+    const clean = cleanCoin(def)
+
+    if (editing && JSON.stringify(clean) === JSON.stringify(cleanCoin(definitionOf(initial)))) {
+      toast.info('No changes to apply')
+      onClose()
+
+      return
+    }
+
+    onApply(clean)
+    toast.success(editing ? `${clean.code} changes staged` : `${clean.code} added to the list`, { description: 'Review and save to put it live.' })
   }
 
   return (
@@ -127,8 +205,10 @@ const CoinDialog = ({
                 autoComplete='off'
                 placeholder='QAC'
                 className='font-mono uppercase'
+                aria-invalid={!!shown.code}
                 onChange={e => set('code', e.target.value.toUpperCase())}
               />
+              <FieldError id='coin-code-error' message={shown.code} />
               <FieldDescription>{editing ? 'Fixed once created.' : 'A capital letter, then 1–9 capitals or digits.'}</FieldDescription>
             </Field>
             <Field>
@@ -148,20 +228,32 @@ const CoinDialog = ({
             </Field>
             <Field>
               <FieldLabel htmlFor='coin-name'>Name</FieldLabel>
-              <Input id='coin-name' name='name' value={form.name} maxLength={60} placeholder='QA coin' onChange={e => set('name', e.target.value)} />
+              <Input id='coin-name' name='name' value={form.name} maxLength={60} placeholder='QA coin' aria-invalid={!!shown.name} onChange={e => set('name', e.target.value)} />
+              <FieldError id='coin-name-error' message={shown.name} />
             </Field>
             <Field>
               <FieldLabel htmlFor='coin-symbol'>Symbol</FieldLabel>
-              <Input id='coin-symbol' name='symbol' value={form.symbol} maxLength={12} placeholder={form.code || 'QAC'} onChange={e => set('symbol', e.target.value)} />
+              <Input
+                id='coin-symbol'
+                name='symbol'
+                value={form.symbol}
+                maxLength={12}
+                placeholder={form.code || 'QAC'}
+                aria-invalid={!!shown.symbol}
+                onChange={e => set('symbol', e.target.value)}
+              />
+              <FieldError id='coin-symbol-error' message={shown.symbol} />
             </Field>
             <Field>
               <FieldLabel htmlFor='coin-decimals'>Decimals</FieldLabel>
-              <Input id='coin-decimals' name='decimals' inputMode='numeric' value={form.decimals} onChange={e => set('decimals', e.target.value)} />
+              <Input id='coin-decimals' name='decimals' inputMode='numeric' value={form.decimals} aria-invalid={!!shown.decimals} onChange={e => set('decimals', e.target.value)} />
+              <FieldError id='coin-decimals-error' message={shown.decimals} />
               <FieldDescription>0–{MAX_DECIMALS}</FieldDescription>
             </Field>
             <Field>
               <FieldLabel htmlFor='coin-rate'>USD rate</FieldLabel>
-              <Input id='coin-rate' name='usdRate' inputMode='decimal' value={form.usdRate} placeholder='0.01' onChange={e => set('usdRate', e.target.value)} />
+              <Input id='coin-rate' name='usdRate' inputMode='decimal' value={form.usdRate} placeholder='0.01' aria-invalid={!!shown.usdRate} onChange={e => set('usdRate', e.target.value)} />
+              <FieldError id='coin-rate-error' message={shown.usdRate} />
               <FieldDescription>USD value of 1 {form.code || 'unit'}; swap prices it here.</FieldDescription>
             </Field>
           </div>
@@ -196,6 +288,7 @@ const CoinDialog = ({
                   <PlusIcon /> Add network
                 </Button>
               </div>
+              <FieldError id='coin-networks-error' message={shown.networks} />
               <FieldDescription>Labels only for now: a custom coin has no deposit or withdrawal rail.</FieldDescription>
             </Field>
           )}
@@ -205,10 +298,16 @@ const CoinDialog = ({
             <FieldLabel htmlFor='coin-enabled'>{form.enabled ? 'On — in the plan' : 'Off — hidden from players'}</FieldLabel>
           </Field>
 
-          {error && (
+          {tried && errorCount > 0 ? (
             <p role='alert' className='text-destructive text-sm'>
-              {error}
+              Fix {errorCount} field{errorCount === 1 ? '' : 's'} above first.
             </p>
+          ) : (
+            error && (
+              <p role='alert' className='text-destructive text-sm'>
+                {error}
+              </p>
+            )
           )}
           <button type='submit' className='hidden' aria-hidden tabIndex={-1} />
         </form>
@@ -216,7 +315,9 @@ const CoinDialog = ({
           <Button variant='outline' onClick={onClose}>
             Cancel
           </Button>
-          <Button onClick={apply}>{editing ? 'Apply changes' : 'Add coin'}</Button>
+          <Button onClick={apply} disabled={tried && errorCount > 0}>
+            {editing ? 'Apply changes' : 'Add coin'}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -230,7 +331,7 @@ const CoinDialog = ({
  * names are the site admin's; they are shown here read-only, as the site reports them.
  */
 const Coins = () => {
-  const { data: doc, error, isLoading, refetch } = useApi<EditableDoc>('/api/owner/entitlements')
+  const { data: doc, error, isLoading, refetch, isRefetching } = useApi<EditableDoc>('/api/owner/entitlements')
   const site = useApi<{ coins: SiteCoin[]; source: 'site' | 'catalogue'; reason?: string }>('/api/owner/coins')
   const [edits, setEdits] = useState<Record<string, boolean>>({})
   const [coinDraft, setCoinDraft] = useState<CoinDefinition[] | null>(null)
@@ -286,23 +387,25 @@ const Coins = () => {
   const on = (key: string) => flags[key] !== false
   const set = (key: string, value: boolean) => setEdits(prev => ({ ...prev, [key]: value }))
 
-  const save = useApiMutation<void, { doc: EntitlementsDoc; changes: Change[]; live?: { live: boolean; reason?: string } }>({
+  const save = useApiMutation<void, SaveResult & { doc: EntitlementsDoc; changes: Change[] }>({
     // Only the flags change; features, variants and the template stay as stored.
     fn: () => api.put('/api/owner/entitlements', { version: doc!.version, features: {}, flags: edits, ...(coinDraft ? { coins: coinDraft } : {}) }),
     invalidate: [['api']],
-    success: r =>
-      !r.changes.length
-        ? 'Nothing to save'
-        : r.live?.live
-          ? `Saved as version ${r.doc.version} — live on the site now`
-          : `Saved as version ${r.doc.version} — the backend picks it up on its next poll`,
-    onSuccess: () => {
+    errorTitle: 'Coins not saved',
+    onSuccess: r => {
+      toastSaved(r, 'Coins saved')
       discard()
       setReviewing(false)
     }
   })
 
-  if (error) return <ErrorState error={error} />
+  if (error)
+    return (
+      <>
+        <PageHeader title='Coins' />
+        <ErrorState error={error} title='Could not load the entitlements document' onRetry={refetch} retrying={isRefetching} />
+      </>
+    )
 
   const changedKeys = new Set(changes.map(c => c.key))
 
@@ -317,6 +420,12 @@ const Coins = () => {
           </Button>
         }
       />
+
+      {site.error && (
+        <div className='mb-4'>
+          <ErrorState error={site.error} title="Could not load the site's coin list" onRetry={site.refetch} retrying={site.isRefetching} />
+        </div>
+      )}
 
       {site.data?.source === 'catalogue' && (
         <Alert className='mb-4'>
@@ -460,10 +569,17 @@ const Coins = () => {
               {changes.length} unsaved change{changes.length === 1 ? '' : 's'}
             </span>
             <div className='flex gap-2'>
-              <Button variant='outline' onClick={discard}>
+              <Button
+                variant='outline'
+                disabled={save.isPending}
+                onClick={() => {
+                  discard()
+                  toast.info('Changes discarded')
+                }}
+              >
                 Discard
               </Button>
-              <Button onClick={() => setReviewing(true)}>Review and save</Button>
+              <Button onClick={() => (changes.length ? setReviewing(true) : toast.info('Nothing to save'))}>Review and save</Button>
             </div>
           </div>
         </div>

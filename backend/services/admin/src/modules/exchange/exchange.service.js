@@ -5,7 +5,12 @@ const { money, AppError } = require('@ibitplay/common');
 
 const { manageableStaffIds } = require('../staff-directory/staffDirectory.service');
 const { assertTransactionPassword } = require('../staff-auth/transactionPassword');
-const { addOwnerBalance, addOwnerDirectBalance, readOwnerDirectBalance } = require('../lords/ownerWallet');
+const {
+  addOwnerBalance,
+  addOwnerDirectBalance,
+  readOwnerDirectBalance,
+  listOwnerDirectLedger,
+} = require('../lords/ownerWallet');
 const { TRANSFER_TYPE } = require('../lords/lords.constants');
 const { listChildren } = require('./accountList');
 const { settlePoints } = require('./pointsSettle');
@@ -18,7 +23,7 @@ const { settlePoints } = require('./pointsSettle');
  *   staff  → user_type 'STAFF', staff_id
  *   player → user_type 'USER',  uid
  *
- * Owner ke do balance hain: Client Management (`credits`, children ke liye) aur
+ * Owner ke do balance hain: Agent System (`credits`, children ke liye) aur
  * Direct User (`staff_balances`, sirf direct users ke liye) — `lords/ownerWallet.js`.
  *
  * Yahan sirf padhna hai, aur likhne wale kaam: owner apne dono balance me add kare.
@@ -91,6 +96,15 @@ class ExchangeService {
       wallet: await this.#wallet(actor.id),
       directBalance: show(await readOwnerDirectBalance(this.models, actor.id)),
     };
+  }
+
+  /**
+   * Owner ke Direct User wallet ka ledger — kab kya add hua, kis direct user ko diya / liya,
+   * har entry ke pehle aur baad ka balance. Sirf owner.
+   */
+  async ownerDirectLedger({ actor, limit, offset, from, to }) {
+    if (!actor.canIssueFunds) throw onlyOwner();
+    return listOwnerDirectLedger(this.models, actor.id, { limit, offset, from, to });
   }
 
   /**

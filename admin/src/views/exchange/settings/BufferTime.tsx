@@ -4,6 +4,8 @@ import { Fragment, useMemo, useState } from 'react'
 
 import { toast } from 'sonner'
 
+import { Loader2Icon } from 'lucide-react'
+
 import PageHeader from '@/components/shared/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -26,6 +28,7 @@ import {
   type League,
   type Market
 } from './shared'
+import { check } from '@/lib/validate'
 
 /**
  * Buffer Time — zip `pages/settings/BufferTime.jsx` (sirf owner).
@@ -253,6 +256,7 @@ const BufferTime = () => {
               step={0.5}
               className='h-8 w-20'
               disabled={inheriting}
+              aria-invalid={!inheriting && check.number(cell.seconds, 'Buffer', { min: 0, max: maxSeconds }) ? true : undefined}
               value={inheriting ? (cell.inherited ?? 0) : cell.seconds}
               onChange={e => setCellDraft(key, saved, { state: 'set', seconds: e.target.value })}
             />
@@ -372,6 +376,7 @@ const BufferTime = () => {
                 </Button>
               )}
               <Button size='sm' disabled={dirtyCount === 0 || saving} onClick={saveAll}>
+                {saving && <Loader2Icon className='animate-spin' />}
                 {saving ? 'Saving…' : `Save changes${dirtyCount ? ` (${dirtyCount})` : ''}`}
               </Button>
             </div>

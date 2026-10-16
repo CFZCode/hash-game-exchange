@@ -33,49 +33,6 @@ const createAccount = {
     .strict(),
 };
 
-/** Multi Login — zip ke privilege keys (utils/permissions.js), true/false. */
-const privileges = z.record(z.string().max(40), z.boolean());
-
-const createExecutive = {
-  body: z
-    .object({
-      username: z.string().trim().min(4).max(100),
-      full_name: z.string().trim().min(4).max(120),
-      password: z.string().min(1).max(200),
-      transactionPassword: z.string().max(200).optional(),
-      permissions: privileges,
-    })
-    .strict(),
-};
-
-const updateExecutive = {
-  params: z.object({ executiveId: id }),
-  body: z.object({ permissions: privileges }).strict(),
-};
-
-// Body kuch nahi aata (DELETE) — strict khali object.
-const executiveParam = { params: z.object({ executiveId: id }), body: z.object({}).strict() };
-
-const executiveActive = {
-  params: z.object({ executiveId: id }),
-  body: z.object({ active: z.boolean().optional() }).strict(),
-};
-
-const executivePassword = {
-  params: z.object({ executiveId: id }),
-  body: z.object({ password: z.string().min(1).max(200) }).strict(),
-};
-
-/** Assign Agent — "User Creation" CSV: From date, To = From + 7 din. */
-const userCreationCsv = {
-  query: z
-    .object({
-      from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-      to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    })
-    .strict(),
-};
-
 // ── System Tracker ────────────────────────────────────────────────────
 
 const trackerSearch = { query: z.object({ q: z.string().trim().max(100).optional() }).strict() };
@@ -86,12 +43,6 @@ const watchdogAck = { params: z.object({ id }), body: z.object({}).strict() };
 module.exports = {
   checkUsername,
   createAccount,
-  createExecutive,
-  updateExecutive,
-  executiveParam,
-  executiveActive,
-  executivePassword,
-  userCreationCsv,
   trackerSearch,
   trackerAccount,
   watchdogList,

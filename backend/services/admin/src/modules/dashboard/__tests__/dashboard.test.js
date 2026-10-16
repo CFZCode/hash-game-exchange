@@ -353,7 +353,7 @@ test('dashboard against a database', async (t) => {
 /**
  * Every dashboard figure is DIRECT USERS ONLY (no parent), and only the
  * root's tree sees them. Players with a parent are agent clients — the
- * "Client Management" tab — and never appear here.
+ * "Agent System" tab — and never appear here.
  *
  * Confirmed live: an agent's dashboard showed the site's totals, and the
  * registrations and movements drill-downs named every player on the site.

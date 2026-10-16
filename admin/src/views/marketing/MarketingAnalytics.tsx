@@ -79,7 +79,7 @@ const SeriesTable = ({ rows, title }: { rows: Record<string, unknown>[] | undefi
 
 const agentColumns: Column<TopAgent>[] = [
   { key: 'n', header: '#', cell: (_r, i) => <span className='text-muted-foreground'>{i + 1}</span> },
-  { key: 'agent', header: 'Agent', cell: r => <Link href={`/staff/${r.agentId}`} className='font-medium hover:underline'>{r.agentName}</Link> },
+  { key: 'agent', header: 'Agent', cell: r => <span className='font-medium'>{r.agentName}</span> },
   { key: 'code', header: 'Code', cell: r => <code className='text-xs'>{r.agentCode ?? '—'}</code> },
   { key: 'role', header: 'Role', cell: r => <Badge variant='secondary'>{r.role ?? '—'}</Badge> },
   { key: 'customers', header: 'Customers', align: 'right', cell: r => formatNumber(r.customers) },
@@ -145,7 +145,7 @@ const customerColumns: Column<Customer>[] = [
   },
   { key: 'contact', header: 'Contact', cell: r => <div className='flex flex-col text-xs'><span>{r.email ?? '—'}</span><span className='text-muted-foreground'>{r.phone ?? ''}</span></div> },
   { key: 'loc', header: 'Location', cell: r => <div className='flex flex-col text-xs'><span>{r.country ?? '—'}</span><span className='text-muted-foreground font-mono'>{r.lastIp ?? ''}</span></div> },
-  { key: 'agent', header: 'Agent', cell: r => (r.agent ? <Link href={`/staff/${r.agent.id}`} className='hover:underline'>{r.agent.name}{r.agent.code ? <span className='text-muted-foreground'> · {r.agent.code}</span> : null}</Link> : <Badge variant='outline'>direct</Badge>) },
+  { key: 'agent', header: 'Agent', cell: r => (r.agent ? <span>{r.agent.name}{r.agent.code ? <span className='text-muted-foreground'> · {r.agent.code}</span> : null}</span> : <Badge variant='outline'>direct</Badge>) },
   { key: 'signed', header: 'Signed up', cell: r => <span>{r.createdEstimated ? <span className='text-muted-foreground'>≈ </span> : null}<DateTime value={r.createdAt} /></span> },
   { key: 'login', header: 'Last login', cell: r => <DateTime value={r.lastLoginAt} relative /> },
   { key: 'deposits', header: 'Deposits', align: 'right', cell: r => <span className='flex flex-col items-end'><Money value={r.depositVolume} /><span className='text-muted-foreground text-xs'>{formatNumber(r.depositCount)} txns</span></span> },

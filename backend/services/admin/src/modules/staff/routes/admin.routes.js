@@ -1,28 +1,20 @@
 'use strict';
 
+/**
+ * Staff ke bache hue routes — sirf jo Sports Exchange aur panel use karte hain:
+ *   POST  /transfer  paisa dena / lena (Sports Exchange ka Credit / Deposit / Withdraw)
+ *   PATCH /password  apna password (My Account) ya kisi aur ka reset
+ * Bahar wala agent system (list, create, edit, delete, tree, rollup…) hata diya —
+ * agent / master ab sirf Sports Exchange se bante hain.
+ */
 const { Router } = require('express');
-const { validate, createActivityRecorder, noBody, UnauthorizedError } = require('@ibitplay/common');
+const { validate, createActivityRecorder, UnauthorizedError } = require('@ibitplay/common');
 const { PERMISSIONS, markAuthorization } = require('@ibitplay/auth');
 
 const v = require('../staff.validators');
 const { StaffService } = require('../staff.service');
 const { createControllers } = require('../controllers');
 
-/**
- * The staff hierarchy.
- *
- * ── ROUTE ORDER IS LOad-BEARING HERE ─────────────────────────────────────
- *
- * Two legacy routes were unreachable because a parameter route was declared
- * before them:
- *
- *   `/transactions` was shadowed by `/:id`
- *   `/transfers/summary` was shadowed by `/transfers/:id?`
- *
- * Every literal path below is declared BEFORE any route with a parameter in
- * the same position, and the parameterised ones are last. That is the only
- * arrangement in which all of them are reachable.
- */
 module.exports = function adminRoutes(deps) {
   const { auth, clients, logger, config } = deps;
   const ctrl = createControllers({ service: new StaffService(deps) });
@@ -32,7 +24,6 @@ module.exports = function adminRoutes(deps) {
   });
 
   const router = Router();
-  const canRead = auth.requirePermission(PERMISSIONS.STAFF_READ);
   const canWrite = auth.requirePermission(PERMISSIONS.STAFF_WRITE);
   const audit = (action, describe) => withActivity({ action, describe });
 
@@ -49,26 +40,6 @@ module.exports = function adminRoutes(deps) {
     const self = targetId === undefined || targetId === null || Number(targetId) === Number(req.staff.id);
     return self ? next() : canWrite(req, res, next);
   });
-
-  // ── Literal paths first ─────────────────────────────────────────────
-  router.get('/', canRead, validate(v.listStaff), ctrl.list);
-  router.get('/tree', canRead, ctrl.tree);
-  router.get('/players', canRead, validate(v.listPlayers), ctrl.listPlayers);
-  router.get('/transactions', canRead, validate(v.listTransfers), ctrl.transfers);
-  router.get('/transfers/summary', canRead, validate(v.transferSummary), ctrl.transferSummary);
-  router.get('/transfers', canRead, validate(v.listTransfers), ctrl.transfers);
-
-  // ── Writes ──────────────────────────────────────────────────────────
-  router.post(
-    '/',
-    canWrite,
-    validate(v.createStaff),
-    audit('staff.create', (req) => ({
-      targetType: 'STAFF',
-      details: { name: req.body.name, email: req.body.email, roleId: req.body.roleId },
-    })),
-    ctrl.create
-  );
 
   /**
    * Moving money between accounts.
@@ -107,45 +78,6 @@ module.exports = function adminRoutes(deps) {
       details: { self: req.body.targetId === undefined },
     })),
     ctrl.changePassword
-  );
-
-  router.post(
-    '/bulk-status',
-    canWrite,
-    validate(v.bulkStatus),
-    audit('staff.bulk-status', (req) => ({
-      details: { ids: req.body.ids, status: req.body.status },
-    })),
-    ctrl.bulkStatus
-  );
-
-  // ── Parameterised paths last ────────────────────────────────────────
-  router.get('/rollup/:staffId', canRead, validate(v.rollup), ctrl.rollup);
-  router.get('/analytics/:staffId', canRead, validate(v.analytics), ctrl.analytics);
-  router.get('/transfers/:staffId', canRead, validate(v.listTransfersForStaff), ctrl.transfers);
-
-  router.get('/:staffId', canRead, validate(v.staffParam), ctrl.getById);
-  router.get('/:staffId/percent-chain', canRead, validate(v.staffParam), ctrl.percentChain);
-  router.get('/:staffId/percent-tree', canRead, validate(v.staffParam), ctrl.percentTree);
-  router.get('/:staffId/whatsapp-ref', canRead, validate(v.staffParam), ctrl.whatsappRef);
-
-  router.patch(
-    '/:staffId',
-    canWrite,
-    validate(v.updateStaff),
-    audit('staff.update', (req) => ({
-      targetType: 'STAFF', targetId: req.params.staffId, details: req.body,
-    })),
-    ctrl.update
-  );
-
-  router.delete(
-    '/:staffId',
-    noBody(),
-    canWrite,
-    validate(v.staffParam),
-    audit('staff.delete', (req) => ({ targetType: 'STAFF', targetId: req.params.staffId })),
-    ctrl.remove
   );
 
   return router;

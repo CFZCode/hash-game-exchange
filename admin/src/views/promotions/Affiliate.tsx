@@ -26,6 +26,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useApi, useApiMutation, useListState, usePagedApi } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
 import { formatNumber } from '@/lib/format'
+import { check } from '@/lib/validate'
 import RewardStats from './RewardStats'
 import type { AffiliateMember, AffiliateReward, AffiliateStats, AffiliateTeam, AffiliateTeamMember, AffiliateTop } from './types'
 import { useLocalList } from './useLocalList'
@@ -180,8 +181,9 @@ const Rewards = () => {
               description="Names the MEMBER. The platform reads their wager total and picks the tier itself; there is no amount to enter."
               submitLabel='Unlock'
               onSubmit={() => unlockM.mutateAsync()}
+              validate={() => ({ 'un-member': check.required(unlockName, 'Member username') || check.length(unlockName, 'Member username', { max: 120 }) })}
             >
-              <TextField id='un-member' label='Member username' required value={unlockName} onChange={e => setUnlockName(e.target.value)} />
+              <TextField id='un-member' name='memberName' label='Member username' required value={unlockName} onChange={e => setUnlockName(e.target.value)} />
             </FormDialog>
             <FormDialog
               trigger={<Button size='sm'><PlusIcon /> Record reward</Button>}
@@ -189,14 +191,21 @@ const Rewards = () => {
               description='Writes a reward row in the ledger for an owner / member pair. Amount is a decimal string.'
               submitLabel='Record'
               onSubmit={() => recordM.mutateAsync()}
+              validate={() => ({
+                'rw-owner': check.required(record.ownerName, 'Owner username') || check.length(record.ownerName, 'Owner username', { max: 120 }),
+                'rw-member': check.required(record.memberName, 'Member username') || check.length(record.memberName, 'Member username', { max: 120 }),
+                'rw-code': check.required(record.referralCode, 'Referral code') || check.length(record.referralCode, 'Referral code', { max: 120 }),
+                'rw-amount': check.amount(record.amount),
+                'rw-coin': check.length(record.coin, 'Coin', { max: 10 })
+              })}
             >
               <div className='grid grid-cols-2 gap-3'>
-                <TextField id='rw-owner' label='Owner username' required value={record.ownerName} onChange={e => setRecord({ ...record, ownerName: e.target.value })} />
-                <TextField id='rw-member' label='Member username' required value={record.memberName} onChange={e => setRecord({ ...record, memberName: e.target.value })} />
+                <TextField id='rw-owner' name='ownerName' label='Owner username' required value={record.ownerName} onChange={e => setRecord({ ...record, ownerName: e.target.value })} />
+                <TextField id='rw-member' name='memberName' label='Member username' required value={record.memberName} onChange={e => setRecord({ ...record, memberName: e.target.value })} />
               </div>
-              <TextField id='rw-code' label='Referral code' required minLength={3} maxLength={40} value={record.referralCode} onChange={e => setRecord({ ...record, referralCode: e.target.value })} />
+              <TextField id='rw-code' name='referralCode' label='Referral code' required maxLength={120} value={record.referralCode} onChange={e => setRecord({ ...record, referralCode: e.target.value })} />
               <div className='grid grid-cols-2 gap-3'>
-                <TextField id='rw-amount' label='Amount' required placeholder='10.00' value={record.amount} onChange={e => setRecord({ ...record, amount: e.target.value })} />
+                <TextField id='rw-amount' name='amount' label='Amount' required placeholder='10.00' value={record.amount} onChange={e => setRecord({ ...record, amount: e.target.value })} />
                 <TextField id='rw-coin' label='Coin' placeholder='USDT' maxLength={10} value={record.coin} onChange={e => setRecord({ ...record, coin: e.target.value })} />
               </div>
             </FormDialog>

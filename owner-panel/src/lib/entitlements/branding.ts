@@ -89,7 +89,7 @@ const TYPE_OF_EXT: Record<string, BrandingImageType> = { png: 'image/png', webp:
 export const EXT_OF_TYPE: Record<BrandingImageType, string> = { 'image/png': 'png', 'image/webp': 'webp', 'image/svg+xml': 'svg' }
 
 /** Printable text: no control characters, no angle brackets (it lands in <title> and <meta>). */
-const BAD_TEXT = /[<>\u0000-\u001f\u007f]/
+export const BAD_TEXT = /[<>\u0000-\u001f\u007f]/
 
 const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '')
 

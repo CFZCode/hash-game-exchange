@@ -119,18 +119,6 @@ export type WalletBalanceRow = {
   balances: Record<string, string>
 }
 
-export type StaffTransferRow = {
-  id: number
-  from: { type: string; id: number | string; name?: string | null }
-  to: { type: string; id: number | string; name?: string | null }
-  amount: string
-  direction: 'deposit' | 'withdraw' | string
-  transferType?: string | null
-  createdAt?: string | null
-}
-
-export type TransferSummary = { direction: string; count: number; total: string }
-
 export type ExchangeRateRow = { currency: string; usdRate: string; lastUpdated?: string | null }
 
 /** `GET admin/user/vault/stats` — platform-wide totals plus the locked balance per coin. */

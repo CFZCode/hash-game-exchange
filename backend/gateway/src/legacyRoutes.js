@@ -472,12 +472,6 @@ const EXACT = {
   // `/api/admin/balance-sheet/:userId` is `/api/v1/admin/reports/balance-sheet/:userId`;
   // `/api/report/player/:uid` is `/api/v1/admin/reports/player-sheet/:uid`.
   //
-  // `/api/admin/agent-users` lived in `siteconfig/routes/adminRiskRoutes.js`
-  // and was missed by the port entirely — there was no target to rewrite it to
-  // until the reports module grew one, so the Agent System tab 404'd rather
-  // than merely changing shape.
-  'GET /api/admin/agent-users': '/api/v1/admin/reports/agent-users',
-  //
   // `POST /api/admin/user-lock` is NOT here. The locks module already owns that
   // write at `POST /api/v1/admin/locks`, it reaches the whole subtree where
   // legacy reached one level, and its body names the locks rather than the
@@ -529,7 +523,7 @@ const EXACT = {
   'GET /marketing/analytics/top-agents': '/api/v1/admin/marketing/analytics/top-agents',
   'GET /marketing/customers': '/api/v1/admin/marketing/customers',
 
-  // ── admin/players — creating and closing a player account ────────────
+  // ── admin/players — editing and closing a player account ────────────
   //
   // `DELETE /api/staff/players/:id` read `information_schema.columns` for
   // anything named `user_id`/`userid`/`uid`/`id_user`/`user` and DELETEd from
@@ -537,9 +531,8 @@ const EXACT = {
   // produced, unrecoverably, on a licensed gambling platform. It now closes and
   // anonymises the account and keeps the financial record.
   //
-  // `POST` and the two `/:id` routes carry parameter segments except the
-  // create: `/api/v1/admin/players`, then `/api/v1/admin/players/:playerId`.
-  'POST /api/staff/players': '/api/v1/admin/players',
+  // Create ab nahi (naya user sirf Sports Exchange se); edit / close
+  // `/api/v1/admin/players/:playerId` pe hain.
 
   // ── admin/locks — locking an account out ─────────────────────────────
   //
@@ -604,20 +597,9 @@ const EXACT = {
 
   // ── admin/staff — the hierarchy and the money in it ──────────────────
   //
-  // `legacy/system/` is the best-built code in this platform: real token
-  // authentication, a closure table for the tree, an audit recorder on every
-  // write. Two of its routes were nonetheless unreachable —
-  // `/api/staff/transactions` was shadowed by `/:id`, and
-  // `/api/staff/transfers/summary` by `/transfers/:id?`.
-  'GET /api/staff': '/api/v1/admin/staff',
-  'POST /api/staff': '/api/v1/admin/staff',
-  'GET /api/staff/tree': '/api/v1/admin/staff/tree',
-  'GET /api/staff/players': '/api/v1/admin/staff/players',
-  'GET /api/staff/transactions': '/api/v1/admin/staff/transactions',
-  'GET /api/staff/transfers': '/api/v1/admin/staff/transfers',
-  'GET /api/staff/transfers/summary': '/api/v1/admin/staff/transfers/summary',
+  // Bahar wala agent system hata diya — sirf password aur transfer bache hain
+  // (Sports Exchange aur My Account ke liye).
   'PATCH /api/staff/password': '/api/v1/admin/staff/password',
-  'POST /api/staff/patch-bulk-status': '/api/v1/admin/staff/bulk-status',
   /**
    * NOT rewritten: `POST /api/staff/reset-password-for-staff`.
    *
@@ -633,8 +615,6 @@ const EXACT = {
    * whose token lacks it gets a 403 where it used to get a 200.
    */
   'POST /api/staff/transfer': '/api/v1/admin/staff/transfer',
-  // The parameterised staff paths — `/api/staff/:id` and the rest — are in
-  // PATTERNS below.
 
   // ── sports/bet-admin ─────────────────────────────────────────────────
   //
@@ -1094,36 +1074,6 @@ const EXACT = {
  * ═══════════════════════════════════════════════════════════════════════════
  */
 const PATTERNS = [
-  // ── admin/staff ─────────────────────────────────────────────────────
-  //
-  // `rollupStaff` and `metrics` were three legacy handlers over the same two
-  // counts and one balance sum; they are one route with `?includeSubtree=`.
-  ['GET /api/staff/rollup/:id', '/api/v1/admin/staff/rollup/:id'],
-  ['GET /api/staff/rollupStaff/:id', '/api/v1/admin/staff/rollup/:id?includeSubtree=true'],
-  ['GET /api/staff/metrics/:id', '/api/v1/admin/staff/rollup/:id'],
-  ['GET /api/staff/analytics/:id', '/api/v1/admin/staff/analytics/:id'],
-
-  // `/transfers/summary/:id` scopes by a path segment in legacy and by a query
-  // parameter now — the summary route is literal so that `/transfers/:id` can
-  // stay reachable beneath it.
-  ['GET /api/staff/transfers/summary/:id', '/api/v1/admin/staff/transfers/summary?staffId=:id'],
-  ['GET /api/staff/transfers/:id', '/api/v1/admin/staff/transfers/:id'],
-
-  ['GET /api/staff/:id/percent-chain', '/api/v1/admin/staff/:id/percent-chain'],
-  ['GET /api/staff/:id/percent-tree', '/api/v1/admin/staff/:id/percent-tree'],
-  ['GET /api/staff/:id/whatsapp-ref', '/api/v1/admin/staff/:id/whatsapp-ref'],
-
-  ['GET /api/staff/:id', '/api/v1/admin/staff/:id'],
-  ['PATCH /api/staff/:id', '/api/v1/admin/staff/:id'],
-  /**
-   * `DELETE /api/staff/:id` refuses an account that still has descendants, a
-   * balance or players, where legacy deleted the row and orphaned the subtree.
-   * The path is unchanged, so this is a rewrite; the outcome is not, so a
-   * caller deleting a populated account now gets a 409 where it used to get a
-   * 200 and an invisible branch.
-   */
-  ['DELETE /api/staff/:id', '/api/v1/admin/staff/:id'],
-
   // ── admin/risk ──────────────────────────────────────────────────────
   //
   // From `siteconfig/routes/adminRiskRoutes.js`, which the port missed in full.

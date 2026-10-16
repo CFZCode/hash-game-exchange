@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 
 import { Loader2Icon, LockIcon, RotateCcwIcon, SaveIcon } from 'lucide-react'
 
@@ -33,9 +33,13 @@ const FeatureFlags = () => {
   const [filter, setFilter] = useState('')
   const canWrite = can('config:write')
 
-  useEffect(() => {
-    if (flags.data) setDraft(flags.data)
-  }, [flags.data])
+  // A fresh load replaces the draft (adjusting state during render, not in an effect).
+  const [loaded, setLoaded] = useState<Flags | undefined>(undefined)
+
+  if (flags.data && flags.data !== loaded) {
+    setLoaded(flags.data)
+    setDraft(flags.data)
+  }
 
   const dirty = useMemo(() => Object.keys(draft).filter(k => flags.data && draft[k] !== flags.data[k]), [draft, flags.data])
 
@@ -48,7 +52,7 @@ const FeatureFlags = () => {
       return api.put<Flags>('admin/site-config/global', patch)
     },
     invalidate: [['api', 'admin/site-config/global']],
-    success: r => `${dirty.length} flag${dirty.length === 1 ? '' : 's'} saved`,
+    success: () => `${dirty.length} flag${dirty.length === 1 ? '' : 's'} saved`,
     onSuccess: () => refreshFlags()
   })
 

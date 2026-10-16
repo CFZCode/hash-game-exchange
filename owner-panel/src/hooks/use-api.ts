@@ -3,7 +3,8 @@
 import { useMutation, useQuery, useQueryClient, type UseQueryOptions } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
-import { api, errorMessage } from '@/lib/api/client'
+import { api } from '@/lib/api/client'
+import { toastError } from '@/lib/api/feedback'
 import type { Query } from '@/lib/api/types'
 
 export function useApi<T>(path: string | null, query?: Query, options?: Partial<UseQueryOptions<T>>) {
@@ -20,6 +21,9 @@ type Spec<TVars, TResult> = {
   invalidate?: (string | null)[][]
   success?: string | ((r: TResult, v: TVars) => string)
   onSuccess?: (r: TResult, v: TVars) => void
+
+  /** The error toast's title (its text is the server's message); none = the message alone. */
+  errorTitle?: string
 }
 
 export function useApiMutation<TVars = void, TResult = unknown>(spec: Spec<TVars, TResult>) {
@@ -32,6 +36,6 @@ export function useApiMutation<TVars = void, TResult = unknown>(spec: Spec<TVars
       if (spec.success) toast.success(typeof spec.success === 'function' ? spec.success(r, v) : spec.success)
       spec.onSuccess?.(r, v)
     },
-    onError: e => toast.error(errorMessage(e))
+    onError: e => toastError(e, spec.errorTitle)
   })
 }

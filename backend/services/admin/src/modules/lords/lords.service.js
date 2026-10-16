@@ -30,6 +30,7 @@ const {
   debitOwnerDirectBalance,
   creditOwnerDirectBalance,
   insufficientDirectBalance,
+  LEDGER_TYPE,
 } = require('./ownerWallet');
 
 /** The only currency a staff float holds (`credits.inr` on the staff row). */
@@ -271,7 +272,10 @@ class LordsService {
        * reason about.
        */
       if (ownerToDirectUser) {
-        const debited = await debitOwnerDirectBalance(this.models, actor.id, amount, { transaction });
+        const debited = await debitOwnerDirectBalance(this.models, actor.id, amount, {
+          transaction,
+          entry: { type: LEDGER_TYPE.USER_DEPOSIT, userId: accountId, note: note ?? 'Refill' },
+        });
         if (!debited) throw insufficientDirectBalance({ amount });
       } else {
         const debited = await debitStaffFloat(this.models, actor.id, amount, { transaction, allowCredit: true });
@@ -474,7 +478,10 @@ class LordsService {
       //       Owner → direct user: owner ka Direct User balance (staff_balances).
       if (isCredit) {
         if (ownerToDirectUser) {
-          const debited = await debitOwnerDirectBalance(this.models, actor.id, decimal, { transaction });
+          const debited = await debitOwnerDirectBalance(this.models, actor.id, decimal, {
+            transaction,
+            entry: { type: LEDGER_TYPE.USER_DEPOSIT, userId, note: description ?? 'Deposit' },
+          });
           if (!debited) {
             throw insufficientDirectBalance({
               requested: decimal,
@@ -499,7 +506,12 @@ class LordsService {
         if (!affected) {
           throw insufficientPlayerBalance({ requested: decimal, available: money.toDecimalString(previous) });
         }
-        if (ownerToDirectUser) await creditOwnerDirectBalance(this.models, actor.id, decimal, { transaction });
+        if (ownerToDirectUser) {
+          await creditOwnerDirectBalance(this.models, actor.id, decimal, {
+            transaction,
+            entry: { type: LEDGER_TYPE.USER_WITHDRAW, userId, note: description ?? 'Withdraw' },
+          });
+        }
         else await creditStaffFloat(this.models, actor.id, decimal, { transaction });
       }
 

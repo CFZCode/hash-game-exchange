@@ -1,0 +1,78 @@
+/* The article body on /blog/:slug. Preflight zeroes every margin and list marker, and a post is
+   staff-written HTML with no classes, so its prose rules live here — this build's own values, in
+   the spirit of `.help-doc` (pages/Help/Help.css). No `display` on anything a utility hides. */
+.blog-content h1,
+.blog-content h2,
+.blog-content h3,
+.blog-content h4 {
+  margin: 20px 0 8px;
+  color: var(--color-primary);
+  font-weight: 800;
+}
+
+.blog-content h1 { font-size: 1.25rem; line-height: 1.75rem; }
+.blog-content h2 { font-size: 1.125rem; line-height: 1.75rem; }
+.blog-content h3,
+.blog-content h4 { font-size: 1rem; line-height: 1.5rem; }
+
+.blog-content > :first-child { margin-top: 0; }
+
+.blog-content p {
+  margin: 12px 0;
+  word-break: break-word;
+}
+
+.blog-content ul,
+.blog-content ol {
+  margin: 8px 0;
+  padding-left: 1.5rem;
+  list-style-position: outside;
+}
+
+.blog-content ul { list-style-type: disc; }
+.blog-content ol { list-style-type: decimal; }
+.blog-content li { margin: 0 0 6px; }
+
+.blog-content a {
+  color: var(--color-brand);
+  text-decoration: underline;
+}
+
+.blog-content img {
+  max-width: 100%;
+  height: auto;
+  margin: 12px 0;
+  border-radius: 0.75rem;
+}
+
+.blog-content blockquote {
+  margin: 12px 0;
+  padding-left: 12px;
+  border-left: 3px solid var(--color-brand);
+}
+
+.blog-content pre {
+  margin: 12px 0;
+  padding: 12px;
+  overflow-x: auto;
+  border-radius: 0.5rem;
+  background: var(--color-layer5);
+}
+
+.blog-content hr {
+  margin: 16px 0;
+  border-color: var(--color-layer5);
+}
+
+.blog-content table {
+  width: 100%;
+  margin: 12px 0;
+  border-collapse: collapse;
+}
+
+.blog-content th,
+.blog-content td {
+  padding: 6px 8px;
+  border: 1px solid var(--color-layer5);
+  text-align: left;
+}

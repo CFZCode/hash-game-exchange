@@ -1,21 +1,13 @@
 // Third-party Imports
 import {
   ArrowDownToLineIcon,
-  ArrowLeftRightIcon,
   ArrowUpFromLineIcon,
   BellIcon,
   BellRingIcon,
-  BanIcon,
   BookOpenIcon,
   ChartColumnIcon,
-  GaugeIcon,
   GavelIcon,
   ListTreeIcon,
-  MonitorPlayIcon,
-  PercentIcon,
-  SlidersHorizontalIcon,
-  TimerIcon,
-  UserPlusIcon,
   CircleDollarSignIcon,
   CoinsIcon,
   CreditCardIcon,
@@ -35,7 +27,6 @@ import {
   LinkIcon,
   LockKeyholeIcon,
   MegaphoneIcon,
-  NetworkIcon,
   NewspaperIcon,
   RepeatIcon,
   ScrollTextIcon,
@@ -60,18 +51,10 @@ import {
  * loads — the bulk of the slow first load. Add an icon here to use it below.
  */
 export const navIcons = {
-  Ban: BanIcon,
   ChartColumn: ChartColumnIcon,
-  Gauge: GaugeIcon,
   Gavel: GavelIcon,
   ListTree: ListTreeIcon,
-  MonitorPlay: MonitorPlayIcon,
-  Percent: PercentIcon,
-  SlidersHorizontal: SlidersHorizontalIcon,
-  Timer: TimerIcon,
-  UserPlus: UserPlusIcon,
   ArrowDownToLine: ArrowDownToLineIcon,
-  ArrowLeftRight: ArrowLeftRightIcon,
   ArrowUpFromLine: ArrowUpFromLineIcon,
   Bell: BellIcon,
   BellRing: BellRingIcon,
@@ -94,7 +77,6 @@ export const navIcons = {
   LayoutDashboard: LayoutDashboardIcon,
   Link: LinkIcon,
   Megaphone: MegaphoneIcon,
-  Network: NetworkIcon,
   Newspaper: NewspaperIcon,
   Repeat: RepeatIcon,
   ScrollText: ScrollTextIcon,
@@ -205,8 +187,15 @@ const OWNER_ONLY = 'wallet:adjust'
 
 export const navItems: NavItem[] = [
   {
-    // Ek hi Dashboard: Direct Users (reports:read) + Agent System (Sports Exchange) tab.
-    items: [{ icon: 'LayoutDashboard', label: 'Dashboard', href: '/dashboard', permission: ['reports:read', ...WALLET_ANY] }]
+    // Main: Dashboard (Direct Users + Agent System tab) aur Users (Direct / Agent / Financial).
+    groupLabel: 'Main',
+    items: [
+      { icon: 'LayoutDashboard', label: 'Dashboard', href: '/dashboard', permission: ['reports:read', ...WALLET_ANY] },
+
+      // Either grant opens the list: reports:read reads `admin/reports/players` (balances, deposits,
+      // wagers); users:read alone falls back to the player directory `admin/user/directory`.
+      { icon: 'Users', label: 'Users', href: '/users', activePath: '/users', permission: ['reports:read', 'users:read'] } as MenuItem
+    ]
   },
   {
     /*
@@ -218,19 +207,6 @@ export const navItems: NavItem[] = [
     collapsible: true,
     items: [
       { icon: 'ChartColumn', label: 'Market Analysis', href: '/exchange/market-analysis', permission: 'sports:read' },
-      { icon: 'KeyRound', label: 'Multi Login Account', href: '/exchange/multi-login', permission: 'staff:read' },
-      {
-        icon: 'Users',
-        label: 'Account',
-        permission: ['users:read', 'staff:read'],
-        childItems: [
-          { label: 'Account List For Active Users', href: '/exchange/users/active' },
-          { label: 'Account List', href: '/exchange/users' },
-          { label: 'Create Account', href: '/exchange/users/create', permission: ['users:write', 'staff:write'] }
-        ]
-      },
-      { icon: 'UserPlus', label: 'Assign Agent', href: '/exchange/assign-agent', permission: 'staff:write' },
-      { icon: 'Landmark', label: 'Bank', href: '/exchange/bank', permission: WALLET_ANY },
       {
         icon: 'FileBarChart',
         label: 'Reports',
@@ -250,34 +226,29 @@ export const navItems: NavItem[] = [
           { label: 'User Win Loss', href: '/exchange/reports/user-win-loss' }
         ]
       },
-      {
-        // Zip me owner only. Casino Settlement nahi.
-        icon: 'Gavel',
-        label: 'Settlement',
-        permission: OWNER_ONLY,
-        childItems: [
-          { label: 'Match Settlement', href: '/exchange/settlement/match' },
-          { label: 'Fancy Settlement', href: '/exchange/settlement/fancy' },
-          { label: 'Void Bets', href: '/exchange/settlement/void-bets' }
-        ]
-      },
 
-      // Zip me owner only (sports config).
-      { icon: 'Timer', label: 'Buffer Time', href: '/exchange/settings/buffer-time', permission: OWNER_ONLY },
-      { icon: 'Percent', label: 'Commission', href: '/exchange/settings/commission', permission: OWNER_ONLY },
-      { icon: 'Gauge', label: 'Max Odds', href: '/exchange/settings/max-odds', permission: OWNER_ONLY },
-      { icon: 'Ban', label: 'Auto Void', href: '/exchange/settings/auto-void', permission: OWNER_ONLY },
-      { icon: 'MonitorPlay', label: 'Virtual Bet Limits', href: '/exchange/settings/virtual-limits', permission: OWNER_ONLY },
-      { icon: 'SlidersHorizontal', label: 'Bet Limits', href: '/exchange/settings/bet-limits', permission: OWNER_ONLY },
+      // Zip me owner only. Casino Settlement nahi. Match / Fancy / Void Bets ek page pe tabs me.
+      { icon: 'Gavel', label: 'Settlement', href: '/exchange/settlement', permission: OWNER_ONLY },
+
+      // Zip me owner only (sports config): Buffer Time, Commission, Max Odds, Auto Void, Virtual / Bet Limits — tabs me.
+      { icon: 'Settings2', label: 'Global Settings', href: '/exchange/settings', permission: OWNER_ONLY },
       { icon: 'ListTree', label: 'Events', href: '/exchange/events', permission: 'sports:read' }
+    ]
+  },
+  {
+    // Sports Exchange ka agent system — sidebar me alag section. Create Account Account List ke button se.
+    groupLabel: 'Agent Management',
+    collapsible: true,
+    items: [
+      { icon: 'Users', label: 'Account List', href: '/exchange/users', activePath: '/exchange/users', permission: ['users:read', 'staff:read'] } as MenuItem,
+      { icon: 'Landmark', label: 'Bank', href: '/exchange/bank', permission: WALLET_ANY }
     ]
   },
   {
     groupLabel: 'Users',
     items: [
-      // Either grant opens the list: reports:read reads `admin/reports/players` (balances, deposits,
-      // wagers); users:read alone falls back to the player directory `admin/user/directory`.
-      { icon: 'Users', label: 'Users', href: '/users', activePath: '/users', permission: ['reports:read', 'users:read'] } as MenuItem,
+      // Sirf Super Admin: direct users ko kisi bhi currency me credit / debit (admin-structure.zip ka Wallet page).
+      { icon: 'Wallet', label: 'Direct User Wallet', href: '/direct-wallet', permission: 'wallet:adjust' },
       { icon: 'Globe', label: 'IP tracker', href: '/ip-tracker', permission: 'reports:read' },
       { icon: 'ShieldCheck', label: 'KYC', href: '/kyc', permission: 'users:read', feature: 'kyc' },
       { icon: 'Landmark', label: 'Bank details', href: '/bank-details', permission: 'config:read' }
@@ -306,7 +277,6 @@ export const navItems: NavItem[] = [
         ]
       },
       { icon: 'Wallet', label: 'Wallets', href: '/wallets', permission: 'wallet:read' },
-      { icon: 'ArrowLeftRight', label: 'Transfers', href: '/transfers', permission: 'staff:read' },
       { icon: 'Coins', label: 'Exchange rates', href: '/exchange-rates', permission: 'config:read' },
 
       // House only: `promotions` is the mark that hides a screen from agent-tree logins.
@@ -331,6 +301,8 @@ export const navItems: NavItem[] = [
   {
     groupLabel: 'Promotions',
     items: [
+      // The campaigns on the player site's /promotions. Reads are the public routes (staff see drafts); writes are config:write.
+      { icon: 'Megaphone', label: 'Promotions', href: '/promotions/campaigns', permission: 'config:read', promotions: true, feature: 'promotions' },
       { icon: 'Gift', label: 'Bonus', href: '/bonus', permission: 'reports:read', promotions: true, flag: 'bonus', feature: 'bonus' },
       { icon: 'Ticket', label: 'Redeem codes', href: '/redeem-codes', permission: 'reports:read', promotions: true },
 
@@ -390,7 +362,6 @@ export const navItems: NavItem[] = [
   {
     groupLabel: 'Team',
     items: [
-      { icon: 'Network', label: 'Staff & agents', href: '/staff', activePath: '/staff', permission: 'staff:read' } as MenuItem,
       { icon: 'KeyRound', label: 'Executives', href: '/access/executives', permission: 'staff:read' },
       { icon: 'Megaphone', label: 'Marketing', href: '/marketing', account: 'marketing' },
       { icon: 'ScrollText', label: 'Activity log', href: '/audit', permission: 'audit:read' }
@@ -461,6 +432,7 @@ export const navItems: NavItem[] = [
  * notice on these instead of the screen, so no promotion API is called from a pasted URL either.
  */
 export const PROMOTION_ROUTES = [
+  '/promotions',
   '/bonus',
   '/redeem-codes',
   '/gift-cards',
@@ -486,7 +458,7 @@ export const isPromotionRoute = (pathname: string) =>
  * the sidebar would have hidden the link.
  *
  * `permissions` is every level of the menu chain (the group's grant AND the leaf's), each one an
- * any-of list. Sub-routes inherit their entry (`/users/42` → Users, `/staff/7` → Staff & agents);
+ * any-of list. Sub-routes inherit their entry (`/users/42` → Users, `/exchange/users/create` → Account List);
  * the longest matching `href` wins. A route no entry links to has no requirement here.
  */
 export type RouteRequirement = {

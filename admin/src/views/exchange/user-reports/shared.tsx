@@ -7,6 +7,7 @@ import { FileSpreadsheetIcon, FileTextIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useApi } from '@/hooks/use-api'
+import { errorMessage } from '@/lib/api/client'
 import { exportExcel, exportPdf } from '../exportList'
 
 /**
@@ -61,7 +62,7 @@ export function ClientSearch({ value, onChange, placeholder = 'Select option' }:
   const [open, setOpen] = useState(false)
   const typed = value.trim()
 
-  const { data } = useApi<{ results: SearchResult[] }>(
+  const { data, error } = useApi<{ results: SearchResult[] }>(
     open && typed.length >= 3 ? 'admin/exchange-lookup/search-by-username' : null,
     { username: typed, limit: 25 }
   )
@@ -82,7 +83,9 @@ export function ClientSearch({ value, onChange, placeholder = 'Select option' }:
       />
       {open && typed.length > 0 && (
         <ul className='bg-popover text-popover-foreground absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-md border text-sm shadow-md'>
-          {typed.length < 3 || results.length === 0 ? (
+          {typed.length >= 3 && error ? (
+            <li className='text-destructive px-3 py-2'>Search failed: {errorMessage(error)}</li>
+          ) : typed.length < 3 || results.length === 0 ? (
             <li className='text-muted-foreground px-3 py-2'>No elements found. Consider changing the search query.</li>
           ) : (
             results.map(r => (

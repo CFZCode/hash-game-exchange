@@ -2,7 +2,12 @@ import { useNavigate } from 'react-router-dom';
 import { useSession } from '../../../context/session';
 import { useCanSignUp } from '../../../context/gates';
 import Banner from './Banner';
-import { siteName, useSiteMark } from '../../../services/siteBranding';
+import { getSignupHeroArt } from '../../../services/banner';
+import { useResource } from '../../../hooks/useResource';
+
+const DEFAULT_HERO_ART = '/brand/parker567-hero.jpg';
+/* Figma "Frame 146" (372×215 @2x): the phone banner, two players on the right. */
+const DEFAULT_HERO_ART_MOBILE = '/brand/parker567-hero-mobile.jpg';
 import googleIcon from '../../../assets/google.png';
 import telegramIcon from '../../../assets/telegram.png';
 import './Hero.css';
@@ -19,7 +24,7 @@ const HeroCopy = () => {
   const canSignUp = useCanSignUp();
 
   return (
-    <div className="center relative z-[1] flex h-full w-1/2 min-w-[11.25rem] flex-col whitespace-nowrap">
+    <div className="center relative z-[1] flex h-full w-[42%] min-w-0 flex-col whitespace-nowrap lg:w-1/2 lg:min-w-[11.25rem]">
       <div className="flex items-center gap-1">
         <h1 className="max-w-44 text-wrap p-0 text-center text-lg font-extrabold leading-5 text-primary sm:max-w-none sm:text-2xl sm:leading-7">
           JOIN THE UNTAMED
@@ -35,10 +40,10 @@ const HeroCopy = () => {
         Sign Up
       </button>
 
-      {/* "Or Register With" Google / Telegram is not drawn: the buttons had no handler and the
-          platform has no social sign-in, so they were dead controls. */}
-      {SOCIAL_SIGN_IN && (
-        <>
+      {/* "Or Register With" — Google only (user's request, 2026-10-16). The platform has no
+          Google OAuth yet, so the button opens the same sign-up form the Sign Up button does
+          rather than sitting dead; Telegram stays hidden (SOCIAL_SIGN_IN). Wire it to the real
+          OAuth start the day the backend has one. */}
       <p className="mt-3 p-0 font-semibold leading-[150%] text-secondary">Or Register With</p>
 
       <div className="mt-1.5 h-8">
@@ -47,10 +52,12 @@ const HeroCopy = () => {
             <button
               className="button h-8 w-[5.5rem] flex-none gap-1 rounded-lg border border-third bg-black_alpha5 p-0 text-xs backdrop-blur-sm sm:h-10 sm:w-[120px] sm:text-base"
               type="button"
+              onClick={() => navigate('/login/regist')}
             >
               <img alt="google" className="size-[0.875rem] sm:size-5" src={googleIcon} />
               <span className="font-extrabold text-primary">Google</span>
             </button>
+            {SOCIAL_SIGN_IN && (
             <button
               className="button relative h-8 w-[5.5rem] flex-none gap-1 overflow-hidden rounded-lg border border-third bg-black_alpha5 p-0 text-xs backdrop-blur-sm sm:h-10 sm:w-[120px] sm:text-base"
               type="button"
@@ -60,11 +67,10 @@ const HeroCopy = () => {
                 <span className="font-extrabold text-primary">Telegram</span>
               </div>
             </button>
+            )}
           </div>
         </div>
       </div>
-        </>
-      )}
         </>
       )}
     </div>
@@ -76,21 +82,27 @@ const HeroCopy = () => {
 function SignedOutHero() {
   /* THE ORIGINAL'S ARTWORK IS GONE: `banner.png` / `banner_mobile.png` are bc.game's esports team
      in "BC GAME ESPORTS / JB.COM" shirts and `banner_logo*.png` is the 3D BC mark — another
-     brand's marketing. The panel keeps its own fill and copy; the right-hand art is the owner's
-     square mark (branding/public) when one is uploaded, and nothing otherwise. */
-  const mark = useSiteMark();
+     brand's marketing. The panel keeps its own fill and copy; the art is Parker567's own banner
+     (public/brand/parker567-hero.jpg) unless the admin uploads one. */
+  /* The operator's own hero art (site admin › Banners, placements `home` /
+     `home_mobile`), placed exactly as the original's banner.png / banner_mobile.png were.
+     With none uploaded the bundled Parker567 banner shows. */
+  const { data: art } = useResource(getSignupHeroArt);
+  /* Parker567's own banner (Figma "Frame 145", 1276×270 @2x) when the admin has uploaded none. */
+  const desktopArt = art?.desktop ?? DEFAULT_HERO_ART;
+  /* An admin desktop banner without a mobile one falls back to it (getSignupHeroArt); with no
+     admin art at all the phone gets its own Parker567 banner. */
+  const mobileArt = art?.mobile ?? DEFAULT_HERO_ART_MOBILE;
   return (
     <div dir="ltr" className="w-full px-4 sm:px-0">
       <div className="hero-panel relative h-[14.375rem] w-full overflow-hidden rounded-lg pl-2.5 sm:h-[260px]">
-        {mark && (
-          <img
-            alt={siteName() || 'logo'}
-            className="absolute right-6 top-1/2 h-3/5 w-auto -translate-y-1/2 rounded-2xl object-contain opacity-90 lg:right-16"
-            src={mark}
-          />
-        )}
+        {/* Desktop: the finished banner covers the panel, anchored left (the crowned P). Phone:
+            the players' art sits bottom-right at 88% height, its left and top edges faded into the panel,
+            so both players stay whole beside the copy (held to 42%). */}
+        <img alt="banner" className="absolute bottom-0 right-0 h-[88%] w-auto max-w-none [mask-image:linear-gradient(to_right,transparent,#000_30%),linear-gradient(to_bottom,transparent,#000_18%)] [mask-composite:intersect] lg:hidden" src={mobileArt} />
+        <img alt="banner" className="absolute inset-0 hidden h-full w-full object-cover object-left lg:block" src={desktopArt} />
 
-        <div className="relative hidden h-full w-[50%] items-center justify-center lg:flex">
+        <div className="relative hidden h-full w-[50%] items-center justify-center lg:ml-[12%] lg:flex">
           <HeroCopy />
         </div>
         <div className="contents lg:hidden">

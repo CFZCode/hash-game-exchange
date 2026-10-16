@@ -21,7 +21,7 @@ const { createControllers } = require('../controllers');
  */
 module.exports = function adminRoutes(deps) {
   const ctrl = createControllers({ service: new DashboardService(deps) });
-  // Direct Users tab: only players with no parent (agent clients are on Client Management).
+  // Direct Users tab: only players with no parent (agent clients are on Agent System).
   const stats = createStatsControllers({ service: new DashboardStatsService({ ...deps, directOnly: true }) });
 
   const router = Router();

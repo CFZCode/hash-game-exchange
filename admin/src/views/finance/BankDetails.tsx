@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useApi, useApiMutation } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
+import { check } from '@/lib/validate'
 
 import { useOwnerCoinFilter } from './useCurrencyCodes'
 
@@ -37,8 +38,6 @@ type BankRow = {
 
 const CURRENCIES = ['INR', 'PKR', 'BDT', 'NPR', 'AED', 'MVR', 'EUR', 'USDT']
 
-const emptyForm = { bankName: '', accountNumber: '', ifscCode: '', accountHolderName: '', upiId: '', isActive: true }
-
 const DetailForm = ({ coin, row, onDone }: { coin: string; row?: BankRow; onDone?: () => void }) => {
   const [form, setForm] = useState({
     bankName: row?.bankName ?? '',
@@ -48,7 +47,19 @@ const DetailForm = ({ coin, row, onDone }: { coin: string; row?: BankRow; onDone
     upiId: row?.upiId ?? '',
     isActive: row?.isActive ?? true
   })
+
   const [file, setFile] = useState<File | null>(null)
+
+  // bankDetails.validators.js: every text ≤ 255 (account ≤ 100, IFSC ≤ 50); a new row needs an account number or a UPI id.
+  const validate = () => ({
+    accountHolderName: check.length(form.accountHolderName, 'Account holder', { max: 255 }),
+    bankName: check.length(form.bankName, 'Bank name', { max: 255 }),
+    ifscCode: check.length(form.ifscCode, 'IFSC / SWIFT', { max: 50 }),
+    accountNumber:
+      !form.accountNumber.trim() && !form.upiId.trim() ? 'Either an account number or a UPI id is required' : check.length(form.accountNumber, 'Account number', { max: 100 }),
+    upiId: check.length(form.upiId, 'UPI id', { max: 255 }),
+    'bd-qr': file && !['image/png', 'image/jpeg'].includes(file.type) ? 'QR image must be a PNG or JPEG' : file && file.size > 2 * 1024 * 1024 ? 'QR image must be 2 MB or smaller' : undefined
+  })
 
   const save = useApiMutation({
     fn: () => {
@@ -83,15 +94,16 @@ const DetailForm = ({ coin, row, onDone }: { coin: string; row?: BankRow; onDone
       title={row ? `Edit ${coin} destination` : `New ${coin} destination`}
       description='Either an account number or a UPI id is required. The QR image is optional and replaces the stored one.'
       submitLabel={row ? 'Save' : 'Add'}
+      validate={validate}
       onSubmit={() => save.mutateAsync()}
     >
-      <TextField id='bd-holder' label='Account holder' value={form.accountHolderName} onChange={e => setForm({ ...form, accountHolderName: e.target.value })} />
+      <TextField id='bd-holder' name='accountHolderName' label='Account holder' value={form.accountHolderName} onChange={e => setForm({ ...form, accountHolderName: e.target.value })} />
       <div className='grid grid-cols-2 gap-4'>
-        <TextField id='bd-bank' label='Bank name' value={form.bankName} onChange={e => setForm({ ...form, bankName: e.target.value })} />
-        <TextField id='bd-ifsc' label='IFSC / SWIFT' value={form.ifscCode} onChange={e => setForm({ ...form, ifscCode: e.target.value })} />
+        <TextField id='bd-bank' name='bankName' label='Bank name' value={form.bankName} onChange={e => setForm({ ...form, bankName: e.target.value })} />
+        <TextField id='bd-ifsc' name='ifscCode' label='IFSC / SWIFT' value={form.ifscCode} onChange={e => setForm({ ...form, ifscCode: e.target.value })} />
       </div>
-      <TextField id='bd-acct' label='Account number' value={form.accountNumber} onChange={e => setForm({ ...form, accountNumber: e.target.value })} />
-      <TextField id='bd-upi' label='UPI id' value={form.upiId} onChange={e => setForm({ ...form, upiId: e.target.value })} />
+      <TextField id='bd-acct' name='accountNumber' label='Account number' value={form.accountNumber} onChange={e => setForm({ ...form, accountNumber: e.target.value })} />
+      <TextField id='bd-upi' name='upiId' label='UPI id' value={form.upiId} onChange={e => setForm({ ...form, upiId: e.target.value })} />
       <div className='grid gap-2'>
         <label htmlFor='bd-qr' className='text-sm font-medium'>
           QR image (PNG or JPEG, max 2 MB)

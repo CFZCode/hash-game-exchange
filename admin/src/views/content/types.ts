@@ -31,6 +31,7 @@ export type Blog = {
   byteSize: number | null
   createdAt: string | null
   updatedAt: string | null
+
   /** Only on `GET /blogs/:id`. */
   description?: string
 }

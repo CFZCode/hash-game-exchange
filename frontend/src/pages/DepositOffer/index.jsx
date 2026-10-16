@@ -14,6 +14,7 @@ import {
 } from "./icons";
 import "./DepositOffer.css";
 import Skeleton from '../../components/shared/Skeleton';
+import EmptyPlaceholder from '../../components/shared/EmptyPlaceholder';
 import * as globMaps from './index.globs.js';
 
 /* The deposit-bonus page — `/deposit-offer`.
@@ -216,11 +217,13 @@ function ProgressCard({ bonus, resetAt, onOpenDetail }) {
           <span className="text-base font-extrabold text-primary max-sm:text-sm">
             {bonus.title}
           </span>
-          <span className="flex flex-row items-center gap-1 rounded-lg bg-layer4 px-2 py-1 text-sm font-semibold text-primary max-sm:text-xs">
-            <ClockIcon className="icon size-4 text-[#070F0B] dark:text-[#D5E2E5]" />
-            Reset in
-            <Countdown expiresAt={resetAt} className="text-primary" />
-          </span>
+          {resetAt > 0 && (
+            <span className="flex flex-row items-center gap-1 rounded-lg bg-layer4 px-2 py-1 text-sm font-semibold text-primary max-sm:text-xs">
+              <ClockIcon className="icon size-4 text-[#070F0B] dark:text-[#D5E2E5]" />
+              Reset in
+              <Countdown expiresAt={resetAt} className="text-primary" />
+            </span>
+          )}
         </div>
 
         <button
@@ -250,7 +253,7 @@ function ProgressCard({ bonus, resetAt, onOpenDetail }) {
               than stored so it cannot drift from the dialog's calculator. */}
           <p className="flex flex-row justify-between text-xl font-extrabold text-primary max-sm:flex-col max-sm:items-center">
             <span className="text-3xl font-extrabold text-primary max-sm:text-2xl">
-              {stageMatch(stage)}% Deposit Rakeback
+              {stageMatch(stage)}% Deposit {bonus.headlineNoun ?? 'Rakeback'}
             </span>
           </p>
 
@@ -326,16 +329,19 @@ function PromotionCard({ bonus, resetAt, onOpenDetail }) {
       className="relative flex w-full min-w-[17rem] max-w-[25rem] flex-col gap-3 overflow-hidden rounded-lg bg-layer3 p-4 sm:max-w-none"
       style={HAIRLINE}
     >
-      <span className="absolute right-0 top-0 flex flex-row items-center justify-center rounded-bl-lg bg-white_alpha5 px-2 py-1">
-        <ClockIcon className="icon size-4 text-[#070F0B] dark:text-[#D5E2E5]" />
-        <span className="ml-[2px] mr-1 text-[0.625rem] font-semibold text-primary">
-          Reset in
+      {/* No reset on a bonus that does not cycle (the live first-deposit one): no badge. */}
+      {resetAt > 0 && (
+        <span className="absolute right-0 top-0 flex flex-row items-center justify-center rounded-bl-lg bg-white_alpha5 px-2 py-1">
+          <ClockIcon className="icon size-4 text-[#070F0B] dark:text-[#D5E2E5]" />
+          <span className="ml-[2px] mr-1 text-[0.625rem] font-semibold text-primary">
+            Reset in
+          </span>
+          <Countdown
+            expiresAt={resetAt}
+            className="text-[0.625rem] text-primary"
+          />
         </span>
-        <Countdown
-          expiresAt={resetAt}
-          className="text-[0.625rem] text-primary"
-        />
-      </span>
+      )}
 
       <span className="flex flex-row items-center gap-3">
         <span className="size-12 flex-none">
@@ -458,6 +464,11 @@ export default function DepositOffer() {
         <Skeleton className="mt-4 block h-40 w-full rounded-xl" radius={0}>
           <div className="size-full" />
         </Skeleton>
+      ) : bonuses.length === 0 ? (
+        /* Nothing on offer: the site admin's first-deposit bonus is off or has no tiers
+           (Site config › Welcome bonuses). The site's own empty state, once, instead of two bare
+           headings. */
+        <EmptyPlaceholder />
       ) : (
         bonuses.map((bonus) => (
           <ProgressCard
@@ -469,7 +480,7 @@ export default function DepositOffer() {
         ))
       )}
 
-      <SectionHeading icon={GiftIcon}>Available PROMOTIONS</SectionHeading>
+      {(loading || bonuses.length > 0) && <SectionHeading icon={GiftIcon}>Available PROMOTIONS</SectionHeading>}
 
       {/* `sm:mb-4` IS THIS BUILD'S AND IS NOW DESKTOP-ONLY. The rendered markup carries no bottom
           margin on this grid at all — `class="grid grid-cols-1 justify-items-center gap-4

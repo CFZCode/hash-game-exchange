@@ -22,7 +22,8 @@ import {
   SPORTS_LIST,
   withMinimumDelay,
   type Client,
-  type ReportColumn
+  type ReportColumn,
+  rangeError
 } from './reportKit'
 
 type TurnoverResult = { loss_turnover: number; loss: number; win_turnover: number; win: number; total_turnover: number; total_pl: number }
@@ -57,7 +58,20 @@ const Turnover = () => {
     e.preventDefault()
     setTypeInvalid(!typeVal)
     setSportInvalid(Boolean(typeVal) && !sportVal)
-    if (!typeVal || !sportVal) return
+
+    if (!typeVal || !sportVal) {
+      toast.error(!typeVal ? 'Choose a type' : 'Choose a sport')
+
+      return
+    }
+
+    const badRange = rangeError({ from: fromDate, to: toDate })
+
+    if (badRange) {
+      toast.error(badRange)
+
+      return
+    }
 
     setLoading(true)
 

@@ -41,7 +41,19 @@ const LOGOS = {
   'stake-site': 'stake-site.svg',
   addaplay: 'addaplay.webp',
   roobet: 'roobet.svg',
+  parker567: 'parker567.png',
 };
+
+/* The square marks that go with a logo above (favicon, loader), by the same name. */
+const MARKS = {
+  parker567: 'parker567-mark.png',
+};
+
+/* This front end is Parker567's. In live mode an unbranded backend (the owner has not uploaded a
+   logo yet) must still show Parker567, never the BC.GAME art the code imports, so the live build
+   falls back to these files when NEXT_PUBLIC_SITE_LOGO is not set. Fixture mode (the pixel
+   reference) keeps the imported art. */
+const LIVE_DEFAULT_BRAND = LIVE ? 'parker567' : null;
 
 /* Next inlines `process.env.NEXT_PUBLIC_*` only where it is written out literally, so the keys
    are spelled out here rather than read by name. */
@@ -151,10 +163,20 @@ export const siteTitle = () => runtime?.title ?? runtime?.siteName ?? env('NEXT_
 export const siteDescription = () => runtime?.description ?? env('NEXT_PUBLIC_SITE_DESCRIPTION');
 
 /** The owner's uploaded logo, else the one chosen by exact name, else null: the site's own. */
-export const siteLogo = (options) => absolute(runtime?.logoUrl) ?? logoFor(env('NEXT_PUBLIC_SITE_LOGO'), options);
+export const siteLogo = (options) =>
+  absolute(runtime?.logoUrl) ?? logoFor(env('NEXT_PUBLIC_SITE_LOGO') ?? LIVE_DEFAULT_BRAND, options);
 
-/** The owner's square mark (favicon, signed-in mobile header, loader), or null. */
-export const siteMark = () => absolute(runtime?.markUrl);
+/** The static mark for a brand name, or null. */
+export function markFor(name) {
+  const file = MARKS[String(name ?? '').trim().toLowerCase()];
+  if (!file) return null;
+  const base = String(process.env.NEXT_PUBLIC_BASE_PATH ?? '/').replace(/\/*$/, '/');
+  return `${base}brand/${file}`;
+}
+
+/** The owner's square mark (favicon, signed-in mobile header, loader), else the build's, or null. */
+export const siteMark = () =>
+  absolute(runtime?.markUrl) ?? markFor(env('NEXT_PUBLIC_SITE_LOGO') ?? LIVE_DEFAULT_BRAND);
 
 /** Hooks: the same values, re-rendering when the runtime branding arrives or changes. */
 export function useSiteBranding() {
@@ -227,6 +249,9 @@ export function applySiteBranding() {
     }
     meta.setAttribute('content', description);
   }
+  /* The mark has a build-time fallback, so it goes on even before (or without) the backend's. */
+  setFavicon(siteMark());
+  setLoaderMark(siteMark());
   if (!runtime) return;
 
   setMeta('name', 'keywords', runtime.keywords.length ? runtime.keywords.join(', ') : null);
@@ -235,8 +260,6 @@ export function applySiteBranding() {
   setMeta('property', 'og:description', runtime.ogDescription ?? description);
   setMeta('property', 'og:image', absolute(runtime.ogImageUrl));
   setMeta('name', 'theme-color', runtime.themeColor);
-  setFavicon(siteMark());
-  setLoaderMark(siteMark());
 }
 
 let loading = null;

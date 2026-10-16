@@ -103,13 +103,6 @@ test('report validators', async (t) => {
     assert.equal(v.balanceSheet.query.safeParse({ currency: 'USD' }).success, true);
   });
 
-  await t.test('the agent listing pages, and takes no stray parameters', () => {
-    // Legacy took nothing and capped the list at a bare `LIMIT 1000`.
-    assert.equal(v.agentUsers.query.parse({}).limit, 200);
-    assert.equal(v.agentUsers.query.safeParse({ limit: '5000' }).success, false);
-    assert.equal(v.agentUsers.query.safeParse({ channel: 'agent' }).success, false);
-  });
-
   await t.test('a player id must be a positive integer', () => {
     assert.equal(v.playerReport.params.safeParse({ userId: 'abc' }).success, false);
     assert.equal(v.playerReport.params.safeParse({ userId: '-1' }).success, false);
@@ -260,6 +253,20 @@ test('reports against a database', async (t) => {
 
     assert.ok(ids.includes(String(playerA)));
     assert.equal(ids.includes(String(playerB)), false);
+
+    // Users page: har row me locks aur parent staff; summary bhi usi scope me.
+    const rowA = (await service.userList({ staff: asA, limit: 100 })).rows.find((r) => r.id === String(playerA));
+    assert.equal(typeof rowA.locks.withdraw, 'boolean');
+    assert.ok(rowA.parentStaff, 'agent player has a parent staff');
+    const list = await service.userList({ staff: asA, channel: 'agent', limit: 100 });
+    const summary = await service.playersSummary({ staff: asA, channel: 'agent' });
+    assert.equal(summary.totalUsers, list.total);
+    assert.equal(seenByA.rows[0].locks, undefined, 'players API unchanged');
+
+    // Client user (parent hai) ki balance sheet point ledger se aati hai.
+    const sheet = await service.clientBalanceSheet({ staff: asA, userId: playerA, limit: 10, offset: 0 });
+    assert.equal(sheet.source, 'point_ledger');
+    assert.ok(Array.isArray(sheet.rows));
   });
 
   await t.test('THE EXPORT IS SCOPED, AND THE HOSTILE NAME IS NEUTRALISED', async () => {
@@ -380,82 +387,4 @@ test('reports against a database', async (t) => {
 
   // ── The agent system ─────────────────────────────────────────────────
 
-  await t.test('the agent listing is scoped, and does not include the caller', async () => {
-    const seen = await service.agentUsers({ staff: asA });
-
-    assert.deepEqual(seen.users.map((u) => u.id), [String(playerA)]);
-    assert.equal(seen.total, 1);
-    // `descendantIds` includes the account it is asked about; an operator
-    // listing their downline does not mean themselves.
-    assert.equal(seen.staff.some((s) => s.id === String(agentA)), false);
-    assert.equal(seen.staff.some((s) => s.id === String(agentB)), false, 'nor a rival');
-    assert.equal(seen.users[0].staffName, `agent-a-${agentA}`);
-  });
-
-  await t.test('agent funding counts as a deposit', async () => {
-    /**
-     * An agent-system player is funded by their agent through
-     * `staff_transfers`, not by a bank transfer of their own. Counting only the
-     * payment rails reports every one of them as having deposited nothing —
-     * which is the whole reason legacy's version of this query existed.
-     */
-    await models.StaffTransfers.destroy({ where: { to_type: 'user', to_id: playerA } });
-    await models.StaffTransfers.create({
-      from_type: 'staff', from_id: agentA,
-      to_type: 'user', to_id: playerA,
-      amount: '2500', transfer_type: 'transfer', direction: 'down',
-    });
-
-    const seen = await service.agentUsers({ staff: asA });
-    assert.equal(seen.users[0].totalDeposit, '2500.00000000');
-
-    await models.StaffTransfers.destroy({ where: { to_type: 'user', to_id: playerA } });
-  });
-
-  await t.test('withdrawn is Approved or Paid — the player list, export and agent P&L', async () => {
-    /**
-     * Since ebfcdc0 a bank withdrawal goes In Queue → Approved → Paid; legacy
-     * rows stop at Approved. Counting Approved alone dropped a withdrawal from
-     * these totals the moment it was marked Paid.
-     */
-    await models.FiatWithdrawals.destroy({ where: { uid: playerA } });
-    const row = (amount, status) => ({
-      uid: playerA, amount, status, currency: 'INR', account_holder_name: 'T', date: new Date(),
-    });
-    await models.FiatWithdrawals.bulkCreate([
-      row('100', 'Approved'),
-      row('40', 'Paid'),
-      row('7', 'In Queue'),
-      row('9', 'Rejected'),
-    ]);
-
-    try {
-      const seen = await service.agentUsers({ staff: asA });
-      assert.equal(seen.users[0].totalWithdrawal, '140.00000000', 'Approved 100 + Paid 40, each once');
-    } finally {
-      await models.FiatWithdrawals.destroy({ where: { uid: playerA } });
-    }
-  });
-
-  await t.test('PNL is the betting result, not every row of the ledger', async () => {
-    /**
-     * Legacy summed EVERY `credits_ledger` row as sports PNL, because in legacy
-     * the settlement worker was the only writer. In this platform a deposit
-     * writes there too — and legacy's agent-users screen counted it as a bet
-     * won. Same reason filter as the balance sheet.
-     */
-    await models.CreditsLedger.destroy({ where: { user_id: String(playerA) } });
-    await models.CreditsLedger.bulkCreate([
-      { user_id: String(playerA), currency: 'INR', amount: '-100', netamount: '-100', reason: 'BET_STAKE' },
-      { user_id: String(playerA), currency: 'INR', amount: '250', netamount: '250', reason: 'BET_PAYOUT' },
-      // Not a bet. Legacy counted this as winnings.
-      { user_id: String(playerA), currency: 'INR', amount: '9000', netamount: '9000', reason: 'DEPOSIT' },
-    ]);
-
-    const seen = await service.agentUsers({ staff: asA });
-    assert.equal(seen.users[0].sportsPnl, '150.00000000', 'the deposit is not winnings');
-    assert.equal(seen.users[0].pnl, '150.00000000');
-
-    await models.CreditsLedger.destroy({ where: { user_id: String(playerA) } });
-  });
 });

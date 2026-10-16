@@ -17,8 +17,6 @@ const TARGET_TYPES = Object.freeze(Object.values(TARGET_TYPE));
 /** Staff balances are INR only — the staff `credits` row uses `inr` alone. */
 const BALANCE_CURRENCY = 'INR';
 
-const STAFF_STATUS = Object.freeze(['active', 'suspended', 'inactive']);
-
 /**
  * Cost factor for a staff password.
  *
@@ -31,5 +29,5 @@ const PASSWORD_ROUNDS = 12;
 module.exports = {
   TRANSFER_DIRECTION, TRANSFER_DIRECTIONS,
   TARGET_TYPE, TARGET_TYPES,
-  BALANCE_CURRENCY, STAFF_STATUS, PASSWORD_ROUNDS,
+  BALANCE_CURRENCY, PASSWORD_ROUNDS,
 };

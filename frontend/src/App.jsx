@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { CHAT_AVAILABLE } from './services/availability';
 import { referralCodeFromPath, savePendingReferral } from './services/referralCapture';
-import { Link, Navigate, Route, Routes, useLocation, useNavigate, useNavigationType } from 'react-router-dom';
+import { Link, Navigate, Route, Routes, matchPath, useLocation, useNavigate, useNavigationType } from 'react-router-dom';
 import MainLayout from './layouts/MainLayout/MainLayout';
 import Home from './pages/Home';
 import Casino from './pages/Casino';
@@ -15,10 +15,11 @@ import ExchangeMyBets from './pages/Exchange/MyBets';
 import ExchangeStatement from './pages/Exchange/Statement';
 import Promotions from './pages/Promotions';
 import DepositOffer from './pages/DepositOffer';
+import Blog from './pages/Blog';
+import BlogPost from './pages/Blog/Post';
 import Deposit from './pages/Deposit';
 import DepositPanels from './pages/Deposit/Panels';
 import DailyContest from './pages/DailyContest';
-import WeeklyRaffle from './pages/WeeklyRaffle';
 import VIP from './pages/VIP';
 import Referral from './pages/Referral';
 import ReferralDashboard from './pages/Referral/Dashboard';
@@ -62,6 +63,8 @@ import VipDialog from './pages/VIP/Dialog';
 import HelpDialog from './pages/Help/Dialog';
 import ReferralDialog from './pages/Referral/Dialog';
 import PromotionsDialog from './pages/Promotions/Dialog';
+import PromotionDetail from './pages/PromotionDetail';
+import PromotionDetailDialog from './pages/PromotionDetail/Dialog';
 import DailyContestDialog from './pages/DailyContest/Dialog';
 import PageDialog from './components/shared/PageDialog';
 import NotificationDialog from './components/Notification/Dialog';
@@ -78,6 +81,7 @@ import { SessionProvider } from './context/SessionContext';
 import { SettingsProvider } from './context/SettingsContext';
 import { GatesProvider, RouteGate } from './context/GatesContext';
 import { useSession } from './context/session';
+import { PASSKEY_ENABLED } from './config/hiddenFeatures';
 
 /* DEV ONLY — the exchange component kit's preview (`/dev/exchange-kit`). Lazy so the preview and
    its sample data never enter the production bundle's main chunk; the route itself is only
@@ -260,13 +264,18 @@ function AppShell() {
      `/wallet/withdraw` are the two already done, each with its own note. */
   const promotionsDialog = pathname === '/promotions/promotion' && !isDesktop;
   const dailyContestDialog = pathname === '/promotions/daily-contest' && !isDesktop;
+  /* `/promotion/:segment/:slug` — one promotion, the card's destination (built on request,
+     2026-10-16). bc.game's own is `/promotion/:id` with `info: { dialog: m.mobile, keepAlive: !1 }`,
+     so it joins this family: a page on a desktop, the sheet below `lg`, titled with the
+     promotion's own title (pages/PromotionDetail/Dialog.jsx). */
+  const promotionDetailMatch = matchPath('/promotion/:segment/:slug', pathname);
+  const promotionDetailDialog = Boolean(promotionDetailMatch) && !isDesktop;
 
   /* THE REST OF THE `dialog: m.mobile` ROUTES, and every one of these titles is sourced rather
      than chosen — see components/shared/PageDialog for the table and how each was settled.
      `/quests` is gated on `login` for the reason `/bonus` and `/referral` are: its route guard
      sends a logged-out visitor to `/`, the page performs that redirect itself, and redirecting
      out of a dialog is worse than letting it fall through to the plain route. */
-  const weeklyRaffleDialog = pathname === '/promotions/weekly-raffle' && !isDesktop;
   const depositOfferDialog = pathname === '/deposit-offer' && !isDesktop;
   const questsDialog = pathname === '/quests' && !isDesktop && session.login;
   const referralExhibitionDialog = pathname === '/referral-exhibition' && !isDesktop;
@@ -361,7 +370,9 @@ function AppShell() {
   const phishingDialog = phishingRoute && session.login;
   const phishingNeedsAuth = phishingRoute && !session.login;
 
-  const passkeyRoute = pathname === '/settings/passkey';
+  /* Off on this platform (config/hiddenFeatures.js): the path then belongs to the settings layout
+     like any unknown pane, and the dialog never mounts. */
+  const passkeyRoute = PASSKEY_ENABLED && pathname === '/settings/passkey';
   const passkeyDialog = passkeyRoute && session.login;
   const passkeyNeedsAuth = passkeyRoute && !session.login;
 
@@ -497,7 +508,7 @@ function AppShell() {
     helpDialog ||
     promotionsDialog ||
     dailyContestDialog ||
-    weeklyRaffleDialog ||
+    promotionDetailDialog ||
     depositOfferDialog ||
     questsDialog ||
     referralExhibitionDialog ||
@@ -779,22 +790,31 @@ function AppShell() {
               `/promotions/exclusive-promo`, `/promotion/:id`) are the individual promotion
               pages behind each card and are not built, so they still fall to the catch-all. */}
           <Route path="/promotions/promotion" element={promotionsDialog ? null : <Promotions />} />
+          {/* One promotion — bc.game's `/promotion/:id`, with the platform's segment in the path
+              because its slug is unique per segment. See `promotionDetailDialog`. */}
+          <Route
+            path="/promotion/:segment/:slug"
+            element={promotionDetailDialog ? null : <PromotionDetail />}
+          />
           {/* `/deposit-offer` is the original's own path too — a sibling of the promotions
               routes rather than a child of them, which is why it is not under /promotions
               despite being the sidebar's "Deposit Bonus" row under that group. Its
               `info: { dialog: m.mobile }` is the same flag the promotions page carries: a
               page on desktop, a full-screen dialog on a phone. */}
           <Route path="/deposit-offer" element={depositOfferDialog ? null : <DepositOffer />} />
+          {/* `/blog` and `/blog/:slug` — this build's own pages (bc.game's Blog is an external
+              site), on the user's request. Pages at every width, never dialogs; gated by the
+              owner's `blog` feature through the RouteGate above (services/gates.js ROUTES). */}
+          <Route path="/blog" element={<Blog />} />
+          <Route path="/blog/:slug" element={<BlogPost />} />
           {/* `/promotions/daily-contest` — the original's own path, loading
               Contest-Uqb1GQAo.js. Unlike /deposit-offer this one IS under the promotions
               family, so the footer already drops its prose band here and the sidebar group
               already opens itself. */}
           <Route path="/promotions/daily-contest" element={dailyContestDialog ? null : <DailyContest />} />
-          {/* `/promotions/weekly-raffle` — the original's own path, loading
-              index-BLT5gN04.js, which is NOT in the mirror. Its route there carries
-              `guards: [() => !1]`, i.e. the page is switched off on the live site; it is
-              routed here because the sidebar row points at it. */}
-          <Route path="/promotions/weekly-raffle" element={weeklyRaffleDialog ? null : <WeeklyRaffle />} />
+          {/* `/promotions/weekly-raffle` is not routed: removed on the user's request (2026-10-16),
+              this platform runs no raffle. The page stays on disk in pages/WeeklyRaffle; the URL
+              falls to the catch-all like the other removed products. */}
           {/* The VIP Club. `/vip-detail` is the page; `/vip` is the original's own alias for
               it, carrying `guards: [() => "/vip-detail"]` — a guard that returns a path is a
               redirect there, so both land on the same component. Its chunk was missing from
@@ -1089,6 +1109,15 @@ function AppShell() {
       {promotionsDialog && (
         <PromotionsDialog onClose={closeOverlay} onBack={backOverlay} enter={dialogEnter} />
       )}
+      {promotionDetailDialog && (
+        <PromotionDetailDialog
+          segment={promotionDetailMatch.params.segment}
+          slug={promotionDetailMatch.params.slug}
+          onClose={closeOverlay}
+          onBack={backOverlay}
+          enter={dialogEnter}
+        />
+      )}
       {dailyContestDialog && (
         <DailyContestDialog onClose={closeOverlay} onBack={backOverlay} enter={dialogEnter} />
       )}
@@ -1148,16 +1177,6 @@ function AppShell() {
           `/vip-detail` is deliberately NOT given one: its route carries
           `behavior: "transparent-title"`, so the bar is clear and floats over the hero artwork,
           and a title there would print across the banner. */}
-      {weeklyRaffleDialog && (
-        <PageDialog
-          title="Weekly Raffle"
-          onClose={closeOverlay}
-          onBack={backOverlay}
-          enter={dialogEnter}
-        >
-          <WeeklyRaffle />
-        </PageDialog>
-      )}
       {depositOfferDialog && (
         <PageDialog
           title="Deposit Offer"

@@ -69,18 +69,12 @@ const LIVE = [
 
 /* In-house BC Originals — the slugs `/game/:slug` resolves and whose art ships with the build. */
 const ORIGINALS = [
-  ['crash', 'Crash'],
-  ['dice', 'Dice'],
+  /* Only Originals this site offers (`SHOWN_ORIGINALS` in services/originals.js). Diamonds is
+     offered too but ships no icon or cover art, so a showcase row for it would draw a stand-in. */
   ['limbo', 'Limbo'],
   ['plinko', 'Plinko'],
   ['mines', 'Mines'],
-  ['hilo', 'Hilo'],
   ['keno', 'Keno'],
-  ['coinflip', 'Coinflip'],
-  ['classic-dice', 'Classic Dice'],
-  ['tower-legend', 'Tower Legend'],
-  ['roulette', 'Roulette'],
-  ['wheel', 'Wheel'],
 ];
 
 const byIndex = (list) => (i) => list[i % list.length];

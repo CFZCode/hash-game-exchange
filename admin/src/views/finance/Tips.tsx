@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from 'react'
 
 import Link from 'next/link'
 
-import { HandCoinsIcon, RotateCcwIcon, SearchIcon } from 'lucide-react'
+import { HandCoinsIcon, Loader2Icon, RotateCcwIcon, SearchIcon } from 'lucide-react'
+import { toast } from 'sonner'
 
 import DataTable, { type Column } from '@/components/shared/DataTable'
 import DateTime from '@/components/shared/DateTime'
@@ -82,7 +83,9 @@ const LimitsForm = ({ saved }: { saved?: TipLimits }) => {
   const [minWagered, setMinWagered] = useState(saved ? trimDecimal(saved.minWageredUsd) : '')
 
   const values = [perTip, perDay, minWagered].map(v => v.trim())
-  const invalid = values.some(v => v !== '' && !USD_DECIMAL.test(v))
+  const fieldError = (v: string) => (v !== '' && !USD_DECIMAL.test(v) ? 'Use a plain number (≥ 0) with at most 8 decimal places' : undefined)
+  const errors = values.map(fieldError)
+  const invalid = errors.some(Boolean)
 
   const save = useApiMutation({
     fn: () =>
@@ -102,7 +105,14 @@ const LimitsForm = ({ saved }: { saved?: TipLimits }) => {
       className='grid gap-4'
       onSubmit={e => {
         e.preventDefault()
-        if (!invalid) save.mutate()
+
+        if (invalid) {
+          toast.error('Fix the highlighted limits before saving')
+
+          return
+        }
+
+        save.mutate()
       }}
     >
       <div className='grid gap-4 sm:grid-cols-3'>
@@ -112,6 +122,7 @@ const LimitsForm = ({ saved }: { saved?: TipLimits }) => {
           hint='0 = no cap'
           inputMode='decimal'
           value={perTip}
+          error={errors[0]}
           onChange={e => setPerTip(decimal(e.target.value))}
           disabled={!writable}
         />
@@ -121,6 +132,7 @@ const LimitsForm = ({ saved }: { saved?: TipLimits }) => {
           hint='A player’s tips in the last 24 hours, all currencies. 0 = no cap'
           inputMode='decimal'
           value={perDay}
+          error={errors[1]}
           onChange={e => setPerDay(decimal(e.target.value))}
           disabled={!writable}
         />
@@ -130,13 +142,14 @@ const LimitsForm = ({ saved }: { saved?: TipLimits }) => {
           hint='Lifetime wager a player needs before they can send a tip. 0 = off'
           inputMode='decimal'
           value={minWagered}
+          error={errors[2]}
           onChange={e => setMinWagered(decimal(e.target.value))}
           disabled={!writable}
         />
       </div>
-      {invalid && <p className='text-destructive text-sm'>Use a plain number with at most 8 decimal places.</p>}
       {writable ? (
         <Button type='submit' disabled={save.isPending || !saved || invalid} className='justify-self-start'>
+          {save.isPending && <Loader2Icon className='animate-spin' />}
           Save
         </Button>
       ) : (

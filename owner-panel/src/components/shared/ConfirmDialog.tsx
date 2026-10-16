@@ -36,6 +36,8 @@ const ConfirmDialog = ({ trigger, title, description, confirmLabel = 'Confirm', 
     try {
       await onConfirm()
       setOpen(false)
+    } catch {
+      // the action already toasted its error; stay open so it can be retried
     } finally {
       setBusy(false)
     }

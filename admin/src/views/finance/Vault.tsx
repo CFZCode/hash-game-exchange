@@ -8,6 +8,7 @@ import { PencilIcon, PlusIcon, Trash2Icon } from 'lucide-react'
 
 import Can from '@/components/shared/Can'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
+import ErrorState from '@/components/shared/ErrorState'
 import DataTable, { type Column } from '@/components/shared/DataTable'
 import DateTime from '@/components/shared/DateTime'
 import FormDialog from '@/components/shared/FormDialog'
@@ -21,6 +22,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useApi, useApiMutation, useListState, usePagedApi } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
 import { formatNumber } from '@/lib/format'
+import { check } from '@/lib/validate'
 import RewardStats from '@/views/promotions/RewardStats'
 
 import { useFinanceFilters } from './currencyFilter'
@@ -95,13 +97,16 @@ const Interest = ({ coin }: { coin: string }) => {
   )
 }
 
+/** vault.validators.js `rateString`: a decimal ≥ 0 with up to 4 places. */
+const rateError = (v: string) => check.required(v, 'Rate') ?? (/^\d+(\.\d{1,4})?$/.test(v.trim()) ? undefined : 'Rate must be a number ≥ 0 with at most 4 decimal places')
+
 const RATE_HINT = 'Annual percentage, e.g. 7.5 — applies to new deposits only'
 
 const AddPeriod = () => {
   const [form, setForm] = useState({ lockPeriod: '', label: '', days: '', rate: '' })
 
   const add = useApiMutation({
-    fn: () => api.post(PERIODS, { lockPeriod: form.lockPeriod, label: form.label, days: Number(form.days), rate: form.rate }),
+    fn: () => api.post(PERIODS, { lockPeriod: form.lockPeriod.trim(), label: form.label.trim(), days: Number(form.days), rate: form.rate.trim() }),
     invalidate: INVALIDATE,
     success: 'Lock period added',
     onSuccess: () => setForm({ lockPeriod: '', label: '', days: '', rate: '' })
@@ -116,15 +121,21 @@ const AddPeriod = () => {
       }
       title='New lock period'
       submitLabel='Add'
+      validate={() => ({
+        lockPeriod: check.required(form.lockPeriod, 'Key') ?? check.length(form.lockPeriod, 'Key', { max: 50 }),
+        label: check.required(form.label, 'Label') ?? check.length(form.label, 'Label', { max: 100 }),
+        days: check.number(form.days, 'Days', { integer: true, min: 1, max: 3650 }),
+        rate: rateError(form.rate)
+      })}
       onSubmit={() => add.mutateAsync()}
     >
       <div className='grid grid-cols-2 gap-4'>
-        <TextField id='vp-key' label='Key' required placeholder='3m' hint='Short identifier' value={form.lockPeriod} onChange={e => setForm({ ...form, lockPeriod: e.target.value })} />
-        <TextField id='vp-label' label='Label' required placeholder='3 months' value={form.label} onChange={e => setForm({ ...form, label: e.target.value })} />
+        <TextField id='vp-key' name='lockPeriod' label='Key' required placeholder='3m' hint='Short identifier' value={form.lockPeriod} onChange={e => setForm({ ...form, lockPeriod: e.target.value })} />
+        <TextField id='vp-label' name='label' label='Label' required placeholder='3 months' value={form.label} onChange={e => setForm({ ...form, label: e.target.value })} />
       </div>
       <div className='grid grid-cols-2 gap-4'>
-        <TextField id='vp-days' label='Days' required inputMode='numeric' min={1} max={3650} type='number' value={form.days} onChange={e => setForm({ ...form, days: e.target.value })} />
-        <TextField id='vp-rate' label='Rate %' required placeholder='7.5' hint={RATE_HINT} value={form.rate} onChange={e => setForm({ ...form, rate: e.target.value })} />
+        <TextField id='vp-days' name='days' label='Days' required inputMode='numeric' min={1} max={3650} type='number' value={form.days} onChange={e => setForm({ ...form, days: e.target.value })} />
+        <TextField id='vp-rate' name='rate' inputMode='decimal' label='Rate %' required placeholder='7.5' hint={RATE_HINT} value={form.rate} onChange={e => setForm({ ...form, rate: e.target.value })} />
       </div>
     </FormDialog>
   )
@@ -134,7 +145,7 @@ const EditRate = ({ p }: { p: VaultLockPeriod }) => {
   const [rate, setRate] = useState(p.rate)
 
   const update = useApiMutation({
-    fn: () => api.put(`${PERIODS}/rate`, { lockPeriod: p.value, rate }),
+    fn: () => api.put(`${PERIODS}/rate`, { lockPeriod: p.value, rate: rate.trim() }),
     invalidate: INVALIDATE,
     success: `${p.label} rate updated`
   })
@@ -149,9 +160,10 @@ const EditRate = ({ p }: { p: VaultLockPeriod }) => {
       title={`${p.label} — rate`}
       description='Open deposits keep the rate they were opened at.'
       submitLabel='Save'
+      validate={() => ({ rate: rateError(String(rate ?? '')) })}
       onSubmit={() => update.mutateAsync()}
     >
-      <TextField id={`vr-${p.value}`} label='Rate %' required hint={RATE_HINT} value={rate} onChange={e => setRate(e.target.value)} />
+      <TextField id={`vr-${p.value}`} name='rate' inputMode='decimal' label='Rate %' required hint={RATE_HINT} value={rate} onChange={e => setRate(e.target.value)} />
     </FormDialog>
   )
 }
@@ -227,6 +239,11 @@ const Vault = () => {
           </Can>
         }
       />
+      {stats.error ? (
+        <div className='mb-4'>
+          <ErrorState error={stats.error} title='Could not load vault stats' />
+        </div>
+      ) : null}
       <div className='mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4'>
         <StatCard label='Users in vault' value={formatNumber(users)} loading={stats.isLoading} hint={`${allRows.length} coin${allRows.length === 1 ? '' : 's'} · all coins`} />
         {rows.slice(0, 2).map(r => (

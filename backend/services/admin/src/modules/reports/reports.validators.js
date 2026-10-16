@@ -82,26 +82,38 @@ module.exports = {
       .strict(),
   },
 
-  /** @legacy GET /reports/user/:userId */
-  playerReport: {
-    params: z.object({ userId }).strict(),
-  },
-
-  /**
-   * @legacy GET /api/admin/agent-users
-   *
-   * No `channel` — an agent-system listing is agent-anchored players by
-   * definition. Legacy took no parameters at all and capped the list at a bare
-   * `LIMIT 1000`.
-   */
-  agentUsers: {
+  /** GET /reports/user-list — Users page ki table (players jaisa + withdrawLocked filter). */
+  userList: {
     query: z
       .object({
+        channel,
         search: z.string().trim().min(1).max(80).optional(),
-        limit: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(MAX_PAGE_SIZE),
+        /** Users → Financial ka "Locked" filter. */
+        withdrawLocked: z.enum(['true', 'false']).transform((v) => v === 'true').optional(),
+        ...pagination,
+      })
+      .strict(),
+  },
+
+  /** GET /reports/client-balance-sheet/:userId — client user ki sheet, point ledger se. */
+  clientBalanceSheet: {
+    params: z.object({ userId }).strict(),
+    query: z
+      .object({
+        limit: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(50),
         offset: z.coerce.number().int().min(0).default(0),
       })
       .strict(),
+  },
+
+  /** GET /reports/players/summary — Users page ke cards */
+  playersSummary: {
+    query: z.object({ channel }).strict(),
+  },
+
+  /** @legacy GET /reports/user/:userId */
+  playerReport: {
+    params: z.object({ userId }).strict(),
   },
 
   /**
@@ -136,11 +148,6 @@ module.exports = {
 
   /** The same filters, grouped by address: IPs two or more accounts have used. */
   sharedIps: { query: ipTrackerQuery() },
-
-  /** Never a legacy route — the screen was written against one that did not exist. */
-  staffRisk: {
-    params: z.object({ staffId: z.coerce.number().int().positive() }).strict(),
-  },
 
   /** @legacy GET /api/admin/balance-sheet/:userId */
   balanceSheet: {

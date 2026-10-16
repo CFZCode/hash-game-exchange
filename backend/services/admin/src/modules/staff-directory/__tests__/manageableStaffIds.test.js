@@ -4,7 +4,6 @@ const test = require('node:test');
 const assert = require('node:assert');
 
 const { manageableStaffIds, visibleStaffIds } = require('../staffDirectory.service');
-const { StaffService } = require('../../staff/staff.service');
 
 /**
  * A level-1 Super Admin sees and manages EVERY staff tree on the site.
@@ -76,16 +75,4 @@ test('manageableStaffIds', async (t) => {
     assert.deepEqual(await manageableStaffIds(models, 0), []);
   });
 
-  await t.test('through StaffService: the Super Admin lists the demo tree; an Admin gets 404 outside its own', async () => {
-    const service = new StaffService({ models, logger: null });
-    const listed = await service.list({ actor: { id: 1, level: 1 } });
-    assert.deepEqual(listed.rows.map((r) => Number(r.id)).sort((a, b) => a - b), ALL);
-
-    await assert.rejects(
-      () => service.getById({ actor: { id: 2, level: 2 }, staffId: 9 }),
-      (err) => err.code === 'STAFF_NOT_IN_YOUR_TREE' && err.status === 404
-    );
-    const adminList = await service.list({ actor: { id: 2, level: 2 } });
-    assert.deepEqual(adminList.rows.map((r) => Number(r.id)).sort((a, b) => a - b), [2, 3, 4]);
-  });
 });

@@ -11,6 +11,7 @@ import { useSettings } from '../../../context/settings';
 import { siteName, useSiteLogo } from '../../../services/siteBranding';
 import AfterLogin, { MobileAfterLogin } from './AfterLogin';
 import './Header.css';
+import { useSiteCurrency } from '../../../hooks/useSiteCurrency';
 
 /* The mobile header's background fades IN as the page scrolls, from `ks()` in
  * Enter-MsmOuq5R.js:
@@ -94,6 +95,7 @@ export default function Header({
   const headerBgOpacity = useHeaderScrollOpacity();
   const navigate = useNavigate();
   const { session } = useSession();
+  const siteCurrency = useSiteCurrency();
   /* Off on a B2B site (context/gates.js): Sign In stays, Sign Up is not rendered. */
   const canSignUp = useCanSignUp();
 
@@ -270,7 +272,7 @@ export default function Header({
                     {/* The picker's own field, as the sidebar and Preferences print it. */}
                     {session.setting.enableLocaleCurrency
                       ? getAlias(session.setting.localeCurrencyName).replace(/FIAT$/, '')
-                      : 'None'}
+                      : siteCurrency ?? 'None'}
                   </span>
                 </button>
               </div>

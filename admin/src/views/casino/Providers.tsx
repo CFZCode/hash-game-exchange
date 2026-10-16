@@ -73,12 +73,23 @@ const UploadLogo = ({ provider }: { provider: ProviderSetting }) => {
       description='PNG, JPEG or WebP, up to 1 MB. A wide logo on a transparent background reads best (about 240×80). SVG is not accepted: it can carry script.'
       submitLabel='Upload'
       onSubmit={() => upload.mutateAsync()}
+      validate={() => ({
+        'p-logo': !file
+          ? 'Choose an image file'
+          : !['image/png', 'image/jpeg', 'image/webp'].includes(file.type)
+            ? 'The logo must be a PNG, JPEG or WebP image'
+            : file.size > 1024 * 1024
+              ? `The image is ${(file.size / 1024 / 1024).toFixed(1)} MB — the limit is 1 MB`
+              : undefined
+      })}
     >
       <div className='grid gap-2'>
         <label htmlFor='p-logo' className='text-sm font-medium'>
           Image *
         </label>
         <input id='p-logo' type='file' accept='image/png,image/jpeg,image/webp' className='text-sm' required onChange={e => setFile(e.target.files?.[0] ?? null)} />
+        {file && !['image/png', 'image/jpeg', 'image/webp'].includes(file.type) && <p role='alert' className='text-destructive text-sm'>The logo must be a PNG, JPEG or WebP image</p>}
+        {file && file.size > 1024 * 1024 && <p role='alert' className='text-destructive text-sm'>The image is larger than 1 MB</p>}
         {(preview || provider.hasLogo) && (
           <div className='grid gap-1'>
             <span className='text-muted-foreground text-xs'>{preview ? 'The new logo' : 'The current logo'}</span>

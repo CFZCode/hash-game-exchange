@@ -4,8 +4,11 @@ import { useEffect, useMemo, useState } from 'react'
 
 import { Loader2Icon } from 'lucide-react'
 
+import { toast } from 'sonner'
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useApi } from '@/hooks/use-api'
+import { errorMessage } from '@/lib/api/client'
 import { MARKET_API, type BookNode, type UserBookResponse } from './api'
 
 type Props = {
@@ -58,7 +61,7 @@ function BookRows({ node, runners }: { node: BookNode; runners: string[] }) {
  * modal khulta hi nahi.
  */
 const UserBookDialog = ({ eventId, gameType, onClose }: Props) => {
-  const { data, isFetching } = useApi<UserBookResponse>(gameType ? `${MARKET_API}/user-book` : null, { eventId, gameType: gameType ?? undefined }, { staleTime: 0, gcTime: 0 })
+  const { data, isFetching, error } = useApi<UserBookResponse>(gameType ? `${MARKET_API}/user-book` : null, { eventId, gameType: gameType ?? undefined }, { staleTime: 0, gcTime: 0 })
   const book = useMemo(() => (data ? orderBook(data) : null), [data])
   const ready = Boolean(gameType) && !isFetching && Boolean(book)
   const empty = ready && !book?.tree.length
@@ -68,7 +71,17 @@ const UserBookDialog = ({ eventId, gameType, onClose }: Props) => {
     if (empty) onClose()
   }, [empty, onClose])
 
+  // A failed load would leave the full-screen loader up forever — say why and close.
+  useEffect(() => {
+    if (gameType && error && !isFetching) {
+      toast.error(`Could not load the user book: ${errorMessage(error)}`)
+      onClose()
+    }
+  }, [gameType, error, isFetching, onClose])
+
   if (gameType && !ready) {
+    if (error && !isFetching) return null
+
     return (
       <div className='bg-background/40 fixed inset-0 z-50 flex items-center justify-center'>
         <Loader2Icon className='size-8 animate-spin' />

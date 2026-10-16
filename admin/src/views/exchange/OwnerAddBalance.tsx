@@ -6,15 +6,16 @@ import FormDialog from '@/components/shared/FormDialog'
 import { SelectField, TextAreaField, TextField } from '@/components/shared/FormField'
 import { useApi, useApiMutation } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
+import { check } from '@/lib/validate'
 import { TxnPasswordLabel } from '@/views/finance/StaffFloat'
 import type { OwnerWallet } from './types'
 
-/** Owner ke do balance: Client Management (`credits`) aur Direct Users (`staff_balances`). */
+/** Owner ke do balance: Agent System (`credits`) aur Direct Users (`staff_balances`). */
 type Target = 'client' | 'direct'
 
 const TARGETS: Record<Target, { label: string; path: string; note: string }> = {
   client: {
-    label: 'Client Management balance',
+    label: 'Agent System balance',
     path: 'admin/exchange/owner/add-balance',
     note: 'Used only for your staff, agents and their players.'
   },
@@ -28,7 +29,7 @@ const TARGETS: Record<Target, { label: string; path: string; note: string }> = {
 /**
  * "Add Balance" — zip (tenexch bundle) ka OwnerAddBalanceModal: Current Balance, Amount,
  * Remark, Transaction Code. Sirf owner apne wallet me paisa daalta hai.
- * Owner chunta hai kaunse balance me: Client Management ya Direct Users.
+ * Owner chunta hai kaunse balance me: Agent System ya Direct Users.
  * Header ke profile menu se khulta hai (alag page nahi).
  */
 const OwnerAddBalance = ({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) => {
@@ -36,7 +37,7 @@ const OwnerAddBalance = ({ open, onOpenChange }: { open: boolean; onOpenChange: 
   const [form, setForm] = useState({ amount: '', note: '', transactionPassword: '' })
 
   // Current Balance — dialog khula ho tabhi mangwao
-  const { data } = useApi<OwnerWallet>(open ? 'admin/exchange/owner/wallet' : null)
+  const { data, error } = useApi<OwnerWallet>(open ? 'admin/exchange/owner/wallet' : null)
   const current = data ? (target === 'client' ? data.wallet.balance : data.directBalance) : null
 
   const add = useApiMutation({
@@ -46,8 +47,8 @@ const OwnerAddBalance = ({ open, onOpenChange }: { open: boolean; onOpenChange: 
         ...(form.note ? { note: form.note } : {}),
         transactionPassword: form.transactionPassword
       }),
-    invalidate: [['api', 'admin/exchange/owner/wallet'], ['api', 'admin/exchange/dashboard'], ['api', 'admin/exchange/user-reports/home'], ['api', 'admin/accounts/float'], ['api', 'admin/exchange/accounts']],
-    success: `Balance added to your ${TARGETS[target].label}`,
+    invalidate: [['api', 'admin/exchange/owner/wallet'], ['api', 'admin/exchange/dashboard'], ['api', 'admin/exchange/user-reports/home'], ['api', 'admin/accounts/float'], ['api', 'admin/exchange/accounts'], ['paged', 'admin/exchange/owner/direct-ledger']],
+    success: () => `${Number(form.amount).toLocaleString()} added to your ${TARGETS[target].label}`,
     onSuccess: () => setForm({ amount: '', note: '', transactionPassword: '' })
   })
 
@@ -57,8 +58,15 @@ const OwnerAddBalance = ({ open, onOpenChange }: { open: boolean; onOpenChange: 
       onOpenChange={onOpenChange}
       trigger={null}
       title='Add Balance'
-      description='You have two balances. Client Management pays your staff, agents and their players. Direct Users pays direct users only.'
+      description='You have two balances. Agent System pays your staff, agents and their players. Direct Users pays direct users only.'
       submitLabel='Add Balance'
+
+      // Server (`ownerAddBalance`): amount > 0 with ≤ 2 decimals, note ≤ 200, transaction password required.
+      validate={() => ({
+        'ob-amount': check.number(form.amount, 'Amount', { positive: true, decimals: 2 }),
+        'ob-note': check.length(form.note, 'Remark', { max: 200 }),
+        'ob-tp': check.required(form.transactionPassword, 'Transaction code')
+      })}
       onSubmit={() => add.mutateAsync()}
     >
       <SelectField
@@ -69,7 +77,7 @@ const OwnerAddBalance = ({ open, onOpenChange }: { open: boolean; onOpenChange: 
         options={(Object.keys(TARGETS) as Target[]).map(k => ({ value: k, label: TARGETS[k].label }))}
         hint={TARGETS[target].note}
       />
-      <TextField id='ob-current' label='Current Balance' readOnly disabled value={current !== null ? Number(current).toLocaleString() : '…'} />
+      <TextField id='ob-current' label='Current Balance' readOnly disabled value={current !== null ? Number(current).toLocaleString() : error ? 'Could not load' : '…'} />
       <TextField id='ob-amount' label='Amount' required placeholder='Amount' value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} />
       <TextAreaField id='ob-note' label='Remark (optional)' maxLength={200} value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} />
       <TextField
