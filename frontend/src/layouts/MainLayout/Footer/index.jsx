@@ -211,11 +211,14 @@ export default function Footer() {
           Footer.css, which turn this band into two even columns below sm. At sm and up it
           carries nothing. */}
       <div className="footer-links flex w-full max-w-300 flex-wrap justify-between gap-x-4 gap-y-4 px-4 py-6">
-        {COLUMNS.map((column) => (
+        {/* A column whose every link is gated off is not drawn (About Us is only News → /blog). */}
+        {COLUMNS.map((column) => ({ ...column, links: column.links.filter((link) => (link.gate ? on(link.gate) : link.external || routeOn(link.href))) }))
+          .filter((column) => column.links.length)
+          .map((column) => (
           <div key={column.title}>
             <h4 className="mb-5 text-base font-extrabold text-primary">{column.title}</h4>
             <ul className="flex flex-col gap-y-3">
-              {column.links.filter((link) => (link.gate ? on(link.gate) : link.external || routeOn(link.href))).map((link) => (
+              {column.links.map((link) => (
                 <li key={link.label}>
                   <NavLink {...link} />
                 </li>

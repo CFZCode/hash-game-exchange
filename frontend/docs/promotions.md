@@ -47,6 +47,12 @@ The tab indicator is **measured, not computed**: these tabs are `max-w-fit` with
 
 Two **deliberate departures** from the capture, both flagged at their call sites so they are one-word reverts: the pager sits at `pt-4` where the capture has `pt-8` (the grid above already ends on `sm:gap-y-8`, so the captured pair stacks 32px on 32px), and the card description is `font-normal` where the capture has `font-semibold`. The second is worth understanding rather than just noting: this build ships Averta at **400/600/800 only**, so any weight the original uses that we do not gets synthesised by the browser instead of swapped for a real face, and semibold body copy at 12px lands heavier here than on the live page.
 
+### Promotion detail — `/promotion/:segment/:slug`
+
+Built on request (2026-10-16); every card links here. bc.game's route is `/promotion/:id` → `L.PromotionDetail` → `wa` → `detail-Bn5sXbpM.js` (not in the mirror; off `hash.game/assets/`), `info: { dialog: m.mobile, keepAlive: !1 }`, and the sheet's title is the promotion's own (`<div class="mx-16 truncate">`). The templates (`pr` back row, `wr` artwork, `vr` four-box clock, `_r`, `$r` ends line, `xr` total prize, `Cr` body card, `Tr`/`Lr` rich text, `Ar` Participating Games grid) are transcribed in `pages/PromotionDetail/index.jsx`; `.promotion-richStyle` is verbatim from `index-DxOqNczA.css`, in `@layer components` so the element's own utilities still win as they do on the original. The segment is in the path because the platform's slug is unique per segment. Data: `services/promotions.js` `getPromotionBySlug` (404 → `null` → the site's empty state). Departures, flagged at the call sites: T&C in the shared Accordion, a countdown box without artwork, the "Play now"/"Bet now" CTA, sports events as cards (no BetBy), no `leaderboard` yet. Operator HTML goes through `utils/sanitizeHtml.js`. The chunk's `center mb-4 inline-flex` back row is written as `inline-flex items-center justify-center` because the unlayered `.center` here would beat `inline-flex`.
+
+The live strip is All / Casino / Sports — Sports (`SPORTS_TAB`) is this build's, the fixture build keeps the captured strip.
+
 ## Deposit Bonus
 
 `/deposit-offer` — the original's own path (`component: c(() => L.DepositOffer())`), and what the sidebar's "Deposit Bonus" row means; that row already carried the `deposit_offer` sprite and had nowhere to go. It is a **sibling** of the promotions routes, not a child, so `SUBMENU_ROUTES` carries a second `promotions` entry to make the group open itself there.

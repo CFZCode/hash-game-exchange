@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { CHAT_AVAILABLE } from './services/availability';
 import { referralCodeFromPath, savePendingReferral } from './services/referralCapture';
-import { Link, Navigate, Route, Routes, useLocation, useNavigate, useNavigationType } from 'react-router-dom';
+import { Link, Navigate, Route, Routes, matchPath, useLocation, useNavigate, useNavigationType } from 'react-router-dom';
 import MainLayout from './layouts/MainLayout/MainLayout';
 import Home from './pages/Home';
 import Casino from './pages/Casino';
@@ -15,6 +15,8 @@ import ExchangeMyBets from './pages/Exchange/MyBets';
 import ExchangeStatement from './pages/Exchange/Statement';
 import Promotions from './pages/Promotions';
 import DepositOffer from './pages/DepositOffer';
+import Blog from './pages/Blog';
+import BlogPost from './pages/Blog/Post';
 import Deposit from './pages/Deposit';
 import DepositPanels from './pages/Deposit/Panels';
 import DailyContest from './pages/DailyContest';
@@ -61,6 +63,8 @@ import VipDialog from './pages/VIP/Dialog';
 import HelpDialog from './pages/Help/Dialog';
 import ReferralDialog from './pages/Referral/Dialog';
 import PromotionsDialog from './pages/Promotions/Dialog';
+import PromotionDetail from './pages/PromotionDetail';
+import PromotionDetailDialog from './pages/PromotionDetail/Dialog';
 import DailyContestDialog from './pages/DailyContest/Dialog';
 import PageDialog from './components/shared/PageDialog';
 import NotificationDialog from './components/Notification/Dialog';
@@ -260,6 +264,12 @@ function AppShell() {
      `/wallet/withdraw` are the two already done, each with its own note. */
   const promotionsDialog = pathname === '/promotions/promotion' && !isDesktop;
   const dailyContestDialog = pathname === '/promotions/daily-contest' && !isDesktop;
+  /* `/promotion/:segment/:slug` — one promotion, the card's destination (built on request,
+     2026-10-16). bc.game's own is `/promotion/:id` with `info: { dialog: m.mobile, keepAlive: !1 }`,
+     so it joins this family: a page on a desktop, the sheet below `lg`, titled with the
+     promotion's own title (pages/PromotionDetail/Dialog.jsx). */
+  const promotionDetailMatch = matchPath('/promotion/:segment/:slug', pathname);
+  const promotionDetailDialog = Boolean(promotionDetailMatch) && !isDesktop;
 
   /* THE REST OF THE `dialog: m.mobile` ROUTES, and every one of these titles is sourced rather
      than chosen — see components/shared/PageDialog for the table and how each was settled.
@@ -498,6 +508,7 @@ function AppShell() {
     helpDialog ||
     promotionsDialog ||
     dailyContestDialog ||
+    promotionDetailDialog ||
     depositOfferDialog ||
     questsDialog ||
     referralExhibitionDialog ||
@@ -779,12 +790,23 @@ function AppShell() {
               `/promotions/exclusive-promo`, `/promotion/:id`) are the individual promotion
               pages behind each card and are not built, so they still fall to the catch-all. */}
           <Route path="/promotions/promotion" element={promotionsDialog ? null : <Promotions />} />
+          {/* One promotion — bc.game's `/promotion/:id`, with the platform's segment in the path
+              because its slug is unique per segment. See `promotionDetailDialog`. */}
+          <Route
+            path="/promotion/:segment/:slug"
+            element={promotionDetailDialog ? null : <PromotionDetail />}
+          />
           {/* `/deposit-offer` is the original's own path too — a sibling of the promotions
               routes rather than a child of them, which is why it is not under /promotions
               despite being the sidebar's "Deposit Bonus" row under that group. Its
               `info: { dialog: m.mobile }` is the same flag the promotions page carries: a
               page on desktop, a full-screen dialog on a phone. */}
           <Route path="/deposit-offer" element={depositOfferDialog ? null : <DepositOffer />} />
+          {/* `/blog` and `/blog/:slug` — this build's own pages (bc.game's Blog is an external
+              site), on the user's request. Pages at every width, never dialogs; gated by the
+              owner's `blog` feature through the RouteGate above (services/gates.js ROUTES). */}
+          <Route path="/blog" element={<Blog />} />
+          <Route path="/blog/:slug" element={<BlogPost />} />
           {/* `/promotions/daily-contest` — the original's own path, loading
               Contest-Uqb1GQAo.js. Unlike /deposit-offer this one IS under the promotions
               family, so the footer already drops its prose band here and the sidebar group
@@ -1086,6 +1108,15 @@ function AppShell() {
       {helpDialog && <HelpDialog onClose={closeOverlay} onBack={backOverlay} enter={dialogEnter} />}
       {promotionsDialog && (
         <PromotionsDialog onClose={closeOverlay} onBack={backOverlay} enter={dialogEnter} />
+      )}
+      {promotionDetailDialog && (
+        <PromotionDetailDialog
+          segment={promotionDetailMatch.params.segment}
+          slug={promotionDetailMatch.params.slug}
+          onClose={closeOverlay}
+          onBack={backOverlay}
+          enter={dialogEnter}
+        />
       )}
       {dailyContestDialog && (
         <DailyContestDialog onClose={closeOverlay} onBack={backOverlay} enter={dialogEnter} />

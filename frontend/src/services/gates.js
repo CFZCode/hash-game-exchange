@@ -68,10 +68,10 @@ export const GATES = {
   // "Originals (in-house)" flag, masked onto site-config/public by the backend, which also refuses
   // the in-house list and launch (casino gameEntitlement.js).
   originals: { flag: 'originals' },
-  // The Blog (sidebar row, footer News link — both external, so gated by name, not by route):
-  // hidden for an agent's player (no `promotions`, or the agent-player capability pair) and on a
-  // whole B2B site. Direct players and guests on hybrid/b2c keep it.
-  blog: { capability: 'promotions', notAgentPlayer: true, notB2B: true },
+  // The Blog — `/blog`, `/blog/:slug`, the sidebar row and the footer News link (all internal now):
+  // the OWNER's `blog` feature, and never for an agent's player. Not a promotion section, so a B2B
+  // site keeps it when the owner switches it on.
+  blog: { feature: 'blog', notAgentPlayer: true },
 };
 
 /** Path prefix → gate, most specific first. History routes (transaction, rollover, bet history,
@@ -93,7 +93,10 @@ export const ROUTES = [
   ['/promotions/daily-contest', 'contest'],
   ['/promotions/weekly-raffle', 'raffle'],
   ['/promotions', 'promotions'],
+  // One promotion's page (`/promotion/:segment/:slug`) — the same section as the list.
+  ['/promotion', 'promotions'],
   ['/deposit-offer', 'promotions'],
+  ['/blog', 'blog'],
   ['/sports', 'sports'],
   ['/notification', 'notifications'],
   ['/settings/verify', 'kyc'],

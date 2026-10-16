@@ -35,6 +35,7 @@ export const SITE_UI: Record<string, UiSupport> = {
   notifications: { status: 'toggle', variant: 'notice_centre', surfaces: '/notification' },
   kyc: { status: 'toggle', variant: 'document_cockpit', surfaces: '/settings/verify' },
   gift_cards: { status: 'toggle', variant: 'redeem_dialog', surfaces: 'sidebar Gift Card card and redeem dialog' },
+  blog: { status: 'toggle', variant: 'category_feed', surfaces: '/blog, /blog/:slug, sidebar Blog row and footer News link' },
 
   casino_lobby: { status: 'fixed', variant: 'tabbed_themes', surfaces: 'the casino lobby is the site itself; use the Casino flag and the game-category flags' },
   banners: { status: 'fixed', variant: 'artwork_slides', surfaces: 'the home hero carousel (artwork from the site admin banners)' },
@@ -45,8 +46,7 @@ export const SITE_UI: Record<string, UiSupport> = {
   chat: { status: 'absent', why: 'Chat is socket-only and this UI has no socket client.' },
   club_membership: { status: 'absent', why: 'No club screens in this UI.' },
   push_notifications: { status: 'absent', why: 'This UI does not load a push SDK.' },
-  analytics: { status: 'absent', why: 'This UI does not load a Google tag.' },
-  blog: { status: 'absent', why: "This UI's Blog row is a link to an off-site blog; there is no blog page." }
+  analytics: { status: 'absent', why: 'This UI does not load a Google tag.' }
 }
 
 /** Owner options that do nothing in this UI (their page does not exist here). Hidden, value kept. */

@@ -57,6 +57,12 @@ export const TABS = [
  */
 export const TABS_H5 = TABS.filter((t) => t.id !== 'exclusive');
 
+/* THE PLATFORM'S SPORTS SEGMENT — this build's, not the capture's. bc.game's strip has no Sports
+   tab (sport campaigns file under All), but the platform answers `segment=sports`, so a live build
+   shows All / Casino / Sports (services/promotions.js `LIVE_TABS`). Added at request (2026-10-16);
+   the fixture build keeps the captured strip above. Same shape as the entries in `TABS`. */
+export const SPORTS_TAB = { id: 'sports', label: 'Sports' };
+
 export const PAGE_SIZE = 9;
 
 export const PROMOTIONS = [

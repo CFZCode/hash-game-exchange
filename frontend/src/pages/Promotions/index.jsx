@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import Pagination from '../../components/shared/Pagination';
 import { Empty } from '../../components/Explore/GameGrid';
 import { getPromotions } from '../../services/promotions';
@@ -12,7 +13,8 @@ import * as globMaps from './index.globs.js';
  * That path is the original's own (`Enter-MsmOuq5R.js`, and the footer already links to it).
  * The route also carries a family of siblings there — `/promotions/daily-contest`,
  * `/promotions/weekly-raffle`, `/promotions/exclusive-promo`, `/promotion/:id` — which are the
- * individual promotion pages behind each card. None of those are built; the cards are inert.
+ * individual promotion pages behind each card. One is built here as `/promotion/:segment/:slug`
+ * (pages/PromotionDetail, on request 2026-10-16) and every card with an `href` opens it.
  *
  * Transcribed from the live page's rendered markup, so the class lists below are the site's,
  * not a reconstruction. Three things in them are worth not "tidying":
@@ -64,8 +66,16 @@ export function PromotionCard({ promo }) {
   /* `imageUrl` is the live feed's own art (services/promotions.js); the fixture never sets it. */
   const image = artFor(promo.image) || promo.imageUrl;
 
+  /* A ROUTER LINK when the card has a detail page (CLAUDE.md: an internal destination is a
+     `<Link>`), the inert `<article>` it always was when it does not. Same class list either way —
+     the original's card already carried `cursor-pointer`. */
+  const Card = promo.href ? Link : 'article';
+  const cardProps = promo.href ? { to: promo.href } : {};
+
   return (
-    <article className="relative flex h-44 w-full cursor-pointer flex-col overflow-hidden rounded-xl border border-fourth/10 bg-alw_white pb-2 pl-5 pr-4 pt-5 sm:rounded-2xl dark:bg-card_dark">
+    <Card
+      {...cardProps}
+      className="relative flex h-44 w-full cursor-pointer flex-col overflow-hidden rounded-xl border border-fourth/10 bg-alw_white pb-2 pl-5 pr-4 pt-5 sm:rounded-2xl dark:bg-card_dark">
       <div className="flex items-start justify-between gap-3">
         <div className="w-56 min-w-0 flex-1">
           {/* Absolutely positioned against the CARD, not this column — it tucks into the card's
@@ -115,7 +125,7 @@ export function PromotionCard({ promo }) {
 
         <ChevronIcon className="icon size-4 rotate-180 fill-secondary" />
       </div>
-    </article>
+    </Card>
   );
 }
 

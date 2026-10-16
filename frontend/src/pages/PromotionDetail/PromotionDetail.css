@@ -1,0 +1,93 @@
+/* `.promotion-richStyle` — the site's own rules for an operator-authored promotion body, verbatim
+ * out of `index-DxOqNczA.css` on hash.game (the detail chunk's own `detail-CKVlkrmQ.css` holds only
+ * `.sport-icon-svg`). The `R G B` triples are this project's hex tokens: `rgb(var(--primary) / 1)`
+ * is `--color-primary`, `rgb(var(--secondary) / .2)` is that token at 20%, `rgb(var(--layer3))` is
+ * `--color-layer3` — all three move with the light theme.
+ *
+ * IN `@layer components` ON PURPOSE. On the original this block sits ~130KB BEFORE the utilities in
+ * the same unlayered file, so `text-sm leading-normal` on the element itself win over the root
+ * rule's `line-height: 1.6`. Unlayered here it would beat the layered utilities outright (the
+ * cascade hazard in CLAUDE.md); layered, the original's order holds. The descendant rules never
+ * meet a utility, so the layer changes nothing for them. */
+@layer components {
+  .promotion-richStyle {
+    font-weight: 400;
+    line-height: 1.6;
+  }
+  .promotion-richStyle h2 {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--color-primary);
+  }
+  .promotion-richStyle li {
+    display: list-item;
+    text-align: -webkit-match-parent;
+    unicode-bidi: isolate;
+  }
+  .promotion-richStyle ol {
+    display: block;
+    list-style-type: decimal;
+    margin-block-start: 1em;
+    margin-block-end: 1em;
+    margin-inline-start: 0px;
+    margin-inline-end: 0px;
+    padding-inline-start: 40px;
+    unicode-bidi: isolate;
+  }
+  .promotion-richStyle ul {
+    display: block;
+    list-style-type: disc;
+    margin-block-start: 1em;
+    margin-block-end: 1em;
+    margin-inline-start: 0px;
+    margin-inline-end: 0px;
+    padding-inline-start: 40px;
+    unicode-bidi: isolate;
+  }
+  .promotion-richStyle ol,
+  .promotion-richStyle ul {
+    margin: 0;
+  }
+  [dir='ltr'] .promotion-richStyle ol,
+  [dir='ltr'] .promotion-richStyle ul {
+    padding-left: 1.2em;
+  }
+  [dir='rtl'] .promotion-richStyle ol:not(:where([dir='ltr'], [dir='ltr'] *)),
+  [dir='rtl'] .promotion-richStyle ul:not(:where([dir='ltr'], [dir='ltr'] *)) {
+    padding-right: 1.2em;
+  }
+  .promotion-richStyle video {
+    width: 500px;
+    margin: 0 auto;
+    border-radius: 4px;
+  }
+  .promotion-richStyle table {
+    min-width: 50%;
+    table-layout: fixed;
+    border-collapse: collapse;
+    margin: 0.8em 0;
+    display: table;
+  }
+  .promotion-richStyle thead {
+    font-weight: 700;
+  }
+  .promotion-richStyle th,
+  .promotion-richStyle td {
+    padding: 8px 10px;
+    border: 1px solid color-mix(in srgb, var(--color-secondary) 20%, transparent);
+    vertical-align: top;
+    white-space: normal;
+    word-break: break-word;
+  }
+  [dir='ltr'] .promotion-richStyle th,
+  [dir='ltr'] .promotion-richStyle td {
+    text-align: left;
+  }
+  [dir='rtl'] .promotion-richStyle th:not(:where([dir='ltr'], [dir='ltr'] *)),
+  [dir='rtl'] .promotion-richStyle td:not(:where([dir='ltr'], [dir='ltr'] *)) {
+    text-align: right;
+  }
+  .promotion-richStyle tbody tr:nth-child(2n) {
+    background: var(--color-layer3);
+  }
+}

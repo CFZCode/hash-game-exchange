@@ -220,6 +220,8 @@ const SUBMENU_ROUTES = [
   ['casino', '/casino'],
   ['sports', '/sports'],
   ['promotions', '/promotions/promotion'],
+  /* One promotion's page (`/promotion/:segment/:slug`) opens the same group as the list. */
+  ['promotions', '/promotion'],
   /* A group may claim more than one route — `find` takes the first match and nothing here
      cares which entry won. Deposit Bonus is a row inside the Promotions group but its path is
      a top-level sibling on the original (`/deposit-offer`, not `/promotions/…`), so a prefix
@@ -514,7 +516,10 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
        Predictions gap above. */
     { id: 'fair',         label: 'Provably Fair',         menuIcon: 'fair',           href: '/help/provably-fair' },
     { id: 'responsible',  label: 'Responsible Gambling',  menuIcon: 'account',        href: '/responsible/faq', match: ['/responsible'] },
-    /* Blog (blog.bc.game) removed: BC.GAME's blog, no Parker567 equivalent. */
+    /* Blog: bc.game's row goes to the external blog.bc.game; here it is the site's own `/blog`
+       (pages/Blog), on the user's request — a deliberate departure. A plain internal row, so the
+       route gate (`/blog` → the owner's `blog` feature) decides whether it is drawn. */
+    { id: 'blog',         label: 'Blog',                  menuIcon: 'blog',           href: '/blog', match: ['/blog'] },
   ];
 
   return (
