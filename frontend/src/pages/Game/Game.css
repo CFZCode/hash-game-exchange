@@ -93,10 +93,10 @@
   filter: blur(1px);
 }
 
-/* `w-[30rem]` on the original assumes a desktop; on a phone the card has to fit the frame. */
-.game-overlay-card {
-  max-width: calc(100% - 2rem);
-}
+/* `w-[30rem]` on the original assumes a desktop; on a phone the card has to fit the frame. The
+   card is `w-full max-w-[30rem]` inside a `px-4` overlay (same box on a desktop): the earlier
+   `max-width: calc(100% - 2rem)` here was ignored by iOS Safari inside the absolute flex overlay,
+   so the card ran off the frame's right edge on an iPhone. */
 
 /* The phone's "Zoom & Play": once a game is running below `lg`, the frame leaves the page and
    fills the screen (`fixed inset-0 z-[9999]`, `ic` in Layout-DI8MpYIQ.js), with a bar to close

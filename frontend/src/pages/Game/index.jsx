@@ -207,8 +207,8 @@ function PlayOverlay({ game, login, currencyName, balances, setting, launching, 
   );
 
   return (
-    <div className="game-overlay absolute inset-0 z-20 flex items-center justify-center bg-black/60">
-      <div className="game-overlay-card w-[30rem] rounded-xl bg-layer3 p-8">
+    <div className="game-overlay absolute inset-0 z-20 flex items-center justify-center bg-black/60 px-4">
+      <div className="game-overlay-card w-full max-w-[30rem] rounded-xl bg-layer3 p-8">
         {login ? (
           <>
             <div className="items-left flex flex-col justify-center gap-2">

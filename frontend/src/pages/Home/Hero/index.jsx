@@ -98,10 +98,10 @@ function SignedOutHero() {
       <div className="hero-panel relative h-[14.375rem] w-full overflow-hidden rounded-lg pl-2.5 sm:h-[260px]">
         {/* Phone: the copy column is the original's (w-1/2, min-w-[11.25rem]). The original's
             banner_mobile.png is a cut-out at right-0 top-0 h-full; this art is a full JPG whose two
-            players stand wider, so it sits bottom-right at 86% height (4% past the right edge) with
+            players stand wider, so it sits bottom-right at 92% height (8% past the right edge) with
             its left and top edges faded into the panel, keeping the players clear of the copy.
             Desktop: the finished banner covers the panel, anchored left (the crowned P). */}
-        <img alt="banner" className="absolute -right-[4%] bottom-0 h-[86%] w-auto max-w-none [mask-image:linear-gradient(to_right,transparent,#000_28%),linear-gradient(to_bottom,transparent,#000_14%)] [mask-composite:intersect] lg:hidden" src={mobileArt} />
+        <img alt="banner" className="absolute -right-[8%] bottom-0 h-[92%] w-auto max-w-none [mask-image:linear-gradient(to_right,transparent,#000_28%),linear-gradient(to_bottom,transparent,#000_14%)] [mask-composite:intersect] lg:hidden" src={mobileArt} />
         <img alt="banner" className="absolute inset-0 hidden h-full w-full object-cover object-left lg:block" src={desktopArt} />
 
         <div className="relative hidden h-full w-[50%] items-center justify-center lg:ml-[12%] lg:flex">

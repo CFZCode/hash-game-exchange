@@ -563,13 +563,23 @@ function AppShell() {
    *
    * An effect is the right shape here rather than the render-time adjustment the two states above
    * use: the scroll position is an EXTERNAL system being synchronised to React state, which is
-   * what effects are for. */
+   * what effects are for.
+   *
+   * KEYED ON THE HISTORY ENTRY, not on the location object. Closing a dialog goes BACK to the
+   * page's own entry, and React Router hands that entry over as a NEW object, so keying on the
+   * object scrolled the page to the top every time a phone sheet (VIP, Promotions, …) closed —
+   * the page jumped out from under the reader. The same entry (same `key`, same URL) is the
+   * same page: it keeps its place. */
+  const pageEntry = `${pageLocation.key}|${pageLocation.pathname}${pageLocation.search}${pageLocation.hash}`;
+  const scrolledEntry = React.useRef(null);
   React.useEffect(() => {
+    if (scrolledEntry.current === pageEntry) return;
+    scrolledEntry.current = pageEntry;
     const hash = pageLocation.hash ? document.getElementById(pageLocation.hash.slice(1)) : null;
 
     if (hash) hash.scrollIntoView();
     else window.scrollTo(0, 0);
-  }, [pageLocation]);
+  }, [pageEntry, pageLocation.hash]);
 
   /* THE CROSS CLOSES THE WHOLE STACK; THE BACK ARROW POPS ONE. Both are the same helper on the
    * original with a different depth, which is what makes the pair unambiguous:
