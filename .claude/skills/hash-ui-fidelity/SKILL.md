@@ -79,7 +79,7 @@ Changes the user asked for, so the pixel check WILL show them against the refere
 - **Game page**: a High win / Lucky win board under the frame (live `top-wins?game=`, else `staticGameWins`), then the Recommended Games row, then the home's Latest round & Race tables; the info card is replaced by the Recommended Games row (`pages/GameCollection/RecommendList`); the play overlay card is `w-full max-w-[30rem]` in a `px-4` overlay.
 - **Rollover**: a turnover strip (Wagered / Required / Remaining, `GET /user/wager/progress`) above the table; the Amount column is "Turnover" — wagered / target with a progress bar; Time is date over time; money is text-only.
 - **Account menus**: Free Plays and Do Not Disturb are hidden (hidden-features skill).
-- **Header currency picker below `lg`**: a PopCenter bottom sheet titled "Currency" (the original's `CS` arm) instead of the desktop popover.
+- **Header currency picker below `lg`**: a PopCenter bottom sheet titled "Select Currency" with a close cross, 80vh tall, and a full-width Deposit button under the footer — matched to bc.game's phone sheet (checked on playin05.com, a bc.game skin) — instead of the desktop popover.
 
 The sidebar is therefore shorter than the reference, so everything below the removed rows in the sidebar shifts up. Details are in `frontend/docs/architecture.md` under Sidebar. Left as they were on purpose: the Sports lobby's own Predictions tab (BetBy's), the Trading and Lottery options in the bet-history type filter, the slot theme tag "Lottery" in the casino catalogue's tag list, the footer's "Crypto trading is not gambling" licence line, and the `detrade:trading` game redirects in FreePlay and Profile.
 
