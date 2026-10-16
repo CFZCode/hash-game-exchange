@@ -127,6 +127,45 @@ const updateWelcomeBonusSettings = {
 };
 
 /**
+ * Referral unlock tiers (migration 106) — the /referral/rules table. The whole
+ * list is sent and replaces what is stored. `level` is the friend's VIP level
+ * name as the player site prints it; `totalWager` and `unlockAmount` are exact
+ * decimal strings in the reward currency (at most 12 integer digits, the
+ * numeric(20,8) every other amount here fits). Two rows may not share a
+ * wager — which one a friend reached would be undefined — nor a level.
+ */
+const unlockAmountString = rate.refine((v) => v.split('.')[0].length <= 12, 'at most 12 digits before the decimal point');
+
+const unlockTier = z
+  .object({
+    level: z
+      .string({ invalid_type_error: 'send the level as a string' })
+      .transform((v) => v.replace(/\s+/g, ' ').trim())
+      .pipe(z.string().min(1, 'give the level a name').max(40, 'at most 40 characters')),
+    totalWager: unlockAmountString,
+    unlockAmount: unlockAmountString,
+  })
+  .strict();
+
+const updateReferralUnlockSettings = {
+  body: z
+    .object({
+      tiers: z
+        .array(unlockTier)
+        .max(50, 'at most 50 rows')
+        .refine(
+          (list) => new Set(list.map((t) => Number.parseFloat(t.totalWager))).size === list.length,
+          'two rows cannot have the same total wager'
+        )
+        .refine(
+          (list) => new Set(list.map((t) => t.level.toLowerCase())).size === list.length,
+          'two rows cannot have the same level'
+        ),
+    })
+    .strict(),
+};
+
+/**
  * Tip limits (migration 081), all USD. Decimal strings ≥ 0 with at most 8
  * decimal places and at most 12 integer digits (the column is numeric(20,8)).
  * An empty string reads as "0" — no cap on a max, off for the wager rule.
@@ -280,6 +319,7 @@ module.exports = {
   updateAffiliateSettings,
   updateWelcomeBonusSettings,
   updateTipSettings,
+  updateReferralUnlockSettings,
   setSportsEnabled,
   updateRewardCurrencies,
   updateEmailSettings,

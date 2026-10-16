@@ -27,9 +27,27 @@ const FALLBACK_ICONS: Metadata['icons'] = FALLBACK_MARK
   ? { icon: { url: FALLBACK_MARK, type: 'image/png' }, apple: FALLBACK_MARK }
   : ORIGINAL_METADATA.icons;
 
+/* bc.game's own viewport, read off the live site's <meta name="viewport">:
+     width=device-width,minimum-scale=1,maximum-scale=1,user-scalable=no,initial-scale=1.0,viewport-fit=cover
+   The hash-games copy carried only `width=device-width, initial-scale=1`, and that left two ways for
+   a phone to rescale the page by itself:
+   - ANY element wider than the screen (a long unbroken string, a nowrap row) widened Chrome's
+     layout viewport to fit it (innerWidth 900 on a 440px phone, measured): the fixed header was laid
+     out across the wider box so its right half (balance pill, avatar) went off screen, and the
+     zoomed-out page switched on Chrome's text autosizing, which inflates paragraph text. With
+     minimum-scale=1 the page can never be shown below 1:1, so the layout viewport stays at the
+     device width whatever the content does.
+   - iOS zooms in on focus of any input under 16px, and below 430px this build's 1rem IS under 16px
+     (remScale: 14.5px at 390). maximum-scale=1 stops that, as on bc.game.
+   viewport-fit=cover is what the env(safe-area-inset-*) rules in index.css / MainLayout.css were
+   written against. */
 const ORIGINAL_VIEWPORT: Viewport = {
   width: 'device-width',
   initialScale: 1,
+  minimumScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: 'cover',
   themeColor: '#232626',
 };
 

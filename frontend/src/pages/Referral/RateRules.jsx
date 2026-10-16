@@ -5,9 +5,11 @@ import PopCenter from '../../components/shared/PopCenter';
 import Select from '../../components/shared/Select';
 import NumberInput from '../../components/shared/NumberInput';
 import { coinIcon } from '../../utils/coinArt';
-import { vipTier, tierColor } from '../../data/vipConfig';
+import { vipTier, vipTierByName, tierColor } from '../../data/vipConfig';
+import useResource from '../../hooks/useResource';
+import { getReferralUnlocks } from '../../services/referral';
 import { fill } from './format';
-import { LEVEL_UNLOCKS, RULES, HOW_TO_STEPS, GAME_RATES } from './referral';
+import { RULES, HOW_TO_STEPS, GAME_RATES } from './referral';
 import {
   IconTierBronze,
   IconTierSilver,
@@ -93,7 +95,13 @@ const TIER_ICON = {
   Platinum: IconTierPlatinum,
 };
 
+/* THE ROWS ARE THE SITE ADMIN'S NOW, not the chunk's array: `getReferralUnlocks` reads them off
+   `site-config/public` and answers the capture when fixtures are on or the backend has no such
+   setting yet. A live row names its level ("Bronze I") instead of numbering it, and carries the
+   reward currency, whose coin replaces bc.game's gold one. Until the read settles the body is
+   empty — the table is the last thing in its card, so nothing below it moves. */
 function UnlockTable() {
+  const { data: rows } = useResource(getReferralUnlocks);
   return (
     <table className="mt-4 w-full rounded-lg bg-layer3 text-center">
       <thead className="text-secondary">
@@ -104,11 +112,11 @@ function UnlockTable() {
         </tr>
       </thead>
       <tbody>
-        {LEVEL_UNLOCKS.map((row) => {
-          const tier = vipTier(row.level);
+        {(rows ?? []).map((row) => {
+          const tier = typeof row.level === 'number' ? vipTier(row.level) : vipTierByName(row.level);
           const Icon = TIER_ICON[tier.base] || IconTierBronze;
           return (
-            <tr key={row.level}>
+            <tr key={`${row.level}-${row.wager}`}>
               <td className="flex items-center justify-start gap-1 p-3">
                 {/* `[&_svg]:size-4` on the wrapper and an inline `color` on it, which the
                     unfilled glyph inherits through `.icon`'s `fill: currentColor`. */}
@@ -119,7 +127,7 @@ function UnlockTable() {
               </td>
               <td className="p-3">{row.wager}</td>
               <td className="flex items-center justify-end gap-1 p-3">
-                <img className="h-4 w-4" alt="coin" src={goldCoin} />
+                <img className="h-4 w-4" alt="coin" src={row.currency ? coinIcon(row.currency) : goldCoin} />
                 <span className="font-extrabold text-brand">{row.amount}</span>
               </td>
             </tr>

@@ -24,7 +24,7 @@ const HeroCopy = () => {
   const canSignUp = useCanSignUp();
 
   return (
-    <div className="center relative z-[1] flex h-full w-[42%] min-w-0 flex-col whitespace-nowrap lg:w-1/2 lg:min-w-[11.25rem]">
+    <div className="center relative z-[1] flex h-full w-1/2 min-w-[11.25rem] flex-col whitespace-nowrap">
       <div className="flex items-center gap-1">
         <h1 className="max-w-44 text-wrap p-0 text-center text-lg font-extrabold leading-5 text-primary sm:max-w-none sm:text-2xl sm:leading-7">
           JOIN THE UNTAMED
@@ -96,10 +96,12 @@ function SignedOutHero() {
   return (
     <div dir="ltr" className="w-full px-4 sm:px-0">
       <div className="hero-panel relative h-[14.375rem] w-full overflow-hidden rounded-lg pl-2.5 sm:h-[260px]">
-        {/* Desktop: the finished banner covers the panel, anchored left (the crowned P). Phone:
-            the players' art sits bottom-right at 88% height, its left and top edges faded into the panel,
-            so both players stay whole beside the copy (held to 42%). */}
-        <img alt="banner" className="absolute bottom-0 right-0 h-[88%] w-auto max-w-none [mask-image:linear-gradient(to_right,transparent,#000_30%),linear-gradient(to_bottom,transparent,#000_18%)] [mask-composite:intersect] lg:hidden" src={mobileArt} />
+        {/* Phone: the copy column is the original's (w-1/2, min-w-[11.25rem]). The original's
+            banner_mobile.png is a cut-out at right-0 top-0 h-full; this art is a full JPG whose two
+            players stand wider, so it sits bottom-right at 86% height (4% past the right edge) with
+            its left and top edges faded into the panel, keeping the players clear of the copy.
+            Desktop: the finished banner covers the panel, anchored left (the crowned P). */}
+        <img alt="banner" className="absolute -right-[4%] bottom-0 h-[86%] w-auto max-w-none [mask-image:linear-gradient(to_right,transparent,#000_28%),linear-gradient(to_bottom,transparent,#000_14%)] [mask-composite:intersect] lg:hidden" src={mobileArt} />
         <img alt="banner" className="absolute inset-0 hidden h-full w-full object-cover object-left lg:block" src={desktopArt} />
 
         <div className="relative hidden h-full w-[50%] items-center justify-center lg:ml-[12%] lg:flex">

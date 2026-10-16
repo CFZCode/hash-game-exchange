@@ -868,6 +868,8 @@ the end of this appendix.
 | `POST` | `/api/v1/admin/site-config/email/test` | `staff` + `config:write` | `200` `service.sendTestEmail(…)` |
 | `GET` | `/api/v1/admin/site-config/global` | `staff` + `config:read` | `200` `flags` |
 | `PUT` | `/api/v1/admin/site-config/global` | `staff` + `config:write` | `200` `service.updateGlobalSettings(…)` |
+| `GET` | `/api/v1/admin/site-config/referral-unlocks` | `staff` + `config:read` | `200` `service.referralUnlockSettings(…)` |
+| `PUT` | `/api/v1/admin/site-config/referral-unlocks` | `staff` + `config:write` | `200` `service.updateReferralUnlockSettings(…)` |
 | `GET` | `/api/v1/admin/site-config/rewards` | `staff` + `config:read` | `200` `service.rewardCurrencies(…)` |
 | `PUT` | `/api/v1/admin/site-config/rewards` | `staff` + `config:write` | `200` `service.updateRewardCurrencies(…)` |
 | `GET` | `/api/v1/admin/site-config/settings` | `staff` + `config:read` | `200` `service.operatorSettings(…)` |

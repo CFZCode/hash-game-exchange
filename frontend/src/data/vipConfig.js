@@ -76,6 +76,18 @@ export const vipLevelRow = (level) =>
 /* `Wv` — the account's tier as the level card reads it. */
 export const vipTier = (level) => splitLevelName(vipLevelRow(level).levelName);
 
+/* A tier from a level NAME rather than a number — what the site admin's referral unlock table
+   stores (`services/referral.js` `getReferralUnlocks`). A name on this ladder resolves through its
+   row, so "Platinum II" takes `Platinum\nII`'s exact rendering (whitespace and case ignored when
+   matching); any other name is split as typed. */
+const nameKey = (name) => String(name ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
+
+export function vipTierByName(name) {
+  const key = nameKey(name);
+  const row = VIP_LEVELS.find((r) => nameKey(r.levelName) === key);
+  return row ? vipTier(row.level) : splitLevelName(String(name ?? '').replace(/\s+/g, ' ').trim());
+}
+
 /* `Sn`, the DARK arm of the tier palette. Its light twin `qv` is a set of deeper shades and is
    unreachable in a dark-only build. `jv` falls through to `currentColor` for a family that is not
    in this map, which is exactly what the ten newline names get. */

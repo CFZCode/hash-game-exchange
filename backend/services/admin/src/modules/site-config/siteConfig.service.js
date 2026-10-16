@@ -57,6 +57,33 @@ const TIP_LIMIT_FIELDS = Object.freeze({
 const TIP_LIMIT_DEFAULTS = Object.freeze({ maxPerTipUsd: '500', maxPerDayUsd: '2000', minWageredUsd: '0' });
 
 /**
+ * Referral unlock tiers (migration 106) — the "Friend's Level / Total Wager /
+ * Unlock Amount" table on the player site's `/referral/rules`.
+ *
+ * DISPLAY TERMS. What the site promises a referrer; user-service's tier unlock
+ * (`UNLOCK_TIERS` in affiliate.constants.js) still pays on its own constants.
+ *
+ * The defaults are the migration's column default (the bc.game capture the
+ * page shipped with) and are what a site without the column yet reads, so the
+ * page is unchanged until an operator edits it. Kept in step with
+ * `packages/db/migrations/106-referral-unlock-tiers.js` by hand.
+ */
+const REFERRAL_UNLOCK_COLUMN = 'referral_unlock_tiers';
+const REFERRAL_UNLOCK_MAX = 50;
+const REFERRAL_UNLOCK_DEFAULTS = Object.freeze([
+  { level: 'Bronze I', totalWager: '1000', unlockAmount: '0.50' },
+  { level: 'Bronze II', totalWager: '3000', unlockAmount: '2.50' },
+  { level: 'Bronze IV', totalWager: '15000', unlockAmount: '5.00' },
+  { level: 'Silver I', totalWager: '30000', unlockAmount: '12.00' },
+  { level: 'Silver III', totalWager: '120000', unlockAmount: '25.00' },
+  { level: 'Silver IV', totalWager: '240000', unlockAmount: '50.00' },
+  { level: 'Gold I', totalWager: '500000', unlockAmount: '80.00' },
+  { level: 'Gold II', totalWager: '1000000', unlockAmount: '120.00' },
+  { level: 'Gold IV', totalWager: '3500000', unlockAmount: '205.00' },
+  { level: 'Platinum II', totalWager: '8500000', unlockAmount: '500.00' },
+].map(Object.freeze));
+
+/**
  * The business settings an operator owns — limits, policy and schedule.
  *
  * ── WHY THIS TABLE EXISTS ───────────────────────────────────────────────
@@ -436,6 +463,87 @@ class SiteConfigService {
     return this.tipSettings();
   }
 
+  // ══════════════════════════════════════════════════════════════════════
+  //  Referral unlock tiers — the /referral/rules table (migration 106)
+  // ══════════════════════════════════════════════════════════════════════
+
+  /**
+   * The tier list as stored, or the shipped defaults when there is no row or
+   * the column is not there yet (migration 106 not run). Raw SQL for the same
+   * reason as `tipSettings()`: the shared model file is not touched for it.
+   * A missing column must not take `publicSettings()` — every first paint —
+   * down with it, so that one error reads as "defaults".
+   */
+  async #storedReferralUnlocks() {
+    try {
+      const [row] = await this.models.Siteconfig.sequelize.query(
+        `SELECT id, ${REFERRAL_UNLOCK_COLUMN} FROM siteconfig ORDER BY id ASC LIMIT 1`,
+        { type: this.models.Siteconfig.sequelize.QueryTypes.SELECT }
+      );
+      if (!row) return { tiers: this.#unlockTiers(REFERRAL_UNLOCK_DEFAULTS), configured: false, stored: false };
+      const value = row[REFERRAL_UNLOCK_COLUMN];
+      return {
+        tiers: this.#unlockTiers(typeof value === 'string' ? JSON.parse(value) : value),
+        configured: true,
+        stored: true,
+      };
+    } catch (error) {
+      if (!isUndefinedColumn(error)) throw error;
+      this.logger?.warn(`siteconfig.${REFERRAL_UNLOCK_COLUMN} is missing — run migration 106; serving the defaults`);
+      return { tiers: this.#unlockTiers(REFERRAL_UNLOCK_DEFAULTS), configured: true, stored: false };
+    }
+  }
+
+  /**
+   * The referral unlock table, as the Affiliate rates screen reads it.
+   * `totalWager` and `unlockAmount` are denominated in the site's reward
+   * currency (`currency`), like every other operator-entered reward amount.
+   * `stored: false` = the column is missing and these are the defaults.
+   */
+  async referralUnlockSettings() {
+    const [stored, rewardCurrency] = await Promise.all([this.#storedReferralUnlocks(), this.rewardCurrency()]);
+    return { ...stored, currency: rewardCurrency, rewardCurrency, maxTiers: REFERRAL_UNLOCK_MAX };
+  }
+
+  /** Replaces the whole list (the validator has already checked each row). */
+  async updateReferralUnlockSettings({ tiers, staffId = null }) {
+    const row = await this.#configRow(['id']);
+    if (!row) throw errors.NOT_CONFIGURED();
+
+    const list = this.#unlockTiers(tiers);
+    try {
+      await this.models.Siteconfig.sequelize.query(
+        `UPDATE siteconfig SET ${REFERRAL_UNLOCK_COLUMN} = CAST(:tiers AS jsonb), updatedat = now() WHERE id = :id`,
+        { replacements: { id: row.id, tiers: JSON.stringify(list) } }
+      );
+    } catch (error) {
+      if (isUndefinedColumn(error)) throw errors.MIGRATION_PENDING({ migration: '106-referral-unlock-tiers' });
+      throw error;
+    }
+
+    this.logger?.info({ staffId, configId: row.id, tiers: list.length }, 'Referral unlock tiers changed');
+
+    await this.pushPublic();
+
+    return this.referralUnlockSettings();
+  }
+
+  /** Rows as exact decimal strings, lowest wager first; junk rows dropped. */
+  #unlockTiers(value) {
+    const list = Array.isArray(value) ? value : [];
+    const out = [];
+    for (const t of list) {
+      try {
+        const level = String(t?.level ?? '').replace(/\s+/g, ' ').trim();
+        if (!level) continue;
+        out.push({ level, totalWager: this.#amount(t?.totalWager), unlockAmount: this.#amount(t?.unlockAmount) });
+      } catch {
+        // A row that is not a decimal is not a tier.
+      }
+    }
+    return out.sort((a, b) => money.compare(a.totalWager, b.totalWager)).slice(0, REFERRAL_UNLOCK_MAX);
+  }
+
   /**
    * @legacy GET /sportsCheck
    *
@@ -646,7 +754,11 @@ class SiteConfigService {
 
     // What the site may promise a new player. Only the terms when it is on.
     const tiers = this.#tiers(row?.first_deposit_bonus_tiers);
-    const [rewardCurrency, defaultCurrency] = await Promise.all([this.rewardCurrency(), this.#publicDefaultCurrency()]);
+    const [rewardCurrency, defaultCurrency, referralUnlocks] = await Promise.all([
+      this.rewardCurrency(),
+      this.#publicDefaultCurrency(),
+      this.#storedReferralUnlocks(),
+    ]);
     const firstDepositBonus = row?.first_deposit_bonus_enabled && tiers.length
       ? { enabled: true, currency: rewardCurrency, payoutCurrency: rewardCurrency, tiers }
       : { enabled: false };
@@ -660,6 +772,10 @@ class SiteConfigService {
       // A browser can say "your friend must deposit" next to the joining bonus.
       affiliateBonusRequiresDeposit: row ? row.affiliate_bonus_requires_deposit !== false : true,
       firstDepositBonus,
+      // The /referral/rules table (migration 106): friend's VIP level, the
+      // total wager that reaches it, and what the referrer unlocks there —
+      // amounts in the reward currency. Display terms only.
+      referralUnlocks: { currency: rewardCurrency, tiers: referralUnlocks.tiers },
       rewardCurrency,
       registerBonusCurrency: rewardCurrency,
       affiliateBonusCurrency: rewardCurrency,
@@ -1078,6 +1194,12 @@ class SiteConfigService {
 
 }
 
+/** Postgres 42703 — a column the query names does not exist (a migration not run yet). */
+function isUndefinedColumn(error) {
+  const code = error?.parent?.code ?? error?.original?.code ?? error?.code;
+  return code === '42703';
+}
+
 /** Minimal escaping — the address is ours, but it still lands in an HTML body. */
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (c) =>
@@ -1120,4 +1242,7 @@ function coerceSetting(key, spec, raw) {
   return spec.kind === 'decimal' ? String(raw).trim() : n;
 }
 
-module.exports = { SiteConfigService, AFFILIATE_FIELDS, OPERATOR_FLAGS, USER_PREFS, OPERATOR_SETTINGS, TIP_LIMIT_FIELDS, TIP_LIMIT_DEFAULTS };
+module.exports = {
+  SiteConfigService, AFFILIATE_FIELDS, OPERATOR_FLAGS, USER_PREFS, OPERATOR_SETTINGS, TIP_LIMIT_FIELDS, TIP_LIMIT_DEFAULTS,
+  REFERRAL_UNLOCK_DEFAULTS, REFERRAL_UNLOCK_MAX,
+};

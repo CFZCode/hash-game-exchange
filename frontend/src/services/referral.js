@@ -1,7 +1,17 @@
 import { emptyIfAgentBlocked, request, USE_FIXTURES } from './client';
 import ENDPOINTS, { PLATFORM } from './endpoints';
-import { HERO, CARDS, PROGRAM, FAQ, FAQ_TITLE, LIVE, DASHBOARD_INFO } from '../pages/Referral/referral';
+import {
+  HERO,
+  CARDS,
+  PROGRAM,
+  FAQ,
+  FAQ_TITLE,
+  LIVE,
+  DASHBOARD_INFO,
+  LEVEL_UNLOCKS,
+} from '../pages/Referral/referral';
 import { SIGNED_IN } from '../context/account';
+import { printCurrency } from '../utils/currency';
 
 /* The referral programme's signed-out landing page.
  *
@@ -409,5 +419,48 @@ export const claimAffiliateReward = (rewardId) =>
 
 export const claimAllAffiliateRewards = () =>
   request(PLATFORM.user.affiliate.claimAll, { live: true, method: 'POST', fixture: null });
+
+/* The Rate & Rules tab's "Friend's Level / Total Wager / Unlock Amount" table.
+ *
+ * bc.game hardcodes it in the chunk (`LEVEL_UNLOCKS`, the capture). Here the SITE ADMIN owns it:
+ * `referralUnlocks` on `GET /admin/site-config/public` (migration 106, edited on the admin's
+ * Affiliate rates screen), `{ currency, tiers: [{ level, totalWager, unlockAmount }] }` with
+ * `level` the VIP level NAME the site prints and the two amounts exact decimal strings in the
+ * site's reward currency. Its seed is the capture's ten rows, so the page is unchanged until an
+ * operator edits it.
+ *
+ * Every arm answers the SAME row shape the table renders — `{ level, wager, amount, currency }`,
+ * `level` a ladder number (capture) or a name (live), `wager`/`amount` display strings:
+ *   - fixtures on                     the capture, verbatim ("1000,000" included)
+ *   - a backend without the setting   the capture too (`referralUnlocks` absent = not deployed yet)
+ *   - the setting                     the operator's rows, through `printCurrency`
+ *   - a failed read                   no rows, rather than numbers the operator may have changed
+ *
+ * `currency` is null on the capture rows, which is what keeps bc.game's gold coin on them. */
+const CAPTURE_UNLOCKS = LEVEL_UNLOCKS.map((row) => ({ ...row, currency: null }));
+
+const UNLOCKS_FIXTURE = { referralUnlocks: null };
+
+export const toUnlockRows = (config) => {
+  const live = config?.referralUnlocks;
+  if (!live || !Array.isArray(live.tiers)) return CAPTURE_UNLOCKS;
+  const currency = String(live.currency || config?.rewardCurrency || 'USDT').toUpperCase();
+  const print = (value, minDecimals) => printCurrency(value, currency, { hasAlias: false, minDecimals });
+  return live.tiers
+    .filter((tier) => tier && String(tier.level ?? '').trim())
+    .map((tier) => ({
+      level: String(tier.level).trim(),
+      wager: print(tier.totalWager, 0),
+      amount: `+${print(tier.unlockAmount, 2)}`,
+      currency,
+    }));
+};
+
+export const getReferralUnlocks = () => {
+  const read = request(PLATFORM.site.config, { live: true, fixture: UNLOCKS_FIXTURE });
+  return typeof read?.then === 'function'
+    ? read.then(toUnlockRows, () => [])
+    : toUnlockRows(read);
+};
 
 export default getReferral;
