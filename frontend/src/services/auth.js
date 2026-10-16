@@ -558,13 +558,16 @@ const usernameFromEmail = (email) => {
   return cleaned.length >= 3 ? cleaned.slice(0, 60) : `${cleaned}user`.slice(0, 60);
 };
 
-export async function register({ email, password, referral }, previous) {
+/* Two ways in (user's request, 2026-10-16): by USERNAME — the platform's own required field, no
+   email at all — or by EMAIL, with the username derived from it as before. */
+export async function register({ username, email, password, referral }, previous) {
+  const byUsername = Boolean(username);
   await request(PLATFORM.user.auth.register, {
     live: true,
     method: 'POST',
     json: {
-      username: usernameFromEmail(email),
-      email,
+      username: byUsername ? username : usernameFromEmail(email),
+      ...(byUsername ? {} : { email }),
       password,
       /* Only when the visitor opened the panel and typed one — an empty string is a value the
          validator would accept and store as a referrer that does not exist. */
@@ -576,7 +579,7 @@ export async function register({ email, password, referral }, previous) {
      arm always did. A failure HERE is worth surfacing differently from a failed registration —
      the account exists at this point — but the caller cannot usefully act on that distinction,
      so it propagates as one error. */
-  return login({ identifier: email, password }, previous);
+  return login({ identifier: byUsername ? username : email, password }, previous);
 }
 
 /* ── Password reset ──────────────────────────────────────────────────────────────────────────

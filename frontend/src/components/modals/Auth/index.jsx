@@ -403,7 +403,13 @@ function SignInForm({ onSubmit, pending, error, onForgot }) {
 }
 
 /* Transcribed from the live dialog's rendered DOM, like the Sign In tab. */
+/* The platform's username rule (profile.validators.js): 3–30 of letters, digits, `_ . -`. */
+const USERNAME_RULE = /^[A-Za-z0-9_.-]{3,30}$/;
+
 function SignUpForm({ onSubmit, error, onClearError }) {
+  /* Username vs Email, as on the Sign In tab (user's request): Username first. */
+  const [method, setMethod] = React.useState(0);
+  const byUsername = method === 0;
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [revealed, setRevealed] = React.useState(false);
@@ -417,7 +423,8 @@ function SignUpForm({ onSubmit, error, onClearError }) {
   const [agreed, setAgreed] = React.useState(true);
   const [moreOpen, setMoreOpen] = React.useState(false);
 
-  const ready = email.length > 0 && password.length > 0 && agreed;
+  const usernameBad = byUsername && email.trim().length > 0 && !USERNAME_RULE.test(email.trim());
+  const ready = email.trim().length > 0 && !usernameBad && password.length > 0 && agreed;
 
   return (
     <>
@@ -438,18 +445,55 @@ function SignUpForm({ onSubmit, error, onClearError }) {
                arms take different fields and answer the same shape, so one flag beats a second
                handler. The referral is passed only when the visitor opened that panel and typed
                one; an empty string would be stored as a referrer who does not exist. */
-            if (ready) onSubmit({ signUp: true, email, password, referral: referral || undefined });
+            if (ready) {
+              onSubmit({
+                signUp: true,
+                ...(byUsername ? { username: email.trim() } : { email: email.trim() }),
+                password,
+                referral: referral || undefined,
+              });
+            }
           }
         }}
       >
-        <Label>Email</Label>
+        <div
+          role="tablist"
+          className="scroll-x tabs-title hide-scroll mb-4"
+          style={indicatorVars(method, 2)}
+        >
+          <div className="tabs-btn-group">
+            {[
+              { label: 'Username', Icon: UserIcon },
+              { label: 'Email', Icon: MailIcon },
+            ].map((item, index) => (
+              <button
+                key={item.label}
+                type="button"
+                role="tab"
+                className="tabs-btn btn-like"
+                aria-selected={method === index ? 'true' : undefined}
+                onClick={() => setMethod(index)}
+              >
+                <div className="flex items-center justify-center">
+                  <item.Icon className="size-4" />
+                  <p className="ml-1 font-extrabold">{item.label}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+          <div className="tabs-indicator" />
+        </div>
+
+        <Label>{byUsername ? 'Username' : 'Email'}</Label>
         {/* Two nested `relative` wrappers in the capture. Kept — that is presumably where a
             validation popover anchors, and dropping them is a change, not a tidy-up. */}
         <div className="relative">
           <div className="relative">
             <Field
+              key={byUsername ? 'username' : 'email'}
               autoFocus
-              type="email"
+              type={byUsername ? 'text' : 'email'}
+              autoComplete={byUsername ? 'username' : 'email'}
               value={email}
               onChange={setEmail}
               /* `J(t.errorMsg && "border-error", "!mt-0")` on the original's EmailPhoneInput: the
@@ -475,6 +519,10 @@ function SignUpForm({ onSubmit, error, onClearError }) {
             prints here, through the same `messageOf` the Sign In tab uses, and no toast doubles
             it. The three site-level refusals still move to Sign In (`SIGNUP_REFUSALS`). */}
         {error && !passwordError ? <p className="mt-1 text-xs text-error">{error}</p> : null}
+        {/* Our own hint, in the same slot and style: the platform refuses these anyway. */}
+        {!error && usernameBad ? (
+          <p className="mt-1 text-xs text-error">3–30 characters: letters, digits, _ . - only</p>
+        ) : null}
 
         <div className="mt-6">
           <Label>Password</Label>
