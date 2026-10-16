@@ -27,5 +27,10 @@ export const POST = handler(async (req: NextRequest) => {
   if (!file || typeof file === 'string') throw new HttpError(400, 'BRANDING_NO_FILE', 'Send the image as the multipart field "file"')
   if (file.size > MAX_IMAGE_BYTES[slot]) throw new HttpError(413, 'BRANDING_TOO_LARGE', `At most ${MAX_IMAGE_BYTES[slot] / 1024} KB`)
 
-  return ok(await storeUpload(new Uint8Array(await file.arrayBuffer()), slot))
+  const bytes = new Uint8Array(await file.arrayBuffer())
+  const asset = await storeUpload(bytes, slot)
+
+  // The uploaded image as a data URL, for the screen's instant preview (`<img src={dataUrl}>`).
+  // Only the reference above goes into the document; the site fetches the file by its hash.
+  return ok({ ...asset, dataUrl: `data:${asset.type};base64,${Buffer.from(bytes).toString('base64')}` })
 })

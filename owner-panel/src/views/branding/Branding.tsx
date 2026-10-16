@@ -42,7 +42,13 @@ import type { Change, EditableDoc, EntitlementsDoc } from '@/lib/entitlements/ty
 import { cn } from '@/lib/utils'
 import ChangeList from '../entitlements/ChangeList'
 
-const assetUrl = (a: BrandingAsset | null) => (a ? withBase(`/api/owner/branding/asset/${a.file}`) : null)
+/* Images uploaded in this tab, by file name: the upload answers the bytes as a data URL, so the
+   preview draws straight from it — no second request, and no dependence on the asset route being
+   reachable (the panel behind a proxy path). The document itself only ever holds the reference. */
+const previews = new Map<string, string>()
+
+const assetUrl = (a: BrandingAsset | null) =>
+  a ? (previews.get(a.file) ?? withBase(`/api/owner/branding/asset/${a.file}`)) : null
 
 /** `{ success, data }` from the multipart upload (the JSON client does not send FormData). */
 async function upload(slot: BrandingSlot, file: File): Promise<BrandingAsset> {
@@ -50,8 +56,11 @@ async function upload(slot: BrandingSlot, file: File): Promise<BrandingAsset> {
 
   body.set('file', file)
   const res = await send(`/api/owner/branding/upload?slot=${slot}`, { method: 'POST', body, cache: 'no-store' })
+  const { dataUrl, ...asset } = await readEnvelope<BrandingAsset & { dataUrl?: string }>(res)
 
-  return readEnvelope<BrandingAsset>(res)
+  if (dataUrl) previews.set(asset.file, dataUrl)
+
+  return asset
 }
 
 /**
