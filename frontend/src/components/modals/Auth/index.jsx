@@ -218,7 +218,7 @@ function DirectRow({ heading, children }) {
 }
 
 function SignInForm({ onSubmit, pending, error, onForgot }) {
-  /* Email vs Username — THIS BUILD'S TABS (user's request, 2026-10-16), in place of bc.game's
+  /* Username vs Email — THIS BUILD'S TABS (user's request, 2026-10-16), in place of bc.game's
      Password / One-time Code: the platform has no one-time code, and its login takes either an
      email or a username in the same `identifier` field. Both tabs are the Password capture's form;
      only the field's label, input type and autofill hint change. The default `tabs-title` variant —
@@ -228,7 +228,8 @@ function SignInForm({ onSubmit, pending, error, onForgot }) {
   const [password, setPassword] = React.useState('');
   const [revealed, setRevealed] = React.useState(false);
 
-  const byUsername = method === 1;
+  /* Username first (user's request), Email second. */
+  const byUsername = method === 0;
   /* The captured submit carries `disabled`, on a dialog that had just opened with both fields
      empty — so the button is gated on the form, not permanently dead. `pending` joins it once a
      submit is in flight, which is this build's rather than the capture's: the original has a
@@ -245,8 +246,8 @@ function SignInForm({ onSubmit, pending, error, onForgot }) {
       >
         <div className="tabs-btn-group">
           {[
-            { label: 'Email', Icon: MailIcon },
             { label: 'Username', Icon: UserIcon },
+            { label: 'Email', Icon: MailIcon },
           ].map((item, index) => (
             <button
               key={item.label}

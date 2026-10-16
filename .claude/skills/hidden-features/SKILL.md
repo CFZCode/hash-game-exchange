@@ -22,7 +22,7 @@ If the operator should be able to switch it on later, it belongs to the owner pa
 | Feature | Why | Surfaces | How |
 |---|---|---|---|
 | Passkey | No WebAuthn on the platform | Auth dialog "Sign In with Passkey" button (`components/modals/Auth/index.jsx`), Settings › Security Passkey tile (`pages/Settings/Security.jsx`), `/settings/passkey` dialog route (`App.jsx`, `components/modals/Passkey`) | `PASSKEY_ENABLED = false` in `config/hiddenFeatures.js` |
-| One-time Code login | No OTP login | Sign-in tabs were Password / One-time Code | Replaced by **Email / Username** tabs, both password logins on the platform's `identifier` field (`components/modals/Auth/index.jsx` SignInForm). The OTP arm is deleted. |
+| One-time Code login | No OTP login | Sign-in tabs were Password / One-time Code | Replaced by **Username / Email** tabs (Username first), both password logins on the platform's `identifier` field (`components/modals/Auth/index.jsx` SignInForm). The OTP arm is deleted. |
 | Cwallet sign-in | No Cwallet integration | Auth dialog direct-login row | Not drawn (comment in Auth/index.jsx) |
 | Weekly Raffle | No raffle | Promotions sidebar row, `/promotions/weekly-raffle` route + phone dialog, card in `pages/Promotions/promotions.js` | Removed; `pages/WeeklyRaffle` left on disk unrouted |
 | Lottery | Not offered | Sidebar group, home LOTTERY card + Upcoming Lottery Draw, Explore search type, footer link | Deleted |
