@@ -6,6 +6,8 @@ import { getSignupHeroArt } from '../../../services/banner';
 import { useResource } from '../../../hooks/useResource';
 
 const DEFAULT_HERO_ART = '/brand/parker567-hero.jpg';
+/* Figma "Frame 146" (372×215 @2x): the phone banner, two players on the right. */
+const DEFAULT_HERO_ART_MOBILE = '/brand/parker567-hero-mobile.jpg';
 import googleIcon from '../../../assets/google.png';
 import telegramIcon from '../../../assets/telegram.png';
 import './Hero.css';
@@ -22,7 +24,7 @@ const HeroCopy = () => {
   const canSignUp = useCanSignUp();
 
   return (
-    <div className="center relative z-[1] flex h-full w-1/2 min-w-[11.25rem] flex-col whitespace-nowrap">
+    <div className="center relative z-[1] flex h-full w-[42%] min-w-0 flex-col whitespace-nowrap lg:w-1/2 lg:min-w-[11.25rem]">
       <div className="flex items-center gap-1">
         <h1 className="max-w-44 text-wrap p-0 text-center text-lg font-extrabold leading-5 text-primary sm:max-w-none sm:text-2xl sm:leading-7">
           JOIN THE UNTAMED
@@ -88,13 +90,16 @@ function SignedOutHero() {
   const { data: art } = useResource(getSignupHeroArt);
   /* Parker567's own banner (Figma "Frame 145", 1276×270 @2x) when the admin has uploaded none. */
   const desktopArt = art?.desktop ?? DEFAULT_HERO_ART;
-  const mobileArt = art?.mobile ?? DEFAULT_HERO_ART;
+  /* An admin desktop banner without a mobile one falls back to it (getSignupHeroArt); with no
+     admin art at all the phone gets its own Parker567 banner. */
+  const mobileArt = art?.mobile ?? DEFAULT_HERO_ART_MOBILE;
   return (
     <div dir="ltr" className="w-full px-4 sm:px-0">
       <div className="hero-panel relative h-[14.375rem] w-full overflow-hidden rounded-lg pl-2.5 sm:h-[260px]">
-        {/* A finished full-width banner, so it covers the panel: anchored left on desktop (the
-            crowned P), right on a phone (the players) where the panel is too narrow for both. */}
-        <img alt="banner" className="absolute inset-0 h-full w-full object-cover object-right lg:hidden" src={mobileArt} />
+        {/* Desktop: the finished banner covers the panel, anchored left (the crowned P). Phone:
+            the players' art sits bottom-right at 74% height, its left edge faded into the panel,
+            so both players stay whole beside the copy (held to 42%). */}
+        <img alt="banner" className="absolute bottom-0 right-0 h-[74%] w-auto max-w-none [mask-image:linear-gradient(to_right,transparent,#000_30%)] lg:hidden" src={mobileArt} />
         <img alt="banner" className="absolute inset-0 hidden h-full w-full object-cover object-left lg:block" src={desktopArt} />
 
         <div className="relative hidden h-full w-[50%] items-center justify-center lg:ml-[12%] lg:flex">
