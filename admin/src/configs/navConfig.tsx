@@ -331,6 +331,8 @@ export const navItems: NavItem[] = [
   {
     groupLabel: 'Promotions',
     items: [
+      // The campaigns on the player site's /promotions. Reads are the public routes (staff see drafts); writes are config:write.
+      { icon: 'Megaphone', label: 'Promotions', href: '/promotions/campaigns', permission: 'config:read', promotions: true, feature: 'promotions' },
       { icon: 'Gift', label: 'Bonus', href: '/bonus', permission: 'reports:read', promotions: true, flag: 'bonus', feature: 'bonus' },
       { icon: 'Ticket', label: 'Redeem codes', href: '/redeem-codes', permission: 'reports:read', promotions: true },
 
@@ -461,6 +463,7 @@ export const navItems: NavItem[] = [
  * notice on these instead of the screen, so no promotion API is called from a pasted URL either.
  */
 export const PROMOTION_ROUTES = [
+  '/promotions',
   '/bonus',
   '/redeem-codes',
   '/gift-cards',
