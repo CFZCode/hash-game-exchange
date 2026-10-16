@@ -82,6 +82,28 @@ export const getHomeBanners = ({
   });
 };
 
+/* THE SIGNED-OUT HERO'S ARTWORK, from the site admin's Banners (user's request, 2026-10-16):
+ * placement `home` (the admin's "Home · hero banner") is the desktop art, `home_mobile` the phone
+ * art (falls back to the desktop one). Same rows and image route as the slides above; `null` with fixtures on, with no
+ * row, or on a failed read — the hero then keeps the owner's mark. */
+export const SIGNUP_HERO_PLACEMENTS = { desktop: 'home', mobile: 'home_mobile' };
+
+export const getSignupHeroArt = () => {
+  if (USE_FIXTURES) return null;
+  return Promise.resolve(request(PLATFORM.site.banners, { live: true, fixture: null }))
+    .then((answer) => {
+      const rows = Array.isArray(answer) ? answer : (answer?.rows ?? []);
+      const url = (type) => {
+        const row = rows.find((r) => r?.type === type && r.active !== false);
+        return row ? `${API_BASE}${row.url ?? PLATFORM.site.bannerImage(row.type)}` : null;
+      };
+      const desktop = url(SIGNUP_HERO_PLACEMENTS.desktop);
+      const mobile = url(SIGNUP_HERO_PLACEMENTS.mobile) ?? desktop;
+      return desktop || mobile ? { desktop: desktop ?? mobile, mobile } : null;
+    })
+    .catch(() => null);
+};
+
 /* Not a call — the chunk's own hardcoded trio, exported through here so a component never
    reaches into a fixture directly. See banners.js for why it does not render today. */
 export const getFallbackBanners = () => FALLBACK_BANNERS;

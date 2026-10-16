@@ -3,6 +3,8 @@ import { useSession } from '../../../context/session';
 import { useCanSignUp } from '../../../context/gates';
 import Banner from './Banner';
 import { siteName, useSiteMark } from '../../../services/siteBranding';
+import { getSignupHeroArt } from '../../../services/banner';
+import { useResource } from '../../../hooks/useResource';
 import googleIcon from '../../../assets/google.png';
 import telegramIcon from '../../../assets/telegram.png';
 import './Hero.css';
@@ -79,10 +81,20 @@ function SignedOutHero() {
      brand's marketing. The panel keeps its own fill and copy; the right-hand art is the owner's
      square mark (branding/public) when one is uploaded, and nothing otherwise. */
   const mark = useSiteMark();
+  /* The operator's own hero art (site admin › Banners, placements `home` /
+     `home_mobile`), placed exactly as the original's banner.png / banner_mobile.png were.
+     With none uploaded the owner's mark stands in, as before. */
+  const { data: art } = useResource(getSignupHeroArt);
   return (
     <div dir="ltr" className="w-full px-4 sm:px-0">
       <div className="hero-panel relative h-[14.375rem] w-full overflow-hidden rounded-lg pl-2.5 sm:h-[260px]">
-        {mark && (
+        {art && (
+          <>
+            <img alt="banner" className="absolute right-0 top-0 h-full w-auto max-w-none lg:hidden" src={art.mobile} />
+            <img alt="banner" className="absolute right-0 top-0 hidden h-full w-auto lg:block" src={art.desktop} />
+          </>
+        )}
+        {!art && mark && (
           <img
             alt={siteName() || 'logo'}
             className="absolute right-6 top-1/2 h-3/5 w-auto -translate-y-1/2 rounded-2xl object-contain opacity-90 lg:right-16"

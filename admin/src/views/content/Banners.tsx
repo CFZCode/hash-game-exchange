@@ -31,7 +31,8 @@ const bannerImageUrl = (b: Banner) => api.url(`admin/banners/${b.type}`).replace
  * placement name; "Other" takes any name for a template that reads its own.
  */
 const PLACEMENTS = [
-  { value: 'home', label: 'Home · hero banner', hint: 'Right half of the home hero. A transparent PNG/WebP cut-out, about 1200×880.' },
+  { value: 'home', label: 'Home · hero banner', hint: 'The signed-out home hero, right-aligned at full height (desktop, 260px tall). A finished banner about 2000×520, art on the right; the sign-up copy sits on the left.' },
+  { value: 'home_mobile', label: 'Home · hero banner (mobile)', hint: 'The same hero below 1024px, 230px tall, right-aligned. About 900×460. Falls back to the desktop banner when missing.' },
   ...[1, 2, 3, 4, 5, 6].map(n => ({
     value: `slider-${n}`,
     label: `Promo slider · slide ${n}`,
