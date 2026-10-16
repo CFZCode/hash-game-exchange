@@ -29,43 +29,44 @@ import g0_23 from '../../assets/sports/sport-blitz-basketball.svg?raw';
 import g0_24 from '../../assets/sports/sport-boxing.svg?raw';
 import g0_25 from '../../assets/sports/sport-chess.svg?raw';
 import g0_26 from '../../assets/sports/sport-counterstrike.svg?raw';
-import g0_27 from '../../assets/sports/sport-cricket.svg?raw';
-import g0_28 from '../../assets/sports/sport-cycling.svg?raw';
-import g0_29 from '../../assets/sports/sport-darts.svg?raw';
-import g0_30 from '../../assets/sports/sport-dota2.svg?raw';
-import g0_31 from '../../assets/sports/sport-e-fighting-b.svg?raw';
-import g0_32 from '../../assets/sports/sport-ecricket-b.svg?raw';
-import g0_33 from '../../assets/sports/sport-ehorseracing.svg?raw';
-import g0_34 from '../../assets/sports/sport-esoccer-x-battle-fc.svg?raw';
-import g0_35 from '../../assets/sports/sport-fifa-b.svg?raw';
-import g0_36 from '../../assets/sports/sport-fifa-penalty-b.svg?raw';
-import g0_37 from '../../assets/sports/sport-fifa-volta.svg?raw';
-import g0_38 from '../../assets/sports/sport-formula-1.svg?raw';
-import g0_39 from '../../assets/sports/sport-formula-2.svg?raw';
-import g0_40 from '../../assets/sports/sport-futevolei.svg?raw';
-import g0_41 from '../../assets/sports/sport-golf.svg?raw';
-import g0_42 from '../../assets/sports/sport-handball.svg?raw';
-import g0_43 from '../../assets/sports/sport-horseracing.svg?raw';
-import g0_44 from '../../assets/sports/sport-icehockey.svg?raw';
-import g0_45 from '../../assets/sports/sport-kabbadi.svg?raw';
-import g0_46 from '../../assets/sports/sport-leagueoflegends.svg?raw';
-import g0_47 from '../../assets/sports/sport-mma.svg?raw';
-import g0_48 from '../../assets/sports/sport-nascar.svg?raw';
-import g0_49 from '../../assets/sports/sport-nba2k-b.svg?raw';
-import g0_50 from '../../assets/sports/sport-padel-tennis.svg?raw';
-import g0_51 from '../../assets/sports/sport-rugby.svg?raw';
-import g0_52 from '../../assets/sports/sport-rugbyleague.svg?raw';
-import g0_53 from '../../assets/sports/sport-skirace.svg?raw';
-import g0_54 from '../../assets/sports/sport-snooker.svg?raw';
-import g0_55 from '../../assets/sports/sport-soccer.svg?raw';
-import g0_56 from '../../assets/sports/sport-sumo.svg?raw';
-import g0_57 from '../../assets/sports/sport-tabletennis.svg?raw';
-import g0_58 from '../../assets/sports/sport-tennis.svg?raw';
-import g0_59 from '../../assets/sports/sport-teqball.svg?raw';
-import g0_60 from '../../assets/sports/sport-vaquejada-eletronico.svg?raw';
-import g0_61 from '../../assets/sports/sport-volleyball.svg?raw';
-import g0_62 from '../../assets/sports/sport-waterpolo.svg?raw';
-import g0_63 from '../../assets/sports/sport-x-battle-bats.svg?raw';
+import g0_27 from '../../assets/sports/sport-cricket-color.svg?raw';
+import g0_28 from '../../assets/sports/sport-cricket.svg?raw';
+import g0_29 from '../../assets/sports/sport-cycling.svg?raw';
+import g0_30 from '../../assets/sports/sport-darts.svg?raw';
+import g0_31 from '../../assets/sports/sport-dota2.svg?raw';
+import g0_32 from '../../assets/sports/sport-e-fighting-b.svg?raw';
+import g0_33 from '../../assets/sports/sport-ecricket-b.svg?raw';
+import g0_34 from '../../assets/sports/sport-ehorseracing.svg?raw';
+import g0_35 from '../../assets/sports/sport-esoccer-x-battle-fc.svg?raw';
+import g0_36 from '../../assets/sports/sport-fifa-b.svg?raw';
+import g0_37 from '../../assets/sports/sport-fifa-penalty-b.svg?raw';
+import g0_38 from '../../assets/sports/sport-fifa-volta.svg?raw';
+import g0_39 from '../../assets/sports/sport-formula-1.svg?raw';
+import g0_40 from '../../assets/sports/sport-formula-2.svg?raw';
+import g0_41 from '../../assets/sports/sport-futevolei.svg?raw';
+import g0_42 from '../../assets/sports/sport-golf.svg?raw';
+import g0_43 from '../../assets/sports/sport-handball.svg?raw';
+import g0_44 from '../../assets/sports/sport-horseracing.svg?raw';
+import g0_45 from '../../assets/sports/sport-icehockey.svg?raw';
+import g0_46 from '../../assets/sports/sport-kabbadi.svg?raw';
+import g0_47 from '../../assets/sports/sport-leagueoflegends.svg?raw';
+import g0_48 from '../../assets/sports/sport-mma.svg?raw';
+import g0_49 from '../../assets/sports/sport-nascar.svg?raw';
+import g0_50 from '../../assets/sports/sport-nba2k-b.svg?raw';
+import g0_51 from '../../assets/sports/sport-padel-tennis.svg?raw';
+import g0_52 from '../../assets/sports/sport-rugby.svg?raw';
+import g0_53 from '../../assets/sports/sport-rugbyleague.svg?raw';
+import g0_54 from '../../assets/sports/sport-skirace.svg?raw';
+import g0_55 from '../../assets/sports/sport-snooker.svg?raw';
+import g0_56 from '../../assets/sports/sport-soccer.svg?raw';
+import g0_57 from '../../assets/sports/sport-sumo.svg?raw';
+import g0_58 from '../../assets/sports/sport-tabletennis.svg?raw';
+import g0_59 from '../../assets/sports/sport-tennis.svg?raw';
+import g0_60 from '../../assets/sports/sport-teqball.svg?raw';
+import g0_61 from '../../assets/sports/sport-vaquejada-eletronico.svg?raw';
+import g0_62 from '../../assets/sports/sport-volleyball.svg?raw';
+import g0_63 from '../../assets/sports/sport-waterpolo.svg?raw';
+import g0_64 from '../../assets/sports/sport-x-battle-bats.svg?raw';
 import g1_0 from '../../assets/sports/flag-CZE.svg';
 import g1_1 from '../../assets/sports/flag-DEU.svg';
 import g1_2 from '../../assets/sports/flag-ESP.svg';
@@ -101,43 +102,44 @@ export const art = {
   '../../assets/sports/sport-boxing.svg': g0_24,
   '../../assets/sports/sport-chess.svg': g0_25,
   '../../assets/sports/sport-counterstrike.svg': g0_26,
-  '../../assets/sports/sport-cricket.svg': g0_27,
-  '../../assets/sports/sport-cycling.svg': g0_28,
-  '../../assets/sports/sport-darts.svg': g0_29,
-  '../../assets/sports/sport-dota2.svg': g0_30,
-  '../../assets/sports/sport-e-fighting-b.svg': g0_31,
-  '../../assets/sports/sport-ecricket-b.svg': g0_32,
-  '../../assets/sports/sport-ehorseracing.svg': g0_33,
-  '../../assets/sports/sport-esoccer-x-battle-fc.svg': g0_34,
-  '../../assets/sports/sport-fifa-b.svg': g0_35,
-  '../../assets/sports/sport-fifa-penalty-b.svg': g0_36,
-  '../../assets/sports/sport-fifa-volta.svg': g0_37,
-  '../../assets/sports/sport-formula-1.svg': g0_38,
-  '../../assets/sports/sport-formula-2.svg': g0_39,
-  '../../assets/sports/sport-futevolei.svg': g0_40,
-  '../../assets/sports/sport-golf.svg': g0_41,
-  '../../assets/sports/sport-handball.svg': g0_42,
-  '../../assets/sports/sport-horseracing.svg': g0_43,
-  '../../assets/sports/sport-icehockey.svg': g0_44,
-  '../../assets/sports/sport-kabbadi.svg': g0_45,
-  '../../assets/sports/sport-leagueoflegends.svg': g0_46,
-  '../../assets/sports/sport-mma.svg': g0_47,
-  '../../assets/sports/sport-nascar.svg': g0_48,
-  '../../assets/sports/sport-nba2k-b.svg': g0_49,
-  '../../assets/sports/sport-padel-tennis.svg': g0_50,
-  '../../assets/sports/sport-rugby.svg': g0_51,
-  '../../assets/sports/sport-rugbyleague.svg': g0_52,
-  '../../assets/sports/sport-skirace.svg': g0_53,
-  '../../assets/sports/sport-snooker.svg': g0_54,
-  '../../assets/sports/sport-soccer.svg': g0_55,
-  '../../assets/sports/sport-sumo.svg': g0_56,
-  '../../assets/sports/sport-tabletennis.svg': g0_57,
-  '../../assets/sports/sport-tennis.svg': g0_58,
-  '../../assets/sports/sport-teqball.svg': g0_59,
-  '../../assets/sports/sport-vaquejada-eletronico.svg': g0_60,
-  '../../assets/sports/sport-volleyball.svg': g0_61,
-  '../../assets/sports/sport-waterpolo.svg': g0_62,
-  '../../assets/sports/sport-x-battle-bats.svg': g0_63,
+  '../../assets/sports/sport-cricket-color.svg': g0_27,
+  '../../assets/sports/sport-cricket.svg': g0_28,
+  '../../assets/sports/sport-cycling.svg': g0_29,
+  '../../assets/sports/sport-darts.svg': g0_30,
+  '../../assets/sports/sport-dota2.svg': g0_31,
+  '../../assets/sports/sport-e-fighting-b.svg': g0_32,
+  '../../assets/sports/sport-ecricket-b.svg': g0_33,
+  '../../assets/sports/sport-ehorseracing.svg': g0_34,
+  '../../assets/sports/sport-esoccer-x-battle-fc.svg': g0_35,
+  '../../assets/sports/sport-fifa-b.svg': g0_36,
+  '../../assets/sports/sport-fifa-penalty-b.svg': g0_37,
+  '../../assets/sports/sport-fifa-volta.svg': g0_38,
+  '../../assets/sports/sport-formula-1.svg': g0_39,
+  '../../assets/sports/sport-formula-2.svg': g0_40,
+  '../../assets/sports/sport-futevolei.svg': g0_41,
+  '../../assets/sports/sport-golf.svg': g0_42,
+  '../../assets/sports/sport-handball.svg': g0_43,
+  '../../assets/sports/sport-horseracing.svg': g0_44,
+  '../../assets/sports/sport-icehockey.svg': g0_45,
+  '../../assets/sports/sport-kabbadi.svg': g0_46,
+  '../../assets/sports/sport-leagueoflegends.svg': g0_47,
+  '../../assets/sports/sport-mma.svg': g0_48,
+  '../../assets/sports/sport-nascar.svg': g0_49,
+  '../../assets/sports/sport-nba2k-b.svg': g0_50,
+  '../../assets/sports/sport-padel-tennis.svg': g0_51,
+  '../../assets/sports/sport-rugby.svg': g0_52,
+  '../../assets/sports/sport-rugbyleague.svg': g0_53,
+  '../../assets/sports/sport-skirace.svg': g0_54,
+  '../../assets/sports/sport-snooker.svg': g0_55,
+  '../../assets/sports/sport-soccer.svg': g0_56,
+  '../../assets/sports/sport-sumo.svg': g0_57,
+  '../../assets/sports/sport-tabletennis.svg': g0_58,
+  '../../assets/sports/sport-tennis.svg': g0_59,
+  '../../assets/sports/sport-teqball.svg': g0_60,
+  '../../assets/sports/sport-vaquejada-eletronico.svg': g0_61,
+  '../../assets/sports/sport-volleyball.svg': g0_62,
+  '../../assets/sports/sport-waterpolo.svg': g0_63,
+  '../../assets/sports/sport-x-battle-bats.svg': g0_64,
 };
 
 /* import.meta.glob('../../assets/sports/flag-*.svg', { eager: true, import: 'default' }) */

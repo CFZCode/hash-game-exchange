@@ -170,7 +170,9 @@ function StatusBadge({ status, isSystemCancel }) {
 const COLUMNS = [
   ['Type', HEAD],
   ['Time', HEAD_CENTER],
-  ['Amount', HEAD_CENTER],
+  /* "Turnover", not bc.game's "Amount" (user's request, 2026-10-16): the platform's requirement is
+     a turnover — wagered so far against the target — so that is what the column shows. */
+  ['Turnover', HEAD_CENTER],
   ['Status', HEAD_END],
 ];
 
@@ -182,6 +184,26 @@ const COLUMNS = [
    caller lives in the detail dialog, which is not built. */
 const rolloverTypeLabel = (isBuy, taskType, taskTypeDesc) =>
   isBuy && taskType === 1 ? 'Buy' : taskTypeDesc;
+
+/* The turnover cell: wagered so far / the target, and a progress bar under it. `originalAmount`
+   is the target (services/rollover.js); `wagered` rides along on the row. */
+function Turnover({ item, settings }) {
+  const target = Number(item.originalAmount) || 0;
+  const wagered = Math.max(0, Number(item.wagered) || 0);
+  const pct = target > 0 ? Math.min(100, (wagered / target) * 100) : 100;
+  return (
+    <div className="flex w-full flex-col items-center gap-1">
+      <div className="flex flex-wrap items-center justify-center gap-x-1 whitespace-nowrap">
+        <CurrencyAmount amount={wagered} currency={item.originalCurrencyName} settings={settings} />
+        <span className="text-secondary">/</span>
+        <CurrencyAmount amount={target} currency={item.originalCurrencyName} settings={settings} />
+      </div>
+      <div className="h-1 w-full max-w-28 overflow-hidden rounded-full bg-layer6">
+        <div className="h-full rounded-full bg-brand" style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
 
 /* `te` — the list. */
 function RolloverList({ settings }) {
@@ -221,15 +243,7 @@ function RolloverList({ settings }) {
               {new Date(Number(item.createTime)).toLocaleString()}
             </div>
             <div className={CELL_CENTER}>
-              {/* `originalAmount` / `originalCurrencyName` — the bonus as granted, not what is
-                  left to wager. The remaining figure lives in the detail dialog. */}
-              <CurrencyAmount
-                amount={item.originalAmount}
-                currency={item.originalCurrencyName}
-                sign="auto"
-                color="auto"
-                settings={settings}
-              />
+              <Turnover item={item} settings={settings} />
             </div>
             <div className={`${CELL} justify-end`}>
               <StatusBadge

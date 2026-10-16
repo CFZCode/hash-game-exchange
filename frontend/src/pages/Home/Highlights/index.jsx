@@ -8,7 +8,9 @@ import { getHighlights } from '../../../services/home';
 import { useResource } from '../../../hooks/useResource';
 import soccerIcon from '../../../assets/sports/sport-soccer.svg?raw';
 import tennisIcon from '../../../assets/sports/sport-tennis.svg?raw';
-import cricketIcon from '../../../assets/sports/sport-cricket.svg?raw';
+/* Cricket in colour (user's request, 2026-10-16): bat and red ball, own fills, so the
+   `fill-tertiary` below does not reach its paths. Soccer and tennis keep the grey glyphs. */
+import cricketIcon from '../../../assets/sports/sport-cricket-color.svg?raw';
 import '../GameSection/GameSection.css';
 import './Highlights.css';
 
@@ -103,10 +105,10 @@ function MatchCard({ match }) {
     >
       {match.live && <LiveBadge />}
 
-      {/* px-14 on a live card, px-4 otherwise — the extra inset is what keeps the
-          tournament name from running under the Live badge. */}
+      {/* Left-aligned rather than centred (user's request, 2026-10-16): a long centred tournament
+          name ran under the Live badge. pr-16 holds the line clear of the badge on a live card. */}
       <div
-        className={`flex items-center justify-center gap-2 pb-3 ${match.live ? 'px-14' : 'px-4'}`}
+        className={`flex items-center justify-start gap-2 pb-3 pl-4 ${match.live ? 'pr-16' : 'pr-4'}`}
       >
         <div className="flex size-6 flex-none items-center justify-center rounded-full">
           <SportIcon sport={match.sport} />

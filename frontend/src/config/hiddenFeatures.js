@@ -16,3 +16,12 @@ export const SOCIAL_LOGINS = ['Google'];
 /* The fiat currencies the deposit dialog's Fiat tab offers (user's request, 2026-10-16: INR only),
  * intersected with the owner's enabled list. Add a code here to offer another. */
 export const DEPOSIT_FIATS = ['INR'];
+
+/* FREE PLAYS (user's request, 2026-10-16): the account dropdown's "Free Plays" row, the phone
+ * /user/enter "Free Plays" tile, and the `/free-plays` dialog route (falls to the page under it).
+ * The platform issues no free spins. */
+export const FREE_PLAYS_ENABLED = false;
+
+/* DO NOT DISTURB (user's request, 2026-10-16): the switch row at the foot of the account dropdown
+ * and at the top of the phone /user/enter balance card (DisturbSetting). */
+export const DO_NOT_DISTURB_ENABLED = false;

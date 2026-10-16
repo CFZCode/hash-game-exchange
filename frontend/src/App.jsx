@@ -81,7 +81,7 @@ import { SessionProvider } from './context/SessionContext';
 import { SettingsProvider } from './context/SettingsContext';
 import { GatesProvider, RouteGate } from './context/GatesContext';
 import { useSession } from './context/session';
-import { PASSKEY_ENABLED } from './config/hiddenFeatures';
+import { FREE_PLAYS_ENABLED, PASSKEY_ENABLED } from './config/hiddenFeatures';
 
 /* DEV ONLY — the exchange component kit's preview (`/dev/exchange-kit`). Lazy so the preview and
    its sample data never enter the production bundle's main chunk; the route itself is only
@@ -452,7 +452,7 @@ function AppShell() {
      behind the dialog simply does not fetch when logged out, which renders the same empty dialog
      either way. `dialog: !0` with no `size` means the manager's own 30rem x 40rem default; see
      Auth.css. */
-  const showFreePlay = pathname === '/free-plays';
+  const showFreePlay = FREE_PLAYS_ENABLED && pathname === '/free-plays';
 
   /* THE PROFILE FAMILY — three dialog routes that STACK, which is new here. `/user/profile/:userId`
    * is what the account dropdown's My Profile row opens; its two Details links push

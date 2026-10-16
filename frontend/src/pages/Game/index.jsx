@@ -14,6 +14,7 @@ import { tagWords } from '../../services/catalog';
 import { getAlias, printCurrency } from '../../utils/currency';
 import { addFavoriteGame, isFavoriteGame, removeFavoriteGame } from '../../services/collection';
 import { formatOnlineUsers } from '../../utils/gameArt';
+import RecommendList from '../GameCollection/RecommendList';
 import './Game.css';
 
 /* `/game/:gameUnique` — where every game tile points, and the original's own path and param name
@@ -313,6 +314,8 @@ function enterFullscreen() {
   Promise.resolve(request?.call(frame)).catch(() => {});
 }
 
+const SHOW_INFO_CARD = false;
+
 export default function GamePage() {
   const { gameUnique = '' } = useParams();
   const { session, balances, setSetting } = useSession();
@@ -596,6 +599,10 @@ export default function GamePage() {
         </aside>
       </div>
 
+      {/* The info card (name, provider, tags, House Edge / RTP / Max Win / Stakes Range) is off
+          (user's request, 2026-10-16: most of its figures were "--"); the Recommended Games row
+          hash.game shows on its game page takes its place. Flip SHOW_INFO_CARD to restore it. */}
+      {SHOW_INFO_CARD ? (
       <section className="game-info">
         {loading ? (
           <div className="game-info-loading">
@@ -644,6 +651,11 @@ export default function GamePage() {
           </>
         )}
       </section>
+      ) : (
+        <div className="game-recommend -mx-4 mt-6 sm:mx-0">
+          <RecommendList />
+        </div>
+      )}
       <GameUnavailable open={unavailableOpen} onClose={closeUnavailable} />
     </div>
   );

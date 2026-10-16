@@ -75,6 +75,11 @@ Changes the user asked for, so the pixel check WILL show them against the refere
 
 - **Signed-out home hero art is Parker567's** (bc.game's esports banner is another brand): desktop `public/brand/parker567-hero.jpg` covers the panel; phone `parker567-hero-mobile.jpg` sits bottom-right at 86% height, 4% past the right edge, left/top edges faded. The copy column keeps the original's `w-1/2 min-w-[11.25rem]`, so text matches the reference exactly; only the art region differs.
 
+- **Home Highlights card**: cricket uses a colour icon (`assets/sports/sport-cricket-color.svg`); the sport/tournament line is left-aligned with `pr-16` clear of the Live badge.
+- **Game page**: the info card is replaced by the Recommended Games row (`pages/GameCollection/RecommendList`); the play overlay card is `w-full max-w-[30rem]` in a `px-4` overlay.
+- **Rollover**: the Amount column is "Turnover" — wagered / target with a progress bar.
+- **Account menus**: Free Plays and Do Not Disturb are hidden (hidden-features skill).
+
 The sidebar is therefore shorter than the reference, so everything below the removed rows in the sidebar shifts up. Details are in `frontend/docs/architecture.md` under Sidebar. Left as they were on purpose: the Sports lobby's own Predictions tab (BetBy's), the Trading and Lottery options in the bet-history type filter, the slot theme tag "Lottery" in the casino catalogue's tag list, the footer's "Crypto trading is not gambling" licence line, and the `detrade:trading` game redirects in FreePlay and Profile.
 
 ## Next.js migration rules

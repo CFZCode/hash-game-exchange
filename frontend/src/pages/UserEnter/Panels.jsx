@@ -11,6 +11,7 @@ import { getVipStanding } from '../../services/vip';
 import useResource from '../../hooks/useResource';
 import SOCIALS from '../../components/modals/RegionBlock/icons';
 import DisturbSetting from '../../layouts/MainLayout/Header/AfterLogin/DisturbSetting';
+import { DO_NOT_DISTURB_ENABLED, FREE_PLAYS_ENABLED } from '../../config/hiddenFeatures';
 import {
   IconArrow,
   IconBetHistory,
@@ -283,7 +284,7 @@ const TILES = [
   { label: 'Transaction', Icon: IconTransaction, link: '/wallet/transaction', show: true },
   { label: 'Rollover', Icon: IconRollover, link: '/wallet/rollover', show: true },
   { label: 'Bet History', Icon: IconBetHistory, link: '/wallet/bet-history', show: true },
-  { label: 'Free Plays', Icon: IconFreePlays, link: '/free-plays', show: true, dot: true },
+  { label: 'Free Plays', Icon: IconFreePlays, link: '/free-plays', show: FREE_PLAYS_ENABLED, dot: true },
   { label: 'Annual Report', Icon: IconAnnualReport, link: '/wallet/annual-report', show: false },
 ];
 
@@ -422,7 +423,7 @@ function SettingsCards({ onRefer, onLanguage, onCurrency, confirm, affiliateOn =
             of `Disturb-CUKXIk9c.js`, rendered by both. Its `max-sm:` arms are dead in the
             dropdown (desktop-only) and live here, which is where its bottom hairline comes
             from. */}
-        <DisturbSetting confirm={confirm} />
+        {DO_NOT_DISTURB_ENABLED && <DisturbSetting confirm={confirm} />}
 
         <Link
           to="/notification"

@@ -10,6 +10,7 @@ import { getRewards } from '../../../../services/rewards';
 import { printCurrency } from '../../../../utils/currency';
 import { coinIcon } from '../../../../utils/coinArt';
 import { ACCOUNT_MENU } from './menu';
+import { DO_NOT_DISTURB_ENABLED, FREE_PLAYS_ENABLED } from '../../../../config/hiddenFeatures';
 import CurrencySelect from './CurrencySelect';
 import ManageAssets from './ManageAssets';
 import DisturbSetting from './DisturbSetting';
@@ -354,8 +355,11 @@ function AccountMenu() {
      account's gates (services/gates.js): an agent's player loses Withdraw, Buy Crypto, VIP Club,
      Vault Pro and Referral. Every row stays with fixtures. */
   const { routeOn } = useGates();
-  const rows = ACCOUNT_MENU.filter((row) => !row.link || routeOn(row.link));
-  const panelHeight = (rows.length + 1) * 44 + 8;
+  const rows = ACCOUNT_MENU.filter(
+    (row) => (!row.link || routeOn(row.link)) && (FREE_PLAYS_ENABLED || row.link !== '/free-plays'),
+  );
+  /* `+ 1` is the Do Not Disturb row; with it hidden (config/hiddenFeatures) the panel is one row shorter. */
+  const panelHeight = (rows.length + (DO_NOT_DISTURB_ENABLED ? 1 : 0)) * 44 + 8;
 
   /* CALLED HERE AND NOT IN THE ROW, deliberately — the panel below is conditional and this
      component is not, and the confirm dialog has to outlive the panel. The whole reason is at
@@ -425,7 +429,7 @@ function AccountMenu() {
             })}
 
             {/* `<For each={items}>` then the disturb row, in that order — the `+ 1` above. */}
-            <DisturbSetting confirm={confirm} />
+            {DO_NOT_DISTURB_ENABLED && <DisturbSetting confirm={confirm} />}
           </div>
         </div>
       )}
