@@ -15,6 +15,14 @@ for (const key of KEYS) {
   if (value !== undefined) env[`NEXT_PUBLIC_${key}`] = value;
 }
 
+/* SAME-ORIGIN PROXY for a host the live API's CORS list does not carry (a Vercel deployment):
+   with API_PROXY_TARGET set (e.g. https://api.parker567.com) the browser calls this site's own
+   /api/v1/* and /ws/*, and proxy.js forwards them (dropping Origin), so no request is
+   cross-origin. The client's API base is then '' (same origin). Unset — local dev, the pm2
+   server — nothing changes. */
+const PROXY_TARGET = (process.env.API_PROXY_TARGET ?? '').replace(/\/+$/, '');
+if (PROXY_TARGET) env.NEXT_PUBLIC_API_BASE = '';
+
 const ASSET = '*.{png,jpg,jpeg,avif,webp,gif,svg}';
 const RAW = { query: /[?&]raw(?=&|$)/ };
 const URL_QUERY = { query: /[?&]url(?=&|$)/ };
