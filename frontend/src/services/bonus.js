@@ -29,7 +29,7 @@ const liveTiers = (terms) =>
 /** The first-deposit terms in the shape /deposit-offer renders. Copy is the fixture's where it
     describes the mechanics both share (deposit, claim, wager, collect) and the terms' own numbers
     everywhere else; the monthly/4-chance wording is bc.game's and is not carried over. */
-export function toDepositOffer(terms, now = new Date()) {
+export function toDepositOffer(terms) {
   const tiers = liveTiers(terms);
   if (!tiers.length) return { bonuses: [], resetAt: 0 };
 
@@ -44,12 +44,15 @@ export function toDepositOffer(terms, now = new Date()) {
         ...template,
         id: 'first-deposit-bonus',
         title: 'First Deposit Bonus',
+        /* A matched deposit bonus, not bc.game's rakeback, so the headline says so. */
+        headlineNoun: 'Bonus',
         description: `Up to ${top}% bonus on your first deposit.`,
         tags: [template.tags[0]],
         currentStage: 1,
         progress: terms.claimed ? 100 : 0,
-        stages: tiers.map((t, i) => ({
-          label: `TIER ${i + 1}`,
+        stages: tiers.map((t) => ({
+          /* The tier's own floor, e.g. "10+ USDT", rather than a bare index. */
+          label: `${Number(t.minDeposit).toLocaleString('en-US', { maximumFractionDigits: 2 })}+ ${currency}`,
           bonus: Number(t.percent),
           rakeback: 0,
           minDeposit: Number(t.minDeposit),
@@ -61,7 +64,9 @@ export function toDepositOffer(terms, now = new Date()) {
           (expiry ? ` It expires ${expiry} days after it is credited.` : ''),
       },
     ],
-    resetAt: expiry ? now.getTime() + expiry * 864e5 : 0,
+    /* A first-deposit bonus never resets — `expiryDays` is how long a CREDITED bonus lives, not a
+       cycle — so there is no countdown to print (0 hides the "Reset in" badges). */
+    resetAt: 0,
   };
 }
 
