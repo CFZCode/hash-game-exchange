@@ -75,7 +75,7 @@ Changes the user asked for, so the pixel check WILL show them against the refere
 
 - **Signed-out home hero art is Parker567's** (bc.game's esports banner is another brand): desktop `public/brand/parker567-hero.jpg` covers the panel; phone `parker567-hero-mobile.jpg` sits bottom-right at 86% height, 4% past the right edge, left/top edges faded. The copy column keeps the original's `w-1/2 min-w-[11.25rem]`, so text matches the reference exactly; only the art region differs.
 
-- **Home Highlights card**: cricket uses a colour icon (`assets/sports/sport-cricket-color.svg`); the sport/tournament line is left-aligned with `pr-16` clear of the Live badge.
+- **Home Highlights card**: gradient fill + brand line-art SVG (`.hl-card`, `CardArt`), initials-on-gradient team badges, bordered odds buttons (user's request); cricket uses a colour icon (`assets/sports/sport-cricket-color.svg`); the sport/tournament line is left-aligned with `pr-16` clear of the Live badge.
 - **Game page**: a High win / Lucky win board under the frame (live `top-wins?game=`, else `staticGameWins`), then the Recommended Games row, then the home's Latest round & Race tables; the info card is replaced by the Recommended Games row (`pages/GameCollection/RecommendList`); the play overlay card is `w-full max-w-[30rem]` in a `px-4` overlay.
 - **Rollover**: a turnover strip (Wagered / Required / Remaining, `GET /user/wager/progress`) above the table; the Amount column is "Turnover" — wagered / target with a progress bar; Time is date over time; money is text-only.
 - **Account menus**: Free Plays and Do Not Disturb are hidden (hidden-features skill).

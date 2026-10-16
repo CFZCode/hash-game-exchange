@@ -61,13 +61,46 @@ const SportIcon = ({ sport }) => (
    the badge's place instead (user's request, 2026-10-16) — see `hasArt`. */
 const hasArt = (competitor) => Boolean(competitor.image ?? flagFor(competitor.countryCode));
 
+/* Initials on a gradient disc for a team the feed gives no crest (user's request, 2026-10-16). The
+   hue comes from the name, so a team keeps its colour from card to card. */
+const initials = (name = '') =>
+  name
+    .replace(/\b(W|U\d+|XI|Legends|FC|CC)\b/g, '')
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((word) => word[0].toUpperCase())
+    .join('') || name.slice(0, 2).toUpperCase();
+const hueOf = (name = '') => [...name].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 17);
+
+const TeamBadge = ({ name }) => (
+  <span className="hl-team-badge" style={{ '--hl-hue': hueOf(name) }} aria-hidden="true">
+    {initials(name)}
+  </span>
+);
+
+/* The card's line art: two stadium arcs off the top-right corner, a faint centre circle behind the
+   VS, and a sweep of diagonal strokes bottom-left. Drawn in currentColor (brand) at low alpha. */
+const CardArt = () => (
+  <svg className="hl-card-art" viewBox="0 0 384 214" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <g fill="none" stroke="currentColor" strokeLinecap="round">
+      <circle cx="384" cy="0" r="120" strokeOpacity="0.14" strokeWidth="1.5" />
+      <circle cx="384" cy="0" r="170" strokeOpacity="0.08" strokeWidth="1" />
+      <circle cx="192" cy="96" r="44" strokeOpacity="0.07" strokeWidth="1" strokeDasharray="3 5" />
+      <path d="M-10 214 L70 134 M10 214 L90 134 M30 214 L110 134" strokeOpacity="0.07" strokeWidth="6" />
+      <path d="M0 150 C 90 120, 140 175, 230 150 S 340 120, 384 140" strokeOpacity="0.1" strokeWidth="1" />
+    </g>
+  </svg>
+);
+
 function CompetitorBadge({ competitor, sport }) {
   const src = competitor.image ?? flagFor(competitor.countryCode);
 
   if (!src && competitor.countryCode === undefined) {
     return (
-      <div className="flex h-12 min-w-0 items-center justify-center">
-        <p className="line-clamp-2 text-center text-sm font-semibold leading-tight text-primary">{competitor.name}</p>
+      <div className="flex min-w-0 flex-col items-center gap-1.5">
+        <TeamBadge name={competitor.name} />
+        <p className="w-full truncate text-center text-sm font-semibold leading-tight text-primary" title={competitor.name}>{competitor.name}</p>
       </div>
     );
   }
@@ -100,9 +133,10 @@ function MatchCard({ match }) {
 
   return (
     <div
-      className={`${CARD} relative flex cursor-pointer flex-col rounded-xl bg-layer4 py-4`}
+      className={`${CARD} hl-card relative flex cursor-pointer flex-col rounded-xl py-4`}
       onClick={match.href ? () => navigate(match.href) : undefined}
     >
+      <CardArt />
       {match.live && <LiveBadge />}
 
       {/* Left-aligned rather than centred (user's request, 2026-10-16): a long centred tournament
@@ -122,12 +156,12 @@ function MatchCard({ match }) {
 
       {/* A 3-column grid, not three flex rows: the centre cell spans both rows so the
           time/score sits vertically centred against two badges AND two names. */}
-      <div className="grid flex-1 grid-cols-[1fr_auto_1fr] content-center gap-x-2 px-4 pb-2">
+      <div className="grid flex-1 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] content-center gap-x-2 px-4 pb-2">
         <div className="flex justify-center">
           <CompetitorBadge competitor={match.home} sport={match.sport} />
         </div>
 
-        <div className="row-span-2 flex flex-col items-center justify-center text-center">
+        <div className="row-span-2 flex flex-col items-center justify-center whitespace-nowrap text-center">
           {prematch ? (
             <>
               <p className="text-2xl font-extrabold text-primary">{match.live ? 'VS' : match.time}</p>
@@ -167,7 +201,7 @@ function MatchCard({ match }) {
         {match.outcomes.map((o) => (
           <div
             key={o.name}
-            className="flex h-10 min-w-0 flex-1 items-center justify-between rounded-lg bg-layer3_alt px-2 font-semibold transition-colors hover:bg-layer1"
+            className="hl-odd flex h-10 min-w-0 flex-1 items-center justify-between rounded-lg px-2 font-semibold transition-colors"
           >
             <span className="min-w-0 flex-1 truncate capitalize text-secondary">{o.name}</span>
             <span className="ml-1 flex-none whitespace-nowrap font-extrabold text-brand">
