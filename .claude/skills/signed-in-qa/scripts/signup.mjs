@@ -13,6 +13,9 @@ const call = (method, params = {}) => new Promise(res => { const my = ++id; cons
 const ev = async (e) => (await call('Runtime.evaluate', { expression: e, awaitPromise: true, returnByValue: true })).result?.value
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 await call('Emulation.setDeviceMetricsOverride', { width: 440, height: 956, deviceScaleFactor: 2, mobile: true })
+// Start signed OUT: an earlier QA player's tokens live in this origin's localStorage (local origin only).
+await call('Page.navigate', { url: origin + '/' }); await sleep(5000)
+await ev('localStorage.clear(), sessionStorage.clear(), true')
 await call('Page.navigate', { url: origin + '/login/regist' }); await sleep(9000)
 const fill = `(() => { const set = (el, v) => { const d = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value'); d.set.call(el, v); el.dispatchEvent(new Event('input', { bubbles: true })); };
   const form = [...document.querySelectorAll('form')].find(f => f.offsetParent); if (!form) return 'no form';

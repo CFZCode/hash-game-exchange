@@ -74,6 +74,7 @@ Checklist for a signed-in change:
 ## What this does NOT prove
 
 - **Live data.** Local coins/config differ from live (local site admin has every coin on; live is INR, USDT TRC20, BTC). Re-check live-only state with `live-verify` (`node scripts/verify-live.mjs`).
+- **Parallel screenshots.** Five `vshot.mjs` tabs at once once rendered a page twice in the capture (a raster glitch, one dialog in the DOM). Re-shoot a suspicious frame alone before calling it a bug.
 - **iOS Safari.** CDP Chrome is Blink; Safari-only bugs (e.g. a `calc()` max-width ignored inside an absolute flex overlay) need the user's phone. Say so instead of claiming it.
 - **The user's own live account.** If the user signs up on live themselves, they test there; never ask for or type their password.
 
