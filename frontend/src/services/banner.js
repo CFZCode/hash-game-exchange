@@ -36,7 +36,10 @@ const normalise = (rows, hasSportsbook) =>
  * `type` plus the optional slide copy (title, subtitle, cta, sortOrder). `home_top_<n>` is THIS
  * BUILD'S placement name for a hero slide. The image is a CSS `url()` on the gateway, so it needs
  * `API_BASE` in front and does not go through `request()`. */
-const PLACEMENT_PREFIX = 'home_top_';
+/* The site admin's Banners page names slides `slider-1` … `slider-6` (admin/src/views/content/
+   Banners.tsx); `home_top_<n>` is this build's older name. Both are slides, so an upload from the
+   admin reaches the strip whichever it used. */
+const SLIDE_PLACEMENT = /^(slider-|home_top_)\d+$/;
 
 /* LIVE MODE BUILDS THE STRIP FROM THE PLATFORM'S ROWS ONLY. The captured slides in `banners.js`
  * are bc.game's own campaigns (Soaked by Sea Men, €20/€10 free spins, Knockoin, a $500 soccer
@@ -48,7 +51,7 @@ const PLACEMENT_PREFIX = 'home_top_';
 const platformSlides = (answer) => {
   const rows = Array.isArray(answer) ? answer : (answer?.rows ?? []);
   return rows
-    .filter((row) => typeof row?.type === 'string' && row.type.startsWith(PLACEMENT_PREFIX) && row.active !== false)
+    .filter((row) => typeof row?.type === 'string' && SLIDE_PLACEMENT.test(row.type) && row.active !== false)
     .sort((x, y) => (x.sortOrder ?? 0) - (y.sortOrder ?? 0) || x.type.localeCompare(y.type, undefined, { numeric: true }))
     .map((row) => ({
       bannerId: row.type,
