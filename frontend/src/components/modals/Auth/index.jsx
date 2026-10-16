@@ -31,7 +31,7 @@ import './Auth.css';
    imports them: the motion belongs to the router's shell, and this dialog is one more of its
    arms. */
 import '../../shared/DialogShell/DialogShell.css';
-import { PASSKEY_ENABLED } from '../../../config/hiddenFeatures';
+import { PASSKEY_ENABLED, SOCIAL_LOGINS } from '../../../config/hiddenFeatures';
 
 /* The sign-in / sign-up dialog.
  *
@@ -183,13 +183,18 @@ const THIRD_PARTY = [
   { label: 'Steam', Icon: SteamIcon },
 ];
 
-const ThirdPartyButton = ({ label, Icon }) => (
+/* Only the social logins this site offers (config/hiddenFeatures.js SOCIAL_LOGINS). */
+const SHOWN_THIRD_PARTY = THIRD_PARTY.filter((item) => SOCIAL_LOGINS.includes(item.label));
+
+/* `labelled`: a lone button spans the row, so it carries its name beside the icon. */
+const ThirdPartyButton = ({ label, Icon, labelled = false }) => (
   <button
     type="button"
     aria-label={label}
     className="button button-m h-11 flex-1 rounded-lg border border-solid border-third p-0 shadow-[0px_2px_4px_rgba(0,0,0,0.10)]"
   >
     <Icon className="size-5 fill-secondary" />
+    {labelled && <span className="ml-2 text-base font-extrabold text-primary">{label}</span>}
   </button>
 );
 
@@ -388,8 +393,8 @@ function SignInForm({ onSubmit, pending, error, onForgot }) {
         )}
 
         <div className="third-group-wrap mt-6 flex h-11 w-full items-center gap-2">
-          {THIRD_PARTY.map((item) => (
-            <ThirdPartyButton key={item.label} {...item} />
+          {SHOWN_THIRD_PARTY.map((item) => (
+            <ThirdPartyButton key={item.label} {...item} labelled={SHOWN_THIRD_PARTY.length === 1} />
           ))}
         </div>
       </DirectRow>
@@ -617,6 +622,7 @@ function SignUpForm({ onSubmit, error, onClearError }) {
               <span className="ml-2 text-base font-extrabold text-primary">Google</span>
             </button>
 
+            {SHOWN_THIRD_PARTY.some((item) => item.label !== 'Google') && (
             <button
               type="button"
               aria-expanded={moreOpen}
@@ -630,6 +636,7 @@ function SignUpForm({ onSubmit, error, onClearError }) {
                 }`}
               />
             </button>
+            )}
           </div>
 
           {/* Always rendered, never unmounted — the row fades and slides rather than appearing,
@@ -643,7 +650,7 @@ function SignUpForm({ onSubmit, error, onClearError }) {
           >
             <div className="third-group-wrap mt-4 flex h-11 w-full items-center gap-2">
               {/* Six, not seven: Google has its own button above. */}
-              {THIRD_PARTY.filter((item) => item.label !== 'Google').map((item) => (
+              {SHOWN_THIRD_PARTY.filter((item) => item.label !== 'Google').map((item) => (
                 <ThirdPartyButton key={item.label} {...item} />
               ))}
             </div>

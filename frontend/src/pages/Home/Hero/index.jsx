@@ -38,10 +38,10 @@ const HeroCopy = () => {
         Sign Up
       </button>
 
-      {/* "Or Register With" Google / Telegram is not drawn: the buttons had no handler and the
-          platform has no social sign-in, so they were dead controls. */}
-      {SOCIAL_SIGN_IN && (
-        <>
+      {/* "Or Register With" — Google only (user's request, 2026-10-16). The platform has no
+          Google OAuth yet, so the button opens the same sign-up form the Sign Up button does
+          rather than sitting dead; Telegram stays hidden (SOCIAL_SIGN_IN). Wire it to the real
+          OAuth start the day the backend has one. */}
       <p className="mt-3 p-0 font-semibold leading-[150%] text-secondary">Or Register With</p>
 
       <div className="mt-1.5 h-8">
@@ -50,10 +50,12 @@ const HeroCopy = () => {
             <button
               className="button h-8 w-[5.5rem] flex-none gap-1 rounded-lg border border-third bg-black_alpha5 p-0 text-xs backdrop-blur-sm sm:h-10 sm:w-[120px] sm:text-base"
               type="button"
+              onClick={() => navigate('/login/regist')}
             >
               <img alt="google" className="size-[0.875rem] sm:size-5" src={googleIcon} />
               <span className="font-extrabold text-primary">Google</span>
             </button>
+            {SOCIAL_SIGN_IN && (
             <button
               className="button relative h-8 w-[5.5rem] flex-none gap-1 overflow-hidden rounded-lg border border-third bg-black_alpha5 p-0 text-xs backdrop-blur-sm sm:h-10 sm:w-[120px] sm:text-base"
               type="button"
@@ -63,11 +65,10 @@ const HeroCopy = () => {
                 <span className="font-extrabold text-primary">Telegram</span>
               </div>
             </button>
+            )}
           </div>
         </div>
       </div>
-        </>
-      )}
         </>
       )}
     </div>
