@@ -25,6 +25,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useSession } from '@/contexts/SessionContext'
 import { useApi, useListState, usePagedApi } from '@/hooks/use-api'
 import { api, errorMessage } from '@/lib/api/client'
+import { check } from '@/lib/validate'
 import { formatNumber } from '@/lib/format'
 import PlayerStatsOverview from './PlayerStatsOverview'
 import { daysAgo, downloadBlob, type AgentStaffRow, type AgentUserRow, type AgentUsersReport, type PlayerReportRow } from './types'
@@ -260,19 +261,19 @@ const PlayerSheet = () => {
       title='Download a user sheet'
       description='A printable statement of one user for the period.'
       submitLabel='Download'
+      validate={() => ({
+        'ps-uid': check.id(form.uid, 'User id'),
+        'ps-period': check.dateRange(form.from, form.to, 'The period must start before it ends')
+      })}
       onSubmit={async () => {
-        try {
-          const blob = await api.blob(`admin/reports/player-sheet/${form.uid.trim()}`, { from: form.from || undefined, to: form.to || undefined })
+        // A failure is toasted by the dialog (with the server's message) and the dialog stays open.
+        const blob = await api.blob(`admin/reports/player-sheet/${form.uid.trim()}`, { from: form.from || undefined, to: form.to || undefined })
 
-          downloadBlob(blob, `user-${form.uid.trim()}-${form.from}-${form.to}.pdf`)
-          toast.success('User sheet downloaded')
-        } catch (e) {
-          toast.error(errorMessage(e))
-          throw e
-        }
+        downloadBlob(blob, `user-${form.uid.trim()}-${form.from}-${form.to}.pdf`)
+        toast.success('User sheet downloaded')
       }}
     >
-      <TextField id='ps-uid' label='User id' required value={form.uid} onChange={e => setForm({ ...form, uid: e.target.value.replace(/\D/g, '') })} />
+      <TextField id='ps-uid' inputMode='numeric' label='User id' required value={form.uid} onChange={e => setForm({ ...form, uid: e.target.value.replace(/\D/g, '') })} />
       <DateRangeField id='ps-period' label='Period' from={form.from} to={form.to} onChange={r => setForm({ ...form, ...r })} />
     </FormDialog>
   )

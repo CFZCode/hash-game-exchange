@@ -3,6 +3,7 @@
 import { useSyncExternalStore } from 'react'
 
 import { BarChart, type ChartColor } from '@/components/shared/charts'
+import ErrorState from '@/components/shared/ErrorState'
 import StatCard from '@/components/shared/StatCard'
 import { Card, CardContent } from '@/components/ui/card'
 import { useApi } from '@/hooks/use-api'
@@ -93,7 +94,7 @@ const LegendValues = ({ items, cols }: { items: Item[]; cols: string }) => (
  * Casino / third-party casino P/L aur "Our Live Casino" yahan nahi hain.
  */
 const ExchangeDashboard = () => {
-  const { data, isLoading } = useApi<Home>('admin/exchange/user-reports/home')
+  const { data, isLoading, error } = useApi<Home>('admin/exchange/user-reports/home')
   const horizontal = !useIsPhone()
 
   const creditPts = Number(data?.credit) || 0
@@ -136,6 +137,7 @@ const ExchangeDashboard = () => {
 
   return (
     <div className='flex flex-col gap-4'>
+      {error && !data && <ErrorState error={error} title='Could not load your points' />}
       <div className='grid grid-cols-2 gap-3 md:grid-cols-4'>
         {tiles.map(t => (
           <StatCard key={t.label} label={t.label} value={fmt(t.value)} loading={isLoading} />

@@ -4,12 +4,12 @@ import { useEffect, useMemo, useState } from 'react'
 
 import { useRouter, useSearchParams } from 'next/navigation'
 
-import { CalendarClockIcon, EyeIcon, FlaskConicalIcon, PlusIcon, SaveIcon, SendIcon, Trash2Icon } from 'lucide-react'
+import { CalendarClockIcon, EyeIcon, FlaskConicalIcon, Loader2Icon, PlusIcon, SaveIcon, SendIcon, Trash2Icon } from 'lucide-react'
 import { toast } from 'sonner'
 
 import Can from '@/components/shared/Can'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
-import { DateTimeField, SelectField, SwitchField, TextAreaField, TextField } from '@/components/shared/FormField'
+import { DateTimeField, FormErrorsProvider, SelectField, SwitchField, TextAreaField, TextField, useFormErrors } from '@/components/shared/FormField'
 import JsonView from '@/components/shared/JsonView'
 import PageHeader from '@/components/shared/PageHeader'
 import { Badge } from '@/components/ui/badge'
@@ -20,6 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useApi, useApiMutation } from '@/hooks/use-api'
 import { api, errorMessage } from '@/lib/api/client'
+import { check, firstError, type FieldErrors } from '@/lib/validate'
 import { ImageInput, NotificationPreview, PushStatusCard, Warnings } from './PushParts'
 import {
   KNOWN_TAGS,
@@ -151,6 +152,46 @@ const campaignOf = (f: Form, withSchedule: boolean) => ({
   sendAt: withSchedule && f.sendAt ? new Date(f.sendAt).toISOString() : undefined
 })
 
+const isClickUrl = (u: string) => /^https?:\/\//i.test(u) || u.startsWith('/') || u.startsWith('#')
+
+/** push.validators.js `campaignBody` / `content`, checked before anything is sent. Keys are the server's field names. */
+const problemsOf = (f: Form, withSchedule: boolean): FieldErrors => {
+  const url = f.url.trim()
+  const ids = list(f.userIds)
+  const segs = f.segments.split(',').map(x => x.trim()).filter(Boolean)
+  const badButton = f.buttons.findIndex(b => !/^[a-zA-Z0-9_-]{1,32}$/.test(b.id.trim()) || !b.text.trim() || b.text.trim().length > 40 || (b.url.trim() && !isClickUrl(b.url.trim())))
+  const badFilter = f.filters.findIndex(x => !/^[a-zA-Z0-9_]{1,32}$/.test(x.tag.trim()) || String(x.value ?? '').length > 100)
+  const sendAt = f.sendAt ? new Date(f.sendAt).getTime() : NaN
+
+  return {
+    name: check.length(f.name, 'Internal name', { max: 120 }),
+    title: check.required(f.title, 'Title') || check.length(f.title, 'Title', { max: 120 }),
+    body: check.required(f.body, 'Message') || check.length(f.body, 'Message', { max: 500 }),
+    imageUrl: check.url(f.imageUrl, 'Big image', true),
+    iconUrl: check.url(f.iconUrl, 'Icon', true),
+    url: url && !isClickUrl(url) ? 'Click URL must be https://… or a site path like /vip' : check.length(url, 'Click URL', { max: 2000 }),
+    buttons:
+      badButton >= 0
+        ? `Button ${badButton + 1}: id is letters, digits, _ or - (max 32), text is required (max 40), URL is https://… or a site path`
+        : undefined,
+    ttlSeconds: check.number(f.ttl, 'Time to live', { integer: true, min: 0, max: 2419200, optional: true }),
+    topic: f.topic.trim() && !/^[a-zA-Z0-9_-]{1,64}$/.test(f.topic.trim()) ? 'Topic: letters, digits, _ or - (max 64)' : undefined,
+    'audience.userIds':
+      f.audienceKind !== 'players'
+        ? undefined
+        : !ids.length
+          ? 'Enter at least one player id'
+          : ids.some(x => !/^\d+$/.test(x) || Number(x) <= 0)
+            ? 'Player ids must be positive whole numbers'
+            : ids.length > 10000
+              ? 'At most 10,000 player ids'
+              : undefined,
+    'audience.segments': f.audienceKind !== 'segment' ? undefined : !segs.length ? 'Enter a segment name' : segs.length > 5 ? 'At most 5 segments' : segs.some(x => x.length > 100) ? 'A segment name is at most 100 characters' : undefined,
+    'audience.filters': f.audienceKind !== 'filters' ? undefined : badFilter >= 0 ? `Filter ${badFilter + 1}: tag is letters, digits or _ (max 32), value at most 100 characters` : undefined,
+    sendAt: !withSchedule ? undefined : !f.sendAt ? 'Pick a schedule time first' : Number.isNaN(sendAt) ? 'Pick a valid schedule time' : sendAt <= Date.now() ? 'The schedule time must be in the future' : undefined
+  }
+}
+
 const PushCompose = () => {
   const router = useRouter()
   const params = useSearchParams()
@@ -182,14 +223,16 @@ const PushCompose = () => {
   const editable = !existing.data || ['draft', 'scheduled', 'failed'].includes(existing.data.status)
   const audience = useMemo(() => audienceOf(form), [form])
 
-  const audienceOk =
-    audience.kind === 'all' ||
-    (audience.kind === 'players' && audience.userIds.length > 0) ||
-    (audience.kind === 'segment' && audience.segments.length > 0) ||
-    (audience.kind === 'filters' && audience.filters.every(x => x.tag))
+  const f = useFormErrors()
+  const problem = firstError(problemsOf(form, false))
+  const ready = !problem
 
-  const buttonsOk = form.buttons.every(b => /^[a-zA-Z0-9_-]{1,32}$/.test(b.id) && b.text.trim())
-  const ready = form.title.trim().length > 0 && form.body.trim().length > 0 && audienceOk && buttonsOk
+  /** Validate (inline + toast), then run; a 422 lands on the fields. */
+  const run = (m: { mutate: (v: undefined, o: { onError: (e: unknown) => void }) => void }, withSchedule = false) => {
+    if (f.passes(problemsOf(form, withSchedule))) m.mutate(undefined, { onError: f.fromServer })
+  }
+
+  const testUserError = testUser ? check.id(testUser, 'Test player id') : undefined
   const pushOnly = form.audienceKind === 'segment' || form.audienceKind === 'filters'
 
   const doPreview = useApiMutation({
@@ -265,6 +308,7 @@ const PushCompose = () => {
       {existing.data && !editable && (
         <Warnings title='Read only' items={[`This campaign is ${existing.data.status}; only drafts, scheduled and failed campaigns can be edited.`]} />
       )}
+      <FormErrorsProvider errors={f.errors} onClear={f.clear}>
       <div className='grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]'>
         <div className='grid content-start gap-6'>
           <Card className='shadow-none'>
@@ -272,18 +316,22 @@ const PushCompose = () => {
               <CardTitle className='text-base'>Message</CardTitle>
             </CardHeader>
             <CardContent className='grid gap-4'>
-              <TextField id='p-name' label='Internal name' hint='Only staff see this.' maxLength={120} value={form.name} onChange={e => set('name', e.target.value)} />
-              <TextField id='p-title' label='Title' required maxLength={120} value={form.title} onChange={e => set('title', e.target.value)} hint={`${form.title.length}/120 — keep it under ~50 to avoid truncation.`} />
-              <TextAreaField id='p-body' label='Message' required rows={3} maxLength={500} value={form.body} onChange={e => set('body', e.target.value)} hint={`${form.body.length}/500`} />
-              <ImageInput id='p-image' label='Big image' value={form.imageUrl} onChange={v => set('imageUrl', v)} />
+              <TextField id='p-name' name='name' label='Internal name' hint='Only staff see this.' maxLength={120} value={form.name} onChange={e => set('name', e.target.value)} />
+              <TextField id='p-title' name='title' label='Title' required maxLength={120} value={form.title} onChange={e => set('title', e.target.value)} hint={`${form.title.length}/120 — keep it under ~50 to avoid truncation.`} />
+              <TextAreaField id='p-body' name='body' label='Message' required rows={3} maxLength={500} value={form.body} onChange={e => set('body', e.target.value)} hint={`${form.body.length}/500`} />
+              <ImageInput id='p-image' label='Big image' value={form.imageUrl} error={f.errors.imageUrl} onChange={v => { f.clear('imageUrl'); set('imageUrl', v) }} />
               <ImageInput
                 id='p-icon'
                 label='Icon (optional)'
                 value={form.iconUrl}
-                onChange={v => set('iconUrl', v)}
+                error={f.errors.iconUrl}
+                onChange={v => {
+                  f.clear('iconUrl')
+                  set('iconUrl', v)
+                }}
                 hint='Square, 256×256 recommended. Empty = the default icon from Prompt & settings or the OneSignal dashboard.'
               />
-              <TextField id='p-url' label='Click URL' placeholder='/promotions or https://…' value={form.url} onChange={e => set('url', e.target.value)} hint='A site path opens inside the site; the public origin is added for you.' />
+              <TextField id='p-url' name='url' label='Click URL' placeholder='/promotions or https://…' value={form.url} onChange={e => set('url', e.target.value)} hint='A site path opens inside the site; the public origin is added for you.' />
             </CardContent>
           </Card>
 
@@ -303,6 +351,11 @@ const PushCompose = () => {
                   </Button>
                 </div>
               ))}
+              {f.errors.buttons && (
+                <p role='alert' className='text-destructive text-sm'>
+                  {f.errors.buttons}
+                </p>
+              )}
               {form.buttons.length < 2 && (
                 <Button
                   variant='outline'
@@ -339,6 +392,7 @@ const PushCompose = () => {
               {form.audienceKind === 'players' && (
                 <TextAreaField
                   id='p-users'
+                  name='audience.userIds'
                   label='Player ids'
                   rows={3}
                   placeholder='12, 15, 2041'
@@ -350,6 +404,7 @@ const PushCompose = () => {
               {form.audienceKind === 'segment' && (
                 <TextField
                   id='p-seg'
+                  name='audience.segments'
                   label='OneSignal segment name(s)'
                   placeholder='Active Subscriptions, VIP'
                   value={form.segments}
@@ -408,6 +463,11 @@ const PushCompose = () => {
                       ]}
                     />
                   </div>
+                  {f.errors['audience.filters'] && (
+                    <p role='alert' className='text-destructive text-sm'>
+                      {f.errors['audience.filters']}
+                    </p>
+                  )}
                   <p className='text-muted-foreground text-xs'>The site sets vip_level, language, currency and country on every subscriber.</p>
                 </div>
               )}
@@ -437,9 +497,9 @@ const PushCompose = () => {
                   { value: 'high', label: 'High (wakes the device)' }
                 ]}
               />
-              <TextField id='p-ttl' label='Time to live (seconds)' inputMode='numeric' placeholder='default: 3 days' value={form.ttl} onChange={e => set('ttl', e.target.value.replace(/\D/g, ''))} hint='Dropped if the device is offline longer than this. Max 28 days.' />
-              <TextField id='p-topic' label='Replace topic' placeholder='e.g. daily-promo' value={form.topic} onChange={e => set('topic', e.target.value)} hint='A newer push with the same topic replaces the older one on the device.' />
-              <DateTimeField id='p-sendat' label='Schedule (your local time)' value={form.sendAt} onChange={v => set('sendAt', v)} hint='Leave empty to send now or save a draft.' />
+              <TextField id='p-ttl' name='ttlSeconds' label='Time to live (seconds)' inputMode='numeric' placeholder='default: 3 days' value={form.ttl} onChange={e => set('ttl', e.target.value.replace(/\D/g, ''))} hint='Dropped if the device is offline longer than this. Max 28 days.' />
+              <TextField id='p-topic' name='topic' label='Replace topic' placeholder='e.g. daily-promo' value={form.topic} onChange={e => set('topic', e.target.value)} hint='A newer push with the same topic replaces the older one on the device.' />
+              <DateTimeField id='p-sendat' label='Schedule (your local time)' error={f.errors.sendAt} value={form.sendAt} onChange={v => { f.clear('sendAt'); set('sendAt', v) }} hint='Leave empty to send now or save a draft.' />
             </CardContent>
           </Card>
         </div>
@@ -464,21 +524,21 @@ const PushCompose = () => {
 
           <Card className='shadow-none'>
             <CardContent className='grid gap-3 pt-6'>
-              <Button variant='outline' disabled={!ready || doPreview.isPending} onClick={() => doPreview.mutate()}>
-                <EyeIcon /> Preview payload &amp; audience
+              <Button variant='outline' disabled={doPreview.isPending} onClick={() => run(doPreview)}>
+                {doPreview.isPending ? <Loader2Icon className='animate-spin' /> : <EyeIcon />} Preview payload &amp; audience
               </Button>
               <Can permission='config:write'>
                 <div className='grid grid-cols-2 gap-2'>
-                  <Button variant='outline' disabled={!ready || !editable || saveDraft.isPending} onClick={() => saveDraft.mutate()}>
-                    <SaveIcon /> Save draft
+                  <Button variant='outline' disabled={!editable || saveDraft.isPending} onClick={() => run(saveDraft)}>
+                    {saveDraft.isPending ? <Loader2Icon className='animate-spin' /> : <SaveIcon />} Save draft
                   </Button>
                   <Button
                     variant='outline'
-                    disabled={!ready || !editable || !form.sendAt || schedule.isPending}
-                    onClick={() => schedule.mutate()}
+                    disabled={!editable || schedule.isPending}
+                    onClick={() => run(schedule, true)}
                     title={form.sendAt ? undefined : 'Pick a schedule time first'}
                   >
-                    <CalendarClockIcon /> Schedule
+                    {schedule.isPending ? <Loader2Icon className='animate-spin' /> : <CalendarClockIcon />} Schedule
                   </Button>
                 </div>
                 <ConfirmDialog
@@ -494,10 +554,18 @@ const PushCompose = () => {
                   confirmLabel='Send'
                   onConfirm={() => sendNow.mutateAsync()}
                 />
+                {problem && editable && <p className='text-muted-foreground text-xs'>Before sending: {problem}</p>}
                 <div className='flex gap-2'>
-                  <Input placeholder='Player id' inputMode='numeric' value={testUser} onChange={e => setTestUser(e.target.value.replace(/\D/g, ''))} aria-label='Test player id' />
-                  <Button variant='secondary' disabled={!ready || !testUser || test.isPending} onClick={() => test.mutate()}>
-                    <FlaskConicalIcon /> Test
+                  <Input placeholder='Player id' inputMode='numeric' value={testUser} aria-invalid={testUserError ? true : undefined} onChange={e => setTestUser(e.target.value.replace(/\D/g, ''))} aria-label='Test player id' />
+                  <Button
+                    variant='secondary'
+                    disabled={!testUser || test.isPending}
+                    onClick={() => {
+                      if (testUserError) return void toast.error(testUserError)
+                      run(test)
+                    }}
+                  >
+                    {test.isPending ? <Loader2Icon className='animate-spin' /> : <FlaskConicalIcon />} Test
                   </Button>
                 </div>
                 <p className='text-muted-foreground text-xs'>A test push goes to one player only, with no bell row. That player must have allowed notifications on the site while signed in.</p>
@@ -532,6 +600,7 @@ const PushCompose = () => {
           )}
         </div>
       </div>
+      </FormErrorsProvider>
     </div>
   )
 }

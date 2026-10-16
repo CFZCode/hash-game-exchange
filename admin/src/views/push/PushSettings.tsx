@@ -2,16 +2,17 @@
 
 import { useEffect, useState } from 'react'
 
-import { BellRingIcon, SaveIcon } from 'lucide-react'
+import { BellRingIcon, Loader2Icon, SaveIcon } from 'lucide-react'
 
 import Can from '@/components/shared/Can'
 import ErrorState from '@/components/shared/ErrorState'
-import { SelectField, SwitchField, TextAreaField, TextField } from '@/components/shared/FormField'
+import { FormErrorsProvider, SelectField, SwitchField, TextAreaField, TextField, useFormErrors } from '@/components/shared/FormField'
 import PageHeader from '@/components/shared/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useApi, useApiMutation } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
+import { check } from '@/lib/validate'
 import { ImageInput, PushStatusCard } from './PushParts'
 import type { PromptSettings, PushSettings as Settings } from './types'
 
@@ -65,6 +66,30 @@ const PushSettings = () => {
     invalidate: [['api', 'admin/push/settings'], ['api', 'admin/push/status']]
   })
 
+  const f = useFormErrors()
+
+  // Mirrors push.validators.js `putSettings`.
+  const submit = () => {
+    if (!s) return
+    const p = s.prompt
+    const text = (v: string, label: string, max: number) => check.required(v, label) || check.length(v, label, { max })
+    const origin = s.publicOrigin.trim().replace(/\/+$/, '')
+
+    const ok = f.passes({
+      'prompt.title': text(p.title, 'Popup title', 80),
+      'prompt.text': text(p.text, 'Popup text', 300),
+      'prompt.allowLabel': text(p.allowLabel, 'Allow button', 24),
+      'prompt.laterLabel': text(p.laterLabel, 'Dismiss button', 24),
+      'prompt.delaySeconds': check.number(p.delaySeconds, 'Delay', { integer: true, min: 0, max: 3600 }),
+      'prompt.cooldownDays': check.number(p.cooldownDays, 'Ask-again days', { integer: true, min: 1, max: 365 }),
+      publicOrigin: origin && !/^https?:\/\/[^/\s]+$/i.test(origin) ? 'Public origin must be an origin like https://example.com (no path)' : check.length(origin, 'Public origin', { max: 200 }),
+      allSegment: text(s.allSegment, '“Everyone” segment', 100),
+      defaultIconUrl: check.url(s.defaultIconUrl, 'Default icon', true) || check.length(s.defaultIconUrl, 'Default icon', { max: 2000 })
+    })
+
+    if (ok) save.mutate(undefined, { onError: f.fromServer })
+  }
+
   const setPrompt = <K extends keyof PromptSettings>(key: K, value: PromptSettings[K]) => setS(x => (x ? { ...x, prompt: { ...x.prompt, [key]: value } } : x))
 
   return (
@@ -74,6 +99,7 @@ const PushSettings = () => {
       {isLoading && <Card className='h-64 animate-pulse shadow-none' />}
       {error && <ErrorState error={error} />}
       {s && (
+        <FormErrorsProvider errors={f.errors} onClear={f.clear}>
         <div className='grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]'>
           <div className='grid content-start gap-6'>
             <Card className='shadow-none'>
@@ -85,11 +111,11 @@ const PushSettings = () => {
               </CardHeader>
               <CardContent className='grid gap-4'>
                 <SwitchField id='ps-on' label='Show the popup' checked={s.prompt.enabled} onChange={v => setPrompt('enabled', v)} />
-                <TextField id='ps-title' label='Title' maxLength={80} value={s.prompt.title} onChange={e => setPrompt('title', e.target.value)} />
-                <TextAreaField id='ps-text' label='Text' rows={3} maxLength={300} value={s.prompt.text} onChange={e => setPrompt('text', e.target.value)} />
+                <TextField id='ps-title' name='prompt.title' label='Title' maxLength={80} value={s.prompt.title} onChange={e => setPrompt('title', e.target.value)} />
+                <TextAreaField id='ps-text' name='prompt.text' label='Text' rows={3} maxLength={300} value={s.prompt.text} onChange={e => setPrompt('text', e.target.value)} />
                 <div className='grid gap-4 sm:grid-cols-2'>
-                  <TextField id='ps-allow' label='Allow button' maxLength={24} value={s.prompt.allowLabel} onChange={e => setPrompt('allowLabel', e.target.value)} />
-                  <TextField id='ps-later' label='Dismiss button' maxLength={24} value={s.prompt.laterLabel} onChange={e => setPrompt('laterLabel', e.target.value)} />
+                  <TextField id='ps-allow' name='prompt.allowLabel' label='Allow button' maxLength={24} value={s.prompt.allowLabel} onChange={e => setPrompt('allowLabel', e.target.value)} />
+                  <TextField id='ps-later' name='prompt.laterLabel' label='Dismiss button' maxLength={24} value={s.prompt.laterLabel} onChange={e => setPrompt('laterLabel', e.target.value)} />
                   <SelectField
                     id='ps-trigger'
                     label='When to show'
@@ -102,6 +128,7 @@ const PushSettings = () => {
                   />
                   <TextField
                     id='ps-delay'
+                    name='prompt.delaySeconds'
                     label='Delay (seconds)'
                     inputMode='numeric'
                     value={String(s.prompt.delaySeconds)}
@@ -109,6 +136,7 @@ const PushSettings = () => {
                   />
                   <TextField
                     id='ps-cool'
+                    name='prompt.cooldownDays'
                     label='After “dismiss”, ask again in (days)'
                     inputMode='numeric'
                     value={String(s.prompt.cooldownDays)}
@@ -125,6 +153,7 @@ const PushSettings = () => {
               <CardContent className='grid gap-4'>
                 <TextField
                   id='ps-origin'
+                  name='publicOrigin'
                   label='Public origin'
                   placeholder='https://www.your-site.com'
                   value={s.publicOrigin}
@@ -133,6 +162,7 @@ const PushSettings = () => {
                 />
                 <TextField
                   id='ps-seg'
+                  name='allSegment'
                   label='“Everyone” segment in OneSignal'
                   value={s.allSegment}
                   onChange={e => setS({ ...s, allSegment: e.target.value })}
@@ -142,7 +172,11 @@ const PushSettings = () => {
                   id='ps-icon'
                   label='Default notification icon'
                   value={s.defaultIconUrl}
-                  onChange={v => setS({ ...s, defaultIconUrl: v })}
+                  error={f.errors.defaultIconUrl}
+                  onChange={v => {
+                    f.clear('defaultIconUrl')
+                    setS({ ...s, defaultIconUrl: v })
+                  }}
                   hint='Square PNG, 256×256 recommended, https. Empty = the default icon set in the OneSignal dashboard.'
                 />
               </CardContent>
@@ -151,10 +185,10 @@ const PushSettings = () => {
             <Can permission='config:write'>
               <Button
                 className='justify-self-start'
-                disabled={save.isPending || !s.prompt.title.trim() || !s.prompt.text.trim() || !s.prompt.allowLabel.trim() || !s.prompt.laterLabel.trim() || !s.allSegment.trim()}
-                onClick={() => save.mutate()}
+                disabled={save.isPending}
+                onClick={submit}
               >
-                <SaveIcon /> Save settings
+                {save.isPending ? <Loader2Icon className='animate-spin' /> : <SaveIcon />} Save settings
               </Button>
             </Can>
           </div>
@@ -162,6 +196,7 @@ const PushSettings = () => {
             <PromptPreview p={s.prompt} />
           </div>
         </div>
+        </FormErrorsProvider>
       )}
     </div>
   )

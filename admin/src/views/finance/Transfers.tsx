@@ -4,6 +4,7 @@ import Link from 'next/link'
 
 import DataTable, { type Column } from '@/components/shared/DataTable'
 import DateTime from '@/components/shared/DateTime'
+import ErrorState from '@/components/shared/ErrorState'
 import Money from '@/components/shared/Money'
 import PageHeader from '@/components/shared/PageHeader'
 import StatCard from '@/components/shared/StatCard'
@@ -51,6 +52,11 @@ const Transfers = () => {
         title='Staff transfers'
         description='Balance moved down the agent tree (deposit) and pulled back up (withdraw), between staff accounts and their users. The agent float is held in INR only, so every transfer here is INR.'
       />
+      {summary.error ? (
+        <div className='mb-4'>
+          <ErrorState error={summary.error} title='Could not load the transfer totals' />
+        </div>
+      ) : null}
       <div className='mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4'>
         <StatCard label='Deposits' value={<Money value={sum('deposit')?.total ?? '0'} currency='INR' />} hint={`${formatNumber(sum('deposit')?.count ?? 0)} transfers`} loading={summary.isLoading} />
         <StatCard label='Withdrawals' value={<Money value={sum('withdraw')?.total ?? '0'} currency='INR' />} hint={`${formatNumber(sum('withdraw')?.count ?? 0)} transfers`} loading={summary.isLoading} />

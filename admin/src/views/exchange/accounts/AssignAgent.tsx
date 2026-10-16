@@ -4,6 +4,8 @@ import { useState, type FormEvent } from 'react'
 
 import { toast } from 'sonner'
 
+import { Loader2Icon } from 'lucide-react'
+
 import PageHeader from '@/components/shared/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -82,7 +84,13 @@ const AssignAgent = () => {
 
   const handleDownloadCSV = async (e: FormEvent) => {
     e.preventDefault()
-    if (!fromDate || !toDate) return
+
+    if (!fromDate || !toDate) {
+      toast.error('Choose a From date')
+
+      return
+    }
+
     setDownloading(true)
 
     try {
@@ -94,6 +102,7 @@ const AssignAgent = () => {
       a.download = `user-creation-${fromDate}-to-${toDate}.csv`
       a.click()
       URL.revokeObjectURL(url)
+      toast.success('User creation CSV downloaded')
     } catch (err) {
       toast.error(errorMessage(err))
     } finally {
@@ -178,6 +187,7 @@ const AssignAgent = () => {
               <DatePicker value={toDate} onChange={() => undefined} disabled clearable={false} />
             </div>
             <Button type='submit' disabled={downloading || !toDate}>
+              {downloading && <Loader2Icon className='animate-spin' />}
               Download CSV
             </Button>
           </form>

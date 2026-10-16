@@ -71,6 +71,7 @@ const Decide = ({ row }: { row: CryptoWithdrawalRow }) => {
       destructive={form.status === 'Rejected'}
       validate={() => ({
         status: form.status ? undefined : 'Pick the new status',
+
         // cryptoWithdraw validators: txid 16–120 alphanumerics; comment ≤ 500.
         txid:
           form.status === 'Sent' && !form.txid.trim()

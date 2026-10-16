@@ -4,6 +4,7 @@ import { useState } from 'react'
 
 import { format, subDays } from 'date-fns'
 import { EyeIcon } from 'lucide-react'
+import { toast } from 'sonner'
 
 import DataTable, { type Column } from '@/components/shared/DataTable'
 import PageHeader from '@/components/shared/PageHeader'
@@ -14,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useApi, usePagedApi } from '@/hooks/use-api'
+import { errorMessage } from '@/lib/api/client'
 import { ClientSearch, ExportButtons, REPORTS_API, emptyText, filterRows } from './shared'
 
 type HistoryRow = { id: string; username: string; loginAt?: string; changedAt?: string; ip: string }
@@ -30,7 +32,7 @@ const EXPORT_COLS = ['Username', 'Date', 'IP']
 
 /** "Ip Detail" modal — Key / Value table (IP, City, Country, Mobile). */
 function IpDetailDialog({ ip, onClose }: { ip: string | null; onClose: () => void }) {
-  const { data } = useApi<IpDetail>(ip ? `${REPORTS_API}/ip-detail` : null, { ip: ip ?? '' })
+  const { data, error } = useApi<IpDetail>(ip ? `${REPORTS_API}/ip-detail` : null, { ip: ip ?? '' })
 
   const rows: [string, string][] = [
     ['IP:', data?.ip ?? ip ?? '-'],
@@ -45,6 +47,7 @@ function IpDetailDialog({ ip, onClose }: { ip: string | null; onClose: () => voi
         <DialogHeader>
           <DialogTitle className='uppercase'>Ip Detail</DialogTitle>
         </DialogHeader>
+        {error && <p className='text-destructive text-sm'>Could not load IP detail: {errorMessage(error)}</p>}
         <Table>
           <TableHeader>
             <TableRow>
@@ -96,6 +99,12 @@ function HistoryPane({ mode }: { mode: 'login' | 'password' }) {
   const filtered = filterRows(rows, search)
 
   const handleLoad = () => {
+    if (range.from && range.to && range.from > range.to) {
+      toast.error('From date cannot be after To date')
+
+      return
+    }
+
     setPage(1)
     setLoaded({ username: clientName.trim(), fromDate: range.from, toDate: range.to })
   }

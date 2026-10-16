@@ -21,6 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useSession } from '@/contexts/SessionContext'
 import { useApiMutation, useListState, usePagedApi } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
+import { check } from '@/lib/validate'
 import { allConvertedLabel, useFinanceFilters } from './currencyFilter'
 import FinanceStatsPanel from './FinanceStatsPanel'
 import { Details, ImageDialog, ViewDialog, stop } from './shared'
@@ -63,10 +64,15 @@ const Approve = ({ row }: { row: FiatDepositRow }) => {
         </>
       }
       submitLabel='Approve & credit'
+      validate={() => ({
+        // fiatDeposit.validators.js approve: creditAmount optional money (> 0, ≤ 8 dp); comment ≤ 500.
+        creditAmount: form.creditAmount.trim() ? check.amount(form.creditAmount, 'Credit amount', { decimals: 8 }) : undefined,
+        comment: check.length(form.comment, 'Comment', { max: 500 })
+      })}
       onSubmit={() => approve.mutateAsync()}
     >
-      <TextField id={`ap-amt-${row.depositId}`} label='Credit amount' placeholder={row.amount} hint='Leave blank to credit the claimed amount' value={form.creditAmount} onChange={e => setForm({ ...form, creditAmount: e.target.value })} />
-      <TextAreaField id={`ap-c-${row.depositId}`} label='Comment' value={form.comment} onChange={e => setForm({ ...form, comment: e.target.value })} />
+      <TextField id={`ap-amt-${row.depositId}`} name='creditAmount' inputMode='decimal' label='Credit amount' placeholder={row.amount} hint='Leave blank to credit the claimed amount' value={form.creditAmount} onChange={e => setForm({ ...form, creditAmount: e.target.value })} />
+      <TextAreaField id={`ap-c-${row.depositId}`} name='comment' label='Comment' value={form.comment} onChange={e => setForm({ ...form, comment: e.target.value })} />
     </FormDialog>
   )
 }
@@ -75,7 +81,7 @@ const Reject = ({ row }: { row: FiatDepositRow }) => {
   const [comment, setComment] = useState('')
 
   const reject = useApiMutation({
-    fn: () => api.put(`${LIST}/${row.depositId}/reject`, { comment }),
+    fn: () => api.put(`${LIST}/${row.depositId}/reject`, { comment: comment.trim() }),
     invalidate: INVALIDATE,
     success: 'Deposit rejected'
   })
@@ -91,9 +97,10 @@ const Reject = ({ row }: { row: FiatDepositRow }) => {
       description='The user sees this reason on their deposit history.'
       submitLabel='Reject'
       destructive
+      validate={() => ({ comment: check.required(comment, 'Reason') ?? check.length(comment, 'Reason', { max: 500 }) })}
       onSubmit={() => reject.mutateAsync()}
     >
-      <TextAreaField id={`rj-c-${row.depositId}`} label='Reason' required value={comment} onChange={e => setComment(e.target.value)} />
+      <TextAreaField id={`rj-c-${row.depositId}`} name='comment' label='Reason' required value={comment} onChange={e => setComment(e.target.value)} />
     </FormDialog>
   )
 }

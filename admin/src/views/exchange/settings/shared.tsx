@@ -42,6 +42,7 @@ export async function zipApi<T = Record<string, unknown>>(
 
   if (!res.ok || !json || json.success === false) {
     const err = json?.error
+
     const message =
       (err && typeof err === 'object' && typeof err.message === 'string' && err.message) ||
       (typeof err === 'string' && err) ||

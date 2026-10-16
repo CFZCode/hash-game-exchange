@@ -33,7 +33,7 @@ const BetLockDialog = ({ eventId, market, onClose }: Props) => {
   const [busy, setBusy] = useState(false)
 
   const params = market ? { market_id: String(market.mid), market_name: market.mname } : undefined
-  const { data, refetch, isLoading } = useApi<LockRow[]>(market ? `${LOCK_API}/market-locks/${eventId}` : null, params)
+  const { data, refetch, isLoading, error } = useApi<LockRow[]>(market ? `${LOCK_API}/market-locks/${eventId}` : null, params)
   const rows = data ?? []
   const allLocked = rows.length > 0 && rows.every(r => r.is_locked)
 
@@ -52,7 +52,9 @@ const BetLockDialog = ({ eventId, market, onClose }: Props) => {
 
     try {
       await api.post(`${LOCK_API}/${url}`, { event_id: eventId, market_id: String(market.mid), market_name: market.mname, is_locked: locked, transactionPassword: code, ...body })
-      toast.success(locked ? 'User locked' : 'User unlocked')
+      const who = 'accounts' in body ? 'All accounts' : (rows.find(r => r.id === body.account_id)?.username ?? 'User')
+
+      toast.success(`${who} ${locked ? 'locked' : 'unlocked'} on ${market.mname}`)
       await refetch()
     } catch (error) {
       toast.error(errorMessage(error))
@@ -96,6 +98,12 @@ const BetLockDialog = ({ eventId, market, onClose }: Props) => {
                 <TableRow>
                   <TableCell colSpan={2} className='text-center'>
                     Loading...
+                  </TableCell>
+                </TableRow>
+              ) : error && !rows.length ? (
+                <TableRow>
+                  <TableCell colSpan={2} className='text-destructive text-center'>
+                    Could not load accounts: {errorMessage(error)}
                   </TableCell>
                 </TableRow>
               ) : !rows.length ? (

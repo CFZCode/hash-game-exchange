@@ -24,10 +24,13 @@ type Props = {
   destructive?: boolean
   onConfirm: () => Promise<unknown> | unknown
   children?: ReactNode
+
+  /** Keep the confirm button disabled (e.g. a required reason is still empty). */
+  confirmDisabled?: boolean
 }
 
 /** A yes/no gate around an action. Closes itself when `onConfirm` resolves. */
-const ConfirmDialog = ({ trigger, title, description, confirmLabel = 'Confirm', destructive, onConfirm, children }: Props) => {
+const ConfirmDialog = ({ trigger, title, description, confirmLabel = 'Confirm', destructive, onConfirm, children, confirmDisabled }: Props) => {
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
 
@@ -59,7 +62,7 @@ const ConfirmDialog = ({ trigger, title, description, confirmLabel = 'Confirm', 
           <Button variant='outline' onClick={() => setOpen(false)} disabled={busy}>
             Cancel
           </Button>
-          <Button variant={destructive ? 'destructive' : 'default'} onClick={run} disabled={busy}>
+          <Button variant={destructive ? 'destructive' : 'default'} onClick={run} disabled={busy || confirmDisabled}>
             {busy && <Loader2Icon className='animate-spin' />}
             {confirmLabel}
           </Button>

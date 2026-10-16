@@ -2,6 +2,8 @@
 
 import { useState, type ReactNode } from 'react'
 
+import { Loader2Icon } from 'lucide-react'
+
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -9,7 +11,8 @@ import { Label } from '@/components/ui/label'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
 import { useApi, useApiMutation } from '@/hooks/use-api'
-import { api } from '@/lib/api/client'
+import { api, errorMessage } from '@/lib/api/client'
+import { check } from '@/lib/validate'
 import { fmt, SETTLE_INVALIDATE } from './SettleDialog'
 import type { AccountRow, AccountsResponse, CreditHistoryRow } from './types'
 
@@ -26,7 +29,7 @@ const fmtDate = (d?: string | null) => {
 
 /** Credit History — zip ka CreditHistory (Credit Activity aur More modal dono me). */
 export const CreditHistory = ({ row }: { row: AccountRow }) => {
-  const { data, isLoading } = useApi<CreditHistoryRow[]>('admin/exchange/credit-history', {
+  const { data, isLoading, error } = useApi<CreditHistoryRow[]>('admin/exchange/credit-history', {
     accountType: row.accountType,
     accountId: row.accountId,
     limit: 25,
@@ -49,8 +52,8 @@ export const CreditHistory = ({ row }: { row: AccountRow }) => {
       <TableBody>
         {rows.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={5} className='text-center'>
-              {isLoading ? 'Loading...' : 'There are no records to show'}
+            <TableCell colSpan={5} className={error ? 'text-destructive text-center' : 'text-center'}>
+              {isLoading ? 'Loading...' : error ? `Could not load credit history: ${errorMessage(error)}` : 'There are no records to show'}
             </TableCell>
           </TableRow>
         ) : (
@@ -97,15 +100,17 @@ const CreditForm = ({ mode, row, me, onDone }: { mode: 'deposit' | 'withdraw'; r
         transactionPassword: txnPassword
       }),
     invalidate: SETTLE_INVALIDATE,
-    success: mode === 'deposit' ? 'Sucessfull Balance Transfer' : 'Credit withdraw successful!',
+    success: () => (mode === 'deposit' ? `Credit ${show2(amt)} given to ${row.username}` : `Credit ${show2(amt)} taken back from ${row.username}`),
     onSuccess: onDone
   })
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    if (!amt || amt <= 0) return setError('Enter a valid amount')
-    if (!txnPassword) return setError('Transaction Code required')
+    const bad = check.number(amount, 'Amount', { positive: true, decimals: 2 })
+
+    if (bad) return setError(bad)
+    if (!txnPassword) return setError('Transaction Code is required')
     void save.mutateAsync().catch(() => {})
   }
 
@@ -144,6 +149,7 @@ const CreditForm = ({ mode, row, me, onDone }: { mode: 'deposit' | 'withdraw'; r
       {error && <div className='text-destructive text-right text-sm'>{error}</div>}
       <div className='text-right'>
         <Button type='submit' disabled={save.isPending}>
+          {save.isPending && <Loader2Icon className='animate-spin' />}
           submit
         </Button>
       </div>

@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useApi } from '@/hooks/use-api'
+import { errorMessage } from '@/lib/api/client'
 import { cn } from '@/lib/utils'
 
 /**
@@ -46,6 +47,30 @@ const pad = (n: number) => String(n).padStart(2, '0')
 export const dayString = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 
 /** Zip ka default: aaj se 7 din pehle → aaj. */
+/**
+ * The report routes' date rules (`exchange-reports/reports.validators.js`): both dates set, From not after To,
+ * at most `maxDays` apart and — for the 10-day reports — not older than 3 months. `undefined` = fine.
+ */
+export const RANGE_MESSAGE = 'Sorry for inconvenience! You will see statement of 10 days date range in 3 months timeslot.'
+
+export const rangeError = (range: { from: string; to: string }, { maxDays = 10, threeMonths = true }: { maxDays?: number; threeMonths?: boolean } = {}) => {
+  if (!range.from || !range.to) return 'Choose both From and To dates'
+  const days = (new Date(range.to).getTime() - new Date(range.from).getTime()) / 86_400_000
+
+  if (days < 0) return 'From date cannot be after To date'
+  if (days > maxDays) return threeMonths ? RANGE_MESSAGE : `Date range cannot be more than ${maxDays} days`
+
+  if (threeMonths) {
+    const floor = new Date()
+
+    floor.setMonth(floor.getMonth() - 3)
+    floor.setHours(0, 0, 0, 0)
+    if (new Date(`${range.from}T00:00:00`) < floor) return RANGE_MESSAGE
+  }
+
+  return undefined
+}
+
 export const defaultRange = () => {
   const today = new Date()
   const weekAgo = new Date()
@@ -121,7 +146,7 @@ export function ClientSearch({ value, onChange }: { value: Client | null; onChan
     return () => document.removeEventListener('mousedown', onDown)
   }, [open])
 
-  const { data, isFetching } = useApi<Client[]>(open && search.length >= 3 ? 'admin/exchange/reports/clients' : null, { search })
+  const { data, isFetching, error } = useApi<Client[]>(open && search.length >= 3 ? 'admin/exchange/reports/clients' : null, { search })
 
   const pick = (client: Client) => {
     onChange(value && value.type === client.type && value.id === client.id ? null : client)
@@ -129,7 +154,13 @@ export function ClientSearch({ value, onChange }: { value: Client | null; onChan
   }
 
   const message =
-    text.trim().length === 0 ? 'List is empty.' : text.trim().length < 3 || !data?.length ? 'No elements found. Consider changing the search query.' : null
+    text.trim().length === 0
+      ? 'List is empty.'
+      : search.length >= 3 && error
+        ? `Search failed: ${errorMessage(error)}`
+        : text.trim().length < 3 || !data?.length
+          ? 'No elements found. Consider changing the search query.'
+          : null
 
   return (
     <div ref={rootRef} className='relative'>

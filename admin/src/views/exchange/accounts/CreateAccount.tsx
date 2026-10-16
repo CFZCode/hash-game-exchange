@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation'
 
 import { toast } from 'sonner'
 
+import { Loader2Icon } from 'lucide-react'
+
 import PageHeader from '@/components/shared/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -18,6 +20,7 @@ import { useSession } from '@/contexts/SessionContext'
 import { api, errorMessage } from '@/lib/api/client'
 import { cn } from '@/lib/utils'
 import { ACCOUNTS_API, passwordError } from './api'
+import { check } from '@/lib/validate'
 
 /**
  * Create Account — zip `pages/users/InsertUser.jsx`.
@@ -66,7 +69,7 @@ const STAFF_TYPES: { level: number; label: string }[] = [
   { level: 6, label: 'Agent' }
 ]
 
-const REQUIRED_FIELDS: (keyof Form)[] = ['username', 'fullname', 'password', 'cpassword', 'mpassword', 'city', 'mono', 'point']
+const REQUIRED_FIELDS: (keyof Form)[] = ['username', 'fullname', 'password', 'cpassword', 'mpassword', 'city', 'mono', 'point', 'camt']
 
 type CreateResult = { success: boolean; creditSkipped: boolean; message: string }
 
@@ -77,11 +80,13 @@ const validateField = (name: keyof Form, value: string, all: Form) => {
       if (!value.trim()) return 'The User Name field is required'
       if (!/^[a-zA-Z0-9]+$/.test(value)) return 'The User Name field may only contain alpha-numeric characters'
       if (value.length < 4) return 'The User Name field must be at least 4 characters'
+      if (value.length > 60) return 'The User Name field may not be greater than 60 characters'
 
       return ''
     case 'fullname':
       if (!value.trim()) return 'The Full Name field is required'
       if (value.trim().length < 4) return 'The Full Name field must be at least 4 characters'
+      if (value.trim().length > 120) return 'The Full Name field may not be greater than 120 characters'
 
       return ''
     case 'password':
@@ -103,6 +108,9 @@ const validateField = (name: keyof Form, value: string, all: Form) => {
       if (!/^\d*\.?\d+$/.test(String(value).trim()) || parseFloat(value) < 0.001) return 'The User Rate field must be 0.001 or more'
 
       return ''
+    case 'camt':
+      // Optional (empty = 0); server takes a string of at most 20 characters.
+      return check.number(value, 'The Credit Amount', { min: 0, decimals: 2, optional: true }) || (value.length > 20 ? 'The Credit Amount is too long' : '') || ''
     case 'mpassword':
       return value ? '' : 'required' // zip me sirf laal border, message nahi
 
@@ -197,7 +205,7 @@ const CreateAccount = () => {
           return
         }
       } catch {
-        /* server ka create bhi duplicate rokta hai */
+        /* the check is advisory — the create route refuses a duplicate itself (and that error is toasted) */
       }
 
       setLoading(false)
@@ -212,7 +220,14 @@ const CreateAccount = () => {
     }
 
     setErrors(nextErrors)
-    if (Object.keys(nextErrors).length) return
+
+    if (Object.keys(nextErrors).length) {
+      const first = Object.entries(nextErrors)[0]
+
+      toast.error(first[0] === 'mpassword' ? 'The Transaction Code field is required' : first[1])
+
+      return
+    }
 
     setLoading(true)
 
@@ -232,7 +247,7 @@ const CreateAccount = () => {
       })
 
       if (res.creditSkipped) toast.success(res.message, { duration: 6000 })
-      else toast.success('User Sucessfully Inserted')
+      else toast.success(`Account ${form.username} created`)
       router.push('/exchange/users/active')
     } catch (err) {
       const msg = errorMessage(err)
@@ -295,7 +310,8 @@ const CreateAccount = () => {
           <CardContent className='space-y-4 pt-6'>
             <div className='space-y-1.5'>
               <Label htmlFor='camt'>Credit Amount:</Label>
-              <Input id='camt' name='camt' type='number' placeholder='Credit Amount' value={form.camt} onChange={onInput} />
+              <Input id='camt' name='camt' type='number' min={0} placeholder='Credit Amount' aria-invalid={invalid('camt')} value={form.camt} onChange={onInput} />
+              {errors.camt && <small className='text-destructive text-xs'>{errors.camt}</small>}
             </div>
 
             <div className='space-y-1.5'>
@@ -348,6 +364,7 @@ const CreateAccount = () => {
                 onBlur={onBlur}
               />
               <Button type='submit' disabled={loading}>
+                {loading && <Loader2Icon className='animate-spin' />}
                 Submit
               </Button>
             </div>

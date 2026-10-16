@@ -2,11 +2,12 @@
 
 import { useState, type ChangeEvent, type FormEvent } from 'react'
 
-import { KeyRoundIcon, PencilIcon, Trash2Icon } from 'lucide-react'
+import { KeyRoundIcon, Loader2Icon, PencilIcon, Trash2Icon } from 'lucide-react'
 import { toast } from 'sonner'
 
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import FormDialog from '@/components/shared/FormDialog'
+import { TextField } from '@/components/shared/FormField'
 import PageHeader from '@/components/shared/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -18,6 +19,8 @@ import { useApi } from '@/hooks/use-api'
 import { api, errorMessage } from '@/lib/api/client'
 import { cn } from '@/lib/utils'
 import { ACCOUNTS_API, passwordError } from './api'
+import { notifyError } from '@/lib/notify'
+import { check } from '@/lib/validate'
 
 /**
  * Multi Login Account — zip `pages/MultiLogin.jsx` + `ExecutivePermissionsModal.jsx`.
@@ -79,11 +82,15 @@ const validateField = (name: keyof Form, value: string, all: Form) => {
     case 'uname':
       if (!value) return 'The Client ID field is required'
 
+      if (value.length > 100) return 'The Client ID field may not be greater than 100 characters'
+
       return value.length < 4 ? 'The Client ID field must be at least 4 characters' : ''
     case 'fullname':
       if (!value) return 'The Full Name field is required'
 
-      return value.length < 4 ? 'The Full Name field must be at least 4 characters' : ''
+      if (value.trim().length > 120) return 'The Full Name field may not be greater than 120 characters'
+
+      return value.trim().length < 4 ? 'The Full Name field must be at least 4 characters' : ''
     case 'password':
       return passwordError(value)
     case 'cpass':
@@ -208,7 +215,9 @@ const MultiLogin = () => {
     setErrors(nextErrors)
 
     if (Object.keys(nextErrors).length) {
-      toast.error('Please fill required fields')
+      const first = Object.entries(nextErrors).find(([, m]) => m)
+
+      toast.error(first ? (first[0] === 'mpass' ? 'The Transaction Code field is required' : first[1]) : 'Please fill required fields')
 
       return
     }
@@ -224,7 +233,7 @@ const MultiLogin = () => {
         permissions: fullMap(checked)
       })
 
-      toast.success(res?.message || 'User Sucessfully Inserted')
+      toast.success(res?.message || `Login ${form.uname} created`)
       handleReset()
       refresh()
     } catch (err) {
@@ -242,7 +251,8 @@ const MultiLogin = () => {
       toast.success(res?.message || fallback)
       refresh()
     } catch (err) {
-      toast.error(errorMessage(err))
+      // notifyError marks it shown, so the FormDialog / ConfirmDialog that awaits this does not toast it again.
+      notifyError(err)
       throw err
     }
   }
@@ -308,6 +318,7 @@ const MultiLogin = () => {
                   onBlur={onBlur}
                 />
                 <Button type='submit' disabled={loading}>
+                  {loading && <Loader2Icon className='animate-spin' />}
                   Submit
                 </Button>
                 <Button type='button' variant='outline' onClick={handleReset}>
@@ -397,6 +408,7 @@ const MultiLogin = () => {
         wide
         open={Boolean(editing)}
         onOpenChange={open => !open && setEditing(null)}
+        validate={() => (PRIVILEGES.some(p => editChecked[p.key]) ? undefined : 'The Privileges field is required')}
         onSubmit={() =>
           editing && run(() => api.put(`${ACCOUNTS_API}/multi-login/${editing.id}`, { permissions: fullMap(editChecked) }), 'Privileges updated').then(() => setEditing(null))
         }
@@ -411,17 +423,12 @@ const MultiLogin = () => {
         submitLabel='OK'
         open={Boolean(pwFor)}
         onOpenChange={open => !open && setPwFor(null)}
-        onSubmit={() => {
-          if (!newPassword || newPassword.length < 4) {
-            toast.error('A password of at least 4 characters is required')
-
-            return Promise.reject(new Error('invalid'))
-          }
-
-          return pwFor && run(() => api.post(`${ACCOUNTS_API}/multi-login/${pwFor.id}/password`, { password: newPassword }), 'Password updated').then(() => setPwFor(null))
-        }}
+        validate={() => ({
+          'ml-new-password': !newPassword || newPassword.length < 4 ? 'A password of at least 4 characters is required' : check.length(newPassword, 'Password', { max: 200 })
+        })}
+        onSubmit={() => pwFor && run(() => api.post(`${ACCOUNTS_API}/multi-login/${pwFor.id}/password`, { password: newPassword }), `Password updated for ${pwFor.username}`).then(() => setPwFor(null))}
       >
-        <Input type='password' placeholder='New password' value={newPassword} onChange={e => setNewPassword(e.target.value)} />
+        <TextField id='ml-new-password' label='New password' type='password' placeholder='New password' value={newPassword} onChange={e => setNewPassword(e.target.value)} />
       </FormDialog>
     </div>
   )

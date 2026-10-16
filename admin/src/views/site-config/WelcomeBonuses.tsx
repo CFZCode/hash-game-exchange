@@ -2,7 +2,9 @@
 
 import { useState } from 'react'
 
-import { SwitchField, TextField } from '@/components/shared/FormField'
+import { Loader2Icon } from 'lucide-react'
+
+import { FormErrorsProvider, SwitchField, TextField, useFormErrors } from '@/components/shared/FormField'
 import ErrorState from '@/components/shared/ErrorState'
 import PageHeader from '@/components/shared/PageHeader'
 import { DEFAULT_REWARD_CURRENCY, RewardCurrencyNotice, useRewardCurrency } from '@/components/shared/RewardCurrency'
@@ -13,6 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useSession } from '@/contexts/SessionContext'
 import { useApi, useApiMutation } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
+import { check } from '@/lib/validate'
 
 type RegisterBonus = { enabled: boolean; amount: string; currency: string }
 type Tier = { minDeposit: string; percent: string; maxBonus: string }
@@ -76,6 +79,41 @@ const WelcomeForm = ({ saved }: { saved?: Welcome }) => {
   const setTier = (i: number, patch: Partial<Tier>) =>
     setTiers(ts => ts.map((t, j) => (j === i ? { ...t, ...patch } : t)))
 
+  const f = useFormErrors()
+
+  /** Every check the platform's `updateWelcomeBonusSettings` makes, keyed per field (tiers per row). */
+  const validateForm = () => {
+    const rate = (v: string, label: string, optional = true) => check.number(v, label, { min: 0, decimals: 8, optional })
+
+    const errors: Record<string, string | undefined> = {
+      registerAmount: rate(regAmount, 'Registration amount'),
+      fdWager: check.number(wager, 'Wagering multiplier', { min: 0, max: 100, optional: true }),
+      fdExpiry: check.number(expiry, 'Days to wager it', { min: 0, max: 3650, integer: true, optional: true })
+    }
+
+    const filled = tiers.filter(t => t.minDeposit.trim() || t.percent.trim() || t.maxBonus.trim())
+    const seen = new Set<number>()
+
+    tiers.forEach((t, i) => {
+      if (!(t.minDeposit.trim() || t.percent.trim() || t.maxBonus.trim())) return
+      const row = `Tier ${i + 1}`
+
+      errors[`tier-${i}-minDeposit`] = rate(t.minDeposit, `${row}: deposit from`)
+      errors[`tier-${i}-percent`] =
+        check.number(t.percent, `${row}: bonus %`, { decimals: 8 }) || (Number(t.percent) <= 0 || Number(t.percent) > 1000 ? `${row}: bonus % must be above 0 and at most 1000` : undefined)
+      errors[`tier-${i}-maxBonus`] = rate(t.maxBonus, `${row}: max bonus`)
+
+      const min = Number(t.minDeposit.trim() || '0')
+
+      if (seen.has(min)) errors[`tier-${i}-minDeposit`] = errors[`tier-${i}-minDeposit`] ?? `${row}: two tiers cannot have the same deposit amount`
+      seen.add(min)
+    })
+
+    if (fdOn && filled.length === 0) errors.tiers = 'Add at least one tier, or switch the first deposit bonus off'
+
+    return errors
+  }
+
   const save = useApiMutation({
     fn: () =>
       api.put<Welcome>(PATH, {
@@ -106,10 +144,12 @@ const WelcomeForm = ({ saved }: { saved?: Welcome }) => {
       className='grid max-w-3xl gap-6'
       onSubmit={e => {
         e.preventDefault()
+        if (!f.passes(validateForm())) return
         setTiers(sortTiers(tiers))
-        save.mutate()
+        save.mutate(undefined, { onError: f.fromServer })
       }}
     >
+      <FormErrorsProvider errors={f.errors} onClear={f.clear}>
       <Card className='shadow-none'>
         <CardHeader>
           <CardTitle className='text-base'>Registration bonus</CardTitle>
@@ -182,25 +222,40 @@ const WelcomeForm = ({ saved }: { saved?: Welcome }) => {
                     <Input
                       aria-label={`Deposit from (${cur})`}
                       inputMode='decimal'
+                      aria-invalid={f.errors[`tier-${i}-minDeposit`] ? true : undefined}
                       value={t.minDeposit}
-                      onChange={e => setTier(i, { minDeposit: e.target.value })}
+                      onChange={e => {
+                        f.clear(`tier-${i}-minDeposit`)
+                        setTier(i, { minDeposit: e.target.value })
+                      }}
                     />
+                    {f.errors[`tier-${i}-minDeposit`] && <p className='text-destructive mt-1 text-xs'>{f.errors[`tier-${i}-minDeposit`]}</p>}
                   </TableCell>
                   <TableCell>
                     <Input
                       aria-label='Bonus %'
                       inputMode='decimal'
+                      aria-invalid={f.errors[`tier-${i}-percent`] ? true : undefined}
                       value={t.percent}
-                      onChange={e => setTier(i, { percent: e.target.value })}
+                      onChange={e => {
+                        f.clear(`tier-${i}-percent`)
+                        setTier(i, { percent: e.target.value })
+                      }}
                     />
+                    {f.errors[`tier-${i}-percent`] && <p className='text-destructive mt-1 text-xs'>{f.errors[`tier-${i}-percent`]}</p>}
                   </TableCell>
                   <TableCell>
                     <Input
                       aria-label={`Max bonus (${cur})`}
                       inputMode='decimal'
+                      aria-invalid={f.errors[`tier-${i}-maxBonus`] ? true : undefined}
                       value={t.maxBonus}
-                      onChange={e => setTier(i, { maxBonus: e.target.value })}
+                      onChange={e => {
+                        f.clear(`tier-${i}-maxBonus`)
+                        setTier(i, { maxBonus: e.target.value })
+                      }}
                     />
+                    {f.errors[`tier-${i}-maxBonus`] && <p className='text-destructive mt-1 text-xs'>{f.errors[`tier-${i}-maxBonus`]}</p>}
                   </TableCell>
                   <TableCell>
                     <Button
@@ -217,6 +272,7 @@ const WelcomeForm = ({ saved }: { saved?: Welcome }) => {
               ))}
             </TableBody>
           </Table>
+          {f.errors.tiers && <p className='text-destructive text-sm'>{f.errors.tiers}</p>}
           <p className='text-muted-foreground text-xs'>
             Bonus % up to 1000. Max bonus 0 = no cap. Rows are sorted by deposit when saved; two rows cannot share a
             deposit amount.
@@ -252,7 +308,9 @@ const WelcomeForm = ({ saved }: { saved?: Welcome }) => {
         </CardContent>
       </Card>
 
+      </FormErrorsProvider>
       <Button type='submit' disabled={save.isPending || !writable || !saved} className='justify-self-start'>
+        {save.isPending && <Loader2Icon className='animate-spin' />}
         Save
       </Button>
     </form>

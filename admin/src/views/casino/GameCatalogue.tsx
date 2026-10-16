@@ -23,6 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { isAgentTreeLevel, useSession } from '@/contexts/SessionContext'
 import { useApi, useApiMutation } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
+import { check } from '@/lib/validate'
 import type { Query } from '@/lib/api/types'
 import { formatNumber } from '@/lib/format'
 import type { GisGame, GisProvider, GisType, GisVendor, JsGame, JsScopeEntry } from './types'
@@ -69,6 +70,7 @@ const EditImage = ({ game }: { game: GisGame }) => {
       title={`Tile image — ${game.name}`}
       description='The URL the lobby tile loads. Absolute URL, up to 2048 characters.'
       onSubmit={() => save.mutateAsync()}
+      validate={() => ({ img: check.url(image, 'Image URL') || check.length(image, 'Image URL', { max: 2048 }) })}
     >
       <TextField id='img' label='Image URL' required value={image} onChange={e => setImage(e.target.value)} />
       {image && <img src={image} alt='' className='max-h-40 rounded object-contain' />}
@@ -211,6 +213,7 @@ const EditIcon = ({ game }: { game: JsGame }) => {
       title={`Icon — ${game.game_name}`}
       description='Absolute URL, up to 500 characters.'
       onSubmit={() => save.mutateAsync()}
+      validate={() => ({ icon: check.url(icon, 'Icon URL') || check.length(icon, 'Icon URL', { max: 500 }) })}
     >
       <TextField id='icon' label='Icon URL' type='url' required value={icon} onChange={e => setIcon(e.target.value)} />
       {icon && <img src={icon} alt='' className='max-h-40 rounded object-contain' />}
@@ -377,6 +380,7 @@ const ProvidersTab = () => {
               description='Your transaction password is required for this change.'
               submitLabel='Apply'
               onSubmit={() => save.mutateAsync()}
+              validate={() => ({ tp: check.required(tp, 'Transaction password') })}
             >
               <ul className='text-sm'>
                 {updates.map(u => (
@@ -489,7 +493,25 @@ const CreateFreespin = () => {
   })
 
   return (
-    <FormDialog trigger={<Button>New campaign</Button>} title='Create a free spin campaign' description='Grants a named user free spins on one game between two dates.' submitLabel='Create' onSubmit={() => create.mutateAsync()} wide>
+    <FormDialog
+      trigger={<Button>New campaign</Button>}
+      title='Create a free spin campaign'
+      description='Grants a named user free spins on one game between two dates.'
+      submitLabel='Create'
+      onSubmit={() => create.mutateAsync()}
+      validate={() => ({
+        'fs-id': check.required(f.freespinId, 'Campaign id') || check.length(f.freespinId, 'Campaign id', { max: 190 }),
+        'fs-game': check.required(f.gameUuid, 'Game UUID'),
+        'fs-pid': check.id(f.playerId, 'User id'),
+        'fs-pname': check.required(f.playerName, 'User name') || check.length(f.playerName, 'User name', { max: 120 }),
+        'fs-cur': cur.currency ? undefined : 'No GIS currency is enabled for this site',
+        'fs-qty': check.number(f.quantity, 'Spins', { integer: true, min: 1, max: 10000 }),
+        'fs-from': check.required(f.validFrom, 'Valid from'),
+        'fs-until': check.required(f.validUntil, 'Valid until') || (f.validFrom && toEpoch(f.validUntil) <= toEpoch(f.validFrom) ? 'Valid until must be after valid from' : undefined),
+        'fs-denom': check.number(f.denomination, 'Denomination', { positive: true, optional: true })
+      })}
+      wide
+    >
       <div className='grid grid-cols-2 gap-4'>
         <TextField id='fs-id' label='Campaign id' required value={f.freespinId} onChange={e => setF({ ...f, freespinId: e.target.value })} hint='Your reference; must be unique' />
         <TextField id='fs-game' label='Game UUID' required value={f.gameUuid} onChange={e => setF({ ...f, gameUuid: e.target.value })} />
@@ -530,7 +552,29 @@ const CreateVoucher = () => {
   })
 
   return (
-    <FormDialog trigger={<Button>New voucher</Button>} title='Create a table voucher' description='Table credit with a winnings cap for one user.' submitLabel='Create' onSubmit={() => create.mutateAsync()} wide>
+    <FormDialog
+      trigger={<Button>New voucher</Button>}
+      title='Create a table voucher'
+      description='Table credit with a winnings cap for one user.'
+      submitLabel='Create'
+      onSubmit={() => create.mutateAsync()}
+      validate={() => {
+        const tables = f.tableIds.split(',').map(t => t.trim()).filter(Boolean)
+
+        return {
+          'v-id': check.required(f.voucherId, 'Voucher id') || check.length(f.voucherId, 'Voucher id', { max: 190 }),
+          'v-title': check.required(f.title, 'Title') || check.length(f.title, 'Title', { max: 200 }),
+          'v-pid': check.id(f.playerId, 'User id'),
+          'v-cur': cur.currency ? undefined : 'No GIS currency is enabled for this site',
+          'v-bal': check.number(f.initialBalance, 'Initial balance', { positive: true }),
+          'v-max': check.number(f.maxWinnings, 'Max winnings', { positive: true }),
+          'v-until': check.required(f.validUntil, 'Valid until') || (new Date(f.validUntil).getTime() <= Date.now() ? 'Valid until must be in the future' : undefined),
+          'v-tables': !tables.length ? 'Enter at least one table id' : tables.length > 200 ? 'At most 200 table ids' : tables.some(t => t.length > 120) ? 'Each table id must be at most 120 characters' : undefined,
+          'v-terms': check.length(f.shortTerms, 'Short terms', { max: 2000 })
+        }
+      }}
+      wide
+    >
       <div className='grid grid-cols-2 gap-4'>
         <TextField id='v-id' label='Voucher id' required value={f.voucherId} onChange={e => setF({ ...f, voucherId: e.target.value })} />
         <TextField id='v-title' label='Title' required value={f.title} onChange={e => setF({ ...f, title: e.target.value })} />

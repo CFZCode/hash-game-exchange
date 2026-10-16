@@ -23,6 +23,7 @@ import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useApi, useApiMutation } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
+import { check } from '@/lib/validate'
 import { formatNumber } from '@/lib/format'
 import { LOCK_KINDS, type Exposure, type StaffRisk, type UserRisk } from './types'
 
@@ -65,6 +66,7 @@ const IdLookup = ({ label, onSubmit }: { label: string; onSubmit: (id: string) =
 }
 
 type LockChoice = 'unchanged' | 'lock' | 'unlock'
+
 const LOCK_OPTIONS = [
   { value: 'unchanged', label: 'Leave as is' },
   { value: 'lock', label: 'Lock' },
@@ -81,7 +83,6 @@ const LocksDialog = ({ target, id: presetId }: { target: 'user' | 'staff'; id?: 
       const body: Record<string, number | boolean> = { [target === 'user' ? 'userId' : 'staffId']: Number(id) }
 
       for (const k of LOCK_KINDS) if (choice[k] !== 'unchanged') body[k] = choice[k] === 'lock'
-      if (Object.keys(body).length === 1) return Promise.reject(new Error('Choose at least one lock to change'))
 
       return api.post('admin/locks', body)
     },
@@ -101,6 +102,13 @@ const LocksDialog = ({ target, id: presetId }: { target: 'user' | 'staff'; id?: 
       submitLabel='Apply'
       destructive={Object.values(choice).includes('lock')}
       onOpenChange={o => o && setId(presetId ?? id)}
+      validate={() => {
+        const idError = check.id(id, target === 'user' ? 'User id' : 'Staff id')
+
+        if (idError) return { [`lk-${target}`]: idError }
+
+        return LOCK_KINDS.some(k => choice[k] !== 'unchanged') ? null : 'Choose at least one lock to change'
+      }}
       onSubmit={() => apply.mutateAsync()}
     >
       <TextField id={`lk-${target}`} label={target === 'user' ? 'User id' : 'Staff id'} required value={id} onChange={e => setId(e.target.value.replace(/\D/g, ''))} />
@@ -231,6 +239,7 @@ const StaffRiskTab = () => {
 
 const GenericTable = ({ rows }: { rows: Record<string, unknown>[] | undefined }) => {
   const keys = rows?.length ? Object.keys(rows[0]) : []
+
   const columns: Column<Record<string, unknown>>[] = keys.map(k => ({
     key: k,
     header: k,

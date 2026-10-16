@@ -21,6 +21,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useApiMutation, useListState, usePagedApi } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
+import { check } from '@/lib/validate'
 import { NotificationPreview, PushStatusCard } from './PushParts'
 import { imageSrc, type Audience, type Campaign, type TestResult } from './types'
 
@@ -46,6 +47,9 @@ const Actions = ({ c, onOpen }: { c: Campaign; onOpen: () => void }) => {
   const [testUser, setTestUser] = useState('')
   const editable = ['draft', 'scheduled', 'failed'].includes(c.status)
 
+  const sendAtError = sendAt && Number.isNaN(new Date(sendAt).getTime()) ? 'Pick a valid date and time' : undefined
+  const testUserError = testUser ? check.id(testUser, 'Player id') : undefined
+
   const send = useApiMutation({
     fn: () => api.post<Campaign>(`admin/push/campaigns/${c.id}/send`),
     success: r => (r.status === 'sent' ? `Sent — ${r.accepted} accepted by OneSignal, ${r.inboxRows} inbox row(s)` : `Campaign ${r.status}`),
@@ -53,7 +57,11 @@ const Actions = ({ c, onOpen }: { c: Campaign; onOpen: () => void }) => {
   })
 
   const schedule = useApiMutation({
-    fn: () => api.post<Campaign>(`admin/push/campaigns/${c.id}/schedule`, { sendAt: new Date(sendAt).toISOString() }),
+    fn: () => {
+      if (new Date(sendAt).getTime() <= new Date().getTime()) return Promise.reject(new Error('Send time must be in the future'))
+
+      return api.post<Campaign>(`admin/push/campaigns/${c.id}/schedule`, { sendAt: new Date(sendAt).toISOString() })
+    },
     success: 'Scheduled',
     invalidate: INVALIDATE
   })
@@ -99,9 +107,10 @@ const Actions = ({ c, onOpen }: { c: Campaign; onOpen: () => void }) => {
             }
             title={`Schedule #${c.id}`}
             confirmLabel='Schedule'
+            confirmDisabled={!sendAt || !!sendAtError}
             onConfirm={() => schedule.mutateAsync()}
           >
-            <DateTimeField id={`s-${c.id}`} label='Send at (your local time)' value={sendAt} onChange={setSendAt} />
+            <DateTimeField id={`s-${c.id}`} label='Send at (your local time)' required error={sendAtError} value={sendAt} onChange={setSendAt} />
           </ConfirmDialog>
         )}
         {(c.status === 'draft' || c.status === 'scheduled') && (
@@ -126,9 +135,10 @@ const Actions = ({ c, onOpen }: { c: Campaign; onOpen: () => void }) => {
           title={`Test #${c.id} on one player`}
           description='Push only, no bell row. The player must have allowed notifications on the site while signed in.'
           confirmLabel='Send test'
+          confirmDisabled={!testUser || !!testUserError}
           onConfirm={() => test.mutateAsync()}
         >
-          <TextField id={`t-${c.id}`} label='Player id' inputMode='numeric' value={testUser} onChange={e => setTestUser(e.target.value.replace(/\D/g, ''))} />
+          <TextField id={`t-${c.id}`} label='Player id' required inputMode='numeric' error={testUserError} value={testUser} onChange={e => setTestUser(e.target.value.replace(/\D/g, ''))} />
         </ConfirmDialog>
         {['draft', 'cancelled', 'failed'].includes(c.status) && (
           <ConfirmDialog

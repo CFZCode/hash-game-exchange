@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 
-import { InfoIcon, LockIcon, SendIcon, SettingsIcon } from 'lucide-react'
+import { InfoIcon, Loader2Icon, LockIcon, SendIcon, SettingsIcon } from 'lucide-react'
 
 import ErrorState from '@/components/shared/ErrorState'
 import FormDialog from '@/components/shared/FormDialog'
@@ -82,6 +82,10 @@ const IntegrationSettings = ({ feature, current }: { feature: CatalogueFeature; 
       title={`${feature.label} — ${spec.label}`}
       description='Keys for the variant the platform set. Keys are sealed and never shown again; leave one blank to keep it.'
       submitLabel='Save'
+      validate={() => ({
+        ...Object.fromEntries(spec.configFields.map(f => [`c-${f.key}`, f.required && !(config[f.key] ?? '').trim() && `${f.label} is required`])),
+        ...Object.fromEntries(spec.secretFields.map(f => [`s-${f.key}`, f.required && !current.secretsSet?.[f.key] && !(secrets[f.key] ?? '').trim() && `${f.label} is required`]))
+      })}
       onSubmit={() => save.mutateAsync()}
     >
       {spec.configFields.map(f => (
@@ -117,7 +121,7 @@ const IntegrationSettings = ({ feature, current }: { feature: CatalogueFeature; 
             onChange={e => setTestUser(e.target.value.replace(/\D/g, ''))}
           />
           <Button type='button' variant='outline' onClick={() => test.mutate()} disabled={test.isPending}>
-            <SendIcon /> Test
+            {test.isPending ? <Loader2Icon className='animate-spin' /> : <SendIcon />} Test
           </Button>
         </div>
       )}

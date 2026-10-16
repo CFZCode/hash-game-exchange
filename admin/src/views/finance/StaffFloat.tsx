@@ -5,6 +5,7 @@ import Link from 'next/link'
 import Money from '@/components/shared/Money'
 import { isAgentTreeLevel, useSession } from '@/contexts/SessionContext'
 import { useApi } from '@/hooks/use-api'
+import { errorMessage } from '@/lib/api/client'
 
 /** `GET admin/accounts/float` — the caller's own float: balance, credit line, what is available. */
 export type StaffFloat = { staffId: number; currency: string; balance: string; creditLimit: string; available: string }
@@ -58,6 +59,7 @@ export const StaffFloatNote = () => {
         <span>Available to give</span>
         <Money value={f?.available} currency={f?.currency ?? 'INR'} />
       </div>
+      {float.error ? <p className='text-danger text-xs'>Could not load your balance: {errorMessage(float.error)}</p> : null}
       <p className='text-muted-foreground text-xs'>
         A credit moves money from your balance to the player; a debit moves it back to you. INR only.
       </p>

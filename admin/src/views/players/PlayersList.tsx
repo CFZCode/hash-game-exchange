@@ -21,7 +21,8 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useSession } from '@/contexts/SessionContext'
 import { useApiMutation, useListState, usePagedApi } from '@/hooks/use-api'
-import { api } from '@/lib/api/client'
+import { api, errorMessage } from '@/lib/api/client'
+import { check } from '@/lib/validate'
 import { formatNumber } from '@/lib/format'
 import { useIsAgentTree, TxnPasswordLabel } from '@/views/finance/StaffFloat'
 import type { PlayerRow } from './types'
@@ -96,18 +97,27 @@ const CreatePlayer = () => {
       title='Create a user'
       description='An operator-created account. The user can change the password after first sign-in.'
       submitLabel='Create'
+      validate={() => ({
+        username: check.required(form.username, 'Username') || check.length(form.username, 'Username', { min: 3, max: 60 }),
+        email: check.email(form.email, 'Email', true) || check.length(form.email, 'Email', { max: 160 }),
+        phone: check.length(form.phone, 'Phone', { max: 30 }),
+        country: check.length(form.country, 'Country', { max: 80 }),
+        password: !form.password ? 'Password is required' : check.length(form.password, 'Password', { min: 8, max: 200 }),
+        initialBalance: check.number(form.initialBalance, 'Initial balance', { min: 0, decimals: 8, optional: true }),
+        transactionPassword: hasBalance && agentTree && !form.transactionPassword && 'Transaction password is required for a starting balance'
+      })}
       onSubmit={() => create.mutateAsync()}
     >
-      <TextField id='username' label='Username' required minLength={3} value={form.username} onChange={e => setForm({ ...form, username: e.target.value })} />
+      <TextField id='username' label='Username' required minLength={3} maxLength={60} value={form.username} onChange={e => setForm({ ...form, username: e.target.value })} />
       <TextField id='email' label='Email' type='email' value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
       <div className='grid grid-cols-2 gap-4'>
         <TextField id='phone' label='Phone' value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
         <TextField id='country' label='Country' value={form.country} onChange={e => setForm({ ...form, country: e.target.value })} />
       </div>
       <TextField id='password' label='Password' type='password' required minLength={8} value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} />
-      <TextField id='initialBalance' label='Initial balance' hint='Decimal string, e.g. 100.00' value={form.initialBalance} onChange={e => setForm({ ...form, initialBalance: e.target.value })} />
+      <TextField id='initialBalance' label='Initial balance' inputMode='decimal' hint='Decimal string, e.g. 100.00' value={form.initialBalance} onChange={e => setForm({ ...form, initialBalance: e.target.value })} />
       {hasBalance && (
-        <TextField id='cp-tp' label={<TxnPasswordLabel />} type='password' hint={agentTree ? 'Required for a starting balance' : 'Required (if your account uses one)'} value={form.transactionPassword} onChange={e => setForm({ ...form, transactionPassword: e.target.value })} />
+        <TextField id='cp-tp' name='transactionPassword' label={<TxnPasswordLabel />} type='password' hint={agentTree ? 'Required for a starting balance' : 'Required (if your account uses one)'} value={form.transactionPassword} onChange={e => setForm({ ...form, transactionPassword: e.target.value })} />
       )}
     </FormDialog>
   )
@@ -210,7 +220,7 @@ const ReportsList = () => {
       a.click()
       URL.revokeObjectURL(url)
     } catch (e) {
-      toast.error(String(e))
+      toast.error(`Export failed: ${errorMessage(e)}`)
     }
   }
 

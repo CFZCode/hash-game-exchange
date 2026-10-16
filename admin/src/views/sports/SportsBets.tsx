@@ -39,6 +39,7 @@ const betColumns: Column<SportsBet>[] = [
 
 const AllBets = () => {
   const { state, set, query } = useListState(['status', 'gameType', 'userId', 'matchId'])
+
   const list = usePagedApi<SportsBet>('admin/sports/bet-admin/bets', {
     limit: query.limit,
     page: query.page,

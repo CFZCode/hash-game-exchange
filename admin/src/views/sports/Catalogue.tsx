@@ -5,6 +5,7 @@ import { useState, type ReactNode } from 'react'
 import { InfoIcon } from 'lucide-react'
 
 import Can from '@/components/shared/Can'
+import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import DataTable, { type Column } from '@/components/shared/DataTable'
 import { TextField } from '@/components/shared/FormField'
 import PageHeader from '@/components/shared/PageHeader'
@@ -14,6 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useApiMutation, useListState, usePagedApi } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
+import { check } from '@/lib/validate'
 
 /**
  * Which sports the book offers and which fancy markets are hidden used to come
@@ -45,6 +47,8 @@ const Locks = () => {
   })
 
   const [userId, setUserId] = useState('')
+  const userIdError = userId ? check.id(userId, 'User id') : undefined
+  const canAct = !!userId && !userIdError && !setLock.isPending
 
   const columns: Column<{ userId?: number; username?: string; locked?: boolean }>[] = [
     { key: 'user', header: 'User', cell: u => <span>{u.username ?? `#${u.userId}`}</span> },
@@ -55,9 +59,20 @@ const Locks = () => {
       align: 'right',
       cell: u => (
         <Can permission='sports:manage'>
-          <Button size='sm' variant='outline' onClick={() => u.userId && setLock.mutate({ userId: u.userId, locked: !u.locked })}>
-            {u.locked ? 'Unlock' : 'Lock'}
-          </Button>
+          {u.locked ? (
+            <Button size='sm' variant='outline' disabled={setLock.isPending} onClick={() => u.userId && setLock.mutate({ userId: u.userId, locked: false })}>
+              Unlock
+            </Button>
+          ) : (
+            <ConfirmDialog
+              trigger={<Button size='sm' variant='outline' disabled={setLock.isPending}>Lock</Button>}
+              title={`Lock ${u.username ?? `#${u.userId}`} out of the sportsbook?`}
+              description='They cannot place sports bets until unlocked.'
+              confirmLabel='Lock'
+              destructive
+              onConfirm={() => u.userId && setLock.mutateAsync({ userId: u.userId, locked: true })}
+            />
+          )}
         </Can>
       )
     }
@@ -67,11 +82,20 @@ const Locks = () => {
     <div className='grid gap-4'>
       <Can permission='sports:manage'>
         <div className='flex flex-wrap items-end gap-2'>
-          <TextField id='lk-uid' label='User id' value={userId} onChange={e => setUserId(e.target.value.replace(/\D/g, ''))} />
-          <Button variant='outline' disabled={!/^\d+$/.test(userId)} onClick={() => setLock.mutate({ userId: Number(userId), locked: true })}>
-            Lock
-          </Button>
-          <Button variant='outline' disabled={!/^\d+$/.test(userId)} onClick={() => setLock.mutate({ userId: Number(userId), locked: false })}>
+          <TextField id='lk-uid' label='User id' inputMode='numeric' error={userIdError} value={userId} onChange={e => setUserId(e.target.value.replace(/\D/g, ''))} />
+          <ConfirmDialog
+            trigger={
+              <Button variant='outline' disabled={!canAct}>
+                Lock
+              </Button>
+            }
+            title={`Lock user #${userId} out of the sportsbook?`}
+            description='They cannot place sports bets until unlocked.'
+            confirmLabel='Lock'
+            destructive
+            onConfirm={() => setLock.mutateAsync({ userId: Number(userId), locked: true })}
+          />
+          <Button variant='outline' disabled={!canAct} onClick={() => setLock.mutate({ userId: Number(userId), locked: false })}>
             Unlock
           </Button>
         </div>

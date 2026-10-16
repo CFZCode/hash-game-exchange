@@ -6,6 +6,7 @@ import FormDialog from '@/components/shared/FormDialog'
 import { TextAreaField, TextField } from '@/components/shared/FormField'
 import { useApiMutation } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
+import { check } from '@/lib/validate'
 import { TxnPasswordLabel } from '@/views/finance/StaffFloat'
 import type { AccountRow, AccountsResponse } from './types'
 
@@ -58,7 +59,7 @@ const SettleDialog = ({ mode, row, me, trigger }: Props) => {
   const settle = useApiMutation({
     fn: () => settleApi(row, points, form.transactionPassword, form.remark),
     invalidate: SETTLE_INVALIDATE,
-    success: mode === 'deposit' ? 'Deposit successful!' : 'Withdraw successful!',
+    success: () => `${mode === 'deposit' ? 'Deposited' : 'Withdrew'} ${fmt(amount)} ${mode === 'deposit' ? 'to' : 'from'} ${row.username}`,
     onSuccess: () => setForm({ amount: '', remark: '', transactionPassword: '' })
   })
 
@@ -75,6 +76,12 @@ const SettleDialog = ({ mode, row, me, trigger }: Props) => {
       trigger={trigger}
       title={mode === 'deposit' ? 'DEPOSIT' : 'WITHDRAW'}
       submitLabel='Submit'
+
+      // Server (`exchange.validators.js settle`): points ≠ 0, |points| ≤ 100,000,000; remark ≤ 200.
+      validate={() => ({
+        'settle-amount': check.number(form.amount, 'Amount', { positive: true, max: 100_000_000, decimals: 2 }),
+        'settle-remark': check.length(form.remark, 'Remark', { max: 200 })
+      })}
       onSubmit={() => settle.mutateAsync()}
     >
       <div className='grid gap-2 rounded-md border p-3'>
@@ -91,7 +98,7 @@ const SettleDialog = ({ mode, row, me, trigger }: Props) => {
         value={form.amount}
         onChange={e => setForm({ ...form, amount: e.target.value })}
       />
-      <TextAreaField id='settle-remark' label='Remark' value={form.remark} onChange={e => setForm({ ...form, remark: e.target.value })} />
+      <TextAreaField id='settle-remark' label='Remark' maxLength={200} value={form.remark} onChange={e => setForm({ ...form, remark: e.target.value })} />
       <TextField
         id='settle-tp'
         label={<TxnPasswordLabel />}

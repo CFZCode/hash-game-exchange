@@ -127,6 +127,7 @@ const CreateCard = () => {
 
 const Cards = () => {
   const { state, set, query } = useListState(['activeOnly'])
+
   const list = usePagedApi<GiftCard>('admin/user/gift-cards', {
     limit: query.limit,
     page: query.page,
@@ -211,6 +212,7 @@ const Records = () => {
   const { page, limit, set } = useLocalList()
   const [status, setStatus] = useState('all')
   const [userId, setUserId] = useState('')
+
   const list = usePagedApi<GiftCardRecord>('admin/user/gift-cards/records', {
     limit,
     page,

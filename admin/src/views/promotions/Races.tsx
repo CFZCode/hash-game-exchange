@@ -2,7 +2,9 @@
 
 import { useState } from 'react'
 
-import { BanIcon, FlagIcon, ListOrderedIcon, PlusIcon, RotateCcwIcon, SaveIcon, Trash2Icon, TrophyIcon } from 'lucide-react'
+import { toast } from 'sonner'
+
+import { BanIcon, FlagIcon, ListOrderedIcon, Loader2Icon, PlusIcon, RotateCcwIcon, SaveIcon, Trash2Icon, TrophyIcon } from 'lucide-react'
 
 import Can from '@/components/shared/Can'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
@@ -24,6 +26,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useApi, useApiMutation, useListState, usePagedApi } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
+import { check, cleanErrors, firstError } from '@/lib/validate'
 
 /**
  * Wagering races (stake fork). A config per type decides the points a bet earns
@@ -66,6 +69,20 @@ type Board = { raceId: number; startsAt: string; endsAt: string; winnerCount: nu
 type Race = { id: number; type: RaceType; status?: string; startsAt?: string; endsAt?: string; starts_at?: string; ends_at?: string; participants?: number; prizePool?: string; settledAt?: string | null; totalAwarded?: string; winnerCount?: number; cancelReason?: string | null }
 type Reward = { id: number; raceId?: number; userId?: number | string; username?: string; rank?: number; points?: string; amount?: string; currency?: string; claimed?: boolean; createdAt?: string }
 type Boat = { id: number; name: string; isActive?: boolean }
+
+/** Bounds from race.validators.js `updateConfig` (MAX_WINNERS = 500). */
+const FIELD_RULE: Partial<Record<keyof RaceConfig, (v: unknown, label: string) => string | undefined>> = {
+  sportsPoints: (v, l) => check.number(v as string, l, { min: 0, max: 1000 }),
+  casinoPoints: (v, l) => check.number(v as string, l, { min: 0, max: 1000 }),
+  slotPoints: (v, l) => check.number(v as string, l, { min: 0, max: 1000 }),
+  crashPoints: (v, l) => check.number(v as string, l, { min: 0, max: 1000 }),
+  otherPoints: (v, l) => check.number(v as string, l, { min: 0, max: 1000 }),
+  prizePool: (v, l) => check.number(v as string, l, { min: 0, decimals: 8 }),
+  platformFeePercent: (v, l) => check.number(v as string, l, { min: 0, max: 100 }),
+  winnerCount: (v, l) => check.number(v as string, l, { integer: true, min: 1, max: 500 }),
+  top3Percentage: (v, l) => check.number(v as string, l, { min: 0, max: 100 }),
+  minPoints: (v, l) => check.number(v as string, l, { min: 0, decimals: 8 })
+}
 
 const NUMERIC_FIELDS: { key: keyof RaceConfig; label: string; hint?: string }[] = [
   { key: 'sportsPoints', label: 'Sports points / USD' },
@@ -110,6 +127,19 @@ const LadderDialog = ({ type, current }: { type: RaceType; current: RaceConfig }
       description='One line per paid rank, rank 1 first: its share of the net pool in %. The shares must add up to 100 and never rise down the ladder. The number of lines becomes the ranks paid.'
       submitLabel='Save ladder'
       onSubmit={() => save.mutateAsync()}
+      validate={() => {
+        if (!shares.length) return { ladder: 'Enter at least one rank share' }
+        if (shares.length > 500) return { ladder: 'At most 500 ranks can be paid' }
+        const bad = shares.findIndex(v => !Number.isFinite(v) || v <= 0 || v > 100)
+
+        if (bad >= 0) return { ladder: `Rank ${bad + 1}: share must be a number above 0 and at most 100` }
+        const rising = shares.findIndex((v, i) => i > 0 && v > shares[i - 1])
+
+        if (rising >= 0) return { ladder: `Rank ${rising + 1} pays more than rank ${rising} — shares must never rise down the ladder` }
+        if (Math.abs(total - 100) > 0.01) return { ladder: `Shares add up to ${total.toFixed(2)}% — they must total 100%` }
+
+        return null
+      }}
     >
       <TextAreaField id='ladder' label='Shares (%)' rows={10} value={text} onChange={e => setText(e.target.value)} />
       <p className={`text-sm ${Math.abs(total - 100) <= 0.01 ? 'text-muted-foreground' : 'text-destructive'}`}>
@@ -157,6 +187,17 @@ const ConfigEditor = ({ type }: { type: RaceType }) => {
 
   const dirty = Object.keys(draft).length
 
+  const errors = cleanErrors(
+    Object.fromEntries(NUMERIC_FIELDS.filter(f => f.key in draft).map(f => [`r-${String(f.key)}`, FIELD_RULE[f.key]?.(draft[f.key], f.label)]))
+  )
+
+  const submit = () => {
+    const problem = firstError(errors)
+
+    if (problem) return void toast.error(problem)
+    save.mutate()
+  }
+
   return (
     <div className='grid gap-4 lg:grid-cols-3'>
       <Card className='shadow-none lg:col-span-2'>
@@ -176,6 +217,7 @@ const ConfigEditor = ({ type }: { type: RaceType }) => {
                 id={`r-${String(f.key)}`}
                 label={f.label}
                 hint={f.hint}
+                error={errors[`r-${String(f.key)}`]}
                 value={String(c[f.key] ?? '')}
                 onChange={e => setDraft(d => ({ ...d, [f.key]: e.target.value }))}
               />
@@ -189,8 +231,8 @@ const ConfigEditor = ({ type }: { type: RaceType }) => {
             onChange={bookedSeatsEnabled => setDraft(d => ({ ...d, bookedSeatsEnabled }))}
           />
           <Can permission='config:write'>
-            <Button onClick={() => save.mutate()} disabled={!dirty || save.isPending} className='justify-self-start'>
-              <SaveIcon /> Save {dirty ? `(${dirty})` : ''}
+            <Button onClick={submit} disabled={!dirty || save.isPending} className='justify-self-start'>
+              {save.isPending ? <Loader2Icon className='animate-spin' /> : <SaveIcon />} Save {dirty ? `(${dirty})` : ''}
             </Button>
           </Can>
         </CardContent>
@@ -324,6 +366,7 @@ const RacesTab = () => {
                 submitLabel='Cancel race'
                 destructive
                 onSubmit={() => cancel.mutateAsync(r.id)}
+                validate={() => ({ 'cancel-reason': check.length(reason, 'Reason', { max: 200 }) })}
               >
                 <TextField id='cancel-reason' label='Reason (kept in the activity log)' maxLength={200} value={reason} onChange={e => setReason(e.target.value)} />
               </FormDialog>
@@ -517,7 +560,7 @@ const BoatsTab = () => {
 
   const columns: Column<Boat>[] = [
     { key: 'name', header: 'Name', cell: b => b.name },
-    { key: 'active', header: 'Shown', cell: b => <Can permission='config:write' fallback={<StatusBadge value={b.isActive} />}><Button variant='ghost' size='sm' onClick={() => toggle.mutate({ id: b.id, isActive: !b.isActive })}><StatusBadge value={b.isActive ? 'active' : 'inactive'} /></Button></Can> },
+    { key: 'active', header: 'Shown', cell: b => <Can permission='config:write' fallback={<StatusBadge value={b.isActive} />}><Button variant='ghost' size='sm' disabled={toggle.isPending} onClick={() => toggle.mutate({ id: b.id, isActive: !b.isActive })}><StatusBadge value={b.isActive ? 'active' : 'inactive'} /></Button></Can> },
     {
       key: 'actions',
       header: '',
@@ -555,6 +598,7 @@ const BoatsTab = () => {
           title='Add a booked seat'
           submitLabel='Add'
           onSubmit={() => add.mutateAsync()}
+          validate={() => ({ 'boat-name': check.required(name, 'Display name') || check.length(name, 'Display name', { max: 60 }) })}
         >
           <TextField id='boat-name' label='Display name' required maxLength={60} value={name} onChange={e => setName(e.target.value)} />
         </FormDialog>

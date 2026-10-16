@@ -6,10 +6,12 @@ import { useRouter } from 'next/navigation'
 
 import { ChevronDownIcon } from 'lucide-react'
 
+import { toast } from 'sonner'
+
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useApi } from '@/hooks/use-api'
-import { api } from '@/lib/api/client'
+import { api, errorMessage } from '@/lib/api/client'
 import { cn } from '@/lib/utils'
 import { MARKET_API, SPORTS_USER, fmtDateTime, isLay, plain, type AnalysisResponse, type Bet, type FeedMarket, type MatchMeta } from './api'
 import BetLockDialog from './BetLockDialog'
@@ -125,8 +127,13 @@ const GameDetails = ({ sportId, eventId }: Props) => {
   const meta = metaRes?.data?.[0]?.gmid ? metaRes.data[0] : null
 
   // downline bets is event pe
-  const { data: betsRes } = useApi<{ rows: Bet[] }>(`${MARKET_API}/event-bets`, { eventId, limit: 100 }, { refetchInterval: slow })
+  const { data: betsRes, error: betsError } = useApi<{ rows: Bet[] }>(`${MARKET_API}/event-bets`, { eventId, limit: 100 }, { refetchInterval: slow })
   const openBets = useMemo(() => (betsRes?.rows ?? []).filter(b => !b.deleted), [betsRes])
+
+  // First load of the bets failed — the tables would just look empty. (Refresh failures are toasted globally.)
+  useEffect(() => {
+    if (betsError && !betsRes) toast.error(`Could not load bets: ${errorMessage(betsError)}`, { id: `game-bets-${eventId}` })
+  }, [betsError, betsRes, eventId])
   const matchedBets = openBets.filter(b => !b.unmatched)
   const unmatchedBets = openBets.filter(b => b.unmatched)
 
@@ -172,10 +179,13 @@ const GameDetails = ({ sportId, eventId }: Props) => {
   // khali ya khatam match → 3s baad bahar (zip: home)
   useEffect(() => {
     if (!dead && !noMarkets) return
+
+    // Say why the page is about to leave, instead of a silent blank → redirect.
+    toast.info(dead ? 'This match is no longer on the feed — going back to the dashboard' : 'No open markets for this match — going back to the dashboard', { id: `game-${eventId}` })
     const t = setTimeout(() => router.push('/dashboard?tab=client'), DEAD_REDIRECT_MS)
 
     return () => clearTimeout(t)
-  }, [dead, noMarkets, router])
+  }, [dead, noMarkets, router, eventId])
 
   const etid = String(meta?.etid ?? sportId)
   const isCricket = etid === '4'

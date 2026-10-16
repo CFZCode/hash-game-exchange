@@ -2,8 +2,9 @@
 
 import { useState } from 'react'
 
-import { ArrowRightIcon, FileSpreadsheetIcon, FileTextIcon } from 'lucide-react'
+import { ArrowRightIcon, FileSpreadsheetIcon, FileTextIcon, Loader2Icon } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 
 import DataTable, { type Column } from '@/components/shared/DataTable'
 import PageHeader from '@/components/shared/PageHeader'
@@ -11,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useApi, useListState } from '@/hooks/use-api'
 import { errorMessage } from '@/lib/api/client'
+import { check } from '@/lib/validate'
 import { accountTypeLabel } from './AccountList'
 import { exportExcel, exportPdf } from './exportList'
 import { fmt, SETTLE_INVALIDATE, settleApi } from './SettleDialog'
@@ -56,19 +58,32 @@ const Bank = () => {
 
   const submitRow = async (r: AccountRow) => {
     const key = keyOf(r)
-    const points = Number(amounts[key])
+    const raw = (amounts[key] ?? '').trim()
+    const points = Number(raw)
 
-    if (!points) return setStatus(prev => ({ ...prev, [key]: { ok: false, text: 'Enter points' } }))
+    // Server (`exchange.validators.js settle`): points ≠ 0 and |points| ≤ 100,000,000.
+    const problem = !raw
+      ? 'Enter points'
+      : check.number(raw, 'Points', { min: -100_000_000, max: 100_000_000, decimals: 2 }) || (points === 0 ? 'Points cannot be 0' : undefined)
+
+    if (problem) {
+      setStatus(prev => ({ ...prev, [key]: { ok: false, text: problem } }))
+      toast.error(`${r.username}: ${problem}`)
+
+      return
+    }
 
     setBusy(key)
 
     try {
       await settleApi(r, points, masterPassword)
       setStatus(prev => ({ ...prev, [key]: { ok: true, text: 'Sucessful Balance Transfer' } }))
+      toast.success(`${r.username}: settled ${points.toFixed(2)} points`)
       setAmount(key, '')
       for (const k of SETTLE_INVALIDATE) void qc.invalidateQueries({ queryKey: k })
     } catch (err) {
       setStatus(prev => ({ ...prev, [key]: { ok: false, text: errorMessage(err) } }))
+      toast.error(`${r.username}: ${errorMessage(err)}`)
     } finally {
       setBusy(null)
     }
@@ -98,6 +113,7 @@ const Bank = () => {
             onChange={e => setAmount(keyOf(r), e.target.value)}
           />
           <Button size='sm' disabled={busy === keyOf(r)} onClick={() => submitRow(r)}>
+            {busy === keyOf(r) && <Loader2Icon className='animate-spin' />}
             Submit
           </Button>
         </div>

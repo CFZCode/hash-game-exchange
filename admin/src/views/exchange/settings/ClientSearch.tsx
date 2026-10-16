@@ -6,6 +6,7 @@ import { ChevronDownIcon } from 'lucide-react'
 
 import { Input } from '@/components/ui/input'
 import { useApi } from '@/hooks/use-api'
+import { errorMessage } from '@/lib/api/client'
 import { cn } from '@/lib/utils'
 
 /**
@@ -155,8 +156,15 @@ const ClientSearch = ({ value, placeholder = 'Select option', onChange, onSelect
               {u.username}
             </li>
           ))}
-          {typed.length > 0 && results.length === 0 && (
-            <li className='text-muted-foreground px-3 py-1.5'>No elements found. Consider changing the search query.</li>
+          {typed.length >= SEARCH_MIN && lookup.error ? (
+            <li className='text-destructive px-3 py-1.5'>Search failed: {errorMessage(lookup.error)}</li>
+          ) : (
+            typed.length > 0 &&
+            results.length === 0 && (
+              <li className='text-muted-foreground px-3 py-1.5'>
+                {canSearch && lookup.isFetching ? 'Searching…' : 'No elements found. Consider changing the search query.'}
+              </li>
+            )
           )}
           {typed.length === 0 && <li className='text-muted-foreground px-3 py-1.5'>List is empty.</li>}
         </ul>

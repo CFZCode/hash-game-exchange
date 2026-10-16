@@ -1,5 +1,7 @@
 'use client'
 
+import { Loader2Icon } from 'lucide-react'
+
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import ErrorState from '@/components/shared/ErrorState'
 import PageHeader from '@/components/shared/PageHeader'
@@ -15,12 +17,14 @@ type Sports = { enabled: boolean; [k: string]: unknown }
 const SportsSwitch = () => {
   const { can, refreshFlags } = useSession()
   const q = useApi<Sports>('admin/site-config/sports')
+
   const set = useApiMutation({
     fn: (enabled: boolean) => api.put('admin/site-config/sports', { enabled }),
     invalidate: [['api', 'admin/site-config/sports'], ['api', 'admin/site-config/global']],
     success: (_r, enabled) => (enabled ? 'Sportsbook is ON' : 'Sportsbook is OFF — bet placement refused'),
     onSuccess: () => refreshFlags()
   })
+
   const on = q.data?.enabled
 
   return (
@@ -45,7 +49,8 @@ const SportsSwitch = () => {
               onConfirm={() => set.mutateAsync(false)}
             />
           ) : (
-            <Button onClick={() => set.mutate(true)} disabled={!can('config:write') || q.isLoading}>
+            <Button onClick={() => set.mutate(true)} disabled={!can('config:write') || q.isLoading || set.isPending}>
+              {set.isPending && <Loader2Icon className='animate-spin' />}
               Turn sports ON
             </Button>
           )}

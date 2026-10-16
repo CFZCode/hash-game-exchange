@@ -12,13 +12,17 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { errorMessage } from '@/lib/api/client'
+import { notifyError } from '@/lib/notify'
 
 export type OrderedItem = { id: string; name: string; vendor?: string | null; type?: string | null; image?: string | null; inactive?: boolean }
 
 type Props = {
+
   /** The saved order from the platform. `undefined` while loading. */
   items: OrderedItem[] | undefined
   loading?: boolean
+
   /** Runs the picker search; returns candidates (already-listed ids are filtered out here). */
   search: (q: string) => Promise<OrderedItem[]>
   onSave: (ids: string[]) => Promise<unknown>
@@ -36,17 +40,23 @@ const Picker = ({ search, exclude, onAdd, disabled }: { search: Props['search'];
   const [q, setQ] = useState('')
   const [results, setResults] = useState<OrderedItem[]>([])
   const [busy, setBusy] = useState(false)
+  const [searchError, setSearchError] = useState<string | null>(null)
   const [picked, setPicked] = useState<Map<string, OrderedItem>>(new Map())
 
   useEffect(() => {
     if (!open) return
     let cancelled = false
 
-    setBusy(true)
     const t = setTimeout(() => {
+      setBusy(true)
+      setSearchError(null)
       search(q)
         .then(r => !cancelled && setResults(r))
-        .catch(() => !cancelled && setResults([]))
+        .catch(e => {
+          if (cancelled) return
+          setResults([])
+          setSearchError(errorMessage(e))
+        })
         .finally(() => !cancelled && setBusy(false))
     }, 300)
 
@@ -114,7 +124,9 @@ const Picker = ({ search, exclude, onAdd, disabled }: { search: Props['search'];
                   ))}
                 {!busy && results.filter(r => !exclude.has(r.id)).length === 0 && (
                   <TableRow>
-                    <TableCell className='text-muted-foreground h-16 text-center'>No matches (or everything found is already listed).</TableCell>
+                    <TableCell className={`h-16 text-center ${searchError ? 'text-destructive' : 'text-muted-foreground'}`}>
+                      {searchError ? `Search failed: ${searchError}` : 'No matches (or everything found is already listed).'}
+                    </TableCell>
                   </TableRow>
                 )}
               </TableBody>
@@ -136,12 +148,11 @@ const Picker = ({ search, exclude, onAdd, disabled }: { search: Props['search'];
 
 /** An ordered list with move/remove/add and a dirty-gated save. The order is the whole value: saving PUTs every id. */
 const OrderedList = ({ items, loading, search, onSave, canWrite, max, header, emptyMessage = 'Nothing curated yet. Add games to build the list.' }: Props) => {
-  const [draft, setDraft] = useState<OrderedItem[]>([])
+  const [edited, setEdited] = useState<OrderedItem[] | null>(null)
+  const draft = useMemo(() => edited ?? items ?? [], [edited, items])
   const [saving, setSaving] = useState(false)
 
-  useEffect(() => {
-    if (items) setDraft(items)
-  }, [items])
+  const setDraft = (fn: (d: OrderedItem[]) => OrderedItem[]) => setEdited(prev => fn(prev ?? items ?? []))
 
   const dirty = useMemo(() => !!items && (items.length !== draft.length || items.some((it, i) => it.id !== draft[i]?.id)), [items, draft])
   const ids = useMemo(() => new Set(draft.map(d => d.id)), [draft])
@@ -149,6 +160,7 @@ const OrderedList = ({ items, loading, search, onSave, canWrite, max, header, em
   const move = (from: number, to: number) =>
     setDraft(d => {
       if (to < 0 || to >= d.length) return d
+
       const next = [...d]
       const [item] = next.splice(from, 1)
 
@@ -159,8 +171,13 @@ const OrderedList = ({ items, loading, search, onSave, canWrite, max, header, em
 
   const save = async () => {
     setSaving(true)
+
     try {
       await onSave(draft.map(d => d.id))
+      setEdited(null)
+    } catch (e) {
+      // The mutation has toasted already; anything else is toasted here.
+      notifyError(e)
     } finally {
       setSaving(false)
     }
@@ -177,7 +194,7 @@ const OrderedList = ({ items, loading, search, onSave, canWrite, max, header, em
           {max ? ` / ${max}` : ''} games
         </Badge>
         <Picker search={search} exclude={ids} disabled={!canWrite} onAdd={added => setDraft(d => [...d, ...added.filter(a => !ids.has(a.id))])} />
-        <Button variant='outline' disabled={!dirty || saving} onClick={() => items && setDraft(items)}>
+        <Button variant='outline' disabled={!dirty || saving} onClick={() => setEdited(null)}>
           <RotateCcwIcon /> Reset
         </Button>
         <Button disabled={!dirty || saving || !canWrite || overMax} onClick={save}>

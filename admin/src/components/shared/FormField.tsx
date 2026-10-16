@@ -1,6 +1,8 @@
 'use client'
 
-import { createContext, useContext, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useState, type ReactNode } from 'react'
+
+import { toast } from 'sonner'
 
 import {
   DatePicker,
@@ -15,6 +17,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
+import { cleanErrors, serverFieldErrors, type FieldErrors } from '@/lib/validate'
 
 type Base = {
   id: string
@@ -34,6 +37,49 @@ const FormErrorsContext = createContext<ErrorsCtx | null>(null)
 export const FormErrorsProvider = ({ errors, onClear, children }: { errors: Record<string, string>; onClear: (key: string) => void; children: ReactNode }) => (
   <FormErrorsContext.Provider value={{ errors, clear: onClear }}>{children}</FormErrorsContext.Provider>
 )
+
+/**
+ * Inline errors for a form that is not a `FormDialog` (settings pages). Wrap the fields in
+ * `<FormErrorsProvider errors={f.errors} onClear={f.clear}>`; `f.passes({...})` shows the messages,
+ * toasts the first and says whether to send; `f.fromServer(error)` maps a 422 onto the fields.
+ */
+export const useFormErrors = () => {
+  const [errors, setErrors] = useState<Record<string, string>>({})
+
+  const passes = useCallback((map: FieldErrors | string | null | undefined | false) => {
+    if (typeof map === 'string' && map) {
+      toast.error(map)
+
+      return false
+    }
+
+    const found = typeof map === 'object' ? cleanErrors(map) : {}
+
+    setErrors(found)
+    const first = Object.values(found)[0]
+
+    if (first) toast.error(first)
+
+    return !first
+  }, [])
+
+  const clear = useCallback(
+    (key: string) =>
+      setErrors(prev => {
+        const next = { ...prev }
+
+        delete next[key]
+
+        return next
+      }),
+    []
+  )
+
+  const fromServer = useCallback((error: unknown) => setErrors(serverFieldErrors(error)), [])
+  const reset = useCallback(() => setErrors({}), [])
+
+  return { errors, passes, clear, fromServer, reset }
+}
 
 /** The message for a field and a way to clear it once the user edits that field. */
 const useFieldError = (id: string, name?: string, explicit?: string | false | null) => {

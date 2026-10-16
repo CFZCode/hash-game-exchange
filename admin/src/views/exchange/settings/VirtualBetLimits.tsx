@@ -4,13 +4,14 @@ import { useState, type FormEvent } from 'react'
 
 import { toast } from 'sonner'
 
+import { Loader2Icon } from 'lucide-react'
+
 import PageHeader from '@/components/shared/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { CONFIG_API, Note, errorText, useZip, zipApi } from './shared'
-import { Loader2Icon } from 'lucide-react'
 import { check } from '@/lib/validate'
 
 /**

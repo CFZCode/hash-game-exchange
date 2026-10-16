@@ -2,7 +2,10 @@
 
 import { useState } from 'react'
 
-import { SwitchField, TextField } from '@/components/shared/FormField'
+import { Loader2Icon } from 'lucide-react'
+import { toast } from 'sonner'
+
+import { FormErrorsProvider, SwitchField, TextField, useFormErrors } from '@/components/shared/FormField'
 import ErrorState from '@/components/shared/ErrorState'
 import PageHeader from '@/components/shared/PageHeader'
 import { RewardCurrencyNotice, useRewardCurrency } from '@/components/shared/RewardCurrency'
@@ -11,6 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useSession } from '@/contexts/SessionContext'
 import { useApi, useApiMutation } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
+import { check } from '@/lib/validate'
 
 type Affiliate = {
   affiliateBonus: string
@@ -32,14 +36,18 @@ const AffiliateForm = ({ initial }: { initial: Affiliate | undefined }) => {
   const { code: cur } = useRewardCurrency()
   const [form, setForm] = useState<Affiliate>(() => ({ ...BLANK, ...initial }))
 
+  const f = useFormErrors()
+
+  const patchOf = () => {
+    const patch: Partial<Record<keyof Affiliate, string | boolean>> = {}
+
+    for (const k of Object.keys(BLANK) as (keyof Affiliate)[]) if (initial && form[k] !== initial[k]) patch[k] = typeof form[k] === 'string' ? (form[k] as string).trim() : form[k]
+
+    return patch
+  }
+
   const save = useApiMutation({
-    fn: () => {
-      const patch: Partial<Record<keyof Affiliate, string | boolean>> = {}
-
-      for (const k of Object.keys(BLANK) as (keyof Affiliate)[]) if (initial && form[k] !== initial[k]) patch[k] = form[k]
-
-      return api.put<Affiliate>('admin/site-config/affiliate', patch)
-    },
+    fn: () => api.put<Affiliate>('admin/site-config/affiliate', patchOf()),
     invalidate: [['api', 'admin/site-config/affiliate']],
     success: 'Affiliate rates saved'
   })
@@ -49,10 +57,22 @@ const AffiliateForm = ({ initial }: { initial: Affiliate | undefined }) => {
       className='grid gap-4'
       onSubmit={e => {
         e.preventDefault()
-        save.mutate()
+
+        const rate = (v: string, label: string, max?: number) => check.number(v, label, { min: 0, max, decimals: 8 })
+
+        const ok = f.passes({
+          registerBonus: rate(form.registerBonus, 'Register bonus'),
+          affiliateBonus: rate(form.affiliateBonus, 'Affiliate bonus'),
+          commissionPercent: rate(form.commissionPercent, 'Commission %', 100)
+        })
+
+        if (!ok) return
+        if (!Object.keys(patchOf()).length) return void toast.info('Nothing changed')
+        save.mutate(undefined, { onError: f.fromServer })
       }}
     >
-      <TextField id='registerBonus' label={`Register bonus (${cur})`} hint='Credited to a new account on sign-up, only while switched on in Welcome bonuses' value={form.registerBonus} onChange={e => setForm({ ...form, registerBonus: e.target.value })} />
+      <FormErrorsProvider errors={f.errors} onClear={f.clear}>
+      <TextField id='registerBonus' inputMode='decimal' label={`Register bonus (${cur})`} hint='Credited to a new account on sign-up, only while switched on in Welcome bonuses' value={form.registerBonus} onChange={e => setForm({ ...form, registerBonus: e.target.value })} />
       <TextField
         id='affiliateBonus'
         label={`Affiliate bonus (${cur})`}
@@ -68,8 +88,10 @@ const AffiliateForm = ({ initial }: { initial: Affiliate | undefined }) => {
         onChange={checked => setForm({ ...form, affiliateBonusRequiresDeposit: checked })}
         disabled={!can('config:write')}
       />
-      <TextField id='commissionPercent' label='Commission %' hint='Share of referred users’ activity' value={form.commissionPercent} onChange={e => setForm({ ...form, commissionPercent: e.target.value })} />
+      <TextField id='commissionPercent' inputMode='decimal' label='Commission %' hint='Share of referred users’ activity, 0–100' value={form.commissionPercent} onChange={e => setForm({ ...form, commissionPercent: e.target.value })} />
+      </FormErrorsProvider>
       <Button type='submit' disabled={save.isPending || !can('config:write')} className='justify-self-start'>
+        {save.isPending && <Loader2Icon className='animate-spin' />}
         Save
       </Button>
     </form>

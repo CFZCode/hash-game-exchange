@@ -6,6 +6,9 @@ import Link from 'next/link'
 
 import { CheckCircle2Icon, MonitorIcon, ImageIcon, Loader2Icon, SmartphoneIcon, UploadIcon, XCircleIcon } from 'lucide-react'
 
+import { toast } from 'sonner'
+
+import ErrorState from '@/components/shared/ErrorState'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -34,7 +37,13 @@ export const PushStatusCard = () => {
   const { data: s, isLoading, error } = useApi<PushStatus>('admin/push/status')
 
   if (isLoading) return <Card className='mb-6 h-32 animate-pulse shadow-none' />
-  if (error || !s) return null
+  if (error)
+    return (
+      <div className='mb-6'>
+        <ErrorState error={error} title='Could not load the OneSignal status' />
+      </div>
+    )
+  if (!s) return null
 
   return (
     <Card className='mb-6 shadow-none'>
@@ -94,13 +103,17 @@ export const ImageInput = ({
   label,
   value,
   onChange,
-  hint
+  hint,
+  error
 }: {
   id: string
   label: string
   value: string
   onChange: (url: string) => void
   hint?: ReactNode
+
+  /** An inline message under the field (e.g. "must be an https URL"). */
+  error?: string | false | null
 }) => {
   const file = useRef<HTMLInputElement>(null)
   const [warnings, setWarnings] = useState<string[]>([])
@@ -133,6 +146,7 @@ export const ImageInput = ({
         <Input
           id={id}
           placeholder='https://… or upload'
+          aria-invalid={error ? true : undefined}
           value={value}
           onChange={e => {
             onChange(e.target.value)
@@ -149,7 +163,12 @@ export const ImageInput = ({
             const f = e.target.files?.[0]
 
             e.target.value = ''
-            if (f) upload.mutate(f)
+            if (!f) return
+
+            // push images route: PNG/JPG/WebP/GIF, at most 1 MB — say so before the upload, not after.
+            if (!ACCEPT.split(',').includes(f.type)) return void toast.error('The image must be PNG, JPG, WebP or GIF')
+            if (f.size > 1024 * 1024) return void toast.error(`The image is ${(f.size / 1024 / 1024).toFixed(1)} MB — the limit is 1 MB`)
+            upload.mutate(f)
           }}
         />
         <Button type='button' variant='outline' onClick={() => file.current?.click()} disabled={upload.isPending}>
@@ -162,6 +181,11 @@ export const ImageInput = ({
           </Button>
         )}
       </div>
+      {error && (
+        <p role='alert' className='text-destructive text-sm'>
+          {error}
+        </p>
+      )}
       <p className='text-muted-foreground text-xs'>{hint ?? 'PNG, JPG, WebP or GIF, at most 1 MB. 1440×720 (2:1) recommended. Must be https.'}</p>
       {src && (
         <div className='flex items-center gap-3'>

@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useApi, useApiMutation, useListState } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
+import { check } from '@/lib/validate'
 import { TxnPasswordLabel } from '@/views/finance/StaffFloat'
 import { GAME_TYPE_LABELS, type SettledMarket, type SettlementMatch, type SportsBet } from './types'
 
@@ -107,6 +108,15 @@ const DeclareResult = ({ row }: { row: SettlementMatch }) => {
       description='Every open bet on this market is settled and the winners are paid. Check the winner before confirming.'
       submitLabel='Settle market'
       onSubmit={() => declare.mutateAsync()}
+      validate={() => ({
+        'd-match': check.required(form.match_id, 'Match id'),
+        'd-event': check.required(form.eventid, 'Event id'),
+        'd-title': check.required(form.match_title, 'Match title'),
+        'd-game': check.required(form.game_type, 'Game type'),
+        'd-market': check.required(form.market_type, 'Market type'),
+        'd-winner': form.winnerName.trim() || form.winnerId.trim() ? undefined : 'Give the winner name (or the winning number for a line/session fancy)',
+        'd-fancy': form.game_type.trim().toUpperCase() === 'FAN' ? check.required(form.fancyName, 'Fancy name') : undefined
+      })}
       wide
     >
       <div className='grid grid-cols-2 gap-4'>
@@ -171,6 +181,12 @@ const VoidMarket = ({ row }: { row: SettlementMatch }) => {
       submitLabel='Void market'
       destructive
       onSubmit={() => voidIt.mutateAsync()}
+      validate={() => ({
+        'v-match': check.required(form.match_id, 'Match id'),
+        'v-event': check.required(form.eventid, 'Event id'),
+        'v-market': check.required(form.market_type, 'Market type'),
+        'v-game': check.required(form.gametype, 'Game type')
+      })}
     >
       <div className='grid grid-cols-2 gap-4'>
         <TextField id='v-match' label='Match id' required value={form.match_id} onChange={e => setForm({ ...form, match_id: e.target.value })} />
@@ -289,6 +305,7 @@ const ReverseSettlement = ({ row }: { row: SettledMarket }) => {
       submitLabel='Reverse settlement'
       destructive
       onSubmit={() => reverse.mutateAsync()}
+      validate={() => ({ 'rv-pw': check.required(password, 'Transaction password') })}
     >
       <p className='text-sm'>
         <span className='font-medium'>{field(row, 'matchTitle') || field(row, 'matchId')}</span>

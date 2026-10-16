@@ -4,6 +4,8 @@ import { Fragment, useMemo, useState } from 'react'
 
 import { toast } from 'sonner'
 
+import { Loader2Icon } from 'lucide-react'
+
 import PageHeader from '@/components/shared/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -12,7 +14,6 @@ import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 import { CONFIG_API, Note, ToggleGroupButtons, ToneBadge, errorText, useZip, zipApi } from './shared'
-import { Loader2Icon } from 'lucide-react'
 import { check } from '@/lib/validate'
 
 /**

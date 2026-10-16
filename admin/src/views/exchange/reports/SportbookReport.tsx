@@ -69,7 +69,19 @@ function ReportPane({ status }: { status: 'settled' | 'unsettled' }) {
     e.preventDefault()
 
     // Provider sirf Settled tab par zaroori — Unsettled bina iske load hota hai.
-    if (isSettled && !vendor) return setVendorInvalid(true)
+    if (isSettled && !vendor) {
+      setVendorInvalid(true)
+      toast.error('Choose a provider')
+
+      return
+    }
+
+    if (isSettled && !date) {
+      toast.error('Choose a date')
+
+      return
+    }
+
     setVendorInvalid(false)
     setLoading(true)
 

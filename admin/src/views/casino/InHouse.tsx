@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 
+import { toast } from 'sonner'
+
 import { ClockIcon, Loader2Icon, PlayIcon, RotateCcwIcon, SaveIcon, SquareIcon, TrophyIcon } from 'lucide-react'
 
 import Can from '@/components/shared/Can'
@@ -23,6 +25,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useSession } from '@/contexts/SessionContext'
 import { useApi, useApiMutation, useListState, usePagedApi } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
+import { check } from '@/lib/validate'
 import type { HouseBet, HouseClock, HouseRow } from './types'
 import { usePageList } from './usePageList'
 
@@ -38,13 +41,26 @@ const CounterRow = ({ row, auto }: { row: HouseRow; auto: boolean }) => {
   const [current, setCurrent] = useState(row.current)
   const { can } = useSession()
   const canWrite = can('config:write') && !auto
+
   const update = useApiMutation({
     fn: (body: { max: number; current: number }) => api.post(HOUSE_LIST, { userId: Number(row.userId), ...body }),
     invalidate: invalidateHouse,
     success: `Counter for #${row.userId} saved`
   })
+
   const blocked = Number(row.max) === 0
   const dirty = max !== row.max || current !== row.current
+
+  // house.validators.js: both counters are whole numbers 0–10,000.
+  const maxError = check.number(max, 'Max', { integer: true, min: 0, max: 10000 })
+  const currentError = check.number(current, 'Current', { integer: true, min: 0, max: 10000 })
+
+  const save = () => {
+    const problem = maxError || currentError
+
+    if (problem) return void toast.error(`#${row.userId}: ${problem}`)
+    update.mutate({ max: Number(max), current: Number(current) })
+  }
 
   return (
     <>
@@ -53,22 +69,37 @@ const CounterRow = ({ row, auto }: { row: HouseRow; auto: boolean }) => {
         <div className='text-muted-foreground font-mono text-xs'>#{row.userId}</div>
       </td>
       <td className='px-2 py-2'>
-        <Input className='w-24' value={max} disabled={!canWrite} onChange={e => setMax(e.target.value)} />
+        <Input className='w-24' value={max} disabled={!canWrite} aria-invalid={!!maxError || undefined} title={maxError} onChange={e => setMax(e.target.value)} />
       </td>
       <td className='px-2 py-2'>
-        <Input className='w-24' value={current} disabled={!canWrite} onChange={e => setCurrent(e.target.value)} />
+        <Input className='w-24' value={current} disabled={!canWrite} aria-invalid={!!currentError || undefined} title={currentError} onChange={e => setCurrent(e.target.value)} />
       </td>
       <td className='px-2 py-2 text-center'>
         <StatusBadge value={blocked ? 'blocked' : 'allowed'} />
       </td>
       <td className='px-4 py-2'>
         <div className='flex justify-end gap-1'>
-          <Button size='sm' variant='outline' disabled={!canWrite || !dirty || update.isPending} onClick={() => update.mutate({ max: Number(max), current: Number(current) })}>
+          <Button size='sm' variant='outline' disabled={!canWrite || !dirty || update.isPending} onClick={save}>
             <SaveIcon /> Save
           </Button>
-          <Button size='sm' variant='ghost' disabled={!canWrite || update.isPending} onClick={() => update.mutate(blocked ? { max: 50, current: 0 } : { max: 0, current: 0 })}>
-            {blocked ? 'Allow' : 'Block'}
-          </Button>
+          {blocked ? (
+            <Button size='sm' variant='ghost' disabled={!canWrite || update.isPending} onClick={() => update.mutate({ max: 50, current: 0 })}>
+              Allow
+            </Button>
+          ) : (
+            <ConfirmDialog
+              trigger={
+                <Button size='sm' variant='ghost' disabled={!canWrite || update.isPending}>
+                  Block
+                </Button>
+              }
+              title={`Block in-house wins for #${row.userId}?`}
+              description='Sets max and current to 0: the house stops paying this user until you allow them again.'
+              confirmLabel='Block'
+              destructive
+              onConfirm={() => update.mutateAsync({ max: 0, current: 0 })}
+            />
+          )}
         </div>
       </td>
     </>
@@ -236,7 +267,7 @@ const InHouse = () => (
         <Card className='max-w-2xl shadow-none'>
           <CardHeader>
             <CardTitle className='text-base'>Engine settings (read-only)</CardTitle>
-            <CardDescription>These come from the casino service's in-house constants. There is no admin route to change them; a change is a deploy.</CardDescription>
+            <CardDescription>These come from the casino service&apos;s in-house constants. There is no admin route to change them; a change is a deploy.</CardDescription>
           </CardHeader>
           <CardContent className='grid gap-3 text-sm'>
             <div className='flex justify-between border-b pb-2'><span>House edge</span><span className='font-mono'>{HOUSE_EDGE_PERCENT}%</span></div>

@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { useApi, useApiMutation } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
+import { check } from '@/lib/validate'
 import type { Banner } from './types'
 
 /**
@@ -40,6 +41,11 @@ const PLACEMENTS = [
 ] as const
 
 const OTHER = '__other__'
+
+/** banners.constants.js TYPE_PATTERN and common imageUpload MAX_UPLOAD_BYTES (4 MB). */
+const TYPE_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024
+const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp']
 
 const blankForm = (b?: Banner) => ({
   type: b?.type ?? '',
@@ -109,6 +115,37 @@ const UploadBanner = ({ existing }: { existing?: Banner }) => {
       description='The placement is the address: saving the same one again replaces it. A call to action needs both its label and its link, or neither.'
       submitLabel={existing ? 'Save' : 'Upload'}
       onSubmit={() => upload.mutateAsync()}
+      validate={() => {
+        const hasLabel = !!form.ctaLabel.trim()
+        const hasHref = !!form.ctaHref.trim()
+
+        return {
+          [existing ? 'b-type' : other ? 'b-type' : 'b-place']: !form.type.trim()
+            ? 'Choose a placement'
+            : TYPE_PATTERN.test(form.type.trim())
+              ? undefined
+              : 'Placement: lowercase letters, digits, dash and underscore only (max 64)',
+          'b-image': !file
+            ? existing
+              ? undefined
+              : 'Choose an image'
+            : !IMAGE_TYPES.includes(file.type)
+              ? 'The image must be PNG, JPEG or WebP'
+              : file.size > MAX_IMAGE_BYTES
+                ? `The image is ${(file.size / 1024 / 1024).toFixed(1)} MB — the limit is 4 MB`
+                : undefined,
+          'b-title': check.length(form.title, 'Title', { max: 160 }),
+          'b-sub': check.length(form.subtitle, 'Subtitle', { max: 300 }),
+          'b-cta': hasHref && !hasLabel ? 'A CTA link needs a label' : check.length(form.ctaLabel, 'CTA label', { max: 60 }),
+          'b-href':
+            hasLabel && !hasHref
+              ? 'A CTA label needs a link'
+              : hasHref && !/^(\/[^\s]*|https?:\/\/[^\s]+)$/i.test(form.ctaHref.trim())
+                ? 'CTA link must be a site path (/casino) or an http(s) URL'
+                : check.length(form.ctaHref, 'CTA link', { max: 500 }),
+          'b-sort': check.number(form.sortOrder, 'Sort order', { integer: true, min: 0, max: 9999, optional: true })
+        }
+      }}
     >
       {existing ? (
         <TextField id='b-type' label='Placement' readOnly value={form.type} hint={preset?.hint} />
@@ -142,6 +179,7 @@ const UploadBanner = ({ existing }: { existing?: Banner }) => {
         <label htmlFor='b-image' className='text-sm font-medium'>
           Image {existing ? '(leave empty to keep the current one)' : '*'}
         </label>
+        <span className='text-muted-foreground text-xs'>PNG, JPEG or WebP, up to 4 MB.</span>
         <input id='b-image' type='file' accept='image/png,image/jpeg,image/webp' className='text-sm' onChange={e => setFile(e.target.files?.[0] ?? null)} required={!existing} />
         {(preview || existing) && (
            
@@ -152,11 +190,11 @@ const UploadBanner = ({ existing }: { existing?: Banner }) => {
           />
         )}
       </div>
-      <TextField id='b-title' label='Title' value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
-      <TextField id='b-sub' label='Subtitle' value={form.subtitle} onChange={e => setForm({ ...form, subtitle: e.target.value })} />
+      <TextField id='b-title' name='title' label='Title' maxLength={160} value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
+      <TextField id='b-sub' name='subtitle' label='Subtitle' maxLength={300} value={form.subtitle} onChange={e => setForm({ ...form, subtitle: e.target.value })} />
       <div className='grid grid-cols-2 gap-4'>
-        <TextField id='b-cta' label='CTA label' value={form.ctaLabel} onChange={e => setForm({ ...form, ctaLabel: e.target.value })} />
-        <TextField id='b-href' label='CTA link' hint='/casino or https://…' value={form.ctaHref} onChange={e => setForm({ ...form, ctaHref: e.target.value })} />
+        <TextField id='b-cta' name='ctaLabel' label='CTA label' maxLength={60} value={form.ctaLabel} onChange={e => setForm({ ...form, ctaLabel: e.target.value })} />
+        <TextField id='b-href' name='ctaHref' label='CTA link' hint='/casino or https://…' value={form.ctaHref} onChange={e => setForm({ ...form, ctaHref: e.target.value })} />
       </div>
       <TextField id='b-sort' label='Sort order' type='number' min={0} max={9999} value={form.sortOrder} onChange={e => setForm({ ...form, sortOrder: e.target.value })} />
     </FormDialog>
@@ -195,7 +233,7 @@ const Banners = () => {
     },
     { key: 'cta', header: 'CTA', cell: b => (b.cta ? <span className='text-xs'>{b.cta.label} → <code>{b.cta.href}</code></span> : <span className='text-muted-foreground'>—</span>) },
     { key: 'sort', header: 'Order', align: 'right', cell: b => <span className='tabular-nums'>{b.sortOrder}</span> },
-    { key: 'active', header: 'Visible', cell: b => <Can permission='config:write' fallback={<StatusBadge value={b.active} />}><Switch checked={b.active} onCheckedChange={active => setActive.mutate({ type: b.type, active })} /></Can> },
+    { key: 'active', header: 'Visible', cell: b => <Can permission='config:write' fallback={<StatusBadge value={b.active} />}><Switch checked={b.active} disabled={setActive.isPending} onCheckedChange={active => setActive.mutate({ type: b.type, active })} /></Can> },
     { key: 'at', header: 'Updated', cell: b => <DateTime value={b.updatedAt ?? b.createdAt} relative /> },
     { key: 'actions', header: '', align: 'right', cell: b => <Can permission='config:write'><UploadBanner existing={b} /></Can> }
   ]

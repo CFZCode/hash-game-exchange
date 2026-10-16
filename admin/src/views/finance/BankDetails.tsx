@@ -47,6 +47,7 @@ const DetailForm = ({ coin, row, onDone }: { coin: string; row?: BankRow; onDone
     upiId: row?.upiId ?? '',
     isActive: row?.isActive ?? true
   })
+
   const [file, setFile] = useState<File | null>(null)
 
   // bankDetails.validators.js: every text ≤ 255 (account ≤ 100, IFSC ≤ 50); a new row needs an account number or a UPI id.

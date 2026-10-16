@@ -5,7 +5,6 @@ import { useState, type ReactNode } from 'react'
 import Link from 'next/link'
 
 import { LockIcon, RefreshCwIcon, ShieldAlertIcon } from 'lucide-react'
-import { toast } from 'sonner'
 
 import DataTable, { type Column } from '@/components/shared/DataTable'
 import DateTime from '@/components/shared/DateTime'
@@ -315,18 +314,14 @@ const LockControls = ({ userId, data }: { userId: string; data: PlayerRisk }) =>
                   if (o) setForm(current())
                   setPassword('')
                 }}
-                onSubmit={() => {
-                  if (changes.length) return apply.mutateAsync()
-                  toast.info('Nothing changed')
-
-                  return Promise.reject(new Error('no change'))
-                }}
+                validate={() => (changes.length ? { transactionPassword: !password && 'Transaction password is required' } : 'Nothing changed — flip a switch first')}
+                onSubmit={() => apply.mutateAsync()}
               >
                 <SwitchField id='rl-system' label='Account lock' hint='Blocks sign-in and everything else' checked={form.system} onChange={system => setForm({ ...form, system })} />
                 <SwitchField id='rl-sports' label='Sports bet lock' hint='No new sports / exchange bets' checked={form.sports} onChange={sports => setForm({ ...form, sports })} />
                 <SwitchField id='rl-casino' label='Casino lock' hint='No casino games' checked={form.casino} onChange={casino => setForm({ ...form, casino })} />
                 <SwitchField id='rl-betting' label='Betting suspended' hint='Bet status: suspends all betting' checked={form.betting} onChange={betting => setForm({ ...form, betting })} />
-                <TextField id='rl-pw' label={<TxnPasswordLabel />} type='password' autoComplete='current-password' required value={password} onChange={e => setPassword(e.target.value)} />
+                <TextField id='rl-pw' name='transactionPassword' label={<TxnPasswordLabel />} type='password' autoComplete='current-password' required value={password} onChange={e => setPassword(e.target.value)} />
               </FormDialog>
             )}
           </span>

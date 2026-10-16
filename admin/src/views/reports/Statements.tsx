@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 
 import Link from 'next/link'
 
-import { DownloadIcon, SearchIcon } from 'lucide-react'
+import { DownloadIcon, Loader2Icon, SearchIcon } from 'lucide-react'
 import { toast } from 'sonner'
 
 import DataTable, { type Column } from '@/components/shared/DataTable'
@@ -138,8 +138,9 @@ const StatementTab = () => {
       const blob = await api.blob(`${base}/pdf`, { ...range, category: applied.category })
 
       downloadBlob(blob, `statement-${applied.subject}-${applied.id}.pdf`)
+      toast.success('Statement PDF downloaded')
     } catch (e) {
-      toast.error(errorMessage(e))
+      toast.error(`PDF download failed: ${errorMessage(e)}`)
     } finally {
       setDownloading(false)
     }
@@ -187,7 +188,7 @@ const StatementTab = () => {
             <SearchIcon /> Load statement
           </Button>
           <Button variant='outline' disabled={!applied || downloading} onClick={pdf}>
-            <DownloadIcon /> PDF
+            {downloading ? <Loader2Icon className='animate-spin' /> : <DownloadIcon />} PDF
           </Button>
         </CardContent>
       </Card>
