@@ -1,7 +1,7 @@
 import { request, USE_FIXTURES } from './client';
 import ENDPOINTS, { PLATFORM } from './endpoints';
 import { ACHIEVEMENTS, MEDAL_COUNT, BONUS_STATUS } from '../data/achievements';
-import { GAMES } from '../data/games';
+import { getOriginals } from './originals';
 
 /* The three profile dialogs' data — `/user/profile/:userId`, `/user/medals/:userId` and
  * `/user/statistics`. Five endpoints between them, all read out of the recovered account-remote
@@ -303,12 +303,10 @@ export const PAGE_SIZE = 10;
  * two captured feeds, so the rows are real even though this envelope is not. `Global` is prepended
  * by the dialog, not by the feed.
  */
-const isOriginal = (game) => /^BC(\s|$)|originals?$/i.test(game.provider ?? '');
-
+/* THIS SITE'S ORIGINALS, not bc.game's selection (user's request, 2026-10-16): the same list the
+   lobby shows — services/originals.js, already cut to the five offered (SHOWN_ORIGINALS). */
 export function getStatisticsGames() {
-  return request(ENDPOINTS.homeSelection, {
-    fixture: GAMES.filter(isOriginal)
-      .filter((g) => g.name.replace(/\s/g, '') !== 'CrashTrenball')
-      .map((g) => ({ label: g.name, value: g.slug })),
-  });
+  return Promise.resolve(getOriginals())
+    .then((games) => (games ?? []).map((g) => ({ label: g.name, value: g.slug })))
+    .catch(() => []);
 }
