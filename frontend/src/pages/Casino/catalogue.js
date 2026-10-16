@@ -100,7 +100,7 @@ export const TABS = [
   { label: 'New Releases', tab: 'new' },
   { label: 'Burst Games', tab: 'crash-games' },
   { label: 'Poker', tab: 'poker' },
-  { label: 'Feature Buy-in', tab: 'feature-buy-in' },
+  /* Feature Buy-in removed (user's request, 2026-10-16): no such list on this platform. */
   { label: 'Providers', tab: 'provider' },
   { label: 'Themes', tab: 'themes' },
 ];
@@ -201,7 +201,6 @@ export const ROWS = [
   { title: 'New Releases', key: 'new', href: '/casino/new' },
   { title: 'Poker', key: 'poker', href: '/tagname/Poker' },
   { type: 'providers' },
-  { title: 'Feature Buy-in', key: 'feature', href: '/tagname/Feature%20buy-in' },
   { title: 'Blackjack', key: 'blackjack', href: '/casino/blackjack' },
   { type: 'themes' },
   { title: 'Table Games', key: 'table-game', href: '/casino/table-game' },
@@ -293,7 +292,6 @@ export const THEMES = [
   'Fishing',
   'Poker',
   'Wild West',
-  'Feature Buy-In',
   'Cascading Reels',
   'Bonus Symbols',
   'Bingo',

@@ -9,7 +9,6 @@ import {
   TableGameIcon,
   NewReleasesIcon,
   PokerIcon,
-  FeatureBuyInIcon,
   ProvidersIcon,
 } from './icons';
 
@@ -28,7 +27,6 @@ export const TABS = [
   { label: 'Table Game', value: 'table', Icon: TableGameIcon },
   { label: 'New Releases', value: 'newreleases', Icon: NewReleasesIcon },
   { label: 'Poker', value: 'poker', Icon: PokerIcon },
-  { label: 'Feature Buy-in', value: 'feature', Icon: FeatureBuyInIcon },
   { label: 'Providers', value: 'providers', Icon: ProvidersIcon },
 ];
 
