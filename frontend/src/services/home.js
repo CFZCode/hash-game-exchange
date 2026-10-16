@@ -3,6 +3,7 @@ import ENDPOINTS, { PLATFORM } from './endpoints';
 import { toBetRow } from './betHistory';
 import { getOriginals, slugFor } from './originals';
 import { publicGates } from './gates';
+import { getSportEvents } from './exchange/feed';
 import { getCasinoSet, toCatalogGame } from './catalog';
 import { assetExact } from '../utils/gameArt';
 import { HIDDEN_NAME } from '../context/account';
@@ -260,9 +261,89 @@ const toBigWin = (row) => {
   };
 };
 
-/* LIVE: no BetBy feed exists on the SmartBet backend, so Highlights renders empty rather than
-   the captured matches. (Its neighbour, Upcoming Lottery Draw, is removed with the rest of
-   Lottery on the user's request — a deliberate departure.) */
+/* LIVE: the exchange's own sport boards (user's request, 2026-10-16) — cricket, soccer and
+   tennis, the three Highlights has icons for. There is no BetBy top-events feed on this backend.
+   (Its neighbour, Upcoming Lottery Draw, is removed with the rest of Lottery on the user's
+   request — a deliberate departure.) */
+const HIGHLIGHT_SPORTS = [
+  { sid: 4, sport: 'cricket', category: 'Cricket' },
+  { sid: 1, sport: 'soccer', category: 'Soccer' },
+  { sid: 2, sport: 'tennis', category: 'Tennis' },
+];
+const HIGHLIGHTS_LIMIT = 10;
+
+const back1 = (runner) => Number((runner?.odds ?? []).find((o) => o.oname === 'back1')?.odds) || 0;
+
+/* `stime` is the provider's "10/16/2026 4:30:00 PM": the card's time and date, as printed. */
+function splitStart(stime) {
+  const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?/i.exec(String(stime ?? ''));
+  if (!m) return { time: '', date: '', at: Number.MAX_SAFE_INTEGER };
+  const [, mo, d, y, h, min, ap] = m;
+  const h24 = (Number(h) % 12) + (/pm/i.test(ap ?? '') ? 12 : 0);
+  return {
+    time: `${Number(h)}:${min}${ap ? ` ${ap.toUpperCase()}` : ''}`,
+    date: `${mo.padStart(2, '0')}/${d.padStart(2, '0')}/${y}`,
+    at: new Date(Number(y), Number(mo) - 1, Number(d), h24, Number(min)).getTime(),
+  };
+}
+
+/* One board row -> the card's shape. No crests or flags on this feed, so the competitors carry a
+   name only and the card prints it in the badge's place. */
+function toHighlight(row, { sid, sport, category }) {
+  const runners = (row.section ?? []).map((r) => ({ name: String(r.nat ?? '').trim(), price: back1(r) }));
+  const draw = runners.find((r) => /^(the )?draw$/i.test(r.name));
+  const [home, away] = runners.filter((r) => r !== draw);
+  if (!home || !away) return null;
+  const outcomes = [
+    { name: '1', price: home.price },
+    ...(draw ? [{ name: 'Draw', price: draw.price }] : []),
+    { name: '2', price: away.price },
+  ];
+  if (!outcomes.some((o) => o.price > 0)) return null;
+  const start = splitStart(row.stime);
+
+  return {
+    id: String(row.gmid),
+    href: `/sports/match/${sid}/${row.gmid}`,
+    live: Boolean(row.iplay),
+    sport,
+    category,
+    tournament: String(row.cname ?? '').trim(),
+    home: { name: home.name },
+    away: { name: away.name },
+    time: start.time,
+    date: start.date,
+    at: start.at,
+    status: 'In-Play',
+    marketName: 'Match Odds',
+    outcomes: outcomes.map((o) => ({ name: o.name, value: o.price > 0 ? o.price.toFixed(2) : '-' })),
+    moreMarkets: 0,
+  };
+}
+
+function readLiveHighlights() {
+  return Promise.all(
+    HIGHLIGHT_SPORTS.map((s) =>
+      getSportEvents(s.sid)
+        .then(({ events }) => events.map((row) => toHighlight(row, s)).filter(Boolean))
+        .catch(() => []),
+    ),
+  ).then((boards) => {
+    /* Always cricket, then soccer, then tennis (user's request) — each board in play first, then
+       the soonest start. Every sport gets an equal share of the row; a sport with fewer matches
+       leaves its slots to the next one, so the row stays full while any board has matches. */
+    const sorted = boards.map((rows) => [...rows].sort((a, b) => Number(b.live) - Number(a.live) || a.at - b.at));
+    const share = Math.ceil(HIGHLIGHTS_LIMIT / sorted.length);
+    const picked = sorted.map((rows) => rows.slice(0, share));
+    let room = HIGHLIGHTS_LIMIT - picked.reduce((n, rows) => n + rows.length, 0);
+    sorted.forEach((rows, i) => {
+      const extra = rows.slice(picked[i].length, picked[i].length + Math.max(room, 0));
+      picked[i].push(...extra);
+      room -= extra.length;
+    });
+    return picked.flat().slice(0, HIGHLIGHTS_LIMIT);
+  });
+}
 /* Highlights is BetBy's, not bc.game's — its real source is the top-events feed on BetBy's own
    host, which needs a brand id, a country, a currency and a language. None of those are known
    at rest here, so the path is built with the one captured brand flag and placeholders; see
@@ -273,4 +354,6 @@ export const getHighlights = ({
   currency = 'USD',
   lang = 'en',
 } = {}) =>
-  USE_FIXTURES ? request(ENDPOINTS.betby.topEvents(brand, country, currency, lang), { fixture: matches }) : [];
+  USE_FIXTURES
+    ? request(ENDPOINTS.betby.topEvents(brand, country, currency, lang), { fixture: matches })
+    : publicGates().then((gates) => (gates.on('sports') ? readLiveHighlights() : []));

@@ -1,5 +1,5 @@
 import { request, USE_FIXTURES, getAccessToken } from './client';
-import { getOriginals, slugFor } from './originals';
+import { getOriginals, isShownOriginal, slugFor } from './originals';
 import { publicGates } from './gates';
 import { ORIGINAL_GAMES } from '../pages/Casino/originalGames';
 import { getLiveGame } from './catalog';
@@ -48,6 +48,8 @@ async function readLiveGame(gameUnique) {
      catalogue", never a lookup elsewhere that could dress it up as another game. The backend
      refuses its launch too. */
   if (!(await publicGates()).on('originals') && isHouseGame(gameUnique)) return null;
+  /* An in-house game this site does not offer (see SHOWN_ORIGINALS): not in the catalogue either. */
+  if (isHouseGame(gameUnique) && !isShownOriginal(slugFor(gameUnique))) return null;
   const originals = await Promise.resolve(getOriginals()).catch(() => []);
   const house = (originals ?? []).find((game) => game.slug === gameUnique || game.uid === gameUnique);
   if (house) {

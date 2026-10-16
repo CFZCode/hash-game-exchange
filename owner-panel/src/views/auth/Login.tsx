@@ -10,7 +10,7 @@ import { toast } from 'sonner'
 import Logo from '@/components/shared/Logo'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Toaster } from '@/components/ui/sonner'
@@ -68,7 +68,6 @@ const Login = () => {
           <Logo className='gap-3' />
           <div>
             <CardTitle className='text-2xl font-semibold'>{siteConfig.name}</CardTitle>
-            <CardDescription>Owner sign-in for {siteConfig.key} · {siteConfig.environment}. The login is OWNER_USERNAME / OWNER_PASSWORD in owner-panel/.env.local.</CardDescription>
           </div>
         </CardHeader>
         <CardContent className='px-6'>

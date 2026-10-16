@@ -18,7 +18,6 @@ import DepositOffer from './pages/DepositOffer';
 import Deposit from './pages/Deposit';
 import DepositPanels from './pages/Deposit/Panels';
 import DailyContest from './pages/DailyContest';
-import WeeklyRaffle from './pages/WeeklyRaffle';
 import VIP from './pages/VIP';
 import Referral from './pages/Referral';
 import ReferralDashboard from './pages/Referral/Dashboard';
@@ -266,7 +265,6 @@ function AppShell() {
      `/quests` is gated on `login` for the reason `/bonus` and `/referral` are: its route guard
      sends a logged-out visitor to `/`, the page performs that redirect itself, and redirecting
      out of a dialog is worse than letting it fall through to the plain route. */
-  const weeklyRaffleDialog = pathname === '/promotions/weekly-raffle' && !isDesktop;
   const depositOfferDialog = pathname === '/deposit-offer' && !isDesktop;
   const questsDialog = pathname === '/quests' && !isDesktop && session.login;
   const referralExhibitionDialog = pathname === '/referral-exhibition' && !isDesktop;
@@ -497,7 +495,6 @@ function AppShell() {
     helpDialog ||
     promotionsDialog ||
     dailyContestDialog ||
-    weeklyRaffleDialog ||
     depositOfferDialog ||
     questsDialog ||
     referralExhibitionDialog ||
@@ -790,11 +787,9 @@ function AppShell() {
               family, so the footer already drops its prose band here and the sidebar group
               already opens itself. */}
           <Route path="/promotions/daily-contest" element={dailyContestDialog ? null : <DailyContest />} />
-          {/* `/promotions/weekly-raffle` — the original's own path, loading
-              index-BLT5gN04.js, which is NOT in the mirror. Its route there carries
-              `guards: [() => !1]`, i.e. the page is switched off on the live site; it is
-              routed here because the sidebar row points at it. */}
-          <Route path="/promotions/weekly-raffle" element={weeklyRaffleDialog ? null : <WeeklyRaffle />} />
+          {/* `/promotions/weekly-raffle` is not routed: removed on the user's request (2026-10-16),
+              this platform runs no raffle. The page stays on disk in pages/WeeklyRaffle; the URL
+              falls to the catch-all like the other removed products. */}
           {/* The VIP Club. `/vip-detail` is the page; `/vip` is the original's own alias for
               it, carrying `guards: [() => "/vip-detail"]` — a guard that returns a path is a
               redirect there, so both land on the same component. Its chunk was missing from
@@ -1148,16 +1143,6 @@ function AppShell() {
           `/vip-detail` is deliberately NOT given one: its route carries
           `behavior: "transparent-title"`, so the bar is clear and floats over the hero artwork,
           and a title there would print across the banner. */}
-      {weeklyRaffleDialog && (
-        <PageDialog
-          title="Weekly Raffle"
-          onClose={closeOverlay}
-          onBack={backOverlay}
-          enter={dialogEnter}
-        >
-          <WeeklyRaffle />
-        </PageDialog>
-      )}
       {depositOfferDialog && (
         <PageDialog
           title="Deposit Offer"

@@ -4,6 +4,7 @@ import { isLiveSet } from '../../services/catalog';
 import { PROVIDER_NAMES } from '../../data/providers';
 import { POKER_GAMES, HOLDEM_ROW, TEEN_PATTI_ROW } from './pokerGames';
 import { ORIGINAL_GAMES, ORIGINALS_PAGE_SIZE } from './originalGames';
+import { isShownOriginal } from '../../services/originals';
 import { HOT_GAMES } from './hotGames';
 import { SLOT_GAMES } from './slotGames';
 import { LIVE_GAMES } from './liveGames';
@@ -134,7 +135,7 @@ const SETS = {
   /* The one set on this page that is transcribed rather than derived. `byCategory('Original')`
      found sixteen games in the 118-game capture; the live tab holds sixty-three. See
      originalGames.js, which also carries the page size its pager works at. */
-  brand: () => ORIGINAL_GAMES,
+  brand: () => ORIGINAL_GAMES.filter((game) => isShownOriginal(game.slug)),
   /* Also transcribed rather than derived. `bySection('hot_games')` found ten games in the
      capture — the home feed's hot selection, which is one page of a tab the live site pages
      into the thousands. See hotGames.js for what the 120 here do and don't cover. */

@@ -94,16 +94,6 @@ export const PROMOTIONS = [
     categories: ['casino'],
   },
   {
-    id: 'weekly-raffle',
-    headline: '$5,000 PRIZE',
-    title: 'Weekly Raffle',
-    description: 'Join and get up to $5,000 weekly',
-    image: 'd3b95bcea3',
-    endsLabel: 'Jan 02',
-    progress: 10,
-    categories: [],
-  },
-  {
     id: 'soccer-party-bet-and-win',
     headline: '$18,000 PRIZE',
     title: 'Soccer Party Bet & Win',
