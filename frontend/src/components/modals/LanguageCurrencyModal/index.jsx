@@ -4,6 +4,8 @@ import { useIsDesktop } from '../../../hooks/useMediaQuery';
 import useSheetDrag from '../../../hooks/useSheetDrag';
 import { useSession } from '../../../context/session';
 import { SUPPORTED_LANGUAGES as LANGUAGES, supportedLang } from './languages';
+import { useSiteCurrency } from '../../../hooks/useSiteCurrency';
+import { coinIcon } from '../../../utils/coinArt';
 
 const CURRENCIES = [
   { code: 'NONE', name: 'None', symbol: '★', bg: '#6b7280' },
@@ -74,6 +76,9 @@ export default function LanguageCurrencyModal({
      ("The Currencies will be shown in approximated values"). */
   const { session, setSetting } = useSession();
   const { enableLocaleCurrency, localeCurrencyName } = session.setting;
+  /* The None row is the switch OFF, i.e. amounts in the site's own coin: it is labelled with the
+     owner's default currency when the site names one (hooks/useSiteCurrency). */
+  const siteCurrency = useSiteCurrency();
   const lang = supportedLang(session.setting.lang);
   const overlayerRef = useRef(null);
 
@@ -482,13 +487,19 @@ export default function LanguageCurrencyModal({
                                 need a network round-trip that does not exist here. A tinted
                                 disc with the currency's own symbol is the stand-in — same
                                 24px circle, same position, drawn rather than fetched. */}
-                            <div
-                              className="flex size-6 items-center justify-center rounded-full text-[0.625rem] font-black leading-none text-white"
-                              style={{ backgroundColor: curr.bg }}
-                            >
-                              <span>{curr.symbol}</span>
-                            </div>
-                            <span className="text-base font-semibold">{curr.name}</span>
+                            {curr.code === 'NONE' && siteCurrency && coinIcon(siteCurrency) ? (
+                              <img alt="coin" className="size-6" src={coinIcon(siteCurrency)} />
+                            ) : (
+                              <div
+                                className="flex size-6 items-center justify-center rounded-full text-[0.625rem] font-black leading-none text-white"
+                                style={{ backgroundColor: curr.bg }}
+                              >
+                                <span>{curr.symbol}</span>
+                              </div>
+                            )}
+                            <span className="text-base font-semibold">
+                              {curr.code === 'NONE' ? siteCurrency ?? curr.name : curr.name}
+                            </span>
                           </div>
                         </div>
                       );

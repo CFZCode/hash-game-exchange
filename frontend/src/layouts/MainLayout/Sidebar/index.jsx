@@ -17,6 +17,7 @@ import pwaLightImg from '../../../assets/pwa_w.png';
 import { languageName } from '../../../components/modals/LanguageCurrencyModal/languages';
 import { getAlias } from '../../../utils/currency';
 import { coinIcon } from '../../../utils/coinArt';
+import { useSiteCurrency } from '../../../hooks/useSiteCurrency';
 
 /* The Application card — see its call site for why it is off. */
 const SHOW_APP_CARD = false;
@@ -269,6 +270,8 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
      owner took out of the plan, or promotions for an agent's player. External links are gated
      only by an explicit `gate` (Blog); Refer and Earn has no href and follows the affiliate section. All on with fixtures. */
   const gates = useGates();
+  /* The owner's default currency, printed where "None" was (see hooks/useSiteCurrency). */
+  const siteCurrency = useSiteCurrency();
   const shown = (items) =>
     visibleItems(items, session.login).filter((i) =>
       i.action === 'refer' ? gates.on('affiliate')
@@ -831,6 +834,8 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
                           off) draws the picker's own None disc. */}
                       {session.setting.enableLocaleCurrency ? (
                         <img alt="coin" className="h-6 lg:h-5" src={coinIcon(session.setting.localeCurrencyName)} />
+                      ) : siteCurrency && coinIcon(siteCurrency) ? (
+                        <img alt="coin" className="h-6 lg:h-5" src={coinIcon(siteCurrency)} />
                       ) : (
                         <span className="flex size-6 items-center justify-center rounded-full bg-[#6b7280] text-[0.625rem] font-black leading-none text-white lg:size-5">★</span>
                       )}
@@ -838,7 +843,7 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
                     <span className="sidebar-collapse-hide ms-2 whitespace-nowrap text-base font-semibold text-primary lg:ms-0 lg:text-sm">
                       {session.setting.enableLocaleCurrency
                         ? getAlias(session.setting.localeCurrencyName).replace(/FIAT$/, '')
-                        : 'None'}
+                        : siteCurrency ?? 'None'}
                     </span>
                     <div className="sidebar-collapse-hide arrow-button ms-auto flex size-6 items-center justify-center rounded p-0 lg:me-2 lg:size-5">
                       <ArrowSvg className="rotate-180" />

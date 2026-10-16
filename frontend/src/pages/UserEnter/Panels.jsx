@@ -47,6 +47,7 @@ import balanceCoin from '../../assets/user-enter/balance_coin.png';
 import referArt from '../../assets/user-enter/refer.png';
 import { toast } from '../../components/shared/Toast/toast';
 import { copyToClipboard } from '../../utils/clipboard';
+import { useSiteCurrency } from '../../hooks/useSiteCurrency';
 
 /* Everything inside `/user/enter`'s scroller. The dialog shell around it is index.jsx.
  *
@@ -409,9 +410,10 @@ function SettingsCards({ onRefer, onLanguage, onCurrency, confirm, affiliateOn =
   /* `enableLocaleCurrency ? getAlias(localeCurrencyName).replace(/FIAT$/, "") : t("None")`.
      `getAlias` is the catalogue lookup rather than a suffix strip — KLAY prints KAIA — and the
      strip after it is what turns USDFIAT into USD. */
+  const siteCurrency = useSiteCurrency();
   const currency = session.setting.enableLocaleCurrency
     ? getAlias(session.setting.localeCurrencyName).replace(/FIAT$/, '')
-    : 'None';
+    : siteCurrency ?? 'None';
 
   return (
     <div className="px-4">

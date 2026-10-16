@@ -14,6 +14,7 @@ import {
 } from "./icons";
 import "./DepositOffer.css";
 import Skeleton from '../../components/shared/Skeleton';
+import EmptyPlaceholder from '../../components/shared/EmptyPlaceholder';
 import * as globMaps from './index.globs.js';
 
 /* The deposit-bonus page — `/deposit-offer`.
@@ -458,6 +459,11 @@ export default function DepositOffer() {
         <Skeleton className="mt-4 block h-40 w-full rounded-xl" radius={0}>
           <div className="size-full" />
         </Skeleton>
+      ) : bonuses.length === 0 ? (
+        /* Nothing on offer: the site admin's first-deposit bonus is off or has no tiers
+           (Site config › Welcome bonuses). The site's own empty state, once, instead of two bare
+           headings. */
+        <EmptyPlaceholder />
       ) : (
         bonuses.map((bonus) => (
           <ProgressCard
@@ -469,7 +475,7 @@ export default function DepositOffer() {
         ))
       )}
 
-      <SectionHeading icon={GiftIcon}>Available PROMOTIONS</SectionHeading>
+      {(loading || bonuses.length > 0) && <SectionHeading icon={GiftIcon}>Available PROMOTIONS</SectionHeading>}
 
       {/* `sm:mb-4` IS THIS BUILD'S AND IS NOW DESKTOP-ONLY. The rendered markup carries no bottom
           margin on this grid at all — `class="grid grid-cols-1 justify-items-center gap-4

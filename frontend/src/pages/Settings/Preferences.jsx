@@ -11,6 +11,7 @@ import { toast, toastError } from '../../components/shared/Toast/toast';
 import { getAlias } from '../../utils/currency';
 import { coinIcon } from '../../utils/coinArt';
 import { IconEdit, IconMoon, IconSun } from './icons';
+import { useSiteCurrency } from '../../hooks/useSiteCurrency';
 
 /* `/settings/preferences` — `index-BgFc4GKH.js`, 8 KB, and the whole pane is one Solid template
  * plus `Privacy-ydLbf0kB.js`'s four rows. Four cards, and the last two are gated on the
@@ -205,6 +206,8 @@ export default function SettingsPreferences() {
      site even though `getAlias` is the alias lookup rather than the stripper, which is why both
      appear. `enableLocaleCurrency` off prints "None" instead of the coin. */
   const localeCurrency = getAlias(session.setting.localeCurrencyName).replace(/FIAT$/, '');
+  /* Off: the owner's default currency rather than "None" (hooks/useSiteCurrency). */
+  const siteCurrency = useSiteCurrency();
 
   return (
     /* `w-full py-4 text-base sm:py-0` — the page's own vertical rhythm on a phone, where the
@@ -228,6 +231,11 @@ export default function SettingsPreferences() {
                     src={coinIcon(session.setting.localeCurrencyName)}
                   />
                   <span className="ml-1 text-sm font-semibold">{localeCurrency}</span>
+                </>
+              ) : siteCurrency ? (
+                <>
+                  {coinIcon(siteCurrency) && <img alt="coin" className="size-4" src={coinIcon(siteCurrency)} />}
+                  <span className="ml-1 text-sm font-semibold">{siteCurrency}</span>
                 </>
               ) : (
                 <span className="text-sm font-semibold">None</span>
