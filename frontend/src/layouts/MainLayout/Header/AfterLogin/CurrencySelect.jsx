@@ -8,6 +8,8 @@ import { getCurrency } from '../../../../data/currencies';
 import { printCurrency, getAlias, amount2usd } from '../../../../utils/currency';
 import { coinIcon } from '../../../../utils/coinArt';
 import { layerPosition, scrollParent } from '../../../../components/shared/Select/position';
+import PopCenter from '../../../../components/shared/PopCenter';
+import { useIsDesktop } from '../../../../hooks/useMediaQuery';
 import {
   IconSearch,
   IconClose,
@@ -578,6 +580,11 @@ export default function CurrencySelect({ triggerRef, open, onClose, onManageAsse
   const [position, setPosition] = React.useState(null);
   const [ready, setReady] = React.useState(layerLoaded);
   const layerRef = React.useRef(null);
+  /* THE SHEET ARM (`CS`), built 2026-10-16 on the user's report: below `lg` the popover was a
+     fixed 24rem x 36rem box hanging off the pill, half of it empty. The original hands a phone a
+     `.pop` sheet instead; here that is PopCenter's sheet, with the same Panel inside it. The
+     popover's placement and outside-click effects stand down while the sheet is used. */
+  const isDesktop = useIsDesktop();
 
   React.useEffect(() => {
     if (!open || ready) return undefined;
@@ -589,7 +596,7 @@ export default function CurrencySelect({ triggerRef, open, onClose, onManageAsse
   }, [open, ready]);
 
   React.useLayoutEffect(() => {
-    if (!open) return undefined;
+    if (!open || !isDesktop) return undefined;
     const place = () => {
       const trigger = triggerRef.current;
       const layer = layerRef.current;
@@ -620,10 +627,10 @@ export default function CurrencySelect({ triggerRef, open, onClose, onManageAsse
       scroller.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', onResize);
     };
-  }, [open, onClose, triggerRef]);
+  }, [open, onClose, triggerRef, isDesktop]);
 
   React.useEffect(() => {
-    if (!open) return undefined;
+    if (!open || !isDesktop) return undefined;
     const onPointerDown = (event) => {
       if (triggerRef.current?.contains(event.target)) return;
       if (event.target.closest?.('.dropdown-layer')) return;
@@ -638,9 +645,27 @@ export default function CurrencySelect({ triggerRef, open, onClose, onManageAsse
       document.removeEventListener('pointerdown', onPointerDown, true);
       document.removeEventListener('keydown', onKey);
     };
-  }, [open, onClose, triggerRef]);
+  }, [open, onClose, triggerRef, isDesktop]);
 
   if (!open) return null;
+
+  if (!isDesktop) {
+    return (
+      <PopCenter open onClose={onClose} title="Currency" type="sheet">
+        <div dir="ltr" className="currency-select currency-select-sheet flex max-h-[70vh] min-h-[50vh] flex-col overflow-y-auto overflow-x-hidden px-2">
+          <div className="scroll-container">
+            {ready ? (
+              <Panel onClose={onClose} onManageAssets={onManageAssets} />
+            ) : (
+              <div className="center min-h-[50vh]">
+                <IconLoading className="size-4" />
+              </div>
+            )}
+          </div>
+        </div>
+      </PopCenter>
+    );
+  }
 
   return createPortal(
     <div
