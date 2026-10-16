@@ -14,11 +14,11 @@ import googleImg from '../../../assets/google.png';
 import {
   ArrowIcon,
   CloseIcon,
-  DeviceIcon,
+  MailIcon,
   EyeIcon,
   GoogleIcon,
   LineIcon,
-  LockIcon,
+  UserIcon,
   MetaMaskIcon,
   PasskeyIcon,
   SteamIcon,
@@ -31,6 +31,7 @@ import './Auth.css';
    imports them: the motion belongs to the router's shell, and this dialog is one more of its
    arms. */
 import '../../shared/DialogShell/DialogShell.css';
+import { PASSKEY_ENABLED } from '../../../config/hiddenFeatures';
 
 /* The sign-in / sign-up dialog.
  *
@@ -217,20 +218,23 @@ function DirectRow({ heading, children }) {
 }
 
 function SignInForm({ onSubmit, pending, error, onForgot }) {
-  /* Password vs One-time Code. The default `tabs-title` variant — no `data-type` — so the
-     selected tab is a raised pill on a tab_nopadding track, the same strip the bet table uses. */
+  /* Email vs Username — THIS BUILD'S TABS (user's request, 2026-10-16), in place of bc.game's
+     Password / One-time Code: the platform has no one-time code, and its login takes either an
+     email or a username in the same `identifier` field. Both tabs are the Password capture's form;
+     only the field's label, input type and autofill hint change. The default `tabs-title` variant —
+     no `data-type` — so the selected tab is a raised pill on a tab_nopadding track. */
   const [method, setMethod] = React.useState(0);
   const [account, setAccount] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [revealed, setRevealed] = React.useState(false);
 
-  const otp = method === 1;
+  const byUsername = method === 1;
   /* The captured submit carries `disabled`, on a dialog that had just opened with both fields
      empty — so the button is gated on the form, not permanently dead. `pending` joins it once a
      submit is in flight, which is this build's rather than the capture's: the original has a
      backend and a request that takes time, and a second click on a login form is a second login
      attempt against a rate limiter that counts them. */
-  const ready = (otp ? account.length > 0 : account.length > 0 && password.length > 0) && !pending;
+  const ready = account.trim().length > 0 && password.length > 0 && !pending;
 
   return (
     <>
@@ -241,8 +245,8 @@ function SignInForm({ onSubmit, pending, error, onForgot }) {
       >
         <div className="tabs-btn-group">
           {[
-            { label: 'Password', Icon: LockIcon },
-            { label: 'One-time Code', Icon: DeviceIcon },
+            { label: 'Email', Icon: MailIcon },
+            { label: 'Username', Icon: UserIcon },
           ].map((item, index) => (
             <button
               key={item.label}
@@ -263,55 +267,27 @@ function SignInForm({ onSubmit, pending, error, onForgot }) {
       </div>
 
       <div className="tabs-content bg-transparent">
-        {/* Two captures, two structures — kept separate rather than branched inside one form,
-            because they differ in more than their fields. The One-time Code tab moves the 1rem
-            gap from a wrapper div onto the label, drops the label's weight, KEEPS the input's
-            own `mt-4` (the Password tab cancels it with `!mt-0`, which is why its label sits
-            tight to its box and this one does not), centres its helper line, and its submit
-            carries no `rounded-xl` — so it falls back to `button-l`'s radius. */}
-        {otp ? (
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              /* NO `password`, so this arm never reaches the platform — `POST /user/email/otp`
-                 and its `/verify` sibling exist, but they are a two-step flow and this dialog
-                 has no screen to enter the code on. It stays a fixture sign-in and says so
-                 rather than sending a login the server would refuse. */
-              if (ready) onSubmit({ identifier: account });
-            }}
-          >
-            <Label className="mb-1 mt-4">Email / Phone Number</Label>
-            <div className="relative">
-              <Field autoFocus autoComplete="off" className="mt-4" value={account} onChange={setAccount} />
-            </div>
-
-            <div className="flex w-full justify-center">
-              <p className="mt-4 font-semibold text-secondary">
-                <span>We&apos;ll send a code to your device</span>
-              </p>
-            </div>
-
-            <button
-              type="submit"
-              disabled={!ready}
-              className="button button-brand button-l mt-6 h-14 w-full shadow-[0px_2px_4px_rgba(0,0,0,0.10)]"
-            >
-              <span className="text-base">Send One-time Code</span>
-            </button>
-          </form>
-        ) : (
+        {/* One form for both tabs — the Password capture's structure. bc.game's One-time Code
+            arm is gone with the tab. */}
           <form
             onSubmit={(event) => {
               event.preventDefault();
               /* `identifier` is the platform's own field name and it takes a username, an email
                  or a phone — which is exactly what this label offers. */
-              if (ready) onSubmit({ identifier: account, password });
+              if (ready) onSubmit({ identifier: account.trim(), password });
             }}
           >
             <div className="mt-4">
-              <Label>Email / Phone Number</Label>
+              <Label>{byUsername ? 'Username' : 'Email'}</Label>
               <div className="relative">
-                <Field autoFocus autoComplete="off" value={account} onChange={setAccount} />
+                <Field
+                  key={byUsername ? 'username' : 'email'}
+                  autoFocus
+                  type={byUsername ? 'text' : 'email'}
+                  autoComplete={byUsername ? 'username' : 'email'}
+                  value={account}
+                  onChange={setAccount}
+                />
               </div>
             </div>
 
@@ -395,18 +371,20 @@ function SignInForm({ onSubmit, pending, error, onForgot }) {
               )}
             </button>
           </form>
-        )}
       </div>
 
       <DirectRow heading="Log in directly with">
         {/* Cwallet (BC.GAME's partner wallet) sign-in is not drawn — no Parker567 integration. */}
-        <button
-          type="button"
-          className="button button-m mt-4 h-12 w-full border border-third bg-black_alpha5 shadow-[0px_2px_4px_rgba(0,0,0,0.10)]"
-        >
-          <PasskeyIcon className="size-5 fill-secondary" />
-          <span className="ml-2 text-base font-extrabold text-primary">Sign In with Passkey</span>
-        </button>
+        {/* Hidden: no WebAuthn on the platform (config/hiddenFeatures.js). */}
+        {PASSKEY_ENABLED && (
+          <button
+            type="button"
+            className="button button-m mt-4 h-12 w-full border border-third bg-black_alpha5 shadow-[0px_2px_4px_rgba(0,0,0,0.10)]"
+          >
+            <PasskeyIcon className="size-5 fill-secondary" />
+            <span className="ml-2 text-base font-extrabold text-primary">Sign In with Passkey</span>
+          </button>
+        )}
 
         <div className="third-group-wrap mt-6 flex h-11 w-full items-center gap-2">
           {THIRD_PARTY.map((item) => (

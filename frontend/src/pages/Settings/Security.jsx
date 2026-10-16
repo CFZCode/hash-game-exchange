@@ -23,6 +23,7 @@ import {
   IconAttention,
   IconMobile,
 } from './icons';
+import { PASSKEY_ENABLED } from '../../config/hiddenFeatures';
 
 /* `/settings/security` — `index-DA-0gLy9.js`, 23 KB, plus `index-DnPIrd_m.js` for the
  * anti-phishing card. Two cards: a grid of six security tiles under a strength badge, and the
@@ -255,7 +256,8 @@ function SecuritySetup() {
           {/* `<Show when={ye()}>` — a WebAuthn support test rather than an account flag, so the
               tile is absent on a browser that cannot do passkeys. Reproduced with the same test
               the platform exposes. */}
-          {typeof window !== 'undefined' && window.PublicKeyCredential ? (
+          {/* Hidden on this platform: config/hiddenFeatures.js. */}
+          {PASSKEY_ENABLED && typeof window !== 'undefined' && window.PublicKeyCredential ? (
             <Tile
               dark={false}
               icon={IconPasskey}

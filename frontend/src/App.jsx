@@ -77,6 +77,7 @@ import { SessionProvider } from './context/SessionContext';
 import { SettingsProvider } from './context/SettingsContext';
 import { GatesProvider, RouteGate } from './context/GatesContext';
 import { useSession } from './context/session';
+import { PASSKEY_ENABLED } from './config/hiddenFeatures';
 
 /* DEV ONLY — the exchange component kit's preview (`/dev/exchange-kit`). Lazy so the preview and
    its sample data never enter the production bundle's main chunk; the route itself is only
@@ -359,7 +360,9 @@ function AppShell() {
   const phishingDialog = phishingRoute && session.login;
   const phishingNeedsAuth = phishingRoute && !session.login;
 
-  const passkeyRoute = pathname === '/settings/passkey';
+  /* Off on this platform (config/hiddenFeatures.js): the path then belongs to the settings layout
+     like any unknown pane, and the dialog never mounts. */
+  const passkeyRoute = PASSKEY_ENABLED && pathname === '/settings/passkey';
   const passkeyDialog = passkeyRoute && session.login;
   const passkeyNeedsAuth = passkeyRoute && !session.login;
 

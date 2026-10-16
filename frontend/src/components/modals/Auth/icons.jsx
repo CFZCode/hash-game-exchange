@@ -27,6 +27,25 @@ export const LockIcon = (props) => (
   </Icon>
 );
 
+/* Envelope — the Email sign-in tab (this build's; the platform has no one-time code). */
+export const MailIcon = (props) => (
+  <Icon {...props}>
+    <path
+      fillRule="evenodd"
+      clipRule="evenodd"
+      d="M4 10.4C4 7.97 5.97 6 8.4 6H23.6C26.03 6 28 7.97 28 10.4V21.6C28 24.03 26.03 26 23.6 26H8.4C5.97 26 4 24.03 4 21.6V10.4ZM7.02 9.72C6.85 9.92 6.6 10.4 6.6 10.4V10.62L16 16.89L25.4 10.62V10.4C25.4 10.4 25.15 9.92 24.98 9.72C24.66 9.36 24.16 8.6 23.6 8.6H8.4C7.84 8.6 7.34 9.36 7.02 9.72ZM25.4 13.74L16.72 19.53C16.28 19.82 15.72 19.82 15.28 19.53L6.6 13.74V21.6C6.6 22.59 7.41 23.4 8.4 23.4H23.6C24.59 23.4 25.4 22.59 25.4 21.6V13.74Z"
+    />
+  </Icon>
+);
+
+/* Person — the Username sign-in tab (this build's). */
+export const UserIcon = (props) => (
+  <Icon {...props}>
+    <path d="M16 15.2C19.09 15.2 21.6 12.69 21.6 9.6C21.6 6.51 19.09 4 16 4C12.91 4 10.4 6.51 10.4 9.6C10.4 12.69 12.91 15.2 16 15.2Z" />
+    <path d="M16 17.6C10.02 17.6 5.6 20.67 5.6 24.4C5.6 26.39 6.81 28 8.8 28H23.2C25.19 28 26.4 26.39 26.4 24.4C26.4 20.67 21.98 17.6 16 17.6Z" />
+  </Icon>
+);
+
 /* Handset — the One-time Code method. */
 export const DeviceIcon = (props) => (
   <Icon {...props}>
