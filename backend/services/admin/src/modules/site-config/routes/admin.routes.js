@@ -143,6 +143,33 @@ module.exports = function adminRoutes(deps) {
     )
   );
 
+  /**
+   * Referral unlock tiers (migration 106): the "Friend's Level / Total Wager /
+   * Unlock Amount" table on the player site's /referral/rules. Promotions, so
+   * house staff only like the affiliate rates; the PUT replaces the list and is
+   * audited because it is what the site promises referrers.
+   */
+  router.get(
+    '/referral-unlocks',
+    houseOnly,
+    auth.requirePermission(PERMISSIONS.CONFIG_READ),
+    asyncHandler(async (_req, res) => response.ok(res, await service.referralUnlockSettings()))
+  );
+
+  router.put(
+    '/referral-unlocks',
+    houseOnly,
+    auth.requirePermission(PERMISSIONS.CONFIG_WRITE),
+    validate(v.updateReferralUnlockSettings),
+    withActivity({
+      action: 'site-config.referral-unlocks.update',
+      describe: (req) => ({ targetType: 'SITE_CONFIG', targetId: 'referral-unlocks', details: req.body }),
+    }),
+    asyncHandler(async (req, res) =>
+      response.ok(res, await service.updateReferralUnlockSettings({ ...req.body, staffId: req.staff?.id ?? null }))
+    )
+  );
+
   /** @legacy GET /sportsCheck */
   router.get(
     '/sports',

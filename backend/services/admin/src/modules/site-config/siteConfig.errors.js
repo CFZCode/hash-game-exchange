@@ -58,6 +58,15 @@ module.exports = Object.freeze({
     message: 'That is not a setting this site keeps',
   },
 
+  /**
+   * The setting's column is not in the database yet — the server has the new
+   * code and has not run the migration. Details `{ migration }`.
+   */
+  MIGRATION_PENDING: {
+    status: 503,
+    message: 'This setting needs a database migration that has not been run yet',
+  },
+
   /** A limit outside what it may be — below its floor, or under its own minimum. */
   INVALID_SETTING: {
     status: 422,
