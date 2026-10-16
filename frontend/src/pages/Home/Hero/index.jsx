@@ -97,9 +97,9 @@ function SignedOutHero() {
     <div dir="ltr" className="w-full px-4 sm:px-0">
       <div className="hero-panel relative h-[14.375rem] w-full overflow-hidden rounded-lg pl-2.5 sm:h-[260px]">
         {/* Desktop: the finished banner covers the panel, anchored left (the crowned P). Phone:
-            the players' art sits bottom-right at 74% height, its left edge faded into the panel,
+            the players' art sits bottom-right at 88% height, its left and top edges faded into the panel,
             so both players stay whole beside the copy (held to 42%). */}
-        <img alt="banner" className="absolute bottom-0 right-0 h-[74%] w-auto max-w-none [mask-image:linear-gradient(to_right,transparent,#000_30%)] lg:hidden" src={mobileArt} />
+        <img alt="banner" className="absolute bottom-0 right-0 h-[88%] w-auto max-w-none [mask-image:linear-gradient(to_right,transparent,#000_30%),linear-gradient(to_bottom,transparent,#000_18%)] [mask-composite:intersect] lg:hidden" src={mobileArt} />
         <img alt="banner" className="absolute inset-0 hidden h-full w-full object-cover object-left lg:block" src={desktopArt} />
 
         <div className="relative hidden h-full w-[50%] items-center justify-center lg:ml-[12%] lg:flex">
