@@ -102,6 +102,13 @@ export function getRolloverTasks({ status, type, bonusType, page = 1 }) {
 
 /* `I.getTypes(isBonus)` — the Bonus Type dropdown's options, `{taskType, taskTypeDesc}` rows
    appended after the seeded first entry. */
+/* The Rollover page's turnover strip — `GET /user/wager/progress`, in USD. `null` in fixture mode
+   (nothing to show) and on failure, so the strip simply is not drawn. */
+export function getWagerProgress() {
+  if (USE_FIXTURES) return Promise.resolve(null);
+  return Promise.resolve(request(PLATFORM.user.wagerProgress, { live: true, fixture: null })).catch(() => null);
+}
+
 export function getRolloverTypes(isBonus = true) {
   return request(ENDPOINTS.rollover.types, {
     method: 'POST',

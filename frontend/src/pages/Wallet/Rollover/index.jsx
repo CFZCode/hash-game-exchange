@@ -9,7 +9,7 @@ import Table, {
   CELL_START,
   CELL_CENTER,
 } from '../../../components/shared/Table';
-import CurrencyAmount from '../../../components/shared/CurrencyAmount';
+import { printCurrency } from '../../../utils/currency';
 import EmptyPlaceholder from '../../../components/shared/EmptyPlaceholder';
 import { useSession } from '../../../context/session';
 import WalletFilterProvider from '../../../context/WalletFilterProvider';
@@ -23,6 +23,7 @@ import {
   TYPE,
   statusColor,
   statusLabel,
+  getWagerProgress,
 } from '../../../services/rollover';
 
 /* `/wallet/rollover` — the seventh wallet pane, and the wagering-requirement ledger: every bonus
@@ -193,14 +194,49 @@ function Turnover({ item, settings }) {
   const pct = target > 0 ? Math.min(100, (wagered / target) * 100) : 100;
   return (
     <div className="flex w-full flex-col items-center gap-1">
-      <div className="flex flex-wrap items-center justify-center gap-x-1 whitespace-nowrap">
-        <CurrencyAmount amount={wagered} currency={item.originalCurrencyName} settings={settings} />
-        <span className="text-secondary">/</span>
-        <CurrencyAmount amount={target} currency={item.originalCurrencyName} settings={settings} />
+      <div className="flex max-w-full flex-wrap items-center justify-center gap-x-1 text-sm">
+        <span className="text-primary">{usd(wagered, settings)}</span>
+        <span className="text-secondary">/ {usd(target, settings)}</span>
       </div>
       <div className="h-1 w-full max-w-28 overflow-hidden rounded-full bg-layer6">
         <div className="h-full rounded-full bg-brand" style={{ width: `${pct}%` }} />
       </div>
+    </div>
+  );
+}
+
+/* Text-only money in the wallet's USD row (`USDFIAT`) — a coin mark beside every figure crowded a
+   phone row, and a bare `USD` has no coin art. */
+const usd = (amount, settings) =>
+  printCurrency(Number(amount) || 0, 'USDFIAT', { settings: settings ?? {}, hasAlias: true });
+
+/* The account's turnover at a glance (user's request, 2026-10-16), above the table and shown even
+   before a deposit: wagered so far, the required turnover (deposits x multiplier) and what is left. */
+function TurnoverSummary({ settings }) {
+  const { data } = useResource(getWagerProgress);
+  if (!data) return null;
+  const target = Number(data.target) || 0;
+  const wagered = Number(data.wagered) || 0;
+  const pct = target > 0 ? Math.min(100, (wagered / target) * 100) : wagered > 0 ? 100 : 0;
+  const cell = (label, amount) => (
+    <div className="flex min-w-0 flex-col items-center gap-1">
+      <span className="text-xs text-secondary">{label}</span>
+      <span className="truncate text-primary">{usd(amount, settings)}</span>
+    </div>
+  );
+  return (
+    <div className="mb-4 rounded-lg bg-layer5 p-3 font-semibold">
+      <div className="grid grid-cols-3 gap-2">
+        {cell('Wagered', wagered)}
+        {cell('Required', target)}
+        {cell('Remaining', Number(data.remaining) || 0)}
+      </div>
+      <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-layer6">
+        <div className="h-full rounded-full bg-brand" style={{ width: `${pct}%` }} />
+      </div>
+      {data.multiplier != null && (
+        <p className="mt-2 text-center text-xs text-tertiary">Wager {Number(data.multiplier)}x your deposits to clear the rollover.</p>
+      )}
     </div>
   );
 }
@@ -236,11 +272,17 @@ function RolloverList({ settings }) {
             className="flex cursor-pointer items-center justify-between border-b border-third"
             onClick={() => navigate(`/wallet/roll-detail?taskId=${item.taskId}`, { state: item })}
           >
-            <div className={CELL_START}>
-              {rolloverTypeLabel(false, item.taskType, item.taskTypeDesc)}
+            <div className={`${CELL_START} min-w-0`}>
+              <span className="w-full truncate">{rolloverTypeLabel(false, item.taskType, item.taskTypeDesc)}</span>
             </div>
-            <div className={`${CELL_CENTER} text-secondary`}>
-              {new Date(Number(item.createTime)).toLocaleString()}
+            {/* Date over time, so the cell fits a phone column instead of running into its neighbours. */}
+            <div className={`${CELL_CENTER} min-w-0 flex-col text-sm text-secondary`}>
+              {item.createTime ? (
+                <>
+                  <span>{new Date(Number(item.createTime)).toLocaleDateString()}</span>
+                  <span className="text-xs">{new Date(Number(item.createTime)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                </>
+              ) : null}
             </div>
             <div className={CELL_CENTER}>
               <Turnover item={item} settings={settings} />
@@ -279,6 +321,7 @@ export default function Rollover() {
           <BonusTypeFilter />
         </div>
 
+        <TurnoverSummary settings={settings} />
         <RolloverList settings={settings} />
       </div>
     </WalletFilterProvider>

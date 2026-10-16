@@ -77,7 +77,7 @@ Changes the user asked for, so the pixel check WILL show them against the refere
 
 - **Home Highlights card**: cricket uses a colour icon (`assets/sports/sport-cricket-color.svg`); the sport/tournament line is left-aligned with `pr-16` clear of the Live badge.
 - **Game page**: a High win / Lucky win board under the frame (live `top-wins?game=`, else `staticGameWins`), then the Recommended Games row, then the home's Latest round & Race tables; the info card is replaced by the Recommended Games row (`pages/GameCollection/RecommendList`); the play overlay card is `w-full max-w-[30rem]` in a `px-4` overlay.
-- **Rollover**: the Amount column is "Turnover" — wagered / target with a progress bar.
+- **Rollover**: a turnover strip (Wagered / Required / Remaining, `GET /user/wager/progress`) above the table; the Amount column is "Turnover" — wagered / target with a progress bar; Time is date over time; money is text-only.
 - **Account menus**: Free Plays and Do Not Disturb are hidden (hidden-features skill).
 - **Header currency picker below `lg`**: a PopCenter bottom sheet titled "Currency" (the original's `CS` arm) instead of the desktop popover.
 

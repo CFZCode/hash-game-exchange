@@ -914,6 +914,9 @@ export const PLATFORM = {
        rather than a completed one — never having deposited is not the same as having cleared it.
        `docs/backend-gaps.md` Part 4b.16 argues it in full. */
     wagerTasks: '/api/v1/user/wager/tasks',
+    /* The account's turnover in USD: `{ target, wagered, remaining, multiplier, met, totalDeposited }`,
+       answered even before any deposit (target 0). Drives the Rollover page's summary strip. */
+    wagerProgress: '/api/v1/user/wager/progress',
 
     /* KYC. `status` answers `{status, submitted}` — ONE status for the account
        (`NotSubmitted` | `Unverified` | `Pending` | `Verified` | `Rejected`) and no notion of a
