@@ -73,6 +73,8 @@ Changes the user asked for, so the pixel check WILL show them against the refere
 
 - **Referral unlock table from the site admin** (2026-10-16): `/referral/rules`' Friend's Level / Total Wager / Unlock Amount rows come from `site-config/public` → `referralUnlocks` (migration 106) on live builds. Same markup; once the backend serves the key, wagers print grouped ("1,000,000", not the capture's "1000,000") and each amount's coin is the reward currency's (USDT) rather than bc.game's gold coin. Fixture builds and a backend without the key still render the capture. See `frontend/docs/referral.md` › Rate & Rules.
 
+- **Signed-out home hero art is Parker567's** (bc.game's esports banner is another brand): desktop `public/brand/parker567-hero.jpg` covers the panel; phone `parker567-hero-mobile.jpg` sits bottom-right at 86% height, 4% past the right edge, left/top edges faded. The copy column keeps the original's `w-1/2 min-w-[11.25rem]`, so text matches the reference exactly; only the art region differs.
+
 The sidebar is therefore shorter than the reference, so everything below the removed rows in the sidebar shifts up. Details are in `frontend/docs/architecture.md` under Sidebar. Left as they were on purpose: the Sports lobby's own Predictions tab (BetBy's), the Trading and Lottery options in the bet-history type filter, the slot theme tag "Lottery" in the casino catalogue's tag list, the footer's "Crypto trading is not gambling" licence line, and the `detrade:trading` game redirects in FreePlay and Profile.
 
 ## Next.js migration rules
