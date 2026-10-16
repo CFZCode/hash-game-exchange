@@ -16,7 +16,7 @@ const amount = z
   .regex(/^\d+(\.\d{1,2})?$/, 'must be a positive amount with at most 2 decimal places')
   .refine((v) => Number.parseFloat(v) > 0, 'amount must be greater than zero');
 
-/** POST /exchange/owner/add-balance */
+/** POST /exchange/owner/add-balance aur /exchange/owner/add-direct-balance */
 const ownerAddBalance = {
   body: z
     .object({

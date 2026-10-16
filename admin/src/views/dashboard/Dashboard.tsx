@@ -600,11 +600,11 @@ const DirectUserDashboard = () => {
 /** Sports Exchange wallet dekhne ki koi bhi permission — navConfig ke WALLET_ANY jaisa. */
 const WALLET_ANY = ['wallet:credit', 'wallet:debit', 'wallet:adjust', 'users:read']
 
-type Tab = 'direct' | 'client'
+type Tab = 'direct' | 'agent'
 
 /**
- * Ek hi Dashboard page, do tab: "Direct Users" (site ke players) aur "Client Management"
- * (Sports Exchange ka points / P&L dashboard). Tab URL me `?tab=client` se rehta hai, taaki
+ * Ek hi Dashboard page, do tab: "Direct Users" (site ke players) aur "Agent System"
+ * (Sports Exchange ka points / P&L dashboard). Tab URL me `?tab=agent` se rehta hai, taaki
  * refresh / link pe wahi tab khule. Jis tab ki permission nahi, wo tab nahi dikhta.
  */
 const Dashboard = () => {
@@ -616,7 +616,7 @@ const Dashboard = () => {
   const tabs = (
     [
       { value: 'direct', label: 'Direct Users', allowed: can('reports:read') },
-      { value: 'client', label: 'Client Management', allowed: can(WALLET_ANY) }
+      { value: 'agent', label: 'Agent System', allowed: can(WALLET_ANY) }
     ] as const
   ).filter(t => t.allowed)
 
@@ -652,8 +652,8 @@ const Dashboard = () => {
             <DirectUserDashboard />
           </TabsContent>
         )}
-        {has('client') && (
-          <TabsContent value='client'>
+        {has('agent') && (
+          <TabsContent value='agent'>
             <ExchangeDashboard />
           </TabsContent>
         )}

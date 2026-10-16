@@ -21,14 +21,14 @@ Last updated: 2026-10-16
 | Type | Pehchaan | Kahan dikhte hain |
 |---|---|---|
 | **Direct user** | `users.parent_staff_id IS NULL`: khud site pe signup kiya | Admin **Dashboard → Direct Users** tab |
-| **Client user** | `parent_staff_id` set hai: kisi agent/staff ne banaya | Admin **Dashboard → Client Management** tab (Sports Exchange) |
+| **Client user** | `parent_staff_id` set hai: kisi agent/staff ne banaya | Admin **Dashboard → Agent System** tab (Sports Exchange) |
 
 - **Referral se signup = direct user.** Signup pe referrer ka code sirf `users.refree` me jaata hai aur affiliate team join hoti hai. `parent_staff_id` set nahi hota (`backend/services/user/src/modules/auth/auth.service.js` → `register`).
 - **Client user kabhi referrer nahi ban sakta.** Agent-tree player ka referral code kahin kaam nahi karta (`backend/services/user/src/modules/affiliate/referrerResolver.js`).
 
 ## 3. Admin Dashboard (`/dashboard`)
 
-Ek hi page, do tab. Tab URL me rehta hai (`?tab=client`).
+Ek hi page, do tab. Tab URL me rehta hai (`?tab=agent`).
 
 ### Direct Users tab
 - **Sirf direct users ka data** (parent nahi hai): deposits, withdrawals, casino/sports GGR, turnover, registrations, top games/sports, countries, latest movements.
@@ -38,8 +38,9 @@ Ek hi page, do tab. Tab URL me rehta hai (`?tab=client`).
 - Ye data sirf platform root ke tree (owner / back office) ko dikhta hai. Agent ke tree me sirf client players hote hain, isliye agent ko ye tab khali dikhta hai.
 - Permission: `reports:read`.
 
-### Client Management tab
+### Agent System tab
 - Sports Exchange ka dashboard: login wale ka balance, exposure, credit/all/settlement/upper/down points, Sports P/L.
+- Graph: points = upar bada All Pts card + har point ki simple gradient bar (minus laal), P/L = Total P/L + zero-centre bars (success / danger).
 - API: `GET admin/exchange/user-reports/home`. View: `admin/src/views/exchange/ExchangeDashboard.tsx`.
 - Permission: koi bhi wallet perm (`wallet:credit|debit|adjust`, `users:read`).
 
@@ -58,4 +59,4 @@ Ek hi page, do tab. Tab URL me rehta hai (`?tab=client`).
 ## 5. Admin sidebar
 
 - **Dashboard**: upar wala ek hi link, dono tab yahin hain.
-- **Sports Exchange**: msadmin.zip ke screens (Market Analysis, Account, Bank, Reports, Settlement…). Casino ka kuch nahi. Iska alag dashboard ab nahi hai, wo main Dashboard ke Client Management tab me chala gaya.
+- **Sports Exchange**: msadmin.zip ke screens (Market Analysis, Account, Bank, Reports, Settlement…). Casino ka kuch nahi. Iska alag dashboard ab nahi hai, wo main Dashboard ke Agent System tab me chala gaya.

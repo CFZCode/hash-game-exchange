@@ -197,7 +197,7 @@ export type NavItem = {
  * loads first — most promotion reads (bonus, codes, gift cards, wheel, VIP,
  * affiliate, races, vault) are `reports:read`, P2P reads are `config:write`.
  */
-/** Wallet dekhne ki koi bhi permission (Client Management dashboard tab, bank, point ledger). */
+/** Wallet dekhne ki koi bhi permission (Agent System dashboard tab, bank, point ledger). */
 const WALLET_ANY = ['wallet:credit', 'wallet:debit', 'wallet:adjust', 'users:read']
 
 /** Zip ke owner-only screens: `wallet:adjust` sirf Super Admin (owner) ke paas hai. */
@@ -205,7 +205,7 @@ const OWNER_ONLY = 'wallet:adjust'
 
 export const navItems: NavItem[] = [
   {
-    // Ek hi Dashboard: Direct Users (reports:read) + Client Management (Sports Exchange) tab.
+    // Ek hi Dashboard: Direct Users (reports:read) + Agent System (Sports Exchange) tab.
     items: [{ icon: 'LayoutDashboard', label: 'Dashboard', href: '/dashboard', permission: ['reports:read', ...WALLET_ANY] }]
   },
   {

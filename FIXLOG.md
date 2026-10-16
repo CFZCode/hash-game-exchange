@@ -16,6 +16,11 @@ Format:
 
 ---
 
+## 2026-10-16 — Owner System Tracker ke scan routes pe strict body validator nahi tha
+**Kya toota tha:** `tools/__tests__/verify-strict-validators.test.js` fail: `POST /owner/system-tracker/scan` aur `/watchdog/scan` "no body validator".
+**Fix:** dono pe `noBody()` (owner panel `{}` bhejta hai, wo chalta hai).
+**Check:** verify-strict-validators pass (770 routes), ownerTracker test pass, live owner panel se watchdog scan 200.
+
 ## 2026-10-16 — Events page crash: `matchCount` me `.reduce` of null
 **Kya toota tha:** Sports Exchange → Events page khulte hi error (`views/exchange/market/sportsTree.ts:60`, `matchCount`).
 **Wajah:** `/sports/user/all/sports/events` me jis sport me abhi koi match nahi (Esoccer, Snooker, Ice Hockey…), uska `children: null` aata hai. `groupRaces` use waisa hi lauta deta tha aur `matchCount` `null.reduce` chalata tha.

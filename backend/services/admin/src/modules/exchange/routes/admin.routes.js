@@ -20,7 +20,8 @@ const actorFrom = (req) => ({
  *
  *   GET  /admin/exchange/dashboard          upar ke cards
  *   GET  /admin/exchange/owner/wallet       owner ka wallet (Add Balance popup ka Current Balance)
- *   POST /admin/exchange/owner/add-balance  owner apne wallet me balance add kare
+ *   POST /admin/exchange/owner/add-balance  owner apne Client Management balance (credits) me add kare
+ *   POST /admin/exchange/owner/add-direct-balance  owner apne Direct User balance (staff_balances) me add kare
  *   GET  /admin/exchange/accounts           direct children (Account List / Active Users / Bank)
  *   POST /admin/exchange/points/settle      points settlement (D / W, Bank submit)
  */
@@ -59,6 +60,20 @@ module.exports = function adminRoutes(deps) {
     }),
     asyncHandler(async (req, res) =>
       response.created(res, await service.ownerAddBalance({ ...req.body, actor: actorFrom(req) }))
+    )
+  );
+
+  // Owner ka Direct User balance — direct users ko dena isi se hota hai.
+  router.post(
+    '/owner/add-direct-balance',
+    auth.requirePermission(PERMISSIONS.WALLET_ADJUST),
+    validate(v.ownerAddBalance),
+    withActivity({
+      action: 'exchange.owner.add-direct-balance',
+      describe: (req) => ({ targetType: 'STAFF', targetId: req.staff.id, details: { amount: req.body.amount, note: req.body.note } }),
+    }),
+    asyncHandler(async (req, res) =>
+      response.created(res, await service.ownerAddDirectBalance({ ...req.body, actor: actorFrom(req) }))
     )
   );
 

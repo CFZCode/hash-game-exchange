@@ -23,8 +23,8 @@ const { money } = require('@ibitplay/common');
 const POINT_EVENT = Object.freeze({
   CREDIT: 'Credit', // parent ne child ko diya (+)
   DEBIT: 'Debit', // parent ne child se liya (−)
-  BANK_DEPOSIT: 'Bank Deposite', // owner ne DIRECT user ko diya — owner ka balance nahi kata
-  BANK_WITHDRAW: 'Bank Withdraw', // owner ne DIRECT user se liya — owner ke balance me nahi gaya
+  BANK_DEPOSIT: 'Bank Deposite', // owner ne DIRECT user ko diya — owner ke Direct User balance (staff_balances) se
+  BANK_WITHDRAW: 'Bank Withdraw', // owner ne DIRECT user se liya — owner ke Direct User balance me gaya
 });
 
 /** entry_ref — transfer ki id se, taaki entry dobara na lage. */

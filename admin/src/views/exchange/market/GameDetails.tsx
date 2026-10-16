@@ -172,7 +172,7 @@ const GameDetails = ({ sportId, eventId }: Props) => {
   // khali ya khatam match → 3s baad bahar (zip: home)
   useEffect(() => {
     if (!dead && !noMarkets) return
-    const t = setTimeout(() => router.push('/dashboard?tab=client'), DEAD_REDIRECT_MS)
+    const t = setTimeout(() => router.push('/dashboard?tab=agent'), DEAD_REDIRECT_MS)
 
     return () => clearTimeout(t)
   }, [dead, noMarkets, router])

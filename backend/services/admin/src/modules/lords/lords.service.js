@@ -23,7 +23,14 @@ const {
 } = require('./staffFloat');
 const { TRANSFER_TYPE } = require('./lords.constants');
 const { addPointEntry, POINT_EVENT } = require('./pointLedger');
-const { isOwnerStaff, isDirectUser } = require('./ownerWallet');
+const {
+  isOwnerStaff,
+  isDirectUser,
+  readOwnerDirectBalance,
+  debitOwnerDirectBalance,
+  creditOwnerDirectBalance,
+  insufficientDirectBalance,
+} = require('./ownerWallet');
 
 /** The only currency a staff float holds (`credits.inr` on the staff row). */
 const FLOAT_CURRENCY = 'INR';
@@ -240,8 +247,9 @@ class LordsService {
    * (`ownerAddBalance`) and every refill draws it down. A guarded debit that
    * refuses rather than going negative.
    *
-   * One exception: the owner refilling a DIRECT user (no parent) — the player
-   * gets it and the owner's wallet is not touched (`ownerWallet.js`).
+   * One exception: the owner refilling a DIRECT user (no parent) — that is paid
+   * from the owner's Direct User balance (`staff_balances.inr`), not the
+   * owner's `credits` row (`ownerWallet.js`).
    * ─────────────────────────────────────────────────────────────────────
    */
   async refill({ actor, accountId, amount, note, transactionPassword }) {
@@ -251,7 +259,7 @@ class LordsService {
     const ceiling = String(this.config.ADMIN_MAX_REFILL ?? '1000000');
     if (money.gt(amount, ceiling)) throw errors.REFILL_TOO_LARGE({ amount, ceiling });
 
-    // Owner aur direct user: owner ka wallet nahi katega.
+    // Owner aur direct user: owner ke Direct User balance (staff_balances) se katega.
     const ownerToDirectUser = actor.canIssueFunds && (await isDirectUser(this.models, accountId));
 
     return this.db.transaction(async (transaction) => {
@@ -262,7 +270,10 @@ class LordsService {
        * by every concurrent request, which is a lock whose scope nobody can
        * reason about.
        */
-      if (!ownerToDirectUser) {
+      if (ownerToDirectUser) {
+        const debited = await debitOwnerDirectBalance(this.models, actor.id, amount, { transaction });
+        if (!debited) throw insufficientDirectBalance({ amount });
+      } else {
         const debited = await debitStaffFloat(this.models, actor.id, amount, { transaction, allowCredit: true });
         if (!debited) throw insufficientStaffBalance({ amount });
       }
@@ -369,8 +380,9 @@ class LordsService {
    *
    * OWNER (migration 099): the owner comes through here too, for INR.
    *   - player has a parent → the owner's wallet pays, exactly like an agent
-   *   - DIRECT user (no parent) → the player's balance moves, the owner's
-   *     wallet does NOT; recorded as transfer_type 'direct' and point events
+   *   - DIRECT user (no parent) → the owner's Direct User balance
+   *     (`staff_balances.inr`) pays / gets it back, the owner's `credits` row
+   *     does NOT; recorded as transfer_type 'direct' and point events
    *     'Bank Deposite' / 'Bank Withdraw' (see `ownerWallet.js`)
    * ─────────────────────────────────────────────────────────────────────
    */
@@ -393,7 +405,7 @@ class LordsService {
       executiveId: actor.executiveId ?? null,
     });
 
-    // Owner aur direct user: owner ka wallet nahi badlega.
+    // Owner aur direct user: owner ka Direct User balance (staff_balances) badlega, credits nahi.
     const ownerToDirectUser = actor.canIssueFunds && (await isDirectUser(this.models, userId));
 
     if (String(currency).toUpperCase() !== FLOAT_CURRENCY) {
@@ -459,9 +471,17 @@ class LordsService {
       const previous = money.toMinorQuantised(wallet.inr ?? '0');
 
       // ── 3. Move it. Each side is a guarded/atomic UPDATE decided by Postgres.
-      //       Owner → direct user: sirf player ka balance badalta hai.
+      //       Owner → direct user: owner ka Direct User balance (staff_balances).
       if (isCredit) {
-        if (!ownerToDirectUser) {
+        if (ownerToDirectUser) {
+          const debited = await debitOwnerDirectBalance(this.models, actor.id, decimal, { transaction });
+          if (!debited) {
+            throw insufficientDirectBalance({
+              requested: decimal,
+              available: await readOwnerDirectBalance(this.models, actor.id, { transaction }),
+            });
+          }
+        } else {
           const debited = await debitStaffFloat(this.models, actor.id, decimal, { transaction, allowCredit: true });
           if (!debited) {
             throw insufficientStaffBalance({
@@ -479,7 +499,8 @@ class LordsService {
         if (!affected) {
           throw insufficientPlayerBalance({ requested: decimal, available: money.toDecimalString(previous) });
         }
-        if (!ownerToDirectUser) await creditStaffFloat(this.models, actor.id, decimal, { transaction });
+        if (ownerToDirectUser) await creditOwnerDirectBalance(this.models, actor.id, decimal, { transaction });
+        else await creditStaffFloat(this.models, actor.id, decimal, { transaction });
       }
 
       const previousBalance = money.toDecimalString(previous);
@@ -510,7 +531,7 @@ class LordsService {
           amount: decimal,
           isDeposit: isCredit,
           transferId: transfer.id,
-          // Direct user ki history alag naam se, taaki pata rahe owner ka balance nahi kata.
+          // Direct user ki history alag naam se, taaki pata rahe Direct User balance se gaya.
           eventType: ownerToDirectUser ? (isCredit ? POINT_EVENT.BANK_DEPOSIT : POINT_EVENT.BANK_WITHDRAW) : undefined,
           remark: description || (isCredit ? 'Deposit' : 'Withdraw'),
         },
@@ -558,6 +579,10 @@ class LordsService {
       );
 
       const staffBalance = await readStaffFloat(this.models, actor.id, { transaction });
+      // Owner ↔ direct user: kaun sa balance badla, wo bhi bata do.
+      const directBalance = ownerToDirectUser
+        ? await readOwnerDirectBalance(this.models, actor.id, { transaction })
+        : undefined;
 
       this.logger?.info(
         { actorStaffId: actor.id, userId, amount: decimal, operation, transferId: transfer.id },
@@ -574,6 +599,7 @@ class LordsService {
         previousBalance,
         newBalance,
         staffBalance,
+        ...(directBalance !== undefined ? { directBalance } : {}),
         idempotencyKey: idempotencyKey ?? null,
         replayed: false,
       };

@@ -6,6 +6,11 @@ const { AppError } = require('@ibitplay/common');
 const { POINT_EVENT } = require('../lords/pointLedger');
 const { TRANSFER_TYPE } = require('../lords/lords.constants');
 const { round2 } = require('./accountList');
+const {
+  readOwnerDirectBalance,
+  debitOwnerDirectBalance,
+  creditOwnerDirectBalance,
+} = require('../lords/ownerWallet');
 
 /**
  * Points settlement — zip ka `settlePointsFromChild` (`POST /admin/wallet/points/settle`).
@@ -21,8 +26,9 @@ const { round2 } = require('./accountList');
  * Points: child.all_point += points, child.upper_point += points, parent.down_point −= points
  * (credit nahi badalta, isliye pending 0 ki taraf jaata hai.)
  *
- * Owner aur DIRECT user (parent_staff_id NULL): owner ka wallet nahi badalta —
- * wahi rule jo deposit/withdraw me hai (migration 099).
+ * Owner aur DIRECT user (parent_staff_id NULL): owner ka paisa Direct User
+ * balance (`staff_balances.inr`) se jaata / usi me aata hai, owner ka `credits`
+ * row nahi badalta (na inr, na down_point) — wahi rule jo deposit/withdraw me hai.
  */
 
 const fail = (message, status = 400) => new AppError(message, status, 'EXCHANGE_SETTLE_REFUSED');
@@ -82,8 +88,9 @@ async function settlePoints(models, { actor, accountType, accountId, points, rem
   const childWallet = await lockWallet(sequelize, child, transaction);
   if (!childWallet) throw fail(`Wallet not found for ${child.username}`, 404);
 
-  // Owner ↔ direct user: owner ka wallet bich me nahi aata.
+  // Owner ↔ direct user: owner ka credits wallet bich me nahi aata, Direct User balance aata hai.
   const parentPays = !child.isDirectUser;
+  const fromDirectBalance = child.isDirectUser;
   const parentWallet = await lockWallet(sequelize, { type: 'staff', id: actor.id }, transaction);
   if (!parentWallet) throw fail(`Wallet not found for ${parentName}`, 404);
 
@@ -108,16 +115,19 @@ async function settlePoints(models, { actor, accountType, accountId, points, rem
   // 4. Balance check.
   const taking = delta < 0;
   const childInrBefore = round2(childWallet.inr);
-  const parentInrBefore = round2(parentWallet.inr);
+  const parentInrBefore = fromDirectBalance
+    ? round2(await readOwnerDirectBalance(models, actor.id, { transaction }))
+    : round2(parentWallet.inr);
   if (taking && childInrBefore < Math.abs(delta)) {
     throw fail(`${child.username} has only ${childInrBefore} INR, cannot take ${Math.abs(delta)}`);
   }
-  if (!taking && parentPays && parentInrBefore < delta) {
-    throw fail(`${parentName} has only ${parentInrBefore} INR, cannot pay ${delta}`);
+  if (!taking && parentInrBefore < delta) {
+    const which = fromDirectBalance ? 'Direct User balance' : 'INR';
+    throw fail(`${parentName} has only ${parentInrBefore} ${which}, cannot pay ${delta}`);
   }
 
   const childInrAfter = round2(childInrBefore + delta);
-  const parentInrAfter = parentPays ? round2(parentInrBefore - delta) : parentInrBefore;
+  const parentInrAfter = round2(parentInrBefore - delta);
   const allPointAfter = round2(counter + delta);
 
   // 5. Paisa aur points.
@@ -132,6 +142,10 @@ async function settlePoints(models, { actor, accountType, accountId, points, rem
       'UPDATE credits SET inr = inr - :delta, down_point = down_point - :delta WHERE id = :walletId',
       { replacements: { delta, walletId: parentWallet.id }, transaction }
     );
+  } else if (taking) {
+    await creditOwnerDirectBalance(models, actor.id, Math.abs(delta), { transaction });
+  } else if (!(await debitOwnerDirectBalance(models, actor.id, delta, { transaction }))) {
+    throw fail(`${parentName} has not enough Direct User balance to pay ${delta}`);
   }
 
   // 6. Record: staff_transfers (paisa kahan se kahan gaya).

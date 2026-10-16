@@ -1,28 +1,107 @@
 'use strict';
 
-const { QueryTypes } = require('sequelize');
+const { Op, QueryTypes, literal } = require('sequelize');
 const { money } = require('@ibitplay/common');
-const { creditStaffFloat } = require('./staffFloat');
+const { creditStaffFloat, insufficientFunds } = require('./staffFloat');
 const { TRANSFER_TYPE } = require('./lords.constants');
 
 /**
- * Owner (Super Admin, level 1) ka wallet.
+ * Owner (Super Admin, level 1) ke DO balance hain:
  *
- * Owner ka balance bhi `credits` me hai (user_type 'OWNER', migration 099),
- * aur rules simple hain:
+ *   Client Management balance → `credits.inr` (user_type 'OWNER', migration 099)
+ *     Sirf children ke liye: staff/agent aur parent wale players.
  *
- *   1. Owner khud apne wallet me balance add karta hai  → `addOwnerBalance`
+ *   Direct User balance → `staff_balances.inr` (owner ki row)
+ *     Sirf DIRECT users ke liye (khud signup kiya, parent_staff_id NULL).
+ *
+ * Rules:
+ *
+ *   1. Owner khud apne Client Management balance me add karta hai → `addOwnerBalance`
  *      (inr + credit + all_point badhte hain, point ledger me "Credit" — zip jaisa).
- *      Sirf owner, sirf apne wallet me. Yahi jagah hai jahan paisa system me aata hai.
  *
- *   2. Owner apne child ko deta hai (staff/agent ya parent wala player)
- *      → owner ke `inr` se katta hai, baaki sab staff jaisa (staffFloat).
+ *   2. Owner khud apne Direct User balance me add karta hai → `addOwnerDirectBalance`
+ *      (`staff_balances.inr` badhta hai, staff_transfers me 'owner_direct_topup').
  *
- *   3. Owner DIRECT user ko deta hai (khud signup kiya, parent_staff_id NULL)
- *      → player ko mil jaata hai, owner ka balance NAHI katta.
- *        Iski history alag type se likhi jaati hai: transfer_type 'direct'
- *        aur point ledger me 'Bank Deposite' / 'Bank Withdraw'.
+ *   3. Owner apne child ko deta hai → `credits.inr` se katta hai (staffFloat).
+ *
+ *   4. Owner DIRECT user ko deta hai → `staff_balances.inr` se katta hai;
+ *      direct user se leta hai → wapas `staff_balances.inr` me jaata hai.
+ *      Client Management balance (credits) is len-den me nahi aata.
+ *      History: transfer_type 'direct', point ledger 'Bank Deposite' / 'Bank Withdraw'.
  */
+
+/** Direct User balance kam pada. */
+const insufficientDirectBalance = (details = {}) =>
+  insufficientFunds(
+    { party: 'owner_direct', ...details },
+    'There is not enough in your Direct User balance to cover this'
+  );
+
+const toDecimal = (amount) => money.toDecimalString(money.toMinor(amount));
+
+/** Owner ka Direct User balance (`staff_balances.inr`), decimal string. Row na ho to 0. */
+async function readOwnerDirectBalance(models, ownerId, { transaction } = {}) {
+  const row = await models.StaffBalances.findOne({ where: { staff_id: ownerId }, attributes: ['inr'], transaction, raw: true });
+  return money.toDecimalString(money.toMinorQuantised(row?.inr ?? '0'));
+}
+
+/**
+ * Direct User balance se `amount` kaato. Guard `inr >= amount` UPDATE ke andar
+ * hai (Postgres row lock), isliye do request saath me bhi minus me nahi le ja sakti.
+ *
+ * @returns {Promise<boolean>} false = balance kam hai, kuch nahi likha.
+ */
+async function debitOwnerDirectBalance(models, ownerId, amount, { transaction } = {}) {
+  const decimal = toDecimal(amount);
+  const [affected] = await models.StaffBalances.update(
+    { inr: literal(`inr - ${decimal}`) },
+    { where: { staff_id: ownerId, inr: { [Op.gte]: decimal } }, transaction }
+  );
+  return affected > 0;
+}
+
+/** Direct User balance me `amount` jodo (row na ho to banao). */
+async function creditOwnerDirectBalance(models, ownerId, amount, { transaction } = {}) {
+  const decimal = toDecimal(amount);
+  const [, created] = await models.StaffBalances.findOrCreate({
+    where: { staff_id: ownerId },
+    defaults: { staff_id: ownerId, inr: decimal },
+    transaction,
+  });
+  if (!created) {
+    await models.StaffBalances.increment({ inr: decimal }, { where: { staff_id: ownerId }, transaction });
+  }
+}
+
+/**
+ * Owner apne Direct User balance me paisa daalta hai.
+ * `staff_transfers` me 'owner_direct_topup' row (from 'system').
+ */
+async function addOwnerDirectBalance(models, { ownerId, amount, note }, { transaction }) {
+  const decimal = toDecimal(amount);
+  await creditOwnerDirectBalance(models, ownerId, decimal, { transaction });
+
+  const row = await models.StaffTransfers.create(
+    {
+      from_type: 'system',
+      from_id: 0,
+      to_type: 'staff',
+      to_id: ownerId,
+      amount: decimal,
+      direction: 'deposit',
+      transfer_type: TRANSFER_TYPE.OWNER_DIRECT_TOPUP,
+      note: note ?? 'Owner added Direct User balance',
+      created_at: new Date(),
+    },
+    { transaction }
+  );
+
+  return {
+    transferId: String(row.id),
+    amount: decimal,
+    balance: money.fromStored(await readOwnerDirectBalance(models, ownerId, { transaction })),
+  };
+}
 
 /** Ye staff owner (level 1) hai? */
 async function isOwnerStaff(models, staffId, { transaction } = {}) {
@@ -96,4 +175,13 @@ async function addOwnerBalance(models, { ownerId, amount, note }, { transaction 
   return { transferId: String(row.id), amount: decimal, balance: money.fromStored(wallet?.inr ?? '0') };
 }
 
-module.exports = { isOwnerStaff, isDirectUser, addOwnerBalance };
+module.exports = {
+  isOwnerStaff,
+  isDirectUser,
+  addOwnerBalance,
+  addOwnerDirectBalance,
+  readOwnerDirectBalance,
+  debitOwnerDirectBalance,
+  creditOwnerDirectBalance,
+  insufficientDirectBalance,
+};

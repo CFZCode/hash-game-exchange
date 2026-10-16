@@ -25,9 +25,11 @@ const PASSWORD_ROUNDS = 12;
  *   issuance  — the same by the platform owner: new money, no float debited
  *   adjust    — an agent-tree "adjust balance" (`/admin/user/wallet/adjust`),
  *               which is a transfer between the agent's float and the player
- *   direct    — owner ↔ DIRECT user (no parent). The player's balance moves,
- *               the owner's wallet does not (migration 099 rules)
- *   owner_topup — the owner adding balance to their own wallet (from 'system')
+ *   direct    — owner ↔ DIRECT user (no parent). Paid from / back into the
+ *               owner's Direct User balance (`staff_balances.inr`), never the
+ *               owner's Client Management balance (`credits`)
+ *   owner_topup — the owner adding to their Client Management balance (`credits`, from 'system')
+ *   owner_direct_topup — the owner adding to their Direct User balance (`staff_balances`, from 'system')
  *   points_settle — zip ka points settlement: parent ↔ direct child ka P/L cash me barabar
  *   gt/casino — historical settlement rows; P&L, never money handed over
  */
@@ -38,6 +40,7 @@ const TRANSFER_TYPE = Object.freeze({
   ADJUST: 'adjust',
   DIRECT: 'direct',
   OWNER_TOPUP: 'owner_topup',
+  OWNER_DIRECT_TOPUP: 'owner_direct_topup',
   POINTS_SETTLE: 'points_settle',
 });
 

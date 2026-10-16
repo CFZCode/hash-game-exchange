@@ -5,7 +5,7 @@ const { money, AppError } = require('@ibitplay/common');
 
 const { manageableStaffIds } = require('../staff-directory/staffDirectory.service');
 const { assertTransactionPassword } = require('../staff-auth/transactionPassword');
-const { addOwnerBalance } = require('../lords/ownerWallet');
+const { addOwnerBalance, addOwnerDirectBalance, readOwnerDirectBalance } = require('../lords/ownerWallet');
 const { TRANSFER_TYPE } = require('../lords/lords.constants');
 const { listChildren } = require('./accountList');
 const { settlePoints } = require('./pointsSettle');
@@ -18,7 +18,10 @@ const { settlePoints } = require('./pointsSettle');
  *   staff  → user_type 'STAFF', staff_id
  *   player → user_type 'USER',  uid
  *
- * Yahan sirf padhna hai, aur ek likhne wala kaam: owner apne wallet me balance add kare.
+ * Owner ke do balance hain: Client Management (`credits`, children ke liye) aur
+ * Direct User (`staff_balances`, sirf direct users ke liye) — `lords/ownerWallet.js`.
+ *
+ * Yahan sirf padhna hai, aur likhne wale kaam: owner apne dono balance me add kare.
  * Baaki paisa move karne wale raaste pehle jaise hain (staff transfer, refill, adjust).
  */
 
@@ -84,7 +87,27 @@ class ExchangeService {
   /** Owner ka wallet — Add Balance popup ka "Current Balance". */
   async ownerWallet({ actor }) {
     if (!actor.canIssueFunds) throw onlyOwner();
-    return { wallet: await this.#wallet(actor.id) };
+    return {
+      wallet: await this.#wallet(actor.id),
+      directBalance: show(await readOwnerDirectBalance(this.models, actor.id)),
+    };
+  }
+
+  /**
+   * Owner apne Direct User balance (`staff_balances`) me paisa daalta hai.
+   * Direct users ko dena / lena isi balance se hota hai. Rules wahi: sirf owner, password zaroori.
+   */
+  async ownerAddDirectBalance({ actor, amount, note, transactionPassword }) {
+    if (!actor.canIssueFunds) throw onlyOwner();
+
+    await assertTransactionPassword(this.models, actor.id, transactionPassword, { required: true });
+
+    const result = await this.db.transaction((transaction) =>
+      addOwnerDirectBalance(this.models, { ownerId: actor.id, amount, note }, { transaction })
+    );
+
+    this.logger?.warn({ actorStaffId: actor.id, amount: result.amount }, 'Owner added Direct User balance');
+    return result;
   }
 
   /**
@@ -126,7 +149,9 @@ class ExchangeService {
 
     // `me` — D/W modal ki pehli line (parent ka naam aur balance).
     const staff = await this.models.Staff.findByPk(actor.id, { attributes: ['name'], raw: true });
-    return { ...result, me: { ...(await this.#wallet(actor.id)), username: staff?.name ?? String(actor.id) } };
+    // Owner ke liye Direct User balance bhi — direct user ke D/W me wahi badalta hai.
+    const directBalance = actor.canIssueFunds ? show(await readOwnerDirectBalance(this.models, actor.id)) : null;
+    return { ...result, me: { ...(await this.#wallet(actor.id)), directBalance, username: staff?.name ?? String(actor.id) } };
   }
 
   /**
