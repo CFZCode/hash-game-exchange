@@ -4,7 +4,7 @@ import { useState } from 'react'
 
 import Link from 'next/link'
 
-import { ArrowLeftRightIcon, FileSpreadsheetIcon, FileTextIcon, HandCoinsIcon, InfoIcon, PlusIcon } from 'lucide-react'
+import { ArrowLeftRightIcon, FileSpreadsheetIcon, FileTextIcon, HandCoinsIcon, InfoIcon, PlusIcon, ReceiptTextIcon, ShieldIcon } from 'lucide-react'
 
 import type { Channel } from '@/components/shared/ChannelTabs'
 import DataTable, { type Column } from '@/components/shared/DataTable'
@@ -12,6 +12,8 @@ import PageHeader from '@/components/shared/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { useApi, useListState } from '@/hooks/use-api'
+import { RiskManagementDialog } from '@/views/players/RiskManagement'
+import BalanceSheetDialog from '@/views/players/users/BalanceSheetDialog'
 import { fmt } from './accountMoney'
 import { exportExcel, exportPdf } from './exportList'
 import FundsDialog, { type FundsKind } from './FundsDialog'
@@ -43,6 +45,8 @@ const AccountListBody = ({ channel }: { channel?: Channel }) => {
 
   // Kis row ka kaun sa popup khula hai (Deposit / Withdraw ya Settlement).
   const [open, setOpen] = useState<{ row: AccountRow; kind: FundsKind } | null>(null)
+  const [risk, setRisk] = useState<AccountRow | null>(null)
+  const [sheet, setSheet] = useState<AccountRow | null>(null)
 
   const { data, isLoading, isFetching, error } = useApi<AccountsResponse>('admin/exchange/accounts', {
     limit,
@@ -105,22 +109,39 @@ const AccountListBody = ({ channel }: { channel?: Channel }) => {
       )
   }
 
+  // Risk management + balance sheet: only on rows whose Account Type is User.
+  const userTools: Column<AccountRow> = {
+    key: 'risk',
+    header: 'Risk',
+    cell: r =>
+      r.accountType === 'user' ? (
+        <div className='flex gap-0.5'>
+          <Button size='icon-sm' variant='ghost' className='hover:text-warning' title='Risk management' aria-label='Risk management' onClick={() => setRisk(r)}>
+            <ShieldIcon />
+          </Button>
+          <Button size='icon-sm' variant='ghost' className='hover:text-primary' title='Balance sheet' aria-label='Balance sheet' onClick={() => setSheet(r)}>
+            <ReceiptTextIcon />
+          </Button>
+        </div>
+      ) : null
+  }
+
   const tail: Column<AccountRow>[] = [
     { key: 'bst', header: 'B st', cell: r => lockSwitch(r.betLocked) },
     { key: 'ust', header: 'U st', cell: r => lockSwitch(r.userLocked) },
-    { key: 'pname', header: 'PName', cell: r => `${r.percentage ?? 1} Pt/ INR` },
+    { key: 'pname', header: 'PName', cell: r => `${r.percentage ?? 1} Pt` },
     { key: 'type', header: 'Account Type', cell: r => accountTypeLabel(r) },
     action
   ]
 
-  const columns: Column<AccountRow>[] = [userName, cr, ...tail]
+  const columns: Column<AccountRow>[] = [userName, userTools, cr, ...tail]
 
   // Export — zip jaisa: wahi columns, raw numbers.
   const exportHead = ['User Name', 'CR', 'B st', 'U st', 'PName', 'Account Type']
 
   const exportRows = () =>
     rows.map(r => {
-      const locks = [r.betLocked ? 'Locked' : 'Open', r.userLocked ? 'Locked' : 'Open', `${r.percentage ?? 1} Pt/ INR`, accountTypeLabel(r)]
+      const locks = [r.betLocked ? 'Locked' : 'Open', r.userLocked ? 'Locked' : 'Open', `${r.percentage ?? 1} Pt`, accountTypeLabel(r)]
 
       return [r.username, r.credit, ...locks]
     })
@@ -162,6 +183,8 @@ const AccountListBody = ({ channel }: { channel?: Channel }) => {
         onPageChange={p => set({ page: p })}
         onLimitChange={l => set({ limit: l, page: 1 })}
       />
+      <RiskManagementDialog userId={risk?.accountId ?? null} name={risk?.username} open={!!risk} onOpenChange={o => !o && setRisk(null)} />
+      <BalanceSheetDialog userId={sheet?.accountId ?? null} name={sheet?.username} client open={!!sheet} onOpenChange={o => !o && setSheet(null)} />
       {open && data && <FundsDialog kind={open.kind} row={open.row} me={data.me} open onOpenChange={o => !o && setOpen(null)} />}
     </div>
   )

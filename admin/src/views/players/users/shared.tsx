@@ -6,6 +6,7 @@ import Link from 'next/link'
 
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import { inrSign } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import type { PlayerRow } from '../types'
 
@@ -36,7 +37,7 @@ export type UsersSummary = {
 export type Channel = 'direct' | 'agent' | 'all'
 
 export const inr = (value: string | number | null | undefined) =>
-  `₹${(Number(value) || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`
+  `${inrSign()}${(Number(value) || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`
 
 /** PNL = deposits − withdrawals (reference jaisa: direct feed me yahi figure hai). */
 export const pnlOf = (r: UserRow) => Number(r.totalDeposited || 0) - Number(r.totalWithdrawn || 0)

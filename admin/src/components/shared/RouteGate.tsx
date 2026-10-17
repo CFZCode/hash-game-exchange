@@ -8,14 +8,14 @@ import { usePathname, useRouter } from 'next/navigation'
 import { BanIcon } from 'lucide-react'
 
 import { Skeleton } from '@/components/ui/skeleton'
-import { isPromotionRoute, routeRequirement } from '@/configs/navConfig'
+import { DIRECT_ROUTES, isPromotionRoute, routeRequirement } from '@/configs/navConfig'
 import themeConfig from '@/configs/themeConfig'
 import { useSession } from '@/contexts/SessionContext'
 import { useHomeHref } from '@/hooks/use-nav-visible'
 
 const isRoute = (pathname: string, route: string) => pathname === route || pathname.startsWith(`${route}/`)
 
-type Refusal = 'promotions' | 'permission' | 'account'
+type Refusal = 'promotions' | 'direct' | 'permission' | 'account'
 
 /** Why the screen is closed, worded for the area the pasted URL points at. */
 const noticeReason = (pathname: string, reason: Refusal) => {
@@ -29,6 +29,7 @@ const noticeReason = (pathname: string, reason: Refusal) => {
     return 'Promotions are managed by the site operator and are not part of agent accounts.'
   }
 
+  if (reason === 'direct') return 'Direct users are managed by the Super Admin and are not part of your account.'
   if (reason === 'account') return 'This screen is only for marketing logins.'
 
   return 'Your role does not include this screen. Ask the site operator if you need access.'
@@ -76,6 +77,7 @@ const RouteGate = ({ children }: { children: ReactNode }) => {
 
   const required = routeRequirement(pathname)
   const promotions = isPromotionRoute(pathname) || required?.promotions === true
+  const direct = required?.direct === true || DIRECT_ROUTES.some(r => pathname === r || pathname.startsWith(`${r}/`))
 
   /*
    * Every way into the panel lands on the dashboard (sign-in, `/`, a signed-in visit to /login,
@@ -93,12 +95,13 @@ const RouteGate = ({ children }: { children: ReactNode }) => {
 
   if (mustChange || (landingRefused && home !== pathname)) return <Skeleton className='h-40 w-full' />
 
-  if (!promotions && !required) return <>{children}</>
+  if (!promotions && !direct && !required) return <>{children}</>
   if (!actor) return loading ? <Skeleton className='h-40 w-full' /> : <NotAvailableNotice pathname={pathname} reason='permission' />
 
   let refusal: Refusal | null = null
 
   if (promotions && actor.promotions !== true) refusal = 'promotions'
+  else if (direct && actor.direct !== true) refusal = 'direct'
   else if (required?.account === 'marketing' && actor.marketing !== true) refusal = 'account'
   else if (required && !required.permissions.every(p => can(p))) refusal = 'permission'
 

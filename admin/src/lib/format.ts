@@ -1,5 +1,23 @@
 /** Display helpers. Amounts on the platform are exact decimal STRINGS; never do arithmetic on them here. */
 
+/**
+ * The agent system runs on INR and prints it as a bare number — no "INR", no ₹ (user, 2026-10-17).
+ * Set by SessionProvider for every session that is not the Super Admin's (`actor.direct` false).
+ */
+let plainInr = false
+
+export const setPlainInr = (value: boolean) => {
+  plainInr = value
+}
+
+export const isPlainInr = () => plainInr
+
+/** The code to print after an amount: none for INR in the agent system. */
+const label = (currency?: string) => (currency && !(plainInr && currency.toUpperCase() === 'INR') ? currency : undefined)
+
+/** `₹` for INR, or nothing in the agent system. */
+export const inrSign = () => (plainInr ? '' : '₹')
+
 export function formatMoney(value: string | number | null | undefined, currency?: string, opts: { compact?: boolean; digits?: number } = {}) {
   if (value === null || value === undefined || value === '') return '—'
   const n = typeof value === 'number' ? value : Number(value)
@@ -13,7 +31,7 @@ export function formatMoney(value: string | number | null | undefined, currency?
     notation: opts.compact ? 'compact' : 'standard'
   }).format(n)
 
-  return currency ? `${s} ${currency}` : s
+  return label(currency) ? `${s} ${currency}` : s
 }
 
 /**
@@ -26,13 +44,13 @@ export function formatAmount(value: string | number | null | undefined, currency
   const str = String(value).trim()
   const m = /^(-?)(\d+)(?:\.(\d+))?$/.exec(str)
 
-  if (!m) return currency ? `${str} ${currency}` : str
+  if (!m) return label(currency) ? `${str} ${currency}` : str
   const [, sign, whole, frac = ''] = m
   const grouped = new Intl.NumberFormat('en-IN').format(BigInt(whole))
   const trimmed = frac.slice(0, 8).replace(/0+$/, '')
   const out = `${sign}${grouped}${trimmed ? `.${trimmed}` : ''}`
 
-  return currency ? `${out} ${currency}` : out
+  return label(currency) ? `${out} ${currency}` : out
 }
 
 export function formatNumber(value: number | string | null | undefined) {

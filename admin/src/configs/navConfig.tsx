@@ -202,6 +202,9 @@ export type MenuLeafSubItem = {
 
   /** A promotions screen (or the vault, or swap history): hidden from agent-tree logins (staff levels 4–6 and their executives). */
   promotions?: boolean
+
+  /** A direct-user screen: only the Super Admin and its executives (`actor.direct`). */
+  direct?: boolean
 }
 
 export type MenuGroupSubItem = {
@@ -214,6 +217,9 @@ export type MenuGroupSubItem = {
   feature?: string
   account?: 'marketing'
   promotions?: boolean
+
+  /** A direct-user screen: only the Super Admin and its executives (`actor.direct`). */
+  direct?: boolean
 }
 
 export type MenuSubItem = MenuLeafSubItem | MenuGroupSubItem
@@ -227,6 +233,9 @@ export type MenuItem = {
   feature?: string
   account?: 'marketing'
   promotions?: boolean
+
+  /** A direct-user screen: only the Super Admin and its executives (`actor.direct`). */
+  direct?: boolean
 } & (
   | {
       href: string
@@ -280,12 +289,12 @@ export const navItems: NavItem[] = [
       // Either grant opens the list: reports:read reads `admin/reports/players` (balances, deposits,
       // wagers); users:read alone falls back to the player directory `admin/user/directory`.
       { icon: 'Users', label: 'Users', href: '/users', activePath: '/users', permission: ['reports:read', 'users:read'] } as MenuItem,
-      { icon: 'Wallet', label: 'Wallets', href: '/wallets', permission: 'wallet:adjust' },
+      { icon: 'Wallet', label: 'Wallets', href: '/wallets', permission: 'wallet:adjust', direct: true },
       { icon: 'Globe', label: 'Login & IP history', href: '/ip-tracker', permission: 'reports:read' },
 
       // Zip ke Main jaisa: Redeem Codes (Promotions se yahan) aur Turnover Report (direct users ka wager vs target).
       { icon: 'Ticket', label: 'Redeem Codes', href: '/redeem-codes', permission: 'reports:read', promotions: true },
-      { icon: 'Activity', label: 'Turnover Report', href: '/turnover-report', permission: 'reports:read', promotions: true }
+      { icon: 'Activity', label: 'Turnover Report', href: '/turnover-report', permission: 'reports:read', promotions: true, direct: true }
     ]
   },
   {
@@ -336,16 +345,17 @@ export const navItems: NavItem[] = [
     groupLabel: 'Transactions',
     groupIcon: 'ArrowLeftRight',
     collapsible: true,
+
     // House only (user, 2026-10-17): an agent's player has no deposit / withdraw / KYC, so agent logins get no Transactions section.
     items: [
-      { icon: 'ArrowDownToLine', label: 'Deposit', href: '/transactions/deposit', permission: ['deposits:read', 'users:read'], promotions: true },
-      { icon: 'ArrowUpFromLine', label: 'Withdraw', href: '/transactions/withdraw', permission: ['withdrawals:read', 'users:read'], promotions: true },
+      { icon: 'ArrowDownToLine', label: 'Deposit', href: '/transactions/deposit', permission: ['deposits:read', 'users:read'], promotions: true, direct: true },
+      { icon: 'ArrowUpFromLine', label: 'Withdraw', href: '/transactions/withdraw', permission: ['withdrawals:read', 'users:read'], promotions: true, direct: true },
 
       // The transfer list is `admin/accounts/statement` (users:read); the drill-down is `admin/statements` (reports:read).
-      { icon: 'BookOpen', label: 'Account Statement', href: '/reports/statements', permission: ['users:read', 'reports:read'], promotions: true },
+      { icon: 'BookOpen', label: 'Account Statement', href: '/reports/statements', permission: ['users:read', 'reports:read'], promotions: true, direct: true },
 
       // Users section se yahan: KYC aur Bank details (routes wahi).
-      { icon: 'ShieldCheck', label: 'KYC', href: '/kyc', permission: 'users:read', feature: 'kyc', promotions: true },
+      { icon: 'ShieldCheck', label: 'KYC', href: '/kyc', permission: 'users:read', feature: 'kyc', promotions: true, direct: true },
       { icon: 'Building2', label: 'Bank details', href: '/bank-details', permission: 'config:read', promotions: true }
     ]
   },
@@ -379,19 +389,20 @@ export const navItems: NavItem[] = [
     groupLabel: 'Promotions',
     groupIcon: 'Sparkles',
     collapsible: true,
+
+    // Only direct users get promotions (user, 2026-10-17), so only the Super Admin and its executives see this section.
     items: [
       // The campaigns on the player site's /promotions. Reads are the public routes (staff see drafts); writes are config:write.
-      { icon: 'Megaphone', label: 'Promotions', href: '/promotions/campaigns', permission: 'config:read', promotions: true, feature: 'promotions' },
-      { icon: 'Gift', label: 'Bonus', href: '/bonus', permission: 'reports:read', promotions: true, flag: 'bonus', feature: 'bonus' },
+      { icon: 'Megaphone', label: 'Promotions', href: '/promotions/campaigns', permission: 'config:read', promotions: true, direct: true, feature: 'promotions' },
+      { icon: 'Gift', label: 'Bonus', href: '/bonus', permission: 'reports:read', promotions: true, direct: true, flag: 'bonus', feature: 'bonus' },
 
-      // Tree-scoped by the backend (like player data), so not house-only.
       // `admin/user/bonus-balance` and its stats answer any of reports:read, users:read, wallet:read.
-      { icon: 'LockKeyhole', label: 'Bonus balances', href: '/bonus-balances', permission: ['reports:read', 'users:read', 'wallet:read'] },
-      { icon: 'CreditCard', label: 'Gift cards', href: '/gift-cards', permission: 'reports:read', promotions: true, flag: 'giftcards', feature: 'gift_cards' },
-      { icon: 'Disc3', label: 'Spin wheel', href: '/spin-wheel', permission: 'reports:read', promotions: true, flag: 'wheelspin', feature: 'spin_wheel' },
-      { icon: 'Crown', label: 'VIP & club', href: '/vip', permission: 'reports:read', promotions: true, flag: 'vipclub', feature: 'vip' },
-      { icon: 'Link', label: 'Affiliate', href: '/affiliate', permission: 'reports:read', promotions: true, flag: 'affiliate', feature: 'affiliate' },
-      { icon: 'Flag', label: 'Races', href: '/races', permission: 'reports:read', promotions: true, feature: 'races' }
+      { icon: 'LockKeyhole', label: 'Bonus balances', href: '/bonus-balances', permission: ['reports:read', 'users:read', 'wallet:read'], promotions: true, direct: true },
+      { icon: 'CreditCard', label: 'Gift cards', href: '/gift-cards', permission: 'reports:read', promotions: true, direct: true, flag: 'giftcards', feature: 'gift_cards' },
+      { icon: 'Disc3', label: 'Spin wheel', href: '/spin-wheel', permission: 'reports:read', promotions: true, direct: true, flag: 'wheelspin', feature: 'spin_wheel' },
+      { icon: 'Crown', label: 'VIP & club', href: '/vip', permission: 'reports:read', promotions: true, direct: true, flag: 'vipclub', feature: 'vip' },
+      { icon: 'Link', label: 'Affiliate', href: '/affiliate', permission: 'reports:read', promotions: true, direct: true, flag: 'affiliate', feature: 'affiliate' },
+      { icon: 'Flag', label: 'Races', href: '/races', permission: 'reports:read', promotions: true, direct: true, feature: 'races' }
     ]
   },
   {
@@ -436,7 +447,7 @@ export const navItems: NavItem[] = [
       { icon: 'Newspaper', label: 'Blogs', href: '/content/blogs', permission: 'config:read', feature: 'blog' },
 
       // The device list and per-user history are users:read; sending (gated on the page) is config:write.
-      { icon: 'Bell', label: 'Notifications', href: '/content/notifications', permission: ['users:read', 'config:write'], feature: 'notifications' },
+      { icon: 'Bell', label: 'Notifications', href: '/content/notifications', permission: ['users:read', 'config:write'], feature: 'notifications', direct: true },
       {
         /*
          * OneSignal web push. Hidden when the owner left `push_notifications` out of the plan —
@@ -446,6 +457,7 @@ export const navItems: NavItem[] = [
         label: 'Push notifications',
         permission: 'config:read',
         feature: 'push_notifications',
+        direct: true,
         childItems: [
           { icon: 'SquarePen', label: 'Compose', href: '/push/compose' },
           { icon: 'Send', label: 'Campaigns', href: '/push/campaigns' },
@@ -522,6 +534,9 @@ export const PROMOTION_ROUTES = [
   '/bank-details'
 ]
 
+/** Direct-user screens with no sidebar entry (the old cashier): Super Admin and its executives only, like `direct: true`. */
+export const DIRECT_ROUTES = ['/deposits', '/withdrawals']
+
 export const isPromotionRoute = (pathname: string) =>
   PROMOTION_ROUTES.some(route => pathname === route || pathname.startsWith(`${route}/`))
 
@@ -538,10 +553,11 @@ export type RouteRequirement = {
   href: string
   permissions: Array<string | string[]>
   promotions: boolean
+  direct: boolean
   account?: 'marketing'
 }
 
-type Marks = { permission?: string | string[]; promotions?: boolean; account?: 'marketing' }
+type Marks = { permission?: string | string[]; promotions?: boolean; direct?: boolean; account?: 'marketing' }
 
 const collectRoutes = (): RouteRequirement[] => {
   const out: RouteRequirement[] = []
@@ -554,6 +570,7 @@ const collectRoutes = (): RouteRequirement[] => {
         href: entry.href,
         permissions: marks.map(m => m.permission).filter((p): p is string | string[] => !!p && (!Array.isArray(p) || p.length > 0)),
         promotions: marks.some(m => m.promotions),
+        direct: marks.some(m => m.direct),
         account: marks.find(m => m.account)?.account
       })
     }
@@ -579,6 +596,9 @@ export type NavMarks = {
   feature?: string
   account?: 'marketing'
   promotions?: boolean
+
+  /** A direct-user screen: only the Super Admin and its executives (`actor.direct`). */
+  direct?: boolean
 }
 
 type NavEntry = NavMarks & { href?: string; childItems?: MenuSubItem[] }

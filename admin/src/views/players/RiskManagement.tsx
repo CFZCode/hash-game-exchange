@@ -19,6 +19,7 @@ import { Switch } from '@/components/ui/switch'
 import { useSession } from '@/contexts/SessionContext'
 import { useApi, useApiMutation } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
+import { formatAmount } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import GeoAttribution from './GeoAttribution'
 import { countryFlag } from './geo'
@@ -324,6 +325,10 @@ export const RiskManagementPanel = ({ userId, inDialog = false }: { userId: stri
   // logins have no promotions, so it is neither read nor shown for them.
   const vip = useApi<{ vip?: { level?: number; name?: string } }>(promotions ? `admin/reports/players/${userId}` : null)
 
+  // An agent's player has no deposits / withdrawals: its money is points (INR, no symbol).
+  const agentPlayer = q.data ? !q.data.user.isDirect : false
+  const pts = useApi<{ points?: Record<'total' | 'sports' | 'casino' | 'balance' | 'credit', string> }>(agentPlayer ? `admin/reports/client-balance-sheet/${userId}` : null, { limit: 1 })
+
   if (q.error) return <ErrorState error={q.error} />
   if (!q.data) return <Loading />
 
@@ -410,6 +415,26 @@ export const RiskManagementPanel = ({ userId, inDialog = false }: { userId: stri
         </Section>
       </div>
 
+      {agentPlayer ? (
+        <Section title='Points'>
+          <div className='grid grid-cols-2 gap-4 sm:grid-cols-5'>
+            {(
+              [
+                ['Balance', 'balance'],
+                ['Credit', 'credit'],
+                ['Total points', 'total'],
+                ['Sports points', 'sports'],
+                ['Third-party points', 'casino']
+              ] as const
+            ).map(([label, key]) => (
+              <div key={key}>
+                <p className='text-muted-foreground text-xs'>{label}</p>
+                <p className='text-lg font-semibold'>{formatAmount(pts.data?.points?.[key] ?? '0')}</p>
+              </div>
+            ))}
+          </div>
+        </Section>
+      ) : (
       <Section title={`Financial exposure (${reward.currency})`}>
         <div className='grid grid-cols-2 gap-4 sm:grid-cols-4'>
           <div>
@@ -443,6 +468,7 @@ export const RiskManagementPanel = ({ userId, inDialog = false }: { userId: stri
           {reward.unconverted.length ? ` No rate for ${reward.unconverted.join(', ')}, left out.` : ''}
         </p>
       </Section>
+      )}
 
       <Section title='Network / IP activity'>
         <div className='mb-3 grid grid-cols-2 gap-4 sm:grid-cols-4'>

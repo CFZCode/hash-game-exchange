@@ -14,6 +14,7 @@ import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
 import { formatIn, useReportMoney } from '@/components/shared/ReportMoney'
+import { inrSign } from '@/lib/format'
 import { useApi } from '@/hooks/use-api'
 import { api, errorMessage } from '@/lib/api/client'
 import { cn } from '@/lib/utils'
@@ -30,6 +31,9 @@ type Sheet = {
 
   /** 'point_ledger' = client user (parent wala): sheet `mssports.point_ledger` se, INR. */
   source?: 'point_ledger'
+
+  /** Client user only: the wallet's point buckets (casino = third-party games). */
+  points?: { total: string; sports: string; casino: string; upper: string; down: string; balance: string; credit: string }
   balance: { live: string; ledger: string; openExposure: string; unexplained: string; credited: string; debited: string }
   total: number
   rows: { ts: string; category: string; type: string; description: string; amount: string; balance?: string }[]
@@ -44,7 +48,7 @@ const ALL = 'ALL'
 const MAX_ROWS = 200
 
 const fmt = (value: string | number | null | undefined, cur: string) =>
-  `${cur === 'INR' ? '₹' : ''}${(Number(value) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  `${cur === 'INR' ? inrSign() : ''}${(Number(value) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 const fmtDate = (iso: string) => (iso ? new Date(iso).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : '—')
 
@@ -116,7 +120,8 @@ export const BalanceSheetView = ({
   const refetch = () => (client || !all ? void one.refetch() : many.forEach(m => void m.refetch()))
 
   /** Converted (default view) or native (one currency) — figures shown on the cards and lines. */
-  const converted = all
+  // A client user's sheet is the agent system's: INR points, never converted.
+  const converted = all && !client
   const curOf = (sh: Sheet) => (sh.currency || (client ? 'INR' : currency)).toUpperCase()
 
   const total = (pick: (sh: Sheet) => string | number | undefined, abs = false) =>
@@ -211,6 +216,16 @@ export const BalanceSheetView = ({
             </p>
           )}
 
+          {/* Agent system (user, 2026-10-17): points by game, no credit / debit. */}
+          {client ? (
+            <div className='grid gap-3 sm:grid-cols-2 lg:grid-cols-5'>
+              <StatCard label='Balance' value={show(liveBalance)} icon={<WalletIcon />} tone='primary' loading={loading} />
+              <StatCard label='Credit' value={show(Number(sheets[0]?.points?.credit ?? 0))} icon={<TrendingDownIcon />} tone='danger' loading={loading} />
+              <StatCard label='Total Points' value={show(Number(sheets[0]?.points?.total ?? 0))} icon={<ReceiptTextIcon />} tone='success' loading={loading} />
+              <StatCard label='Sports Points' value={show(Number(sheets[0]?.points?.sports ?? 0))} icon={<TrendingUpIcon />} tone='warning' loading={loading} />
+              <StatCard label='Third-party Points' value={show(Number(sheets[0]?.points?.casino ?? 0))} icon={<ReceiptTextIcon />} tone='info' loading={loading} />
+            </div>
+          ) : (
           <div className='grid gap-3 sm:grid-cols-2 lg:grid-cols-5'>
             <StatCard label='Current Balance' value={show(liveBalance)} icon={<WalletIcon />} tone='primary' loading={loading} />
             {exposure > 0 && <StatCard label='In Play (Unsettled)' value={show(exposure)} icon={<HourglassIcon />} tone='warning' />}
@@ -218,6 +233,7 @@ export const BalanceSheetView = ({
             <StatCard label='Total Debit' value={show(debited)} icon={<TrendingDownIcon />} tone='danger' loading={loading} />
             <StatCard label='Net' value={show(net)} icon={<ReceiptTextIcon />} tone={net >= 0 ? 'success' : 'danger'} loading={loading} />
           </div>
+          )}
 
           {!loading && sheets.length > 0 && (
             <p className='bg-muted/40 rounded-md border px-3 py-2 text-sm'>
@@ -243,7 +259,7 @@ export const BalanceSheetView = ({
             <Table>
               <TableHeader>
                 <TableRow>
-                  {['Date', 'Type', 'Description', 'Credit', 'Debit', 'Balance'].map(h => (
+                  {(client ? ['Date', 'Type', 'Description', 'Points', 'Balance'] : ['Date', 'Type', 'Description', 'Credit', 'Debit', 'Balance']).map(h => (
                     <TableHead key={h} className='text-xs uppercase'>
                       {h}
                     </TableHead>
@@ -269,8 +285,14 @@ export const BalanceSheetView = ({
                             <Chip tone={CATEGORY_TONE[r.category] ?? 'info'}>{r.category}</Chip>
                           </TableCell>
                           <TableCell className='max-w-96 text-sm break-words whitespace-normal'>{r.description}</TableCell>
-                          <TableCell className='text-success font-semibold whitespace-nowrap'>{amount > 0 ? cell(amount, r.cur) : ''}</TableCell>
-                          <TableCell className='text-danger font-semibold whitespace-nowrap'>{amount < 0 ? cell(Math.abs(amount), r.cur) : ''}</TableCell>
+                          {client ? (
+                            <TableCell className={cn('font-semibold whitespace-nowrap', amount < 0 ? 'text-danger' : 'text-success')}>{cell(amount, r.cur)}</TableCell>
+                          ) : (
+                            <>
+                              <TableCell className='text-success font-semibold whitespace-nowrap'>{amount > 0 ? cell(amount, r.cur) : ''}</TableCell>
+                              <TableCell className='text-danger font-semibold whitespace-nowrap'>{amount < 0 ? cell(Math.abs(amount), r.cur) : ''}</TableCell>
+                            </>
+                          )}
                           <TableCell className={cn('font-semibold whitespace-nowrap', Number(r.balance) < 0 && 'text-danger')}>{r.balance !== undefined ? cell(Number(r.balance), r.cur) : ''}</TableCell>
                         </TableRow>
                       )

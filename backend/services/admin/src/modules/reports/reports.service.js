@@ -129,7 +129,7 @@ class ReportsService {
       house ? resolveVipLadder(this.models, { logger: this.logger }) : null,
       this.#betCountsFor(ids),
       this.#agentTreeParents(rows.map((r) => r.parent_staff_id)),
-      wagerValuer(this.models),
+      wagerValuer(this.models, staff),
     ]);
 
     return {
@@ -202,7 +202,7 @@ class ReportsService {
       this.#betCountsFor(ids),
       this.#agentTreeParents(rows.map((r) => r.parent_staff_id)),
       this.#parentStaff(rows.map((r) => r.parent_staff_id)),
-      wagerValuer(this.models),
+      wagerValuer(this.models, staff),
     ]);
 
     return {
@@ -307,7 +307,7 @@ class ReportsService {
         raw: true,
       }),
       this.#agentTreeParents([user.parent_staff_id]),
-      wagerValuer(this.models),
+      wagerValuer(this.models, staff),
     ]);
 
     const report = this.#describePlayer(user, credits.get(String(user.id)), wagers.get(String(user.id)), {
@@ -1367,7 +1367,11 @@ class ReportsService {
    *
    *   Credit / Debit / User creation → "Agent" (parent ne diya / liya)
    *   Bank Deposite / Bank Withdraw   → "Deposit" / "Withdrawal" (D/W settlement)
+   *   casino (category CASINO, JS games)  → "Casino"
    *   bet wali entries (BET_SETTLEMENT, COMMISSION, REVERSAL) → "Sports"
+   *
+   * `points`: wallet ke point buckets — total (all_point), sports (sports_pts), casino
+   * (thirdparty_pts, third-party games), upper / down point.
    *
    * Row ka balance = `all_point_after` (ledger ka running total). Shape direct user wali sheet jaisi,
    * taaki admin ka ek hi dialog dono dikhaye; `source: 'point_ledger'`.
@@ -1389,9 +1393,14 @@ class ReportsService {
 
     const walletId = creditsRow?.id;
     const zero = show(0);
+    const points = {
+      total: show(creditsRow?.all_point), sports: show(creditsRow?.sports_pts), casino: show(creditsRow?.thirdparty_pts),
+      upper: show(creditsRow?.upper_point), down: show(creditsRow?.down_point),
+      balance: show(creditsRow?.inr), credit: show(creditsRow?.credit),
+    };
     if (!walletId) {
       return {
-        subject, currency: 'INR', source: 'point_ledger',
+        subject, currency: 'INR', source: 'point_ledger', points,
         balance: { live: zero, ledger: zero, openExposure: zero, unexplained: zero, credited: zero, debited: zero },
         total: 0, rows: [],
       };
@@ -1408,7 +1417,7 @@ class ReportsService {
         { walletId }
       ),
       select(
-        `SELECT id, created_at, event_type, remark, delta, all_point_after, bet_id, entry_ref
+        `SELECT id, created_at, event_type, category, remark, delta, all_point_after, bet_id, entry_ref
            FROM mssports.point_ledger WHERE wallet_id = :walletId
           ORDER BY created_at DESC, id DESC LIMIT :limit OFFSET :offset`,
         { walletId, limit, offset }
@@ -1416,6 +1425,7 @@ class ReportsService {
     ]);
 
     const categoryOf = (r) => {
+      if (r.category === 'CASINO') return 'Casino';
       if (r.bet_id != null || ['BET_SETTLEMENT', 'COMMISSION', 'REVERSAL'].includes(r.event_type)) return 'Sports';
       if (r.event_type === 'Bank Deposite') return 'Deposit';
       if (r.event_type === 'Bank Withdraw') return 'Withdrawal';
@@ -1430,6 +1440,7 @@ class ReportsService {
       subject,
       currency: 'INR',
       source: 'point_ledger',
+      points,
       balance: {
         live: show(creditsRow.inr),
         ledger,

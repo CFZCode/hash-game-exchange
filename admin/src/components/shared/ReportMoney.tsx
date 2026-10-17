@@ -4,7 +4,7 @@ import { useCallback, useMemo } from 'react'
 
 import { useDefaultCurrency } from '@/components/shared/DefaultCurrency'
 import { useApi } from '@/hooks/use-api'
-import { formatMoney } from '@/lib/format'
+import { formatMoney, isPlainInr } from '@/lib/format'
 
 /**
  * Player money in the site's DEFAULT COIN — the owner's `default_currency` policy (USDT today),
@@ -38,6 +38,8 @@ export function formatIn(value: number, code: string, opts: { digits?: number; s
 
   if (FIAT.has(code)) {
     const digits = opts.digits ?? 2
+
+    if (code === 'INR' && isPlainInr()) return sign + formatMoney(value, undefined, { digits })
 
     return (
       sign +

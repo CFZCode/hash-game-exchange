@@ -1,6 +1,7 @@
 'use client'
 
 import { useApi } from '@/hooks/use-api'
+import { isPlainInr } from '@/lib/format'
 
 /**
  * The site's DEFAULT COIN — the currency every money screen opens on before anybody picks one
@@ -17,7 +18,9 @@ export const FALLBACK_DEFAULT_CURRENCY = 'USDT'
 
 export function useDefaultCurrency() {
   const pub = useApi<PublicConfig>('admin/site-config/public', undefined, { staleTime: 15_000 })
-  const code = String(pub.data?.defaultCurrency || FALLBACK_DEFAULT_CURRENCY).toUpperCase()
+
+  // The agent system (every session but the Super Admin's) runs on INR, whatever the owner's default.
+  const code = isPlainInr() ? 'INR' : String(pub.data?.defaultCurrency || FALLBACK_DEFAULT_CURRENCY).toUpperCase()
 
   return { code, loading: pub.isLoading }
 }

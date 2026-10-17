@@ -495,7 +495,14 @@ const ReportDetail = ({ id }: { id: string }) => {
   // `admin/site-config/user/:id` is guarded by config:read (writes by config:write): without it the
   // tab would only ever show a 403, so it is not offered at all.
   const canPrefs = can('config:read')
-  const tab: Tab = tabParam === 'prefs' && !canPrefs ? 'wallet' : tabParam
+
+  // An agent's player has no bonus, transfers or notifications (user, 2026-10-17): those tabs are not offered.
+  const agentPlayer = report.data?.channel === 'agent'
+  const hidden = (t: Tab) => (t === 'prefs' && !canPrefs) || (agentPlayer && ['bonuses', 'transfers', 'notifications'].includes(t))
+  const tab: Tab = hidden(tabParam) ? 'wallet' : tabParam
+
+  // An agent's player is shown in points (INR, no symbol): total, sports, casino (third-party games).
+  const points = useApi<{ points?: { total: string; sports: string; casino: string; balance: string; credit: string } }>(agentPlayer ? `admin/reports/client-balance-sheet/${id}` : null, { limit: 1 })
 
   const close = useApiMutation({
     fn: (reason: string) => api.delete(`admin/players/${id}`, { reason }),
@@ -596,6 +603,16 @@ const ReportDetail = ({ id }: { id: string }) => {
       {report.error && <ErrorState error={report.error} />}
 
       <div className='grid grid-cols-2 gap-4 lg:grid-cols-4'>
+        {agentPlayer ? (
+          <>
+            <StatCard label='Balance' value={formatAmount(points.data?.points?.balance ?? p?.balance)} loading={report.isLoading || points.isLoading} />
+            <StatCard label='Credit' value={formatAmount(points.data?.points?.credit ?? '0')} loading={points.isLoading} />
+            <StatCard label='Total Points' value={formatAmount(points.data?.points?.total ?? p?.balance)} loading={report.isLoading || points.isLoading} />
+            <StatCard label='Sports Points' value={formatAmount(points.data?.points?.sports ?? '0')} loading={points.isLoading} />
+            <StatCard label='Third-party Points' value={formatAmount(points.data?.points?.casino ?? '0')} loading={points.isLoading} hint='Casino / third-party games' />
+          </>
+        ) : (
+          <>
         <StatCard
           label='Balance'
           value={walletTotal ? walletTotal.text : money.format(p?.balance, 'INR')}
@@ -604,6 +621,8 @@ const ReportDetail = ({ id }: { id: string }) => {
         />
         <StatCard label='Gateway deposits' value={money.format(p?.totalDeposited, 'INR')} loading={report.isLoading} hint={`${formatAmount(p?.totalDeposited, 'INR')} · lifetime bank + gateway, paid in by the player · excludes credits from upline`} />
         <StatCard label='Withdrawn' value={money.format(p?.totalWithdrawn, 'INR')} loading={report.isLoading} hint={formatAmount(p?.totalWithdrawn, 'INR')} />
+          </>
+        )}
         <StatCard
           label='Wagered'
           value={money.format(p?.wager, p?.wagerCurrency ?? 'USD')}
@@ -619,12 +638,12 @@ const ReportDetail = ({ id }: { id: string }) => {
           <TabsTrigger value='stats'>Stats</TabsTrigger>
           <TabsTrigger value='logins'>Logins</TabsTrigger>
           <TabsTrigger value='balances'>Balances</TabsTrigger>
-          <TabsTrigger value='bonuses'>Bonuses</TabsTrigger>
+          {!agentPlayer && <TabsTrigger value='bonuses'>Bonuses</TabsTrigger>}
           {canPrefs && <TabsTrigger value='prefs'>Preferences</TabsTrigger>}
           <TabsTrigger value='risk'>Risk</TabsTrigger>
           <TabsTrigger value='sheet'>Balance sheet</TabsTrigger>
-          <TabsTrigger value='transfers'>Transfers</TabsTrigger>
-          <TabsTrigger value='notifications'>Notifications</TabsTrigger>
+          {!agentPlayer && <TabsTrigger value='transfers'>Transfers</TabsTrigger>}
+          {!agentPlayer && <TabsTrigger value='notifications'>Notifications</TabsTrigger>}
         </TabsList>
         <TabsContent value='wallet'>
           <WalletTab userId={id} />

@@ -69,6 +69,11 @@ export async function GET() {
 
   const promotions = !isAgentTreeLevel(level) && backendPromotions !== false
 
+  // Direct users (no parent staff) are the Super Admin's alone (level 1, legacy owner 0) and its executives' —
+  // `effectiveLevel` is the parent's level for an executive. Admin, Sub Admin and the agent tree see none.
+  const effectiveLevel = Number((live.effectiveLevel as number | null | undefined) ?? level)
+  const direct = Number.isFinite(effectiveLevel) && effectiveLevel <= 1
+
   return Response.json({
     success: true,
     data: {
@@ -81,7 +86,8 @@ export async function GET() {
       expiresAt: new Date(claims.exp * 1000).toISOString(),
       ...live,
       marketing,
-      promotions
+      promotions,
+      direct
     }
   })
 }

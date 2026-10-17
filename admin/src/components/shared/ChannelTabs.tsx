@@ -5,6 +5,7 @@ import { useState, type ReactNode } from 'react'
 import { UsersIcon, NetworkIcon } from 'lucide-react'
 
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useSession } from '@/contexts/SessionContext'
 
 /** Player kis taraf ka: direct = site pe khud bana (koi parent nahi), agent = Sports Exchange agent ke neeche. */
 export type Channel = 'direct' | 'agent'
@@ -17,7 +18,11 @@ export type Channel = 'direct' | 'agent'
  *   <ChannelTabs>{channel => <BetList channel={channel} />}</ChannelTabs>
  */
 const ChannelTabs = ({ children, className }: { children: (channel: Channel) => ReactNode; className?: string }) => {
+  const direct = useSession().actor?.direct === true
   const [channel, setChannel] = useState<Channel>('direct')
+
+  // Direct users are the Super Admin's (and its executives') only: everyone else gets the agent list, no tabs.
+  if (!direct) return <div className={className}>{children('agent')}</div>
 
   return (
     <div className={className}>

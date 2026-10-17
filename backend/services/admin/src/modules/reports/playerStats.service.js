@@ -71,7 +71,7 @@ class PlayerStatsService {
     const window = statsWindow({ from, to, granularity });
     const scope = await playerScope(this.models, staff, { channel, logger: this.logger });
     const rates = await loadRates(this.models);
-    const valuer = createValuer(rates, currency, currency ? null : await reportingCurrency(this.models));
+    const valuer = createValuer(rates, currency, currency ? null : await reportingCurrency(this.models, staff));
 
     const empty = this.#emptyOverview(window, valuer.currency);
     if (scope.empty) return empty;
@@ -252,7 +252,7 @@ class PlayerStatsService {
     const houseOnly = (query) => (house ? query() : []);
     const window = statsWindow({ from, to, granularity });
     const rates = await loadRates(this.models);
-    const valuer = createValuer(rates, currency, currency ? null : await reportingCurrency(this.models));
+    const valuer = createValuer(rates, currency, currency ? null : await reportingCurrency(this.models, staff));
     const uid = String(user.id);
 
     const base = { ...window.replacements, uid, uidNum: user.id, ...(currency ? { currency } : {}) };

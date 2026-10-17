@@ -163,7 +163,7 @@ class PnlStatsService {
       loadRates(this.models),
       this.#buckets(window),
     ]);
-    const valuer = createValuer(rates, currency, currency ? null : await reportingCurrency(this.models));
+    const valuer = createValuer(rates, currency, currency ? null : await reportingCurrency(this.models, staff));
     const ctx = this.#ctx(window, scope, currency);
 
     const [gaming, costRows] = await Promise.all([
@@ -277,7 +277,7 @@ class PnlStatsService {
   async breakdown({ staff, from, to, granularity = 'day', currency, channel }) {
     const window = statsWindow({ from, to, granularity });
     const [scope, rates] = await Promise.all([playerScope(this.models, staff, { channel, logger: this.logger }), loadRates(this.models)]);
-    const valuer = createValuer(rates, currency, currency ? null : await reportingCurrency(this.models));
+    const valuer = createValuer(rates, currency, currency ? null : await reportingCurrency(this.models, staff));
     const ctx = this.#ctx(window, scope, currency);
 
     const [gameRows, sportRows, playerRows] = scope.empty
