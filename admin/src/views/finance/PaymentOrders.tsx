@@ -241,6 +241,7 @@ const PspProbe = () => {
  * (`admin/user/payments/users/:id/orders`) and the provider probe (`admin/user/psp/…/status/…`)
  * both take deposits:read.
  */
+// Gateway payouts yahan nahi — wo Transactions → Withdraw → Fiat me hain (AllRails kind='withdrawals').
 const PaymentOrders = () => {
   const { can } = useSession()
   const canRails = can(['deposits:read', 'withdrawals:read'])
@@ -248,7 +249,6 @@ const PaymentOrders = () => {
 
   const tabs = [
     canRails && 'deposits',
-    canRails && 'withdrawals',
     canOrders && 'player',
     canOrders && 'probe'
   ].filter((t): t is string => Boolean(t))
@@ -268,18 +268,12 @@ const PaymentOrders = () => {
         <Tabs defaultValue={tabs[0]}>
           <TabsList className='mb-4 flex-wrap'>
             {canRails && <TabsTrigger value='deposits'>Gateway deposits</TabsTrigger>}
-            {canRails && <TabsTrigger value='withdrawals'>Gateway payouts</TabsTrigger>}
             {canOrders && <TabsTrigger value='player'>By user</TabsTrigger>}
             {canOrders && <TabsTrigger value='probe'>Provider probe</TabsTrigger>}
           </TabsList>
           {canRails && (
             <TabsContent value='deposits'>
               <AllRails kind='deposits' />
-            </TabsContent>
-          )}
-          {canRails && (
-            <TabsContent value='withdrawals'>
-              <AllRails kind='withdrawals' />
             </TabsContent>
           )}
           {canOrders && (

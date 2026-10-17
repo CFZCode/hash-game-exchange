@@ -4,11 +4,14 @@
  * A key the backend returns that is not listed here still renders, under
  * "Other", so a new column never goes invisible.
  */
+/** Yahan nahi dikhte — apni alag screen hai (sports = Settings → Site config → Sports switch). */
+export const FLAGS_ELSEWHERE = new Set(['sports'])
+
 export const FLAG_GROUPS: { title: string; description: string; keys: string[] }[] = [
   {
     title: 'Products',
     description: 'Whole sections of the site. Off hides the section and its navigation.',
-    keys: ['casino', 'sports', 'lotto', 'vipclub', 'clubmembership', 'bonus', 'affiliate', 'giftcards', 'welcomepack', 'wheelspin', 'provablyfair']
+    keys: ['casino', 'lotto', 'vipclub', 'clubmembership', 'bonus', 'affiliate', 'giftcards', 'welcomepack', 'wheelspin', 'provablyfair']
   },
   {
     title: 'Game categories',

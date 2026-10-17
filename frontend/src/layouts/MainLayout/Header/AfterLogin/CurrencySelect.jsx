@@ -403,7 +403,7 @@ function Panel({ onClose, onManageAssets, sheet = false }) {
   const navigate = useNavigate();
   const { session, balances, setSetting, updateBalance } = useSession();
   /* An agent's player picks from the agent currency only (services/gates.js `walletCoins`). */
-  const { agentPlayer } = useGates();
+  const { agentPlayer, on: gateOn } = useGates();
   const [search, setSearch] = React.useState('');
   const [focused, setFocused] = React.useState(false);
 
@@ -557,7 +557,7 @@ function Panel({ onClose, onManageAssets, sheet = false }) {
         <Footer
           settings={session.setting}
           setSetting={setSetting}
-          sheet={sheet}
+          sheet={sheet && gateOn('deposit')}
           onDeposit={() => {
             onClose();
             navigate('/deposit');

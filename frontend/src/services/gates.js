@@ -169,6 +169,8 @@ export function makeGates({ flags, features, capabilities, ready = true } = {}) 
       return !gate || on(gate);
     },
     policy,
+    /** One site-admin flag (`home_*` sections etc.); absent / not answered = on. */
+    flag: (key) => flagMap?.[key] !== false,
     /** The signed-in player belongs to an agent's tree (restricted UI: INR wallet, no KYC, no promotions). */
     agentPlayer,
     /** Public self-registration: off on a B2B (agent-only) site. */

@@ -15,7 +15,7 @@ import { Switch } from '@/components/ui/switch'
 import { useSession } from '@/contexts/SessionContext'
 import { useApi, useApiMutation } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
-import { CRYPTO_COIN_FLAGS, CRYPTO_MASTER_FLAG, FLAG_GROUPS, flagLabel } from './flagGroups'
+import { CRYPTO_COIN_FLAGS, CRYPTO_MASTER_FLAG, FLAG_GROUPS, FLAGS_ELSEWHERE, flagLabel } from './flagGroups'
 
 type Flags = Record<string, boolean>
 
@@ -57,7 +57,7 @@ const FeatureFlags = () => {
   })
 
   const known = new Set(FLAG_GROUPS.flatMap(g => g.keys))
-  const other = Object.keys(draft).filter(k => !known.has(k))
+  const other = Object.keys(draft).filter(k => !known.has(k) && !FLAGS_ELSEWHERE.has(k))
   const groups = other.length ? [...FLAG_GROUPS, { title: 'Other', description: 'Columns the platform returns that this screen does not yet know by name.', keys: other }] : FLAG_GROUPS
   const q = filter.trim().toLowerCase()
 

@@ -155,7 +155,7 @@ const PUBLIC_FLAGS = Object.freeze([
   // home page sections
   'home_heroSection', 'home_welcomebanner', 'home_latestwins', 'home_livecasino',
   'home_gamingcards', 'home_popularslots', 'home_bonus500banner', 'home_crashgames',
-  'home_paymentbanner', 'home_leaderboard', 'home_promocards',
+  'home_paymentbanner', 'home_leaderboard', 'home_promocards', 'home_livesports',
 ]);
 
 /**
@@ -195,7 +195,7 @@ const PUBLIC_AMOUNTS = Object.freeze([
  * a commission of a billion percent.
  * ═════════════════════════════════════════════════════════════════════════
  */
-const OPERATOR_FLAGS = Object.freeze([...PUBLIC_FLAGS, 'sports', 'home_livesports']);
+const OPERATOR_FLAGS = Object.freeze([...PUBLIC_FLAGS, 'sports']);
 
 /**
  * A player's own preferences — `GET`/`PUT /site-config/user/:userId`.

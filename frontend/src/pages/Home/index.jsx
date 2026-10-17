@@ -119,7 +119,7 @@ export default function Home() {
        Padding rather than margin, so no trailing margin from the last section can collapse into
        it. */
     <div ref={setPage} className="home-page lg:pb-8">
-      <Hero />
+      {gates.flag('home_heroSection') && <Hero />}
       {/* ABOVE Recent Big Wins, which is where `Dn` puts it: that component is
           [wu, Iu, Ao] — the Continue Playing / Favorites block, Game of the Week (Korea only,
           not built), then Recent Big Wins — and `ng()` inserts the whole of it as the FIRST
@@ -127,21 +127,22 @@ export default function Home() {
           signed-in order is hero, this, big wins, categories, BC Originals. Renders nothing at
           all when signed out or when both its lists are empty. */}
       <RecentFavorites />
-      <RecentBigWins />
-      <CategoryCards />
+      {gates.flag('home_latestwins') && <RecentBigWins />}
+      {gates.flag('home_gamingcards') && <CategoryCards />}
       {gates.on('originals') && <GameSection title={brandLabel('BC Originals')} {...section('originals')} />}
       <GameSection title="Hot Games" {...section('hotGames')} />
-      <Highlights />
+      {gates.flag('home_livesports') && <Highlights />}
       {/* BC.GAME's exclusive tables have no Parker567 equivalent; the live feed answers []. Drawn
           only when it has games, so an empty "Exclusive" heading never shows. */}
       {section('exclusive').games?.length !== 0 && <GameSection title={brandLabel('BC Exclusive')} {...section('exclusive')} />}
-      <GameSection title="Slots" {...section('slots')} />
-      <GameSection title="Live Casino" {...section('liveCasino')} />
-      <PayYourWay />
+      {gates.flag('home_popularslots') && <GameSection title="Slots" {...section('slots')} />}
+      {gates.flag('home_livecasino') && <GameSection title="Live Casino" {...section('liveCasino')} />}
+      {/* Admin ka home_paymentbanner, aur agent ke player ko nahi (wo deposit nahi kar sakta). */}
+      {gates.flag('home_paymentbanner') && gates.on('deposit') && <PayYourWay />}
       {/* compact: this row sits under Pay Your Way's fixed-height panel, which leaves empty
           space below its content on mobile — see the note in GameSection. */}
       <GameSection title="All Bingo Games" compact {...section('bingo')} />
-      <LatestBets />
+      {gates.flag('home_leaderboard') && <LatestBets />}
     </div>
   );
 }

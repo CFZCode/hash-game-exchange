@@ -16,7 +16,7 @@ const {
 
 const errors = require('./auth.errors');
 const { sharedIpLocator, normaliseIp } = require('./geo/ipLocation');
-const { sitePolicy } = require('@ibitplay/common');
+const { sitePolicy, withdrawBlock, manualPayments } = require('@ibitplay/common');
 const { RegionService } = require('../region/region.service');
 /* Registration is where a referral becomes a team. Safe to require here —
    the affiliate module does not reach back into auth. */
@@ -316,6 +316,19 @@ class AuthService {
      * Set even when the owner lookup failed (the rest then still reads as "all on").
      */
     if (user.withdraw_locked || systemLocked) user.capabilities = { ...(user.capabilities ?? {}), withdraw: false };
+    /*
+     * Admin ke switch, taaki site form hi na dikhaye (routes waise bhi refuse karte hain):
+     * Users → Financial "Global Withdrawals" OFF → withdraw false; Transactions → Manual ON / OFF →
+     * manualDeposit / manualWithdraw. Padh na paaye to chhod do (sab ON maana jaata hai).
+     */
+    try {
+      const sequelize = this.models.Users.sequelize;
+      const [withdrawalsOn, manual] = await Promise.all([withdrawBlock.withdrawalsEnabled(sequelize), manualPayments.readManualPayments(sequelize)]);
+      user.capabilities = { ...(user.capabilities ?? {}), manualDeposit: manual.deposit, manualWithdraw: manual.withdraw };
+      if (!withdrawalsOn) user.capabilities.withdraw = false;
+    } catch (error) {
+      this.logger?.warn({ userId: String(user.id), err: error.message }, 'Payment switches could not be read');
+    }
     return user;
   }
 
