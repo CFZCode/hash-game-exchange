@@ -1,5 +1,8 @@
-/** Shared by the proxy and the route handlers; the name is not a secret. */
-export const SESSION_COOKIE = 'cfz_owner_session'
+/**
+ * Shared by the proxy and the route handlers; the name is not a secret. Named after the site
+ * (owner-panel/.env.local SITE_NAME, e.g. Parker567 → `parker567_owner_session`).
+ */
+export const SESSION_COOKIE = `${(process.env.SITE_NAME || 'site').toLowerCase().replace(/[^a-z0-9]+/g, '_')}_owner_session`
 
 export const siteConfig = {
   key: 'hash-game-exchange',

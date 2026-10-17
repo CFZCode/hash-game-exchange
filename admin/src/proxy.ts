@@ -6,7 +6,7 @@
  */
 import { NextResponse, type NextRequest } from 'next/server'
 
-const COOKIE = process.env.SESSION_COOKIE_NAME ?? 'cfz_sa_token'
+const COOKIE = process.env.SESSION_COOKIE_NAME ?? 'site_admin_token'
 const PUBLIC = ['/login', '/api/auth/login', '/api/auth/logout']
 
 function tokenLooksValid(token: string | undefined) {

@@ -135,7 +135,7 @@ apply(adminEnv, {
   NEXT_PUBLIC_SITE_NAME: `${SITE_NAME} Admin`,
   NEXT_PUBLIC_SITE_TAGLINE: 'Operator panel',
   NEXT_PUBLIC_ENV_LABEL: 'localhost',
-  SESSION_COOKIE_NAME: `cfz_${SITE_KEY.replace(/[^a-z0-9]/g, '_')}_token`,
+  SESSION_COOKIE_NAME: `${SITE_NAME.toLowerCase().replace(/[^a-z0-9]+/g, '_')}_admin_token`,
   SESSION_MAX_AGE_SECONDS: '28800',
   PORT: String(PORTS.siteAdmin)
 })

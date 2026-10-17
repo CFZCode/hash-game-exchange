@@ -36,8 +36,8 @@ if (arg === '--list') {
 const row = rows().find((r) => r.login === arg);
 if (!row) { console.error(`no demo account ${arg}`); process.exit(2); }
 /* Staff rows sign in to the admin API by e-mail. The site admin keeps that token in the
-   `cfz_hash_game_exchange_token` cookie (admin SESSION_COOKIE_NAME; the hub default
-   `cfz_sa_token` is not used here), so a browser test can set it directly. */
+   `parker567_admin_token` cookie (admin SESSION_COOKIE_NAME; the code default
+   `site_admin_token` is not used here), so a browser test can set it directly. */
 const staff = row.kind && !row.kind.toLowerCase().includes('player');
 const email = staff ? staffEmail(arg) : null;
 function staffEmail(login) {
