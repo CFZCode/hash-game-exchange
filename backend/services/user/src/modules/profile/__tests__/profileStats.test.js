@@ -63,7 +63,7 @@ test('profile stats: fold into USD', () => {
   assert.deepStrictEqual(s.favouriteGames.map((g) => [g.name, g.wageredUsd]), [
     ['Big Bass', '102.50000000'], ['crash', '65.00000000'], ['Aviator', '24.00000000'],
   ]);
-  assert.deepStrictEqual(s.favouriteProviders.map((p) => p.name), ['Pragmatic', 'Sportsbook', 'Spribe']);
+  assert.deepStrictEqual(s.favouriteProviders.map((p) => p.name), ['Pragmatic', 'Sports', 'Spribe']);
 
   assert.strictEqual(s.firstBetAt, '2025-12-31T00:00:00.000Z');
   assert.strictEqual(s.lastBetAt, '2026-10-05T00:00:00.000Z');

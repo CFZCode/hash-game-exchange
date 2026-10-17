@@ -266,7 +266,7 @@ export const INVITE = {
   commissionLabel: 'Commission Rewards',
   commissionRate: '25%',
   description:
-    'Get __friendAmount__ for each friend you invite, plus up to 25% commission on their wagers. Enjoy consistent commission, whether they win or lose, in our Casino and Sportsbook. Start earning now!',
+    'Get __friendAmount__ for each friend you invite, plus up to 25% commission on their wagers. Enjoy consistent commission, whether they win or lose, in our Casino and Sports. Start earning now!',
   linkLabel: 'Referral Link',
   codeLabel: 'Referral Code',
   copy: 'Copy',
