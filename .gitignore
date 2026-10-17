@@ -21,3 +21,4 @@ owner-panel/data/
 .demo-credentials.local.md
 credentials.md
 CREDENTIALS.local.md
+.claude/settings.local.json
