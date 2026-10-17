@@ -65,6 +65,8 @@ export default function MatchOddsBlock({
         <RunnerRow
           key={runner.id}
           name={runner.name}
+          subline={runner.subline}
+          leading={runner.leading}
           back={runner.back}
           lay={runner.lay}
           depth={depth}

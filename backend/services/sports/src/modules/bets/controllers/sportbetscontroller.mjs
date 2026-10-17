@@ -695,7 +695,8 @@ var placeBet = async (req, res, opts) => {
         }
       }
     }
-    if (String(sid) === "10") {
+    // Racing (horse 10, greyhound 65): bets only in the last RACE_BET_WINDOW_MINUTES before the off.
+    if (String(sid) === "10" || String(sid) === "65") {
       let raceStartMs = null;
       try {
         raceStartMs = await resolveRaceStartMs(eventid, sid);
@@ -706,7 +707,7 @@ var placeBet = async (req, res, opts) => {
         const minutesToOff = (raceStartMs - Date.now()) / 6e4;
         console.log(`[placeBet] Race window: gmid=${eventid} minutesToOff=${minutesToOff.toFixed(1)} window=${RACE_BET_WINDOW_MINUTES}`);
         if (minutesToOff > RACE_BET_WINDOW_MINUTES) {
-          throw new Error(`Betting opens ${RACE_BET_WINDOW_MINUTES} minutes before the race starts`);
+          throw new Error(`Bet will be accepted ${RACE_BET_WINDOW_MINUTES} minutes before the market starts, Thanks.`);
         }
       } else {
         console.warn(`[placeBet] Race window: start time unavailable for gmid=${eventid} \u2014 check skipped (fail open)`);

@@ -27,6 +27,7 @@ import {
   getSportsBufferSeconds,
 } from '../../../services/exchange';
 import { toast } from '../../../components/shared/Toast/toast';
+import { isRaceBettingOpen, RACE_WINDOW_TOAST } from '../../../utils/exchange/placeBetRules';
 import { bestPrice, bookFor } from './shape';
 
 /* ─── The match page's one open bet slip ──────────────────────────────────────────────────
@@ -205,6 +206,11 @@ export function useMatchSlip({ sid, gmid, match, getMarkets, signedIn }) {
       // A cashout's hedge stake is solved, not chosen: TENEXCH holds it to no minimum.
       if (err && !(bv.is_cashout && err.code === 'BELOW_MIN' && Number(stakeStr) > 0)) {
         reject(token, err.message, stakeStr);
+        return;
+      }
+      // Racing: only in the last 5 minutes before the off (the server says the same).
+      if (!isRaceBettingOpen(sid, matchInfo.stime)) {
+        reject(token, RACE_WINDOW_TOAST, stakeStr);
         return;
       }
       const key = betMarketKey(bv);

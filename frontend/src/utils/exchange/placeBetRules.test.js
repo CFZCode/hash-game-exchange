@@ -10,6 +10,8 @@
 
 import { describe, it, expect } from 'vitest';
 import {
+  isRaceBettingOpen,
+  parseFeedIstTime,
   BET_ERROR,
   getBetValidationError,
   MIN_BET_AMOUNT,
@@ -292,5 +294,25 @@ describe('namesOwnLine', () => {
     for (const t of ['Normal', 'fancy1', 'oddeven', 'meter', 'match', 'match1']) {
       expect(namesOwnLine(t, t, t)).toBe(false);
     }
+  });
+});
+
+describe('racing betting window', () => {
+  // 10/17/2026 12:40:00 PM IST = 07:10:00 UTC
+  const start = Date.UTC(2026, 9, 17, 7, 10, 0);
+  it('reads the feed time as IST', () => {
+    expect(parseFeedIstTime('10/17/2026 12:40:00 PM')).toBe(start);
+  });
+  it('refuses a horse or greyhound bet more than 5 minutes before the off', () => {
+    expect(isRaceBettingOpen(10, '10/17/2026 12:40:00 PM', start - 6 * 60000)).toBe(false);
+    expect(isRaceBettingOpen('65', '10/17/2026 12:40:00 PM', start - 6 * 60000)).toBe(false);
+  });
+  it('accepts inside the last 5 minutes and after the off', () => {
+    expect(isRaceBettingOpen(10, '10/17/2026 12:40:00 PM', start - 4 * 60000)).toBe(true);
+    expect(isRaceBettingOpen(10, '10/17/2026 12:40:00 PM', start + 60000)).toBe(true);
+  });
+  it('never limits other sports, and fails open on an unreadable time', () => {
+    expect(isRaceBettingOpen(4, '10/17/2026 12:40:00 PM', start - 60 * 60000)).toBe(true);
+    expect(isRaceBettingOpen(10, 'soon', start)).toBe(true);
   });
 });

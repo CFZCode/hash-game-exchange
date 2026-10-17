@@ -129,7 +129,7 @@ function CategoryCard({ src, icon, title, href, isWide }) {
 
 const CATEGORIES = [
   { key: 'poker', icon: 'bcpoker', title: 'POKER', src: pokerImg, href: '/casino/poker' },
-  { key: 'racing', icon: 'racing', title: 'RACING', src: racingImg, href: '/racing' },
+  { key: 'racing', icon: 'racing', title: 'RACING', src: racingImg, href: '/sports?sport=horse-racing' },
   /* LOTTERY (`/lottery`) sat here on the original; removed on the user's request, a deliberate
      departure — see .claude/skills/hash-ui-fidelity. The three remaining cards share the row. */
   /* The Bingo card's art, relabelled SLOTS on the user's request (hash.game has no slots render);

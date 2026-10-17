@@ -25,6 +25,31 @@ import {
  * first of them sat in the feed (TENEXCH GameDetails). */
 
 const gt = (m) => String(m?.gtype || '').toLowerCase();
+
+/* Racing runners (horse / greyhound) carry jockey, trainer, age, draw and a silks image in the
+ * feed. Silks are served per market: race_icons/{mid}/{himg} (TENEXCH RacingDetails). */
+const SILK_BASE = 'https://sitethemedata.com/race_icons/';
+const raceInfo = (s) => {
+  const parts = [
+    s.jname && `J: ${s.jname}`,
+    s.tname && `T: ${s.tname}`,
+    Number(s.hage) > 0 && `Age ${s.hage}`,
+    s.sdraw && String(s.sdraw) !== '0' && `Draw ${s.sdraw}`,
+  ].filter(Boolean);
+  return parts.length ? <p className="mt-0.5 truncate text-[11px] font-semibold leading-4 text-tertiary">{parts.join(' · ')}</p> : undefined;
+};
+const raceSilk = (market, s) =>
+  s.himg ? (
+    <img
+      src={`${SILK_BASE}${market.mid}/${s.himg}`}
+      alt=""
+      loading="lazy"
+      className="size-7 flex-none rounded object-contain"
+      onError={(e) => {
+        e.currentTarget.style.display = 'none';
+      }}
+    />
+  ) : undefined;
 const price = (v) => formatOddAddaplay(v);
 
 function RunnerMarket({ market, book, projected, slip, slipNode, disabled, signedIn, onCell, onCashout }) {
@@ -39,6 +64,8 @@ function RunnerMarket({ market, book, projected, slip, slipNode, disabled, signe
     runners: sections.map((s) => ({
       id: s.sid,
       name: s.nat,
+      subline: raceInfo(s),
+      leading: raceSilk(market, s),
       back: ladder(s, 'back'),
       lay: ladder(s, 'lay'),
       status: rowStatus(market, s),

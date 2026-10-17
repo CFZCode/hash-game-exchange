@@ -403,3 +403,29 @@ export function getBetValidationError({ stakeNum, minStake, maxStake, suspended,
   if (!isValid) return BET_ERROR.INVALID;
   return null;
 }
+
+/* ── Racing betting window (horse 10, greyhound 65) ─────────────────────────────────────────
+   A race takes bets only in the last RACE_BET_WINDOW_MINUTES before the off — the server
+   (sportbetscontroller placeBet) refuses earlier bets with the same sentence. The feed's
+   "M/D/YYYY h:mm:ss AM" start is IST wall time, so it is read as IST for every viewer.
+   Unreadable start → open (the server is authoritative). TENEXCH racingUtils. */
+export const RACING_SIDS = new Set(['10', '65']);
+export const RACE_BET_WINDOW_MINUTES = 5;
+export const RACE_WINDOW_TOAST = `Bet will be accepted ${RACE_BET_WINDOW_MINUTES} minutes before the market starts, Thanks.`;
+
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+export function parseFeedIstTime(stime) {
+  const m = String(stime || '').trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})[ ,]+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?$/i);
+  if (!m) return null;
+  const [, mo, day, yr, hh, mi, ss, ap] = m;
+  let h = Number(hh);
+  if (ap?.toUpperCase() === 'PM' && h !== 12) h += 12;
+  if (ap?.toUpperCase() === 'AM' && h === 12) h = 0;
+  return Date.UTC(Number(yr), Number(mo) - 1, Number(day), h, Number(mi), Number(ss || 0)) - IST_OFFSET_MS;
+}
+
+export function isRaceBettingOpen(sid, stime, now = Date.now()) {
+  if (!RACING_SIDS.has(String(sid))) return true;
+  const start = parseFeedIstTime(stime);
+  return start == null ? true : (start - now) / 60000 <= RACE_BET_WINDOW_MINUTES;
+}

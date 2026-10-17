@@ -40,6 +40,7 @@ export const CELL_W = 'w-[4.25rem] sm:w-16';
  *        `selected` then matches on `{ key }`.
  * @param {React.ReactNode} [props.nameExtra] Inline after the name (e.g. Badlo chip).
  * @param {React.ReactNode} [props.subline]   Extra small line under the name (e.g. fancy min/max on phones).
+ * @param {React.ReactNode} [props.leading]   Before the name block (e.g. a racing runner's jockey silks).
  * @param {React.ReactNode} [props.trailing]  Column after the cells, desktop only (e.g. fancy min/max).
  * @param {React.ReactNode} [props.children]  Rendered full-width UNDER the row — put <BetSlipInline/> here.
  */
@@ -64,6 +65,7 @@ export default function RunnerRow({
   cells: customCells,
   nameExtra,
   subline,
+  leading,
   trailing,
   children,
 }) {
@@ -123,6 +125,7 @@ export default function RunnerRow({
   return (
     <div className="border-t border-third first:border-t-0">
       <div className="flex items-center gap-2 px-3 py-1.5 sm:px-4">
+        {leading}
         <div className="min-w-0 flex-1">
           <p className="flex min-w-0 items-center gap-1.5">
             <span className="truncate text-sm font-semibold text-primary">{name}</span>
