@@ -11,7 +11,7 @@ import PageHeader from '@/components/shared/PageHeader'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { UI_LABEL, uiSupport } from '@/configs/siteUi'
@@ -25,14 +25,13 @@ import {
   type Catalogue,
   type CatalogueFeature,
   type SiteFeature,
-  type SiteFeatures,
-  describeTemplate
+  type SiteFeatures
 } from './featureTypes'
 
 /** How often the features read is refreshed so what the platform changes shows up live. */
 
-/** Not shown to the site admin: the owner's commercial setup, and features this backend does not have. */
-const OWNER_ONLY_FEATURES = new Set(['business_model', 'raffles'])
+/** Not shown to the site admin: the owner's commercial setup (incl. which games provider), and features this backend does not have. */
+const OWNER_ONLY_FEATURES = new Set(['business_model', 'raffles', 'casino_aggregator'])
 const FEATURES_POLL_MS = 15_000
 
 /** The variant's label as staff see it (read-only: the platform picks the variant). */
@@ -144,11 +143,6 @@ const Features = () => {
     refetchOnWindowFocus: true
   })
 
-  const template = useMemo(
-    () => describeTemplate(current.data?.template, catalogue.data?.templates),
-    [current.data?.template, catalogue.data?.templates]
-  )
-
   const rows = useMemo(() => {
     if (!catalogue.data || !current.data) return []
     const byKey = new Map(current.data.features.map(f => [f.feature, f]))
@@ -189,21 +183,6 @@ const Features = () => {
 
       {error && <ErrorState error={error} />}
       {!rows.length && !error && <Skeleton className='h-96' />}
-
-      {catalogue.data && current.data && (
-        <Card className='mb-4 shadow-none'>
-          <CardHeader>
-            <CardTitle className='flex items-center gap-2 text-base'>
-              Template{' '}
-              {template ? <Badge>{template.label}</Badge> : <Badge variant='outline'>none</Badge>}
-            </CardTitle>
-            {template?.description && <CardDescription>{template.description}</CardDescription>}
-            <CardDescription className='flex items-center gap-1.5'>
-              <LockIcon className='size-3' /> Set by the platform. Contact support to change it.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      )}
 
       <div className='grid gap-4'>
         {rows.map(({ cat, items }) => (
