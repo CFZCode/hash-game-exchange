@@ -2,7 +2,9 @@
 
 import { useState, type ReactNode } from 'react'
 
-import { BanIcon, CircleCheckIcon, DicesIcon, GaugeIcon, LockIcon, UsersIcon, WalletIcon } from 'lucide-react'
+import Link from 'next/link'
+
+import { BanIcon, CircleCheckIcon, DicesIcon, GaugeIcon, LockIcon, ShieldCheckIcon, UsersIcon, WalletIcon } from 'lucide-react'
 
 import DataTable, { type Column } from '@/components/shared/DataTable'
 import FormDialog from '@/components/shared/FormDialog'
@@ -15,16 +17,15 @@ import { useApi, useApiMutation, useListState, usePagedApi } from '@/hooks/use-a
 import { api } from '@/lib/api/client'
 import { cn } from '@/lib/utils'
 import { TxnPasswordLabel } from '@/views/finance/StaffFloat'
-import { Chip, StatCard, TONES, inr, type Tone } from './shared'
+import { Chip, StatCard, TONES, avatarClass, inr, type Tone } from './shared'
 
 /**
  * Users → Financial → Withdrawal — reference admin (admin-structure.zip →
  * components/users/FinancialTab.tsx `WithdrawalControl`) jaisa:
  *
+ *   Overview cards      withdrawals ON/OFF, direct users, locked, limit
  *   Global Withdrawals  ON / OFF                           PUT admin/withdrawal-control/global
- *   Withdrawal limit    read-only — owner panel → Features & plan → Withdrawals
- *   Wagering bonus      read-only — same
- *   Direct users / Withdrawal locked cards
+ *   Withdrawal rules    limit + wagering bonus, read-only — owner panel → Features & plan → Withdrawals
  *   Per-user withdrawal lock table                         GET admin/withdrawal-control/users + POST admin/locks
  *
  * Global switch transaction password se confirm hota hai (sirf owner / Super Admin).
@@ -64,38 +65,6 @@ type Pending = { enabled: boolean }
 const fmtMult = (n: number) => `${Number(n)}×`
 const fmtDate = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : '—')
 
-/** Ek setting card: icon box + title + text, right me ON/OFF chip + switch (+ multiplier input). */
-const SettingCard = ({
-  icon,
-  tone,
-  on,
-  title,
-  children,
-  loading,
-  danger,
-  control
-}: {
-  icon: ReactNode
-  tone: Tone
-  on: boolean
-  title: ReactNode
-  children: ReactNode
-  loading?: boolean
-  danger?: boolean
-  control: ReactNode
-}) => (
-  <Card className={cn('flex flex-row flex-wrap items-center justify-between gap-4 p-5', danger && 'border-danger/60')}>
-    <div className='flex min-w-0 flex-[1_1_320px] items-center gap-4'>
-      <span className={cn('flex size-12 shrink-0 items-center justify-center rounded-xl [&_svg]:size-5', on ? TONES[tone] : 'bg-muted text-muted-foreground')}>{icon}</span>
-      <div className='min-w-0'>
-        {loading ? <Skeleton className='h-5 w-56' /> : <p className='font-bold'>{title}</p>}
-        <div className='text-muted-foreground mt-1 text-sm'>{children}</div>
-      </div>
-    </div>
-    <div className='flex flex-wrap items-center gap-3'>{loading ? <Skeleton className='h-8 w-40' /> : control}</div>
-  </Card>
-)
-
 const OnOff = ({ on, tone }: { on: boolean; tone: Tone }) => (
   <Chip tone={tone} className={cn('min-w-12 text-center tracking-widest', !on && 'bg-muted text-muted-foreground')}>
     {on ? 'ON' : 'OFF'}
@@ -104,7 +73,24 @@ const OnOff = ({ on, tone }: { on: boolean; tone: Tone }) => (
 
 /** Owner panel se aane wali setting ka badge — admin yahan badal nahi sakta. */
 const OwnerBadge = () => (
-  <span className='text-muted-foreground bg-muted inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium whitespace-nowrap'>Set in the owner panel</span>
+  <span className='text-muted-foreground bg-muted inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium whitespace-nowrap'>
+    <LockIcon className='size-3' /> Set in the owner panel
+  </span>
+)
+
+/** Withdrawal rules card ki ek line: icon + naam + ON/OFF, bada value, chhota text. */
+const Rule = ({ icon, tone, on, name, value, children, loading }: { icon: ReactNode; tone: Tone; on: boolean; name: string; value: ReactNode; children: ReactNode; loading?: boolean }) => (
+  <div className='flex min-w-0 gap-4 p-5'>
+    <span className={cn('flex size-11 shrink-0 items-center justify-center rounded-xl [&_svg]:size-5', on ? TONES[tone] : 'bg-muted text-muted-foreground')}>{icon}</span>
+    <div className='min-w-0 flex-1'>
+      <div className='flex flex-wrap items-center justify-between gap-2'>
+        <p className='text-muted-foreground text-xs font-semibold tracking-wide uppercase'>{name}</p>
+        {!loading && <OnOff on={on} tone={tone} />}
+      </div>
+      {loading ? <Skeleton className='mt-2 h-7 w-32' /> : <p className={cn('mt-1 text-2xl font-bold tabular-nums', !on && 'text-muted-foreground')}>{value}</p>}
+      <div className='text-muted-foreground mt-2 text-sm'>{children}</div>
+    </div>
+  </div>
 )
 
 const WithdrawalControl = () => {
@@ -149,87 +135,73 @@ const WithdrawalControl = () => {
 
   return (
     <div className='flex flex-col gap-4'>
+      {/* Overview */}
+      <div className='grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4'>
+        <StatCard label='Withdrawals' value={enabled ? 'Open' : 'Stopped'} icon={enabled ? <CircleCheckIcon /> : <BanIcon />} tone={enabled ? 'success' : 'danger'} loading={loading} />
+        <StatCard label='Direct users' value={(s?.directUsers ?? 0).toLocaleString('en-IN')} icon={<UsersIcon />} tone='primary' loading={loading} />
+        <StatCard label='Withdrawal locked' value={(s?.lockedDirectUsers ?? 0).toLocaleString('en-IN')} icon={<LockIcon />} tone='danger' loading={loading} />
+        <StatCard label='Max withdrawal' value={limitOn ? `${fmtMult(m)} deposits` : 'No limit'} icon={<GaugeIcon />} tone='warning' loading={loading} />
+      </div>
+
       {/* Global switch */}
-      <SettingCard
-        icon={enabled ? <CircleCheckIcon /> : <BanIcon />}
-        tone={enabled ? 'success' : 'danger'}
-        on
-        danger={Boolean(s) && !enabled}
-        loading={loading}
-        title='Global Withdrawals'
-        control={
-          <>
-            <Chip tone={enabled ? 'success' : 'danger'} className='min-w-12 text-center tracking-widest'>
-              {enabled ? 'ON' : 'OFF'}
-            </Chip>
-            <Switch checked={enabled} disabled={!s || !canEdit} onCheckedChange={() => setPending({ enabled: !enabled })} aria-label='Global withdrawals' />
-          </>
-        }
-      >
-        Applies to every player and every method: bank / UPI, payment gateway, crypto, P2P sell and tips.
-        <p className='mt-1 text-xs'>
-          Last config change: {fmtDate(s?.updatedAt)}
-          {s?.updatedBy?.name ? ` by ${s.updatedBy.name}` : ''}
-        </p>
-      </SettingCard>
+      <Card className={cn('flex flex-col gap-4 border-l-4 p-5 sm:flex-row sm:items-center sm:justify-between', !s ? '' : enabled ? 'border-l-success' : 'border-danger/60 border-l-danger')}>
+        <div className='flex min-w-0 items-start gap-4'>
+          <span className={cn('flex size-12 shrink-0 items-center justify-center rounded-xl [&_svg]:size-5', TONES[enabled ? 'success' : 'danger'])}>
+            <ShieldCheckIcon />
+          </span>
+          <div className='min-w-0'>
+            <p className='font-bold'>Global Withdrawals</p>
+            <p className='text-muted-foreground mt-1 text-sm'>Applies to every player and every method: bank / UPI, payment gateway, crypto, P2P sell and tips.</p>
+            {loading ? (
+              <Skeleton className='mt-2 h-3.5 w-48' />
+            ) : (
+              <p className='text-muted-foreground mt-1 text-xs'>
+                Last config change: {fmtDate(s?.updatedAt)}
+                {s?.updatedBy?.name ? ` by ${s.updatedBy.name}` : ''}
+              </p>
+            )}
+          </div>
+        </div>
+        <label className='bg-muted/50 flex shrink-0 items-center justify-between gap-3 rounded-lg border px-3 py-2 sm:justify-start'>
+          <span className='text-sm font-semibold'>{loading ? '…' : enabled ? 'Withdrawals on' : 'Withdrawals off'}</span>
+          <Switch checked={enabled} disabled={!s || !canEdit} onCheckedChange={() => setPending({ enabled: !enabled })} aria-label='Global withdrawals' />
+        </label>
+      </Card>
 
       {s && !enabled && (
-        <p className='bg-danger/10 text-danger border-danger/30 rounded-md border px-3 py-2 text-sm'>
+        <p className='bg-danger/10 text-danger border-danger/30 flex items-center gap-2 rounded-md border px-3 py-2 text-sm'>
+          <BanIcon className='size-4 shrink-0' />
           Withdrawals are OFF. No player can withdraw by any method until this is switched back on.
         </p>
       )}
 
-      {/* Deposit-based withdrawal limit — owner panel ki setting, yahan read-only */}
-      <SettingCard
-        icon={<GaugeIcon />}
-        tone='warning'
-        on={limitOn}
-        loading={loading}
-        title={<>Withdrawal limit: {limitOn ? `${fmtMult(m)} total deposits` : 'off'}</>}
-        control={
-          <>
-            <OnOff on={limitOn} tone='warning' />
-            <OwnerBadge />
-          </>
-        }
-      >
-        Every player can withdraw at most this many times what they have deposited, in each currency, plus the wagering bonus below. Agent transfers count as INR deposits, and pending
-        withdrawals count toward the limit.
-      </SettingCard>
+      {/* Limit + wagering bonus — owner panel ki setting, yahan read-only */}
+      <Card className='gap-0 p-0'>
+        <div className='flex flex-wrap items-center justify-between gap-2 border-b px-5 py-3'>
+          <h2 className='font-bold'>Withdrawal rules</h2>
+          <OwnerBadge />
+        </div>
+        <div className='grid divide-y lg:grid-cols-2 lg:divide-x lg:divide-y-0'>
+          <Rule icon={<GaugeIcon />} tone='warning' on={limitOn} name='Withdrawal limit' value={limitOn ? `${fmtMult(m)} deposits` : 'No limit'} loading={loading}>
+            Every player can withdraw at most this many times what they have deposited, in each currency, plus the wagering bonus. Agent transfers count as INR deposits, and pending
+            withdrawals count toward the limit.
+          </Rule>
+          <Rule icon={<DicesIcon />} tone='info' on={limitOn && wagerOn} name='Wagering bonus' value={wagerOn ? `+ up to ${fmtMult(w)}` : 'Off'} loading={loading}>
+            Extra room earned by playing: every rupee bet (casino and settled sports bets, refunds excluded) adds a rupee to the limit, up to this many times deposits.
+            {s && (
+              <p className='bg-muted/50 mt-2 rounded-md px-2.5 py-1.5 text-xs'>
+                {!limitOn
+                  ? 'No effect while the withdrawal limit is off.'
+                  : wagerOn
+                    ? `Example: ₹1,000 deposited and ₹1,000 wagered → ${inr(1000 * m)} + ${inr(Math.min(1000, 1000 * w))} = ${inr(1000 * m + Math.min(1000, 1000 * w))}.`
+                    : `Example: ₹1,000 deposited → max ${inr(1000 * m)}, however much is wagered.`}
+              </p>
+            )}
+          </Rule>
+        </div>
+      </Card>
 
-      {/* Wagering bonus on top of the deposit limit — owner panel ki setting, yahan read-only */}
-      <SettingCard
-        icon={<DicesIcon />}
-        tone='info'
-        on={limitOn && wagerOn}
-        loading={loading}
-        title={<>Wagering bonus: {wagerOn ? `up to ${fmtMult(w)} total deposits` : 'off'}</>}
-        control={
-          <>
-            <OnOff on={limitOn && wagerOn} tone='info' />
-            <OwnerBadge />
-          </>
-        }
-      >
-        Extra room on top of the withdrawal limit, earned by playing: every rupee the player bets (casino and settled sports bets, refunds excluded) adds a rupee to their limit, until it
-        reaches this many times their deposits.
-        {s && (
-          <p className='mt-1 text-xs'>
-            {!limitOn
-              ? 'No effect while the withdrawal limit is off.'
-              : wagerOn
-                ? `Example: ₹1,000 deposited and ₹1,000 wagered → ${inr(1000 * m)} + ${inr(Math.min(1000, 1000 * w))} = ${inr(1000 * m + Math.min(1000, 1000 * w))}.`
-                : `Example: ₹1,000 deposited → max ${inr(1000 * m)}, however much is wagered.`}
-          </p>
-        )}
-      </SettingCard>
-
-      <div className='grid gap-4 sm:grid-cols-2'>
-        <StatCard label='Direct users' value={(s?.directUsers ?? 0).toLocaleString('en-IN')} icon={<UsersIcon />} tone='primary' loading={loading} />
-        <StatCard label='Withdrawal locked' value={(s?.lockedDirectUsers ?? 0).toLocaleString('en-IN')} icon={<LockIcon />} tone='danger' loading={loading} />
-      </div>
-
-      <LockTable />
+      <LockTable locked={s?.lockedDirectUsers} />
 
       <FormDialog
         open={pending !== null}
@@ -246,8 +218,34 @@ const WithdrawalControl = () => {
   )
 }
 
-/** Per-user withdrawal lock — direct users, reference jaisi columns. Lock switch = `POST admin/locks`. */
-const LockTable = () => {
+/** Withdrawn vs max: amount + patli bar (hara → peela → laal jaise limit bharti hai). */
+const WithdrawnBar = ({ withdrawn, max }: { withdrawn: string; max: string | null }) => {
+  if (max === null)
+    return (
+      <div className='text-right whitespace-nowrap'>
+        <p className='font-semibold tabular-nums'>{inr(withdrawn)}</p>
+        <p className='text-muted-foreground text-xs'>no limit</p>
+      </div>
+    )
+
+  const cap = Number(max)
+  const pct = cap > 0 ? Math.min(100, (Number(withdrawn) / cap) * 100) : 100
+
+  return (
+    <div className='ml-auto w-36'>
+      <p className='text-right text-sm whitespace-nowrap tabular-nums'>
+        <span className='font-semibold'>{inr(withdrawn)}</span>
+        <span className='text-muted-foreground'> / {inr(max)}</span>
+      </p>
+      <div className='bg-muted mt-1.5 h-1.5 overflow-hidden rounded-full'>
+        <div className={cn('h-full rounded-full', pct >= 100 ? 'bg-danger' : pct >= 70 ? 'bg-warning' : 'bg-success')} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  )
+}
+
+/** Per-user withdrawal lock — direct users. Lock switch = `POST admin/locks`. Phone pe sirf user, balance, lock. */
+const LockTable = ({ locked }: { locked?: number }) => {
   const { can } = useSession()
   const { state, set, query } = useListState(['status'])
   const status = query.status === 'locked' ? 'locked' : 'all'
@@ -269,23 +267,44 @@ const LockTable = () => {
     {
       key: 'user',
       header: 'User',
-      cell: r => (
-        <div className='min-w-0'>
-          <p className='truncate font-semibold'>{r.name || '—'}</p>
-          <p className='text-muted-foreground truncate text-xs'>
-            {r.email || '—'}
-            {r.country ? ` · ${r.country}` : ''} · <span className='font-mono'>{r.id}</span>
-          </p>
-        </div>
-      )
+      cell: r => {
+        const name = r.name || '—'
+
+        return (
+          <div className='flex min-w-0 items-center gap-3'>
+            <span className={cn('flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white uppercase', avatarClass(name))}>
+              {name === '—' ? '??' : name.slice(0, 2)}
+            </span>
+            <div className='min-w-0'>
+              <Link href={`/users/${r.id}`} className='block truncate font-semibold hover:underline'>
+                {name}
+              </Link>
+              <p className='text-muted-foreground truncate text-xs'>
+                <span className='font-mono'>{r.id}</span>
+                {r.phone ? ` · ${r.phone}` : ''}
+                {r.email ? ` · ${r.email}` : ''}
+                {r.country ? ` · ${r.country}` : ''}
+              </p>
+            </div>
+          </div>
+        )
+      }
     },
-    { key: 'phone', header: 'Phone', cell: r => <span className='text-muted-foreground text-sm whitespace-nowrap'>{r.phone || '—'}</span> },
-    { key: 'bal', header: 'INR balance', align: 'right', cell: r => <span className='font-semibold tabular-nums'>{inr(r.inrBalance)}</span> },
-    { key: 'dep', header: 'Deposited', align: 'right', cell: r => <span className='text-success tabular-nums'>{inr(r.deposited)}</span> },
+    { key: 'bal', header: 'Balance', align: 'right', cell: r => <span className='font-semibold tabular-nums'>{inr(r.inrBalance)}</span> },
+    {
+      key: 'dep',
+      header: 'Deposited',
+      align: 'right',
+      className: 'hidden md:table-cell',
+      headerClassName: 'hidden md:table-cell',
+      cell: r => <span className='text-success tabular-nums'>{inr(r.deposited)}</span>
+    },
     {
       key: 'wager',
       header: 'Wagered',
       align: 'right',
+      className: 'hidden lg:table-cell',
+      headerClassName: 'hidden lg:table-cell',
       cell: r => (
         <span className='tabular-nums'>
           {inr(r.wagered)}
@@ -297,33 +316,49 @@ const LockTable = () => {
       key: 'wd',
       header: 'Withdrawn / max',
       align: 'right',
-      cell: r => (
-        <span className='tabular-nums whitespace-nowrap'>
-          <span className='text-danger'>{inr(r.withdrawn)}</span>
-          <span className='text-muted-foreground'> / {r.maxWithdrawable === null ? 'no limit' : inr(r.maxWithdrawable)}</span>
-        </span>
-      )
+      className: 'hidden md:table-cell',
+      headerClassName: 'hidden md:table-cell',
+      cell: r => <WithdrawnBar withdrawn={r.withdrawn} max={r.maxWithdrawable} />
     },
-    { key: 'joined', header: 'Joined', cell: r => <span className='text-muted-foreground text-xs whitespace-nowrap'>{fmtDate(r.created)}</span> },
-    { key: 'wds', header: 'Withdrawals', cell: r => (r.withdrawLocked || r.systemLocked ? <Chip tone='danger'>Locked</Chip> : <Chip tone='success'>Allowed</Chip>) },
+    {
+      key: 'joined',
+      header: 'Joined',
+      className: 'hidden xl:table-cell',
+      headerClassName: 'hidden xl:table-cell',
+      cell: r => <span className='text-muted-foreground text-xs whitespace-nowrap'>{fmtDate(r.created)}</span>
+    },
     {
       key: 'lock',
-      header: 'Lock',
-      align: 'center',
+      header: 'Withdrawals',
+      align: 'right',
       cell: r => (
-        <Switch
-          checked={r.withdrawLocked}
-          disabled={!can('users:write') || toggle.isPending}
-          onCheckedChange={locked => toggle.mutate({ id: r.id, locked })}
-          aria-label={`Withdrawal lock for ${r.name ?? r.id}`}
-        />
+        <div className='flex items-center justify-end gap-2.5'>
+          {r.systemLocked ? (
+            <Chip tone='danger'>Account locked</Chip>
+          ) : r.withdrawLocked ? (
+            <Chip tone='danger'>Locked</Chip>
+          ) : (
+            <Chip tone='success' className='hidden sm:inline-block'>
+              Allowed
+            </Chip>
+          )}
+          <Switch
+            checked={r.withdrawLocked}
+            disabled={!can('users:write') || toggle.isPending}
+            onCheckedChange={locked => toggle.mutate({ id: r.id, locked })}
+            aria-label={`Withdrawal lock for ${r.name ?? r.id}`}
+          />
+        </div>
       )
     }
   ]
 
   return (
-    <Card className='gap-0 p-4'>
-      <h2 className='mb-2 font-bold'>Per-user withdrawal lock</h2>
+    <div>
+      <div className='mb-2 flex items-baseline justify-between gap-2'>
+        <h2 className='font-bold'>Per-user withdrawal lock</h2>
+        <p className='text-muted-foreground hidden text-xs sm:block'>Switch on to stop one player withdrawing.</p>
+      </div>
       <DataTable
         columns={columns}
         rows={list.data?.rows}
@@ -337,6 +372,7 @@ const LockTable = () => {
         search={String(state.search ?? '')}
         onSearchChange={search => set({ search })}
         searchPlaceholder='Search name, email, phone or ID'
+        emptyMessage={status === 'locked' ? 'No player has withdrawals locked.' : undefined}
         toolbar={
           <div className='flex rounded-md border p-0.5'>
             {(['all', 'locked'] as const).map(v => (
@@ -344,15 +380,19 @@ const LockTable = () => {
                 key={v}
                 type='button'
                 onClick={() => set({ status: v === 'all' ? '' : v, page: 1 })}
-                className={cn('rounded px-3 py-1 text-sm font-semibold capitalize', status === v ? 'bg-accent text-foreground shadow-sm ring-1 ring-border' : 'text-muted-foreground hover:text-foreground')}
+                className={cn(
+                  'flex items-center gap-1.5 rounded px-3 py-1 text-sm font-semibold capitalize',
+                  status === v ? 'bg-accent text-foreground ring-border shadow-sm ring-1' : 'text-muted-foreground hover:text-foreground'
+                )}
               >
                 {v}
+                {v === 'locked' && locked !== undefined && <span className='bg-muted rounded px-1.5 text-xs tabular-nums'>{locked}</span>}
               </button>
             ))}
           </div>
         }
       />
-    </Card>
+    </div>
   )
 }
 
