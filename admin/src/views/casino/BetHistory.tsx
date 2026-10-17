@@ -27,7 +27,7 @@ import { usePageList } from './usePageList'
 const ALL = '__all__'
 
 const SOURCES = [
-  { value: 'inhouse', label: 'In-house' },
+  { value: 'inhouse', label: 'Originals' },
   { value: 'gis', label: 'Slotegrator' },
   { value: 'jsgames', label: 'JS games' }
 ]
@@ -327,7 +327,7 @@ const BetHistory = () => {
 
   return (
     <div>
-      <PageHeader title='Casino bet history' description={`Every casino movement across in-house games, the aggregator and JS games, ${scope}.`} />
+      <PageHeader title='Casino bet history' description={`Every casino movement across Originals, the aggregator and JS games, ${scope}.`} />
       {/* Direct Users / Agent Users: har tab ki listing aur numbers us taraf ke players ke. */}
       <ChannelTabs>
         {channel => (
