@@ -53,7 +53,11 @@ const {
   statExpressions,
   finishedOf,
   MAX_ROWS_PER_SOURCE,
+  KIND,
 } = require('./betHistory.constants');
+
+/** How long a provider round with only its stake is treated as still in flight. */
+const OPEN_ROUND_GRACE_MS = 60_000;
 
 /**
  * Casino transaction history — across all four places a bet can live.
@@ -821,7 +825,7 @@ class BetHistoryService {
       raw: true,
     });
 
-    return rows.map((row) => ({
+    const inHouse = rows.map((row) => ({
       reference: String(row.gid),
       game: row.game ?? null,
       amount: String(row.amount ?? '0'),
@@ -830,6 +834,107 @@ class BetHistoryService {
       currency: row.coin ?? null,
       at: row.created,
     }));
+
+    // Third-party rounds too: the ticker showed only in-house games (on live, only Limbo).
+    const provider = (await this.#providerRounds()).map(({ win, ...round }) => round);
+    return [...inHouse, ...provider]
+      .sort((a, b) => new Date(b.at) - new Date(a.at))
+      .slice(0, limit);
+  }
+
+  /**
+   * Third-party rounds for the public ticker and top wins — one row per finished round, no
+   * player. A provider writes a round as legs (bet, win, …); they are folded here by round:
+   *
+   *   jsgamesv2  every leg carries the round's own `bet_amount` / `win_amount` in
+   *              `additional_data`, keyed by `game_round`, so those are read as-is;
+   *   gis/js v1  legs summed: BET → stake, WIN → payout, NET (v1 settle) → signed profit;
+   *              a REFUND or ROLLBACK voids the round.
+   *
+   * A round with only its stake so far is still open (a crash round in flight) unless it is
+   * older than OPEN_ROUND_GRACE_MS — a losing v2 spin never gets a second leg.
+   *
+   * shortcut: reads each table's newest MAX_ROWS_PER_SOURCE legs, so top wins ranks RECENT
+   * provider rounds; an indexed rounds table is the upgrade if all-time tops are wanted.
+   */
+  async #providerRounds() {
+    const rounds = new Map();
+    const settledBefore = Date.now() - OPEN_ROUND_GRACE_MS;
+
+    for (const key of SOURCE_KEYS) {
+      if (key === 'inhouse') continue;
+      const source = SOURCES[key];
+      const model = this.models[source.model];
+      if (!model) continue;
+
+      const legs = await model.findAll({
+        order: [[source.timeColumn, 'DESC']],
+        limit: MAX_ROWS_PER_SOURCE,
+        raw: true,
+      });
+
+      for (const leg of legs) {
+        const extra = leg.additional_data && typeof leg.additional_data === 'object' ? leg.additional_data : null;
+        const v2 = key === 'jsgamesv2' && extra && extra.bet_amount != null;
+        const roundId = v2 ? extra.game_round : source.roundColumn ? leg[source.roundColumn] : null;
+        const id = `${key}:${roundId ?? leg[source.idColumn]}`;
+        const at = leg[source.timeColumn];
+        const round = rounds.get(id) ?? {
+          reference: String(roundId ?? leg[source.idColumn] ?? ''),
+          gameCatalog: source.catalog,
+          gameId: leg[source.gameColumn] ?? null,
+          gameName: source.gameNameColumn ? (leg[source.gameNameColumn] ?? null) : null,
+          currency: leg[source.currencyColumn] ? String(leg[source.currencyColumn]).toUpperCase() : null,
+          at,
+          stake: 0,
+          win: 0,
+          net: 0,
+          settled: false,
+          void: false,
+        };
+        if (new Date(at) > new Date(round.at)) round.at = at;
+
+        const kind = kindOf(source, leg);
+        const amount = Math.abs(Number(leg[source.amountColumn] ?? 0)) || 0;
+        if (v2) {
+          round.stake = Math.max(round.stake, Number(extra.bet_amount) || 0);
+          round.win = Math.max(round.win, Number(extra.win_amount) || 0);
+          if (kind !== KIND.BET) round.settled = true;
+        } else if (kind === KIND.BET) {
+          round.stake += amount;
+        } else if (kind === KIND.WIN) {
+          round.win += amount;
+          round.settled = true;
+        } else if (kind === KIND.NET) {
+          round.net += Number(leg[source.amountColumn] ?? 0) || 0;
+          round.settled = true;
+        } else if (kind === KIND.REFUND || kind === KIND.ROLLBACK) {
+          round.void = true;
+        }
+        if (finishedOf(source, leg) === true) round.settled = true;
+        rounds.set(id, round);
+      }
+    }
+
+    const finished = [...rounds.values()].filter(
+      (r) => !r.void && r.stake > 0 && (r.settled || new Date(r.at).getTime() < settledBefore),
+    );
+    const names = await this.#gameLabels(finished);
+
+    return finished.map((r) => {
+      const profit = r.win - r.stake + r.net;
+      return {
+        reference: r.reference,
+        game: r.gameId,
+        title: names.get(`${r.gameCatalog}:${r.gameId}`)?.name ?? r.gameName ?? null,
+        amount: this.#decimal(r.stake),
+        profit: this.#decimal(profit),
+        outcome: classify(profit),
+        currency: r.currency,
+        at: r.at,
+        win: profit,
+      };
+    });
   }
 
   /**
@@ -993,7 +1098,7 @@ class BetHistoryService {
       raw: true,
     });
 
-    return rows.map((row) => ({
+    const inHouse = rows.map((row) => ({
       reference: row.gid == null ? null : String(row.gid),
       game: row.game ?? null,
       amount: money.toDecimalString(money.toMinor(row.amount ?? '0')),
@@ -1001,6 +1106,13 @@ class BetHistoryService {
       currency: row.coin ?? null,
       at: row.created,
     }));
+
+    const provider = (await this.#providerRounds())
+      .filter((r) => r.win > 0 && (!game || r.game === game))
+      .map(({ win, outcome, ...round }) => round);
+    return [...inHouse, ...provider]
+      .sort((a, b) => Number(b.profit) - Number(a.profit))
+      .slice(0, limit);
   }
 
   /**

@@ -33,7 +33,6 @@ import {
 } from '../../../services/exchange';
 import { BET_TOAST, ODDS_FIELD, ADDAPLAY_MIN_BET } from '../../../utils/exchange';
 import MarketBlocks from './MarketBlocks';
-import { ExchangeCurrencyNote } from '../ExchangeFrame';
 import { useMatchSlip, placementOdds, slipFigures, projectedBook, slipStakeInr } from './useMatchSlip';
 import { TAB_LABELS, marketTab, marketKind, ladder, rowStatus } from './shape';
 import { sportIconOf } from '../model';
@@ -365,7 +364,7 @@ export default function ExchangeMatchPage() {
                 <iframe
                   title="Live score"
                   src={scoreUrl}
-                  className="block h-48 w-full border-0 bg-layer2 sm:h-56"
+                  className="block h-[19rem] w-full border-0 bg-layer2 sm:h-[23rem]"
                   loading="lazy"
                 />
               )
@@ -471,7 +470,6 @@ export default function ExchangeMatchPage() {
       <div className="mx-auto flex w-full max-w-[75rem] flex-col gap-3 py-4 lg:flex-row lg:items-start">
         <div className="flex min-w-0 flex-1 flex-col gap-3">
           {header}
-          <ExchangeCurrencyNote className="" />
 
           <MarketFilterTabs
             className="lg:hidden"
