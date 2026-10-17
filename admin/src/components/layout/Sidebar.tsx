@@ -59,6 +59,7 @@ import {
 // Config Imports
 import themeConfig from '@/configs/themeConfig'
 import { siteConfig } from '@/configs/site'
+import { useSession } from '@/contexts/SessionContext'
 import { useNavVisible } from '@/hooks/use-nav-visible'
 
 // Util Imports
@@ -532,6 +533,9 @@ const SidebarLayout = () => {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const { state, isMobile, setOpenMobile } = useSidebar()
+  // Agent-tree logins (no promotions) see every section open by default (user, 2026-10-17).
+  const { actor } = useSession()
+  const allOpen = actor?.promotions === false
 
   const visible = useNavVisible()
   const homeHref = firstNavHref(visible)
@@ -585,10 +589,10 @@ const SidebarLayout = () => {
     [navGroups, pathname, searchParams]
   )
 
-  // A user toggle wins; otherwise the branch mirrors whether it holds the active route.
+  // A user toggle wins; otherwise the branch mirrors whether it holds the active route (agents: open).
   const isBranchOpen = useCallback(
-    (key: string) => openItems[key] ?? activeBranchKeys.has(key),
-    [openItems, activeBranchKeys]
+    (key: string) => openItems[key] ?? (allOpen || activeBranchKeys.has(key)),
+    [openItems, activeBranchKeys, allOpen]
   )
 
   const setOpenItem = useCallback((key: string, open: boolean) => {
