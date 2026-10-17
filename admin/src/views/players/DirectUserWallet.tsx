@@ -29,9 +29,10 @@ import { api } from '@/lib/api/client'
 import { cn } from '@/lib/utils'
 import { useCurrencyCodes } from '@/views/finance/useCurrencyCodes'
 import type { OwnerWallet } from '@/views/exchange/types'
+import { PlayerAvatar } from '@/views/players/users/shared'
 
 /** `GET admin/direct-wallet/users` ki ek row. */
-type DirectUserRow = { id: string; name: string; status: string | null; balances: Record<string, string> }
+type DirectUserRow = { id: string; name: string; avatar: string | null; status: string | null; balances: Record<string, string> }
 
 /** `GET admin/direct-wallet/currencies` — 1 unit = kitne INR. */
 type CurrencyRate = { code: string; inrRate: string }
@@ -58,17 +59,6 @@ const inrOf = (amount: string, rate?: string) => (amount && rate ? Number(amount
 
 /** Zip jaisa 4 decimal. */
 const fmt4 = (v?: string | number) => Number(v ?? 0).toFixed(4)
-
-// Zip ke avatar rang — naam se ek fixed rang.
-const AVATAR_COLORS = ['#2B6EF5', '#7B5EF5', '#0ECC68', '#FFC23F', '#E01B4F', '#5581F7']
-
-const avatarColor = (name: string) => {
-  let h = 0
-
-  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h)
-
-  return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length]
-}
 
 /** Zip ke icon buttons: halka rangeen square, hover pe gehra. */
 const ICON_BTN = 'size-8 rounded-md'
@@ -301,9 +291,7 @@ const DirectUserWallet = () => {
       header: 'User',
       cell: r => (
         <Link href={`/users/${r.id}`} className='flex items-center gap-3 hover:underline'>
-          <span className='flex size-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white' style={{ background: avatarColor(r.name) }}>
-            {r.name.slice(0, 2).toUpperCase()}
-          </span>
+          <PlayerAvatar name={r.name} avatar={r.avatar} className='size-8 text-[11px]' />
           <span className='text-sm font-semibold'>{r.name}</span>
         </Link>
       )

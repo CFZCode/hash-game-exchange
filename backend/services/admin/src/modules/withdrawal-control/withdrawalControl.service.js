@@ -120,7 +120,7 @@ class WithdrawalControlService {
     const [{ rows, count }, cap] = await Promise.all([
       this.models.Users.findAndCountAll({
         where,
-        attributes: ['id', 'name', 'email', 'phone', 'country', 'created', 'withdraw_locked', 'system_locked'],
+        attributes: ['id', 'name', 'avatar', 'email', 'phone', 'country', 'created', 'withdraw_locked', 'system_locked'],
         order: [['id', 'DESC']],
         limit,
         offset,
@@ -140,6 +140,7 @@ class WithdrawalControlService {
         return {
           id: String(u.id),
           name: u.name ?? null,
+          avatar: u.avatar ?? null,
           email: u.email ?? null,
           phone: u.phone ?? null,
           country: u.country ?? null,

@@ -107,7 +107,7 @@ class DirectWalletService {
     const coins = COIN_COLUMNS.map((c) => `COALESCE(c.${c}, 0) AS ${c}`).join(', ');
 
     const rows = await this.sequelize.query(
-      `SELECT u.id, u.name, u.status, ${coins}
+      `SELECT u.id, u.name, u.avatar, u.status, ${coins}
          FROM users u
          LEFT JOIN credits c ON c.uid = u.id
         WHERE ${filter}
@@ -125,6 +125,7 @@ class DirectWalletService {
       rows: rows.map((r) => ({
         id: String(r.id),
         name: r.name,
+        avatar: r.avatar ?? null,
         status: r.status ?? null,
         balances: Object.fromEntries(COIN_COLUMNS.map((c) => [c.toUpperCase(), money.fromStored(r[c] ?? '0')])),
       })),

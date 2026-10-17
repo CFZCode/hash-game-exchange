@@ -1,6 +1,6 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 
 import Link from 'next/link'
 
@@ -77,15 +77,44 @@ export const avatarClass = (name: string) => {
   return AVATAR[Math.abs(hash) % AVATAR.length]
 }
 
-/** Avatar (2 akshar) + naam (+ country). Naam pe click = user page. */
+/**
+ * The player's chosen avatar as an <img> src: a platform path (`/api/v1/admin/avatars/3/image?v=…`,
+ * absolute or not) goes through the admin's `/api/gw` proxy, an outside https URL is used as is,
+ * and a player who never chose one gets the player site's default avatar (the same picture they see).
+ */
+export const playerAvatarSrc = (avatar: string | null | undefined) => {
+  const value = String(avatar ?? '').trim()
+  const m = /\/api\/v1\/(.+)$/.exec(value)
+
+  if (m) return `/api/gw/api/v1/${m[1]}`
+
+  return /^https:\/\//.test(value) ? value : DEFAULT_AVATAR
+}
+
+const DEFAULT_AVATAR = '/avatar-default.png'
+
+/** The player's picture (their chosen avatar, else the site default); 2 akshar if it will not load. */
+export const PlayerAvatar = ({ name, avatar, className }: { name: string | null | undefined; avatar?: string | null; className?: string }) => {
+  const label = name || '—'
+  const src = playerAvatarSrc(avatar)
+  const [broken, setBroken] = useState(false)
+
+  return src && !broken ? (
+    <img src={src} alt='' onError={() => setBroken(true)} className={cn('bg-muted size-9 shrink-0 rounded-full object-cover', className)} />
+  ) : (
+    <span className={cn('flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white uppercase', avatarClass(label), className)}>
+      {label === '—' ? '??' : label.slice(0, 2)}
+    </span>
+  )
+}
+
+/** Avatar + naam (+ country). Naam pe click = user page. */
 export const UserCell = ({ row }: { row: UserRow }) => {
   const name = row.name || '—'
 
   return (
     <div className='flex items-center gap-3'>
-      <span className={cn('flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white uppercase', avatarClass(name))}>
-        {name === '—' ? '??' : name.slice(0, 2)}
-      </span>
+      <PlayerAvatar name={row.name} avatar={row.avatar} />
       <div className='min-w-0'>
         <Link href={`/users/${row.id}`} className='block truncate font-semibold hover:underline'>
           {name}

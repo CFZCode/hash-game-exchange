@@ -1,6 +1,6 @@
 import { API_BASE, request } from './client';
 import { PLATFORM } from './endpoints';
-import defaultAvatar from '../assets/avatars/105522617.png';
+import defaultAvatar from '../assets/avatars/default.png';
 
 /* ── Avatars: the site admin's catalogue, unlocked by VIP level ──────────────────────────────
  *
@@ -12,7 +12,7 @@ import defaultAvatar from '../assets/avatars/105522617.png';
  *
  * `url` and the profile's `avatar` are PATHS on this API, so both go through `avatarSrc`. With
  * fixtures on there is no catalogue at all (`[]`): the picker then draws its empty state rather
- * than invented avatars, and every own-avatar slot keeps the shipped `105522617.png`.
+ * than invented avatars, and every own-avatar slot falls back to `default.png` (the default avatar the site owner picked).
  */
 
 /** The image to draw for an avatar value: an API path, an absolute URL, or the shipped default. */

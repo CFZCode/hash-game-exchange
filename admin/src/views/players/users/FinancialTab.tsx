@@ -17,7 +17,7 @@ import { useApi, useApiMutation, useListState, usePagedApi } from '@/hooks/use-a
 import { api } from '@/lib/api/client'
 import { cn } from '@/lib/utils'
 import { TxnPasswordLabel } from '@/views/finance/StaffFloat'
-import { Chip, StatCard, TONES, avatarClass, inr, type Tone } from './shared'
+import { Chip, PlayerAvatar, StatCard, TONES, inr, type Tone } from './shared'
 
 /**
  * Users → Financial → Withdrawal — reference admin (admin-structure.zip →
@@ -45,6 +45,7 @@ type Summary = {
 type LockUser = {
   id: string
   name: string | null
+  avatar: string | null
   email: string | null
   phone: string | null
   country: string | null
@@ -272,9 +273,7 @@ const LockTable = ({ locked }: { locked?: number }) => {
 
         return (
           <div className='flex min-w-0 items-center gap-3'>
-            <span className={cn('flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white uppercase', avatarClass(name))}>
-              {name === '—' ? '??' : name.slice(0, 2)}
-            </span>
+            <PlayerAvatar name={r.name} avatar={r.avatar} />
             <div className='min-w-0'>
               <Link href={`/users/${r.id}`} className='block truncate font-semibold hover:underline'>
                 {name}
