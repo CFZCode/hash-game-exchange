@@ -61,18 +61,25 @@ const Approve = ({ row }: { row: FiatDepositRow }) => {
       title={`Approve deposit #${row.depositId}`}
       description={
         <>
-          Credits user #{row.userId} with <Money value={row.amount} currency={row.currency} /> unless you enter a different amount below (when the bank statement disagrees).
+          Credits user #{row.userId} with <Money value={row.amount} currency={row.currency} />. Enter a smaller amount only when the bank statement shows less, with
+          the reason the user will see. More than the requested amount cannot be credited.
         </>
       }
       submitLabel='Approve & credit'
       validate={() => ({
         // fiatDeposit.validators.js approve: creditAmount optional money (> 0, ≤ 8 dp); comment ≤ 500.
-        creditAmount: form.creditAmount.trim() ? check.amount(form.creditAmount, 'Credit amount', { decimals: 8 }) : undefined,
-        comment: check.length(form.comment, 'Comment', { max: 500 })
+        creditAmount: form.creditAmount.trim()
+          ? (check.amount(form.creditAmount, 'Credit amount', { decimals: 8 }) ??
+            (Number(form.creditAmount) > Number(row.amount) ? `Cannot be more than the requested ${Number(row.amount).toLocaleString('en-IN')} ${row.currency}` : undefined))
+          : undefined,
+        comment:
+          form.creditAmount.trim() && Number(form.creditAmount) < Number(row.amount) && !form.comment.trim()
+            ? 'Say why you credit less than requested (the user sees it)'
+            : check.length(form.comment, 'Comment', { max: 500 })
       })}
       onSubmit={() => approve.mutateAsync()}
     >
-      <TextField id={`ap-amt-${row.depositId}`} name='creditAmount' inputMode='decimal' label='Credit amount' placeholder={row.amount} hint='Leave blank to credit the claimed amount' value={form.creditAmount} onChange={e => setForm({ ...form, creditAmount: e.target.value })} />
+      <TextField id={`ap-amt-${row.depositId}`} name='creditAmount' inputMode='decimal' label='Credit amount' placeholder={row.amount} hint={`Leave blank to credit the requested ${Number(row.amount).toLocaleString('en-IN')} ${row.currency}; at most that`} value={form.creditAmount} onChange={e => setForm({ ...form, creditAmount: e.target.value })} />
       <TextAreaField id={`ap-c-${row.depositId}`} name='comment' label='Comment' value={form.comment} onChange={e => setForm({ ...form, comment: e.target.value })} />
     </FormDialog>
   )
@@ -191,7 +198,7 @@ const FiatDeposits = () => {
 
   // Period, bucket size and currency for the charts. The currency (the site's default coin until
   // somebody picks another) also filters the table; the review queue has no date filter.
-  const filters = useFinanceFilters()
+  const filters = useFinanceFilters({ fiat: true })
   const ownerCoins = useOwnerCoinFilter()
 
   const list = usePagedApi<FiatDepositRow>(LIST, {

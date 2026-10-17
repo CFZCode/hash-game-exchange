@@ -41,10 +41,16 @@ export function useCurrencyParam({ allowAll = false, defaultCode }: { allowAll?:
  * `useStatsFilters` for a Finance screen: the period and bucket as before, and the currency
  * defaulting to the site's default coin (`?currency=ALL` is the explicit "every currency").
  */
-export function useFinanceFilters(options: Omit<Parameters<typeof useStatsFilters>[0] & object, 'defaultCurrency'> = {}) {
+export function useFinanceFilters(options: Omit<Parameters<typeof useStatsFilters>[0] & object, 'defaultCurrency'> & { fiat?: boolean } = {}) {
+  const { fiat, ...rest } = options
   const def = useDefaultCurrency()
+  const choices = useCurrencyChoices()
 
-  return useStatsFilters({ ...options, defaultCurrency: def.code })
+  // A fiat rail (manual bank deposits / withdrawals) opens on a fiat coin: when the site's default
+  // coin is crypto (USDT), its first fiat coin (INR) — else an INR request is filtered out of view.
+  const code = fiat && def.code && !FIAT.has(def.code) ? (choices.fiat[0] ?? def.code) : def.code
+
+  return useStatsFilters({ ...rest, defaultCurrency: code })
 }
 
 /** "All currencies (in USDT)": the label of the converted-totals option, in the default coin. */

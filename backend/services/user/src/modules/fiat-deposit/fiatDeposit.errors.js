@@ -37,4 +37,14 @@ module.exports = defineErrors('FIAT_DEPOSIT', {
     status: 422,
     message: 'A reason is required when rejecting a deposit',
   },
+  /** Approving for more than the player asked to deposit — details `{ claimed, credit }`. */
+  CREDIT_ABOVE_CLAIMED: {
+    status: 422,
+    message: 'The credited amount cannot be more than the amount the player deposited',
+  },
+  /** Approving for less than claimed needs the reason the player will see — details `{ claimed, credit }`. */
+  CREDIT_REASON_REQUIRED: {
+    status: 422,
+    message: 'A reason is required when crediting less than the amount the player deposited',
+  },
 });

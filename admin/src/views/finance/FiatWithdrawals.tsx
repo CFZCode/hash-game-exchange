@@ -134,7 +134,7 @@ const FiatWithdrawals = () => {
 
   // Period for the charts; the currency (the site's default coin until somebody picks another)
   // filters the charts AND the payout queue. The queue has no date filter, so it stays whole.
-  const filters = useFinanceFilters()
+  const filters = useFinanceFilters({ fiat: true })
   const ownerCoins = useOwnerCoinFilter()
   const list = usePagedApi<FiatWithdrawalRow>(LIST, { channel: 'direct', limit: query.limit, page: query.page, status: query.status, userId: query.userId, currency: filters.currency || undefined })
 

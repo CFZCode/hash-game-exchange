@@ -239,6 +239,11 @@ class FiatDepositService {
       // Normalised either way, so the response and the ledger always carry a
       // canonical 8-dp string rather than whatever the operator typed.
       const amount = money.toDecimalString(money.toMinor(creditAmount ?? deposit.amount));
+      const claimed = money.toDecimalString(money.toMinor(deposit.amount));
+      // Never more than the player deposited; less (the bank statement shows less) only with the
+      // reason the player sees.
+      if (money.gt(amount, claimed)) throw errors.CREDIT_ABOVE_CLAIMED({ claimed, credit: amount });
+      if (money.lt(amount, claimed) && !String(comment ?? '').trim()) throw errors.CREDIT_REASON_REQUIRED({ claimed, credit: amount });
 
       await deposit.update(
         {

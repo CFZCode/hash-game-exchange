@@ -46,8 +46,8 @@ const approve = {
   params: z.object({ depositId: z.coerce.number().int().positive() }),
   body: z
     .object({
-      // Lets an operator credit a different figure from the one claimed, when
-      // the bank statement disagrees with what the player entered.
+      // Lets an operator credit less than claimed, when the bank statement shows less than the
+      // player entered (with a comment). Never more — the service refuses that.
       creditAmount: moneyAmount.optional(),
       comment: z.string().trim().max(500).optional(),
     })
