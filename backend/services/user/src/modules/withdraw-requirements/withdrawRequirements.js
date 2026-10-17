@@ -1,6 +1,6 @@
 'use strict';
 
-const { money, sitePolicy, defineErrors, entitlements, withdrawalCap } = require('@ibitplay/common');
+const { money, sitePolicy, defineErrors, entitlements, withdrawalCap, withdrawalDailyLimit } = require('@ibitplay/common');
 
 const { WagerService } = require('../wager/wager.service');
 const { PlayerBonusService } = require('../player-bonuses/playerBonus.service');
@@ -50,7 +50,16 @@ const { createCapFigures } = require('./withdrawCap');
  * FAILS CLOSED: a figure that cannot be read, or a rail that does not name amount and
  * currency, refuses with 503 WITHDRAW_CAP_CHECK_FAILED.
  *
- * Any combination of the three switches; each refusal is its own code.
+ * ── THE DAILY LIMIT (the fourth switch, `withdrawalDailyLimit`) ──────────────────────────
+ *
+ * Per currency, in that currency (packages/common/src/withdrawalDailyLimit.js): at most
+ * `limits[currency]` out in any rolling 24 hours, pending and paid counted on every rail (P2P
+ * sells included). Over it → 403 WITHDRAW_DAILY_LIMIT `{ currency, limit, usedToday, remaining,
+ * attempted }`. Checked with the cap (before any bonus forfeit) and again under the same
+ * per-player lock inside the rail's transaction. Fails closed like the cap (503
+ * WITHDRAW_CAP_CHECK_FAILED when the usage cannot be read). A currency with no entry has no limit.
+ *
+ * Any combination of the four switches; each refusal is its own code.
  *
  * Agent-tree players never reach here: every rail refuses them first (WITHDRAW_NOT_FOR_AGENT_USERS).
  * ═════════════════════════════════════════════════════════════════════════
@@ -73,6 +82,14 @@ const errors = defineErrors('WITHDRAW', {
   CAP_EXCEEDED: {
     status: 403,
     message: 'This withdrawal is over your withdrawal limit',
+  },
+  /**
+   * Over the owner's daily limit for the currency. Details `{ currency, limit, usedToday,
+   * remaining, attempted }` (decimal strings); the message names the limit and what is left.
+   */
+  DAILY_LIMIT: {
+    status: 403,
+    message: 'This withdrawal is over your daily withdrawal limit',
   },
   /** The cap could not be checked (a figure unreadable, or no amount / currency): refused. */
   CAP_CHECK_FAILED: {
@@ -114,6 +131,13 @@ const capDetails = (c) => ({
   currency: c.currency,
 });
 
+/** "Daily withdrawal limit is 50,000 INR; 12,000 INR left today." */
+function dailyMessage(d) {
+  return money.gt(d.remaining, '0')
+    ? `Daily withdrawal limit is ${fmt(d.limit)} ${d.currency}; ${fmt(d.remaining)} ${d.currency} left today.`
+    : `Daily withdrawal limit of ${fmt(d.limit)} ${d.currency} reached. Try again in 24 hours.`;
+}
+
 const dec = (minor) => money.toDecimalString(minor);
 const sum = (values) => dec(values.reduce((acc, v) => acc + money.toMinor(v), 0n));
 
@@ -124,24 +148,89 @@ function createWithdrawRequirements(deps) {
   const rewardMoney = deps.rewardMoney ?? createRewardMoney(deps);
   const kycSwitch = config?.WITHDRAW_REQUIRE_KYC !== false;
   const capFigures = deps.capFigures ?? createCapFigures(deps);
+  const dailyFigures = deps.dailyFigures ?? withdrawalDailyLimit.createDailyFigures(deps);
 
   /**
    * The deposit-cap settings in force: the owner's only (the signed document's `withdrawalCap`,
    * defaults filled). The site admin shows them read-only; whatever an older admin saved in
    * `withdrawal_control` is no longer read.
    */
-  async function capSettings() {
-    return withdrawalCap.cleanWithdrawalCap((await entitlements.getEntitlements()).withdrawalCap);
+  async function ownerSettings() {
+    const plan = await entitlements.getEntitlements();
+    return {
+      cap: withdrawalCap.cleanWithdrawalCap(plan.withdrawalCap),
+      daily: withdrawalDailyLimit.cleanWithdrawalDailyLimit(plan.withdrawalDailyLimit),
+    };
   }
 
   /**
-   * `{ policy, kyc, wager, cap }` — which checks are in force now. Read on every call, no cache.
-   * `cap` is the deposit cap's settings (`cap.enabled` = the switch).
+   * `{ policy, kyc, wager, cap, daily }` — which checks are in force now. Read on every call, no
+   * cache. `cap` is the deposit cap's settings (`cap.enabled` = the switch), `daily` the daily
+   * limit's (`daily.enabled`, `daily.limits`).
    */
   async function rules() {
-    const [policy, cap] = await Promise.all([sitePolicy.readPolicy(models, POLICY), capSettings()]);
+    const [policy, owner] = await Promise.all([sitePolicy.readPolicy(models, POLICY), ownerSettings()]);
     const requires = (what) => (sitePolicy.ALLOWS[POLICY][what] ?? []).includes(policy);
-    return { policy, kyc: requires('kyc') && kycSwitch, wager: requires('wager'), cap };
+    return { policy, kyc: requires('kyc') && kycSwitch, wager: requires('wager'), cap: owner.cap, daily: owner.daily };
+  }
+
+  /**
+   * `{ enabled, currency, limit, used, remaining }` for one currency — `enabled` false (figures
+   * null) when the switch is off or the currency has no limit. Throws on a DB error.
+   */
+  async function dailyFor(userId, currency, daily, { transaction } = {}) {
+    const cur = String(currency).toUpperCase();
+    const limit = withdrawalDailyLimit.limitFor(daily, cur);
+    if (!limit) return { enabled: false, currency: cur, limit: null, used: null, remaining: null };
+    const used = await dailyFigures.used(userId, cur, { transaction });
+    return { enabled: true, currency: cur, ...withdrawalDailyLimit.computeDaily({ limit, used }) };
+  }
+
+  /** Refuse `amount` `currency` over the daily limit. Fails closed like the cap. */
+  async function checkDaily(userId, { amount, currency, daily, transaction }) {
+    if (!withdrawalDailyLimit.limitFor(daily, currency)) return null;
+    let requested;
+    try {
+      requested = money.toMinor(String(amount));
+    } catch {
+      requested = null;
+    }
+    if (requested == null || requested <= 0n) {
+      logger?.error({ userId: String(userId), currency }, 'Daily withdrawal limit: the rail named no amount — refused');
+      throw errors.CAP_CHECK_FAILED();
+    }
+    let d;
+    try {
+      d = await dailyFor(userId, currency, daily, { transaction });
+    } catch (error) {
+      logger?.error({ err: error, userId: String(userId), currency }, 'Daily withdrawal limit could not be checked — refused');
+      throw errors.CAP_CHECK_FAILED();
+    }
+    if (requested > money.toMinor(d.remaining)) {
+      const details = { currency: d.currency, limit: d.limit, usedToday: d.used, remaining: d.remaining, attempted: dec(requested) };
+      logger?.info({ userId: String(userId), ...details }, 'Withdrawal refused: over the daily limit');
+      throw errors.DAILY_LIMIT(details, { message: dailyMessage(d) });
+    }
+    return d;
+  }
+
+  /** The per-player lock both in-transaction checks share: a second request waits for the first. */
+  async function lockPlayer(userId, transaction) {
+    await deps.db.sequelize.query('SELECT pg_advisory_xact_lock(hashtext(:key))', {
+      replacements: { key: `withdraw-cap:${userId}` },
+      transaction,
+    });
+  }
+
+  /**
+   * The daily limit alone, inside a rail's transaction and under the player lock — for a rail
+   * that does not run `assertMet` (P2P sell). Reads the owner's settings itself.
+   */
+  async function assertDailyInTransaction(userId, { amount, currency, transaction }) {
+    const { daily } = await ownerSettings();
+    if (!withdrawalDailyLimit.limitFor(daily, currency)) return null;
+    await lockPlayer(userId, transaction);
+    return checkDaily(userId, { amount, currency, daily, transaction });
   }
 
   /** The cap block for one currency. Throws on a DB error (callers decide: refuse or answer). */
@@ -187,12 +276,12 @@ function createWithdrawRequirements(deps) {
    * cap was off).
    */
   async function assertCapInTransaction(userId, { amount, currency, transaction, applied }) {
-    if (!applied?.cap?.enabled) return;
-    await deps.db.sequelize.query('SELECT pg_advisory_xact_lock(hashtext(:key))', {
-      replacements: { key: `withdraw-cap:${userId}` },
-      transaction,
-    });
-    await checkCap(userId, { amount, currency, settings: applied.cap, transaction });
+    const capOn = Boolean(applied?.cap?.enabled);
+    const dailyOn = Boolean(applied?.daily && withdrawalDailyLimit.limitFor(applied.daily, currency));
+    if (!capOn && !dailyOn) return;
+    await lockPlayer(userId, transaction);
+    if (capOn) await checkCap(userId, { amount, currency, settings: applied.cap, transaction });
+    if (dailyOn) await checkDaily(userId, { amount, currency, daily: applied.daily, transaction });
   }
 
   /** The player's latest `user_kyc` row (user_id is VARCHAR in the legacy schema). */
@@ -263,12 +352,17 @@ function createWithdrawRequirements(deps) {
       return { ...capSettingsOut, currency: c.currency, deposited: c.deposited, withdrawn: c.withdrawn, wagered: c.wagered, cap: c.cap, remaining: c.remaining, wagerToRaise: c.wagerToRaise, unlockedByWager: c.unlockedByWager };
     };
     let cap;
+    let dailyLimit;
     if (currency) {
       cap = await capBlock(String(currency).toUpperCase());
       if (cap.enabled && money.lte(cap.remaining, '0')) missing.push('cap');
+      dailyLimit = await dailyFor(userId, currency, r.daily);
+      if (dailyLimit.enabled && money.lte(dailyLimit.remaining, '0')) missing.push('daily');
     } else {
       const used = r.cap.enabled ? await capFigures.currencies(userId) : [];
       cap = { ...capSettingsOut, currencies: await Promise.all(used.map(capBlock)) };
+      const limited = r.daily.enabled ? Object.keys(r.daily.limits) : [];
+      dailyLimit = { enabled: r.daily.enabled, currencies: await Promise.all(limited.map((cur) => dailyFor(userId, cur, r.daily))) };
     }
 
     return {
@@ -290,6 +384,8 @@ function createWithdrawRequirements(deps) {
       // `forfeitBonus: true`), whatever the policy: bonus money is never cash.
       bonusForfeitRequired: open.bonus.bonuses.length > 0,
       cap,
+      // The owner's daily limit (rolling 24 hours): one block for `?currency=`, else one per limited currency.
+      dailyLimit,
     };
   }
 
@@ -322,10 +418,12 @@ function createWithdrawRequirements(deps) {
     // The deposit cap, before the bonus forfeit (never forfeit for a refused withdrawal). The
     // rail checks it again under its lock (`assertCapInTransaction`).
     if (r.cap.enabled) await checkCap(userId, { amount, currency, settings: r.cap });
+    // The daily limit, likewise before any forfeit; again under the lock in the rail.
+    if (r.daily.enabled && currency) await checkDaily(userId, { amount, currency, daily: r.daily });
     return r;
   }
 
-  return { rules, evaluate, assertMet, assertCapInTransaction, kycStatus, capFor };
+  return { rules, evaluate, assertMet, assertCapInTransaction, assertDailyInTransaction, kycStatus, capFor, dailyFor };
 }
 
 module.exports = { createWithdrawRequirements, withdrawRequirementErrors: errors, POLICY };

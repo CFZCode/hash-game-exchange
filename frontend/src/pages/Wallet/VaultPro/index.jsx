@@ -7,7 +7,8 @@ import NumberInput from '../../../components/shared/NumberInput';
 import { Accordion, AccordionItem } from '../../../components/shared/Accordion';
 import { useSession } from '../../../context/session';
 import { getCurrency } from '../../../data/currencies';
-import { getAlias, printCurrency, convertCurrency, amount2usd } from '../../../utils/currency';
+import { getAlias, printCurrency, amount2usd } from '../../../utils/currency';
+import { useSelectedCurrency } from '../../../hooks/useSelectedCurrency';
 import { coinIcon } from '../../../utils/coinArt';
 /* `IconHistory-CjLCSLET.js` is filed under `IconBetHistory` in that module — it was extracted for
    the account dropdown's Bet History row and named after the row rather than after the file. Same
@@ -115,12 +116,18 @@ function PillTab({ tabs, value, onChange, className = '' }) {
  * Reproduced through `formatToParts` only — the fallback exists on the original to catch a locale
  * whose parts it cannot classify, and there is no such locale in this build's single `en-US`.
  */
-function splitCurrency(usdValue, settings) {
-  const target = settings.enableLocaleCurrency ? settings.localeCurrencyName : 'USDFIAT';
-  const value = target === 'USDFIAT' ? usdValue : convertCurrency(usdValue, 'USDFIAT', target);
-  const format = new Intl.NumberFormat(settings.lang || 'en-US', {
+function splitCurrency(usdValue, cur, lang = 'en-US') {
+  /* Printed in the player's SELECTED currency (`useSelectedCurrency`, the selected-currency
+     skill), not the original's dollars. A crypto selection has no ISO code for `style: currency`:
+     its number is a plain decimal and its alias takes the symbol's place. */
+  const value = cur.convert(usdValue, 'USDFIAT');
+  if (!cur.isFiat) {
+    const number = new Intl.NumberFormat(lang, { maximumFractionDigits: value !== 0 && Math.abs(value) < 1 ? 6 : 2, minimumFractionDigits: 2 }).format(value);
+    return { symbol: cur.alias, number };
+  }
+  const format = new Intl.NumberFormat(lang, {
     style: 'currency',
-    currency: target.replace(/FIAT$/, ''),
+    currency: cur.code.replace(/FIAT$/, ''),
   });
   const parts = format.formatToParts(Number(value) || 0);
   const symbol = parts
@@ -147,6 +154,7 @@ function splitCurrency(usdValue, settings) {
  */
 function SummaryCard({ rows, settings, onRules }) {
   const navigate = useNavigate();
+  const cur = useSelectedCurrency();
 
   /* `f()` in non-single mode: only funded rows count toward the totals. With this fixture that is
      none of them, so all three read zero — which is the capture. */
@@ -154,7 +162,7 @@ function SummaryCard({ rows, settings, onRules }) {
   const total = (field) =>
     funded.reduce((sum, row) => sum + amount2usd(row[field] ?? 0, row.currencyName), 0);
 
-  const figure = (field) => splitCurrency(total(field), settings);
+  const figure = (field) => splitCurrency(total(field), cur, settings.lang);
   const value = figure('amount');
   const yesterday = figure('yesterdayReturn');
   const accumulated = figure('accumulatedReturn');
@@ -683,7 +691,9 @@ function AssetTable({ rows }) {
 
 /* `I` in index-CrIWzX37.js — one figure in a row: the coin amount over its dollar value, with
    `"--"` rather than `"0"` when the amount is exactly the string "0". */
-const AmountCell = ({ amount = '0', currencyName }) => (
+const AmountCell = ({ amount = '0', currencyName }) => {
+  const cur = useSelectedCurrency();
+  return (
   <div className="flex-1 max-sm:mt-2 max-sm:flex max-sm:justify-between">
     <div className="text-right">
       <div className="text-sm font-extrabold text-primary">
@@ -691,11 +701,13 @@ const AmountCell = ({ amount = '0', currencyName }) => (
       </div>
       <div className="text-xs text-secondary">
         <span className="mr-1">≈</span>
-        {printCurrency(convertCurrency(amount, currencyName), 'USDFIAT')}
+        {/* The coin's value in the SELECTED currency (was dollars). */}
+        {cur.show(amount, currencyName)}
       </div>
     </div>
   </div>
-);
+  );
+};
 
 /* `me` — one funded coin. Unreachable with this fixture; see AssetTable. */
 const AssetRow = ({ item }) => (

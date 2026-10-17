@@ -1,5 +1,7 @@
 'use strict';
 
+const { LIVE_PROVIDERS, LIVE_TYPES } = require('../games/games.constants');
+
 /**
  * The four places a casino transaction can live, and how each spells itself.
  *
@@ -93,6 +95,8 @@ const SOURCES = Object.freeze({
     rowIdColumn: 'id',
     /** v2 reports movements, not rounds — each row stands alone. */
     roundColumn: null,
+    gameTypeColumn: 'game_type',
+    gameNameColumn: 'game_name',
     kindColumn: 'transaction_type',
     gameColumn: 'game_uid',
     catalog: 'jsgames',
@@ -111,11 +115,38 @@ const SOURCES = Object.freeze({
  * that owns it.
  */
 const CATALOGS = Object.freeze({
-  gis: { model: 'GisGames', keyColumn: 'uuid', nameColumn: 'name', vendorColumn: 'provider' },
-  jsgames: { model: 'JsGames', keyColumn: 'game_uid', nameColumn: 'game_name', vendorColumn: 'vendor' },
+  // Slotegrator: the lobby's own catalogue (`gisgamesnew`) first, the legacy `gis_games` after.
+  gis: { model: 'Gisgamesnew', fallbackModel: 'GisGames', keyColumn: 'uuid', nameColumn: 'name', vendorColumn: 'provider', typeColumn: 'type' },
+  jsgames: { model: 'JsGames', keyColumn: 'game_uid', nameColumn: 'game_name', vendorColumn: 'vendor', typeColumn: 'game_type' },
 });
 
+/**
+ * The player's Bet History "Type" filter: `original | live | slots`.
+ *
+ *   original  an in-house game — the `bets` table, or a jsGames row whose catalogue vendor is
+ *             `in-house`;
+ *   live      a live-casino game, by the lobby's own rule (games.constants.js): a live provider
+ *             (LIVE_PROVIDERS — Slotegrator types a live blackjack table `blackjack`, the same
+ *             word as an RNG one) or a live type (LIVE_TYPES), or any type naming "live";
+ *   slots     every other third-party casino game (slots, instant, crash, RNG tables…).
+ *
+ * `type` / `vendor` come from the game catalogue (or, for jsGames v2, the row's own
+ * `game_type`); a row the catalogue does not know is a third-party game of unknown kind, so
+ * `slots`.
+ */
+const BET_CATEGORIES = Object.freeze(['original', 'live', 'slots']);
+const IN_HOUSE_VENDOR = 'in-house';
+
+function categoryOf({ sourceKey, vendor, type }) {
+  const v = String(vendor ?? '').trim().toLowerCase();
+  const t = String(type ?? '').trim().toLowerCase();
+  if (sourceKey === 'inhouse' || v === IN_HOUSE_VENDOR) return 'original';
+  if (LIVE_PROVIDERS.includes(v) || LIVE_TYPES.includes(t) || /\blive\b/.test(t)) return 'live';
+  return 'slots';
+}
+
 const SOURCE_KEYS = Object.freeze(Object.keys(SOURCES));
+
 
 /**
  * How a movement is classified, everywhere in this module.
@@ -328,6 +359,8 @@ const MAX_ROWS_PER_SOURCE = 500;
 module.exports = {
   SOURCES,
   SOURCE_KEYS,
+  BET_CATEGORIES,
+  categoryOf,
   CATALOGS,
   OUTCOME,
   KIND,

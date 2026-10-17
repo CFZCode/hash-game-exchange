@@ -91,7 +91,7 @@ export function makeStakeCurrency({ currencyName, usdPrice, inrUsdPrice, alias }
     /** A saved INR chip value, shown as a round number of the selected coin. */
     chipFromInr: (v) => (isInr ? Number(v) : niceStake(Number(v) / inrPerUnit, decimals)),
     /** A chip edited in the selected coin, saved back as whole rupees. */
-    chipToInr: (v) => (isInr ? Number(v) : Math.round(Number(v) * inrPerUnit)),
+    chipToInr: (v) => (isInr ? Number(v) : Math.max(1, Math.round(Number(v) * inrPerUnit))),
     /**
      * The typed stake as the INR string placeBet sends. Within the shown limits it is pinned
      * into [minInr, maxInr] so rounding never turns an allowed stake into a refused one.

@@ -1,8 +1,8 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { BetbyIcon, IconEdit } from '../../components/exchange/icons';
-import { ExposureBadge, StakeButtonsModal } from '../../components/exchange';
-import { useExchangeCurrency, useSportsBalance, useStakeButtons } from '../../hooks/exchange';
+import { StakeButtonsModal } from '../../components/exchange';
+import { useExchangeCurrency, useStakeButtons } from '../../hooks/exchange';
 import { saveStakeButtons } from '../../services/exchange';
 import { toast } from '../../components/shared/Toast/toast';
 import { BET_TOAST } from '../../utils/exchange';
@@ -30,7 +30,7 @@ function tipFrom(e, label) {
 
 /**
  * The exchange's top bar — the sports rail look with Exchange / My Bets / Statement cells and,
- * signed in, the stake-buttons action and the balance + exposure badge on the right.
+ * signed in, the stake-buttons action on the right.
  */
 export default function ExchangeRail() {
   const { pathname } = useLocation();
@@ -74,23 +74,22 @@ export default function ExchangeRail() {
 }
 
 /**
- * Signed-in exchange tools: the stake-buttons action (opens the kit's StakeButtonsModal) and the
- * balance + exposure badge. Nothing when signed out — saving stakes needs a player, and the
- * badge has nothing to show.
+ * Signed-in exchange tools: the stake-buttons action (opens the kit's StakeButtonsModal). Nothing
+ * when signed out — saving stakes needs a player. (The sports balance / exposure badge was removed
+ * at the user's request: the header balance is the one the player reads.)
  *
  * @param {{ inRail?: boolean, tipProps?: (label:string)=>object }} props
  *   `inRail` draws the action as a rail cell after a divider; otherwise as a 40px layer4 square
- *   beside the badge (the account pages' heading row).
+ *   (the account pages' heading row).
  */
 export function ExchangeTools({ inRail = false, tipProps }) {
   const { session } = useSession();
   if (!session.login) return null;
-  return <SignedInTools userId={session.userId} inRail={inRail} tipProps={tipProps} />;
+  return <SignedInTools inRail={inRail} tipProps={tipProps} />;
 }
 
-function SignedInTools({ userId, inRail, tipProps = () => null }) {
-  const { balance, exposure } = useSportsBalance({ userId });
-  // mssports' wallet is INR; printed (and the stake buttons edited) in the header wallet's coin.
+function SignedInTools({ inRail, tipProps = () => null }) {
+  // Stake buttons are saved in rupees and edited in the header wallet's coin.
   const cur = useExchangeCurrency();
   const { data: stakes, refresh } = useStakeButtons();
   const [editing, setEditing] = React.useState(false);
@@ -140,24 +139,14 @@ function SignedInTools({ userId, inRail, tipProps = () => null }) {
       >
         <IconEdit className="size-6" />
       </button>
-      <ExposureBadge
-        className="ml-1 flex-none"
-        balance={balance ?? 0}
-        exposure={exposure ?? 0}
-        currency={cur.prefix}
-        formatAmount={cur.isInr ? undefined : cur.formatInr}
-        loading={balance == null}
-        /* NAMED AS THE SPORTS WALLET. The exchange settles from its own INR wallet, which is not
-           the casino balance in the site header — so a bare "Bal ₹0.00" under a header showing
-           ₹1,000 read as a bug. Labelled until the two wallets are bridged. */
-        balanceLabel="Sports balance"
-        exposureLabel="Exposure"
-        title="Your sports exchange wallet — separate from the casino balance in the header"
-      />
       {editing && stakes && (
         <StakeButtonsModal
           title="Stake buttons"
           values={stakes.stakes.map((s) => cur.chipFromInr(Number(s.value)))}
+          currency={cur.prefix.trim()}
+          currencyName={cur.label}
+          allowDecimals={!cur.isInr}
+          min={cur.isInr ? 1 : 1 / 10 ** cur.decimals}
           saving={saving}
           error={error}
           onSave={save}

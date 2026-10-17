@@ -258,6 +258,17 @@ export default function FiatForm({ currencyName }) {
         </RequirementNotice>
       )}
 
+      {/* The owner's daily limit for this currency (rolling 24 hours, pending included). Same
+          notice as the cap; at 0 left it is also in `missing` and the server refuses with
+          WITHDRAW_DAILY_LIMIT. */}
+      {requirements?.dailyLimit?.enabled && requirements.dailyLimit.remaining != null && (
+        <RequirementNotice>
+          Daily limit: {Number(requirements.dailyLimit.remaining).toFixed(2)} of{' '}
+          {Number(requirements.dailyLimit.limit).toFixed(2)} {requirements.dailyLimit.currency ?? bareCurrency} left
+          in the last 24 hours.
+        </RequirementNotice>
+      )}
+
       <form
         onSubmit={(event) => {
           event.preventDefault();

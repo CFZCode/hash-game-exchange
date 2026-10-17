@@ -1,9 +1,8 @@
 import React from 'react';
 import PopCenter from '../../shared/PopCenter';
 import useResource from '../../../hooks/useResource';
-import { useSession } from '../../../context/session';
+import { useSelectedCurrency } from '../../../hooks/useSelectedCurrency';
 import { getInvitationCode } from '../../../services/referral';
-import { printCurrency } from '../../../utils/currency';
 import referralArt from '../../../assets/refer.png';
 import Loading from '../../shared/Loading';
 import { toast } from '../../shared/Toast/toast';
@@ -44,7 +43,7 @@ import { copyToClipboard } from '../../../utils/clipboard';
  *
  * `__number__` resolving to $1,000.00 is not a constant in disguise — `printCurrency` reads the
  * account's display currency, so the same 1000 prints as the visitor's own currency the moment
- * `enableLocaleCurrency` points somewhere else. Passed `session.setting` for that reason.
+ * `enableLocaleCurrency` points somewhere else. Now shown in the selected currency (useSelectedCurrency).
  *
  * ONE THING IS THIS BUILD'S, flagged at its call site below: where the logged-out branch lives.
  * The copy confirmation is the original's own toast again — it sat on the button while this
@@ -56,7 +55,7 @@ import { copyToClipboard } from '../../../utils/clipboard';
 const REWARD = 1000;
 
 export default function Refer({ open, onClose }) {
-  const { session } = useSession();
+  const cur = useSelectedCurrency();
 
   /* GATED ON `open`, because the original fetches from the dialog's own mount — `k(() => ...)`
      inside `Z`, which the popup manager only ever constructs on a push. This component stays
@@ -105,7 +104,8 @@ export default function Refer({ open, onClose }) {
             <p className="mb-4">
               <span className="block">REFER A FRIEND AND GET</span>
               <span className="text-3xl text-warning">
-                {printCurrency(REWARD, 'USDFIAT', { settings: session.setting })}
+                {/* USD-designed, shown in the selected currency. */}
+                {cur.show(REWARD, 'USDFIAT')}
               </span>
               <span className="mx-1">+</span>
               <span className="text-3xl text-brand">15%</span>

@@ -33,7 +33,6 @@ export {
   placeBet,
   placeCombinedBet,
   getBetResult,
-  cancelBet,
   savePendingBet,
   clearPendingBet,
   reconcilePendingBets,
@@ -50,4 +49,3 @@ export {
   getOneClickButtons,
   saveOneClickButtons,
 } from './stakes';
-export { SPORTS_SOCKET_PATH, connectBalanceSocket, fetchBalanceRest } from './balanceSocket';

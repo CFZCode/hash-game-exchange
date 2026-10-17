@@ -6,7 +6,8 @@ import useResource from '../../../hooks/useResource';
 import EmptyPlaceholder from '../../shared/EmptyPlaceholder';
 import { IconClose } from '../../shared/icons';
 import { useSession } from '../../../context/session';
-import { printCurrency } from '../../../utils/currency';
+import { useSelectedCurrency } from '../../../hooks/useSelectedCurrency';
+import { walletCode } from '../../../utils/currency';
 import { coinIcon } from '../../../utils/coinArt';
 import { getFreePlays, freePlayTabs, freePlayPanel } from '../../../services/freePlay';
 import btiIcon from '../../../assets/freeplay/bti.png';
@@ -137,6 +138,7 @@ const IconChevron = ({ className = '' }) => (
 function FreePlayRow({ item }) {
   const navigate = useNavigate();
   const { session, setSetting } = useSession();
+  const cur = useSelectedCurrency();
 
   const isFreeSpin = item.bonusType === 'Free Spin';
   const isBti = item.provider === 'bti';
@@ -166,8 +168,9 @@ function FreePlayRow({ item }) {
     <>
       {/* `mt-[1px]` is the chunk's own — a 12px coin next to 14px extrabold text sits a pixel
           high without it. */}
-      <img className="mx-1 mt-[1px] size-3" alt="" src={coinIcon(item.currencyName)} />
-      {printCurrency(item.amount, item.currencyName, { settings: session.setting })}
+      {/* The free play's value in its own coin, shown in the selected currency (icon to match). */}
+      <img className="mx-1 mt-[1px] size-3" alt="" src={coinIcon(cur.code)} />
+      {cur.show(item.amount, walletCode(item.currencyName))}
     </>
   );
 

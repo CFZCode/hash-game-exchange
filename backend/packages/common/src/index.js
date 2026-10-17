@@ -72,6 +72,8 @@ const withdrawalCap = require('./withdrawalCap');
 const cashierLimits = require('./cashierLimits');
 /** Deposit cap figures (deposited / withdrawn / wagered) — user-service cap + admin Users → Financial. */
 const withdrawalCapFigures = require('./withdrawalCapFigures');
+/** Daily withdrawal limit per currency: the owner's `withdrawalDailyLimit` block (withdrawalDailyLimit.js). */
+const withdrawalDailyLimit = require('./withdrawalDailyLimit');
 const currencyRegistry = require('./currencyRegistry');
 /** What the operator set in the site admin, read by the services that act on it. */
 const { operatorSettings } = require('./operatorSettings');
@@ -126,6 +128,7 @@ module.exports = {
   regionPolicy,
   withdrawalCap,
   withdrawalCapFigures,
+  withdrawalDailyLimit,
   cashierLimits,
   configureEntitlements: entitlements.configureEntitlements,
   currencyRegistry,

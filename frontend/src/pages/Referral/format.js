@@ -1,4 +1,7 @@
 import { HOST, BUSINESS_EMAIL } from './referral';
+import { useResource } from '../../hooks/useResource';
+import { getSiteConfig } from '../../services/siteConfig';
+import { walletCode } from '../../utils/currency';
 
 /* The referral family's two formatting helpers, split out of `index.jsx` when the signed-in
  * dashboard became a second consumer. Non-components, so they live in a plain module rather than
@@ -52,3 +55,21 @@ export const fill = (text, amount) =>
 /* The ticker's pixels-per-second. See the long note on `LiveRewards` for why the original's flat
    `30s` is a distance rather than a speed, and why this replaces it. */
 export const SCROLL_SPEED = 30;
+
+/* ── Amounts in the selected currency (the `selected-currency` skill) ─────────────────────────
+ *
+ * `printCurrency` above prints a figure in its OWN currency and never converts, so on a ₹ wallet
+ * the rewards read "$0.00". Amount rows now go through `useSelectedCurrency().show(value, source)`;
+ * these two name the SOURCE each figure is in.
+ *
+ * `walletCode` (utils/currency.js, re-exported): a bare API code → this build's wallet key.
+ *
+ * `useRewardCurrency`: the coin the affiliate rewards are credited in — the operator's reward
+ * currency (`rewardCurrency` on /admin/site-config/public), USDT until it answers. Every `*Usd`
+ * figure on the dashboard and My Rewards is a sum of those credits, so that is its source. */
+export { walletCode };
+
+export function useRewardCurrency() {
+  const { data } = useResource(getSiteConfig);
+  return walletCode(data?.rewardCurrency || 'USDT');
+}

@@ -7,6 +7,7 @@ import { publicGates } from './gates';
 import { getSportEvents } from './exchange/feed';
 import { getCasinoSet, toCatalogGame } from './catalog';
 import { assetExact } from '../utils/gameArt';
+import { isFiatCode } from '../utils/currency';
 import { HIDDEN_NAME } from '../context/account';
 import { originals, originalsLink } from '../pages/Home/GameSection/originals';
 import {
@@ -269,6 +270,11 @@ export const getRecentBigWins = ({ tab = 0 } = {}) => {
   );
 };
 
+const walletKey = (code) => {
+  const c = String(code ?? '').toUpperCase();
+  return isFiatCode(c) ? `${c}FIAT` : c;
+};
+
 const toBigWin = (row) => {
   const slug = slugFor(String(row.game ?? ''));
   const profit = Number(row.profit ?? 0);
@@ -278,6 +284,9 @@ const toBigWin = (row) => {
     tier: vipTier(-1),
     name: displayName(HIDDEN_NAME),
     amount: `${profit.toLocaleString('en-US', { maximumFractionDigits: 8 })} ${row.currency ?? ''}`.trim(),
+    // The profit in its own coin (wallet key: INR → INRFIAT), printed in the selected currency.
+    value: profit,
+    valueCurrency: walletKey(row.currency),
   };
 };
 

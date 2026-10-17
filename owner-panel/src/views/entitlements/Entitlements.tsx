@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 
-import { CheckIcon, InfoIcon, Loader2Icon, SearchIcon } from 'lucide-react'
+import { CheckIcon, InfoIcon, Loader2Icon, PlusIcon, SearchIcon, XIcon } from 'lucide-react'
 import { toast } from 'sonner'
 
 import ErrorState from '@/components/shared/ErrorState'
@@ -31,7 +31,8 @@ import {
   featureByKey,
   featureLabel,
   flagLabel,
-  optionsOf
+  optionsOf,
+  REWARD_CURRENCIES
 } from '@/configs/entitlementCatalogue'
 import { HIDDEN_OPTIONS, pinToUi, UI_LABEL, uiSupport } from '@/configs/siteUi'
 import { TEMPLATE_CATALOGUE, type TemplateEntry } from '@/configs/templateCatalogue'
@@ -57,6 +58,12 @@ import {
   WITHDRAWAL_REQUIREMENTS,
   type WithdrawalCap
 } from '@/lib/entitlements/withdrawalCap'
+import {
+  DEFAULT_WITHDRAWAL_DAILY_LIMIT,
+  isDailyLimit,
+  MAX_DAILY_LIMIT,
+  type WithdrawalDailyLimit
+} from '@/lib/entitlements/withdrawalDailyLimit'
 import {
   diffDocs,
   type Change,
@@ -162,7 +169,7 @@ const POLICY_KEYS = new Set(FEATURE_CATALOGUE.filter(f => f.policy).map(f => f.k
 /** The tab an unsaved change belongs to, for the count on each tab. */
 const tabOf = (c: Change): Tab => {
   if (c.kind === 'template') return 'template'
-  if (c.kind === 'withdrawal_cap' || c.key === WITHDRAWAL_REQUIREMENTS) return 'withdrawals'
+  if (c.kind === 'withdrawal_cap' || c.kind === 'withdrawal_daily_limit' || c.key === WITHDRAWAL_REQUIREMENTS) return 'withdrawals'
   if (c.kind === 'flag') return 'flags'
   if ((c.kind === 'variant' || c.kind === 'feature') && POLICY_KEYS.has(c.key)) return 'policies'
 
@@ -387,6 +394,114 @@ const RequirementSwitch = ({
   </label>
 )
 
+type DailyRow = { id: number; code: string; text: string }
+
+/**
+ * The daily withdrawal limit's rows: a currency (the site's entitled coins) and an amount each.
+ * Kept as local rows so a half-typed amount stays on screen; only valid rows reach the draft, and
+ * any bad row blocks the save through `onProblem`.
+ */
+const DailyLimitEditor = ({
+  value,
+  coins,
+  onChange,
+  onProblem
+}: {
+  value: WithdrawalDailyLimit
+  coins: { code: string; name: string }[]
+  onChange: (d: WithdrawalDailyLimit) => void
+  onProblem: (problem: string | null) => void
+}) => {
+  const [rows, setRows] = useState<DailyRow[]>(() => Object.entries(value.limits).map(([code, text], id) => ({ id, code, text })))
+  const nextId = useRef(rows.length)
+
+  useClearOnUnmount(onProblem)
+
+  const rowProblem = (r: DailyRow) => (isDailyLimit(r.text) ? null : `${r.code}: an amount above 0, at most ${MAX_DAILY_LIMIT.toLocaleString('en-US')}, 8 decimals`)
+
+  const apply = (next: DailyRow[]) => {
+    setRows(next)
+    const problem = next.map(rowProblem).find(Boolean) ?? (value.enabled && next.length === 0 ? 'Daily limit: add a currency, or switch it off' : null)
+
+    onProblem(problem)
+    onChange({ ...value, limits: Object.fromEntries(next.filter(r => !rowProblem(r)).map(r => [r.code, r.text.trim()])) })
+  }
+
+  const used = new Set(rows.map(r => r.code))
+  const free = coins.filter(c => !used.has(c.code))
+
+  return (
+    <div className='flex flex-col gap-2' data-withdrawal-daily-rows>
+      {rows.map(r => {
+        const problem = r.text.trim() === '' ? null : rowProblem(r)
+        const choices = coins.filter(c => c.code === r.code || !used.has(c.code))
+
+        return (
+          <div key={r.id} className='flex flex-col gap-0.5' data-daily-row={r.code}>
+            <div className='flex flex-wrap items-center gap-2'>
+              <Select
+                items={choices.map(c => ({ value: c.code, label: c.code }))}
+                value={r.code}
+                autoComplete='off'
+                onValueChange={(v, details) =>
+                  v && isOwnerPick(details.reason) && apply(rows.map(x => (x.id === r.id ? { ...x, code: v } : x)))
+                }
+              >
+                <SelectTrigger size='sm' className='w-28' aria-label='Currency'>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {choices.map(c => (
+                    <SelectItem key={c.code} value={c.code}>
+                      {c.code} <span className='text-muted-foreground text-xs'>{c.name}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input
+                value={r.text}
+                inputMode='decimal'
+                placeholder='Amount per 24 h'
+                aria-label={`${r.code} daily limit`}
+                aria-invalid={Boolean(problem)}
+                className='h-7 w-40'
+                onChange={e => apply(rows.map(x => (x.id === r.id ? { ...x, text: e.target.value } : x)))}
+              />
+              <span className='text-muted-foreground text-xs'>{r.code} per 24 h</span>
+              <Button
+                type='button'
+                variant='ghost'
+                size='icon-sm'
+                aria-label={`Remove ${r.code}`}
+                onClick={() => apply(rows.filter(x => x.id !== r.id))}
+              >
+                <XIcon />
+              </Button>
+            </div>
+            {problem && (
+              <span className='text-destructive text-xs' data-warning='withdrawal-daily-limit'>
+                Above 0, at most {MAX_DAILY_LIMIT.toLocaleString('en-US')}, 8 decimals
+              </span>
+            )}
+          </div>
+        )
+      })}
+      <div>
+        <Button
+          type='button'
+          variant='outline'
+          size='sm'
+          disabled={!free.length}
+          onClick={() => apply([...rows, { id: nextId.current++, code: free[0].code, text: '' }])}
+        >
+          <PlusIcon /> Add currency
+        </Button>
+      </div>
+      {!rows.length && <p className='text-muted-foreground text-xs'>No currency yet: add one to set its limit.</p>}
+    </div>
+  )
+}
+
 /**
  * Withdrawal requirements as switches, any combination: KYC and wagering are the policy's variant
  * (none / kyc / wager / kyc_and_wager), the deposit cap is the document's `withdrawalCap`.
@@ -394,18 +509,26 @@ const RequirementSwitch = ({
 const WithdrawalRequirementsEditor = ({
   variant,
   cap,
+  daily,
+  coins,
   onVariant,
   onCap,
+  onDaily,
   changedVariant,
   changedCap,
+  changedDaily,
   onProblem
 }: {
   variant: string
   cap: WithdrawalCap
+  daily: WithdrawalDailyLimit
+  coins: { code: string; name: string }[]
   onVariant: (v: string) => void
   onCap: (c: WithdrawalCap) => void
+  onDaily: (d: WithdrawalDailyLimit) => void
   changedVariant: boolean
   changedCap: boolean
+  changedDaily: boolean
   onProblem: (key: string, problem: string | null) => void
 }) => {
   const sw = switchesOf(variant)
@@ -483,6 +606,34 @@ const WithdrawalRequirementsEditor = ({
                 (cap.wagerBonus ? Math.min(1000, 1000 * cap.wagerMultiplier) : 0)
               ).toLocaleString('en-US')}
               . Refused over it: 403 WITHDRAW_CAP_EXCEEDED.
+            </p>
+          </div>
+        )}
+      </div>
+      <div
+        className={cn('flex flex-col gap-3 border-t pt-4', changedDaily && 'bg-primary/5 -mx-1 rounded px-1')}
+        data-withdrawal-daily-limit
+      >
+        <RequirementSwitch
+          name='daily'
+          label='Daily withdrawal limit (per currency)'
+          description='Pick a currency and an amount: a player can withdraw at most that much of it in any rolling 24 hours, pending withdrawals included, on every rail (bank, crypto, gateway payouts, P2P sell). A currency with no row has no daily limit.'
+          checked={daily.enabled}
+          onChecked={v => {
+            // Off: its rows are not used, so a half-typed amount no longer blocks the save.
+            if (!v) onProblem('dailyLimit', null)
+
+            // On with no currency yet: nothing to save until a row is added.
+            else if (!Object.keys(daily.limits).length) onProblem('dailyLimit', 'Daily limit: add a currency, or switch it off')
+            onDaily({ ...daily, enabled: v })
+          }}
+        />
+        {daily.enabled && (
+          <div className='ml-12 flex flex-col gap-2'>
+            <DailyLimitEditor value={daily} coins={coins} onChange={onDaily} onProblem={p => onProblem('dailyLimit', p)} />
+            <p className='text-muted-foreground text-xs'>
+              Counted in the currency itself, never converted. Refused over it: 403 WITHDRAW_DAILY_LIMIT (&quot;Daily
+              withdrawal limit is 50,000 INR; 12,000 INR left today.&quot;).
             </p>
           </div>
         )}
@@ -588,7 +739,10 @@ const Entitlements = () => {
         variants: { ...prev?.variants },
         options: Object.fromEntries(Object.entries(prev?.options ?? {}).map(([f, v]) => [f, { ...v }])),
         ...(prev?.region ? { region: { ...prev.region, countries: [...prev.region.countries] } } : {}),
-        ...(prev?.withdrawalCap ? { withdrawalCap: { ...prev.withdrawalCap } } : {})
+        ...(prev?.withdrawalCap ? { withdrawalCap: { ...prev.withdrawalCap } } : {}),
+        ...(prev?.withdrawalDailyLimit
+          ? { withdrawalDailyLimit: { ...prev.withdrawalDailyLimit, limits: { ...prev.withdrawalDailyLimit.limits } } }
+          : {})
       }
 
       fn(next)
@@ -646,7 +800,8 @@ const Entitlements = () => {
         variants: draft!.variants,
         options: draft!.options,
         region: draft!.region,
-        withdrawalCap: draft!.withdrawalCap
+        withdrawalCap: draft!.withdrawalCap,
+        withdrawalDailyLimit: draft!.withdrawalDailyLimit
       }),
     invalidate: [['api']],
     errorTitle: 'Features & plan not saved',
@@ -843,6 +998,15 @@ const Entitlements = () => {
 
   const withdrawalVariant = draft?.variants[WITHDRAWAL_REQUIREMENTS]
 
+  // The daily limit's currency choices: the wallet coins entitled under Site flags (a crypto coin
+  // also needs the crypto master), plus any already set so a row never loses its currency.
+  const dailyCoins = REWARD_CURRENCIES.filter(c => {
+    const k = c.code.toLowerCase()
+    const entitled = draft?.flags[k] !== false && (FIAT_COIN_FLAGS.has(k) || draft?.flags.cryptocoin !== false)
+
+    return entitled || c.code in (draft?.withdrawalDailyLimit?.limits ?? {})
+  })
+
 
   return (
     <div className={cn(changes.length > 0 && 'pb-20')}>
@@ -967,8 +1131,12 @@ const Entitlements = () => {
                           cap={draft.withdrawalCap ?? DEFAULT_WITHDRAWAL_CAP}
                           changedVariant={changed.has(`feature:${WITHDRAWAL_REQUIREMENTS}`)}
                           changedCap={changed.has('withdrawal_cap:withdrawalCap')}
+                          daily={draft.withdrawalDailyLimit ?? DEFAULT_WITHDRAWAL_DAILY_LIMIT}
+                          coins={dailyCoins}
+                          changedDaily={changed.has('withdrawal_daily_limit:withdrawalDailyLimit')}
                           onVariant={v => setVariant(WITHDRAWAL_ROW, v)}
                           onCap={withdrawalCap => edit(next => void (next.withdrawalCap = withdrawalCap))}
+                          onDaily={withdrawalDailyLimit => edit(next => void (next.withdrawalDailyLimit = withdrawalDailyLimit))}
                         />
                       ) : (
                         <p className='text-muted-foreground text-sm'>

@@ -463,8 +463,11 @@ export default function ExchangeMatchPage() {
 
       {stakeModal && (
         <StakeButtonsModal
-          values={stakes}
-          min={1}
+          values={stakesInr.map(cur.chipFromInr)}
+          min={cur.isInr ? 1 : 1 / 10 ** cur.decimals}
+          currency={cur.prefix.trim()}
+          currencyName={cur.label}
+          allowDecimals={!cur.isInr}
           saving={stakeSaving}
           error={stakeError}
           onClose={() => setStakeModal(false)}

@@ -1,8 +1,8 @@
 import React from 'react';
 import { TargetIcon, FxIcon, CheckIcon, ExpiredIcon } from './icons';
 import { formatQuestTime } from './quests';
-import { printCurrency } from '../../utils/currency';
-import { useSession } from '../../context/session';
+import { walletCode } from '../../utils/currency';
+import { useSelectedCurrency } from '../../hooks/useSelectedCurrency';
 import { useSettings } from '../../context/settings';
 import Loading from '../../components/shared/Loading';
 
@@ -199,12 +199,13 @@ export function QuestAction({ action, variant, loading, disabled, onClick, class
  * `enableLocaleCurrency` off it, and this port takes the store as an argument where the original
  * reaches for the global — the same signature change every other call site here makes. */
 export function QuestReward({ amount, currency }) {
-  const { session } = useSession();
+  // The reward in its own coin, shown in the selected currency (the `selected-currency` skill).
+  const cur = useSelectedCurrency();
 
   return (
     <span className="inline-flex min-w-0 items-center overflow-hidden">
       <span className="truncate">
-        {printCurrency(amount, currency, { precision: 7, settings: session.setting })}
+        {cur.show(amount, walletCode(currency), { precision: 7 })}
       </span>
     </span>
   );

@@ -19,6 +19,7 @@
 import iconMap from '../../../assets/gameicons/_map.json';
 import * as globMaps from './bets.globs.js';
 import { printCurrency, getAlias } from '../../../utils/currency';
+import { getUsdPrice } from '../../../data/usdPrice';
 import { HIDDEN_NAME } from '../../../context/account';
 import { isShownOriginal, slugFor } from '../../../services/originals';
 import { isHouseGame } from '../../../services/game';
@@ -59,17 +60,24 @@ export function formatAmount(value, precision = 5) {
  * throwAmount, profitAmount, payout}). This turns one into exactly what a row cell needs, so the
  * table cannot look different depending on where its rows came from.
  *
- * Amounts are printed in USD, as bc.game now does ("$22.45", "-$22.45", "+$2,075.77") with the
- * bet's own coin icon beside them: `printCurrency` to `USDFIAT` with no alias, which converts
- * through the usdPrice table and formats with Intl's currency style. */
-const toUsd = (amount, coin) =>
-  printCurrency(Math.abs(Number(amount) || 0), coin || 'USDFIAT', { target: 'USDFIAT', hasAlias: false });
+ * Amounts are printed in the VIEWER's selected currency (the selected-currency skill: the
+ * header wallet, or "View in currency"), converted from the bet's own coin through the usdPrice
+ * table — "₹1,868.40" for an INR wallet, "22.45" beside a USDT mark for a USDT one. `target`
+ * defaults to USDFIAT, which is bc.game's own "$22.45". The coin mark follows the PRINTED
+ * currency, so a converted figure never sits beside the coin it was not printed in. A bet coin
+ * with no price prints in its own coin instead of a converted 0. */
+const toTarget = (amount, coin, target) => {
+  const from = String(coin || 'USDFIAT').toUpperCase();
+  const to = from === target || getUsdPrice(from) > 0 ? target : from;
+  return { text: printCurrency(Math.abs(Number(amount) || 0), from, { target: to, hasAlias: false }), coin: to };
+};
 
-export function toTableRow(bet) {
+export function toTableRow(bet, target = 'USDFIAT') {
   const mult = multiplier(bet.payout);
   const won = mult >= 1;
   const profit = Number(bet.profitAmount) || 0;
   const hidden = !bet.userName || bet.userName === HIDDEN_NAME || bet.userName === 'Hidden';
+  const shown = toTarget(bet.throwAmount, bet.currencyName, target);
   return {
     key: bet.betId,
     game: bet.fullName || bet.gameUnique,
@@ -79,11 +87,11 @@ export function toTableRow(bet) {
     gameIcon: bet.icon || gameIcon(String(bet.gameUnique ?? '')),
     player: hidden ? null : bet.userName,
     playerHref: !hidden && bet.userId != null ? `/user/profile/${bet.userId}` : null,
-    coin: getAlias(String(bet.currencyName ?? '')),
-    coinIcon: coinIcon(bet.currencyName),
-    bet: toUsd(bet.throwAmount, bet.currencyName),
+    coin: getAlias(shown.coin),
+    coinIcon: coinIcon(shown.coin),
+    bet: shown.text,
     multiplier: `${mult.toFixed(2)}x`,
-    profit: `${won ? '+' : profit < 0 ? '-' : ''}${toUsd(profit, bet.currencyName)}`,
+    profit: `${won ? '+' : profit < 0 ? '-' : ''}${toTarget(profit, bet.currencyName, target).text}`,
     won,
   };
 }

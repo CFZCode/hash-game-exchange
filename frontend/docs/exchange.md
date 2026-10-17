@@ -25,7 +25,7 @@ look stays hash.game's (the hash-ui-fidelity skill lists it under Deliberate dep
 | `/sports` (`?sport=inplay\|cricket\|soccer\|tennis`, default cricket) | `pages/Exchange/Lobby/index.jsx` | `useSportsList(sid)` per board on screen (In-Play polls 4, 1 and 2; a sport view only its own), `useLatestEvents`. The sports tree is the main sidebar's Sports group (`layouts/MainLayout/Sidebar/SportsMenu.jsx`, `useSportsTree`), not a column on this page |
 | `/sports/live` | redirect | → `/sports?sport=inplay` (the footer's link) |
 | `/sports/match/:sid/:gmid` | `pages/Exchange/Match/index.jsx` (match agent) | `React.lazy` inside a `LazyRouteBoundary` keyed on the path |
-| `/sports/my-bets` | `pages/Exchange/MyBets/index.jsx` | `getSportsBets({status, betType, search, page})`, open tabs every 10s, `cancelBet` after a PopCenter confirm |
+| `/sports/my-bets` | `pages/Exchange/MyBets/index.jsx` | `getSportsBets({status, betType, search, page})`, Matched / Settled (no Unmatched: the site only takes matched bets), Matched every 10s, amounts in the header wallet's coin |
 | `/sports/statement` | `pages/Exchange/Statement/index.jsx` | `getAccountStatement` (≤ 31 days, checked client-side first), row → `MarketBetsDialog` (`getStatementMarketBets`) |
 | any other `/sports/*` | lobby | |
 
@@ -39,7 +39,7 @@ look stays hash.game's (the hash-ui-fidelity skill lists it under Deliberate dep
   `pages/Sports/Sports.css`) with Exchange / My Bets / Statement cells (BetBy's `ic-home`,
   `ic-navbar-mybets`, `ic-stat`) and, signed in, the Stake buttons action (kit `StakeButtonsModal`,
   `useStakeButtons` + `saveStakeButtons`, labels "1k"/"1L" like the server's seed) and the kit
-  `ExposureBadge` from `useSportsBalance` (₹ — mssports' own INR wallet). My Bets / Statement use
+  no balance badge (removed at the user's request; the header balance is the one shown). My Bets / Statement use
   `MenuPageLayout` from `lg` up (tools at the heading's right), the frame + a heading below it.
 - **Signed out**, `/sports/my-bets` and `/sports/statement` raise the sign-in dialog over the page
   you came from (`sportsAccountNeedsAuth`, the `/favorite` pattern).
@@ -62,7 +62,6 @@ look stays hash.game's (the hash-ui-fidelity skill lists it under Deliberate dep
 | `POST /place` | `placeBet(payload)` | — | `{ok, odds, stake, balanceDelta, oldBalance, newBalance, totalExposure, exposure, duplicate, raw}` |
 | `POST /place-combined {bets}` | `placeCombinedBet` | — | same + `legs` |
 | `GET /bet-result/:clientRef` | `getBetResult`, `reconcilePendingBets(onOutcome)` | — | `{state:'pending'\|'accepted'\|'rejected'\|'unknown', message, odds, stake}` |
-| `POST /cancel-bet {bet_id}` | `cancelBet` | — | `{ok, message, raw}` |
 | `POST /matchexposures/match {match_id}` | `getMatchExposure(gmid)` | `useMatchExposure(gmid, markets)` 2s + `bet:placed` | rows `[{match_id, event_id, team_name, exposure_amount:number, game_type, …}]`; hook adds `book` `{'<mid>:<runner lc>': n}` |
 | `GET /cricket/user-open-bets-grouped?eventid` | `getOpenBets(gmid)` | `useOpenBets(gmid)` 5s + `bet:placed` | `{matched, unmatched}` of Addaplay `normaliseBet` rows |
 | `GET /fancy-bets?runner&match_id&event_id&sport_id&market_type` | `getFancyBets` | — | `[{bet_type, stake_amount, odds, size, liability, market_type, fancy_name, badlo}]` |
@@ -71,7 +70,6 @@ look stays hash.game's (the hash-ui-fidelity skill lists it under Deliberate dep
 | `POST /account-statement-v2/bets` | `getStatementMarketBets` | — | `{header, winner, description, settledAt, totalBets, totalWin, bets}` |
 | `GET/POST /stake-button-values` | `getStakeButtons`, `saveStakeButtons` | `useStakeButtons()` | `[{label, value}]` |
 | `GET /buttonlist`, `POST /updatebuttonlist` | `getOneClickButtons`, `saveOneClickButtons` | `useStakeButtons()` (`oneClick`) | `number[3]` |
-| socket `/ws/sports/socket.io` | `connectBalanceSocket`, `fetchBalanceRest` | `useSportsBalance({userId})` | `{balance, exposure, connected, source}` |
 
 ### Real responses (trimmed, :4700, 2026-10-13)
 

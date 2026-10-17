@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useSession } from '../../../context/session';
 import { useGates } from '../../../context/gates';
 import { walletCoins } from '../../../services/gates';
-import { amount2usd, printCurrency } from '../../../utils/currency';
+import { amount2usd } from '../../../utils/currency';
+import { useSelectedCurrency } from '../../../hooks/useSelectedCurrency';
 import SelectCurrencyContent from './CurrencyList';
 import LocalAmountItem from '../../../components/shared/LocalAmountItem';
 import { groupWallet, passesHideSmall } from './utils';
@@ -48,25 +49,27 @@ function SummaryCell({ title, amount, first }) {
  *   Bonus Balance    sumBy(coins, c => convertCurrency(c.bonusAmount,   c.currencyName))
  *
  * `convertCurrency` with its target left at the default is plain USD, which is exactly what
- * `amount2usd` is in this project — see the note on it in utils/currency.js. The total is then
- * printed with NO source currency, so `printCurrency` falls back to `USDFIAT` and formats it as
- * dollars; USDFIAT is pinned to 1 in the rate table, so that last conversion is the identity.
+ * `amount2usd` is in this project — see the note on it in utils/currency.js. The original then
+ * printed the USD total as dollars; this build prints it in the player's SELECTED currency
+ * (`useSelectedCurrency`, the selected-currency skill), so the cards agree with the header.
  *
  * Deposit Balance and Bonus Balance are therefore NOT independent numbers — `amount` is the sum of
  * the other two on every row, so the first cell is the sum of the next two. That is worth knowing
  * before anyone "fixes" a fixture where they disagree.
  */
-function Summary({ balances, settings }) {
+function Summary({ balances }) {
+  // Summed in USD (amount2usd), then printed in the SELECTED currency (selected-currency skill):
+  // an INR wallet reads "₹6,000.00" here, matching the header, not "$72.00".
+  const cur = useSelectedCurrency();
   const cells = [
     { title: 'Total Balance', field: 'amount' },
     { title: 'Deposit Balance', field: 'generalAmount' },
     { title: 'Bonus Balance', field: 'bonusAmount' },
   ].map(({ title, field }) => ({
     title,
-    amount: printCurrency(
+    amount: cur.show(
       balances.reduce((sum, coin) => sum + amount2usd(coin[field], coin.currencyName), 0),
-      undefined,
-      { settings },
+      'USDFIAT',
     ),
   }));
 
@@ -220,11 +223,11 @@ function CurrencyList() {
 }
 
 export default function Balance() {
-  const { session, balances } = useSession();
+  const { balances } = useSession();
 
   return (
     <div className="rounded-xl bg-layer4 p-4 lg:px-8">
-      <Summary balances={balances} settings={session.setting} />
+      <Summary balances={balances} />
       <CurrencyList />
     </div>
   );

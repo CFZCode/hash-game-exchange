@@ -76,6 +76,7 @@ function sync() {
   if (!socket?.connected || inFlight) return;
   inFlight = true;
   const id = socket.id;
+  const askedAt = Date.now();
   socket.timeout(8000).emit(SYNC_STATE, null, (err, reply) => {
     inFlight = false;
     if (err) return;
@@ -90,7 +91,7 @@ function sync() {
     unscramble(body.d, id).then(
       (state) => {
         console.log('[socket] SYNC_STATE', state);
-        publishLiveState(state, token);
+        publishLiveState(state, token, askedAt);
       },
       () => {},
     );

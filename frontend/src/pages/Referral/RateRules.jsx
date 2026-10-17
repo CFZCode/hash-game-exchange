@@ -8,7 +8,8 @@ import { coinIcon } from '../../utils/coinArt';
 import { vipTier, vipTierByName, tierColor } from '../../data/vipConfig';
 import useResource from '../../hooks/useResource';
 import { getReferralUnlocks } from '../../services/referral';
-import { fill } from './format';
+import { fill, walletCode } from './format';
+import { useSelectedCurrency } from '../../hooks/useSelectedCurrency';
 import { RULES, HOW_TO_STEPS, GAME_RATES } from './referral';
 import {
   IconTierBronze,
@@ -102,6 +103,10 @@ const TIER_ICON = {
    empty — the table is the last thing in its card, so nothing below it moves. */
 function UnlockTable() {
   const { data: rows } = useResource(getReferralUnlocks);
+  const cur = useSelectedCurrency();
+  /* A live row carries its raw figures in the reward currency (`wagerValue`/`amountValue`), shown
+     in the selected one; the capture rows (no currency) keep their verbatim strings. */
+  const live = (row) => row.currency && row.wagerValue != null;
   return (
     <table className="mt-4 w-full rounded-lg bg-layer3 text-center">
       <thead className="text-secondary">
@@ -125,10 +130,14 @@ function UnlockTable() {
                 </div>
                 <span>{tier.fullName}</span>
               </td>
-              <td className="p-3">{row.wager}</td>
+              <td className="p-3">
+                {live(row) ? cur.show(row.wagerValue, walletCode(row.currency), { hasAlias: false, minDecimals: 0 }) : row.wager}
+              </td>
               <td className="flex items-center justify-end gap-1 p-3">
-                <img className="h-4 w-4" alt="coin" src={row.currency ? coinIcon(row.currency) : goldCoin} />
-                <span className="font-extrabold text-brand">{row.amount}</span>
+                <img className="h-4 w-4" alt="coin" src={live(row) ? coinIcon(cur.code) : row.currency ? coinIcon(row.currency) : goldCoin} />
+                <span className="font-extrabold text-brand">
+                  {live(row) ? `+${cur.show(row.amountValue, walletCode(row.currency), { hasAlias: false, minDecimals: 2 })}` : row.amount}
+                </span>
               </td>
             </tr>
           );
@@ -147,6 +156,10 @@ const commission = (wager, rate, gameRate) =>
 
 export default function RateRules() {
   const isDesktop = useMediaQuery('(min-width: 640px)');
+  /* The calculator works in the selected currency: commission is proportional to the wager, so the
+     figure needs no conversion — only the unit the wager is typed in changes. */
+  const cur = useSelectedCurrency();
+  const unit = cur.isFiat ? cur.code.replace(/FIAT$/, '') : cur.alias;
   const [search] = useSearchParams();
 
   /* ONE BUTTON, TWO SIGNALS, and they are the chunk's own: `S.mobile ? d(o => !o) : push(D1)`.
@@ -229,11 +242,10 @@ export default function RateRules() {
               <IconCalculator className="icon size-4.5 fill-secondary" />
               <p>Commission Calculator</p>
             </div>
-            {/* USDT is hard-coded on this card — the calculator does not follow the wallet's
-                display currency, and the coin mark is `coinIcon("USDT")`. */}
+            {/* bc.game hard-codes USDT on this card; here it follows the selected currency. */}
             <div className="flex gap-2">
-              <img className="h-4 w-4" alt="coin icon" src={coinIcon('USDT')} />
-              <span className="w">USDT</span>
+              <img className="h-4 w-4" alt="coin icon" src={coinIcon(cur.code)} />
+              <span className="w">{unit}</span>
             </div>
           </div>
           <div className="flex flex-col gap-4">
@@ -241,11 +253,11 @@ export default function RateRules() {
               <div className="flex w-10 flex-auto flex-col gap-1">
                 {/* The template's own leading space between the two text nodes: the label is
                     `Wager` followed by a literal `(USDT)`. */}
-                <span className="text-secondary">Wager (USDT)</span>
+                <span className="text-secondary">Wager ({unit})</span>
                 <NumberInput min={1} max={1e7} value={wager} onChange={setWager} />
                 {validation.wager ? (
                   <span className="error-message">
-                    {validation.wager === 1 ? 'Minimum 1 USDT' : 'Maximum 10,000,000 USDT'}
+                    {validation.wager === 1 ? `Minimum 1 ${unit}` : `Maximum 10,000,000 ${unit}`}
                   </span>
                 ) : null}
               </div>
@@ -274,7 +286,7 @@ export default function RateRules() {
             <div className="flex items-center gap-2">
               <span className="text-secondary">=</span>
               <span className="text-xl font-extrabold">
-                {commission(wager, rate, game.rate)} USDT
+                {commission(wager, rate, game.rate)} {unit}
               </span>
             </div>
           </div>
@@ -297,7 +309,7 @@ export default function RateRules() {
                   {step.lead}
                 </span>
                 <span className={`text-xl font-extrabold${step.tailBrand ? ' text-brand' : ''}`}>
-                  {step.tail}
+                  {step.tailAmountUsd ? cur.show(step.tailAmountUsd, 'USDFIAT', { precision: 0 }) : step.tail}
                 </span>
                 <br />
                 <p className="text-secondary">{step.body}</p>

@@ -2,6 +2,9 @@
 
 import type { ReactNode } from 'react'
 
+import { CalendarDays, RotateCcw } from 'lucide-react'
+
+import { Button } from '@/components/ui/button'
 import { DateRangePicker } from '@/components/ui/date-picker'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
@@ -50,7 +53,7 @@ const FilterBar = ({ filters, currencies, allCurrenciesLabel, allowAll = true, s
     : []
 
   return (
-    <div role='group' aria-label='Report filters' className={cn('flex flex-wrap items-center gap-2', className)}>
+    <div role='group' aria-label='Report filters' className={cn('bg-card flex flex-wrap items-center gap-2 rounded-xl border p-2', className)}>
       <Select value={filters.preset} onValueChange={v => v && filters.set(v === 'custom' ? { preset: 'custom', from: filters.from, to: filters.to } : { preset: v as Preset })}>
         <SelectTrigger className='w-40' aria-label='Period'>
           <SelectValue />
@@ -74,8 +77,10 @@ const FilterBar = ({ filters, currencies, allCurrenciesLabel, allowAll = true, s
           onChange={r => r.from && r.to && filters.set({ preset: 'custom', from: r.from, to: r.to })}
         />
       ) : (
-        <span className='text-muted-foreground px-1 text-xs tabular-nums'>
-          {filters.from === filters.to ? shortDay(filters.from) : `${shortDay(filters.from)} – ${shortDay(filters.to)}`} · UTC
+        <span className='bg-muted text-muted-foreground inline-flex h-9 items-center gap-1.5 rounded-md px-3 text-xs tabular-nums'>
+          <CalendarDays className='size-3.5' aria-hidden />
+          {filters.from === filters.to ? shortDay(filters.from) : `${shortDay(filters.from)} – ${shortDay(filters.to)}`}
+          <span className='opacity-70'>· UTC</span>
         </span>
       )}
 
@@ -127,6 +132,19 @@ const FilterBar = ({ filters, currencies, allCurrenciesLabel, allowAll = true, s
       {filters.preset === 'custom' && filters.days >= MAX_RANGE_DAYS && (
         <span className='text-muted-foreground text-xs'>Limited to {MAX_RANGE_DAYS} days.</span>
       )}
+
+      <Button
+        type='button'
+        variant='ghost'
+        size='sm'
+        className='text-muted-foreground ml-auto gap-1.5'
+        disabled={!filters.dirty}
+        onClick={filters.reset}
+        title='Back to the default period, grouping and currency'
+      >
+        <RotateCcw className='size-3.5' aria-hidden />
+        Reset
+      </Button>
     </div>
   )
 }

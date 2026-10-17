@@ -121,6 +121,16 @@ export const getAlias = (currency) =>
 export const isFiatCode = (code) =>
   getCurrency(`${String(code || '').toUpperCase()}FIAT`)?.currencyType === 'FIAT';
 
+/* A bare API code ("INR", "usdt") → this build's wallet key ("INRFIAT", "USDT"); a key already
+   in that shape is kept. The FX table is keyed by wallet keys, so a bare fiat code has no price
+   and would convert to 0 (the `selected-currency` skill). Empty → USDT. */
+export const walletCode = (code) => {
+  const upper = String(code || '').trim().toUpperCase();
+  if (!upper) return 'USDT';
+  if (upper.endsWith('FIAT')) return upper;
+  return isFiatCode(upper) ? `${upper}FIAT` : upper;
+};
+
 /* `toFiatStr`. Two things: deliberately no `maximumFractionDigits` (see note 2 above), and the
    ISO code comes from STRIPPING the suffix rather than from `getAlias` — `e = e.replace(/FIAT$/,
    "")` is what the original writes, and the two stopped being the same function the moment

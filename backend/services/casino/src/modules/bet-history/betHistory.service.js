@@ -46,6 +46,7 @@ const {
   SOURCES,
   SOURCE_KEYS,
   CATALOGS,
+  categoryOf,
   classify,
   kindOf,
   countExpressions,
@@ -122,15 +123,17 @@ class BetHistoryService {
    *
    * Every casino movement the caller is allowed to see, newest first.
    */
-  async list({ page, limit, search, userId, from, to, source, staffId, channel }) {
+  async list({ page, limit, search, userId, from, to, source, staffId, channel, category, currency }) {
     const visible = await this.#visibleUserIds({ staffId, userId, channel });
     if (visible.empty) return { rows: [], total: 0 };
 
-    const wanted = source ? [source] : SOURCE_KEYS;
-    const collected = [];
+    // An in-house round is always `original`, so a live / slots filter never reads `bets`.
+    const sources = source ? [source] : SOURCE_KEYS;
+    const wanted = category === 'live' || category === 'slots' ? sources.filter((k) => k !== 'inhouse') : sources;
+    let collected = [];
 
     for (const key of wanted) {
-      collected.push(...(await this.#read(key, { visible, from, to, search })));
+      collected.push(...(await this.#read(key, { visible, from, to, search, currency })));
     }
 
     // Merged in memory because the four tables have no common key and no
@@ -138,16 +141,22 @@ class BetHistoryService {
     // capped, so the working set is bounded regardless of the date range.
     collected.sort((a, b) => new Date(b.transaction_timestamp) - new Date(a.transaction_timestamp));
 
+    // A category filter needs every row's catalogue entry BEFORE paging (it decides which rows
+    // exist); without one, only the page's rows are looked up — the rest are never rendered.
+    let games = null;
+    if (category) {
+      games = await this.#gameLabels(collected);
+      collected = collected.filter((row) => this.#categoryOfRow(row, games) === category);
+    }
+
     const offset = (page - 1) * limit;
     const pageRows = collected.slice(offset, offset + limit);
 
-    // Both lookups are for the page only — the rows either side of it are never
-    // rendered, so resolving names and titles for them is work nobody reads.
     const names = await this.#namesFor(pageRows.map((r) => r.user_id));
-    const games = await this.#gameLabels(pageRows);
+    games ??= await this.#gameLabels(pageRows);
 
     return {
-      rows: pageRows.map(({ gameCatalog, gameId, providerLabel, ...row }) => {
+      rows: pageRows.map(({ gameCatalog, gameId, gameType, gameName, providerLabel, ...row }) => {
         const game = games.get(`${gameCatalog}:${gameId}`);
         return {
           ...row,
@@ -155,10 +164,12 @@ class BetHistoryService {
           // The provider's id stays available under `game_uid`, because it is
           // what a support ticket names; `game_title` is what a column prints.
           game_uid: gameId,
-          game_title: game?.name ?? gameId,
+          game_title: game?.name ?? gameName ?? gameId,
           // A game the catalog has no row for still came from somewhere, and
           // naming the aggregator beats an empty cell under the title.
           game_vendor: game?.vendor ?? providerLabel,
+          /** original | live | slots — the player's Type filter (`categoryOf`). */
+          game_category: this.#categoryOfRow({ gameCatalog, gameId, gameType, source_key: row.source_key }, games),
         };
       }),
       total: collected.length,
@@ -182,7 +193,13 @@ class BetHistoryService {
    * `bet` row and a `win` row sharing a `round_id`, and reading `amount` alone
    * shows the stake and the payout as two unrelated lines.
    */
-  async #read(key, { visible, from, to, search }) {
+  /** `categoryOf` for a collected row: its catalogue entry, else the row's own game type. */
+  #categoryOfRow(row, games) {
+    const game = games.get(`${row.gameCatalog}:${row.gameId}`);
+    return categoryOf({ sourceKey: row.source_key, vendor: game?.vendor, type: game?.type ?? row.gameType });
+  }
+
+  async #read(key, { visible, from, to, search, currency }) {
     const source = SOURCES[key];
     const model = this.models[source.model];
 
@@ -203,6 +220,10 @@ class BetHistoryService {
     // Search matches the transaction reference. Player-name search is applied
     // after the join below, because the name lives in another service's table.
     if (search) where[source.idColumn] = { [Op.iLike]: `%${search}%` };
+
+    // One coin, case-insensitively: `bets.coin` is stored lower-case, every other source
+    // upper-case. The validator allows letters and digits only, so there is nothing to escape.
+    if (currency) where[source.currencyColumn] = { [Op.iLike]: currency };
 
     const rows = await model.findAll({
       where,
@@ -264,6 +285,8 @@ class BetHistoryService {
         // What `?source=` takes; `source` itself is the table, as legacy named it.
         source_key: key,
         gameId: source.gameColumn ? (row[source.gameColumn] ?? null) : null,
+        gameType: source.gameTypeColumn ? (row[source.gameTypeColumn] ?? null) : null,
+        gameName: source.gameNameColumn ? (row[source.gameNameColumn] ?? null) : null,
         gameCatalog: source.catalog,
         providerLabel: source.label,
       };
@@ -319,22 +342,28 @@ class BetHistoryService {
 
     for (const [key, ids] of wanted) {
       const catalog = CATALOGS[key];
-      const model = catalog && this.models[catalog.model];
-      // A catalog this deployment does not load leaves the raw id in place,
-      // which is worse than a name and better than an empty column.
-      if (!model) continue;
+      if (!catalog) continue;
+      // The primary catalogue first, then the fallback for ids it does not know. A catalog this
+      // deployment does not load leaves the raw id in place, which is worse than a name and
+      // better than an empty column.
+      for (const modelName of [catalog.model, catalog.fallbackModel]) {
+        const model = modelName && this.models[modelName];
+        const missing = [...ids].filter((id) => !labels.has(`${key}:${id}`));
+        if (!model || !missing.length) continue;
 
-      const found = await model.findAll({
-        where: { [catalog.keyColumn]: { [Op.in]: [...ids] } },
-        attributes: [catalog.keyColumn, catalog.nameColumn, catalog.vendorColumn],
-        raw: true,
-      });
-
-      for (const game of found) {
-        labels.set(`${key}:${game[catalog.keyColumn]}`, {
-          name: game[catalog.nameColumn] ?? null,
-          vendor: game[catalog.vendorColumn] ?? null,
+        const found = await model.findAll({
+          where: { [catalog.keyColumn]: { [Op.in]: missing } },
+          attributes: [catalog.keyColumn, catalog.nameColumn, catalog.vendorColumn, ...(catalog.typeColumn ? [catalog.typeColumn] : [])],
+          raw: true,
         });
+
+        for (const game of found) {
+          labels.set(`${key}:${game[catalog.keyColumn]}`, {
+            name: game[catalog.nameColumn] ?? null,
+            vendor: game[catalog.vendorColumn] ?? null,
+            type: catalog.typeColumn ? (game[catalog.typeColumn] ?? null) : null,
+          });
+        }
       }
     }
 

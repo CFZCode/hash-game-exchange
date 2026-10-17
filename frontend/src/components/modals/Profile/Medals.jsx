@@ -1,4 +1,5 @@
 import React from 'react';
+import { useSelectedCurrency } from '../../../hooks/useSelectedCurrency';
 import { useLocation, useNavigate } from 'react-router-dom';
 import DialogShell from '../../shared/DialogShell';
 import useResource from '../../../hooks/useResource';
@@ -87,13 +88,15 @@ import Skeleton from '../../shared/Skeleton';
    `printCurrency`, because the strings are what the i18n key interpolates and the amounts are
    whole dollars in every locale this build ships. */
 const REWARD_LINES = [
-  { number: 5, amount: '$20.00' },
-  { number: 10, amount: '$800.00' },
-  { number: 15, amount: '$2,400.00' },
-  { number: 20, amount: '$10,000.00' },
+  { number: 5, amount: 20 },
+  { number: 10, amount: 800 },
+  { number: 15, amount: 2400 },
+  { number: 20, amount: 10000 },
 ];
 
 function RewardsTooltip() {
+  // The rewards are USD by design; printed in the viewer's selected currency.
+  const cur = useSelectedCurrency();
   return (
     <>
       {REWARD_LINES.map((line) => (
@@ -103,7 +106,7 @@ function RewardsTooltip() {
           Achieve
           <span className="mx-1">{line.number}</span>
           medals: Get
-          <span className="ml-1 text-brand">{line.amount}</span>
+          <span className="ml-1 text-brand">{cur.show(line.amount, 'USDFIAT', { precision: 2 })}</span>
         </p>
       ))}
     </>

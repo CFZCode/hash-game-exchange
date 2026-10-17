@@ -99,6 +99,12 @@ export type StatsFilters = {
   /** Values of the caller's `extraKeys` ('' when unset). */
   extra: Record<string, string>
   set: (patch: StatsFilterPatch) => void
+
+  /** True when anything differs from the screen's defaults (what Reset would clear). */
+  dirty: boolean
+
+  /** Back to the screen's defaults: every filter key, the caller's extra keys included, leaves the URL. */
+  reset: () => void
 }
 
 type Options = {
@@ -207,5 +213,19 @@ export function useStatsFilters({ defaultPreset = '30d', defaultGranularity = 'd
     [setRaw, defaultCurrency]
   )
 
-  return { ...derived, set }
+  const dirty =
+    Boolean(raw.preset && raw.preset !== defaultPreset) ||
+    Boolean(raw.from || raw.to) ||
+    Boolean(raw.granularity && raw.granularity !== defaultGranularity) ||
+    Boolean(raw.currency) ||
+    (extraSig ? extraSig.split('|').some(k => Boolean(raw[k])) : false)
+
+  const reset = useCallback(() => {
+    const next: Record<string, null> = { preset: null, from: null, to: null, granularity: null, currency: null }
+
+    for (const k of extraSig ? extraSig.split('|') : []) next[k] = null
+    void setRaw(next as never)
+  }, [setRaw, extraSig])
+
+  return { ...derived, set, dirty, reset }
 }

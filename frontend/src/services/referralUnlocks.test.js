@@ -22,9 +22,9 @@ describe('referral unlock table', () => {
       },
     });
     expect(rows).toEqual([
-      { level: 'Bronze I', wager: '1,000', amount: '+0.50', currency: 'USDT' },
-      { level: 'Gold II', wager: '1,000,000', amount: '+120.00', currency: 'USDT' },
-      { level: 'Platinum II', wager: '8,500,000', amount: '+500.00', currency: 'USDT' },
+      { level: 'Bronze I', wager: '1,000', amount: '+0.50', wagerValue: '1000.00000000', amountValue: '0.50000000', currency: 'USDT' },
+      { level: 'Gold II', wager: '1,000,000', amount: '+120.00', wagerValue: '1000000.00000000', amountValue: '120.00000000', currency: 'USDT' },
+      { level: 'Platinum II', wager: '8,500,000', amount: '+500.00', wagerValue: '8500000.00000000', amountValue: '500.00000000', currency: 'USDT' },
     ]);
   });
 

@@ -36,6 +36,9 @@ export type SiteFeature = {
   /** Withdrawal requirements only: the platform's deposit cap (read-only here). */
   withdrawalCap?: { enabled: boolean; depositMultiplier: number; wagerBonus: boolean; wagerMultiplier: number }
 
+  /** Withdrawal requirements only: the platform's daily limit per currency, rolling 24 hours (read-only here). */
+  withdrawalDailyLimit?: { enabled: boolean; limits: Record<string, string> }
+
   /** Nothing stored — reading the permissive default. */
   isDefault: boolean
   flag: string | null

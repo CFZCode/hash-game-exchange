@@ -4,7 +4,7 @@ import { useState, type ReactNode } from 'react'
 
 import Link from 'next/link'
 
-import { BanIcon, CircleCheckIcon, DicesIcon, GaugeIcon, LockIcon, ShieldCheckIcon, UsersIcon, WalletIcon } from 'lucide-react'
+import { BanIcon, CalendarClockIcon, CircleCheckIcon, DicesIcon, GaugeIcon, LockIcon, ShieldCheckIcon, UsersIcon, WalletIcon } from 'lucide-react'
 
 import DataTable, { type Column } from '@/components/shared/DataTable'
 import FormDialog from '@/components/shared/FormDialog'
@@ -38,6 +38,9 @@ type Summary = {
   updatedAt: string | null
   updatedBy: { id: string; name: string | null } | null
   limit: { enabled: boolean; depositMultiplier: number; wagerBonus: boolean; wagerMultiplier: number; source: 'owner' }
+
+  /** The owner's daily withdrawal limit per currency, rolling 24 hours (absent from an older backend). */
+  dailyLimit?: { enabled: boolean; limits: Record<string, string> }
   directUsers: number
   lockedDirectUsers: number
 }
@@ -126,6 +129,9 @@ const WithdrawalControl = () => {
   const wagerOn = Boolean(limit?.wagerBonus)
   const m = limit?.depositMultiplier ?? 3
   const w = limit?.wagerMultiplier ?? 5
+  const daily = s?.dailyLimit
+  const dailyRows = Object.entries(daily?.limits ?? {})
+  const dailyOn = Boolean(daily?.enabled && dailyRows.length)
 
   // Confirm dialog ka title / text — reference jaisa.
   const confirm = !pending
@@ -198,6 +204,19 @@ const WithdrawalControl = () => {
                     : `Example: ₹1,000 deposited → max ${inr(1000 * m)}, however much is wagered.`}
               </p>
             )}
+          </Rule>
+        </div>
+        <div className='border-t'>
+          <Rule
+            icon={<CalendarClockIcon />}
+            tone='primary'
+            on={dailyOn}
+            name='Daily withdrawal limit'
+            value={dailyOn ? dailyRows.map(([c, a]) => `${c} ${Number(a).toLocaleString('en-IN', { maximumFractionDigits: 8 })}`).join(' · ') : 'No limit'}
+            loading={loading}
+          >
+            The most a player can withdraw of each listed currency in any rolling 24 hours, pending withdrawals included, on every method (bank / UPI, gateway, crypto, P2P sell). A
+            currency that is not listed has no daily limit.
           </Rule>
         </div>
       </Card>

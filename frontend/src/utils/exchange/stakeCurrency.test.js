@@ -79,6 +79,7 @@ describe('makeStakeCurrency', () => {
   it('chips carry over as round numbers and save back as rupees', () => {
     expect([1000, 2000, 5000, 10000, 25000].map(usdt.chipFromInr)).toEqual([12, 24, 60, 120, 300]);
     expect(usdt.chipToInr(12)).toBe(1000);
+    expect(btc.chipToInr(0.00000001)).toBe(1); // never saves a zero-rupee button
     expect(niceStake(0, 2)).toBe(0);
   });
 });

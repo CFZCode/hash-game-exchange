@@ -1,6 +1,7 @@
 import React from 'react';
 import { BUSINESS_EMAIL } from './referral';
-import { printCurrency, fill, SCROLL_SPEED } from './format';
+import { fill, SCROLL_SPEED, walletCode } from './format';
+import { useSelectedCurrency } from '../../hooks/useSelectedCurrency';
 import * as globMaps from './blocks.globs.js';
 
 /* The three bands the referral pages SHARE — `Questions-dsRHzmFN.js`, whose `L`, `P` and `Q`
@@ -134,6 +135,7 @@ export function Faq({ faq, amount, onAction }) {
  * SCROLL_SPEED is the one number to turn if it still reads wrong; the 30s in Referral.css stays
  * as the original's value and is what renders if this effect never runs. */
 export function LiveRewards({ live }) {
+  const cur = useSelectedCurrency();
   const scrollerRef = React.useRef(null);
   const gridRef = React.useRef(null);
 
@@ -163,7 +165,8 @@ export function LiveRewards({ live }) {
     return () => observer.disconnect();
   }, [live]);
 
-  const total = printCurrency(Number(live.commissionUsd) + Number(live.rewardUsd));
+  // The ticker's total is in USD; each row in its own coin. Both shown in the selected currency.
+  const total = cur.show(Number(live.commissionUsd) + Number(live.rewardUsd), 'USDFIAT');
 
   return (
     /* `md:flex-row`, not `sm:` — this is the one block on the page that stacks until 768. */
@@ -192,9 +195,9 @@ export function LiveRewards({ live }) {
               <p>{row.userName}</p>
               <div className="center flex-shrink-0 gap-1">
                 <p className="text-nowrap font-extrabold text-brand">
-                  +{printCurrency(row.amount, row.currencyName)}
+                  +{cur.show(row.amount, walletCode(row.currencyName), { hasAlias: false })}
                 </p>
-                <img className="h-4 w-4" alt="" src={coinIcon(row.currencyName)} />
+                <img className="h-4 w-4" alt="" src={coinIcon(cur.code)} />
               </div>
             </div>
           ))}

@@ -268,6 +268,16 @@ const Features = () => {
                               : 'off'}
                           </span>
                         )}
+                        {cur.withdrawalDailyLimit && (
+                          <span className='text-muted-foreground block text-xs' data-withdrawal-daily-limit>
+                            Daily limit:{' '}
+                            {cur.withdrawalDailyLimit.enabled && Object.keys(cur.withdrawalDailyLimit.limits).length
+                              ? `${Object.entries(cur.withdrawalDailyLimit.limits)
+                                  .map(([c, a]) => `${c} ${Number(a).toLocaleString('en-IN', { maximumFractionDigits: 8 })}`)
+                                  .join(' · ')} per 24 h`
+                              : 'off'}
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <span className='flex items-center gap-2'>

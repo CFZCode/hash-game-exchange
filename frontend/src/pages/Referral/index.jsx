@@ -5,7 +5,8 @@ import Loading from '../../components/shared/Loading';
 import { useSession } from '../../context/session';
 import useMediaQuery from '../../hooks/useMediaQuery';
 import { REFERRAL_AMOUNT } from './referral';
-import { printCurrency, fill } from './format';
+import { fill } from './format';
+import { useSelectedCurrency } from '../../hooks/useSelectedCurrency';
 import { LiveRewards, ProgramBand, Faq, Segments } from './blocks';
 import * as globMaps from './index.globs.js';
 import './Referral.css';
@@ -62,6 +63,8 @@ export default function Referral() {
      Same caveat as VIP: the original's flag is a DEVICE test, so a phone in landscape is mobile
      to it at any width. No media query can express that. */
   const isDesktop = useMediaQuery('(min-width: 640px)');
+  /* `REFERRAL_AMOUNT` is USD-designed; shown in the selected currency (a hook, so above the returns). */
+  const cur = useSelectedCurrency();
 
 
   const size = isDesktop ? ' button-m' : '';
@@ -84,7 +87,7 @@ export default function Referral() {
 
   const { hero, cards, program, faq, live } = data;
 
-  const amount = printCurrency(REFERRAL_AMOUNT);
+  const amount = cur.show(REFERRAL_AMOUNT, 'USDFIAT');
 
   /* The FAQ's two clickable spans. The chunk sends a signed-out visitor to registration from
      either of them and only routes for real once logged in — `if (!a.login) { n("/login/regist"); return }`

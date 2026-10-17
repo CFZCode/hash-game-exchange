@@ -7,7 +7,8 @@ import { useSession } from '../../context/session';
 import { useIsDialog } from '../../context/dialogRoute';
 import useMediaQuery from '../../hooks/useMediaQuery';
 import { REFERRAL_AMOUNT, INVITE, DASHBOARD_COPY, TABS } from './referral';
-import { printCurrency, fill } from './format';
+import { fill, useRewardCurrency } from './format';
+import { useSelectedCurrency } from '../../hooks/useSelectedCurrency';
 import { LiveRewards, ProgramBand, Faq } from './blocks';
 import EmptyPlaceholder from '../../components/shared/EmptyPlaceholder';
 import { toast } from '../../components/shared/Toast/toast';
@@ -209,13 +210,16 @@ const usehead = art['../../assets/referral/usehead.png'];
    with `md:rounded-xl md:bg-layer4` on each half, so the fill moves from the parent to the
    children rather than the boxes changing shape. */
 function Stats({ dashboard, copy }) {
+  const cur = useSelectedCurrency();
+  const reward = useRewardCurrency();
+  const money = (value) => cur.show(value, reward);
   return (
     <div className="flex flex-col gap-3 md:w-1/3">
       <div className="flex rounded-xl bg-layer4 px-4 py-6">
         <div className="center flex-1 flex-col gap-2 border-r border-third">
           <img className="mb-2 h-auto w-10" alt="trophy" src={trophy} />
           <p className="text-xs text-secondary">{copy.totalReward}</p>
-          <p className="text-xl font-extrabold">{printCurrency(dashboard.rewardUsd)}</p>
+          <p className="text-xl font-extrabold">{money(dashboard.rewardUsd)}</p>
         </div>
         <div className="center flex-1 flex-col gap-2">
           <img className="mb-2 h-auto w-10" alt="user avatar" src={usehead} />
@@ -228,14 +232,14 @@ function Stats({ dashboard, copy }) {
           <IconReferralRewards className="icon mb-2 size-6 fill-brand" />
           <p className="text-xs text-secondary">{copy.referralRewards}</p>
           <span className="text-xl font-extrabold">
-            {printCurrency(dashboard.availableRewardUsd)}
+            {money(dashboard.availableRewardUsd)}
           </span>
         </div>
         <div className="flex h-full w-full flex-1 flex-col px-4 py-6 md:rounded-xl md:bg-layer4">
           <IconCommissionRewards className="icon mb-2 size-6 fill-secondary" />
           <p className="text-xs text-secondary">{copy.commissionRewards}</p>
           <span className="text-xl font-extrabold">
-            {printCurrency(dashboard.availableCommissionUsd)}
+            {money(dashboard.availableCommissionUsd)}
           </span>
         </div>
       </div>
@@ -248,6 +252,9 @@ function Stats({ dashboard, copy }) {
    empty, so what renders is the site's own empty state under the two copy lines. `activities-wrap`
    and `bot-info` are dead classes, checked in both stylesheets like `invite-top`. */
 function Activities({ dashboard, topCommissions, copy }) {
+  const cur = useSelectedCurrency();
+  const reward = useRewardCurrency();
+  const money = (value) => cur.show(value, reward);
   return (
     <div className="flex flex-col gap-3 rounded-xl bg-layer4 px-4 py-6">
       <div className="text-xl font-extrabold">{copy.activities}</div>
@@ -260,7 +267,7 @@ function Activities({ dashboard, topCommissions, copy }) {
                 <span>{copy.referralRewards}</span>
               </div>
               <p className="font-extrabold text-brand">
-                +{printCurrency(dashboard.availableRewardUsd)}
+                +{money(dashboard.availableRewardUsd)}
               </p>
             </div>
             {topCommissions.map((row, i) => (
@@ -269,7 +276,7 @@ function Activities({ dashboard, topCommissions, copy }) {
                   <IconCommissionRewards className="icon mb-2 size-6 fill-secondary" />
                   <span>{copy.commissionRewards}</span>
                 </div>
-                <p className="font-extrabold text-brand">+{printCurrency(row.commissionUsd)}</p>
+                <p className="font-extrabold text-brand">+{money(row.commissionUsd)}</p>
               </div>
             ))}
           </div>
@@ -299,6 +306,9 @@ export default function ReferralDashboard() {
      the programme band swaps has to move with the layout that uses it, and that layout is
      `sm:`. */
   const isDesktop = useMediaQuery('(min-width: 640px)');
+  /* The invite headline (`REFERRAL_AMOUNT`) is a USD-designed figure, shown in the selected
+     currency. Above the early returns, being a hook. */
+  const cur = useSelectedCurrency();
   const size = isDesktop ? ' button-m' : '';
 
   /* `T.mobile` on the original; the dialog context is this build's proxy — see the heading. ABOVE
@@ -342,7 +352,7 @@ export default function ReferralDashboard() {
   const active = TABS.some((t) => t.id === section) ? section : 'referral';
   const { paneClass } = TABS.find((t) => t.id === active);
   const { program, faq, live } = data;
-  const amount = printCurrency(REFERRAL_AMOUNT);
+  const amount = cur.show(REFERRAL_AMOUNT, 'USDFIAT');
 
   const onAction = (target) => navigate(target === 'dashboard' ? '/referral' : target);
 

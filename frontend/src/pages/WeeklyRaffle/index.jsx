@@ -12,6 +12,7 @@ import {
 } from '../../services/raffle';
 import { useSession } from '../../context/session';
 import { useResource } from '../../hooks/useResource';
+import { useSelectedCurrency } from '../../hooks/useSelectedCurrency';
 import { useIsDesktop } from '../../hooks/useMediaQuery';
 import { AVATAR_FILE } from './avatars';
 import heroArt from '../../assets/raffle/hero.png';
@@ -64,8 +65,13 @@ import './WeeklyRaffle.css';
  * low amplitude — so a coarse fit reproduces it and carries none of the UI's edges through.
  */
 
-const money = (value) =>
-  `$${Number(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+/* Raffle figures are USD by design (jackpot, prizes, wager targets) and are PRINTED in the
+   viewer's selected currency (selected-currency skill). Each component takes `money` from the
+   hook, so the call sites read as before. */
+function useRaffleMoney() {
+  const cur = useSelectedCurrency();
+  return (value) => cur.show(value, 'USDFIAT', { precision: 2, minDecimals: 2 });
+}
 
 /* `import.meta.glob` resolves relative to the file it is written in, so the globs live here
    rather than beside the data that names them. */
@@ -277,6 +283,7 @@ function GameIdRow({ data, mobile }) {
 }
 
 function Hero({ data, mobile }) {
+  const money = useRaffleMoney();
   return (
     <div className="py-2.5">
       <div className="">
@@ -401,6 +408,7 @@ function EarnCard({ method }) {
  * decoded rather than fetched — the arrangement the referral socials and the Free Plays provider
  * marks already have. */
 function StatsCard({ stats }) {
+  const money = useRaffleMoney();
   return (
     /* No panel of its own: the stub card and the sub-tab strip below it sit in ONE
        `rounded-lg10 bg-layer4 p-3` panel, opened at the call site. It carried that panel here for
@@ -461,6 +469,7 @@ function StatsCard({ stats }) {
    ticket says "Waiting for next draw", a past winner prints its amount in brand green, and a
    past loser is a bare `--`. */
 function TicketList({ tickets, isRunning }) {
+  const money = useRaffleMoney();
   const rows = tickets?.list ?? [];
 
   /* `ae` in the chunk — the site's own empty placeholder, which this page already imports as
@@ -508,6 +517,7 @@ function TicketList({ tickets, isRunning }) {
 const SUB_TABS = ['Active', 'Past', 'My Winnings'];
 
 function MyTickets({ tickets }) {
+  const money = useRaffleMoney();
   const [tab, setTab] = React.useState(0);
   const stripRef = React.useRef(null);
   const { wager } = wagerProgress(tickets.progress);
@@ -573,6 +583,7 @@ function MyTickets({ tickets }) {
 }
 
 function WinnerRow({ winner, mobile }) {
+  const money = useRaffleMoney();
   return (
     <div className="flex items-center justify-between border-b border-solid border-third py-3.5 text-primary">
       <div className="w-12">No. {winner.rank}</div>
@@ -642,6 +653,7 @@ function WinnerRow({ winner, mobile }) {
  *   only thing marking the top place.
  */
 function PrizeTable({ ladder }) {
+  const money = useRaffleMoney();
   return (
     <div className="rounded-lg bg-layer3 p-2.5">
       <div className="flex items-center text-sm font-bold text-secondary">

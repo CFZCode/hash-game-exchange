@@ -68,17 +68,6 @@ export async function getBetResult(clientRef) {
   };
 }
 
-/**
- * Cancel an UNMATCHED bet — `POST /cancel-bet {bet_id}`. (The TENEXCH slip never creates
- * unmatched bets, so this has no caller there.) Rejections: 404 not found, 403 not yours,
- * 400 only unmatched / already settled / MO+BM only.
- * @returns {Promise<{ ok:true, message:string|null, raw:object }>}
- */
-export async function cancelBet(betId) {
-  const body = await exchangeRequest('/cancel-bet', { method: 'POST', json: { bet_id: betId }, auth: true });
-  return { ok: true, message: body?.message ?? null, raw: body };
-}
-
 /* ─── Bets a reload left in flight (TENEXCH utils/pendingBet.js, toasts removed) ──────────────
    Remember each client_ref before POSTing and clear it on the answer; on the next load
    `reconcilePendingBets(onOutcome)` asks /bet-result for each and reports what happened. */

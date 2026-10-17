@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import SectionHeader from '../../../components/shared/SectionHeader';
 import { toTableRow, isAdvertised } from './bets';
+import { useSelectedCurrency } from '../../../hooks/useSelectedCurrency';
 import Loading from '../../../components/shared/Loading';
 import { getLatestBets, getHighRollers } from '../../../services/home';
 import { useResource } from '../../../hooks/useResource';
@@ -415,7 +416,12 @@ export default function LatestBets() {
      filter (only offered games are advertised) and the same row mapper, so the table prints
      one shape whatever answered. */
   const rawFeed = tab === 1 ? rollers : bets;
-  const feed = React.useMemo(() => (rawFeed ?? []).filter(isAdvertised).map(toTableRow), [rawFeed]);
+  // `cur` is rebuilt when the selection or its rate changes, so the rows re-print then.
+  const cur = useSelectedCurrency();
+  const feed = React.useMemo(
+    () => (rawFeed ?? []).filter(isAdvertised).map((bet) => toTableRow(bet, cur.code)),
+    [rawFeed, cur],
+  );
   const feedLoading = tab === 1 ? rollersLoading : betsLoading;
 
   return (

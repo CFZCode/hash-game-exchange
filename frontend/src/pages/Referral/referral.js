@@ -428,6 +428,8 @@ export const HOW_TO_STEPS = [
   {
     lead: 'Get',
     tail: '$1000',
+    /* `REFERRAL_AMOUNT` in USD: RateRules prints it in the selected currency instead of `tail`. */
+    tailAmountUsd: REFERRAL_AMOUNT,
     tailBrand: true,
     body: 'Your awards will be locked for now',
   },

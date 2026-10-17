@@ -2,6 +2,7 @@ import { brandLabel } from '../../../services/siteBranding';
 import React from 'react';
 import { Link } from 'react-router-dom';
 import VipTierIcon from './VipTierIcon';
+import { useSelectedCurrency } from '../../../hooks/useSelectedCurrency';
 import { getRecentBigWins } from '../../../services/home';
 import { useResource } from '../../../hooks/useResource';
 import { useGates } from '../../../context/gates';
@@ -67,6 +68,13 @@ function TabButton({ title, active, onClick }) {
 }
 
 function WinCard({ win }) {
+  const cur = useSelectedCurrency();
+  /* In the viewer's selected currency (selected-currency skill); the row's own text when its
+     coin has no price, so an unpriced win never reads as 0. */
+  const amount =
+    win.value != null && win.valueCurrency && cur.canConvert(win.valueCurrency)
+      ? cur.show(win.value, win.valueCurrency, { precision: 4 })
+      : win.amount;
   return (
     /* The router's own link to the game page, as every game tile on the site is (CLAUDE.md:
        an internal destination is a `<Link>`, never a bare `<a href>`). */
@@ -97,7 +105,7 @@ function WinCard({ win }) {
           <span className="text-xxs ellipsis -ml-0.5">{win.name}</span>
         </div>
         <div className="text-xxs whitespace-nowrap text-center font-extrabold text-brand">
-          {win.amount}
+          {amount}
         </div>
       </div>
     </Link>

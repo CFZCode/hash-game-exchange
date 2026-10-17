@@ -155,6 +155,9 @@ const toWin = (pick, type, offset) => ([index, amount, coin, level], i) => {
     tier: TIER_BY_LEVEL(level),
     name: who === HIDDEN_NAME ? 'Hidden' : who,
     amount: formatShowcaseAmount(amount, coin),
+    // Raw figure + its coin, for the card to print in the viewer's selected currency.
+    value: amount,
+    valueCurrency: coin,
   };
 };
 

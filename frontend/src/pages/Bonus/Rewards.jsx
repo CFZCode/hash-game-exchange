@@ -6,7 +6,8 @@ import { FormulaButton, Countdown } from '../Quests/QuestCard';
 import { redeemBonusCode, claimBonus, claimRakeback } from '../../services/rewards';
 import { showToast, bonusToast } from '../../components/shared/Toast/toast';
 import { useSession } from '../../context/session';
-import { printCurrency } from '../../utils/currency';
+import { walletCode } from '../../utils/currency';
+import { useSelectedCurrency } from '../../hooks/useSelectedCurrency';
 import { coinIcon } from '../../utils/coinArt';
 import LevelCard from './LevelCard';
 import { REWARD_TYPES, COUNTDOWN, isRecurringReward } from './bonus';
@@ -59,8 +60,10 @@ const REWARD_ICON = {
    glob the wallet uses, and `BC` falls through it to nothing, which is correct: BC is a token
    the wallet does not hold and has no coin file. */
 function CurrencyAmount({ amount, currency, iconCurrency, className = '' }) {
-  const { session } = useSession();
-  const art = coinIcon(iconCurrency ?? currency);
+  /* The figure is in the bonus currency; it is SHOWN in the selected one (the `selected-currency`
+     skill), and the coin beside it follows — except BC, which is its own token's mark. */
+  const cur = useSelectedCurrency();
+  const art = coinIcon(iconCurrency === 'BC' ? 'BC' : cur.code);
 
   return (
     <span className={`inline-flex min-w-0 items-center gap-1 ${className}`}>
@@ -74,7 +77,7 @@ function CurrencyAmount({ amount, currency, iconCurrency, className = '' }) {
       <span className="inline-flex min-w-0 flex-col">
         <span className="inline-flex min-w-0 items-center gap-1">
           <span className="flex min-w-0 font-extrabold" style={{ fontSize: '1em' }}>
-            {printCurrency(amount, currency, { settings: session.setting })}
+            {cur.show(amount, walletCode(currency))}
           </span>
         </span>
       </span>
@@ -204,6 +207,7 @@ const CLAIM_BY_TYPE = {
 
 function TotalClaimable({ payload, onClaimed }) {
   const { session } = useSession();
+  const cur = useSelectedCurrency();
   const total = payload?.claimableTotal ?? 0;
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState('');
@@ -262,7 +266,7 @@ function TotalClaimable({ payload, onClaimed }) {
         )}
         <div className="flex h-9 w-full min-w-0 items-center text-2xl font-extrabold text-brand">
           <span className="-mt-0.5">
-            {printCurrency(total, session.bonusCurrencyName, { settings: session.setting })}
+            {cur.show(total, walletCode(session.bonusCurrencyName))}
           </span>
         </div>
       </div>

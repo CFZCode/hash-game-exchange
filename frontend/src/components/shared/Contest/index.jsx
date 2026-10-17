@@ -9,6 +9,8 @@ import championAvatar from '../../../assets/contest/champion-avatar.png';
 import { HIDDEN_NAME } from '../../../context/account';
 import { useSession } from '../../../context/session';
 import { useIsDesktop } from '../../../hooks/useMediaQuery';
+import { useSelectedCurrency } from '../../../hooks/useSelectedCurrency';
+import { isFiatCode } from '../../../utils/currency';
 import { useResource } from '../../../hooks/useResource';
 import { getContestRank } from '../../../services/contest';
 import { avatarSrc } from '../../../services/avatars';
@@ -60,6 +62,26 @@ const money = (value, currency) =>
 
 const poolMoney = (value, currency) =>
   currency === 'USD' ? `$${grouped(value, 2, 2)}` : `${grouped(value, 2, 2)} ${currency}`;
+
+/* The contest's own currency as a wallet key: a fiat code gets the FIAT suffix. */
+const walletKey = (code) => {
+  const c = String(code ?? '').toUpperCase();
+  return isFiatCode(c) ? `${c}FIAT` : c;
+};
+
+/* Every figure in the viewer's SELECTED currency (selected-currency skill), converted from the
+   contest's currency; the contest's own formatting above when that currency has no price.
+   `pool` keeps the headline's two decimals. */
+function useContestMoney(currency) {
+  const cur = useSelectedCurrency();
+  const src = walletKey(currency);
+  return (value, pool = false) =>
+    cur.canConvert(src)
+      ? cur.show(value, src, { precision: 2, ...(pool ? { minDecimals: 2 } : {}) })
+      : pool
+        ? poolMoney(value, currency)
+        : money(value, currency);
+}
 
 /* `le` — the bonus rate arrives as a fraction and is printed to at most 4 decimals. */
 const pct = (rate) => `${Math.round(rate * 1e6) / 1e4}%`;
@@ -157,7 +179,7 @@ const StatusFlag = ({ active, children }) => (
  *
  * The two mid-ladder arms of `t()` are written out even though this fixture cannot reach them,
  * because they are the whole of what the card says once an account IS ranked. */
-function MyPosition({ contest, standings, currency }) {
+function MyPosition({ contest, standings, show }) {
   const { session } = useSession();
   const isDesktop = useIsDesktop();
 
@@ -198,7 +220,7 @@ function MyPosition({ contest, standings, currency }) {
   const reachLine = rank !== 1 && (
     <div className="text-xs">
       Wager
-      <span className="mx-1 text-primary">{money(toReach, currency)}</span>
+      <span className="mx-1 text-primary">{show(toReach)}</span>
       To reach
       <span className="mx-1 rounded-xl bg-[#F6519666] px-1.5 font-semibold text-alw_white">
         Top {top}
@@ -250,7 +272,7 @@ function MyPosition({ contest, standings, currency }) {
           </div>
           <div className="center ml-4 flex-1 flex-col border-l border-third pl-4">
             <div>Wager</div>
-            <div className="text-base font-extrabold text-brand">{money(wager, currency)}</div>
+            <div className="text-base font-extrabold text-brand">{show(wager)}</div>
           </div>
         </div>
       </div>
@@ -273,7 +295,7 @@ function MyPosition({ contest, standings, currency }) {
       </div>
       <div className="center flex-1 flex-col border-l border-solid border-third">
         <div>Wager</div>
-        <div className="mt-1 text-base font-extrabold text-brand">{money(wager, currency)}</div>
+        <div className="mt-1 text-base font-extrabold text-brand">{show(wager)}</div>
       </div>
       <div className="center flex-1 flex-col border-l border-solid border-third">{reachLine}</div>
     </div>
@@ -281,7 +303,7 @@ function MyPosition({ contest, standings, currency }) {
 }
 
 export default function Contest({ contest, standings = [] }) {
-  const currency = contest.currency;
+  const show = useContestMoney(contest.currency);
   const { session } = useSession();
 
   return (
@@ -303,7 +325,7 @@ export default function Contest({ contest, standings = [] }) {
             </div>
             <div className="my-1 font-semibold">Contest prize pool</div>
             <div className="overflow-hidden text-nowrap rounded-xl bg-layer2 px-3 py-2 text-center font-mono text-2xl font-extrabold text-brand">
-              {poolMoney(contest.prizePool, currency)}
+              {show(contest.prizePool, true)}
             </div>
           </div>
         </div>
@@ -356,7 +378,7 @@ export default function Contest({ contest, standings = [] }) {
                 Profit<span className="ml-1 text-primary">({pct(contest.champion.rate)})</span>
               </div>
               <div className="profit">
-                <span className="text-brand">{money(contest.champion.totalBonus, currency)}</span>
+                <span className="text-brand">{show(contest.champion.totalBonus)}</span>
               </div>
             </div>
           </div>
@@ -367,7 +389,7 @@ export default function Contest({ contest, standings = [] }) {
           — between Last Champion and the table, as a direct child of the root, so the root's
           own `gap-3` is the 12px above and below it. Nothing else moves when it appears. */}
       {session.login && (
-        <MyPosition contest={contest} standings={standings} currency={currency} />
+        <MyPosition contest={contest} standings={standings} show={show} />
       )}
 
       {/* overflow-hidden is what makes the rounded-xl read at the BOTTOM. The zebra stripe
@@ -425,10 +447,10 @@ export default function Contest({ contest, standings = [] }) {
                   <td className={`ellipsis ${hidden ? 'text-quarterary' : 'text-primary'}`}>
                     {hidden ? 'Hidden' : row.player}
                   </td>
-                  <td className="whitespace-nowrap text-brand">{money(row.wager, currency)}</td>
+                  <td className="whitespace-nowrap text-brand">{show(row.wager)}</td>
                   <td className="!text-center">
                     <span className="whitespace-nowrap text-brand">
-                      {money(row.bonus, currency)}
+                      {show(row.bonus)}
                     </span>
                     <span className="ml-1">({pct(row.rate)})</span>
                   </td>

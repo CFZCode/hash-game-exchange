@@ -1,7 +1,7 @@
 'use strict';
 
 const { Op, QueryTypes } = require('sequelize');
-const { AppError, entitlements, money, withdrawalCap, withdrawalCapFigures } = require('@ibitplay/common');
+const { AppError, entitlements, money, withdrawalCap, withdrawalCapFigures, withdrawalDailyLimit } = require('@ibitplay/common');
 
 const { assertTransactionPassword } = require('../staff-auth/transactionPassword');
 
@@ -36,13 +36,17 @@ class WithdrawalControlService {
 
   /** Limit settings in force — hamesha owner panel ki. */
   async #capInForce() {
-    let owner = {};
+    let plan = {};
     try {
-      owner = (await entitlements.getEntitlements())?.withdrawalCap ?? {};
+      plan = (await entitlements.getEntitlements()) ?? {};
     } catch (error) {
       this.logger?.warn({ err: error }, 'entitlements unavailable — deposit cap defaults');
     }
-    return { ...withdrawalCap.cleanWithdrawalCap(owner), source: 'owner' };
+    return {
+      ...withdrawalCap.cleanWithdrawalCap(plan.withdrawalCap ?? {}),
+      daily: withdrawalDailyLimit.cleanWithdrawalDailyLimit(plan.withdrawalDailyLimit),
+      source: 'owner',
+    };
   }
 
   /** Summary — upar ke teen card + direct users / locked ki ginti. */
@@ -74,6 +78,8 @@ class WithdrawalControlService {
         wagerMultiplier: cap.wagerMultiplier,
         source: cap.source,
       },
+      // Owner's daily withdrawal limit per currency (rolling 24 hours); read-only here.
+      dailyLimit: cap.daily,
       directUsers: counts?.direct_users ?? 0,
       lockedDirectUsers: counts?.locked_direct_users ?? 0,
     };

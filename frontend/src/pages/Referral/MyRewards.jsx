@@ -27,6 +27,8 @@ import {
   IconBetHistory,
 } from '../../layouts/MainLayout/Header/AfterLogin/icons';
 import { REWARD_TIPS, MY_REWARDS_TABS } from './referral';
+import { useSelectedCurrency } from '../../hooks/useSelectedCurrency';
+import { useRewardCurrency, walletCode } from './format';
 
 /* `Re(pathname)` — the chunk's own way of reading which pane is open, and it really is the LAST
    segment rather than a route parameter. */
@@ -184,6 +186,7 @@ const Empty = () => <EmptyPlaceholder>No rewards yet invite friends to join you 
    build, which has no such root class and no such variant, emits nothing for it. The row keeps
    `gap-14` at every width, which is what the desktop capture shows anyway. */
 function CommissionByCurrency({ data }) {
+  const cur = useSelectedCurrency();
   return (
     <div className="rounded-lg p-3">
       {data.length ? (
@@ -198,11 +201,12 @@ function CommissionByCurrency({ data }) {
               </div>
               <div className="flex gap-14 pc:gap-10">
                 <div className="flex flex-col items-center">
-                  <span className="font-extrabold text-brand">${floor2(row.availableUsd)}</span>
+                  {/* In the row's own coin, floored there, then shown in the selected currency. */}
+                  <span className="font-extrabold text-brand">{cur.show(floor2(row.availableUsd), walletCode(row.currencyName))}</span>
                   <span className="text-secondary">Available</span>
                 </div>
                 <div className="flex flex-col items-end">
-                  <span className="font-extrabold">${floor2(row.commissionUsd)}</span>
+                  <span className="font-extrabold">{cur.show(floor2(row.commissionUsd), walletCode(row.currencyName))}</span>
                   <span className="text-secondary">Total Received</span>
                 </div>
               </div>
@@ -227,6 +231,8 @@ function CommissionByCurrency({ data }) {
  * The wager range opens on the LAST 90 DAYS rather than cleared, which is the one filter here
  * that starts narrowed; the registration range opens on the picker's own cleared sentinel. */
 function CommissionByFriends({ codes, data, wagerRange }) {
+  const cur = useSelectedCurrency();
+  const reward = useRewardCurrency();
   const [code, setCode] = React.useState('All Codes');
   const [name, setName] = React.useState('');
 
@@ -247,7 +253,7 @@ function CommissionByFriends({ codes, data, wagerRange }) {
       dataIndex: 'commissionUsd',
       render: (v) => (
         <div className="flex cursor-pointer items-center justify-end gap-1 font-semibold">
-          <span className="text-brand">{v}</span>
+          <span className="text-brand">{cur.show(v, reward)}</span>
           <IconArrow className="icon size-4 rotate-180 fill-secondary" />
         </div>
       ),
@@ -289,6 +295,8 @@ function CommissionByFriends({ codes, data, wagerRange }) {
 
 /* `xt` — Level Up Rewards. Five columns over one filter. */
 function LevelUpRewards({ data }) {
+  const cur = useSelectedCurrency();
+  const reward = useRewardCurrency();
   const columns = [
     { title: 'Username', dataIndex: 'userName', render: (v) => <Secondary>{v}</Secondary> },
     { title: 'Registration Date', dataIndex: 'createDate', render: (v) => <Secondary>{v}</Secondary> },
@@ -299,7 +307,7 @@ function LevelUpRewards({ data }) {
       dataIndex: 'rewardUsd',
       render: (v) => (
         <div className="flex cursor-pointer items-center justify-end gap-2">
-          <span className="font-semibold text-brand">${v}</span>
+          <span className="font-semibold text-brand">{cur.show(v, reward)}</span>
           <IconArrow className="icon size-4 rotate-180 fill-secondary" />
         </div>
       ),
@@ -365,6 +373,12 @@ export default function MyRewards() {
   const { data: levelUp } = useResource(getReferralRewards);
 
   const [tip, setTip] = React.useState(null);
+  /* The summary card's figures are sums of reward credits (the reward currency), floored there to
+     2dp so a balance never reads higher than it is, then shown in the selected currency. Held up
+     here with the other hooks, above the loading return. */
+  const cur = useSelectedCurrency();
+  const reward = useRewardCurrency();
+  const money = (value) => cur.show(floor2(value), reward);
 
   /* The indicator is MEASURED, as the promotions and quest strips are and for the same reason:
      `sm:[&_.tabs-btn]:flex-none sm:[&_.tabs-btn]:px-0` with `sm:[&_.tabs-btn-group]:gap-6` sizes
@@ -440,11 +454,11 @@ export default function MyRewards() {
             />
           </div>
           <span className="mb-3 text-2xl font-extrabold text-brand">
-            ${floor2(dashboard.availableCommissionUsd)}
+            {money(dashboard.availableCommissionUsd)}
           </span>
           <div>
             <span className="mr-1 text-nowrap">Total Received</span>
-            <span>${floor2(dashboard.commissionUsd)}</span>
+            <span>{money(dashboard.commissionUsd)}</span>
           </div>
         </div>
 
@@ -457,18 +471,18 @@ export default function MyRewards() {
             />
           </div>
           <span className="mb-3 text-2xl font-extrabold text-brand">
-            ${floor2(dashboard.availableRewardUsd)}
+            {money(dashboard.availableRewardUsd)}
           </span>
           <div className="flex items-center gap-3">
             <div>
               <span className="mr-1 text-nowrap text-secondary">Total Received</span>
               {/* `sub-num` is a dead class in the mirror AND in the current deploy, both
                   checked. Kept like `page-main` and `header-nav-item`. */}
-              <span className="sub-num">${floor2(dashboard.rewardUsd)}</span>
+              <span className="sub-num">{money(dashboard.rewardUsd)}</span>
             </div>
             <div>
               <span className="mr-1 text-nowrap text-secondary">Locked Rewards</span>
-              <span className="sub-num">${floor2(dashboard.remainingRewardUsd)}</span>
+              <span className="sub-num">{money(dashboard.remainingRewardUsd)}</span>
             </div>
           </div>
         </div>

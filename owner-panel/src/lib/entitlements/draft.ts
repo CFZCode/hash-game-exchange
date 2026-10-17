@@ -4,10 +4,12 @@
  */
 import type { RegionSetting } from './region'
 import type { WithdrawalCap } from './withdrawalCap'
+import type { WithdrawalDailyLimit } from './withdrawalDailyLimit'
 
 export type Draft = {
   region?: RegionSetting
   withdrawalCap?: WithdrawalCap
+  withdrawalDailyLimit?: WithdrawalDailyLimit
   template?: string
   features: Record<string, boolean>
   flags: Record<string, boolean>
@@ -18,6 +20,7 @@ export type Draft = {
 type Loaded = {
   region?: RegionSetting
   withdrawalCap?: WithdrawalCap
+  withdrawalDailyLimit?: WithdrawalDailyLimit
   template: string
   features: Record<string, boolean>
   flags: Record<string, boolean>
@@ -33,7 +36,10 @@ export function buildDraft(doc: Loaded, edits: Partial<Draft> | null): Draft {
     variants: { ...doc.variants, ...edits?.variants },
     options: Object.fromEntries(Object.entries(doc.options).map(([f, v]) => [f, { ...v, ...edits?.options?.[f] }])),
     ...(edits?.region ?? doc.region ? { region: edits?.region ?? doc.region } : {}),
-    ...(edits?.withdrawalCap ?? doc.withdrawalCap ? { withdrawalCap: edits?.withdrawalCap ?? doc.withdrawalCap } : {})
+    ...(edits?.withdrawalCap ?? doc.withdrawalCap ? { withdrawalCap: edits?.withdrawalCap ?? doc.withdrawalCap } : {}),
+    ...(edits?.withdrawalDailyLimit ?? doc.withdrawalDailyLimit
+      ? { withdrawalDailyLimit: edits?.withdrawalDailyLimit ?? doc.withdrawalDailyLimit }
+      : {})
   }
 }
 

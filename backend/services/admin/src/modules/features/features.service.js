@@ -1,6 +1,6 @@
 'use strict';
 
-const { featureCatalogue, entitlements, featureOptions, regionPolicy, withdrawalCap } = require('@ibitplay/common');
+const { featureCatalogue, entitlements, featureOptions, regionPolicy, withdrawalCap, withdrawalDailyLimit } = require('@ibitplay/common');
 const { createSecretBox } = require('@ibitplay/auth');
 
 const errors = require('./features.errors');
@@ -148,7 +148,12 @@ class FeaturesService {
           // Region restriction: the owner's list type and countries, shown read-only beside the mode.
           ...(f.key === regionPolicy.FEATURE_KEY ? { region: regionPolicy.cleanRegion(plan.region) } : {}),
           // Withdrawal requirements: the owner's deposit cap, shown read-only beside KYC / wagering.
-          ...(f.key === 'withdrawal_requirements' ? { withdrawalCap: withdrawalCap.cleanWithdrawalCap(plan.withdrawalCap) } : {}),
+          ...(f.key === 'withdrawal_requirements'
+            ? {
+                withdrawalCap: withdrawalCap.cleanWithdrawalCap(plan.withdrawalCap),
+                withdrawalDailyLimit: withdrawalDailyLimit.cleanWithdrawalDailyLimit(plan.withdrawalDailyLimit),
+              }
+            : {}),
         };
       }),
     };

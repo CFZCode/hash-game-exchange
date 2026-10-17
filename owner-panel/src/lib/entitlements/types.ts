@@ -1,6 +1,7 @@
 import { resolveOptions } from '@/configs/entitlementCatalogue'
 import { cleanRegion, type RegionSetting } from './region'
 import { diffWithdrawalCap, type WithdrawalCap } from './withdrawalCap'
+import { diffWithdrawalDailyLimit, type WithdrawalDailyLimit } from './withdrawalDailyLimit'
 import type { CashierLimit } from './cashierLimits'
 import { diffBranding, type Branding, type BrandingChange } from './branding'
 
@@ -51,6 +52,12 @@ export type EntitlementsDoc = {
   withdrawalCap?: WithdrawalCap
 
   /**
+   * Daily withdrawal limit per currency, rolling 24 hours (./withdrawalDailyLimit). Absent in an
+   * older document = off.
+   */
+  withdrawalDailyLimit?: WithdrawalDailyLimit
+
+  /**
    * Site name, page metadata and logo files (./branding, contract §8). Absent in an older
    * document = not branded: the site keeps its own name and the UI's own logo.
    */
@@ -94,7 +101,7 @@ export type SiteCoin = {
 export type VariantsSeed = 'backend' | 'template' | null
 
 /** What the owner screen edits: the document with a full `variants` map. */
-export type EditableDoc = EntitlementsDoc & { variants: Record<string, string>; options: Record<string, Record<string, boolean>>; region: RegionSetting; withdrawalCap: WithdrawalCap; branding: Branding; seededFrom: VariantsSeed }
+export type EditableDoc = EntitlementsDoc & { variants: Record<string, string>; options: Record<string, Record<string, boolean>>; region: RegionSetting; withdrawalCap: WithdrawalCap; withdrawalDailyLimit: WithdrawalDailyLimit; branding: Branding; seededFrom: VariantsSeed }
 
 export type ToggleChange = { kind: 'feature' | 'flag'; key: string; from: boolean; to: boolean }
 export type TemplateChange = { kind: 'template'; key: 'template'; from: string | null; to: string }
@@ -115,10 +122,13 @@ export type RegionChange = { kind: 'region'; key: 'region'; from: RegionSetting;
 /** Withdrawal requirements' deposit cap switched or re-set (audit kind `withdrawal_cap`). */
 export type WithdrawalCapChange = { kind: 'withdrawal_cap'; key: 'withdrawalCap'; from: WithdrawalCap; to: WithdrawalCap }
 
+/** The daily withdrawal limit switched or a currency's amount changed (audit kind `withdrawal_daily_limit`). */
+export type WithdrawalDailyLimitChange = { kind: 'withdrawal_daily_limit'; key: 'withdrawalDailyLimit'; from: WithdrawalDailyLimit; to: WithdrawalDailyLimit }
+
 /** One currency's cashier limits changed (audit kind `cashier_limits`, older audit lines only — the limits are the Super Admin's now). */
 export type CashierLimitsChange = { kind: 'cashier_limits'; key: string; from: CashierLimit; to: CashierLimit }
 export type { BrandingChange }
-export type Change = ToggleChange | TemplateChange | VariantChange | CoinsChange | CoinChange | OptionChange | RegionChange | WithdrawalCapChange | CashierLimitsChange | BrandingChange
+export type Change = ToggleChange | TemplateChange | VariantChange | CoinsChange | CoinChange | OptionChange | RegionChange | WithdrawalCapChange | WithdrawalDailyLimitChange | CashierLimitsChange | BrandingChange
 
 export type AuditEntry = { at: string; user: string; version: number; changes: Change[]; seededFrom?: Exclude<VariantsSeed, null> }
 
@@ -136,6 +146,7 @@ type Diffable = Pick<EntitlementsDoc, 'features' | 'flags'> & {
   options?: Record<string, Record<string, boolean>>
   region?: RegionSetting
   withdrawalCap?: WithdrawalCap
+  withdrawalDailyLimit?: WithdrawalDailyLimit
   branding?: Branding
 }
 
@@ -189,6 +200,11 @@ export function diffDocs(before: Diffable, after: Diffable) {
   const capChange = after.withdrawalCap ? diffWithdrawalCap(before.withdrawalCap, after.withdrawalCap) : null
 
   if (capChange) changes.push(capChange)
+
+  // Daily limit: compared cleaned, so an older document (no block) equals off.
+  const dailyChange = after.withdrawalDailyLimit ? diffWithdrawalDailyLimit(before.withdrawalDailyLimit, after.withdrawalDailyLimit) : null
+
+  if (dailyChange) changes.push(dailyChange)
 
   // Branding: one change per field; an older document (no branding) equals an empty one.
   if (after.branding) changes.push(...diffBranding(before.branding, after.branding))

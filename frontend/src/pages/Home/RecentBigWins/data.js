@@ -834,6 +834,9 @@ const decorate = (win) => ({
   tier: vipTier(win.userVipLevel),
   name: displayName(win.nickName),
   amount: formatWinAmount(win.winAmount),
+  // The capture's `winAmount` is its USD figure; the card prints it in the selected currency.
+  value: win.winAmount,
+  valueCurrency: 'USDFIAT',
 });
 
 /* Tab -> its own twenty rows. `0` is All. */

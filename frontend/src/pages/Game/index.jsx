@@ -17,6 +17,7 @@ import { formatOnlineUsers } from '../../utils/gameArt';
 import RecommendList from '../GameCollection/RecommendList';
 import defaultAvatar from '../../assets/avatars/105522617.png';
 import { coinIcon } from '../../utils/coinArt';
+import { useSelectedCurrency } from '../../hooks/useSelectedCurrency';
 import { useIsDesktop } from '../../hooks/useMediaQuery';
 import LatestBets from '../Home/LatestBets';
 import { getGameTopWins } from '../../services/home';
@@ -457,7 +458,12 @@ function GameWinsTable({ game, gameUnique, settings }) {
       ? list.sort((a, b) => amount2usd(gross(b), b.currencyName) - amount2usd(gross(a), a.currencyName))
       : list.sort((a, b) => Number(b.payout) - Number(a.payout));
   }, [data, tab]);
-  const money = (amount, name) => printCurrency(Number(amount) || 0, name, { settings: settings ?? {}, hasAlias: true });
+  /* Other players' wins, printed in the VIEWER's selected currency (selected-currency skill); the
+     coin mark follows the printed currency. A bet coin with no price stays in its own coin. */
+  const cur = useSelectedCurrency();
+  const shownIn = (name) => (cur.canConvert(name) ? cur.code : name);
+  const money = (amount, name) =>
+    printCurrency(Number(amount) || 0, name, { settings: settings ?? {}, hasAlias: true, target: shownIn(name) });
 
   return (
     <section className="game-wins mt-4 rounded-xl bg-layer4 px-4 pb-4">
@@ -505,7 +511,7 @@ function GameWinsTable({ game, gameUnique, settings }) {
                     </td>
                     <td className="px-2 py-3 align-middle sm:px-4">
                       <div className="flex items-center justify-center gap-1">
-                        <img className="size-5 flex-none rounded-full" alt="" src={coinIcon(row.currencyName)} />
+                        <img className="size-5 flex-none rounded-full" alt="" src={coinIcon(shownIn(row.currencyName))} />
                         <span className="font-extrabold text-brand">+{money(gross(row), row.currencyName)}</span>
                       </div>
                     </td>

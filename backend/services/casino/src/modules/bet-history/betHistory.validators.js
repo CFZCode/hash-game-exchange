@@ -2,7 +2,7 @@
 
 const { z } = require('@ibitplay/common');
 
-const { SOURCE_KEYS } = require('./betHistory.constants');
+const { SOURCE_KEYS, BET_CATEGORIES } = require('./betHistory.constants');
 
 const paging = {
   page: z.coerce.number().int().min(1).default(1),
@@ -123,7 +123,15 @@ const myPosition = {
 
 const myHistory = {
   query: z
-    .object({ ...paging, ...window, source: z.enum(SOURCE_KEYS).optional() })
+    .object({
+      ...paging,
+      ...window,
+      source: z.enum(SOURCE_KEYS).optional(),
+      /** The pane's Type filter — see `categoryOf`. */
+      category: z.enum(BET_CATEGORIES).optional(),
+      /** One coin, any case (`bets.coin` is stored lower-case). */
+      currency: z.string().trim().regex(/^[A-Za-z][A-Za-z0-9]{1,9}$/).transform((c) => c.toUpperCase()).optional(),
+    })
     .strict(),
 };
 

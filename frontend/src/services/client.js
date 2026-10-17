@@ -1,4 +1,4 @@
-import { SOCKET_READS, liveRead, setLiveActive } from './liveStore';
+import { SOCKET_READS, liveRead, markLiveStale, setLiveActive } from './liveStore';
 import {
   clearTokens,
   getAccessToken,
@@ -353,9 +353,12 @@ const socketAnswer = (data) => ({
 async function send(url, path, init) {
   const method = String(init.method ?? 'GET').toUpperCase();
   if (method !== 'GET' || init.json !== undefined) {
-    /* A write: never shared, never retried, and it makes every cached read stale. */
+    /* A write: never shared, never retried, and it makes every cached read stale — the socket's
+       state included, so a re-read after a save never answers with the value from before it. */
     shared.clear();
-    return sendOnce(url, path, init);
+    markLiveStale();
+    // And again once it has landed: a sync asked while the write was in flight may predate it.
+    return sendOnce(url, path, init).finally(markLiveStale);
   }
 
   /* THE STARTUP READS COME OFF THE SOCKET. Branding, region, the coin list and the player's me,

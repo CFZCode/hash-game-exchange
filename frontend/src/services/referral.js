@@ -452,6 +452,9 @@ export const toUnlockRows = (config) => {
       level: String(tier.level).trim(),
       wager: print(tier.totalWager, 0),
       amount: `+${print(tier.unlockAmount, 2)}`,
+      // Raw, so the page can show them in the selected currency (the `selected-currency` skill).
+      wagerValue: tier.totalWager,
+      amountValue: tier.unlockAmount,
       currency,
     }));
 };

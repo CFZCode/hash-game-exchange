@@ -1,4 +1,6 @@
 import React from "react";
+import { useSelectedCurrency } from "../../hooks/useSelectedCurrency";
+import { isFiatCode } from "../../utils/currency";
 import Select from "../../components/shared/Select";
 import PopCenter from "../../components/shared/PopCenter";
 import { useSession } from "../../context/session";
@@ -79,7 +81,18 @@ const PANEL_EDGE = {
 /* One stage: "DEPOSIT 1 / 180% + 40% RakeBack / Min deposit 5 BCD". Both percentages are a
    SINGLE span on the original — `180% + 40%` as one string — with "RakeBack" bottom-aligned
    beside it via `items-end`, not baseline-aligned. */
-const StageCard = ({ stage, currency }) => (
+/* The minimum deposit in the viewer's selected currency (selected-currency skill), converted from
+   the offer's own currency; printed as the offer wrote it when that currency has no price. */
+function useMinDeposit(value, currency) {
+  const cur = useSelectedCurrency();
+  const c = String(currency ?? '').toUpperCase();
+  const src = isFiatCode(c) ? `${c}FIAT` : c;
+  return cur.canConvert(src) ? cur.show(value, src, { precision: 2 }) : `${value} ${currency}`;
+}
+
+const StageCard = ({ stage, currency }) => {
+  const minDeposit = useMinDeposit(stage.minDeposit, currency);
+  return (
   <div
     className="relative flex w-full flex-col gap-2 rounded-md bg-layer3 p-3"
     style={HAIRLINE}
@@ -92,10 +105,11 @@ const StageCard = ({ stage, currency }) => (
       <span className="text-sm font-semibold">RakeBack</span>
     </span>
     <span className="text-[0.625rem] text-secondary">
-      Min deposit {stage.minDeposit} {currency}
+      Min deposit {minDeposit}
     </span>
   </div>
-);
+  );
+};
 
 /* A numbered step. The connector is `flex-1` under the marker with a `gap-3` between them, and
    the row's own `pb-4` is what stops the rail short of the next marker. The last row drops the
@@ -253,8 +267,14 @@ export default function DetailDialog({ bonus, onClose }) {
     () => balances.map((b) => b.currencyName),
     [balances],
   );
-  const [currency, setCurrency] = React.useState(
-    () => session.bonusCurrencyName || balances[0]?.currencyName || "BCD",
+  /* Opens on the SELECTED wallet (selected-currency skill) when it is one of the player's coins,
+     then the account's bonus currency as before. */
+  const selected = useSelectedCurrency().code;
+  const [currency, setCurrency] = React.useState(() =>
+    (currencies.includes(selected) ? selected : null) ||
+    session.bonusCurrencyName ||
+    balances[0]?.currencyName ||
+    "BCD",
   );
 
   const calculator = (

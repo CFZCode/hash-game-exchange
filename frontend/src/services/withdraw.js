@@ -238,8 +238,9 @@ export function getBankAccounts() {
 
 const REQUIREMENTS_OK = { ok: true, missing: [], bonusForfeitRequired: false };
 
-/* `?currency=` adds the `cap` block (the deposit cap: `{enabled, remaining, wagerToRaise, …}`),
-   and `missing` then carries `'cap'` once `remaining` is 0. Bare code, `INR`. */
+/* `?currency=` adds the `cap` block (the deposit cap: `{enabled, remaining, wagerToRaise, …}`)
+   and the `dailyLimit` block (the owner's daily limit: `{enabled, limit, used, remaining}`), and
+   `missing` then carries `'cap'` / `'daily'` once either `remaining` is 0. Bare code, `INR`. */
 export function getWithdrawRequirements(currency) {
   return Promise.resolve(
     request(PLATFORM.user.withdrawals.requirements, {

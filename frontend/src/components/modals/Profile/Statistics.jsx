@@ -8,7 +8,8 @@ import useResource from '../../../hooks/useResource';
 import { IconArrow } from '../../shared/icons';
 import { useSession } from '../../../context/session';
 import { useGates } from '../../../context/gates';
-import { printCurrency, getAlias } from '../../../utils/currency';
+import { getAlias } from '../../../utils/currency';
+import { useSelectedCurrency } from '../../../hooks/useSelectedCurrency';
 import { coinIcon } from '../../../utils/coinArt';
 import {
   getGameSummary,
@@ -72,7 +73,8 @@ export default function Statistics({ onClose, enter }) {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const { session } = useSession();
-  const settings = session.setting;
+  // Wagered totals are USD by design; printed in the viewer's selected currency.
+  const cur = useSelectedCurrency();
   const { agentPlayer } = useGates();
 
   const userId = Number(params.get('userId') || '0');
@@ -110,7 +112,7 @@ export default function Statistics({ onClose, enter }) {
     {
       label: 'Total Wagered',
       Icon: IconTotalWagered,
-      count: printCurrency(summary?.betAmountUsd || '0', undefined, { settings }),
+      count: cur.show(summary?.betAmountUsd || '0', 'USDFIAT'),
     },
   ].filter((cell) => !(hideWagered && cell.label === 'Total Wagered'));
 
@@ -204,7 +206,7 @@ export default function Statistics({ onClose, enter }) {
                   <td className="text-center">{Number(row.betNum)}</td>
                   {!hideWagered && (
                     <td className="text-right">
-                      {printCurrency(row.betAmountUsd || '0', undefined, { settings })}
+                      {cur.show(row.betAmountUsd || '0', 'USDFIAT')}
                     </td>
                   )}
                 </tr>

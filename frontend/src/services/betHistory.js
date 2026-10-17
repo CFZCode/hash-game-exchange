@@ -1,6 +1,7 @@
 import { requestPage } from './client';
 import { PLATFORM } from './endpoints';
 import { isFiatCode } from '../utils/currency';
+import { getSportsBets } from './exchange/history';
 
 /* `/wallet/bet-history` — the last of the nine wallet panes. `_` in `index-D5N4LJZ-.js` is its
  * whole request module: two paths, and the split between them is the interesting part.
@@ -126,32 +127,79 @@ export function toBetRow(row) {
   };
 }
 
-/* `currencyName`, `type` and `minDistributeId` are still PASSED by the pane and are not
-   destructured, for the reasons above — two have no parameter to go to and the cursor is answered
-   rather than consumed. Restore them to the signature the day any of the three is sendable. */
-export function getBetHistory({ beginTime, endTime, page = 1 }) {
+/* ── The pane's filters ─────────────────────────────────────────────────────────────────────
+ *
+ * Type → `?category=original|live|slots` and Assets → `?currency=<code>` on the casino route
+ * (casino bet-history `myHistory`; the rule for each category is `categoryOf` there). Sports is a
+ * different service: Type = Sports reads the player's exchange bets instead (`sportsPage`).
+ *
+ * AN OLDER BACKEND REFUSES THE TWO PARAMS — its validator is strict, so an unknown key is a 422,
+ * not an ignored one. On that answer the read is repeated without them and the rows are filtered
+ * here (`filterLocally`), and the fallback is remembered for the rest of the page's life so every
+ * later read does not pay for a refused one first. */
+const CATEGORY_OF_TYPE = { 1: 'original', 3: 'live', 5: 'slots' };
+const SPORTS_TYPE = '4';
+let serverFilters = true;
+
+/* `INRFIAT` (this build's wallet key for a fiat coin) → `INR`; '' / 'all' → no filter. */
+const bareCode = (assets) => {
+  const code = String(assets ?? '').toUpperCase().replace(/FIAT$/, '');
+  return code && code !== 'ALL' ? code : '';
+};
+
+/* The casino route's live providers and live types, mirrored for the old-backend fallback only
+   (games.constants.js LIVE_PROVIDERS / LIVE_TYPES). The server's answer wins whenever it has one. */
+const LIVE_VENDORS = ['evolution gaming', 'pragmaticplaylive', 'ezugi', 'sa gaming', 'iconic21', 'vivogaming', 'xprogaming', 'betgames'];
+export function categoryOfRow(row) {
+  if (row?.game_category) return row.game_category;
+  const vendor = String(row?.game_vendor ?? '').trim().toLowerCase();
+  if (row?.source_key === 'inhouse' || vendor === 'in-house') return 'original';
+  return LIVE_VENDORS.includes(vendor) ? 'live' : 'slots';
+}
+
+function filterLocally(rows, { category, currency }) {
+  return (rows ?? []).filter(
+    (row) =>
+      (!category || categoryOfRow(row) === category) &&
+      (!currency || String(row.currency_code ?? row.currency ?? '').toUpperCase() === currency),
+  );
+}
+
+/* A strict validator's refusal of a key it does not know. */
+const isRefusedParam = (error) => error?.status === 422 || error?.status === 400 || error?.code === 'VALIDATION_ERROR';
+
+/* `minDistributeId` is still PASSED by the pane and not destructured: the cursor is answered rather
+   than consumed (see `toPage`). */
+export function getBetHistory({ beginTime, endTime, page = 1, type = '', currencyName = '' }) {
+  if (String(type) === SPORTS_TYPE) return sportsPage({ beginTime, endTime, currencyName });
+
   const first = page === 1;
+  const category = CATEGORY_OF_TYPE[type] ?? '';
+  const currency = bareCode(currencyName);
+  const filters = { category, currency };
 
-  const answer = requestPage(PLATFORM.casino.betHistory, {
-    live: true,
-    params: {
-      page,
-      limit: PAGE_SIZE,
-      /* ISO-8601; the pane holds epoch ms. NOTE the player route is `myHistory`, which carries
-         the window but NOT the `to >= from` refine — that guard is on the STAFF listing only, so
-         an inverted range is accepted here and simply matches nothing. Checked against the
-         running server rather than read off the schema, which is what made the difference. */
-      from: beginTime ? new Date(Number(beginTime)).toISOString() : undefined,
-      to: endTime ? new Date(Number(endTime)).toISOString() : undefined,
-    },
-    /* bc.game's own pair, recorded at `ENDPOINTS.betHistory.*` and both answering 403:
-       `POST bet-history-first/` then `POST bet-history/` with
-       `{beginTime, endTime, pageSize, currencyName, type, page, minDistributeId}`. */
-    fixture: EMPTY_PAGE,
-  });
+  const read = (withFilters) =>
+    requestPage(PLATFORM.casino.betHistory, {
+      live: true,
+      params: {
+        page,
+        limit: PAGE_SIZE,
+        /* ISO-8601; the pane holds epoch ms. NOTE the player route is `myHistory`, which carries
+           the window but NOT the `to >= from` refine — that guard is on the STAFF listing only, so
+           an inverted range is accepted here and simply matches nothing. Checked against the
+           running server rather than read off the schema, which is what made the difference. */
+        from: beginTime ? new Date(Number(beginTime)).toISOString() : undefined,
+        to: endTime ? new Date(Number(endTime)).toISOString() : undefined,
+        ...(withFilters ? { category: category || undefined, currency: currency || undefined } : {}),
+      },
+      /* bc.game's own pair, recorded at `ENDPOINTS.betHistory.*` and both answering 403:
+         `POST bet-history-first/` then `POST bet-history/` with
+         `{beginTime, endTime, pageSize, currencyName, type, page, minDistributeId}`. */
+      fixture: EMPTY_PAGE,
+    });
 
-  const toPage = ({ rows, pagination }) => {
-    const resList = (rows ?? []).map(toBetRow);
+  const toPage = ({ rows, pagination }, local) => {
+    const resList = (local ? filterLocally(rows, filters) : rows ?? []).map(toBetRow);
     return {
       resList,
       /* The cursor the component will send back on the next page. Answered from the last row rather
@@ -167,24 +215,70 @@ export function getBetHistory({ beginTime, endTime, page = 1 }) {
     };
   };
 
+  const filtered = Boolean(category || currency);
+  const useServer = filtered && serverFilters;
+  const answer = read(useServer);
+
   /* BOTH ARMS GO THROUGH THE MAPPER. `requestPage` normalises its FIXTURE as well — it answers
      `{rows, pagination}` either way — so handing the fixture back untouched would give the pane
      `rows` where it reads `resList`, and an empty table with no error to explain it. Caught by the
      fixtures-on pass, which is what that pass exists for. */
-  return answer && typeof answer.then === 'function' ? answer.then(toPage) : toPage(answer);
+  if (!answer || typeof answer.then !== 'function') return toPage(answer, filtered);
+  return answer.then(
+    (out) => toPage(out, filtered && !useServer),
+    (error) => {
+      if (!useServer || !isRefusedParam(error)) throw error;
+      serverFilters = false;
+      return read(false).then((out) => toPage(out, true));
+    },
+  );
 }
 
-/* `x` — the Type filter's options, and note the gap: values run "" then 1, 3, 4, 5, 6, 7, 8 with
-   no 2. Whatever category 2 was has been retired from the filter and the numbering left alone. */
+/* ── Type = Sports: the exchange's own bets ───────────────────────────────────────────────────
+ *
+ * mssports keeps them (`GET /cricket/sports-bets/user`, the My Bets page's read) and has no date
+ * filter, so the latest page is read and the window applied here; cancelled bets are left out.
+ * Every exchange bet is in INR, so an Assets filter naming another coin is an empty list. */
+const SPORTS_PAGE = 100;
+
+export function toSportsRow(bet) {
+  const stake = Number(bet.stake) || 0;
+  const profit = bet.isOpen ? 0 : Number(bet.profit) || 0;
+  const market = [bet.selection, bet.marketType].filter(Boolean).join(' · ');
+  return {
+    distributeId: `sports-${bet.id}`,
+    type: [bet.matchTitle, market].filter(Boolean).join(' — ') || 'Sports bet',
+    time: Date.parse(bet.createdAt ?? '') || undefined,
+    payout: !bet.isOpen && stake > 0 ? Math.max(0, Math.round(((stake + profit) / stake) * 1e4)) : 0,
+    profit: String(profit),
+    currencyName: 'INRFIAT',
+  };
+}
+
+async function sportsPage({ beginTime, endTime, currencyName }) {
+  const currency = bareCode(currencyName);
+  if (currency && currency !== 'INR') return { resList: [], minDistributeId: undefined, totalPage: 0, first: true };
+  const { rows } = await getSportsBets({ page: 1, limit: SPORTS_PAGE, status: 'all' });
+  const from = beginTime ? Number(beginTime) : -Infinity;
+  const to = endTime ? Number(endTime) : Infinity;
+  const resList = rows
+    .filter((bet) => !/delete|cancel|void/.test(bet.status))
+    .map(toSportsRow)
+    .filter((row) => row.time && row.time >= from && row.time <= to)
+    .sort((a, b) => b.time - a.time);
+  return { resList, minDistributeId: resList.at(-1)?.distributeId, totalPage: 1, first: true };
+}
+
+/* `x` — the Type filter's options, with bc.game's values kept ("" then 1, 3, 4, 5; there never was
+   a 2). Horse (6), Trading (7) and Lottery (8) are products this site does not run, so they are
+   gone from the list (the hidden-features inventory); a stored "6"–"8" from an older visit falls
+   back to All in the pane. */
 export const BET_TYPE_OPTIONS = [
   { label: 'All', value: '' },
   { label: 'Original', value: '1' },
   { label: 'Live', value: '3' },
   { label: 'Sports', value: '4' },
   { label: 'Slots', value: '5' },
-  { label: 'Horse', value: '6' },
-  { label: 'Trading', value: '7' },
-  { label: 'Lottery', value: '8' },
 ];
 
 /* `y = () => [1, 3, 5].includes(Number(type))` — Original, Live and Slots. It gates TWO things at

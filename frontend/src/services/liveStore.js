@@ -57,7 +57,17 @@ export function setLiveActive(on) {
   }
 }
 
-export function publishLiveState(state, token) {
+/** A write went out: every state from before it may be stale (a just-saved preference, a balance
+ *  the write moved), so no read is answered from one; the next state, built after the write,
+ *  is. Called by client.js on every non-GET. */
+let staleBefore = 0;
+export function markLiveStale() {
+  staleBefore = Date.now();
+}
+
+export function publishLiveState(state, token, askedAt = Date.now()) {
+  // A reply to a sync asked before the last write may already be out of date: drop it for reads.
+  if (askedAt < staleBefore) return;
   last = state;
   lastAt = Date.now();
   lastToken = token ?? null;
@@ -76,7 +86,7 @@ export function onLiveState(fn) {
 }
 
 function fresh(token) {
-  if (!last || Date.now() - lastAt > FRESH_MS) return null;
+  if (!last || Date.now() - lastAt > FRESH_MS || lastAt < staleBefore) return null;
   /* Signed in vs not, rather than the token itself: a refresh rotates the token for the same
      player, while a sign-in or sign-out re-opens the socket (restartRealtime), which clears
      the store before any state of the new session lands. */

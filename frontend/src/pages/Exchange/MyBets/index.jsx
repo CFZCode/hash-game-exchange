@@ -5,21 +5,17 @@ import Input from '../../../components/shared/Input';
 import Loading from '../../../components/shared/Loading';
 import EmptyPlaceholder from '../../../components/shared/EmptyPlaceholder';
 import Pagination from '../../../components/shared/Pagination';
-import PopCenter from '../../../components/shared/PopCenter';
-import { toast } from '../../../components/shared/Toast/toast';
-import { BET_TOAST } from '../../../utils/exchange';
-import { usePolling } from '../../../hooks/exchange';
-import { getSportsBets, cancelBet } from '../../../services/exchange';
-import { useExchangeCurrency } from '../../../hooks/exchange';
+import { usePolling, useExchangeCurrency } from '../../../hooks/exchange';
+import { getSportsBets } from '../../../services/exchange';
 import { ExchangeAccountPage } from '../ExchangeFrame';
 
 /* `status` is mssports' own vocabulary (CricketService.getSportsBetsByUserId): `matchbet` = open
-   and matched, `unmatchbet` = open and unmatched, `deletebet` = cancelled, `all` = every bet.
-   THERE IS NO SETTLED FILTER — Settled reads `all` and drops the open rows here, so a page can
-   hold fewer than PAGE_SIZE rows and the pager counts open bets too (docs/backend-gaps.md). */
+   and matched, `all` = every bet. THERE IS NO SETTLED FILTER — Settled reads `all` and drops the
+   open rows here, so a page can hold fewer than PAGE_SIZE rows and the pager counts open bets too
+   (docs/backend-gaps.md). No Unmatched tab: this site only takes matched bets (the slip never
+   creates an unmatched order, `unmatchbet` is always empty), so there is nothing to list or cancel. */
 const TABS = [
   { id: 'matched', label: 'Matched', status: 'matchbet' },
-  { id: 'unmatched', label: 'Unmatched', status: 'unmatchbet' },
   { id: 'settled', label: 'Settled', status: 'all' },
 ];
 const SIDES = [
@@ -40,15 +36,17 @@ function useMoney() {
   return { fmt, money: (n) => `${cur.prefix}${fmt(n)}` };
 }
 
-function BetRow({ bet, tab, cancelling, onCancel }) {
+function BetRow({ bet, tab }) {
   const { fmt, money } = useMoney();
   const side = bet.side;
   const market = bet.fancyName || bet.marketType;
-  const rate = bet.raw?.size ?? bet.raw?.user_rate_size;
+  // A fancy line's rate (Yes 54 @ 100). Odd/even markets carry a placeholder size (1000000), not a rate.
+  const oddEven = String(bet.raw?.gtype || bet.marketType || '').toLowerCase() === 'oddeven';
+  const rate = oddEven ? null : bet.raw?.size ?? bet.raw?.user_rate_size;
   const result = String(bet.resultStatus || '').toLowerCase();
 
   return (
-    <div className={`flex items-stretch gap-3 border-b border-third py-3 ${cancelling ? 'opacity-60' : ''}`}>
+    <div className="flex items-stretch gap-3 border-b border-third py-3">
       <span className={`w-1 flex-none rounded-full ${backish(side) ? 'bg-back' : 'bg-lay'}`} />
       <div className="min-w-0 flex-1">
         <p className="flex min-w-0 items-center gap-1.5">
@@ -94,54 +92,15 @@ function BetRow({ bet, tab, cancelling, onCancel }) {
             </p>
           )
         )}
-        {tab === 'unmatched' && (
-          <button
-            type="button"
-            aria-disabled={cancelling || undefined}
-            onClick={cancelling ? undefined : () => onCancel(bet)}
-            className="button button-s mt-1 h-7 rounded-md bg-layer5 px-2.5 text-xs font-semibold text-error hover:bg-layer6 aria-disabled:cursor-wait"
-          >
-            {cancelling ? 'Cancelling…' : 'Cancel'}
-          </button>
-        )}
       </div>
     </div>
   );
 }
 
-function CancelConfirm({ bet, onClose, onConfirm }) {
-  const { money } = useMoney();
-  return (
-    <PopCenter open onClose={onClose} title="Cancel bet">
-      <p className="mt-4 text-center text-secondary">
-        Cancel your unmatched {SIDE_LABEL[bet.side] ?? bet.side} bet on{' '}
-        <span className="font-extrabold text-primary">{bet.selection || bet.matchTitle}</span> at {bet.odds} for{' '}
-        {money(bet.stake)}?
-      </p>
-      <div className="mt-8 flex w-full items-center justify-between gap-3">
-        <button
-          type="button"
-          className="button button-m button-second h-12 flex-1 text-lg font-extrabold text-primary"
-          onClick={onClose}
-        >
-          Keep
-        </button>
-        <button
-          type="button"
-          className="button button-m button-brand h-12 flex-1 text-lg font-extrabold text-primary_brand"
-          onClick={onConfirm}
-        >
-          Cancel bet
-        </button>
-      </div>
-    </PopCenter>
-  );
-}
-
 /**
- * `/sports/my-bets` — the player's exchange bets: Matched / Unmatched / Settled
- * (`GET cricket/sports-bets/user`), All / Back / Lay, search, 20 a page. Open tabs re-read every
- * 10s; an unmatched row can be cancelled after a confirm. Signed out never reaches here — App.jsx
+ * `/sports/my-bets` — the player's exchange bets: Matched / Settled (`GET cricket/sports-bets/user`),
+ * All / Back / Lay, search, 20 a page, amounts in the header wallet's coin. Matched re-reads every
+ * 10s. Signed out never reaches here — App.jsx
  * raises the sign-in dialog over the route instead.
  */
 export default function ExchangeMyBets() {
@@ -150,8 +109,6 @@ export default function ExchangeMyBets() {
   const [side, setSide] = React.useState('all');
   const [draft, setDraft] = React.useState('');
   const [query, setQuery] = React.useState('');
-  const [confirming, setConfirming] = React.useState(null);
-  const [cancelling, setCancelling] = React.useState([]);
 
   React.useEffect(() => {
     const t = setTimeout(() => setQuery(draft.trim()), SEARCH_DEBOUNCE_MS);
@@ -176,21 +133,6 @@ export default function ExchangeMyBets() {
 
   const rows = (data?.rows ?? []).filter((b) => (tab === 'settled' ? !b.isOpen : true));
   const pages = Number(data?.pagination?.total_pages) || 0;
-
-  const confirmCancel = async () => {
-    const bet = confirming;
-    setConfirming(null);
-    setCancelling((ids) => [...ids, bet.id]);
-    try {
-      const res = await cancelBet(bet.id);
-      toast.success(res.message || BET_TOAST.BET_CANCELLED);
-      refresh();
-    } catch (e) {
-      toast.error(e?.message || BET_TOAST.CANCEL_FAILED);
-    } finally {
-      setCancelling((ids) => ids.filter((id) => id !== bet.id));
-    }
-  };
 
   const sideOption = SIDES.find((o) => o.value === side);
 
@@ -228,7 +170,7 @@ export default function ExchangeMyBets() {
           )
         ) : rows.length === 0 ? (
           <EmptyPlaceholder>
-            {tab === 'settled' ? 'No settled bets' : tab === 'unmatched' ? 'No unmatched bets' : 'No matched bets'}
+            {tab === 'settled' ? 'No settled bets' : 'No matched bets'}
           </EmptyPlaceholder>
         ) : (
           <>
@@ -239,20 +181,13 @@ export default function ExchangeMyBets() {
               </p>
             )}
             {rows.map((bet) => (
-              <BetRow
-                key={bet.id}
-                bet={bet}
-                tab={tab}
-                cancelling={cancelling.includes(bet.id)}
-                onCancel={setConfirming}
-              />
+              <BetRow key={bet.id} bet={bet} tab={tab} />
             ))}
           </>
         )}
 
         <Pagination page={page} pages={pages} onChange={(p) => setPageState({ key: filterKey, page: p })} />
       </div>
-      {confirming && <CancelConfirm bet={confirming} onClose={() => setConfirming(null)} onConfirm={confirmCancel} />}
     </ExchangeAccountPage>
   );
 }

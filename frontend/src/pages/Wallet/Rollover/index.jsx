@@ -9,9 +9,8 @@ import Table, {
   CELL_START,
   CELL_CENTER,
 } from '../../../components/shared/Table';
-import { printCurrency } from '../../../utils/currency';
+import { useSelectedCurrency } from '../../../hooks/useSelectedCurrency';
 import EmptyPlaceholder from '../../../components/shared/EmptyPlaceholder';
-import { useSession } from '../../../context/session';
 import WalletFilterProvider from '../../../context/WalletFilterProvider';
 import useResource from '../../../hooks/useResource';
 import { useWalletFilter } from '../../../context/walletFilter';
@@ -188,15 +187,16 @@ const rolloverTypeLabel = (isBuy, taskType, taskTypeDesc) =>
 
 /* The turnover cell: wagered so far / the target, and a progress bar under it. `originalAmount`
    is the target (services/rollover.js); `wagered` rides along on the row. */
-function Turnover({ item, settings }) {
+function Turnover({ item }) {
+  const cur = useSelectedCurrency();
   const target = Number(item.originalAmount) || 0;
   const wagered = Math.max(0, Number(item.wagered) || 0);
   const pct = target > 0 ? Math.min(100, (wagered / target) * 100) : 100;
   return (
     <div className="flex w-full flex-col items-center gap-1">
       <div className="flex max-w-full flex-wrap items-center justify-center gap-x-1 text-sm">
-        <span className="text-primary">{usd(wagered, settings)}</span>
-        <span className="text-secondary">/ {usd(target, settings)}</span>
+        <span className="text-primary">{usd(wagered, cur)}</span>
+        <span className="text-secondary">/ {usd(target, cur)}</span>
       </div>
       <div className="h-1 w-full max-w-28 overflow-hidden rounded-full bg-layer6">
         <div className="h-full rounded-full bg-brand" style={{ width: `${pct}%` }} />
@@ -205,14 +205,15 @@ function Turnover({ item, settings }) {
   );
 }
 
-/* Text-only money in the wallet's USD row (`USDFIAT`) — a coin mark beside every figure crowded a
-   phone row, and a bare `USD` has no coin art. */
-const usd = (amount, settings) =>
-  printCurrency(Number(amount) || 0, 'USDFIAT', { settings: settings ?? {}, hasAlias: true });
+/* Text-only money — a coin mark beside every figure crowded a phone row. The platform's turnover
+   figures are USD (`userwager` is kept in USD, user-service wager module); they are printed in the
+   player's SELECTED currency (`useSelectedCurrency`, the selected-currency skill). */
+const usd = (amount, cur) => cur.show(Number(amount) || 0, 'USDFIAT');
 
 /* The account's turnover at a glance (user's request, 2026-10-16), above the table and shown even
    before a deposit: wagered so far, the required turnover (deposits x multiplier) and what is left. */
-function TurnoverSummary({ settings }) {
+function TurnoverSummary() {
+  const cur = useSelectedCurrency();
   const { data } = useResource(getWagerProgress);
   if (!data) return null;
   const target = Number(data.target) || 0;
@@ -221,7 +222,7 @@ function TurnoverSummary({ settings }) {
   const cell = (label, amount) => (
     <div className="flex min-w-0 flex-col items-center gap-1">
       <span className="text-xs text-secondary">{label}</span>
-      <span className="truncate text-primary">{usd(amount, settings)}</span>
+      <span className="truncate text-primary">{usd(amount, cur)}</span>
     </div>
   );
   return (
@@ -242,7 +243,7 @@ function TurnoverSummary({ settings }) {
 }
 
 /* `te` — the list. */
-function RolloverList({ settings }) {
+function RolloverList() {
   const navigate = useNavigate();
   const { get } = useWalletFilter();
 
@@ -285,7 +286,7 @@ function RolloverList({ settings }) {
               ) : null}
             </div>
             <div className={CELL_CENTER}>
-              <Turnover item={item} settings={settings} />
+              <Turnover item={item} />
             </div>
             <div className={`${CELL} justify-end`}>
               <StatusBadge
@@ -301,9 +302,6 @@ function RolloverList({ settings }) {
 }
 
 export default function Rollover() {
-  const { session } = useSession();
-  const settings = session.setting;
-
   /* `defaults` on the original are all empty strings — there is no "past 24 hours" equivalent
      here, so an unset filter means "everything" and the body sends 0 or omits the key. */
   const defaults = React.useMemo(() => ({ type: '', status: '', bonusType: '' }), []);
@@ -321,8 +319,8 @@ export default function Rollover() {
           <BonusTypeFilter />
         </div>
 
-        <TurnoverSummary settings={settings} />
-        <RolloverList settings={settings} />
+        <TurnoverSummary />
+        <RolloverList />
       </div>
     </WalletFilterProvider>
   );

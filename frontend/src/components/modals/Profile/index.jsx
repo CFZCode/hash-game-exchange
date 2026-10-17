@@ -6,7 +6,7 @@ import useResource from '../../../hooks/useResource';
 import { IconArrow } from '../../shared/icons';
 import { useSession } from '../../../context/session';
 import { useGates } from '../../../context/gates';
-import { printCurrency } from '../../../utils/currency';
+import { useSelectedCurrency } from '../../../hooks/useSelectedCurrency';
 import { vipTier } from '../../../data/vipConfig';
 import { getUserProfile } from '../../../services/profile';
 import { orderMedals, visibleMedals, medalIcon } from './catalogue';
@@ -176,7 +176,9 @@ function MedalsCard({ profile, userId }) {
 
 /* `rt` — the Statistics card. The three cells are also the Statistics dialog's; the labels differ
    by one word there ("Total Bets" against "Total Bet Counts") and the icons are the same four. */
-function StatisticsCard({ profile, userId, userName, settings, hideWagered }) {
+function StatisticsCard({ profile, userId, userName, hideWagered }) {
+  // Wagered is USD by design; printed in the viewer's selected currency.
+  const cur = useSelectedCurrency();
   const navigate = useNavigate();
 
   const cells = [
@@ -185,7 +187,7 @@ function StatisticsCard({ profile, userId, userName, settings, hideWagered }) {
     {
       label: 'Total Wagered',
       Icon: IconTotalWagered,
-      count: printCurrency(profile.betAmountUsd, undefined, { settings }),
+      count: cur.show(profile.betAmountUsd, 'USDFIAT'),
     },
   ].filter((cell) => !(hideWagered && cell.label === 'Total Wagered'));
 
@@ -234,7 +236,8 @@ function StatisticsCard({ profile, userId, userName, settings, hideWagered }) {
    out: no `iconThreeFour` at all, and one whose URL contains "common" — the CDN's own generic
    cover, which the site replaces rather than showing. `detail_ko` is the Korean twin and is
    deliberately not fetched, for the reason the VIP page's light backdrops are not. */
-function FavouriteGame({ item, settings, hideWagered }) {
+function FavouriteGame({ item, hideWagered }) {
+  const cur = useSelectedCurrency();
   const navigate = useNavigate();
 
   const href = () => {
@@ -266,7 +269,7 @@ function FavouriteGame({ item, settings, hideWagered }) {
         <div className="ml-auto flex flex-col items-end">
           <p className="text-xs font-semibold text-secondary">Wagered</p>
           <p className="font-semibold">
-            {printCurrency(item.betAmountUsd, undefined, { settings })}
+            {cur.show(item.betAmountUsd, 'USDFIAT')}
           </p>
         </div>
       )}

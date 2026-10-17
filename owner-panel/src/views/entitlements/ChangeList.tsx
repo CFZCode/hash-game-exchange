@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import type { Change, CoinChange, CoinDefinition, ToggleChange } from '@/lib/entitlements/types'
 import { regionLabel } from '@/lib/entitlements/region'
 import { withdrawalCapLabel } from '@/lib/entitlements/withdrawalCap'
+import { withdrawalDailyLimitLabel } from '@/lib/entitlements/withdrawalDailyLimit'
 import { cashierLimitLabel } from '@/lib/entitlements/cashierLimits'
 import { BRANDING_LABELS } from '@/lib/entitlements/branding'
 
@@ -94,6 +95,14 @@ const ChangeList = ({ changes, labelOf }: { changes: Change[]; labelOf: (c: Togg
           <span className='font-medium'>Withdrawal requirements: deposit cap</span>
           <span className='text-muted-foreground font-mono text-xs'>
             {withdrawalCapLabel(c.from)} → {withdrawalCapLabel(c.to)}
+          </span>
+        </li>
+      ) : c.kind === 'withdrawal_daily_limit' ? (
+        <li key='withdrawal_daily_limit' className='flex flex-wrap items-center gap-2 text-sm'>
+          <span className='text-muted-foreground w-14 text-xs uppercase'>policy</span>
+          <span className='font-medium'>Withdrawal requirements: daily limit</span>
+          <span className='text-muted-foreground font-mono text-xs'>
+            {withdrawalDailyLimitLabel(c.from)} → {withdrawalDailyLimitLabel(c.to)}
           </span>
         </li>
       ) : c.kind === 'cashier_limits' ? (
