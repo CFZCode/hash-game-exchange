@@ -174,7 +174,7 @@ const BankBody = ({ channel }: { channel: Channel }) => {
 
 const Bank = () => (
   <div>
-    <PageHeader title='Bank' description='Settle the Client(P/L) of your direct accounts.' />
+    <PageHeader title='Bank' description='Settle the Client(P/L) of your accounts.' />
     <BankBody channel='agent' />
   </div>
 )

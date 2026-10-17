@@ -27,6 +27,7 @@ import ErrorState from '@/components/shared/ErrorState'
 import Money from '@/components/shared/Money'
 import ChannelTabs, { type Channel } from '@/components/shared/ChannelTabs'
 import PageHeader from '@/components/shared/PageHeader'
+import { useSession } from '@/contexts/SessionContext'
 import { useApi } from '@/hooks/use-api'
 import { formatMoney, formatNumber } from '@/lib/format'
 import { useCurrencyCodes } from '@/views/finance/useCurrencyCodes'
@@ -735,11 +736,15 @@ const ProfitLossView = ({ channel }: { channel: Channel }) => {
 }
 
 /** Profit & loss — Direct Users | Agent Users alag tab (dono ke figures alag). */
-const ProfitLoss = () => (
-  <div>
-    <PageHeader title='Profit & loss' description='What the house made from players, minus what it gave back. Direct and agent players are shown separately.' />
-    <ChannelTabs>{channel => <ProfitLossView channel={channel} />}</ChannelTabs>
-  </div>
-)
+const ProfitLoss = () => {
+  const direct = useSession().actor?.direct === true
+
+  return (
+    <div>
+      <PageHeader title='Profit & loss' description={`What the house made from players, minus what it gave back.${direct ? ' Direct and agent players are shown separately.' : ''}`} />
+      <ChannelTabs>{channel => <ProfitLossView channel={channel} />}</ChannelTabs>
+    </div>
+  )
+}
 
 export default ProfitLoss
