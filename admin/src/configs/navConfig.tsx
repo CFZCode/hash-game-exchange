@@ -345,6 +345,7 @@ export const navItems: NavItem[] = [
     groupLabel: 'Transactions',
     groupIcon: 'ArrowLeftRight',
     collapsible: true,
+
     // House only (user, 2026-10-17): an agent's player has no deposit / withdraw / KYC, so agent logins get no Transactions section.
     items: [
       { icon: 'ArrowDownToLine', label: 'Deposit', href: '/transactions/deposit', permission: ['deposits:read', 'users:read'], promotions: true, direct: true },
@@ -388,6 +389,7 @@ export const navItems: NavItem[] = [
     groupLabel: 'Promotions',
     groupIcon: 'Sparkles',
     collapsible: true,
+
     // Only direct users get promotions (user, 2026-10-17), so only the Super Admin and its executives see this section.
     items: [
       // The campaigns on the player site's /promotions. Reads are the public routes (staff see drafts); writes are config:write.
@@ -445,7 +447,7 @@ export const navItems: NavItem[] = [
       { icon: 'Newspaper', label: 'Blogs', href: '/content/blogs', permission: 'config:read', feature: 'blog' },
 
       // The device list and per-user history are users:read; sending (gated on the page) is config:write.
-      { icon: 'Bell', label: 'Notifications', href: '/content/notifications', permission: ['users:read', 'config:write'], feature: 'notifications' },
+      { icon: 'Bell', label: 'Notifications', href: '/content/notifications', permission: ['users:read', 'config:write'], feature: 'notifications', direct: true },
       {
         /*
          * OneSignal web push. Hidden when the owner left `push_notifications` out of the plan —
@@ -455,6 +457,7 @@ export const navItems: NavItem[] = [
         label: 'Push notifications',
         permission: 'config:read',
         feature: 'push_notifications',
+        direct: true,
         childItems: [
           { icon: 'SquarePen', label: 'Compose', href: '/push/compose' },
           { icon: 'Send', label: 'Campaigns', href: '/push/campaigns' },
