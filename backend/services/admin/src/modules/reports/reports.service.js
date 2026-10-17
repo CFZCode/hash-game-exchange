@@ -22,6 +22,7 @@ const {
 } = require('./reports.constants');
 const { isPrivateIp, deviceFromUA } = require('./ipTracker');
 const { playerScope } = require('./audienceStats.helpers');
+const { wagerValuer } = require('./reportingCurrency');
 const { COIN_IDS, DEPOSIT_SUCCESS, DIRECT_WALLET_LEDGER } = require('../dashboard/dashboard.constants');
 const { WITHDRAWAL_DONE: STATS_WITHDRAWAL_DONE } = require('./audienceStats.constants');
 const { visibleStaffIds } = require('../staff-directory/staffDirectory.service');
@@ -121,13 +122,14 @@ class ReportsService {
     // VIP standing is house-only (as on `reward-stats/vip` and the P&L costs):
     // an agent-tree caller gets `vip: null`, and the ladder is not even read.
     const house = canManagePromotions(staff);
-    const [credits, wagers, totals, ladder, bets, agentParents] = await Promise.all([
+    const [credits, wagers, totals, ladder, bets, agentParents, wagerIn] = await Promise.all([
       this.#creditsFor(ids),
       this.#wagersFor(ids),
       this.#lifetimeTotalsFor(ids),
       house ? resolveVipLadder(this.models, { logger: this.logger }) : null,
       this.#betCountsFor(ids),
       this.#agentTreeParents(rows.map((r) => r.parent_staff_id)),
+      wagerValuer(this.models),
     ]);
 
     return {
@@ -142,6 +144,7 @@ class ReportsService {
             ladder,
             bets: bets.get(String(user.id)) ?? 0,
             agentTree: agentParents.has(Number(user.parent_staff_id)),
+            wagerIn,
           }
         )
       ),
@@ -191,7 +194,7 @@ class ReportsService {
     // VIP standing is house-only (as on `reward-stats/vip` and the P&L costs):
     // an agent-tree caller gets `vip: null`, and the ladder is not even read.
     const house = canManagePromotions(staff);
-    const [credits, wagers, totals, ladder, bets, agentParents, parents] = await Promise.all([
+    const [credits, wagers, totals, ladder, bets, agentParents, parents, wagerIn] = await Promise.all([
       this.#creditsFor(ids),
       this.#wagersFor(ids),
       this.#lifetimeTotalsFor(ids),
@@ -199,6 +202,7 @@ class ReportsService {
       this.#betCountsFor(ids),
       this.#agentTreeParents(rows.map((r) => r.parent_staff_id)),
       this.#parentStaff(rows.map((r) => r.parent_staff_id)),
+      wagerValuer(this.models),
     ]);
 
     return {
@@ -213,6 +217,7 @@ class ReportsService {
             ladder,
             bets: bets.get(String(user.id)) ?? 0,
             agentTree: agentParents.has(Number(user.parent_staff_id)),
+            wagerIn,
           }
         ),
         email: user.email ?? null,
@@ -291,7 +296,7 @@ class ReportsService {
     const user = await this.#assertVisible(staff, userId);
 
     const house = canManagePromotions(staff);
-    const [credits, wagers, totals, ladder, bets, lockRow, agentParents] = await Promise.all([
+    const [credits, wagers, totals, ladder, bets, lockRow, agentParents, wagerIn] = await Promise.all([
       this.#creditsFor([user.id]),
       this.#wagersFor([user.id]),
       this.#lifetimeTotalsFor([user.id]),
@@ -302,6 +307,7 @@ class ReportsService {
         raw: true,
       }),
       this.#agentTreeParents([user.parent_staff_id]),
+      wagerValuer(this.models),
     ]);
 
     const report = this.#describePlayer(user, credits.get(String(user.id)), wagers.get(String(user.id)), {
@@ -310,6 +316,7 @@ class ReportsService {
       ladder,
       bets: bets.get(String(user.id)) ?? 0,
       agentTree: agentParents.has(Number(user.parent_staff_id)),
+      wagerIn,
     });
     return {
       ...report,
@@ -1905,7 +1912,7 @@ class ReportsService {
     return new Set(rows.filter((r) => AGENT_TREE_LEVELS.includes(levelOf.get(Number(r.role_id)))).map((r) => Number(r.id)));
   }
 
-  #describePlayer(user, credits, wager, { verbose = false, totals, ladder, bets = 0, agentTree = user.parent_staff_id != null } = {}) {
+  #describePlayer(user, credits, wager, { verbose = false, totals, ladder, bets = 0, agentTree = user.parent_staff_id != null, wagerIn = null } = {}) {
     // `fromStored`, not `toMinor`: `credits` is bare `numeric`, and real rows
     // carry more than eight decimal places. `toMinor` refuses those, which
     // turned one over-precise balance into a 400 for the whole listing.
@@ -1939,9 +1946,9 @@ class ReportsService {
       balance: amount(credits?.inr),
       totalDeposited: totals?.deposited ?? '0.00000000',
       totalWithdrawn: totals?.withdrawn ?? '0.00000000',
-      wager: wager ?? '0',
-      // `userwager` is counted in USD (stakes are converted when counted).
-      wagerCurrency: 'USD',
+      // `userwager` is counted in USD; shown in the site's default coin (`wagerValuer`).
+      wager: wagerIn ? wagerIn.of(wager ?? '0') : wager ?? '0',
+      wagerCurrency: wagerIn ? wagerIn.currency : 'USD',
 
       /**
        * The level the player HOLDS.
@@ -1960,7 +1967,8 @@ class ReportsService {
         card: vip.card,
         nextLevel: vip.nextLevel,
         nextName: vip.nextName,
-        wagerToNextLevel: vip.wagerToNextLevel,
+        wagerToNextLevel: wagerIn ? wagerIn.of(vip.wagerToNextLevel) : vip.wagerToNextLevel,
+        wagerCurrency: wagerIn ? wagerIn.currency : 'USD',
         progressPct: vip.progressPct,
       },
 

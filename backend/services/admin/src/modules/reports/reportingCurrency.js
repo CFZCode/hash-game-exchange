@@ -14,4 +14,23 @@ async function reportingCurrency(models) {
   return defaultCurrencyOf(row?.variant);
 }
 
-module.exports = { reportingCurrency };
+/**
+ * `userwager` (and everything derived from it — VIP progress) is counted in USD.
+ * For display it is carried into the site's default coin at today's rate, the way
+ * every converted admin total is; USD when that coin has no rate.
+ *
+ * @returns {Promise<{ currency: string, of: (usd: string|number|null) => string|null }>}
+ */
+async function wagerValuer(models) {
+  // Required here, not at the top: the helpers module is the bigger one and this keeps the
+  // dependency one-way for anything that only wants `reportingCurrency`.
+  const { loadRates, createValuer, decimal } = require('./audienceStats.helpers');
+  const [rates, target] = await Promise.all([loadRates(models), reportingCurrency(models)]);
+  const valuer = createValuer(rates, null, target);
+  return {
+    currency: valuer.currency,
+    of: (usd) => (usd == null ? null : decimal(valuer.value(String(usd).replace(/,/g, ''), 'USD'))),
+  };
+}
+
+module.exports = { reportingCurrency, wagerValuer };

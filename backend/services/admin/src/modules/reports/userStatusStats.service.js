@@ -5,6 +5,7 @@ const { canManagePromotions } = require('@ibitplay/auth');
 
 const errors = require('./reports.errors');
 const { playerScope, statsWindow, bucketSql, rangeSql, select, byBucket, seriesRow, percent, rangeBlock, decimal } = require('./audienceStats.helpers');
+const { wagerValuer } = require('./reportingCurrency');
 
 /**
  * Account status for the site admin's charts.
@@ -411,7 +412,7 @@ class UserStatusStatsService {
     // ── VIP ───────────────────────────────────────────────────────────────
     let vip = null;
     if (house) {
-      const ladder = await resolveVipLadder(this.models, { logger: this.logger });
+      const [ladder, wagerIn] = await Promise.all([resolveVipLadder(this.models, { logger: this.logger }), wagerValuer(this.models)]);
       const v = ladder.levelFor(String(wager?.wager ?? '0').replace(/,/g, '') || '0');
       vip = {
         level: v.level,
@@ -419,8 +420,10 @@ class UserStatusStatsService {
         card: v.card,
         nextName: v.nextName,
         progressPct: v.progressPct,
-        wager: v.wager,
-        wagerToNextLevel: v.wagerToNextLevel,
+        // The ladder is in USD; the figures are shown in the site's default coin.
+        wager: wagerIn.of(v.wager),
+        wagerToNextLevel: wagerIn.of(v.wagerToNextLevel),
+        wagerCurrency: wagerIn.currency,
         topLevel: ladder.top.level,
       };
     }

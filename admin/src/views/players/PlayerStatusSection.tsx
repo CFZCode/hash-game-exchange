@@ -49,6 +49,8 @@ type PlayerStatus = {
     progressPct: string
     wager: string
     wagerToNextLevel: string | null
+    /** The site's default coin the two figures above are shown in (the ladder itself is USD). */
+    wagerCurrency?: string
     topLevel: number
   } | null
   bonuses: {
@@ -172,11 +174,11 @@ const PlayerStatusSection = ({ userId, filters: f }: { userId: string; filters: 
                 <span className='font-medium'>{vip.name}</span>
                 <span className='text-muted-foreground text-xs'>Level {vip.level} of {vip.topLevel}</span>
                 <span className='text-muted-foreground text-xs'>
-                  {vip.nextName && vip.wagerToNextLevel !== null ? `${formatMoney(vip.wagerToNextLevel, undefined, { digits: 0 })} USD to ${vip.nextName}` : 'Top tier reached'}
+                  {vip.nextName && vip.wagerToNextLevel !== null ? `${formatMoney(vip.wagerToNextLevel, undefined, { digits: 0 })} ${vip.wagerCurrency ?? 'USD'} to ${vip.nextName}` : 'Top tier reached'}
                 </span>
               </div>
             </div>
-            <p className='text-muted-foreground text-xs'>Lifetime wager {formatMoney(vip.wager, undefined, { digits: 2 })} USD</p>
+            <p className='text-muted-foreground text-xs'>Lifetime wager {formatMoney(vip.wager, undefined, { digits: 2 })} {vip.wagerCurrency ?? 'USD'}</p>
           </Panel>
         ) : null}
 
