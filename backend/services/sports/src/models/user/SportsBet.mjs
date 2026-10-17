@@ -65,7 +65,7 @@ var SportsBet = db_default.define(
       defaultValue: "INR"
     },
     original_amount: {
-      type: DataTypes7.DECIMAL(15, 2),
+      type: DataTypes7.DECIMAL(24, 8),
       allowNull: true
     },
     usd_amount: {

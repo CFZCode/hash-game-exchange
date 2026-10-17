@@ -1,5 +1,6 @@
 // mannualSettle/controller.js — mssports core, moved unchanged
 import { db_default, init_db } from "../../../lib/config/db.mjs";
+import { betCoin, payInBetCoin } from "../../../lib/helper/betCoin.mjs";
 import { TotalExposure_default, init_TotalExposure } from "../../../models/user/TotalExposure.mjs";
 import { User_default } from "../../../models/user/User.mjs";
 // Wallets → credits: the player's sports balance is the platform wallet, credits.inr.
@@ -531,11 +532,16 @@ var voidSingleOpenBet = async (req, res) => {
           //   transaction: t
           // });
           // NEW (credits.inr): the voided bet's liability goes back to inr.
-          await Credits_default.increment("inr", {
-            by: refundAmount,
-            where: { uid },
-            transaction: t
-          });
+          if (betCoin(bet) !== "INR") {
+            // A non-INR bet's liability goes back to its coin at the bet's own rate (helper/betCoin.mjs).
+            await payInBetCoin(db_default, { uid, bets: [bet], release: refundAmount, transaction: t });
+          } else {
+            await Credits_default.increment("inr", {
+              by: refundAmount,
+              where: { uid },
+              transaction: t
+            });
+          }
           ledgerId = await recordManualVoidRefund({
             uid,
             refundAmount,

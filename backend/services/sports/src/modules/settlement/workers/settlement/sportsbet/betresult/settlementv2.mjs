@@ -28,6 +28,7 @@ import { applyWinCommission } from "../../services/settlement/sportsCommissionSe
 import { manualresult_default } from "../../models/admin/manualresult.mjs";
 import { resolveH2HBookmakerFallback, splitRunnerString, matchMarketByRunners } from "./customMarketResolvers.mjs";
 import { TOTAL_EXPOSURE_SQL } from "../../helper/totalExposure.mjs";
+import { betCoin, splitCredit, payInBetCoin } from "../../../../../../lib/helper/betCoin.mjs";
 
 import fs from "fs";
 import path2 from "path";
@@ -68,7 +69,9 @@ async function applyWalletDeltaWithLedger(user_id, { cashDelta = 0, inrDelta = 0
 // NEW (credits.inr): one balance. Placement took the liability out of inr, so inr gets what
 // cash got — the released liability plus the market result (a win pays in, a full loss adds 0).
 // `inrDelta` (the old inr_balance P/L) has no column any more and is ignored.
-async function applyWalletDeltaWithLedger(user_id, { cashDelta = 0, inrDelta = 0, ledger }) {
+// `bets` (the bets this credit settles) put a non-INR bet's money into its own coin wallet
+// (helper/betCoin.mjs); `inrDelta` is the market P/L that splits the credit into liability + win.
+async function applyWalletDeltaWithLedger(user_id, { cashDelta = 0, inrDelta = 0, ledger, bets = null }) {
   return db_default.transaction(async (t) => {
     const w = await Credits_default.findOne({
       where: { uid: user_id },
@@ -76,6 +79,12 @@ async function applyWalletDeltaWithLedger(user_id, { cashDelta = 0, inrDelta = 0
       lock: t.LOCK.UPDATE
     });
     if (!w) return null;
+    if (bets && betCoin(bets) !== "INR") {
+      const paid = await payInBetCoin(db_default, { uid: user_id, bets, ...splitCredit(cashDelta, inrDelta), transaction: t });
+      const inrNow = Number(w.inr || 0);
+      const ledgerRow = await CreditsLedger_default.create({ ...ledger, closing: inrNow, meta: { ...ledger.meta || {}, ...paid } }, { transaction: t });
+      return { ledgerRow, newCash: inrNow, newInr: inrNow, paid };
+    }
     const newCash = Number(w.inr || 0) + Number(cashDelta || 0);
     await w.update({ inr: newCash }, { transaction: t });
     const ledgerRow = await CreditsLedger_default.create({ ...ledger, closing: newCash }, { transaction: t });
@@ -1033,6 +1042,7 @@ async function initiateRefund({ job_id, user_id, eventid, match_id, bet, market_
     const desc = buildSettlementDesc(bet, market_type, "SUSPENDED");
     const refundWrite = await applyWalletDeltaWithLedger(user_id, {
       cashDelta: refundAmount,
+      bets: [bet],
       ledger: {
         user_id: String(user_id),
         currency: "INR",
@@ -1392,6 +1402,7 @@ async function processMobmGroup({ job_id, user_id, eventid, match_id, bets, even
       const moWrite = await applyWalletDeltaWithLedger(user_id, {
         cashDelta: Number(marketFinalCredit),
         inrDelta: Number(marketNetAmount),
+        bets,
         ledger: {
           user_id: String(user_id),
           currency: "INR",
@@ -1584,6 +1595,7 @@ async function processnonfancy({ job_id, user_id, eventid, match_id, bet, eventN
       const nfWrite = await applyWalletDeltaWithLedger(user_id, {
         cashDelta: Number(finalcredit),
         inrDelta: Number(marketNetAmount),
+        bets: [bet],
         ledger: {
           user_id: String(user_id),
           currency: "INR",
@@ -1775,6 +1787,14 @@ async function processFanBet({ job_id, bet, eventName, marketId, marketName }) {
     }
     const resultStatus = winner ? "won" : "loss";
     let alreadySettled = false;
+    // A non-INR bet: both wallet moves below go to its coin (helper/betCoin.mjs), summed here for the ledger meta.
+    const fanCoin = betCoin(bet);
+    let fanPaid = null;
+    const payFan = async (part, transaction) => {
+      const p = await payInBetCoin(db_default, { uid: user_id, bets: [bet], ...part, transaction });
+      const sum = (k) => Math.round(((fanPaid?.[k] || 0) + p[k]) * 1e8) / 1e8;
+      fanPaid = { ...p, coin_amount: sum("coin_amount"), coin_win: sum("coin_win") };
+    };
     await db_default.transaction(async (transaction) => {
       const [claimed] = await SportsBet_default.update(
         { status: "closed", result_status: resultStatus, fixed: 1, updated_at: /* @__PURE__ */ new Date() },
@@ -1814,7 +1834,9 @@ async function processFanBet({ job_id, bet, eventName, marketId, marketName }) {
       const oldExposure = oldExposuresRows[0] ? Number(oldExposuresRows[0].exposure_amount) : 0;
       console.log("OLD EXPOSURES:", oldExposure);
       let releaseexposure = Math.abs(oldExposure);
-      if (releaseexposure > 0) {
+      if (releaseexposure > 0 && fanCoin !== "INR") {
+        await payFan({ release: releaseexposure }, transaction);
+      } else if (releaseexposure > 0) {
         // OLD (Wallets.cash):
         /*
         const creditRecord = await Wallet_default.findOne({
@@ -1862,7 +1884,11 @@ async function processFanBet({ job_id, bet, eventName, marketId, marketName }) {
         matchid: match_id,
         created_at: /* @__PURE__ */ new Date()
       }, { transaction });
-      if (Number(netamount) !== 0) {
+      if (Number(netamount) !== 0 && fanCoin !== "INR") {
+        // A loss takes back the liability just released (placed rate); a win is converted at today's rate.
+        const amt = Number(num2(netamount));
+        await payFan(amt > 0 ? { win: amt } : { release: amt }, transaction);
+      } else if (Number(netamount) !== 0) {
         const amt = Number(num2(netamount));
         try {
           // OLD (Wallets.cash + Wallets.inr_balance):
@@ -1953,7 +1979,7 @@ async function processFanBet({ job_id, bet, eventName, marketId, marketName }) {
       job_id: job_id || null,
       market_type: market_type || null,
       sport_id: bet.sport_id || null,
-      meta: meta || null,
+      meta: fanPaid ? { ...meta || {}, ...fanPaid } : meta || null,
       commission: null,
       // `??`, not `||`: a badlo leg off its run (or a meter landing on its
       // line) settles at a REAL net of 0. `|| null` stored that as NULL,

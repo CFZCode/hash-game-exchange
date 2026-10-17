@@ -1,4 +1,5 @@
 // services/admin/sportsMarketVoidService.js — mssports core, moved unchanged
+import { betCoin, payInBetCoin } from "../../../lib/helper/betCoin.mjs";
 import { db_default, init_db } from "../../../lib/config/db.mjs";
 import { TotalExposure_default, init_TotalExposure } from "../../../models/user/TotalExposure.mjs";
 // Wallets → credits: the player's sports balance is the platform wallet, credits.inr.
@@ -194,11 +195,17 @@ var voidOpenMarket = async ({
           //   transaction: t
           // });
           // NEW (credits.inr): the voided liability goes back to inr.
-          await Credits_default.increment("inr", {
-            by: refundAmount,
-            where: { uid },
-            transaction: t
-          });
+          // A non-INR market goes back to its coin at the bets' own rate (helper/betCoin.mjs).
+          const voidBets = await SportsBet_default.findAll({ where: { ...whereClause, user_id: uid }, transaction: t });
+          if (betCoin(voidBets) !== "INR") {
+            await payInBetCoin(db_default, { uid, bets: voidBets, release: refundAmount, transaction: t });
+          } else {
+            await Credits_default.increment("inr", {
+              by: refundAmount,
+              where: { uid },
+              transaction: t
+            });
+          }
           const repBet = await SportsBet_default.findOne({
             where: { ...whereClause, user_id: uid },
             order: [["id", "ASC"]],
