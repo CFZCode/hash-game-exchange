@@ -144,7 +144,8 @@ export default function ExchangeMatchPage() {
     if (signedIn) refreshStakes();
   }, [signedIn, refreshStakes]);
 
-  /* Scorecard + stream, gated as TENEXCH's GameDetails gates them (signed-in only):
+  /* Scorecard + stream, gated as TENEXCH's GameDetails gates them, except the scorecard shows
+     signed out too (owner's call); the stream stays signed-in only:
      - cricket: the socket card, once the match has started (iplay, or stime has passed);
      - other sports: the score iframe only when the feed assigns a graphic (gtv > 0). Sticky per
        match: a poll without gtv must not unmount it, since a remount spends another single-use
@@ -163,7 +164,7 @@ export default function ExchangeMatchPage() {
   })();
 
   const scoreKey = `${gmid}|${sid}`;
-  const wantScoreUrl = signedIn && !isCricket && scoreCovered && Boolean(gmid && sid);
+  const wantScoreUrl = !isCricket && scoreCovered && Boolean(gmid && sid);
   React.useEffect(() => {
     if (!wantScoreUrl) return undefined;
     let alive = true;
@@ -347,9 +348,9 @@ export default function ExchangeMatchPage() {
       showTv={tvOn}
       onToggleTv={setShowTv}
       scoreSlot={
-        isTournament ? null : (isCricket && signedIn && matchStarted) || tvOn || (scoreUrl && signedIn) ? (
+        isTournament ? null : (isCricket && matchStarted) || tvOn || scoreUrl ? (
           <>
-            {isCricket && signedIn && matchStarted && <CricketScorecard gmid={gmid} started />}
+            {isCricket && matchStarted && <CricketScorecard gmid={gmid} started />}
             {tvOn ? (
               <iframe
                 key={gmid}
@@ -360,7 +361,7 @@ export default function ExchangeMatchPage() {
                 allowFullScreen
               />
             ) : (
-              !isCricket && scoreUrl && signedIn && (
+              !isCricket && scoreUrl && (
                 <iframe
                   title="Live score"
                   src={scoreUrl}
