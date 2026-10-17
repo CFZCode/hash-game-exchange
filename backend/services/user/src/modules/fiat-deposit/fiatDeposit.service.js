@@ -249,7 +249,7 @@ class FiatDepositService {
       await deposit.update(
         {
           status: DEPOSIT_STATUS.APPROVED,
-          // What was credited; the claim stays in claimed_amount (migration 113), so every
+          // What was credited; the claim stays in claimed_amount (migration 114), so every
           // sum of approved deposits (rollover, withdrawal cap, reports) counts real money.
           amount,
           claimed_amount: claimed,
@@ -461,7 +461,7 @@ class FiatDepositService {
     return {
       depositId: row.deposit_id,
       userId: row.user_id,
-      // Credited once approved; claimedAmount is what the player entered (migration 113).
+      // Credited once approved; claimedAmount is what the player entered (migration 114).
       amount: money.toDecimalString(money.toMinor(row.amount ?? '0')),
       claimedAmount: money.toDecimalString(money.toMinorQuantised(String(row.claimed_amount ?? row.amount ?? '0'))),
       currency: row.currency,

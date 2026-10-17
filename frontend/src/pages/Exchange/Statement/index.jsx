@@ -6,7 +6,7 @@ import Input from '../../../components/shared/Input';
 import Loading from '../../../components/shared/Loading';
 import EmptyPlaceholder from '../../../components/shared/EmptyPlaceholder';
 import Pagination from '../../../components/shared/Pagination';
-import { usePolling } from '../../../hooks/exchange';
+import { usePolling, useExchangeCurrency } from '../../../hooks/exchange';
 import { getAccountStatement } from '../../../services/exchange';
 import { ExchangeAccountPage } from '../ExchangeFrame';
 import { defaultStatementRange, statementRangeError } from '../model';
@@ -25,6 +25,9 @@ const amount = (v) => (v == null || v === '-' || v === '' ? null : Number(v));
 const opensResult = (r) => r.category === 'SPORTS' && r.matchId != null && r.eventId != null;
 
 function StatementRow({ row, onOpen }) {
+  // INR from mssports, printed in the header wallet's coin (utils/exchange/stakeCurrency.js).
+  const cur = useExchangeCurrency();
+  const fmt = cur.isInr ? formatAmount : cur.formatInr;
   const credit = amount(row.credit);
   const debit = amount(row.debit);
   const closing = amount(row.closing);
@@ -38,14 +41,14 @@ function StatementRow({ row, onOpen }) {
       </div>
       <div className="flex-none text-right text-xs leading-5">
         {credit != null && credit !== 0 ? (
-          <p className="font-extrabold text-success">+{formatAmount(credit)}</p>
+          <p className="font-extrabold text-success">+{fmt(credit)}</p>
         ) : debit != null && debit !== 0 ? (
-          <p className="font-extrabold text-error">−{formatAmount(debit)}</p>
+          <p className="font-extrabold text-error">−{fmt(debit)}</p>
         ) : (
-          <p className="text-secondary">{formatAmount(credit ?? 0)}</p>
+          <p className="text-secondary">{fmt(credit ?? 0)}</p>
         )}
         <p className="text-tertiary">
-          Bal <span className="text-secondary">{closing != null ? formatAmount(closing) : '—'}</span>
+          Bal <span className="text-secondary">{closing != null ? fmt(closing) : '—'}</span>
         </p>
       </div>
       {clickable && <IconArrow className="size-4 flex-none rotate-180 self-center fill-secondary" />}

@@ -28,6 +28,8 @@
  * imported images have light, dark and small variants that one file under public/brand/ does not.
  */
 import { useSyncExternalStore } from 'react';
+import { fetchSharedJson } from './client';
+import { onLiveState } from './liveStore';
 import { API_BASE, BRANDING_PATH, BRANDING_STORAGE_KEY, LIVE, cleanBranding } from './siteBrandingCore.js';
 
 /**
@@ -264,21 +266,31 @@ export function applySiteBranding() {
 
 let loading = null;
 
+function adoptBranding(data) {
+  const next = cleanBranding(data);
+  if (JSON.stringify(next) === JSON.stringify(runtime)) return;
+  runtime = next;
+  writeCache(next);
+  applySiteBranding();
+  for (const fn of listeners) fn();
+}
+
+/* An owner's branding change reaches an open tab with the socket's next state. */
+if (LIVE && typeof window !== 'undefined') {
+  onLiveState((state) => {
+    if (state?.branding) adoptBranding(state.branding);
+  });
+}
+
 /** Live mode: read the backend's branding, keep it, apply it, re-render the logos. Never throws. */
 export function loadSiteBranding() {
   if (!LIVE || typeof window === 'undefined') return Promise.resolve(null);
   if (loading) return loading;
-  loading = fetch(`${API_BASE}${BRANDING_PATH}`, { headers: { accept: 'application/json' }, cache: 'no-store' })
-    .then((res) => (res.ok ? res.json() : null))
+  // Through the client seam, which answers it from the realtime socket's state when it can.
+  loading = fetchSharedJson(BRANDING_PATH, { base: API_BASE })
     .then((body) => {
       if (!body || body.success === false) return runtime; // unreachable: keep the cached copy
-      const next = cleanBranding(body.data);
-      if (JSON.stringify(next) !== JSON.stringify(runtime)) {
-        runtime = next;
-        writeCache(next);
-        applySiteBranding();
-        for (const fn of listeners) fn();
-      }
+      adoptBranding(body.data);
       return runtime;
     })
     .catch(() => runtime)

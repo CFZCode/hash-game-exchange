@@ -2,7 +2,7 @@ import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { BetbyIcon, IconEdit } from '../../components/exchange/icons';
 import { ExposureBadge, StakeButtonsModal } from '../../components/exchange';
-import { useSportsBalance, useStakeButtons } from '../../hooks/exchange';
+import { useExchangeCurrency, useSportsBalance, useStakeButtons } from '../../hooks/exchange';
 import { saveStakeButtons } from '../../services/exchange';
 import { toast } from '../../components/shared/Toast/toast';
 import { BET_TOAST } from '../../utils/exchange';
@@ -90,6 +90,8 @@ export function ExchangeTools({ inRail = false, tipProps }) {
 
 function SignedInTools({ userId, inRail, tipProps = () => null }) {
   const { balance, exposure } = useSportsBalance({ userId });
+  // mssports' wallet is INR; printed (and the stake buttons edited) in the header wallet's coin.
+  const cur = useExchangeCurrency();
   const { data: stakes, refresh } = useStakeButtons();
   const [editing, setEditing] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
@@ -105,7 +107,7 @@ function SignedInTools({ userId, inRail, tipProps = () => null }) {
     setSaving(true);
     setError(null);
     try {
-      await saveStakeButtons(values.map((value) => ({ label: stakeLabel(value), value })));
+      await saveStakeButtons(values.map(cur.chipToInr).map((value) => ({ label: stakeLabel(value), value })));
       refresh();
       setEditing(false);
       // TENEXCH SetButtonValueModal's wording, both ways; the modal stays open on a failure.
@@ -142,7 +144,8 @@ function SignedInTools({ userId, inRail, tipProps = () => null }) {
         className="ml-1 flex-none"
         balance={balance ?? 0}
         exposure={exposure ?? 0}
-        currency="₹"
+        currency={cur.prefix}
+        formatAmount={cur.isInr ? undefined : cur.formatInr}
         loading={balance == null}
         /* NAMED AS THE SPORTS WALLET. The exchange settles from its own INR wallet, which is not
            the casino balance in the site header — so a bare "Bal ₹0.00" under a header showing
@@ -154,7 +157,7 @@ function SignedInTools({ userId, inRail, tipProps = () => null }) {
       {editing && stakes && (
         <StakeButtonsModal
           title="Stake buttons"
-          values={stakes.stakes.map((s) => s.value)}
+          values={stakes.stakes.map((s) => cur.chipFromInr(Number(s.value)))}
           saving={saving}
           error={error}
           onSave={save}

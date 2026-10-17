@@ -29,7 +29,6 @@ import {
   MATCHES,
   LATEST,
   MATCHED,
-  UNMATCHED,
   STAKES,
 } from './sampleData';
 
@@ -307,14 +306,7 @@ export default function ExchangeKitPreview() {
               >
                 Edit stake buttons
               </button>
-              <OpenBetsPanel
-                matched={MATCHED}
-                unmatched={UNMATCHED}
-                currency="₹"
-                onCancel={() => {}}
-                onCancelAll={() => {}}
-                cancellingIds={['u2']}
-              />
+              <OpenBetsPanel matched={MATCHED} currency="₹" />
             </aside>
           </div>
         </Section>

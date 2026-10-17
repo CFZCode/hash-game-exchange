@@ -2,13 +2,13 @@ import React from 'react';
 import DialogShell from '../../../components/shared/DialogShell';
 import Loading from '../../../components/shared/Loading';
 import { formatAmount, formatStartTime } from '../../../components/exchange';
-import { usePolling } from '../../../hooks/exchange';
+import { usePolling, useExchangeCurrency } from '../../../hooks/exchange';
 import { getStatementMarketBets } from '../../../services/exchange';
 
-const money = (n) => `₹${formatAmount(n)}`;
-const signed = (n) => {
+/* INR from mssports, printed in the header wallet's coin (utils/exchange/stakeCurrency.js). */
+const signedWith = (fmt) => (n) => {
   const v = Number(n) || 0;
-  return `${v > 0 ? '+' : v < 0 ? '−' : ''}${formatAmount(Math.abs(v))}`;
+  return `${v > 0 ? '+' : v < 0 ? '−' : ''}${fmt(Math.abs(v))}`;
 };
 const tone = (n) => (Number(n) > 0 ? 'text-success' : Number(n) < 0 ? 'text-error' : 'text-secondary');
 
@@ -20,6 +20,10 @@ const tone = (n) => (Number(n) > 0 ? 'text-success' : Number(n) < 0 ? 'text-erro
  * @param {{ row: { matchId, eventId, fancyName?, description }, onClose: () => void }} props
  */
 export default function MarketBetsDialog({ row, onClose }) {
+  const cur = useExchangeCurrency();
+  const fmt = cur.isInr ? formatAmount : cur.formatInr;
+  const money = (n) => `${cur.prefix}${fmt(n)}`;
+  const signed = signedWith(fmt);
   const { matchId, eventId, fancyName } = row;
   const fetcher = React.useCallback(
     () => getStatementMarketBets({ matchId, eventId, fancyName: fancyName || undefined }),

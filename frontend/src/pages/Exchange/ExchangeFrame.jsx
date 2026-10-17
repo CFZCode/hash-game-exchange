@@ -4,21 +4,31 @@ import ExchangeRail, { ExchangeTools } from './ExchangeRail';
 import Notice from '../../components/shared/Notice';
 import { useSession } from '../../context/session';
 import { getAlias } from '../../utils/currency';
+import { useExchangeCurrency } from '../../hooks/exchange';
 
 /**
- * The exchange books, settles and shows every figure in INR (₹) whatever the header wallet is,
- * so a player on any other currency (USDT, BTC…) is told so before staking — otherwise "100" on
- * the slip reads as 100 of their own coin. Signed-in, non-INR wallets only. Says nothing about
- * how funds move between wallets: that is not this note's to promise.
+ * The exchange books and settles in INR (₹) whatever the header wallet is; these pages show and
+ * take every amount in the header wallet's coin and convert at the platform's rate
+ * (utils/exchange/stakeCurrency.js). Signed-in, non-INR wallets only, so the player knows the
+ * figures are converted and what the rate is. A coin with no rate falls back to INR, and says so.
  */
 export function ExchangeCurrencyNote({ className = 'mt-3' }) {
   const { session } = useSession();
+  const cur = useExchangeCurrency();
   const code = String(session?.setting?.currencyName ?? '');
   if (!session?.login || !code || code === 'BCD' || /^INR(FIAT)?$/i.test(code)) return null;
+  if (cur.fallback) {
+    return (
+      <Notice type="warning" className={className}>
+        No exchange rate for {getAlias(code)} right now, so sports exchange amounts on these pages are shown in INR (₹).
+      </Notice>
+    );
+  }
+  const rate = cur.inrPerUnit.toLocaleString('en-US', { maximumFractionDigits: cur.inrPerUnit >= 100 ? 0 : 2 });
   return (
-    <Notice type="warning" className={className}>
-      Sports exchange bets are in INR (₹). Stakes, profit, liability and exposure on these pages are
-      shown in INR, not in {getAlias(code)}.
+    <Notice type="info" className={className}>
+      Sports exchange bets settle in INR. Stakes, profit, liability and exposure here are in {cur.label}, converted
+      at 1 {cur.label} ≈ ₹{rate}.
     </Notice>
   );
 }

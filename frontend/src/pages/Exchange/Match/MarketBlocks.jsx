@@ -52,7 +52,7 @@ const raceSilk = (market, s) =>
   ) : undefined;
 const price = (v) => formatOddAddaplay(v);
 
-function RunnerMarket({ market, book, projected, slip, slipNode, disabled, signedIn, onCell, onCashout }) {
+function RunnerMarket({ market, book, projected, slip, slipNode, disabled, signedIn, onCell, onCashout, formatAmount }) {
   const mine = slip && String(slip.mid) === String(market.mid);
   const g = gt(market);
   const sections = market.section || [];
@@ -81,6 +81,7 @@ function RunnerMarket({ market, book, projected, slip, slipNode, disabled, signe
       showSize
       formatPrice={price}
       formatSize={formatSize}
+      formatAmount={formatAmount}
       selected={mine ? slip.kitSel : null}
       activeRunnerId={mine ? slip.rowId : null}
       betSlip={mine ? slipNode : null}
@@ -105,7 +106,7 @@ function RunnerMarket({ market, book, projected, slip, slipNode, disabled, signe
   );
 }
 
-function FancyMarket({ market, book, slip, slipNode, disabled, onCell, onBadlo }) {
+function FancyMarket({ market, book, slip, slipNode, disabled, onCell, onBadlo, formatAmount, formatLimit }) {
   const mine = slip && String(slip.mid) === String(market.mid);
   const sections = market.section || [];
   const rows = sections.map((s) => {
@@ -127,6 +128,8 @@ function FancyMarket({ market, book, slip, slipNode, disabled, onCell, onBadlo }
     <FancyBlock
       title={marketTitle(market)}
       rows={rows}
+      formatAmount={formatAmount}
+      formatLimit={formatLimit}
       selected={mine ? slip.kitSel : null}
       activeRowId={mine ? slip.rowId : null}
       betSlip={mine ? slipNode : null}
@@ -150,7 +153,7 @@ function FancyMarket({ market, book, slip, slipNode, disabled, onCell, onBadlo }
   );
 }
 
-function OddEvenMarket({ market, book, slip, slipNode, disabled, onCell }) {
+function OddEvenMarket({ market, book, slip, slipNode, disabled, onCell, formatAmount }) {
   const mine = slip && String(slip.mid) === String(market.mid);
   const sections = market.section || [];
   const rows = sections.map((s) => ({
@@ -167,6 +170,7 @@ function OddEvenMarket({ market, book, slip, slipNode, disabled, onCell }) {
       rows={rows}
       formatPrice={price}
       formatSize={formatSize}
+      formatAmount={formatAmount}
       selected={mine ? slip.kitSel : null}
       activeRowId={mine ? slip.rowId : null}
       betSlip={mine ? slipNode : null}
@@ -189,7 +193,7 @@ function OddEvenMarket({ market, book, slip, slipNode, disabled, onCell }) {
   );
 }
 
-function LineMarkets({ markets, book, slip, slipNode, disabled, onCell }) {
+function LineMarkets({ markets, book, slip, slipNode, disabled, onCell, formatAmount }) {
   const rows = [];
   const index = {};
   for (const m of markets) {
@@ -214,6 +218,7 @@ function LineMarkets({ markets, book, slip, slipNode, disabled, onCell }) {
       depth={markets.some(hasDepth) ? 3 : 1}
       formatPrice={price}
       formatSize={formatSize}
+      formatAmount={formatAmount}
       selected={mine ? slip.kitSel : null}
       activeRowId={mine ? slip.rowId : null}
       betSlip={mine ? slipNode : null}
@@ -241,12 +246,12 @@ function LineMarkets({ markets, book, slip, slipNode, disabled, onCell }) {
 
 /* Khado (one Yes price, the band width in the name) and cricket-casino Number grids (one Back
    price per row) — no kit block of their own, so the kit's MarketCard + RunnerRow `cells`. */
-function SingleMarket({ market, book, slip, slipNode, disabled, onCell }) {
+function SingleMarket({ market, book, slip, slipNode, disabled, onCell, formatAmount }) {
   const mine = slip && String(slip.mid) === String(market.mid);
   const sections = market.section || [];
   const khado = gt(market) === 'khado';
   return (
-    <MarketCard name={marketTitle(market)} columns={[khado ? 'Yes' : 'Back']} columnTones={['back']}>
+    <MarketCard name={marketTitle(market)} columns={[khado ? 'Yes' : 'Back']} columnTones={['back']} formatAmount={formatAmount}>
       {sections.map((s) => {
         const row = singleRow(market, s);
         return (
@@ -259,6 +264,7 @@ function SingleMarket({ market, book, slip, slipNode, disabled, onCell }) {
             pnl={bookFor(book, market.mid, s.nat)}
             formatPrice={khado ? (v) => String(v ?? '') : price}
             formatSize={formatSize}
+            formatAmount={formatAmount}
             selected={mine && slip.rowId === s.sid ? { key: row.cell.key } : null}
             onSelect={(sel) =>
               onCell({
@@ -294,9 +300,11 @@ function SingleMarket({ market, book, slip, slipNode, disabled, onCell }) {
  * @param {(spec)=>void} props.onCell
  * @param {(market)=>void} props.onCashout
  * @param {(row)=>void} props.onBadlo
+ * @param {(n)=>string} [props.formatAmount]  INR book / limits → the player's coin (undefined = kit default)
+ * @param {(n)=>string} [props.formatLimit]   Fancy rows' Min/Max (undefined = kit default)
  */
-export default function MarketBlocks({ markets, book, slip, slipNode, projected, disabled, signedIn, onCell, onCashout, onBadlo }) {
-  const common = { book, slip, slipNode, disabled, onCell };
+export default function MarketBlocks({ markets, book, slip, slipNode, projected, disabled, signedIn, onCell, onCashout, onBadlo, formatAmount, formatLimit }) {
+  const common = { book, slip, slipNode, disabled, onCell, formatAmount };
   const lines = markets.filter((m) => marketKind(m) === 'line');
   let linesDrawn = false;
   const out = [];
@@ -318,7 +326,7 @@ export default function MarketBlocks({ markets, book, slip, slipNode, projected,
     } else if (kind === 'single') {
       out.push(<SingleMarket key={m.mid} market={m} {...common} />);
     } else {
-      out.push(<FancyMarket key={m.mid} market={m} onBadlo={onBadlo} {...common} />);
+      out.push(<FancyMarket key={m.mid} market={m} onBadlo={onBadlo} formatLimit={formatLimit} {...common} />);
     }
   }
   return <div className="flex flex-col gap-3">{out}</div>;
