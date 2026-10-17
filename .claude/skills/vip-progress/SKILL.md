@@ -56,7 +56,7 @@ STAFF_EMAIL=<admin email> STAFF_PASSWORD='<pw>' node .claude/skills/vip-progress
 ## How wager reaches VIP (check this when a level doesn't move)
 
 - **Casino:** casino-service posts every stake to `/internal/user/wager/record`.
-- **Sports:** sports-service's wager sync (`services/sports/src/modules/settlement/sportsWagerSync.js`, every `SPORTS_WAGER_SYNC_MS`, default 30 s) posts each bet settled won or lost, once, as `sports:<betId>`. Open bets don't count. A voided bet is reversed. The cursor table is `mssports.sports_wager_sync` (migration 117).
+- **Sports:** sports-service's wager-report sync (`services/sports/src/modules/wager-report/sportsWagerSync.js`, every `SPORTS_WAGER_SYNC_INTERVAL_MS`, default 60 s) posts each bet settled won or lost, once, with ref `<betId>`; its cursor is `wager_activity` itself. Open bets don't count. A voided bet is reversed. (A second job that used `sports:<betId>` double-counted every bet and was removed on 2026-10-18; the same sync now reverses those `sports:` duplicates.)
 - **No USD rate** for the stake's currency: the stake is not counted yet. It is retried on the next tick.
 - **Level-up reward:** paid once per level crossed (`vip:level_up:<user>:<level>`).
 

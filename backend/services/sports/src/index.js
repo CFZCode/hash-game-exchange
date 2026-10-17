@@ -7,7 +7,6 @@ const { createContainer } = require('./container');
 const { buildApp } = require('./app');
 const { attachSockets } = require('./sockets');
 const { mssports } = require('./lib/mssports');
-const { createSportsWagerSync } = require('./modules/settlement/sportsWagerSync');
 
 async function main() {
   const container = await createContainer();
@@ -31,20 +30,9 @@ async function main() {
     onShutdown: [() => container.close()],
   });
 
-  // Settled sports stakes → the player's wager / VIP level (they never reached it before).
-  const stopWagerSync = createSportsWagerSync({
-    sequelize: container.db.sequelize ?? container.db,
-    clients: container.clients,
-    logger: container.logger,
-    schema: config.MSSPORTS_DB_SCHEMA,
-  }).start(config.SPORTS_WAGER_SYNC_MS);
-
   // The mssports balance room; see `sockets.js`.
   const sockets = attachSockets({ server, container });
-  container.onShutdown = () => {
-    stopWagerSync();
-    sockets.close();
-  };
+  container.onShutdown = () => sockets.close();
 }
 
 main().catch((error) => {

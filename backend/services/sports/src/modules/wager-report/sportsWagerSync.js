@@ -31,7 +31,7 @@ class SportsWagerSync {
 
   async run({ limit = 200 } = {}) {
     const counted = await this.#countSettled(limit);
-    const reversed = await this.#reverseVoided(limit);
+    const reversed = (await this.#reverseVoided(limit)) + (await this.#reverseDuplicates(limit));
     if (counted || reversed) this.logger?.info({ counted, reversed }, 'Sports wager sync');
     return { counted, reversed };
   }
@@ -62,6 +62,33 @@ class SportsWagerSync {
         if (outcome?.counted) done += 1;
       } catch (error) {
         this.logger?.warn({ err: error, betId: bet.id }, 'Sports wager record failed — retried next sweep');
+      }
+    }
+    return done;
+  }
+
+  /**
+   * A second sweep (since removed) recorded the same bets under `sports:<betId>`; user-service
+   * dedupes on `(source, ref)`, so each such bet was counted twice. Take the `sports:` copy back
+   * out wherever the plain `<betId>` row exists — once each, then nothing is left to match.
+   */
+  async #reverseDuplicates(limit) {
+    const rows = await this.#query(
+      `SELECT d.user_id, d.ref
+         FROM public.wager_activity d
+         JOIN public.wager_activity w ON w.source = d.source AND w.ref = substring(d.ref from 8) AND w.reversed_at IS NULL
+        WHERE d.source = :source AND d.ref LIKE 'sports:%' AND d.reversed_at IS NULL
+        ORDER BY d.id
+        LIMIT :limit`,
+      { source: SOURCE, limit }
+    );
+    let done = 0;
+    for (const row of rows) {
+      try {
+        await this.clients.user.post('/internal/user/wager/reverse', { userId: Number(row.user_id), source: SOURCE, ref: row.ref });
+        done += 1;
+      } catch (error) {
+        this.logger?.warn({ err: error, ref: row.ref }, 'Duplicate sports wager reversal failed — retried next sweep');
       }
     }
     return done;

@@ -21,8 +21,7 @@ Labels: **MISSING** means no route, storage or enforcement exists. **BUG** means
   - Add `/internal/user/wager` to the sports-service entry in `packages/common/src/internalAcl.js`.
   - Backfill existing settled bets without spamming level-up rewards.
 - **Status: fixed locally, not committed or deployed yet.**
-  - `services/sports/src/modules/settlement/sportsWagerSync.js` runs every 30 s (`SPORTS_WAGER_SYNC_MS`). It posts each settled won or lost bet once (`sports:<betId>`, `rakeback: false`) and reverses one that is later voided.
-  - Its cursor is migration **117** `mssports.sports_wager_sync`.
+  - **Corrected 2026-10-18:** two jobs ended up counting sports stakes — the team's `modules/wager-report/sportsWagerSync.js` (ref `<betId>`) and a second `modules/settlement/sportsWagerSync.js` (ref `sports:<betId>`). Every settled bet was counted TWICE on live (VIP wager, rollover, affiliate commission, level-ups). The second job is removed; the wager-report sync now also reverses the `sports:` duplicates. Deploy sports-service to stop the double count. Table `mssports.sports_wager_sync` (migration 117) is now unused.
   - The first start backfills every settled bet. Level-up rewards fire once per level crossed.
   - Also fixed: the VIP progress bar showed 0% for every unranked player (`packages/common/src/vipLadder.js`). `/user/vip` now returns `currency`, `wagerInCurrency` and `wagerToNextLevelInCurrency` in the owner's default coin.
 - **Open risk:** on the exchange, a back and a lay on the same runner inflate wager at near-zero risk. That can farm VIP level-up rewards and affiliate commission. Rakeback is already off for sports stakes; the other two are not guarded. Count only the net exposure per market, or exclude hedged pairs.
