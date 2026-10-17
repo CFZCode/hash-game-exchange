@@ -34,7 +34,7 @@ const { money, ServiceUnavailableError } = require('@ibitplay/common');
 const TTL_MS = 60_000;
 const MAX_ENTRIES = 5_000;
 const USD_LIKE = new Set(['USD', 'USDT', 'USDC']);
-const SPORTS_PROVIDER = 'Sportsbook';
+const SPORTS_PROVIDER = 'Sports';
 
 const ZERO = '0';
 const dec = (minor) => money.toDecimalString(minor);

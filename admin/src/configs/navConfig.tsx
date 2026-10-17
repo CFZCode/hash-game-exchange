@@ -418,8 +418,8 @@ export const navItems: NavItem[] = [
       // The house-games and bet-history admin reads are guarded by reports:read, not casino:read.
       { icon: 'History', label: 'Bet history', href: '/casino/bets', permission: 'reports:read', flag: 'casino' },
 
-      // Like bet history: `GET admin/reports/wager-stats` is reports:read and tree-scoped.
-      { icon: 'FileSpreadsheet', label: 'Wager report', href: '/casino/wager-report', permission: 'reports:read', flag: 'casino' },
+      // Like bet history: `GET admin/reports/wager-stats` is reports:read and tree-scoped. Not for agent logins (user, 2026-10-17).
+      { icon: 'FileSpreadsheet', label: 'Wager report', href: '/casino/wager-report', permission: 'reports:read', flag: 'casino', promotions: true },
       { icon: 'Trophy', label: 'Providers Priority', href: '/providers-priority', permission: 'casino:read', flag: 'casino' },
       { icon: 'ArrowBigUp', label: 'Vendor Priority', href: '/vendor-priority', permission: 'casino:read', flag: 'casino' },
       { icon: 'Gamepad2', label: 'Type Priority', href: '/type-priority', permission: 'casino:read', flag: 'casino' },
@@ -471,10 +471,11 @@ export const navItems: NavItem[] = [
     groupLabel: 'Reports',
     groupIcon: 'ChartPie',
     collapsible: true,
+    // Not for agent logins (user, 2026-10-17): agents have their own reports under Agent Management.
     items: [
-      { icon: 'ClipboardList', label: 'User reports', href: '/reports/players', permission: 'reports:read' },
-      { icon: 'BadgeDollarSign', label: 'Profit & loss', href: '/reports/pnl', permission: 'reports:read' },
-      { icon: 'ShieldAlert', label: 'Risk', href: '/reports/risk', permission: 'reports:read' }
+      { icon: 'ClipboardList', label: 'User reports', href: '/reports/players', permission: 'reports:read', promotions: true },
+      { icon: 'BadgeDollarSign', label: 'Profit & loss', href: '/reports/pnl', permission: 'reports:read', promotions: true },
+      { icon: 'ShieldAlert', label: 'Risk', href: '/reports/risk', permission: 'reports:read', promotions: true }
     ]
   },
   {
@@ -531,7 +532,11 @@ export const PROMOTION_ROUTES = [
   '/withdrawals',
   '/reports/statements',
   '/kyc',
-  '/bank-details'
+  '/bank-details',
+
+  // Casino wager report and the Reports section: Super Admin side only, not the agent system.
+  '/casino/wager-report',
+  '/reports'
 ]
 
 /** Direct-user screens with no sidebar entry (the old cashier): Super Admin and its executives only, like `direct: true`. */
