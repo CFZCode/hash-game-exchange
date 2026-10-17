@@ -13,11 +13,11 @@ const API = 'admin/agent-ledger'
 const PAGE_SIZE = 25
 
 /* admin-structure.zip `Deposit.tsx` / `Withdraw.tsx` ke colours. */
-const card = 'rounded-lg border border-[#1E2D55] bg-[#0E1831]'
-const input = 'h-10 rounded-md border border-[#1E2D55] bg-[#0B1427] px-3 text-sm text-[#F9F9F9] outline-none placeholder:text-[#8384A5] hover:border-[#2B6EF5] focus:border-[#2B6EF5] [color-scheme:dark]'
-const outlineBtn = 'inline-flex items-center gap-1.5 rounded-md border border-[#1E2D55] px-3 py-1 text-sm text-[#8384A5] hover:border-[#2B6EF5] hover:text-[#2B6EF5] disabled:opacity-40'
-const th = 'whitespace-nowrap border-b border-[#1E2D55] bg-[#0B1427] px-4 py-2.5 text-left text-[0.72rem] font-bold tracking-[0.06em] text-[#8384A5] uppercase'
-const td = 'border-b border-[#1E2D55] px-4 py-3 text-[0.82rem] text-[#C8CAE5]'
+const card = 'rounded-lg border border-border bg-card'
+const input = 'h-10 rounded-md border border-border bg-muted px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground hover:border-[#2B6EF5] focus:border-[#2B6EF5] dark:[color-scheme:dark]'
+const outlineBtn = 'inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1 text-sm text-muted-foreground hover:border-[#2B6EF5] hover:text-[#2B6EF5] disabled:opacity-40'
+const th = 'whitespace-nowrap border-b border-border bg-muted px-4 py-2.5 text-left text-[0.72rem] font-bold tracking-[0.06em] text-muted-foreground uppercase'
+const td = 'border-b border-border px-4 py-3 text-[0.82rem] text-foreground/80'
 
 const fmt = (iso: string) => {
   const d = new Date(iso)
@@ -30,10 +30,10 @@ const money = (v: string | number) => Number(v || 0).toLocaleString('en-IN', { m
 
 const party = (p: Side) => (
   <span>
-    <span className='text-[#8384A5]'>
+    <span className='text-muted-foreground'>
       {p.type === 'staff' ? 'Staff' : 'User'} #{p.id}
     </span>
-    {p.name && <span className='ml-1 font-medium text-[#F9F9F9]'>{p.name}</span>}
+    {p.name && <span className='ml-1 font-medium text-foreground'>{p.name}</span>}
   </span>
 )
 
@@ -90,8 +90,8 @@ const AgentLedger = ({ direction }: { direction: 'deposit' | 'withdraw' }) => {
             {deposit ? <ArrowUpCircleIcon className='size-[22px] text-[#0ECC68]' /> : <ArrowDownCircleIcon className='size-[22px] text-[#E01B4F]' />}
           </span>
           <div>
-            <h2 className='text-2xl font-bold text-[#F9F9F9]'>{deposit ? 'Deposit History' : 'Withdraw History'}</h2>
-            <p className='text-xs text-[#8384A5]'>{deposit ? 'Agent → User / sub-agent deposits (point ledger)' : 'User / sub-agent → Agent withdrawals (point ledger)'}</p>
+            <h2 className='text-2xl font-bold text-foreground'>{deposit ? 'Deposit History' : 'Withdraw History'}</h2>
+            <p className='text-xs text-muted-foreground'>{deposit ? 'Agent → User / sub-agent deposits (point ledger)' : 'User / sub-agent → Agent withdrawals (point ledger)'}</p>
           </div>
         </div>
         <button
@@ -116,8 +116,8 @@ const AgentLedger = ({ direction }: { direction: 'deposit' | 'withdraw' }) => {
           ['Page', `${page} / ${totalPages}`]
         ].map(([label, value]) => (
           <div key={label} className={`${card} p-4`}>
-            <div className='text-xs text-[#8384A5]'>{label}</div>
-            <div className={`mt-1 text-lg font-bold tabular-nums ${label === 'Total Amount' ? (deposit ? 'text-[#0ECC68]' : 'text-[#E01B4F]') : 'text-[#F9F9F9]'}`}>{value}</div>
+            <div className='text-xs text-muted-foreground'>{label}</div>
+            <div className={`mt-1 text-lg font-bold tabular-nums ${label === 'Total Amount' ? (deposit ? 'text-[#0ECC68]' : 'text-[#E01B4F]') : 'text-foreground'}`}>{value}</div>
           </div>
         ))}
       </div>
@@ -125,14 +125,14 @@ const AgentLedger = ({ direction }: { direction: 'deposit' | 'withdraw' }) => {
       {/* Filters */}
       <div className={`${card} mb-4 flex flex-col gap-4 p-4 md:flex-row md:items-center`}>
         <div className='relative'>
-          <SearchIcon className='absolute top-1/2 left-3 size-[15px] -translate-y-1/2 text-[#8384A5]' />
+          <SearchIcon className='absolute top-1/2 left-3 size-[15px] -translate-y-1/2 text-muted-foreground' />
           <input className={`${input} min-w-40 pl-9`} placeholder='Search by ID…' value={f.q} onChange={e => change('q', e.target.value)} />
         </div>
-        <label className='grid gap-0.5 text-[0.7rem] text-[#8384A5]'>
+        <label className='grid gap-0.5 text-[0.7rem] text-muted-foreground'>
           From
           <input type='date' className={`${input} min-w-[150px]`} value={f.from} onChange={e => change('from', e.target.value)} />
         </label>
-        <label className='grid gap-0.5 text-[0.7rem] text-[#8384A5]'>
+        <label className='grid gap-0.5 text-[0.7rem] text-muted-foreground'>
           To
           <input type='date' className={`${input} min-w-[150px]`} value={f.to} onChange={e => change('to', e.target.value)} />
         </label>
@@ -141,7 +141,7 @@ const AgentLedger = ({ direction }: { direction: 'deposit' | 'withdraw' }) => {
         {hasFilters && (
           <button
             type='button'
-            className='inline-flex items-center gap-1 rounded-md border border-[#1E2D55] px-3 py-1.5 text-sm whitespace-nowrap text-[#8384A5] hover:border-[#E01B4F] hover:text-[#E01B4F]'
+            className='inline-flex items-center gap-1 rounded-md border border-border px-3 py-1.5 text-sm whitespace-nowrap text-muted-foreground hover:border-[#E01B4F] hover:text-[#E01B4F]'
             onClick={() => {
               setPage(1)
               setF({ q: '', from: '', to: '', min: '', max: '' })
@@ -171,7 +171,7 @@ const AgentLedger = ({ direction }: { direction: 'deposit' | 'withdraw' }) => {
                   <tr key={i}>
                     {[...Array(6)].map((__, j) => (
                       <td key={j} className={td}>
-                        <div className='h-4 animate-pulse rounded bg-[#162140]' />
+                        <div className='h-4 animate-pulse rounded bg-accent' />
                       </td>
                     ))}
                   </tr>
@@ -185,8 +185,8 @@ const AgentLedger = ({ direction }: { direction: 'deposit' | 'withdraw' }) => {
               ) : rows.length === 0 ? (
                 <tr>
                   <td colSpan={6} className='py-12 text-center'>
-                    {deposit ? <ArrowUpCircleIcon className='mx-auto size-10 text-[#1E2D55]' /> : <ArrowDownCircleIcon className='mx-auto size-10 text-[#1E2D55]' />}
-                    <p className='mt-2 text-[#8384A5]'>No {deposit ? 'deposits' : 'withdrawals'} found.</p>
+                    {deposit ? <ArrowUpCircleIcon className='mx-auto size-10 text-border' /> : <ArrowDownCircleIcon className='mx-auto size-10 text-border' />}
+                    <p className='mt-2 text-muted-foreground'>No {deposit ? 'deposits' : 'withdrawals'} found.</p>
                   </td>
                 </tr>
               ) : (
@@ -196,13 +196,13 @@ const AgentLedger = ({ direction }: { direction: 'deposit' | 'withdraw' }) => {
                     <td className={td}>{party(r.from)}</td>
                     <td className={td}>{party(r.to)}</td>
                     <td className={td}>
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${TYPE_TONE[r.type] ?? 'bg-[#162140] text-[#8384A5]'}`}>{r.type}</span>
-                      {r.remark && <span className='ml-2 text-xs text-[#8384A5]'>{r.remark}</span>}
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${TYPE_TONE[r.type] ?? 'bg-accent text-muted-foreground'}`}>{r.type}</span>
+                      {r.remark && <span className='ml-2 text-xs text-muted-foreground'>{r.remark}</span>}
                     </td>
                     <td className={`${td} text-right font-semibold tabular-nums ${deposit ? 'text-[#0ECC68]' : 'text-[#E01B4F]'}`}>
                       {deposit ? '+' : '−'}₹{money(r.amount)}
                     </td>
-                    <td className={`${td} whitespace-nowrap text-[#8384A5]`}>{fmt(r.createdAt)}</td>
+                    <td className={`${td} whitespace-nowrap text-muted-foreground`}>{fmt(r.createdAt)}</td>
                   </tr>
                 ))
               )}
@@ -211,15 +211,15 @@ const AgentLedger = ({ direction }: { direction: 'deposit' | 'withdraw' }) => {
         </div>
 
         {!list.isLoading && rows.length > 0 && (
-          <div className='flex items-center justify-between border-t border-[#1E2D55] px-4 py-3'>
-            <span className='text-xs text-[#8384A5]'>
+          <div className='flex items-center justify-between border-t border-border px-4 py-3'>
+            <span className='text-xs text-muted-foreground'>
               Showing {(page - 1) * PAGE_SIZE + 1}–{(page - 1) * PAGE_SIZE + rows.length} of {total}
             </span>
             <div className='flex items-center gap-2'>
               <button type='button' className={`${outlineBtn} text-xs`} disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}>
                 Previous
               </button>
-              <span className='px-1 text-xs text-[#8384A5]'>
+              <span className='px-1 text-xs text-muted-foreground'>
                 {page} / {totalPages}
               </span>
               <button type='button' className={`${outlineBtn} text-xs`} disabled={page >= totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>

@@ -27,7 +27,7 @@ const LEVELS: { level: number; label: string; color: string }[] = [
   { level: 6, label: 'Agent', color: '#5581F7' }
 ]
 
-const colorOf = (level: number | null) => LEVELS.find(l => l.level === level)?.color ?? '#8384A5'
+const colorOf = (level: number | null) => LEVELS.find(l => l.level === level)?.color ?? '#8B8B93'
 
 /** Hex → rgba (zip ke `bg: rgba(...,0.15)`). */
 const tint = (hex: string, a: number) => {
@@ -36,7 +36,7 @@ const tint = (hex: string, a: number) => {
   return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`
 }
 
-const line = 'bg-[#1E2D55]'
+const line = 'bg-border'
 
 const FlowNode = ({ node, byParent, isRoot }: { node: Node; byParent: Map<string, Node[]>; isRoot?: boolean }) => {
   const kids = byParent.get(node.id) ?? []
@@ -54,12 +54,12 @@ const FlowNode = ({ node, byParent, isRoot }: { node: Node; byParent: Map<string
         className={`relative min-w-40 rounded-lg px-4 py-2.5 text-center transition-all ${kids.length ? 'cursor-pointer hover:brightness-125' : ''}`}
         style={{ background: tint(color, 0.15), border: `1.5px solid ${color}`, boxShadow: node.depth === 0 ? `0 0 12px ${color}66` : undefined }}
       >
-        <div className='mb-0.5 text-[0.82rem] leading-tight font-semibold text-[#F9F9F9]'>{node.name}</div>
+        <div className='mb-0.5 text-[0.82rem] leading-tight font-semibold text-foreground'>{node.name}</div>
         <span className='inline-block rounded-full border px-2 text-[0.62rem] leading-4 font-semibold' style={{ color, borderColor: color }}>
           {node.role}
         </span>
-        {(isRoot || node.depth === 0) && <div className='mt-0.5 text-[0.6rem] text-[#8384A5]'>{node.depth === 0 ? 'you' : 'root'}</div>}
-        {kids.length > 0 && <span className='absolute top-1 right-1.5 size-1.5 rounded-full' style={{ background: open ? color : '#1E2D55' }} />}
+        {(isRoot || node.depth === 0) && <div className='mt-0.5 text-[0.6rem] text-muted-foreground'>{node.depth === 0 ? 'you' : 'root'}</div>}
+        {kids.length > 0 && <span className='absolute top-1 right-1.5 size-1.5 rounded-full' style={{ background: open ? color : 'var(--border)' }} />}
       </div>
 
       {kids.length > 0 && open && (
@@ -72,7 +72,7 @@ const FlowNode = ({ node, byParent, isRoot }: { node: Node; byParent: Map<string
                 <div key={c.id} className='flex flex-col items-center'>
                   <div className={`h-4 w-0.5 ${line}`} />
                   {/* Zip me yahan % tha — apne setup me percentage nahi, users ki ginti */}
-                  <div className='mb-1.5 rounded border border-[#1E2D55] bg-[#0E1831] px-1.5 py-0.5 text-[0.6rem] font-bold whitespace-nowrap text-[#8384A5]'>
+                  <div className='mb-1.5 rounded border border-border bg-card px-1.5 py-0.5 text-[0.6rem] font-bold whitespace-nowrap text-muted-foreground'>
                     {c.users} {c.users === 1 ? 'user' : 'users'}
                   </div>
                   <FlowNode node={c} byParent={byParent} />
@@ -105,15 +105,15 @@ const Hierarchy = () => {
   }
 
   return (
-    <div className='rounded-xl bg-[#0C0D1D] p-4 sm:p-6'>
+    <div className='rounded-xl bg-background p-4 sm:p-6'>
       <div className='mx-auto max-w-[1400px]'>
         <div className='mb-6 flex items-center gap-3'>
           <span className='flex rounded-lg bg-[rgba(43,110,245,0.15)] p-2'>
             <GitBranchIcon className='size-[22px] text-[#2B6EF5]' />
           </span>
           <div>
-            <h2 className='text-2xl font-bold text-[#F9F9F9]'>Agent Hierarchy</h2>
-            <p className='text-xs text-[#8384A5]'>Your upline and downline — click any node to collapse</p>
+            <h2 className='text-2xl font-bold text-foreground'>Agent Hierarchy</h2>
+            <p className='text-xs text-muted-foreground'>Your upline and downline — click any node to collapse</p>
           </div>
         </div>
 
@@ -125,19 +125,19 @@ const Hierarchy = () => {
           ))}
         </div>
 
-        <div className='min-h-52 overflow-auto rounded-xl border border-[#1E2D55] bg-[#0B1427] p-8'>
+        <div className='min-h-52 overflow-auto rounded-xl border border-border bg-muted p-8'>
           {isLoading ? (
             <div className='flex justify-center gap-6'>
               {[...Array(3)].map((_, i) => (
-                <div key={i} className='h-[70px] w-40 animate-pulse rounded-lg bg-[#1E2D55]' />
+                <div key={i} className='h-[70px] w-40 animate-pulse rounded-lg bg-border' />
               ))}
             </div>
           ) : error ? (
             <p className='py-12 text-center text-[#E01B4F]'>{error.message || 'Failed to load'}</p>
           ) : roots.length === 0 ? (
             <div className='flex flex-col items-center py-12'>
-              <GitBranchIcon className='size-10 text-[#1E2D55]' />
-              <p className='mt-2 text-[#8384A5]'>No hierarchy data found.</p>
+              <GitBranchIcon className='size-10 text-border' />
+              <p className='mt-2 text-muted-foreground'>No hierarchy data found.</p>
             </div>
           ) : (
             <div className='flex w-max min-w-full justify-center gap-12'>

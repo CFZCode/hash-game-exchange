@@ -21,7 +21,7 @@ type Part = { key: string; label: string; view: () => ReactNode }
 /** Zip ka tab button (DepositPage / SelfDeposit ke tab bar jaisa). */
 const tabClass = (active: boolean) =>
   `flex items-center gap-1.5 whitespace-nowrap border-b-2 px-5 py-3 text-[0.8rem] transition-colors ${
-    active ? 'border-[#2B6EF5] bg-[rgba(43,110,245,0.08)] font-bold text-[#2B6EF5]' : 'border-transparent text-[#8384A5] hover:bg-[#162140] hover:text-[#F9F9F9]'
+    active ? 'border-[#2B6EF5] bg-[rgba(43,110,245,0.08)] font-bold text-[#2B6EF5]' : 'border-transparent text-muted-foreground hover:bg-accent hover:text-foreground'
   }`
 
 /** Direct Users → zip ka "Crypto | Fiat" switcher; andar apne purane screens (unke actions ke saath). */
@@ -31,7 +31,7 @@ const DirectUsers = ({ parts }: { parts: Part[] }) => {
 
   return (
     <div className='p-4'>
-      <div className='mb-6 overflow-x-auto rounded-lg border border-[#1E2D55] bg-[#0E1831]'>
+      <div className='mb-6 overflow-x-auto rounded-lg border border-border bg-card'>
         <div className='flex'>
           {parts.map(p => (
             <button key={p.key} type='button' className={tabClass(p.key === active.key)} onClick={() => setKey(p.key)}>
@@ -106,13 +106,13 @@ const Transactions = ({ direction }: { direction: 'deposit' | 'withdraw' }) => {
     can('users:read') ? { id: 'agent', label: 'Agent System', icon: <ArrowLeftRightIcon className='size-4' />, view: () => <AgentLedger direction={direction} /> } : null
   ].filter(t => t !== null)
 
-  if (!tabs.length) return <p className='p-6 text-sm text-[#8384A5]'>You do not have access to this page.</p>
+  if (!tabs.length) return <p className='p-6 text-sm text-muted-foreground'>You do not have access to this page.</p>
 
   const active = tabs.find(t => t.id === params.get('tab')) ?? tabs[0]
 
   return (
-    <div className='overflow-hidden rounded-xl border border-[#1E2D55]'>
-      <div className='overflow-x-auto border-b border-[#1E2D55] bg-[#0E1831]'>
+    <div className='overflow-hidden rounded-xl border border-border'>
+      <div className='overflow-x-auto border-b border-border bg-card'>
         <div className='flex'>
           {tabs.map(t => (
             <button
@@ -126,7 +126,7 @@ const Transactions = ({ direction }: { direction: 'deposit' | 'withdraw' }) => {
           ))}
         </div>
       </div>
-      <div key={active.id} className='min-h-[80vh] bg-[#0C0D1D]'>
+      <div key={active.id} className='min-h-[80vh] bg-background'>
         {active.view()}
       </div>
     </div>

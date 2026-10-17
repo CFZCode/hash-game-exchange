@@ -121,21 +121,21 @@
 }
 
 .dark {
-  /* admin-structure.zip ka dark theme (src/theme.ts): navy background, blue #2B6EF5,
-     green #0ECC68, red #E01B4F, yellow #FFC23F, borders #1E2D55. */
-  --background: #0c0d1d;
-  --foreground: #f9f9f9;
-  --card: #0e1831;
-  --card-foreground: #f9f9f9;
-  --popover: #0e1831;
+  /* Neutral dark (no navy tint): near-black page, grey cards and borders. Accents stay from
+     admin-structure.zip: blue #2B6EF5, green #0ECC68, red #E01B4F, yellow #FFC23F. */
+  --background: #0a0a0b;
+  --foreground: #fafafa;
+  --card: #141416;
+  --card-foreground: #fafafa;
+  --popover: #18181b;
   --popover-foreground: #f9f9f9;
   --primary: #2b6ef5;
   --primary-foreground: #ffffff;
-  --secondary: #1a2550;
+  --secondary: #1f1f23;
   --secondary-foreground: #f9f9f9;
-  --muted: #121e38;
-  --muted-foreground: #8384a5;
-  --accent: #162140;
+  --muted: #18181b;
+  --muted-foreground: #8b8b93;
+  --accent: #232327;
   --accent-foreground: #f9f9f9;
   --destructive: #e01b4f;
 
@@ -147,8 +147,8 @@
   --danger-soft: rgb(224 27 79 / 16%);
   --info: #5581f7;
   --info-soft: rgb(85 129 247 / 16%);
-  --border: #1e2d55;
-  --input: #1e2d55;
+  --border: #27272a;
+  --input: #2e2e33;
   --ring: #2b6ef5;
   --chart-1: #3987e5;
   --chart-2: #d95926;
@@ -158,13 +158,13 @@
   --chart-6: #008300;
   --chart-7: #9085e9;
   --chart-8: #e66767;
-  --sidebar: #0e1831;
+  --sidebar: #111113;
   --sidebar-foreground: #f9f9f9;
   --sidebar-primary: #2b6ef5;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: rgb(43 110 245 / 12%);
+  --sidebar-accent: #1f1f23;
   --sidebar-accent-foreground: #2b6ef5;
-  --sidebar-border: #1e2d55;
+  --sidebar-border: #27272a;
   --sidebar-ring: #2b6ef5;
 }
 

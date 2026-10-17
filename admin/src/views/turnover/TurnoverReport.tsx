@@ -43,15 +43,15 @@ type SortKey = (typeof COLUMNS)[number]['key']
 
 /*
  * admin-structure.zip `TurnoverReport` ke exact colours (MUI sx → Tailwind):
- * page #0C0D1D · card #0E1831 · border #1E2D55 · input / th #0B1427 · hover #162140
- * text #F9F9F9 / #C8CAE5 / muted #8384A5 · blue #2B6EF5 / #5581F7 · green #0ECC68 · red #E01B4F
+ * surfaces and text come from the theme tokens (background, card, border, muted, accent,
+ * foreground, muted-foreground) · blue #2B6EF5 / #5581F7 · green #0ECC68 · red #E01B4F
  */
-const card = 'rounded-lg border border-[#1E2D55] bg-[#0E1831]'
-const input = 'h-10 rounded-md border border-[#1E2D55] bg-[#0B1427] px-3 text-sm text-[#F9F9F9] outline-none placeholder:text-[#8384A5] hover:border-[#2B6EF5] focus:border-[#2B6EF5]'
-const outlineBtn = 'inline-flex items-center gap-1.5 rounded-md border border-[#1E2D55] px-3 py-1 text-sm text-[#8384A5] hover:border-[#2B6EF5] hover:text-[#2B6EF5] disabled:opacity-40'
+const card = 'rounded-lg border border-border bg-card'
+const input = 'h-10 rounded-md border border-border bg-muted px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground hover:border-[#2B6EF5] focus:border-[#2B6EF5]'
+const outlineBtn = 'inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1 text-sm text-muted-foreground hover:border-[#2B6EF5] hover:text-[#2B6EF5] disabled:opacity-40'
 const greenBtn = 'inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md bg-[#0ECC68] px-3 py-1.5 text-sm font-medium text-white shadow hover:bg-[#0ab85e] disabled:opacity-50'
-const th = 'cursor-pointer select-none whitespace-nowrap border-b border-[#1E2D55] bg-[#0B1427] px-4 py-2.5 text-left text-xs font-bold tracking-[0.06em] text-[#8384A5] uppercase hover:bg-[#162140] hover:text-[#F9F9F9]'
-const td = 'border-b border-[#1E2D55] px-4 py-3 text-[0.82rem] text-[#C8CAE5]'
+const th = 'cursor-pointer select-none whitespace-nowrap border-b border-border bg-muted px-4 py-2.5 text-left text-xs font-bold tracking-[0.06em] text-muted-foreground uppercase hover:bg-accent hover:text-foreground'
+const td = 'border-b border-border px-4 py-3 text-[0.82rem] text-foreground/80'
 
 /** Zip ka "Edit Target Multiplier" dialog. */
 const EditDialog = ({ row, onClose }: { row: Row; onClose: () => void }) => {
@@ -65,30 +65,30 @@ const EditDialog = ({ row, onClose }: { row: Row; onClose: () => void }) => {
   })
 
   const info = (label: string, value: React.ReactNode) => (
-    <p className='text-sm text-[#8384A5]'>
+    <p className='text-sm text-muted-foreground'>
       {label}: {value}
     </p>
   )
 
   return (
     <Dialog open onOpenChange={o => !o && onClose()}>
-      <DialogContent className='rounded-xl border border-[#1E2D55] bg-[#0E1831] p-0 text-[#F9F9F9] sm:max-w-[420px]'>
-        <DialogTitle className='flex items-center gap-2 border-b border-[#1E2D55] px-6 pt-5 pb-3 text-[#F9F9F9]'>
+      <DialogContent className='rounded-xl border border-border bg-card p-0 text-foreground sm:max-w-[420px]'>
+        <DialogTitle className='flex items-center gap-2 border-b border-border px-6 pt-5 pb-3 text-foreground'>
           <PencilIcon className='size-[18px] text-[#2B6EF5]' /> Edit Target Multiplier
         </DialogTitle>
         <div className='grid gap-1 px-6 pt-2'>
-          {info('User ID', <b className='text-[#F9F9F9]'>#{row.id}</b>)}
-          {info('Name', <b className='text-[#F9F9F9]'>{row.name ?? '—'}</b>)}
-          {info('Email', <span className='text-[#F9F9F9]'>{row.email ?? '—'}</span>)}
+          {info('User ID', <b className='text-foreground'>#{row.id}</b>)}
+          {info('Name', <b className='text-foreground'>{row.name ?? '—'}</b>)}
+          {info('Email', <span className='text-foreground'>{row.email ?? '—'}</span>)}
           {info('Current Multiplier', <b className='text-[#2B6EF5]'>{row.multiplier}x</b>)}
           {info('Status', <b className={row.locked ? 'text-[#E01B4F]' : 'text-[#0ECC68]'}>{row.locked ? 'Locked' : 'Unlocked'}</b>)}
-          <label className='mt-4 grid gap-1 text-xs text-[#8384A5]'>
+          <label className='mt-4 grid gap-1 text-xs text-muted-foreground'>
             Target Multiplier
             <input className={input} inputMode='decimal' value={value} onChange={e => setValue(e.target.value.replace(/[^0-9.]/g, ''))} />
           </label>
         </div>
         <div className='flex gap-2 px-6 pt-2 pb-5'>
-          <button type='button' className='flex-1 rounded-md border border-[#1E2D55] py-1.5 text-sm text-[#8384A5] hover:border-[#8384A5]' onClick={onClose}>
+          <button type='button' className='flex-1 rounded-md border border-border py-1.5 text-sm text-muted-foreground hover:border-muted-foreground' onClick={onClose}>
             Cancel
           </button>
           <button
@@ -162,7 +162,7 @@ const TurnoverReport = () => {
   const sortIcon = desc ? <ChevronDownIcon className='size-4' /> : <ChevronUpIcon className='size-4' />
 
   return (
-    <div className='min-h-full rounded-xl bg-[#0C0D1D] p-4 sm:p-6'>
+    <div className='min-h-full rounded-xl bg-background p-4 sm:p-6'>
       <div className='mx-auto max-w-[1400px]'>
         {/* Header */}
         <div className='mb-6 flex items-center justify-between gap-3'>
@@ -171,8 +171,8 @@ const TurnoverReport = () => {
               <TrendingUpIcon className='size-[22px] text-[#2B6EF5]' />
             </span>
             <div>
-              <h1 className='text-2xl font-bold text-[#F9F9F9]'>Turnover Report</h1>
-              <p className='text-xs text-[#8384A5]'>User wager progress &amp; target management</p>
+              <h1 className='text-2xl font-bold text-foreground'>Turnover Report</h1>
+              <p className='text-xs text-muted-foreground'>User wager progress &amp; target management</p>
             </div>
           </div>
           <button type='button' className={outlineBtn} disabled={list.isFetching} onClick={() => invalidate(...INVALIDATE)}>
@@ -183,7 +183,7 @@ const TurnoverReport = () => {
         {/* Toolbar */}
         <div className={`${card} mb-4 flex flex-col gap-4 p-4 sm:flex-row sm:items-center`}>
           <div className='relative flex-1'>
-            <SearchIcon className='absolute top-1/2 left-3 size-4 -translate-y-1/2 text-[#8384A5]' />
+            <SearchIcon className='absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground' />
             <input
               className={`${input} w-full pl-9`}
               placeholder='Search by name, email or ID…'
@@ -219,7 +219,7 @@ const TurnoverReport = () => {
           <div className='flex items-center gap-2'>
             <select className={`${input} min-w-[150px]`} aria-label='Sort by' value={sortKey} onChange={e => setSortKey(e.target.value as SortKey)}>
               {COLUMNS.map(c => (
-                <option key={c.key} value={c.key} className='bg-[#0E1831]'>
+                <option key={c.key} value={c.key} className='bg-card'>
                   {c.label}
                 </option>
               ))}
@@ -228,7 +228,7 @@ const TurnoverReport = () => {
               type='button'
               title='Toggle sort direction'
               aria-label='Toggle sort direction'
-              className='rounded-md border border-[#1E2D55] p-2 text-[#8384A5] hover:border-[#2B6EF5] hover:text-[#2B6EF5]'
+              className='rounded-md border border-border p-2 text-muted-foreground hover:border-[#2B6EF5] hover:text-[#2B6EF5]'
               onClick={() => setDesc(d => !d)}
             >
               {desc ? <ChevronDownIcon className='size-4' /> : <ChevronUpIcon className='size-4' />}
@@ -241,15 +241,15 @@ const TurnoverReport = () => {
           {list.isLoading ? (
             <div className='grid gap-2 p-6'>
               {[...Array(6)].map((_, i) => (
-                <div key={i} className='h-[52px] animate-pulse rounded bg-[#162140]' />
+                <div key={i} className='h-[52px] animate-pulse rounded bg-accent' />
               ))}
             </div>
           ) : list.error ? (
             <p className='p-8 text-center text-[#E01B4F]'>{list.error.message || 'Failed to load data'}</p>
           ) : rows.length === 0 ? (
             <div className='flex flex-col items-center p-12'>
-              <TrendingUpIcon className='size-10 text-[#1E2D55]' />
-              <p className='mt-2 text-[#8384A5]'>No results found.</p>
+              <TrendingUpIcon className='size-10 text-border' />
+              <p className='mt-2 text-muted-foreground'>No results found.</p>
             </div>
           ) : (
             <div className='overflow-x-auto'>
@@ -277,13 +277,13 @@ const TurnoverReport = () => {
                         <td className={`${td} font-semibold text-[#5581F7]`}>#{r.id}</td>
                         <td className={td}>
                           <span className='flex items-center gap-2'>
-                            <span className='flex size-7 items-center justify-center rounded-full bg-[#1E2D55] text-[0.7rem] font-bold text-white'>
+                            <span className='flex size-7 items-center justify-center rounded-full bg-border text-[0.7rem] font-bold text-white'>
                               {r.name?.charAt(0)?.toUpperCase() || '?'}
                             </span>
-                            <span className='font-medium text-[#F9F9F9]'>{r.name ?? '—'}</span>
+                            <span className='font-medium text-foreground'>{r.name ?? '—'}</span>
                           </span>
                         </td>
-                        <td className={`${td} text-[#8384A5]`}>{r.email ?? '—'}</td>
+                        <td className={`${td} text-muted-foreground`}>{r.email ?? '—'}</td>
                         <td className={td}>{fmtAmt(r.wager)}</td>
                         <td className={td}>{fmtAmt(r.totalDeposit)}</td>
                         <td className={td}>
@@ -297,20 +297,20 @@ const TurnoverReport = () => {
                               onClick={() => setEditing(r)}
                             >
                               {canEdit && <PencilIcon className='size-[13px] text-[#2B6EF5]' />}
-                              <span className='rounded-full bg-[#162140] px-1.5 text-[0.65rem] leading-[18px] text-[#8384A5]'>{r.multiplier}x</span>
+                              <span className='rounded-full bg-accent px-1.5 text-[0.65rem] leading-[18px] text-muted-foreground'>{r.multiplier}x</span>
                             </button>
                           </span>
                         </td>
-                        <td className={`${td} font-semibold ${done ? 'text-[#0ECC68]' : 'text-[#C8CAE5]'}`}>
+                        <td className={`${td} font-semibold ${done ? 'text-[#0ECC68]' : 'text-foreground/80'}`}>
                           {r.targetPercentage.toFixed(2)}%
                           {r.targetPercentage > 100 && <span className='ml-1 text-[0.7rem] text-[#0ECC68]'>+{(r.targetPercentage - 100).toFixed(1)}%</span>}
                         </td>
                         <td className={`${td} min-w-[200px]`}>
                           <div className='flex flex-col gap-1'>
-                            <div className='h-2 overflow-hidden rounded bg-[#162140]'>
+                            <div className='h-2 overflow-hidden rounded bg-accent'>
                               <div className={`h-full rounded ${done ? 'bg-[#0ECC68]' : 'bg-[#2B6EF5]'}`} style={{ width: `${Math.max(0, Math.min(100, r.targetPercentage))}%` }} />
                             </div>
-                            <div className='flex justify-between text-xs text-[#8384A5]'>
+                            <div className='flex justify-between text-xs text-muted-foreground'>
                               <span>{fmtAmt(r.wager)}</span>
                               <span className={`font-semibold ${done ? 'text-[#0ECC68]' : ''}`}>{r.targetPercentage.toFixed(1)}%</span>
                               <span>{fmtAmt(r.target)}</span>
@@ -341,15 +341,15 @@ const TurnoverReport = () => {
 
           {/* Pagination */}
           {!list.isLoading && rows.length > 0 && (
-            <div className='flex items-center justify-between border-t border-[#1E2D55] px-4 py-3'>
-              <span className='text-xs text-[#8384A5]'>
+            <div className='flex items-center justify-between border-t border-border px-4 py-3'>
+              <span className='text-xs text-muted-foreground'>
                 Showing {(page - 1) * PAGE_SIZE + 1}–{(page - 1) * PAGE_SIZE + rows.length} of {list.data?.pagination.total ?? rows.length}
               </span>
               <div className='flex items-center gap-2'>
                 <button type='button' className={`${outlineBtn} text-xs`} disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}>
                   Previous
                 </button>
-                <span className='px-1 text-xs text-[#8384A5]'>
+                <span className='px-1 text-xs text-muted-foreground'>
                   {page} / {totalPages}
                 </span>
                 <button type='button' className={`${outlineBtn} text-xs`} disabled={page >= totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>
