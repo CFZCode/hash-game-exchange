@@ -38,15 +38,6 @@ const avatarSrc = (a: Avatar) => {
   return m ? `/api/gw/api/v1/${m[1]}` : api.url(`admin/avatars/${a.id}/image`)
 }
 
-const readDataUrl = (file: File) =>
-  new Promise<string>((resolve, reject) => {
-    const reader = new FileReader()
-
-    reader.onload = () => resolve(String(reader.result))
-    reader.onerror = () => reject(reader.error ?? new Error('Could not read the file'))
-    reader.readAsDataURL(file)
-  })
-
 const fileProblem = (file: File | null, required: boolean) =>
   !file
     ? required
@@ -119,13 +110,17 @@ const UploadAvatar = ({ levels }: { levels: ReturnType<typeof useLevelOptions> }
   }
 
   const upload = useApiMutation({
-    fn: async () =>
-      api.post<Avatar>('admin/avatars', {
-        image: await readDataUrl(file!),
-        minLevel: Number(form.minLevel),
-        ...(form.sort !== '' ? { sort: Number(form.sort) } : {}),
-        enabled: form.enabled
-      }),
+    // Multipart, as Banners: the file under `image`, the rest as form fields.
+    fn: async () => {
+      const fd = new FormData()
+
+      fd.set('image', file!)
+      fd.set('minLevel', form.minLevel)
+      if (form.sort !== '') fd.set('sort', form.sort)
+      fd.set('enabled', String(form.enabled))
+
+      return api.upload<Avatar>('admin/avatars', fd)
+    },
     invalidate: [['api', 'admin/avatars']],
     success: () => 'Avatar uploaded'
   })
@@ -181,7 +176,13 @@ const EditAvatar = ({ avatar, levels }: { avatar: Avatar; levels: ReturnType<typ
       if (Number(form.sort) !== avatar.sort) changes.sort = Number(form.sort)
       if (form.enabled !== avatar.enabled) changes.enabled = form.enabled
       if (Object.keys(changes).length) await api.patch(`admin/avatars/${avatar.id}`, changes)
-      if (file) await api.put(`admin/avatars/${avatar.id}/image`, { image: await readDataUrl(file) })
+
+      if (file) {
+        const fd = new FormData()
+
+        fd.set('image', file)
+        await api.upload(`admin/avatars/${avatar.id}/image`, fd, 'PUT')
+      }
     },
     invalidate: [['api', 'admin/avatars']],
     success: () => 'Avatar saved'

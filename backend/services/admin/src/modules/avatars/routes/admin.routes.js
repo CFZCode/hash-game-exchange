@@ -6,6 +6,7 @@ const { PERMISSIONS, denyAgentTree } = require('@ibitplay/auth');
 
 const v = require('../avatars.validators');
 const errors = require('../avatars.errors');
+const { MAX_AVATAR_BYTES } = require('../avatars.constants');
 const { AvatarsService } = require('../avatars.service');
 
 /**
@@ -24,7 +25,7 @@ module.exports = function adminRoutes(deps) {
   const canWrite = auth.requirePermission(PERMISSIONS.CONFIG_WRITE);
   // The multipart parse runs AFTER the permission check, so a caller without the grant never
   // has its body read.
-  const upload = imageUpload.singleImage({ field: 'image', errors, maxBytes: errors.MAX_AVATAR_BYTES });
+  const upload = imageUpload.singleImage({ field: 'image', errors, maxBytes: MAX_AVATAR_BYTES });
   const router = Router();
 
   router.get('/', houseOnly, canRead, validate(v.empty), asyncHandler(async (_req, res) => response.ok(res, await service.list())));
