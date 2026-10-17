@@ -1,8 +1,8 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { BetbyIcon, IconEdit } from '../../components/exchange/icons';
-import { StakeButtonsModal } from '../../components/exchange';
-import { useExchangeCurrency, useStakeButtons } from '../../hooks/exchange';
+import { ExposureBadge, StakeButtonsModal } from '../../components/exchange';
+import { useExchangeCurrency, useSportsBalance, useStakeButtons } from '../../hooks/exchange';
 import { saveStakeButtons } from '../../services/exchange';
 import { toast } from '../../components/shared/Toast/toast';
 import { BET_TOAST } from '../../utils/exchange';
@@ -91,6 +91,9 @@ export function ExchangeTools({ inRail = false, tipProps }) {
 function SignedInTools({ inRail, tipProps = () => null }) {
   // Stake buttons are saved in rupees and edited in the header wallet's coin.
   const cur = useExchangeCurrency();
+  const { session } = useSession();
+  // The player's open sports exposure (sports socket), in the header wallet's coin.
+  const { exposure } = useSportsBalance({ userId: session?.userId ?? null });
   const { data: stakes, refresh } = useStakeButtons();
   const [editing, setEditing] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
@@ -139,6 +142,17 @@ function SignedInTools({ inRail, tipProps = () => null }) {
       >
         <IconEdit className="size-6" />
       </button>
+      <ExposureBadge
+        className="ml-1 flex-none"
+        hideBalance
+        balance={0}
+        exposure={exposure ?? 0}
+        currency={cur.prefix}
+        formatAmount={cur.isInr ? undefined : cur.formatInr}
+        loading={exposure == null}
+        exposureLabel="Exposure"
+        title="Your open sports exposure"
+      />
       {editing && stakes && (
         <StakeButtonsModal
           title="Stake buttons"

@@ -15,6 +15,7 @@ import { cx, formatAmount as defaultFormatAmount } from './utils';
  * @param {string}   [props.balanceLabel='Bal']  Label before the balance figure.
  * @param {string}   [props.exposureLabel='Exp'] Label before the exposure figure.
  * @param {string}   [props.title]               Tooltip for the whole badge.
+ * @param {boolean}  [props.hideBalance]         Exposure only (the sports pages show just the player's open exposure).
  */
 export default function ExposureBadge({
   balance,
@@ -27,6 +28,7 @@ export default function ExposureBadge({
   balanceLabel = 'Bal',
   exposureLabel = 'Exp',
   title,
+  hideBalance = false,
 }) {
   const exp = Math.abs(Number(exposure) || 0);
   const Tag = onClick ? 'button' : 'div';
@@ -42,12 +44,14 @@ export default function ExposureBadge({
         className,
       )}
     >
+      {!hideBalance && (
       <span className="whitespace-nowrap text-xs text-tertiary">
         {balanceLabel}{' '}
         <span className="font-extrabold text-primary">
           {loading ? '—' : `${currency}${formatAmount(balance)}`}
         </span>
       </span>
+      )}
       <span className="whitespace-nowrap text-xs text-tertiary">
         {exposureLabel}{' '}
         <span className={cx('font-extrabold', exp > 0 ? 'text-error' : 'text-secondary')}>
