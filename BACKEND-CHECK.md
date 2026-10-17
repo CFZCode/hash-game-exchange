@@ -64,6 +64,10 @@ Labels: **MISSING** means no route, storage or enforcement exists. **BUG** means
 
 ## P1: security and permissions
 
+### 6b. Skipping a VIP card skips its rank-up reward (BUG, decide)
+- On the local stack, a player who jumped from L0 straight to L2 in one wager got the L2 level-up (1 USDT) and the Bronze rank-up (5 USDT). They did not get the Wood rank-up (1 USDT) for the card they passed.
+- **Fix:** when one wager crosses several cards, pay the rank-up for every card crossed. Each payout already has an idempotency key per card, so this is safe. Or state that only the card reached is paid.
+
 ### 7. Points settle runs without a transaction password for a Super Admin who never set one (SECURITY, low)
 - `admin/src/modules/exchange/exchange.service.js:177–180` uses `assertTransactionPassword(..., { required: !actor.canIssueFunds })`. Every other money route (`exchange.service.js:117,134`, `direct-wallet/directWallet.service.js:153–154`) uses `required: true`.
 - **Fix:** use `required: true` here too.

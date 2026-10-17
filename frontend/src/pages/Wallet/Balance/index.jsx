@@ -3,7 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useSession } from '../../../context/session';
 import { useGates } from '../../../context/gates';
 import { walletCoins } from '../../../services/gates';
-import { amount2usd } from '../../../utils/currency';
+import { amount2usd, walletCode } from '../../../utils/currency';
+import { useResource } from '../../../hooks/useResource';
+import { getBonusBalance } from '../../../services/bonus';
 import { useSelectedCurrency } from '../../../hooks/useSelectedCurrency';
 import SelectCurrencyContent from './CurrencyList';
 import LocalAmountItem from '../../../components/shared/LocalAmountItem';
@@ -58,20 +60,17 @@ function SummaryCell({ title, amount, first }) {
  * before anyone "fixes" a fixture where they disagree.
  */
 function Summary({ balances }) {
-  // Summed in USD (amount2usd), then printed in the SELECTED currency (selected-currency skill):
-  // an INR wallet reads "₹6,000.00" here, matching the header, not "$72.00".
-  const cur = useSelectedCurrency();
+  // Summed in USD (amount2usd), then printed in the owner's DEFAULT coin (user's request): the
+  // wallet columns are the deposit money; bonus money is held apart (`/user/bonus-balance`).
+  const cur = useSelectedCurrency({ site: true });
+  const { data: bonus } = useResource(getBonusBalance);
+  const depositUsd = balances.reduce((sum, coin) => sum + amount2usd(coin.generalAmount, coin.currencyName), 0);
+  const bonusUsd = (bonus?.balances ?? []).reduce((sum, b) => sum + amount2usd(b.amount, walletCode(b.currency)), 0);
   const cells = [
-    { title: 'Total Balance', field: 'amount' },
-    { title: 'Deposit Balance', field: 'generalAmount' },
-    { title: 'Bonus Balance', field: 'bonusAmount' },
-  ].map(({ title, field }) => ({
-    title,
-    amount: cur.show(
-      balances.reduce((sum, coin) => sum + amount2usd(coin[field], coin.currencyName), 0),
-      'USDFIAT',
-    ),
-  }));
+    { title: 'Total Balance', usd: depositUsd + bonusUsd },
+    { title: 'Deposit Balance', usd: depositUsd },
+    { title: 'Bonus Balance', usd: bonusUsd },
+  ].map(({ title, usd }) => ({ title, amount: cur.show(usd, 'USDFIAT') }));
 
   return (
     <div className="mb-5 flex items-center rounded-xl bg-layer5 p-5">

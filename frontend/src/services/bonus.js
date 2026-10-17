@@ -243,4 +243,9 @@ const rechargeBonusConfigFixture = () =>
     },
   });
 
+/* The player's ACTIVE bonus money (`GET /user/bonus-balance` → `{ currency, balances: [{ currency, amount }] }`),
+   held apart from the wallet columns until it is wagered off — the wallet's Bonus Balance card. Null in fixture mode. */
+export const getBonusBalance = () =>
+  USE_FIXTURES ? null : Promise.resolve(request('/api/v1/user/bonus-balance', { live: true, fixture: null })).catch(() => null);
+
 export default getDepositBonuses;
