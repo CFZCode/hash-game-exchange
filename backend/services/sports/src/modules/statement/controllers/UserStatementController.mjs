@@ -65,7 +65,8 @@ var UserStatementController = {
       if (!id) {
         return res.status(401).json({ success: false, message: "User not authenticated or ID missing" });
       }
-      const user = await User_default.findByPk(id, { attributes: ["id", "parent_staff_id"], raw: true });
+      // mssports `users` is keyed `user_id` (there is no `id` column: asking for one was a 500).
+      const user = await User_default.findByPk(id, { attributes: ["user_id", "parent_staff_id"], raw: true });
       if (!user) return res.status(404).json({ success: false, message: "User not found" });
       if (user.parent_staff_id != null) {
         return res.status(403).json({ success: false, message: "Agent users use /account-statement-v2" });

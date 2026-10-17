@@ -12,6 +12,7 @@ const {
   totp,
   createSecretBox,
   playerCapabilities,
+  isAgentPlayer,
 } = require('@ibitplay/auth');
 
 const errors = require('./auth.errors');
@@ -306,6 +307,14 @@ class AuthService {
      */
     try {
       user.capabilities = await playerCapabilities(user.id);
+      /*
+       * Whether this player came through an agent (any owner, `parent_staff_id` set) or signed up
+       * on the site themselves — the same rule as `isAgentPlayer` and as the sports statement
+       * (`account-statement-direct` refuses an agent-tree player, who reads `account-statement-v2`).
+       * Sent as its own flag because `capabilities.promotions` is also off for everybody on a
+       * B2B site, so it cannot tell the two apart.
+       */
+      user.agentTree = await isAgentPlayer(user.id);
     } catch (error) {
       this.logger?.warn({ userId: String(user.id), err: error.message }, 'Player capabilities could not be resolved');
     }

@@ -21,7 +21,7 @@ import {
   BET_TYPE_OPTIONS,
   linksToGameDetail,
 } from '../../../services/betHistory';
-import SportsBets from './SportsBets';
+import SportsBets, { SPORTS_SIDE_KEY, SPORTS_STATUS_KEY, SportsFilters } from './SportsBets';
 
 /* Type = Sports (value "4"): the exchange's bets, drawn by SportsBets instead of the casino table. */
 const SPORTS_TYPE = '4';
@@ -167,6 +167,12 @@ function BetList({ settings }) {
   );
 }
 
+/* Status and Side, only while Type is Sports. */
+function SportsOnlyFilters() {
+  const { get } = useWalletFilter();
+  return get('type') === SPORTS_TYPE ? <SportsFilters /> : null;
+}
+
 function BetBody({ settings }) {
   const { get } = useWalletFilter();
   return get('type') === SPORTS_TYPE ? <SportsBets /> : <BetList settings={settings} />;
@@ -176,7 +182,10 @@ export default function BetHistory() {
   const { session } = useSession();
   const settings = session.setting;
 
-  const defaults = React.useMemo(() => ({ type: '', assets: '', time: defaultRange() }), []);
+  const defaults = React.useMemo(
+    () => ({ type: '', assets: '', time: defaultRange(), [SPORTS_STATUS_KEY]: '', [SPORTS_SIDE_KEY]: '' }),
+    [],
+  );
 
   return (
     <WalletFilterProvider storageKey={STORAGE_KEY} defaults={defaults}>
@@ -189,6 +198,7 @@ export default function BetHistory() {
           <TypeFilter />
           <AssetsFilter />
           <TimeFilter />
+          <SportsOnlyFilters />
         </div>
 
         {/* The `center` slot sits here on the original — `ProviderBalanceList`, which is not built.

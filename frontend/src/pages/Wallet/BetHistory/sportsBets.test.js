@@ -81,3 +81,92 @@ describe('the row', () => {
     expect(formatBetDate(null)).toBe('-');
   });
 });
+
+/* ── The statement-based view ─────────────────────────────────────────────────────────────────── */
+import { buildRows, filterRows, statementRow } from './sportsBets';
+import { clampStatementWindow, isAgentTreePlayer } from '../../../services/sportsStatement';
+
+const st = (over) => ({
+  date: '2026-10-17T14:00:00.000Z',
+  currency: 'INR',
+  credit: '-',
+  debit: '-',
+  description: 'Bangladesh v Zimbabwe / MATCH_ODDS',
+  betId: 15,
+  sportId: '4',
+  eventId: '544246120',
+  matchId: '8304374687587',
+  marketType: 'MATCH_ODDS',
+  gameType: 'MO',
+  fancyName: null,
+  eventType: 'BET_SETTLEMENT',
+  ...over,
+});
+const onMarket = (over) => feed({ match_id: '8304374687587', eventid: '544246120', ...over });
+
+describe('a statement line', () => {
+  it('P&L is the ledger figure, not recomputed from odds', () => {
+    const row = statementRow(st({ credit: '27.50' }), [onMarket({ result_status: 'won' })]);
+    expect(row).toMatchObject({ kind: 'settled', status: 'won', pnl: 27.5, stake: 100, selection: 'Bangladesh', side: 'back', currency: 'INR' });
+    expect(row.breadcrumb).toBe('One Day Internationals -> Bangladesh v Zimbabwe -> Match Odds');
+    expect(row.drill).toEqual({ matchId: '8304374687587', eventId: '544246120', fancyName: null });
+  });
+
+  it('a debit is a loss, a VOID line or nothing moved is void', () => {
+    expect(statementRow(st({ debit: '56.00' }), []).status).toBe('lost');
+    expect(statementRow(st({ debit: '56.00' }), []).pnl).toBe(-56);
+    expect(statementRow(st({ eventType: 'VOID' }), []).status).toBe('void');
+    expect(statementRow(st({}), []).pnl).toBe(0);
+  });
+
+  it('a market with a back and a lay reads as both sides', () => {
+    const row = statementRow(st({ credit: '10' }), [onMarket({}), onMarket({ id: 16, bet_type: 'lay', liability: '28' })]);
+    expect(row.side).toBe('mixed');
+    expect(row.sides.sort()).toEqual(['back', 'lay']);
+  });
+});
+
+describe('rows and filters', () => {
+  const bets = [
+    onMarket({ id: 19, status: 'open', result_status: 'pending', created_at: '2026-10-17T14:02:17.000Z' }),
+    onMarket({ id: 15, result_status: 'void', created_at: '2026-10-17T12:54:37.000Z' }),
+  ];
+
+  it('open bets from the feed, settled markets from the statement', () => {
+    const rows = buildRows({ statement: [st({ eventType: 'VOID' })], bets });
+    expect(rows.map((r) => `${r.kind}:${r.status}`)).toEqual(['open:open', 'settled:void']);
+  });
+
+  it('with no statement the feed stands in for settled bets too', () => {
+    const rows = buildRows({ statement: null, bets });
+    expect(rows.map((r) => `${r.kind}:${r.status}`)).toEqual(['open:open', 'settled:void']);
+  });
+
+  it('filters by status, side, coin and window', () => {
+    const rows = buildRows({ statement: [st({ credit: '5', date: '2026-10-17T13:00:00.000Z' })], bets });
+    expect(filterRows(rows, { status: 'open' }).map((r) => r.id)).toEqual([19]);
+    expect(filterRows(rows, { status: 'won' })).toHaveLength(1);
+    expect(filterRows(rows, { side: 'lay' })).toHaveLength(0);
+    expect(filterRows(rows, { currency: 'USDT' })).toHaveLength(0);
+    expect(filterRows(rows, { currency: 'INRFIAT' })).toHaveLength(2);
+    expect(filterRows(rows, { from: Date.parse('2026-10-17T13:30:00.000Z') }).map((r) => r.id)).toEqual([19]);
+  });
+});
+
+describe('direct or agent, and the 31-day cap', () => {
+  it('reads agentTree, else the agent-only capabilities (never promotions)', () => {
+    expect(isAgentTreePlayer({ agentTree: true })).toBe(true);
+    expect(isAgentTreePlayer({ agentTree: false, capabilities: { vault: false, swap: false, tips: false } })).toBe(false);
+    expect(isAgentTreePlayer({ capabilities: { promotions: false, vault: true, swap: true, tips: true } })).toBe(false);
+    expect(isAgentTreePlayer({ capabilities: { promotions: false, vault: false, swap: false, tips: false } })).toBe(true);
+    expect(isAgentTreePlayer({})).toBeNull();
+  });
+
+  it('a window over 31 days is clamped to the last 31', () => {
+    const to = Date.parse('2026-10-17T12:00:00.000Z');
+    const w = clampStatementWindow(to - 60 * 86_400_000, to);
+    expect(w.clamped).toBe(true);
+    expect((w.to - w.from) / 86_400_000).toBe(30);
+    expect(clampStatementWindow(to - 86_400_000, to).clamped).toBe(false);
+  });
+});
