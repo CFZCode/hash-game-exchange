@@ -34,7 +34,7 @@ fi
 APPS=("${BACKEND[@]}")
 if [ "$ALL" = 1 ]; then
   for app in admin owner-panel; do
-    if pgrep -f "$app/node_modules/.bin/next build" >/dev/null; then
+    if pgrep -f "^node [^ ]*/$app/node_modules/.bin/next build" >/dev/null; then
       echo "== $app: another build is running, skipped" >&2
       continue
     fi

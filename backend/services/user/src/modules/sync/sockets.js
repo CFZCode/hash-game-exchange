@@ -14,6 +14,7 @@ const { RegionService } = require('../region/region.service');
  *
  *   { me, profile, balances, preferences }   signed in only (the same bodies as /user/auth/me,
  *                                            /user/profile, /user/wallet/balances, /user/preferences)
+ *   { exposure }                             signed in only: open sports liability, INR, positive
  *   { flags, features, currencies, branding, avatars }
  *                                            everyone (/admin/site-config/public,
  *                                            /admin/features/public, /admin/currencies/public,
@@ -95,12 +96,22 @@ function register({ on, deps }) {
 
   const settle = (promise) => promise.catch(() => null);
 
+  /* The player's open sports liability, INR, as a positive number (mssports keeps one row per
+     player in `total_exposures`, keyed on the platform user id). No row = nothing open = 0. */
+  const readExposure = async (userId) => {
+    const [row] = await deps.db.sequelize.query(
+      'SELECT total_exposure FROM mssports.total_exposures WHERE user_id = :userId ORDER BY id DESC LIMIT 1',
+      { replacements: { userId }, type: 'SELECT' }
+    );
+    return Math.abs(Number(row?.total_exposure) || 0);
+  };
+
   on(PLATFORM_EVENTS.SYNC_STATE, {
     audience: AUDIENCE.PUBLIC,
     limit: { windowMs: 10_000, max: 20 },
     handle: async (_payload, context) => {
       const userId = context.userId ? String(context.userId) : null;
-      const [siteHalf, me, balances, prefs, record, area] = await Promise.all([
+      const [siteHalf, me, balances, prefs, record, area, exposure] = await Promise.all([
         siteState(),
         userId ? settle(auth.me(userId)) : null,
         userId ? settle(wallet.getBalances(userId)) : null,
@@ -108,6 +119,7 @@ function register({ on, deps }) {
         userId ? settle(profile.get(userId)) : null,
         // The address and country cannot change within one connection: read once per socket.
         (context.socket.data.region ??= settle(region.visitor({ ip: context.ip, rayId: context.socket.id }))),
+        userId ? settle(readExposure(userId)) : null,
       ]);
 
       const state = {
@@ -115,7 +127,7 @@ function register({ on, deps }) {
         signedIn: Boolean(userId),
         ...(siteHalf ?? {}),
         ...(area ? { region: area } : {}),
-        ...(userId ? { me, profile: record, balances, preferences: prefs } : {}),
+        ...(userId ? { me, profile: record, balances, preferences: prefs, exposure } : {}),
       };
 
       return { status: true, d: scramble(state, keyFor(context.socket.id)) };
