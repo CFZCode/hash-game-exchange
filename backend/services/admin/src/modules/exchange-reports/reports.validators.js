@@ -80,6 +80,23 @@ const directUserWinLoss = {
     .refine(inTenDayWindow, { message: RANGE_MESSAGE }),
 };
 
+/** POST /exchange/reports/direct-bet-history — direct user ki point_ledger_direct entries, max 31 din. */
+const directBetHistory = {
+  body: z
+    .object({
+      clientId: id,
+      fromDate: day,
+      toDate: day,
+      category: z.enum(['ALL', 'SPORTS', 'CASINO']).default('ALL'),
+      currency: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{2,10}$/, 'A currency code like INR').optional(),
+      page: z.coerce.number().int().min(1).default(1),
+      limit: z.coerce.number().int().min(1).max(200).default(50),
+    })
+    .strict()
+    .refine((q) => days(q) >= 0, { message: 'fromDate cannot be after toDate.' })
+    .refine((q) => days(q) <= 31, { message: 'Date range cannot be more than 31 days.' }),
+};
+
 /** POST /exchange/reports/total-profit-loss — sirf sports (sportbook hamare yahan nahi). */
 const totalProfitLoss = {
   body: z
@@ -102,4 +119,4 @@ const turnover = {
     .refine(inTenDayWindow, { message: RANGE_MESSAGE }),
 };
 
-module.exports = { clients, statement, statementRow, partyWinLoss, userWinLoss, directUserWinLoss, totalProfitLoss, turnover };
+module.exports = { clients, statement, statementRow, partyWinLoss, userWinLoss, directUserWinLoss, directBetHistory, totalProfitLoss, turnover };
