@@ -7,6 +7,7 @@
 // `entry_ref` unique hai — wahi event dobara aaye to row dobara nahi banti.
 import { QueryTypes } from "sequelize";
 import { withVoidSuffix } from "../helper/voidLabel.mjs";
+import { inrToCurrency } from "../helper/toInr.mjs";
 
 const TABLE = "mssports.point_ledger_direct";
 
@@ -28,12 +29,15 @@ async function walletOf(db, userId, currency, transaction) {
 async function writeDirectEntry(db, { entryRef, eventType, category, userId, currency, delta, betId = null, sportId = null, gameType = null, remark = null }, { transaction } = {}) {
   const code = String(currency || "INR").toUpperCase().slice(0, 10);
   const wallet = await walletOf(db, userId, code, transaction);
+  // `delta` in the coin the bet was placed in (sign kept); no bet → no coin to convert into.
+  const [bet] = betId ? await db.query('SELECT original_currency FROM mssports."SportsBet" WHERE id = :betId', { replacements: { betId }, type: QueryTypes.SELECT, transaction }) : [];
+  const deltaCurrency = bet ? await inrToCurrency(delta, bet.original_currency || "INR") : null;
   const rows = await db.query(
     `INSERT INTO ${TABLE}
-       (entry_ref, event_type, category, user_id, username, currency, delta, balance_after,
+       (entry_ref, event_type, category, user_id, username, currency, delta, delta_currency, balance_after,
         bet_id, sport_id, game_type, remark, created_at)
      VALUES
-       (:entryRef, :eventType, :category, :userId, :username, :currency, :delta, :balanceAfter,
+       (:entryRef, :eventType, :category, :userId, :username, :currency, :delta, :deltaCurrency, :balanceAfter,
         :betId, :sportId, :gameType, :remark, NOW())
      ON CONFLICT (entry_ref) DO NOTHING
      RETURNING id`,
@@ -46,6 +50,7 @@ async function writeDirectEntry(db, { entryRef, eventType, category, userId, cur
         username: wallet.username ?? null,
         currency: code,
         delta: String(delta),
+        deltaCurrency: deltaCurrency == null ? null : String(deltaCurrency),
         balanceAfter: wallet.balance ?? null,
         betId,
         sportId: sportId != null ? String(sportId).slice(0, 50) : null,

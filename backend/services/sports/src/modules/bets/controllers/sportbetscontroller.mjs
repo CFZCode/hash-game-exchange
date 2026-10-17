@@ -30,6 +30,7 @@ import { checkBetLive } from "../buffer/betBuffer.mjs";
 import { StaffMarketLocks_default } from "../../../models/admin/StaffMarketLocks.mjs";
 
 import xssClean from "xss-clean";
+import { toInr } from "../../../lib/helper/toInr.mjs";
 import fetch from "node-fetch";
 init_TotalExposure();
 init_db();
@@ -539,7 +540,6 @@ var placeBet = async (req, res, opts) => {
       team_two,
       category,
       original_currency,
-      original_amount,
       usd_amount,
       match_start_time,
       eventid,
@@ -567,6 +567,15 @@ var placeBet = async (req, res, opts) => {
     } = req.body;
     count = runners.length;
     console.log("PLACE BET PAYLOAD RECEIVED:", req.body);
+    // `currency`; today's frontend still sends it as `original_currency` (INR).
+    const currency = req.body.currency ?? original_currency;
+    if (!currency || typeof currency !== "string") {
+      if (!externalTx) await transaction.rollback();
+      return res.status(400).json({ success: false, error: "currency is required" });
+    }
+    // The stake as the player sent it, in their coin; from here on stake_amount is INR.
+    const currency_amount = Number(stake_amount);
+    stake_amount = await toInr(stake_amount, currency);
     const ip_address = req.headers["x-forwarded-for"]?.split(",")[0] || req.connection.remoteAddress || req.ip;
     console.log("IP ADDRESS:", ip_address);
     const browser = req.headers["user-agent"] || null;
@@ -2038,8 +2047,8 @@ var placeBet = async (req, res, opts) => {
         bet_type: finalBetType,
         odds: oddN,
         stake_amount: stake,
-        original_currency: original_currency || "INR",
-        original_amount: original_amount || stake,
+        original_currency: currency.toUpperCase(),
+        original_amount: currency_amount,
         usd_amount: usd_amount || await inrToUsd(stake),
         liability: singleBetLiability,
         match_start_time: startTime,
@@ -2182,7 +2191,12 @@ var placeCombinedBet = async (req, res) => {
     if (legs.some((l) => !Array.isArray(l?.runners) || !l.runners.length)) {
       return res.status(400).json({ success: false, error: "Combined selections are missing the runner list" });
     }
-    const totalStake = isBadloSlip ? Math.max(...legs.map((l) => Number(l.stake_amount))) : legs.reduce((s, l) => s + Number(l.stake_amount), 0);
+    const legCurrency = (l) => l?.currency ?? l?.original_currency;
+    if (legs.some((l) => !legCurrency(l) || typeof legCurrency(l) !== "string")) {
+      return res.status(400).json({ success: false, error: "currency is required" });
+    }
+    const rawStake = isBadloSlip ? Math.max(...legs.map((l) => Number(l.stake_amount))) : legs.reduce((s, l) => s + Number(l.stake_amount), 0);
+    const totalStake = await toInr(rawStake, legCurrency(first));
     try {
       const limits = await resolveMarketLimits({
         eventid: first.eventid,
