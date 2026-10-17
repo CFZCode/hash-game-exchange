@@ -52,7 +52,7 @@ function Radios({ value, onChange, options }: { value: string; onChange: (v: str
  * Current Bets — zip ka `pages/reports/CurrentBets.jsx` (sirf Sports tab).
  *
  * Data sirf "Load" dabane pe aata hai. Search box loaded rows pe hi filter karta hai (API ko
- * nahi jaata). Total Soda / Total Amount = dikh rahi rows ka. Back = blue border, Lay = pink.
+ * nahi jaata). Total Bets / Total Amount = dikh rahi rows ka. Back = blue border, Lay = pink.
  * Upar Direct Users | Agent Users tab — dono ki bets alag (API ko `channel`).
  */
 const BetsList = ({ channel }: { channel: Channel }) => {
@@ -116,7 +116,7 @@ const BetsList = ({ channel }: { channel: Channel }) => {
             </Button>
           </div>
           <h5 className='font-semibold'>
-            Total Soda: <span className='mr-2'>{filtered.length}</span> Total Amount: <span>{totalAmount.toLocaleString()}</span>
+            Total Bets: <span className='mr-2'>{filtered.length}</span> Total Amount: <span>{totalAmount.toLocaleString()}</span>
           </h5>
         </div>
 

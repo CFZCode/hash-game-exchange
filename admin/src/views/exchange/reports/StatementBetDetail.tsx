@@ -121,7 +121,7 @@ const StatementBetDetail = ({ detail, onClose }: { detail: BetDetail | null; onC
                 <TableHead>Username</TableHead>
                 <TableHead>Nation</TableHead>
                 <TableHead className='text-right'>Rate</TableHead>
-                <TableHead className='text-right'>Bhav</TableHead>
+                <TableHead className='text-right'>Rate</TableHead>
                 <TableHead className='text-right'>Amount</TableHead>
                 <TableHead className='text-right'>Win</TableHead>
                 <TableHead>Date</TableHead>

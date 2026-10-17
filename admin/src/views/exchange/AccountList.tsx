@@ -6,7 +6,7 @@ import Link from 'next/link'
 
 import { ArrowLeftRightIcon, FileSpreadsheetIcon, FileTextIcon, HandCoinsIcon, InfoIcon, PlusIcon } from 'lucide-react'
 
-import ChannelTabs, { type Channel } from '@/components/shared/ChannelTabs'
+import type { Channel } from '@/components/shared/ChannelTabs'
 import DataTable, { type Column } from '@/components/shared/DataTable'
 import PageHeader from '@/components/shared/PageHeader'
 import { Button } from '@/components/ui/button'
@@ -32,7 +32,7 @@ const lockSwitch = (on: boolean) => <Switch checked={on} disabled aria-label={on
  * Sirf DIRECT children. Staff ke naam pe click = uske children (drill-down, sirf dekhna — wahan
  * D/W nahi, sirf "P"). Har row pe rangeen button — "Deposit / Withdraw" (simple, `admin/staff/transfer`),
  * "Settlement" (points settle) — dabane pe zip ke wallet jaisa − / + popup khulta hai; aur More.
- * Apni list pe Direct Users | Agent Users tab (`channel`); drill-down me tab nahi.
+ * Sirf Agent Users (`channel=agent`) — direct users Agent Management me nahi aate.
  */
 const AccountListBody = ({ channel }: { channel?: Channel }) => {
   const title = 'Account List'
@@ -177,7 +177,7 @@ const AccountList = () => {
         title='Account List'
         description={parentId ? 'Downline of the selected account (view only).' : 'Your direct accounts. Deposit / Withdraw moves credit; Settlement settles the Client(P/L).'}
       />
-      {parentId ? <AccountListBody /> : <ChannelTabs>{channel => <AccountListBody channel={channel} />}</ChannelTabs>}
+      <AccountListBody channel='agent' />
     </div>
   )
 }

@@ -236,7 +236,7 @@ const n = (v: string | number | null | undefined) => {
 const DirectUserDashboard = () => {
   // Agent-tree logins (no promotions) see their own network, not the whole site.
   const inNetwork = useSession().actor?.promotions === false
-  const f = useStatsFilters({ defaultPreset: '30d' })
+  const f = useStatsFilters({ defaultPreset: 'all' })
   const currencies = useCurrencyCodes()
   const reportCoin = useDefaultCurrency().code
 

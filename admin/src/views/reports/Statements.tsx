@@ -302,7 +302,7 @@ const Statements = () => {
 
   return (
     <div>
-      <PageHeader title='Statements' description='Transfers between accounts in your tree, and the full account statement ("hisab") for one user or staff member.' />
+      <PageHeader title='Statements' description='Transfers between accounts in your tree, and the full account statement for one user or staff member.' />
       <Tabs defaultValue={canStatement ? 'statement' : 'transfers'}>
         <TabsList className='mb-4'>
           {canStatement && <TabsTrigger value='statement'>Account statement</TabsTrigger>}

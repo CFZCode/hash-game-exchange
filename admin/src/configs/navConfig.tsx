@@ -273,6 +273,7 @@ export const navItems: NavItem[] = [
     // Main: Dashboard (Direct Users + Agent System tab), Users (Direct / Agent / Financial) aur Wallets (zip jaisa Direct User Wallet).
     groupLabel: 'Main',
     groupIcon: 'LayoutGrid',
+    collapsible: true,
     items: [
       { icon: 'LayoutDashboard', label: 'Dashboard', href: '/dashboard', permission: ['reports:read', ...WALLET_ANY] },
 
@@ -285,6 +286,24 @@ export const navItems: NavItem[] = [
       // Zip ke Main jaisa: Redeem Codes (Promotions se yahan) aur Turnover Report (direct users ka wager vs target).
       { icon: 'Ticket', label: 'Redeem Codes', href: '/redeem-codes', permission: 'reports:read', promotions: true },
       { icon: 'Activity', label: 'Turnover Report', href: '/turnover-report', permission: 'reports:read', promotions: true }
+    ]
+  },
+  {
+    // Sports Exchange ka agent system — sidebar me alag section. Create Account Account List ke button se.
+    groupLabel: 'Agent Management',
+    groupIcon: 'Network',
+    collapsible: true,
+    items: [
+      { icon: 'LayoutDashboard', label: 'Dashboard', href: '/exchange/dashboard', permission: WALLET_ANY },
+      { icon: 'BookUser', label: 'Account List', href: '/exchange/users', activePath: '/exchange/users', permission: ['users:read', 'staff:read'] } as MenuItem,
+      { icon: 'Landmark', label: 'Bank', href: '/exchange/bank', permission: WALLET_ANY },
+
+      // Agent ke reports.
+      { icon: 'ReceiptText', label: 'Account Statement', href: '/exchange/reports/account-statement', permission: 'reports:read' },
+      { icon: 'Scale', label: 'Party Win Loss', href: '/exchange/reports/party-win-loss', permission: 'reports:read' },
+      { icon: 'TrendingUp', label: 'Total Profit Loss', href: '/exchange/reports/total-profit-loss', permission: 'reports:read' },
+      { icon: 'UserRoundCheck', label: 'User Win Loss', href: '/exchange/reports/user-win-loss', permission: 'reports:read' },
+      { icon: 'Lock', label: 'General Lock', href: '/exchange/reports/general-lock', permission: 'reports:read' }
     ]
   },
   {
@@ -310,29 +329,13 @@ export const navItems: NavItem[] = [
     ]
   },
   {
-    // Sports Exchange ka agent system — sidebar me alag section. Create Account Account List ke button se.
-    groupLabel: 'Agent Management',
-    groupIcon: 'Network',
-    collapsible: true,
-    items: [
-      { icon: 'BookUser', label: 'Account List', href: '/exchange/users', activePath: '/exchange/users', permission: ['users:read', 'staff:read'] } as MenuItem,
-      { icon: 'Landmark', label: 'Bank', href: '/exchange/bank', permission: WALLET_ANY },
-
-      // Agent ke reports.
-      { icon: 'ReceiptText', label: 'Account Statement', href: '/exchange/reports/account-statement', permission: 'reports:read' },
-      { icon: 'Scale', label: 'Party Win Loss', href: '/exchange/reports/party-win-loss', permission: 'reports:read' },
-      { icon: 'TrendingUp', label: 'Total Profit Loss', href: '/exchange/reports/total-profit-loss', permission: 'reports:read' },
-      { icon: 'UserRoundCheck', label: 'User Win Loss', href: '/exchange/reports/user-win-loss', permission: 'reports:read' },
-      { icon: 'Lock', label: 'General Lock', href: '/exchange/reports/general-lock', permission: 'reports:read' }
-    ]
-  },
-  {
     /*
      * Transactions — admin-structure.zip jaisa: Deposit, Withdraw (dono me Direct Users / Agent Users tab)
      * aur Account Statement. Purane Fiat / Crypto / Payment orders screens Direct Users tab ke andar.
      */
     groupLabel: 'Transactions',
     groupIcon: 'ArrowLeftRight',
+    collapsible: true,
     items: [
       { icon: 'ArrowDownToLine', label: 'Deposit', href: '/transactions/deposit', permission: ['deposits:read', 'users:read'] },
       { icon: 'ArrowUpFromLine', label: 'Withdraw', href: '/transactions/withdraw', permission: ['withdrawals:read', 'users:read'] },
@@ -348,6 +351,7 @@ export const navItems: NavItem[] = [
   {
     groupLabel: 'Finance',
     groupIcon: 'Banknote',
+    collapsible: true,
     items: [
       { icon: 'ArrowRightLeft', label: 'Exchange rates', href: '/exchange-rates', permission: 'config:read' },
 
@@ -373,6 +377,7 @@ export const navItems: NavItem[] = [
   {
     groupLabel: 'Promotions',
     groupIcon: 'Sparkles',
+    collapsible: true,
     items: [
       // The campaigns on the player site's /promotions. Reads are the public routes (staff see drafts); writes are config:write.
       { icon: 'Megaphone', label: 'Promotions', href: '/promotions/campaigns', permission: 'config:read', promotions: true, feature: 'promotions' },
@@ -392,6 +397,7 @@ export const navItems: NavItem[] = [
     // Casino — ek hi section: andar koi doosra "Casino" dropdown nahi; priority screens bhi yahin (Settings se aaye).
     groupLabel: 'Casino',
     groupIcon: 'Spade',
+    collapsible: true,
     items: [
       { icon: 'Gamepad2', label: 'Game catalogue', href: '/casino/games', permission: 'casino:read', flag: 'casino' },
       { icon: 'ListOrdered', label: 'Lobby curation', href: '/casino/curation', permission: 'casino:read', flag: 'casino' },
@@ -411,6 +417,7 @@ export const navItems: NavItem[] = [
   {
     groupLabel: 'Team',
     groupIcon: 'Contact',
+    collapsible: true,
     items: [
       { icon: 'KeyRound', label: 'Executives', href: '/access/executives', permission: 'staff:read' },
       { icon: 'Target', label: 'Marketing', href: '/marketing', account: 'marketing' },
@@ -420,6 +427,7 @@ export const navItems: NavItem[] = [
   {
     groupLabel: 'Content',
     groupIcon: 'LayoutTemplate',
+    collapsible: true,
     items: [
       { icon: 'Image', label: 'Banners', href: '/content/banners', permission: 'config:read', feature: 'banners' },
 
@@ -450,6 +458,7 @@ export const navItems: NavItem[] = [
   {
     groupLabel: 'Reports',
     groupIcon: 'ChartPie',
+    collapsible: true,
     items: [
       { icon: 'ClipboardList', label: 'User reports', href: '/reports/players', permission: 'reports:read' },
       { icon: 'BadgeDollarSign', label: 'Profit & loss', href: '/reports/pnl', permission: 'reports:read' },
@@ -460,6 +469,7 @@ export const navItems: NavItem[] = [
     // Site Config — Settings ke barabar alag section (pehle Settings ke andar dropdown tha).
     groupLabel: 'Site Config',
     groupIcon: 'Settings2',
+    collapsible: true,
     items: [
       { icon: 'ToggleRight', label: 'Features', href: '/site-config/features', permission: 'config:read' },
       { icon: 'Palette', label: 'Branding', href: '/site-config/branding', permission: 'config:read' },
@@ -474,6 +484,7 @@ export const navItems: NavItem[] = [
     // Zip jaisa Settings: Payment Methods (+ My account). Priority screens Casino me, Site Config alag section.
     groupLabel: 'Settings',
     groupIcon: 'Settings',
+    collapsible: true,
     items: [
       { icon: 'CreditCard', label: 'Payment Methods', href: '/payment-methods', permission: 'config:read' },
       { icon: 'CircleUserRound', label: 'My account', href: '/account' }

@@ -6,7 +6,7 @@ import { ArrowRightIcon, FileSpreadsheetIcon, FileTextIcon, Loader2Icon } from '
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
-import ChannelTabs, { type Channel } from '@/components/shared/ChannelTabs'
+import type { Channel } from '@/components/shared/ChannelTabs'
 import DataTable, { type Column } from '@/components/shared/DataTable'
 import PageHeader from '@/components/shared/PageHeader'
 import { Button } from '@/components/ui/button'
@@ -29,7 +29,7 @@ const EXPORT_COLS = ['User Name', 'CR', 'pts', 'Client(P/L)', 'Exposure', 'Avail
  * Direct children ki list (CR, pts, Client(P/L), Exposure, Available pts). Har row me
  * "All →" pending ka ULTA sign box me bhar deta hai, Submit = points settlement:
  *   Client(P/L) −100 → box +100 (dena hai)  |  Client(P/L) +10 → box −10 (lena hai)
- * Transaction Code upar ek baar. Upar Direct Users | Agent Users tab (`channel`).
+ * Transaction Code upar ek baar. Sirf Agent Users (`channel=agent`).
  */
 const BankBody = ({ channel }: { channel: Channel }) => {
   const qc = useQueryClient()
@@ -175,7 +175,7 @@ const BankBody = ({ channel }: { channel: Channel }) => {
 const Bank = () => (
   <div>
     <PageHeader title='Bank' description='Settle the Client(P/L) of your direct accounts.' />
-    <ChannelTabs>{channel => <BankBody channel={channel} />}</ChannelTabs>
+    <BankBody channel='agent' />
   </div>
 )
 
