@@ -47,8 +47,10 @@ const OwnerBalanceInner = () => {
 }
 
 const OwnerBalance = () => {
-  const { actor } = useSession()
-  const isOwner = actor?.level === 1 && !actor.executiveId
+  const { actor, can } = useSession()
+
+  // Super Admin, or its executive granted wallet:adjust (the owner-wallet routes' permission).
+  const isOwner = actor?.level === 1 && can('wallet:adjust')
 
   // owner na ho to API call hi nahi
   return isOwner ? <OwnerBalanceInner /> : null

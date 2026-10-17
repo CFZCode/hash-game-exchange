@@ -121,7 +121,7 @@ class CreateAccountService {
 
     // 2. Transaction Code — form pe hamesha hai. Owner ka sirf tab check hota hai jab set ho.
     await assertTransactionPassword(this.models, staffActor.id, transactionPassword, {
-      required: !canIssueFunds(staffActor),
+      required: !canIssueFunds(staffActor) || Boolean(staffActor.executiveId),
       executiveId: staffActor.executiveId ?? null,
     });
 

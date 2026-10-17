@@ -2,6 +2,8 @@
 
 const { Router } = require('express');
 
+const { PERMISSIONS } = require('@ibitplay/auth');
+
 const { lazy } = require('../../../lib/mssports');
 
 /**
@@ -19,26 +21,29 @@ const { lazy } = require('../../../lib/mssports');
  *  POST /void-bet-after-settlement    🔑  reverse a settled bet      (needs transaction password)
  *  POST /void-market-after-settlement 🔑  reverse a settled market   (needs transaction password)
  */
-module.exports = function adminRoutes() {
+module.exports = function adminRoutes({ auth }) {
   const router = Router();
+  // Platform permissions first, so a Super Admin executive can be given exactly these (user, 2026-10-17).
+  const canSettle = auth.requirePermission(PERMISSIONS.SPORTS_SETTLE);
+  const canVoidSettled = auth.requirePermission(PERMISSIONS.SPORTS_VOID_SETTLED);
   const authMiddleware = lazy((m) => m.authMiddleware);
   const requireOwner = lazy((m) => m.requireOwner);
   const verifyTransactionPassword = lazy((m) => m.verifyTransactionPassword);
   const settle = (name) => lazy((m) => m.ManualSettleController[name]);
 
-  router.get('/momatches', authMiddleware, requireOwner, settle('getMoMatches'));
-  router.get('/fanmatches', authMiddleware, requireOwner, settle('getFanOpenBets'));
-  router.post('/declareresult', authMiddleware, requireOwner, settle('declareResult'));
-  router.post('/void', authMiddleware, requireOwner, settle('voidResult'));
-  router.get('/open-bets', authMiddleware, requireOwner, settle('getOpenBetsForMarket'));
-  router.post('/void-single-bet', authMiddleware, requireOwner, settle('voidSingleOpenBet'));
+  router.get('/momatches', canSettle, authMiddleware, requireOwner, settle('getMoMatches'));
+  router.get('/fanmatches', canSettle, authMiddleware, requireOwner, settle('getFanOpenBets'));
+  router.post('/declareresult', canSettle, authMiddleware, requireOwner, settle('declareResult'));
+  router.post('/void', canSettle, authMiddleware, requireOwner, settle('voidResult'));
+  router.get('/open-bets', canSettle, authMiddleware, requireOwner, settle('getOpenBetsForMarket'));
+  router.post('/void-single-bet', canSettle, authMiddleware, requireOwner, settle('voidSingleOpenBet'));
   // Sports — settle ho chuke markets ka void (admin "Void Bets (After Settlement)" page).
-  router.get('/settled-markets', authMiddleware, requireOwner, settle('getSettledMarkets'));
-  router.get('/settled-bets', authMiddleware, requireOwner, settle('getSettledBets'));
-  router.post('/void-bet-after-settlement', authMiddleware, requireOwner, verifyTransactionPassword, settle('voidBetAfterSettlement'));
-  router.post('/void-market-after-settlement', authMiddleware, requireOwner, verifyTransactionPassword, settle('voidMarketAfterSettlement'));
+  router.get('/settled-markets', canSettle, authMiddleware, requireOwner, settle('getSettledMarkets'));
+  router.get('/settled-bets', canSettle, authMiddleware, requireOwner, settle('getSettledBets'));
+  router.post('/void-bet-after-settlement', canVoidSettled, authMiddleware, requireOwner, verifyTransactionPassword, settle('voidBetAfterSettlement'));
+  router.post('/void-market-after-settlement', canVoidSettled, authMiddleware, requireOwner, verifyTransactionPassword, settle('voidMarketAfterSettlement'));
 
   router.authorizationReviewed =
-    'mssports authorizes each route itself: authMiddleware then requireOwner (the platform Super Admin), plus the transaction password on the two post-settlement voids';
+    'platform permission first (sports:settle; sports:void-settled for the post-settlement voids), then mssports: authMiddleware then requireOwner (the Super Admin or its executive), plus the transaction password on the two post-settlement voids';
   return router;
 };

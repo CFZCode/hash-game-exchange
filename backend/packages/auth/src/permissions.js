@@ -294,13 +294,13 @@ function effectiveStaffLevel({ level, parentLevel = null } = {}) {
 /**
  * May this session ISSUE funds — pay out without drawing down a balance?
  *
- * The platform owner only: a Super Admin's own session, not an executive
- * acting under one. Legacy spelled this `level === 0`; the levels start at 1,
- * so the check matched nobody and the owner's transfers were refused for want
- * of a balance it was never meant to hold.
+ * The platform owner: a Super Admin's session, or an executive acting under one
+ * (user, 2026-10-17: an executive may do whatever its granted permissions
+ * allow, and every money route is behind its own permission). Legacy spelled
+ * this `level === 0`; the levels start at 1, so the check matched nobody.
  */
 function canIssueFunds(staff) {
-  if (!staff || staff.executiveId) return false;
+  if (!staff) return false;
   return Number(staff.level) === STAFF_LEVELS.SUPER_ADMIN;
 }
 

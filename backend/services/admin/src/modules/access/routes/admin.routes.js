@@ -5,6 +5,7 @@ const { validate, createActivityRecorder } = require('@ibitplay/common');
 const { PERMISSIONS } = require('@ibitplay/auth');
 
 const v = require('../access.validators');
+const errors = require('../access.errors');
 const { AccessService } = require('../access.service');
 const { createControllers } = require('../controllers');
 
@@ -32,15 +33,15 @@ module.exports = function adminRoutes(deps) {
   const canRead = auth.requirePermission(PERMISSIONS.STAFF_READ);
   const canGrant = auth.requirePermission(PERMISSIONS.ROLES_MANAGE);
   /**
-   * Executives: `roles:manage` OR `staff:write`. Opening them to `staff:write`
-   * lets the agent tree (super masters, masters) and admins mint sub-logins
-   * under THEMSELVES — safe because the service already scopes every executive
+   * Executives: every staff login, Super Admin down to Agent (user, 2026-10-17),
+   * manages its OWN executives — safe because the service scopes every executive
    * to its owning staff member (`parent_staff_id = actor.id`, `#assertOwned`)
    * and refuses a grant the owner does not hold (`#assertGrantable`). An
-   * executive session cannot mint or edit sub-logins at all. Marketing
+   * executive session cannot list, mint or edit sub-logins at all. Marketing
    * accounts stay behind `roles:manage`.
    */
-  const canGrantExecutive = auth.requireAnyPermission(PERMISSIONS.ROLES_MANAGE, PERMISSIONS.STAFF_WRITE);
+  const canGrantExecutive = (req, _res, next) =>
+    next(req.staff?.executiveId ? errors.NOT_PERMITTED({ reason: 'an executive cannot manage executives' }) : undefined);
   const canAudit = auth.requirePermission(PERMISSIONS.AUDIT_READ);
   const audit = (action, describe) => withActivity({ action, describe });
 
@@ -48,7 +49,7 @@ module.exports = function adminRoutes(deps) {
   router.get('/me/permissions', ctrl.myPermissions);
 
   // ── Executives ──────────────────────────────────────────────────────
-  router.get('/executives', canRead, validate(v.listExecutives), ctrl.listExecutives);
+  router.get('/executives', canGrantExecutive, validate(v.listExecutives), ctrl.listExecutives);
 
   router.post(
     '/executives',
@@ -137,5 +138,8 @@ module.exports = function adminRoutes(deps) {
   router.get('/activity', canAudit, validate(v.allActivity), ctrl.activity);
   router.get('/executives/:executiveId/activity', canAudit, validate(v.activity), ctrl.executiveActivity);
 
+  // canGrantExecutive is not a permission guard by design: every staff login manages its own executives.
+  router.authorizationReviewed =
+    'Executive routes: any non-executive staff session (canGrantExecutive); the service scopes each executive to its owner (#assertOwned) and refuses any grant the owner does not hold (#assertGrantable). Other routes carry requirePermission.';
   return router;
 };

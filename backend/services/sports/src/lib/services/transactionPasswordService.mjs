@@ -24,7 +24,8 @@ async function passwordMatches(reqUser, transactionPassword) {
   const staffId = Number(reqUser.platformStaffId);
   if (!Number.isSafeInteger(staffId) || staffId <= 0) return false;
   try {
-    await admin().post("/internal/admin/staff-directory/verify-transaction-password", { staffId, transactionPassword });
+    // An executive confirms with its own password (admin-service's rule), not its parent's.
+    await admin().post("/internal/admin/staff-directory/verify-transaction-password", { staffId, transactionPassword, executiveId: reqUser.platformExecutiveId ?? null });
     return true;
   } catch (error) {
     // 403 = wrong password; anything else (admin-service down) also refuses — fail closed.

@@ -74,13 +74,17 @@ export function decodePlatformToken(token) {
     throw adminError;
   }
   const level = Number(p.level);
-  if (p.executiveId || level >= 7) throw new Error('Executive accounts cannot use the sportsbook');
+  // An executive LOGIN carries its parent's id (`sub`) and level, so it acts on the parent's tree only;
+  // what it may do is its granted platform permissions, checked on each admin route (user, 2026-10-17).
+  // A legacy level-7 staff ROW has no such mapping and stays refused.
+  if (level >= 7) throw new Error('Executive accounts cannot use the sportsbook');
   // `platform_staff_id`: the platform's own staff id, which the owner mapping (owner_id 1) loses —
   // the transaction-password check in TXN_PASSWORD_MODE=login verifies against that account.
-  if (level === OWNER_LEVEL) return { owner_id: OWNER_ID, role: 'OWNER', platform_staff_id: Number(p.sub) };
+  const ids = { platform_staff_id: Number(p.sub), platform_executive_id: p.executiveId ?? null };
+  if (level === OWNER_LEVEL) return { owner_id: OWNER_ID, role: 'OWNER', ...ids };
   const mapped = STAFF_ROLES[level];
   if (!mapped) throw new Error(`No sportsbook role for staff level ${p.level}`);
-  return { staff_id: Number(p.sub), role: mapped.role, level: mapped.level, platform_staff_id: Number(p.sub) };
+  return { staff_id: Number(p.sub), role: mapped.role, level: mapped.level, ...ids };
 }
 
 /** decodePlatformToken, plus the account's mssports rows. */

@@ -25,13 +25,15 @@ export type ExecutiveActivity = {
 export const EXECUTIVE_STATUSES = ['active', 'inactive', 'locked'] as const
 
 /** The platform permission vocabulary — `backend/packages/auth/src/permissions.js`. */
+// Grouped by what the screens do (agent system, sports exchange, …); the picker offers only what the creator holds.
 export const PERMISSION_GROUPS: { label: string; permissions: string[] }[] = [
-  { label: 'Users', permissions: ['users:read', 'users:write', 'users:lock', 'users:delete', 'users:impersonate'] },
-  { label: 'Wallet', permissions: ['wallet:read', 'wallet:credit', 'wallet:debit', 'wallet:adjust'] },
-  { label: 'Payments', permissions: ['deposits:read', 'deposits:approve', 'withdrawals:read', 'withdrawals:approve'] },
+  { label: 'Agent system: accounts, create account, locks', permissions: ['users:read', 'users:write', 'users:lock', 'staff:read', 'staff:write'] },
+  { label: 'Agent system: points (D/W, settlement, bank)', permissions: ['wallet:read', 'wallet:credit', 'wallet:debit', 'wallet:adjust'] },
+  { label: 'Reports (statements, win/loss, turnover, current bets)', permissions: ['reports:read', 'audit:read'] },
+  { label: 'Sports exchange: view / settings & locks / settlement / void', permissions: ['sports:read', 'sports:manage', 'sports:settle', 'sports:void-settled'] },
+  { label: 'Payments (direct users)', permissions: ['deposits:read', 'deposits:approve', 'withdrawals:read', 'withdrawals:approve'] },
   { label: 'Casino', permissions: ['casino:read', 'casino:manage', 'casino:settle'] },
-  { label: 'Sports', permissions: ['sports:read', 'sports:manage', 'sports:settle', 'sports:void-settled'] },
-  { label: 'Admin', permissions: ['staff:read', 'staff:write', 'roles:manage', 'config:read', 'config:write', 'reports:read', 'audit:read'] }
+  { label: 'Admin', permissions: ['roles:manage', 'config:read', 'config:write', 'redeem:write', 'users:delete', 'users:impersonate'] }
 ]
 
 export const ALL_PERMISSIONS = PERMISSION_GROUPS.flatMap(g => g.permissions)

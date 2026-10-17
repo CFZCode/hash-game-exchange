@@ -114,11 +114,11 @@ export const CreateSubLogin = ({ kind }: { kind: Kind }) => {
 }
 
 /**
- * Who may mint and manage each kind. Executives: `roles:manage` or `staff:write` — admins and the
- * agent tree (super masters, masters) create them under THEMSELVES, never with a permission they
- * do not hold (the platform refuses). Marketing users stay with `roles:manage`.
+ * Who may mint and manage each kind. Executives: every staff login, Super Admin down to Agent,
+ * under THEMSELVES and never with a permission they do not hold (the platform refuses; an
+ * executive session cannot manage executives at all). Marketing users stay with `roles:manage`.
  */
-export const GRANT: Record<Kind, string | string[]> = { executive: ['roles:manage', 'staff:write'], marketing: 'roles:manage' }
+export const GRANT: Record<Kind, string | string[]> = { executive: [], marketing: 'roles:manage' }
 
 const RowActions = ({ row, kind }: { row: ExecutiveRow; kind: Kind }) => {
   const base = BASE[kind]

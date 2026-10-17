@@ -302,8 +302,8 @@ const cashierProblem = (rows: CashierRow[]) => {
  * every other staff account sees them read-only. Every deposit and withdrawal rail checks them.
  */
 const CashierLimitsCard = () => {
-  const { actor } = useSession()
-  const isSuperAdmin = actor?.level === 1 && !actor?.executiveId
+  const { actor, can } = useSession()
+  const isSuperAdmin = actor?.level === 1 && can('config:write')
   const q = useApi<{ currencies: CashierRow[] }>('admin/site-config/cashier-limits')
   const [draft, setDraft] = useState<Record<string, Partial<Record<CashierField, string | null>>>>({})
   const [confirming, setConfirming] = useState(false)

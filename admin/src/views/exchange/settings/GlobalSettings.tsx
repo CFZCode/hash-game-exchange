@@ -6,7 +6,6 @@ import BetLimits from './BetLimits'
 import BufferTime from './BufferTime'
 import Commission from './Commission'
 import MaxOdds from './MaxOdds'
-import VirtualBetLimits from './VirtualBetLimits'
 
 /** Sports Exchange → Global Settings: saari sports settings ek page pe, tab se switch (`?tab=`). */
 const GlobalSettings = () => (
@@ -16,7 +15,6 @@ const GlobalSettings = () => (
       { value: 'commission', label: 'Commission', render: () => <Commission /> },
       { value: 'max-odds', label: 'Max Odds', render: () => <MaxOdds /> },
       { value: 'auto-void', label: 'Auto Void', render: () => <AutoVoid /> },
-      { value: 'virtual-limits', label: 'Virtual Bet Limits', render: () => <VirtualBetLimits /> },
       { value: 'bet-limits', label: 'Bet Limits', render: () => <BetLimits /> }
     ]}
   />

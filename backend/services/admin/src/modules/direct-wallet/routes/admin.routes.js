@@ -11,7 +11,7 @@ const { DirectWalletService } = require('../directWallet.service');
 const actorFrom = (req) => ({
   id: req.staff.id,
   executiveId: req.staff.executiveId ?? null,
-  canIssueFunds: canIssueFunds(req.staff) && !req.staff.executiveId,
+  canIssueFunds: canIssueFunds(req.staff),
 });
 
 /**

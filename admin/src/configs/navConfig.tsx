@@ -236,6 +236,9 @@ export type MenuItem = {
 
   /** A direct-user screen: only the Super Admin and its executives (`actor.direct`). */
   direct?: boolean
+
+  /** Staff's own logins only — an executive session never sees it. */
+  notExecutive?: boolean
 } & (
   | {
       href: string
@@ -273,9 +276,6 @@ export type NavItem = {
  */
 /** Wallet dekhne ki koi bhi permission (Agent System dashboard tab, bank, point ledger). */
 const WALLET_ANY = ['wallet:credit', 'wallet:debit', 'wallet:adjust', 'users:read']
-
-/** Zip ke owner-only screens: `wallet:adjust` sirf Super Admin (owner) ke paas hai. */
-const OWNER_ONLY = 'wallet:adjust'
 
 export const navItems: NavItem[] = [
   {
@@ -330,10 +330,10 @@ export const navItems: NavItem[] = [
       { icon: 'RotateCw', label: 'Turn Over', href: '/exchange/reports/turnover', permission: 'reports:read' },
 
       // Zip me owner only. Casino Settlement nahi. Match / Fancy / Void Bets ek page pe tabs me.
-      { icon: 'Gavel', label: 'Settlement', href: '/exchange/settlement', permission: OWNER_ONLY },
+      { icon: 'Gavel', label: 'Settlement', href: '/exchange/settlement', permission: 'sports:settle', direct: true },
 
       // Zip me owner only (sports config): Buffer Time, Commission, Max Odds, Auto Void, Virtual / Bet Limits — tabs me.
-      { icon: 'SlidersHorizontal', label: 'Global Settings', href: '/exchange/settings', permission: OWNER_ONLY },
+      { icon: 'SlidersHorizontal', label: 'Global Settings', href: '/exchange/settings', permission: 'sports:manage', direct: true },
       { icon: 'CalendarDays', label: 'Events', href: '/exchange/events', permission: 'sports:read' }
     ]
   },
@@ -430,7 +430,8 @@ export const navItems: NavItem[] = [
     groupIcon: 'Contact',
     collapsible: true,
     items: [
-      { icon: 'KeyRound', label: 'Executives', href: '/access/executives', permission: 'staff:read' },
+      // Every staff login (Super Admin down to Agent) makes its own executives (user, 2026-10-17).
+      { icon: 'KeyRound', label: 'Executives', href: '/access/executives', notExecutive: true },
       { icon: 'Target', label: 'Marketing', href: '/marketing', account: 'marketing' },
       { icon: 'ScrollText', label: 'Activity log', href: '/audit', permission: 'audit:read' }
     ]
@@ -471,6 +472,7 @@ export const navItems: NavItem[] = [
     groupLabel: 'Reports',
     groupIcon: 'ChartPie',
     collapsible: true,
+
     // Not for agent logins (user, 2026-10-17): agents have their own reports under Agent Management.
     items: [
       { icon: 'ClipboardList', label: 'User reports', href: '/reports/players', permission: 'reports:read', promotions: true },
@@ -604,6 +606,9 @@ export type NavMarks = {
 
   /** A direct-user screen: only the Super Admin and its executives (`actor.direct`). */
   direct?: boolean
+
+  /** Staff's own logins only — an executive session never sees it (e.g. managing executives). */
+  notExecutive?: boolean
 }
 
 type NavEntry = NavMarks & { href?: string; childItems?: MenuSubItem[] }
