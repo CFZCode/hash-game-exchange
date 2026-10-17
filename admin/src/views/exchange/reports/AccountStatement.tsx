@@ -113,8 +113,10 @@ const AccountStatement = () => {
     // 10 din se lamba range kabhi load nahi hota (Load par notice).
     if (daysBetween(range.from, range.to) > 10) return null
 
+    // Agent Management: direct users never show here (only the Super Admin sees them, elsewhere).
     return api.post<StatementPage>('admin/exchange/reports/statement', {
       ...clientBody(client),
+      channel: 'agent',
       reportType: typeVal === '3' ? 'SPORTS' : 'TRANSACTION',
       fromDate: range.from,
       toDate: range.to,
@@ -325,7 +327,7 @@ const AccountStatement = () => {
         <form onSubmit={handleLoad} className='space-y-4 border-b p-4'>
           <div className='grid gap-4 md:grid-cols-2 lg:grid-cols-6'>
             <FilterField label='Search By Client Name' className='lg:col-span-1'>
-              <ClientSearch value={client} onChange={setClient} />
+              <ClientSearch value={client} onChange={setClient} channel='agent' />
             </FilterField>
             <FilterField label='Select Date Range' className='lg:col-span-1'>
               <DateRangePicker from={range.from} to={range.to} max={defaultRange().to} clearable={false} onChange={r => setRange({ from: r.from, to: r.to })} />
