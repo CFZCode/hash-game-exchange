@@ -4,13 +4,14 @@ import { createHmac, createPrivateKey, sign as edSign, type KeyObject } from 'no
 import { appendFile, mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
-import { FEATURE_CATALOGUE, FEATURE_KEYS, FEATURE_OPTIONS, FLAG_KEYS, isPolicy, isVariantOf, resolveOptions } from '@/configs/entitlementCatalogue'
+import { FEATURE_CATALOGUE, FEATURE_KEYS, FEATURE_OPTIONS, FLAG_GROUPS, FLAG_KEYS, isPolicy, isVariantOf, resolveOptions } from '@/configs/entitlementCatalogue'
 import { serverConfig } from '@/configs/site'
 import { pinToUi, SITE_UI } from '@/configs/siteUi'
 import { DEFAULT_TEMPLATE, resolveTemplateKey, templateByKey, TEMPLATE_KEYS } from '@/configs/templateCatalogue'
 import { HttpError } from '@/lib/owner/guard'
 import { brandingProblem, BRANDING_SLOTS, cleanBranding, type Branding } from './branding'
 import { assetExists } from './brandingAssets'
+import { coinSwitchedOff } from './coinGate'
 import { cleanCoin, coinProblem, diffCoins, droppedCoins } from './coins'
 import { cleanRegion, regionProblem, type RegionSetting } from './region'
 import { cleanWithdrawalCap, withdrawalCapProblem, type WithdrawalCap } from './withdrawalCap'
@@ -62,6 +63,8 @@ function knownVariants(map: unknown) {
  * The rule that ties ON to VARIANT (contract §2): a policy is always on (its variant is the
  * policy); any other feature on variant `none` is off.
  */
+const FIAT_COIN_FLAGS = new Set(FLAG_GROUPS.find(g => g.title === 'Fiat currencies')?.keys ?? [])
+
 function normalise(features: Record<string, boolean>, variants: Record<string, string>) {
   const out = { ...features }
 
@@ -351,10 +354,20 @@ export function saveEntitlements(
     // variant, fixed features stay on, features the UI does not have stay off.
     const pinned = pinToUi(complete({ ...current.features, ...input.features }, FEATURE_KEYS), variants)
 
+    const flags = complete({ ...current.flags, ...input.flags }, FLAG_KEYS)
+
+    // The default coin and the reward coin must be coins the site actually offers: a switched-off
+    // coin would open every money screen (and value every promotion) in a currency players can't hold.
+    for (const key of ['default_currency', 'reward_currency']) {
+      const coin = String(pinned.variants[key] ?? '').toLowerCase()
+
+      if (coin && coinSwitchedOff(coin, flags, FIAT_COIN_FLAGS)) throw new HttpError(422, 'VALIDATION_ERROR', `${key}: ${coin.toUpperCase()} is switched off under Site flags — allow the coin or pick another`)
+    }
+
     const next = {
       template,
       features: normalise(pinned.features, pinned.variants),
-      flags: complete({ ...current.flags, ...input.flags }, FLAG_KEYS),
+      flags,
       variants: pinned.variants,
       options,
       region,

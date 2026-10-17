@@ -80,8 +80,59 @@ Run each admin step with `evaluate_script` on ONE new background admin page (`/s
    - Player side: `/user/wallet/balances` (A has no USDT; B has +12) and `/user/bonus/first-deposit` (`claimed` only for B).
    - Admin side: `admin/reports/balance-sheet/<id>?currency=USDT` (B has the bonus row; A has none) and `admin/reports/players?channel=direct`.
 
+## Scenario: full player lifecycle (register → referral → deposits → VIP → withdrawal)
+
+Proven on live 2026-10-18 (players `lcp1…` and `lcp2…`).
+
+1. **Register P1 (UI):** new isolated context → `/login/regist`.
+   - Username + password. Tick the 18+ box (the `role=checkbox` button). Submit with Sign Up.
+2. **Get P1's referral link:** `GET /user/affiliate` → `referralLink` (`https://parker567.com/referal/<CODE>`). The local equivalent is `http://localhost:5190/referal/<CODE>`.
+3. **Register P2 through the link (UI):** open the link in a new isolated context.
+   - The site keeps `pending-referral` and the sign-up form prefills the code.
+   - Expect:
+     - P1: `GET /user/affiliate/team` → `total 1` with P2.
+     - Admin player page: "referred by <P1>".
+4. **P2's INR deposit (UI):** Deposit → Fiat. The form shows "First deposit bonus: +100% … up to 100 USDT".
+   - Typing ₹1,000 shows "Extra +₹1,000.00".
+   - Fill the UTR and attach a screenshot (any PNG), then submit. Expect the toast "Deposit submitted…" and the row pending in `/user/history/deposits`.
+5. **Admin approves (transaction password).** Expect `firstDepositBonus.paid: true, amount 12 USDT`.
+   - P1 then has the referral reward: `GET /user/affiliate/rewards/unclaimed` → 20 USDT (tier).
+6. **P2's USDT deposit:**
+   - The UI's manual crypto form needs an admin USDT collection address (Admin → Bank details → USDT, network TRC20).
+   - Without one, submit through the API: `POST /user/deposits/fiat` as multipart with `amount`, `currency=USDT`, `network=TRC20`, `transactionId`, `screenshot`.
+   - Approve it in admin. Expect `ALREADY_PAID`, so no second bonus.
+7. **Turnover / VIP screens:**
+   - `/wallet/rollover`: Required = 3 × (all deposits in USDT), e.g. 3 × (12 + 5) = 51 USDT.
+   - `/bonus`: "Wager 500 USDT to Bronze I" and daily/weekly "Unlocks at VIP 2".
+   - VIP 2 needs ~1,000 USD of settled wager. That is impossible within the betting budget on live, so prove it with `node scripts/e2e-player-journey.mjs` on the local stack.
+8. **Withdrawal (UI):** `/wallet/withdraw` → currency INR.
+   - Live requires verified KYC ("Complete KYC verification before withdrawing").
+   - P2 submits KYC at `/settings/verification` → Basic → country → form: test text plus "TEST DOCUMENT" images.
+   - The admin then approves KYC (`PUT admin/user/kyc/review {userId, status:'Verified'}`).
+     - That approval may be blocked by the Claude Code permission classifier. If so, the owner approves it in Admin → KYC.
+     - Then: add a test UPI or bank account, withdraw ₹200, and admin → Fiat withdrawals → decide with the transaction password.
+9. **Admin checks:**
+   - Users list (P1/P2).
+   - P2 detail: Balance in USDT and "referred by".
+   - Balance sheet: USDT shows the bonus and deposit rows; INR shows the deposit.
+
+**Cleanup:**
+- Test players keep their credits.
+- Report each player (username, id, balance), any pending KYC, and P1's unclaimed referral reward.
+
 ## Report
 
 - A PASS/FAIL table, with evidence and screenshots.
 - Every live write made: config changes and their restore, players created, deposits approved.
 - Anything skipped because of the budget.
+
+
+## Withdrawal step (proven on live 2026-10-18)
+
+1. KYC must be Verified when the withdraw policy requires it. The player submits KYC through the UI. Then, from an admin tab, send `PUT admin/user/kyc/review` with `{ userId, status: 'Verified' }`.
+2. As the player:
+   - `POST /user/bank-accounts` with `{ method: 'upi', accountHolderName, upiId }`. Use a TEST holder name.
+   - `POST /user/withdrawals/fiat` with `{ amount, currency: 'INR', bankAccountId }`. Expect `In Queue`, with the amount held from the wallet.
+3. As admin: `POST admin/user/withdrawals/fiat/status` with `{ withdrawalId, status: 'Paid' }`. Expect 403 `TXN_PASSWORD_REQUIRED`.
+4. Send the same request with `transactionPassword`. Expect 200 `Paid`.
+5. Check the player's `/user/history`: withdrawals show Paid. Check the admin balance sheet for the INR currency: a Withdrawal −amount row.

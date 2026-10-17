@@ -12,3 +12,4 @@ export {
   useStakeButtons,
 } from './feedHooks';
 export { useExchangeCurrency } from './useExchangeCurrency';
+export { useSportsBalance } from './useSportsBalance';
