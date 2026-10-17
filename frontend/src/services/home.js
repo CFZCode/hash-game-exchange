@@ -131,7 +131,8 @@ const LIVE_BETS = 30;
  * site's own behaviour for the many third-party games it does not have an icon for.
  */
 const toLatestBet = (row) => {
-  const mapped = toBetRow(row);
+  /* A third-party round carries the catalogue's `title` ("Aviator"); its `game` is a provider uid. */
+  const mapped = toBetRow(row.title ? { ...row, game_title: row.title } : row);
   const gameUnique = String(row.game ?? row.game_uid ?? '');
   const slug = slugFor(gameUnique);
   return {
