@@ -100,13 +100,39 @@ export function getSessionId() {
  * the server's answer rather than our guess at it; see `client.js`.
  */
 export function setTokens({ accessToken, refreshToken } = {}) {
+  const was = Boolean(current?.accessToken);
   current = accessToken ? { accessToken, refreshToken: refreshToken ?? null } : null;
   write(current);
+  if (was !== Boolean(current)) notifySessionChanged();
 }
 
 export function clearTokens() {
+  const was = Boolean(current?.accessToken);
   current = null;
   write(null);
+  if (was) notifySessionChanged();
+}
+
+/* ── Signed in ↔ signed out ──────────────────────────────────────────────────────────────
+ *
+ * Fired when this tab goes from no session to one (sign-in) or back (sign-out, an expired
+ * refresh) — not on a refresh, which keeps the same player. The realtime socket listens: its
+ * handshake names the player, so it re-opens at once, before the reads that follow a sign-in. */
+const sessionListeners = new Set();
+
+export function onSessionChanged(fn) {
+  sessionListeners.add(fn);
+  return () => sessionListeners.delete(fn);
+}
+
+function notifySessionChanged() {
+  for (const fn of [...sessionListeners]) {
+    try {
+      fn();
+    } catch {
+      /* one listener must not stop the others */
+    }
+  }
 }
 
 /* ── The signed-out signal ────────────────────────────────────────────────────────────────

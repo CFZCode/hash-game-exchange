@@ -357,7 +357,12 @@ function createRateLimiter({
 
     // Health checks must never be throttled or the orchestrator will kill a
     // healthy service during a traffic spike.
-    skip: (req) => req.path === '/health' || req.path === '/health/live' || req.path === '/health/ready',
+    // socket.io's long-polling is not counted either: one open socket is a
+    // request every few seconds, which would spend a player's whole HTTP budget
+    // on its own. Every socket EVENT has its own limit (`limit` on each
+    // handler in @ibitplay/socket), which is where that traffic is metered.
+    skip: (req) =>
+      req.path === '/health' || req.path === '/health/live' || req.path === '/health/ready' || req.path.startsWith('/socket.io'),
 
     handler: (req, res) => {
       const retryAfter = Math.ceil(windowMs / 1000);

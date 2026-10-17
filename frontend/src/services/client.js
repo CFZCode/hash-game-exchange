@@ -1,3 +1,4 @@
+import { SOCKET_READS, liveRead, setLiveActive } from './liveStore';
 import {
   clearTokens,
   getAccessToken,
@@ -63,6 +64,9 @@ export const API_BASE = BASE;
 /* Defaults to ON, so a checkout with no env file behaves exactly as the build does today.
    Compared against the string because Vite injects env values as strings. */
 export const USE_FIXTURES = String(process.env.NEXT_PUBLIC_USE_FIXTURES ?? 'true') !== 'false';
+
+/* A live browser build opens the realtime socket at start-up: reads it can answer wait for it. */
+if (!USE_FIXTURES && typeof window !== 'undefined') setLiveActive(true);
 
 /* How long a fixture read pretends to take. See the note above; 0 restores the synchronous
    behaviour this file had before the loading states were built. `Number.isFinite` rather than a
@@ -340,6 +344,12 @@ async function sendWithBackoff(url, path, init) {
   }
 }
 
+/* A 200 the socket answered: the same envelope the route would have sent. */
+const socketAnswer = (data) => ({
+  res: { ok: true, status: 200, headers: new Headers({ 'content-type': 'application/json' }) },
+  body: { success: true, data: copyBody(data) },
+});
+
 async function send(url, path, init) {
   const method = String(init.method ?? 'GET').toUpperCase();
   if (method !== 'GET' || init.json !== undefined) {
@@ -347,6 +357,16 @@ async function send(url, path, init) {
     shared.clear();
     return sendOnce(url, path, init);
   }
+
+  /* THE STARTUP READS COME OFF THE SOCKET. Branding, region, the coin list and the player's me,
+     profile, balances and preferences all arrive in the realtime socket's one SYNC_STATE reply
+     (services/liveStore.js), so a plain GET for one of them is answered from there; HTTP only
+     when the socket has no answer (down, still connecting past its wait, an older backend). */
+  if (SOCKET_READS[path] && url === BASE + path) {
+    const value = await liveRead(path, getAccessToken());
+    if (value !== undefined) return socketAnswer(value);
+  }
+
   if (init.signal) return sendWithBackoff(url, path, init);
 
   const key = `${url}\u0000${getAccessToken() ?? ''}`;

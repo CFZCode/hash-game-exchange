@@ -127,3 +127,4 @@ export {
 export { mapMatchExposures } from './exposureMapping';
 export { isTossDone, battingFirstSide, tossMarketRows } from './tossState';
 export { BET_TOAST } from './betToastMessages';
+export { exchangeCode, makeStakeCurrency, niceStake } from './stakeCurrency';

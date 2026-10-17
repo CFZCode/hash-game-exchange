@@ -3,7 +3,7 @@ import RunnerRow from './RunnerRow';
 import { compactAmount, statusLabel } from './utils';
 
 const asIs = (v) => (v == null ? '' : String(v));
-const limits = (min, max) => `Min: ${compactAmount(min || 0)} · Max: ${compactAmount(max || 0)}`;
+const limits = (min, max, fmt = compactAmount) => `Min: ${fmt(min || 0)} · Max: ${fmt(max || 0)}`;
 
 /**
  * FancyBlock — session/fancy markets: No (lay colour) | Yes (back colour), each cell a run LINE
@@ -31,6 +31,7 @@ const limits = (min, max) => `Min: ${compactAmount(min || 0)} · Max: ${compactA
  * @param {boolean}  [props.collapsed] @param {(b)=>void} [props.onToggleCollapse]
  * @param {boolean}  [props.disabled]
  * @param {(n)=>string} [props.formatAmount]
+ * @param {(n)=>string} [props.formatLimit]   Each row's Min/Max (default: compact INR, 25K · 1L).
  */
 export default function FancyBlock({
   title = 'Fancy',
@@ -48,6 +49,7 @@ export default function FancyBlock({
   onToggleCollapse,
   disabled = false,
   formatAmount,
+  formatLimit,
 }) {
   const blockLabel = statusLabel(status);
 
@@ -107,12 +109,12 @@ export default function FancyBlock({
             subline={
               row.min != null || row.max != null ? (
                 <p className="mt-0.5 text-[0.6875rem] leading-4 text-tertiary lg:hidden">
-                  {limits(row.min, row.max)}
+                  {limits(row.min, row.max, formatLimit)}
                 </p>
               ) : null
             }
             trailing={
-              <span className="text-xs leading-4 text-secondary">{limits(row.min, row.max)}</span>
+              <span className="text-xs leading-4 text-secondary">{limits(row.min, row.max, formatLimit)}</span>
             }
           >
             {activeRowId != null && activeRowId === row.id ? betSlip : null}

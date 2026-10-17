@@ -177,15 +177,28 @@ export function SessionProvider({ children }) {
 
   /* ── The realtime socket (services/realtime.js) ─────────────────────────────────────────
    *
-   * Opened on sign-in and on a restored session, closed on sign-out. Its state lands every ~2 s
+   * Opened at start-up for everyone (a visitor's socket brings the branding, region, flags and
+   * coin list), and re-opened with the new token whenever the player signs in or out. The
+   * startup GETs are answered out of it by services/client.js. Its state lands every ~2 s
    * and at once when the balance moves anywhere on the platform (a settled bet, an approved
    * deposit, an operator's adjustment), so the wallet never waits for a reload. The rows are built
    * exactly as `loadAccount` builds them, and only when the balances or the coin list changed,
    * so an unchanged tick re-renders nothing.
    */
   React.useEffect(() => {
-    if (!account.login || USE_FIXTURES) return undefined;
+    if (USE_FIXTURES) return undefined;
     startRealtime();
+    return stopRealtime;
+  }, []);
+
+  const firstLogin = React.useRef(true);
+  React.useEffect(() => {
+    if (USE_FIXTURES) return undefined;
+    // The first run is the start-up socket above; a sign-in or sign-out has already re-opened it
+    // (services/tokens.js → realtime.js), so this only makes sure it is open for this session.
+    if (firstLogin.current) firstLogin.current = false;
+    else startRealtime();
+    if (!account.login) return undefined;
     let key = null;
     const off = onLiveState((state) => {
       if (!state.signedIn || !state.balances) return;
@@ -195,10 +208,7 @@ export function SessionProvider({ children }) {
       if (Array.isArray(state.currencies)) setEnabledCurrencies(state.currencies);
       setBalances(toWalletRows(state.balances, state.flags, state.currencies));
     });
-    return () => {
-      off();
-      stopRealtime();
-    };
+    return off;
   }, [account.login]);
 
   /* ── The FX table ────────────────────────────────────────────────────────────────────────

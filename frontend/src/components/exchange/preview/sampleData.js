@@ -124,9 +124,4 @@ export const MATCHED = [
   { id: 'b3', runnerName: '6 over runs IND', marketName: 'Fancy', side: 'yes', price: 54, rate: 100, stake: 400, profit: 400, liability: 400 },
 ];
 
-export const UNMATCHED = [
-  { id: 'u1', runnerName: 'India', marketName: 'Match Odds', side: 'back', price: 1.95, stake: 2000, placedAt: new Date().toISOString() },
-  { id: 'u2', runnerName: 'Australia', marketName: 'Match Odds', side: 'lay', price: 2.1, stake: 1000 },
-];
-
 export const STAKES = [100, 500, 1000, 2500, 5000, 10000, 25000, 50000];

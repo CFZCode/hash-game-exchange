@@ -60,6 +60,7 @@ const INTERNAL_SURFACE = Object.freeze({
     '/internal/admin/accounts',
     '/internal/admin/audit',
     '/internal/admin/auth',
+    '/internal/admin/branding',
     '/internal/admin/currencies',
     '/internal/admin/entitlements',
     '/internal/admin/notifications',
@@ -104,6 +105,8 @@ const INTERNAL_ACL = Object.freeze({
     '/internal/admin/accounts',
     '/internal/admin/audit',
     '/internal/admin/auth',
+    /** The public branding block, for the state sync socket (`modules/sync/sockets.js`). */
+    '/internal/admin/branding',
     /**
      * The coin registry (names, networks, switches) — read through
      * `currencyRegistry` for the crypto deposit / withdrawal network lists.

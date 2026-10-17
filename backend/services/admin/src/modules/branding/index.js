@@ -8,6 +8,7 @@
  *   GET /api/v1/admin/branding/public        anyone: the block, with image URLs
  *   GET /api/v1/admin/branding/asset/:file   anyone: an image, immutable
  *   GET /api/v1/admin/branding               staff (config:read): read-only, managedBy
+ *   GET /internal/admin/branding/public      user-service's sync socket: the public block
  */
 module.exports = {
   name: 'branding',
@@ -17,5 +18,6 @@ module.exports = {
   routers: {
     public: require('./routes/public.routes'),
     admin: require('./routes/admin.routes'),
+    internal: require('./routes/internal.routes'),
   },
 };

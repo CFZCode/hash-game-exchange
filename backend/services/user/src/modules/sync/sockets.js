@@ -6,14 +6,18 @@ const { AUDIENCE, PLATFORM_EVENTS } = require('@ibitplay/socket');
 const { AuthService } = require('../auth/auth.service');
 const { WalletService } = require('../wallet/wallet.service');
 const { PreferencesService } = require('../preferences/preferences.service');
+const { ProfileService } = require('../profile/profile.service');
+const { RegionService } = require('../region/region.service');
 
 /**
  * `SYNC_STATE` — the client's whole state in one socket read, asked every 2 s.
  *
- *   { me, balances, preferences }        signed in only (the same bodies as
- *                                        /user/auth/me, /user/wallet/balances, /user/preferences)
- *   { flags, features, currencies }      everyone (/admin/site-config/public,
- *                                        /admin/features/public, /admin/currencies/public)
+ *   { me, profile, balances, preferences }   signed in only (the same bodies as /user/auth/me,
+ *                                            /user/profile, /user/wallet/balances, /user/preferences)
+ *   { flags, features, currencies, branding } everyone (/admin/site-config/public,
+ *                                            /admin/features/public, /admin/currencies/public,
+ *                                            /admin/branding/public)
+ *   { region }                               everyone, for THIS socket's address (/user/region)
  *
  * The site half is admin-service's and the same for every player, so it is read at most once per
  * SITE_TTL_MS for the whole process, however many sockets poll.
@@ -40,6 +44,8 @@ function register({ on, deps }) {
   const auth = new AuthService(deps);
   const wallet = new WalletService(deps);
   const preferences = new PreferencesService(deps);
+  const profile = new ProfileService(deps);
+  const region = new RegionService(deps);
 
   let site = null;
   let siteAt = 0;
@@ -48,14 +54,20 @@ function register({ on, deps }) {
   const body = (result) => (result && typeof result === 'object' && 'data' in result ? result.data : result);
 
   async function readSite() {
-    const [config, currencies] = await Promise.all([
+    const [config, currencies, branding] = await Promise.all([
       clients.admin.get('/internal/admin/site-config/public').then(body),
       clients.admin.get('/internal/admin/currencies/public').then(body),
+      // An older admin-service has no internal branding route: the client then reads it over HTTP.
+      clients.admin.get('/internal/admin/branding/public').then(body).catch((error) => {
+        logger?.debug({ err: error.message }, 'Sync could not read the branding');
+        return null;
+      }),
     ]);
     return {
       flags: config?.flags ?? {},
       features: Array.isArray(config?.features) ? config.features : [],
       currencies: Array.isArray(currencies) ? currencies : [],
+      ...(branding ? { branding } : {}),
     };
   }
 
@@ -84,18 +96,22 @@ function register({ on, deps }) {
     limit: { windowMs: 10_000, max: 20 },
     handle: async (_payload, context) => {
       const userId = context.userId ? String(context.userId) : null;
-      const [siteHalf, me, balances, prefs] = await Promise.all([
+      const [siteHalf, me, balances, prefs, record, area] = await Promise.all([
         siteState(),
         userId ? settle(auth.me(userId)) : null,
         userId ? settle(wallet.getBalances(userId)) : null,
         userId ? settle(preferences.get({ userId })) : null,
+        userId ? settle(profile.get(userId)) : null,
+        // The address and country cannot change within one connection: read once per socket.
+        (context.socket.data.region ??= settle(region.visitor({ ip: context.ip, rayId: context.socket.id }))),
       ]);
 
       const state = {
         at: new Date().toISOString(),
         signedIn: Boolean(userId),
         ...(siteHalf ?? {}),
-        ...(userId ? { me, balances, preferences: prefs } : {}),
+        ...(area ? { region: area } : {}),
+        ...(userId ? { me, profile: record, balances, preferences: prefs } : {}),
       };
 
       return { status: true, d: scramble(state, keyFor(context.socket.id)) };

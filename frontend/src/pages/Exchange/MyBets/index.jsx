@@ -10,6 +10,7 @@ import { toast } from '../../../components/shared/Toast/toast';
 import { BET_TOAST } from '../../../utils/exchange';
 import { usePolling } from '../../../hooks/exchange';
 import { getSportsBets, cancelBet } from '../../../services/exchange';
+import { useExchangeCurrency } from '../../../hooks/exchange';
 import { ExchangeAccountPage } from '../ExchangeFrame';
 
 /* `status` is mssports' own vocabulary (CricketService.getSportsBetsByUserId): `matchbet` = open
@@ -32,9 +33,15 @@ const SEARCH_DEBOUNCE_MS = 400;
 const backish = (side) => side === 'back' || side === 'yes';
 const SIDE_LABEL = { back: 'Back', lay: 'Lay', yes: 'Yes', no: 'No' };
 const RESULT_LABEL = { won: 'Won', win: 'Won', lost: 'Lost', loss: 'Lost', void: 'Void', refund: 'Void', cancelled: 'Cancelled' };
-const money = (n) => `₹${formatAmount(n)}`;
+/* mssports amounts are INR; printed in the header wallet's coin (utils/exchange/stakeCurrency.js). */
+function useMoney() {
+  const cur = useExchangeCurrency();
+  const fmt = cur.isInr ? formatAmount : cur.formatInr;
+  return { fmt, money: (n) => `${cur.prefix}${fmt(n)}` };
+}
 
 function BetRow({ bet, tab, cancelling, onCancel }) {
+  const { fmt, money } = useMoney();
   const side = bet.side;
   const market = bet.fancyName || bet.marketType;
   const rate = bet.raw?.size ?? bet.raw?.user_rate_size;
@@ -76,14 +83,14 @@ function BetRow({ bet, tab, cancelling, onCancel }) {
             {bet.profit != null && (
               <span className={bet.profit > 0 ? 'font-extrabold text-success' : bet.profit < 0 ? 'font-extrabold text-error' : 'text-secondary'}>
                 {bet.profit > 0 ? '+' : bet.profit < 0 ? '−' : ''}
-                {formatAmount(Math.abs(bet.profit))}
+                {fmt(Math.abs(bet.profit))}
               </span>
             )}
           </p>
         ) : (
           bet.liability > 0 && (
             <p className="text-tertiary">
-              Liability <span className="font-extrabold text-error">−{formatAmount(bet.liability)}</span>
+              Liability <span className="font-extrabold text-error">−{fmt(bet.liability)}</span>
             </p>
           )
         )}
@@ -103,6 +110,7 @@ function BetRow({ bet, tab, cancelling, onCancel }) {
 }
 
 function CancelConfirm({ bet, onClose, onConfirm }) {
+  const { money } = useMoney();
   return (
     <PopCenter open onClose={onClose} title="Cancel bet">
       <p className="mt-4 text-center text-secondary">
@@ -137,6 +145,7 @@ function CancelConfirm({ bet, onClose, onConfirm }) {
  * raises the sign-in dialog over the route instead.
  */
 export default function ExchangeMyBets() {
+  const { money } = useMoney();
   const [tab, setTab] = React.useState('matched');
   const [side, setSide] = React.useState('all');
   const [draft, setDraft] = React.useState('');

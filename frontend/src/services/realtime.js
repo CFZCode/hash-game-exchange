@@ -1,16 +1,21 @@
 import { io } from 'socket.io-client';
 import { API_BASE, USE_FIXTURES } from './client';
-import { getAccessToken } from './tokens';
+import { getAccessToken, onSessionChanged } from './tokens';
+import { liveState as storedState, onLiveState as subscribe, publishLiveState, setLiveActive } from './liveStore';
 
 /**
  * ─── The one platform socket ─────────────────────────────────────────────────────────────────
  *
- * user-service's socket (gateway `/socket.io`). Opened when a player signs in (and on a reload
- * that restores the session), closed on sign-out. Over it:
+ * user-service's socket (gateway `/socket.io`). Opened at start-up for everyone — a visitor's
+ * socket carries the site half — and re-opened with the new token on sign-in / sign-out, so the
+ * handshake always names the current player. Over it:
  *
  *   every 2 s   SYNC_STATE → the whole client state in one scrambled reply:
- *                 { me, balances, preferences }        the player (/user/auth/me, wallet, prefs)
- *                 { flags, features, currencies }      the site (site-config, features, coins)
+ *                 { me, profile, balances, preferences }   the player
+ *                 { flags, features, currencies, branding } the site
+ *                 { region }                               this visitor's address and country
+ *               It lands in services/liveStore.js, which answers those startup GETs in
+ *               `client.js` (see SOCKET_READS there) so they never go over HTTP.
  *   at once     a push re-asks without waiting for the tick:
  *                 C.CREDIT          the balance moved (any service — DB trigger, migration 113)
  *                 accountUpdated    an operator locked / unlocked the account
@@ -34,22 +39,17 @@ const CREDIT = '660cb6fe7737d7b70e7a07b706b93f70';
 const PUSHES = [CREDIT, 'accountUpdated', 'featuresUpdated', 'siteConfigUpdated', 'currenciesUpdated'];
 const SALT = 'p567.sync.v1';
 const TICK_MS = 2000;
+const WS = process.env.NEXT_PUBLIC_SOCKET_TRANSPORT === 'websocket';
 
 let socket = null;
 let timer = null;
 let inFlight = false;
 let keyFor = { id: null, key: null };
-let last = null;
-const listeners = new Set();
+let openedWith = null;
 
 /** Every state the socket brings, newest first to a new subscriber. Returns unsubscribe. */
-export function onLiveState(fn) {
-  listeners.add(fn);
-  if (last) fn(last);
-  return () => listeners.delete(fn);
-}
-
-export const liveState = () => last;
+export const onLiveState = subscribe;
+export const liveState = storedState;
 
 async function keyOf(id) {
   if (keyFor.id === id) return keyFor.key;
@@ -86,22 +86,32 @@ function sync() {
       return;
     }
     if (!body?.status || typeof body.d !== 'string') return;
+    const token = openedWith;
     unscramble(body.d, id).then(
-      (state) => {
-        last = state;
-        listeners.forEach((fn) => fn(state));
-      },
+      (state) => publishLiveState(state, token),
       () => {},
     );
   });
 }
 
-/** Open the socket for the signed-in player (no-op with fixtures on, or already open). */
+/**
+ * Open the socket (no-op with fixtures on, or when it is already open for the current token).
+ * Long-polling, like the platform's other clients (casino-sportsbook's lib/socket.ts): plain HTTP
+ * requests that pass any proxy and show in the Network tab. NEXT_PUBLIC_SOCKET_TRANSPORT=websocket
+ * lets it upgrade to a WebSocket where the edge carries one. The backend's HTTP rate limit does
+ * not count /socket.io (each socket event has its own limit).
+ */
 export function startRealtime() {
-  if (USE_FIXTURES || socket || !getAccessToken()) return;
+  if (USE_FIXTURES || typeof window === 'undefined') return;
+  const token = getAccessToken();
+  if (socket && openedWith === token) return;
+  if (socket) stopRealtime();
+  openedWith = token;
+  setLiveActive(true);
   socket = io(SOCKET_BASE || undefined, {
     path: '/socket.io',
-    transports: ['websocket'],
+    transports: WS ? ['polling', 'websocket'] : ['polling'],
+    upgrade: WS,
     // A function, so every reconnect carries the CURRENT token (the transport refreshes it).
     auth: (cb) => cb({ token: getAccessToken() }),
     reconnection: true,
@@ -114,16 +124,27 @@ export function startRealtime() {
   timer = setInterval(sync, TICK_MS);
 }
 
-/** Close it — sign-out, or a token that no longer verifies. */
+/** Close it. */
 export function stopRealtime() {
   clearInterval(timer);
   timer = null;
   inFlight = false;
-  last = null;
   keyFor = { id: null, key: null };
+  openedWith = null;
+  setLiveActive(false);
   if (socket) {
     socket.removeAllListeners();
     socket.disconnect();
     socket = null;
   }
 }
+
+/** Sign-in / sign-out: the handshake names the player, so the socket is re-opened with the new token. */
+export function restartRealtime() {
+  stopRealtime();
+  startRealtime();
+}
+
+/* The moment the token appears or goes, not when React next renders: the reads a sign-in
+   triggers are then answered by the new player's socket. */
+if (typeof window !== 'undefined') onSessionChanged(() => socket && restartRealtime());

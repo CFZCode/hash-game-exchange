@@ -19,10 +19,10 @@ import {
   useMatchExposure,
   useOpenBets,
   useStakeButtons,
+  useExchangeCurrency,
 } from '../../../hooks/exchange';
 import {
   getScoreUrl,
-  cancelBet,
   reconcilePendingBets,
   announceBetPlaced,
   saveStakeButtons,
@@ -33,7 +33,7 @@ import {
 import { BET_TOAST, ODDS_FIELD, ADDAPLAY_MIN_BET } from '../../../utils/exchange';
 import MarketBlocks from './MarketBlocks';
 import { ExchangeCurrencyNote } from '../ExchangeFrame';
-import { useMatchSlip, placementOdds, slipFigures, projectedBook } from './useMatchSlip';
+import { useMatchSlip, placementOdds, slipFigures, projectedBook, slipStakeInr } from './useMatchSlip';
 import { TAB_LABELS, marketTab, marketKind, ladder, rowStatus } from './shape';
 import { sportIconOf } from '../model';
 import { markMatchGone, reviveMatch } from '../../../services/exchange/deadMatches';
@@ -47,7 +47,6 @@ import { markMatchGone, reviveMatch } from '../../../services/exchange/deadMatch
  * Layout: markets column + a 22rem right column (one-click, stakes, open bets) from `lg`; below
  * it the right column becomes a "Open Bets" tab beside "Markets". */
 
-const CURRENCY = '₹';
 const gtypeOf = (m) => String(m?.gtype || '').toLowerCase();
 const stakeLabel = (v) => (v >= 1000 && v % 1000 === 0 ? `${v / 1000}k` : String(v));
 
@@ -103,7 +102,11 @@ export default function ExchangeMatchPage() {
   const stakesQ = useStakeButtons();
   const refreshStakes = stakesQ.refresh;
 
-  const slipApi = useMatchSlip({ sid, gmid, match, getMarkets: mk.getMarkets, signedIn });
+  /* Stakes are typed, and every INR figure mssports sends is printed, in the header wallet's
+     coin (utils/exchange/stakeCurrency.js). INR is the identity: the kit's own formatters. */
+  const cur = useExchangeCurrency();
+  const fmtInr = cur.isInr ? undefined : cur.formatInr;
+  const slipApi = useMatchSlip({ sid, gmid, match, getMarkets: mk.getMarkets, signedIn, currency: cur });
   const { slip, stake, loading } = slipApi;
 
   const [filter, setFilter] = React.useState('all');
@@ -113,8 +116,6 @@ export default function ExchangeMatchPage() {
   const [stakeModal, setStakeModal] = React.useState(false);
   const [stakeSaving, setStakeSaving] = React.useState(false);
   const [stakeError, setStakeError] = React.useState(null);
-  const [confirmBet, setConfirmBet] = React.useState(null);
-  const [cancelling, setCancelling] = React.useState([]);
   const [score, setScore] = React.useState({ key: null, url: null });
   const [showScore, setShowScore] = React.useState(true);
 
@@ -174,12 +175,18 @@ export default function ExchangeMatchPage() {
   }, [slipGone, closeSlip]);
 
   const odds = placementOdds(slip, mk.markets);
-  const figures = slipFigures(slip, stake, odds);
-  const projected = projectedBook(slip, stake, odds, slipMarket, book);
+  /* Figures in INR from the INR stake that would be sent — the same numbers the server books —
+     then printed in the player's coin by `fmtInr`, like the book they sit beside. */
+  const stakeInr = slipStakeInr(slip, stake, cur);
+  const figures = slipFigures(slip, stakeInr, odds);
+  const projected = projectedBook(slip, stakeInr, odds, slipMarket, book);
   const liveBlocked = slip && slipMarket && slipSection ? rowStatus(slipMarket, slipSection) : null;
 
-  const stakes = (stakesQ.data?.stakes || DEFAULT_STAKE_BUTTONS).map((b) => Number(b.value)).filter((n) => n > 0);
-  const ocStakes = (stakesQ.data?.oneClick || DEFAULT_ONE_CLICK_BUTTONS).map(Number);
+  /* Saved stake buttons are rupees; shown (and edited) as round numbers of the player's coin. */
+  const uniq = (list) => [...new Set(list)];
+  const stakesInr = (stakesQ.data?.stakes || DEFAULT_STAKE_BUTTONS).map((b) => Number(b.value)).filter((n) => n > 0);
+  const stakes = uniq(stakesInr.map(cur.chipFromInr).filter((n) => n > 0));
+  const ocStakes = uniq((stakesQ.data?.oneClick || DEFAULT_ONE_CLICK_BUTTONS).map(Number).map(cur.chipFromInr));
   const ocStake = ocStakes.includes(ocActive) ? ocActive : ocStakes[0];
 
   const onCell = (spec) => {
@@ -225,28 +232,13 @@ export default function ExchangeMatchPage() {
     placedAt: b.createdAt,
   });
   const matched = (openBetsQ.data?.matched || []).map(toRow);
-  const unmatched = (openBetsQ.data?.unmatched || []).map(toRow);
-  const openCount = matched.length + unmatched.length;
-
-  const doCancel = async (bet) => {
-    setConfirmBet(null);
-    setCancelling((ids) => [...ids, bet.id]);
-    try {
-      const res = await cancelBet(bet.id);
-      toast.success(res.message || BET_TOAST.BET_CANCELLED);
-      announceBetPlaced(0);
-    } catch (e) {
-      toast.error(e?.message || BET_TOAST.CANCEL_FAILED);
-    } finally {
-      setCancelling((ids) => ids.filter((id) => id !== bet.id));
-    }
-  };
+  const openCount = matched.length;
 
   const saveStakes = async (values) => {
     setStakeSaving(true);
     setStakeError(null);
     try {
-      await saveStakeButtons(values.map((v) => ({ label: stakeLabel(v), value: v })));
+      await saveStakeButtons(values.map(cur.chipToInr).map((v) => ({ label: stakeLabel(v), value: v })));
       refreshStakes();
       setStakeModal(false);
       // TENEXCH SetButtonValueModal's wording, both ways; the modal stays open on a failure.
@@ -262,7 +254,7 @@ export default function ExchangeMatchPage() {
 
   const saveOneClick = async (next) => {
     try {
-      await saveOneClickButtons(next);
+      await saveOneClickButtons(next.map(cur.chipToInr));
       refreshStakes();
     } catch (e) {
       toast.error(e?.message || BET_TOAST.GENERIC_ERROR);
@@ -277,8 +269,9 @@ export default function ExchangeMatchPage() {
     const side = oddEven ? 'back' : bv.betType;
     const pick = oddEven ? (bv.betType === 'yes' ? 'Odd' : 'Even') : null;
     const lineLike = kind === 'fancy' || kind === 'line' || gtypeOf(bv) === 'khado';
-    const max = Number(bv.max) > 0 ? Number(bv.max) : null;
-    const min = bv.is_cashout ? 0 : Math.max(ADDAPLAY_MIN_BET, Number(bv.min) || 0);
+    const maxInr = Number(bv.max) > 0 ? Number(bv.max) : null;
+    const minInr = bv.is_cashout ? 0 : Math.max(ADDAPLAY_MIN_BET, Number(bv.min) || 0);
+    const { min, max } = cur.limits(minInr, maxInr);
     slipNode = (
       <BetSlipInline
         side={side}
@@ -295,7 +288,8 @@ export default function ExchangeMatchPage() {
         quickStakes={stakes}
         minStake={max != null ? min : undefined}
         maxStake={max ?? undefined}
-        currency={CURRENCY}
+        currency={cur.prefix}
+        formatAmount={fmtInr}
         profit={figures.profit}
         liability={figures.liability}
         loading={loading}
@@ -378,42 +372,14 @@ export default function ExchangeMatchPage() {
     </button>
   ) : null;
 
+  /* Only matched bets exist on this site, so the panel is the matched list — no tabs, no Cancel. */
   const openBets = signedIn ? (
-    <div className="flex flex-col gap-2">
-      <OpenBetsPanel
-        matched={matched}
-        unmatched={unmatched}
-        loading={openBetsQ.data === undefined && !openBetsQ.error}
-        currency={CURRENCY}
-        cancellingIds={cancelling}
-        onCancel={(bet) => setConfirmBet(bet)}
-      />
-      {confirmBet && (
-        <div role="alertdialog" aria-label="Cancel bet" className="rounded-xl bg-layer4 p-3">
-          <p className="text-sm font-semibold text-primary">Cancel this unmatched bet?</p>
-          <p className="mt-1 truncate text-xs text-tertiary">
-            {confirmBet.runnerName} · {confirmBet.price} × {CURRENCY}
-            {confirmBet.stake}
-          </p>
-          <div className="mt-3 flex gap-2">
-            <button
-              type="button"
-              onClick={() => setConfirmBet(null)}
-              className="button button-second h-9 flex-1 rounded-lg text-sm"
-            >
-              Keep
-            </button>
-            <button
-              type="button"
-              onClick={() => doCancel(confirmBet)}
-              className="button button-brand h-9 flex-1 rounded-lg text-sm"
-            >
-              Cancel bet
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
+    <OpenBetsPanel
+      matched={matched}
+      loading={openBetsQ.data === undefined && !openBetsQ.error}
+      currency={cur.prefix}
+      formatAmount={fmtInr}
+    />
   ) : (
     <Card className="!py-6">
       <p className="text-sm text-secondary">Sign in to see your open bets.</p>
@@ -448,6 +414,8 @@ export default function ExchangeMatchPage() {
           slip={slip}
           slipNode={slipNode}
           projected={projected}
+          formatAmount={fmtInr}
+          formatLimit={fmtInr}
           disabled={loading}
           signedIn={signedIn}
           onCell={onCell}

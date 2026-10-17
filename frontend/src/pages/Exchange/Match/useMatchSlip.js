@@ -18,6 +18,8 @@ import {
   stepKhadoLine,
   computeCashoutClick,
   BET_TOAST,
+  ADDAPLAY_MIN_BET,
+  makeStakeCurrency,
 } from '../../../utils/exchange';
 import {
   placeBet,
@@ -130,6 +132,30 @@ function errorText(err) {
   return rupeeText(err.message) || BET_TOAST.GENERIC_ERROR;
 }
 
+/* INR identity, for a caller that passes no currency. */
+const INR = makeStakeCurrency({ currencyName: 'INR', usdPrice: 1, inrUsdPrice: 1 });
+
+/** The INR limits the slip enforces (a cashout has no minimum — see the header). */
+export function slipLimitsInr(bv) {
+  if (!bv) return {};
+  return {
+    minInr: bv.is_cashout ? undefined : Math.max(ADDAPLAY_MIN_BET, Number(bv.min) || 0),
+    maxInr: Number(bv.max) > 0 ? Number(bv.max) : undefined,
+  };
+}
+
+/**
+ * The stake the slip shows → the INR stake placeBet sends. The slip is typed in the header
+ * wallet's coin (utils/exchange/stakeCurrency.js); mssports is INR-only. A cashout's prefilled
+ * hedge goes back as the exact INR it was solved in, not a rounded round trip.
+ */
+export function slipStakeInr(slip, stakeStr, currency = INR) {
+  if (!slip) return '';
+  if (currency.isInr) return String(stakeStr ?? '');
+  if (slip.cashoutInr != null && String(stakeStr) === slip.cashoutShown) return String(slip.cashoutInr);
+  return currency.stakeToInr(stakeStr, slipLimitsInr(slip.bv));
+}
+
 /**
  * @param {object} p
  * @param {string|number} p.sid
@@ -137,8 +163,9 @@ function errorText(err) {
  * @param {object|null} p.match       header ({ gmid, ename, cname, stime })
  * @param {() => object[]} p.getMarkets  the live market list (useMatchMarkets().getMarkets)
  * @param {boolean} p.signedIn
+ * @param {object} [p.currency]  useExchangeCurrency(): the coin the stake is typed in
  */
-export function useMatchSlip({ sid, gmid, match, getMarkets, signedIn }) {
+export function useMatchSlip({ sid, gmid, match, getMarkets, signedIn, currency = INR }) {
   const [slip, setSlip] = React.useState(null);
   const [stake, setStake] = React.useState('');
   const [loading, setLoading] = React.useState(false);
@@ -193,9 +220,16 @@ export function useMatchSlip({ sid, gmid, match, getMarkets, signedIn }) {
       const odds = placementOdds(s, live);
       const isEdited = isEditedSlip(s);
       const bv = { ...s.bv };
+      // Limits first in the player's own coin, so the message names what they typed.
+      const coinErr = bv.is_cashout ? null : currency.checkStake(stakeStr, slipLimitsInr(bv));
+      if (coinErr) {
+        reject(token, coinErr, stakeStr);
+        return;
+      }
+      const inrStake = slipStakeInr(s, stakeStr, currency);
       const err = prevalidateBet({
         bv,
-        stake: stakeStr,
+        stake: inrStake,
         odds,
         originalOdds: s.kind === 'line' ? odds : bv.odds,
         isUserModifiedOdds: isEdited,
@@ -204,7 +238,7 @@ export function useMatchSlip({ sid, gmid, match, getMarkets, signedIn }) {
         signedIn,
       });
       // A cashout's hedge stake is solved, not chosen: TENEXCH holds it to no minimum.
-      if (err && !(bv.is_cashout && err.code === 'BELOW_MIN' && Number(stakeStr) > 0)) {
+      if (err && !(bv.is_cashout && err.code === 'BELOW_MIN' && Number(inrStake) > 0)) {
         reject(token, err.message, stakeStr);
         return;
       }
@@ -218,7 +252,7 @@ export function useMatchSlip({ sid, gmid, match, getMarkets, signedIn }) {
         reject(token, BET_TOAST.MULTIPLE_BET_NOT_ALLOWED, stakeStr);
         return;
       }
-      const { payload, clientRef } = buildPlaceRequest({ bv, odds, stake: stakeStr, isEdited, selectedOdds: bv.odds });
+      const { payload, clientRef } = buildPlaceRequest({ bv, odds, stake: inrStake, isEdited, selectedOdds: bv.odds });
       setError(null);
       setLoading(true);
       try {
@@ -257,7 +291,7 @@ export function useMatchSlip({ sid, gmid, match, getMarkets, signedIn }) {
         if (aliveRef.current) setLoading(false);
       }
     },
-    [getMarkets, matchInfo, signedIn, sid, reject],
+    [getMarkets, matchInfo, signedIn, sid, reject, currency],
   );
 
   /**
@@ -326,6 +360,8 @@ export function useMatchSlip({ sid, gmid, match, getMarkets, signedIn }) {
         match_title: base.match_title, match_start_time: base.match_start_time, game_type: base.game_type,
         min: undefined, max: base.max };
       tokenRef.current += 1;
+      // The hedge is solved in INR (the book is INR); shown in the player's coin.
+      const shown = c.cashoutStake == null ? '' : currency.isInr ? String(c.cashoutStake) : String(currency.fromInr(c.cashoutStake));
       setSlip({
         bv,
         kind: 'runner',
@@ -335,12 +371,14 @@ export function useMatchSlip({ sid, gmid, match, getMarkets, signedIn }) {
         display: String(c.odds),
         modified: false,
         fieldMode: ODDS_FIELD.TEXT,
+        cashoutInr: c.cashoutStake ?? null,
+        cashoutShown: shown,
       });
-      setStake(String(c.cashoutStake ?? ''));
+      setStake(shown);
       setError(null);
       return null;
     },
-    [loading, gmid, matchInfo, sid],
+    [loading, gmid, matchInfo, sid, currency],
   );
 
   const setPrice = React.useCallback((v) => {
