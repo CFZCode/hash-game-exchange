@@ -3,6 +3,9 @@ import { IconCopy, IconInform } from '../../components/shared/icons';
 import { copyWithToast } from '../../utils/clipboard';
 import { showToast, toastError } from '../../components/shared/Toast/toast';
 import { getBankDetails, readBankQr, submitFiatDeposit } from '../../services/fiatDeposit';
+import { printCurrency } from '../../utils/currency';
+import { depositBonusConfig, extraBonusAmount } from './deposit';
+import { useSelectedCurrency } from '../../hooks/useSelectedCurrency';
 
 /* The manual (bank transfer) deposit — THIS BUILD'S, not bc.game's (the original's fiat tab is a
  * payment-channel grid; this platform's fiat rail is "send to the house account, then file the
@@ -68,6 +71,14 @@ export default function ManualDeposit({ currency }) {
     };
   }, [coin]);
 
+  /* The first-deposit offer, as FiatTab's channel form shows it: the same recharge config (FiatTab
+     mounts its read; null when this player can't get the bonus — claimed, agent, or switched off). */
+  const walletCode = `${coin}FIAT`;
+  const bonus = depositBonusConfig(walletCode);
+  const extra = extraBonusAmount(amount, walletCode);
+  const site = useSelectedCurrency({ site: true });
+  const fiat = (value) => printCurrency(value, walletCode, { target: walletCode });
+
   const account = accounts?.[picked];
   const ready = account && Number(amount) > 0 && reference.trim() && file && !busy;
 
@@ -109,6 +120,17 @@ export default function ManualDeposit({ currency }) {
         </div>
       </div>
 
+      {bonus && (
+        <div className="mb-4 flex rounded-xl bg-brand/10 p-2 text-secondary">
+          <IconInform className="icon -mt-0.5 mr-1.5 size-6 flex-none fill-brand" />
+          <div>
+            First deposit bonus: <span className="font-extrabold text-brand">+{Math.round(bonus.ratio * 100)}%</span> on a
+            deposit of {fiat(bonus.minDeposit)} or more
+            {bonus.maxBonusAmount < Number.MAX_SAFE_INTEGER / 2 && <>, up to {site.show(bonus.maxBonusAmount, walletCode, { precision: 2 })}</>}.
+          </div>
+        </div>
+      )}
+
       {accounts.length > 1 && (
         <>
           <div className="mb-1 mt-5 text-secondary">Pay To</div>
@@ -137,6 +159,8 @@ export default function ManualDeposit({ currency }) {
       <div className="mb-1 mt-5 text-secondary">Deposit Amount ({coin})</div>
       <div className="input bg-input_bright text-base">
         <input inputMode="decimal" name="amount" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))} />
+        {/* FiatTab's `iC` line: zero below the bonus minimum, so it disappears rather than shrinking. */}
+        {extra > 0 && <div className="px-2 font-extrabold text-success">Extra +{fiat(extra)}</div>}
       </div>
 
       <div className="mb-1 mt-3 text-secondary">Bank Reference / UTR</div>

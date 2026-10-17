@@ -414,7 +414,11 @@ class CryptoService {
     const missing = ['CCPAYMENT_BASE_URL', 'CCPAYMENT_APP_ID', 'CCPAYMENT_APP_SECRET']
       .filter((name) => !this.config?.[name]);
     if (!this.http) missing.push('http client');
-    if (missing.length) throw errors.NOT_CONFIGURED({ missing });
+    if (missing.length) {
+      // The names stay in the server log: the public 503 must not tell anyone which config is missing.
+      this.logger?.error({ missing }, 'CCPayment is not configured');
+      throw errors.NOT_CONFIGURED();
+    }
 
     const body = payload ? JSON.stringify(payload) : '';
     const timestamp = Math.floor(Date.now() / 1000);

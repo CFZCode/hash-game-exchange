@@ -8,6 +8,7 @@ module.exports = defineErrors('TIP', {
   DISABLED_BY_RECIPIENT: { status: 400, message: 'This player does not accept tips' },
   RECIPIENT_UNAVAILABLE: { status: 400, message: 'This player cannot receive tips' },
   SENDER_BLOCKED: { status: 403, message: 'Your account cannot send tips' },
+  KYC_REQUIRED: { status: 403, message: 'Identity verification must be completed before sending tips' },
   INSUFFICIENT_BALANCE: { status: 400, message: 'Insufficient balance for this tip' },
   MIN_AMOUNT: { status: 400, message: 'The amount is below the minimum tip' },
   RATE_LIMITED: { status: 429, message: 'Too many tips — try again later' },

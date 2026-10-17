@@ -393,11 +393,11 @@ test('custom coins in the wallet', async (t) => {
     }
   });
 
-  await t.test('a registry outage hides and refuses nothing (fails open)', async () => {
+  await t.test('a registry outage hides nothing, but money rails refuse (fail closed)', async () => {
     configureCurrencyRegistry({ read: () => { throw new Error('admin-service down'); }, config: { CURRENCY_REGISTRY_TTL_MS: 0 } });
     try {
       assert.equal((await currencyRegistry.disabledCodes()).size, 0);
-      await currencyRegistry.assertCurrencyEnabled('LTC');
+      await assert.rejects(currencyRegistry.assertCurrencyEnabled('LTC'), (e) => e.code === 'CURRENCY_REGISTRY_UNAVAILABLE');
       const uid = await player();
       assert.equal((await wallet.getBalances(uid)).LTC, '0.00000000');
     } finally {

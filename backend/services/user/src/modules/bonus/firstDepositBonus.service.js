@@ -356,7 +356,7 @@ class FirstDepositBonusService {
       expiryDays: terms.expiryDays,
       description:
         `First deposit bonus: ${pct}% of ${twoPlaces(value)} ${rewardCurrency}` +
-        (code === rewardCurrency ? '' : ` (${deposited} ${code})`) +
+        (code === rewardCurrency ? '' : ` (${twoPlaces(deposited)} ${code})`) +
         rollover,
     });
 

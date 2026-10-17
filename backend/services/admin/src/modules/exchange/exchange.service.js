@@ -173,9 +173,9 @@ class ExchangeService {
    * + points = parent deta hai (D), − points = parent leta hai (W).
    */
   async settle({ actor, accountType, accountId, points, remark, transactionPassword }) {
-    // Owner ka password set ho to zaroori, baaki sab ke liye hamesha (adjust jaisa).
+    // Hamesha zaroori — owner ke liye bhi, baaki money routes (add-balance, direct-wallet adjust) jaisa.
     await assertTransactionPassword(this.models, actor.id, transactionPassword, {
-      required: !actor.canIssueFunds,
+      required: true,
       executiveId: actor.executiveId ?? null,
     });
 

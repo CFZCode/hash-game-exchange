@@ -104,6 +104,10 @@ function RewardStatus({ entry, session }) {
     return <span className={`text-xs font-semibold ${config?.className ?? ''}`}>settling</span>;
   }
 
+  if (entry.extra?.lockedVip != null && !entry.canClaim) {
+    return <span className="text-xs font-semibold text-secondary">Unlocks at VIP {entry.extra.lockedVip}</span>;
+  }
+
   if (isRecurringReward(entry.rewardType) && timestamp) {
     return <span className="text-xs font-semibold text-primary">In Progress</span>;
   }

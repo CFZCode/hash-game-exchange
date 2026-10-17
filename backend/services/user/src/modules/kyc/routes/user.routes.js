@@ -2,7 +2,7 @@
 
 const { Router } = require('express');
 const multer = require('multer');
-const { validate, noQuery } = require('@ibitplay/common');
+const { validate, noQuery, entitlements } = require('@ibitplay/common');
 const { denyAgentPlayer } = require('@ibitplay/auth');
 
 const v = require('../kyc.validators');
@@ -31,6 +31,8 @@ module.exports = function userRoutes(deps) {
   });
 
   const router = Router();
+  // The owner's KYC feature off: no submit, no reads (and withdrawals stop requiring KYC — withdrawRequirements).
+  router.use(entitlements.requireFeature('kyc'));
 
   router.get('/status', noQuery(), ctrl.status);
 

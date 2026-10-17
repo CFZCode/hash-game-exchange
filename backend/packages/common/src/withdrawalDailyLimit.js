@@ -117,6 +117,9 @@ const USED_SQL = `
     + (SELECT COALESCE(SUM(crypto_amount), 0) FROM p2p_orders_sell
         WHERE user_id = :uidText AND upper(coin) = :cur
           AND upper(status) IN ('PENDING','RELEASED','DISPUTED') AND created_at >= ${WINDOW})
+    -- Tips sent leave the account too: without them a limited player tips a friend who withdraws.
+    + (SELECT COALESCE(SUM(amount), 0) FROM tips
+        WHERE from_user_id = :uid AND upper(currency) = :cur AND created_at >= ${WINDOW})
     AS total`;
 
 /** The rolling-24h usage reader, on the connection the caller uses (inside its transaction). */

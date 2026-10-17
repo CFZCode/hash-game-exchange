@@ -90,6 +90,7 @@ class CryptoWithdrawService {
     // The coin registry (migration 061): a coin the site or the owner switched
     // off is not paid out, and a named network must be one of the coin's
     // networks that is on. A registry outage fails open.
+    await currencyRegistry.assertRegistryReadable();
     if (!(await currencyRegistry.isEnabled(currency))) throw errors.UNSUPPORTED_COIN({ coin: currency });
     const network = chain ? String(chain) : null;
     if (network) {

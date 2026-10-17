@@ -12,6 +12,7 @@ const { visibleUserIds, CHANNEL_SQL } = require('../directory/playerScope');
 const { notifyPlayer } = require('../notifications/notifyPlayer');
 const { createRewardMoney, USD_CODES } = require('../../lib/rewardMoney');
 const { createTipLimitsResolver } = require('./tipLimits');
+const { createWithdrawRequirements } = require('../withdraw-requirements/withdrawRequirements');
 
 /** `%`, `_` and the escape character itself, made literal for `LIKE … ESCAPE '\'`. */
 const escapeLike = (value) => String(value).replace(/[\\%_]/g, (c) => `\\${c}`);
@@ -61,6 +62,8 @@ class TipService {
     this.wallet = new WalletService(deps);
     this.tipLimits = deps.tipLimits ?? createTipLimitsResolver(deps);
     this.rewardMoney = deps.rewardMoney ?? createRewardMoney(deps);
+    // A tip is money out like a withdrawal: same KYC / wagering / cap / daily-limit rules.
+    this.requirements = deps.withdrawRequirements ?? createWithdrawRequirements(deps);
   }
 
   // ══ Player ══════════════════════════════════════════════════════════
@@ -104,6 +107,11 @@ class TipService {
     if (!(await this.#tipsEnabled(recipientId))) throw errors.DISABLED_BY_RECIPIENT({ toUsername: recipient.name });
 
     const value = money.toDecimalString(money.toMinor(amount));
+    const applied = await this.requirements.assertMet(senderId, {
+      amount: value,
+      currency: code,
+      kycError: (status) => errors.KYC_REQUIRED({ kycStatus: status ?? null }),
+    });
 
     // The limits and this tip's USD value are plain reads, taken before any lock is held;
     // they are CHECKED inside the transaction, after the sender's row is locked.
@@ -114,6 +122,10 @@ class TipService {
     let result;
     try {
       result = await this.db.transaction(async (transaction) => {
+        // ── 0. Cap / daily limit under the player lock, taken BEFORE the wallet rows (the order
+        //       the withdraw rails use), so a tip and a withdrawal racing cannot deadlock.
+        await this.requirements.assertCapInTransaction(senderId, { amount: value, currency: code, transaction, applied });
+
         // ── 1. Both wallet rows, lowest id first ────────────────────────
         // `debit` / `credit` take these same row locks themselves; taking them
         // here first fixes the ORDER, which is what prevents the deadlock.

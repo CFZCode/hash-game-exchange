@@ -228,6 +228,11 @@ function register({ on, deps }) {
 
       if (!COIN_COLUMNS[currency]) return refuse(errors.UNSUPPORTED_COIN({ coin: currency }));
       // The coin registry (migration 061): a switched-off coin or network gets no address.
+      try {
+        await currencyRegistry.assertRegistryReadable();
+      } catch (error) {
+        return refuse(error);
+      }
       if (!(await currencyRegistry.isEnabled(currency))) return refuse(errors.UNSUPPORTED_COIN({ coin: currency }));
       if (chain) {
         const offered = await networksFor(currency);

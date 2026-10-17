@@ -39,16 +39,29 @@ Labels: **MISSING** means no route, storage or enforcement exists. **BUG** means
   - Audit bet #17: who placed it, the market price at that moment, the settlement, and who voided it.
 
 ### 3. The daily withdrawal limit can be bypassed with tips (SECURITY)
+- **Fixed locally (not deployed):**
+  - Tips sent now count toward the 24-hour daily limit (`packages/common/src/withdrawalDailyLimit.js` `USED_SQL`).
+  - `tip/tip.service.js` `send()` runs `withdrawRequirements.assertMet` (KYC, wagering, cap, daily) before anything moves, and `assertCapInTransaction` under the player lock, taken before the wallet rows so it can't deadlock. New error: `TIP_KYC_REQUIRED`.
+  - Tests: `tip/__tests__/tipRequirements.test.js`, `common/__tests__/withdrawalDailyLimit.test.js`.
 - **Actual:** the new owner daily limit, the deposit cap and the KYC/wager requirements are enforced on the fiat, crypto, gateway and P2P rails (`withdraw-requirements/withdrawRequirements.js`, `p2p/p2p.service.js`). Tips (`tip/tip.service.js:91`) check only `withdraw_locked`.
 - **Repro:** with `tips` entitled, a capped or limited player tips the money to a second account that has headroom, then withdraws from that account.
 - **Fix:** apply the withdraw requirements to outgoing tips, or at least count tips sent against the daily limit.
 
 ### 4. A disabled coin can be deposited or withdrawn when the coin registry is unreadable (BUG)
+- **Fixed locally (not deployed):**
+  - New `assertRegistryReadable()`: 503 `CURRENCY_REGISTRY_UNAVAILABLE` when a registry is configured but no copy can be read. `assertCurrencyEnabled` now calls it, so fiat deposit/withdraw, payment orders and vault refuse during an outage with no call-site change.
+  - Crypto withdraw (`cryptoWithdraw.service.js`) and the crypto deposit-address socket call it too.
+  - Display paths (`isEnabled`, `listCurrencies`) stay fail-open. An unknown code still passes.
+  - Tests: `common/__tests__/currencyRegistryFailClosed.test.js`; `wallet/__tests__/customCoins.money.test.js` updated to the new rule.
 - **Actual:** `packages/common/src/currencyRegistry.js:133–157` (`isEnabled` / `assertCurrencyEnabled`) treats the coin as enabled when the registry read fails or the coin is unknown. The money rails use it: `fiatDeposit.service.js:89`, `fiatWithdraw.service.js:76`, `cryptoWithdraw.service.js:93`.
 - **Repro:** while admin-service is down, a player can move PKR, AED or any other coin the owner turned off.
 - **Fix:** fail closed (`CURRENCY_DISABLED` or 503) for money in and money out. Keep fail-open only for display.
 
 ### 5. KYC feature switch is not enforced, and the `kyc` withdrawal policy ignores it (BUG)
+- **Fixed locally (not deployed):**
+  - KYC user routes now sit behind `requireFeature('kyc')` (403 `NOT_ENTITLED` when the owner turns KYC off).
+  - `withdrawRequirements` `rules()` requires KYC only while the KYC feature is entitled.
+  - Tests: `kyc/__tests__/kycFeatureGate.test.js`, `withdraw-requirements/__tests__/kycFeature.test.js`.
 - **Actual:** the KYC user routes have no `requireFeature('kyc')` (`kyc/routes/user.routes.js:34–46`). `withdrawRequirements.js:172–174` requires KYC from the `withdrawal_requirements` policy alone.
 - **Repro:** the owner turns KYC OFF while the policy is still `kyc`. Players can no longer see KYC, yet every direct player's withdrawal is refused as "KYC not verified", and the submit route still accepts documents.
 - **Fix:**
@@ -69,10 +82,15 @@ Labels: **MISSING** means no route, storage or enforcement exists. **BUG** means
 - **Fix:** when one wager crosses several cards, pay the rank-up for every card crossed. Each payout already has an idempotency key per card, so this is safe. Or state that only the card reached is paid.
 
 ### 7. Points settle runs without a transaction password for a Super Admin who never set one (SECURITY, low)
+- **Fixed locally (not deployed):**
+  - `exchange.service.js` `settle` now uses `required: true`. The admin FundsDialog already sends the password.
+  - The gap only existed in `TXN_PASSWORD_MODE=separate`; login mode always asked.
+  - Test: `exchange/__tests__/settlePassword.test.js`.
 - `admin/src/modules/exchange/exchange.service.js:177–180` uses `assertTransactionPassword(..., { required: !actor.canIssueFunds })`. Every other money route (`exchange.service.js:117,134`, `direct-wallet/directWallet.service.js:153–154`) uses `required: true`.
 - **Fix:** use `required: true` here too.
 
 ### 8. Crypto deposit errors leak env variable names to anonymous callers (BUG, minor)
+- **Fixed locally (not deployed):** `crypto.service.js` logs the missing names server-side, and the public 503 `CRYPTO_NOT_CONFIGURED` no longer lists them. Test: `crypto/__tests__/notConfigured.test.js`.
 - `services/user/src/modules/crypto/crypto.service.js:414–417`: live `GET /api/v1/user/crypto/coins?symbol=USDT` returns `"missing":["CCPAYMENT_BASE_URL","CCPAYMENT_APP_ID","CCPAYMENT_APP_SECRET"]`.
 - **Fix:**
   - Log the missing names on the server and drop them from the public body.
@@ -80,6 +98,7 @@ Labels: **MISSING** means no route, storage or enforcement exists. **BUG** means
   - Set the CCPayment keys on live.
 
 ### 9. Duplicate JILI provider flag (`jili` and `jilli`) (BUG, low)
+- **Checked: not a bypass, no code change needed.** `gameEntitlement.js` maps JILI to both keys (lines 66–67). Lists drop a game when ANY of its flags is off, and launch asserts every flag. So switching either key off closes JILI. What's left is a duplicate toggle in the owner/admin flag lists, which is cosmetic. Test: `casino/.../games/__tests__/jiliFlags.test.js`.
 - Live `site-config/public` returns both `jili: true` and `jilli: true`. If they are toggled separately, one can keep JILI games open after the other is turned off.
 - **Fix:** confirm which key `games/gameEntitlement.js` PROVIDER_FLAGS reads, migrate the other one away, and remove it.
 

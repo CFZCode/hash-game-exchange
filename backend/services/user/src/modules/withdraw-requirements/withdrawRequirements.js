@@ -158,6 +158,7 @@ function createWithdrawRequirements(deps) {
   async function ownerSettings() {
     const plan = await entitlements.getEntitlements();
     return {
+      kycFeature: entitlements.isFeatureEntitledIn(plan, 'kyc'),
       cap: withdrawalCap.cleanWithdrawalCap(plan.withdrawalCap),
       daily: withdrawalDailyLimit.cleanWithdrawalDailyLimit(plan.withdrawalDailyLimit),
     };
@@ -171,7 +172,9 @@ function createWithdrawRequirements(deps) {
   async function rules() {
     const [policy, owner] = await Promise.all([sitePolicy.readPolicy(models, POLICY), ownerSettings()]);
     const requires = (what) => (sitePolicy.ALLOWS[POLICY][what] ?? []).includes(policy);
-    return { policy, kyc: requires('kyc') && kycSwitch, wager: requires('wager'), cap: owner.cap, daily: owner.daily };
+    // KYC is only demanded while the owner's KYC feature is in the plan: with it off the player
+    // cannot submit documents, so requiring them would stop every withdrawal.
+    return { policy, kyc: requires('kyc') && kycSwitch && owner.kycFeature, wager: requires('wager'), cap: owner.cap, daily: owner.daily };
   }
 
   /**

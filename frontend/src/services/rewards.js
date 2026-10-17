@@ -47,9 +47,9 @@ import { rewardTypeName } from '../pages/Bonus/claimAll';
  *
  * The instant itself stays derived from each bonus's own stated rule ("Drops the next day UTC",
  * "every Friday UTC", "every 15th UTC") because the platform publishes no next-claim time at all
- * — see the note at `buildRewards`. `eligible` is deliberately NOT consulted: it answers "does
- * your VIP level reach `minVipLevel`", which gates whether the bonus can ever pay, and bc.game
- * renders an ineligible row exactly as it renders an empty one.
+ * — see the note at `buildRewards`. `eligible` answers "does your VIP level reach `minVipLevel`";
+ * bc.game renders an ineligible row like an empty one, but here an ineligible row carries
+ * `extra.lockedVip` and the /bonus page reads "Unlocks at VIP n" (user's request, 2026-10-18).
  *
  * ── THE ITEM ──────────────────────────────────────────────────────────────────────────────────
  *
@@ -73,10 +73,12 @@ const positive = (value) => Number(value) > 0;
 
 /* One live figure folded onto the entry `buildRewards` already made, so anything the fixture
    carries that the platform has no opinion about survives untouched. */
-function fill(entry, { amount, currency, claimable }) {
+function fill(entry, { amount, currency, claimable, eligible, minVipLevel }) {
   const canClaim = Boolean(claimable);
   const extra = { ...entry.extra };
   if (canClaim) delete extra.nextClaimTime;
+  // Below the VIP gate the row says so ("Unlocks at VIP 2") instead of an "In Progress" that can't pay.
+  if (eligible === false && minVipLevel != null) extra.lockedVip = Number(minVipLevel);
 
   return {
     ...entry,

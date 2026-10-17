@@ -145,13 +145,31 @@ async function disabledCodes() {
 }
 
 /**
+ * Money rails only: refuse with 503 when a registry is configured but no copy of
+ * it can be read (admin-service down, nothing cached yet). Failing open here let a
+ * player move a coin the owner switched off during an outage. Display paths keep
+ * the fail-open `isEnabled` / `listCurrencies`.
+ */
+async function assertRegistryReadable() {
+  if (!reader) return;
+  let list = null;
+  try {
+    list = await reader.get();
+  } catch {
+    list = null;
+  }
+  if (!list) throw new AppError('The coin list could not be checked right now — try again shortly', 503, 'CURRENCY_REGISTRY_UNAVAILABLE');
+}
+
+/**
  * Refuse a coin the registry has switched off: 422 `CURRENCY_DISABLED`. For
  * the paths that put money INTO a coin or start a payment in it (deposits,
  * payment orders, vault-in, withdrawals). Taking money OUT of a switched-off
- * coin (a swap from it, a bet already settled) is left to the caller. An
- * unknown code or a registry outage passes (fails open).
+ * coin (a swap from it, a bet already settled) is left to the caller. A registry
+ * outage is refused (503, `assertRegistryReadable`); an unknown code passes.
  */
 async function assertCurrencyEnabled(code) {
+  await assertRegistryReadable();
   if (await isEnabled(code)) return;
   const currency = String(code ?? '').trim().toUpperCase();
   throw new AppError(`${currency} is switched off on this site`, 422, 'CURRENCY_DISABLED', { currency });
@@ -188,6 +206,7 @@ module.exports = {
   isEnabled,
   disabledCodes,
   assertCurrencyEnabled,
+  assertRegistryReadable,
   networksOf,
   invalidateCurrencyRegistry,
   resetCurrencyRegistry,

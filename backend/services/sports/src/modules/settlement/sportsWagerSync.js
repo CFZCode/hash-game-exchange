@@ -55,6 +55,7 @@ function createSportsWagerSync({ sequelize, clients, logger, schema = 'mssports'
       { counted: COUNTED, batch }
     );
     let counted = 0;
+    let done = 0;
     for (const row of rows) {
       const amount = stakeString(row.amount);
       let outcome = { counted: false, reason: 'NOT_POSITIVE' };
@@ -74,9 +75,10 @@ function createSportsWagerSync({ sequelize, clients, logger, schema = 'mssports'
         `INSERT INTO ${t('sports_wager_sync')} (bet_id, user_id) VALUES (:id, :userId) ON CONFLICT (bet_id) DO NOTHING`,
         { replacements: { id: row.id, userId: row.user_id } }
       );
+      done += 1;
       if (outcome?.counted) counted += 1;
     }
-    return { scanned: rows.length, counted };
+    return { scanned: rows.length, counted, done };
   }
 
   async function reverseUndone() {
@@ -107,9 +109,11 @@ function createSportsWagerSync({ sequelize, clients, logger, schema = 'mssports'
     try {
       let total = 0;
       for (let i = 0; i < 50; i += 1) {
-        const { scanned, counted } = await countSettled();
+        const { scanned, counted, done } = await countSettled();
         total += counted;
-        if (scanned < batch) break;
+        // A full batch where nothing could be marked (every row waiting on a USD rate) would
+        // re-post the same rows 50 times a tick; stop and retry next tick instead.
+        if (scanned < batch || done === 0) break;
       }
       const { reversed } = await reverseUndone();
       if (total || reversed) logger?.info({ counted: total, reversed }, 'sports wager sync');
