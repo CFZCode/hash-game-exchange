@@ -63,6 +63,18 @@ const WITHDRAWAL_DONE = Object.freeze({
 });
 
 /**
+ * Direct User Wallet credits / debits (`direct-wallet` module) — the Super Admin's
+ * manual deposit to a direct user. No table of their own: one `credits_ledger`
+ * row each, reason ADMIN_CREDIT / ADMIN_DEBIT, `meta.refType` DIRECT_WALLET.
+ * The debit's `amount` is stored NEGATIVE, so every reader takes ABS.
+ */
+const DIRECT_WALLET_LEDGER = Object.freeze({
+  refType: 'DIRECT_WALLET',
+  deposit: 'ADMIN_CREDIT',
+  withdrawal: 'ADMIN_DEBIT',
+});
+
+/**
  * ═══════════════════════════════════════════════════════════════════════════
  * WHY THE LIFETIME TOTALS CARRY A HEALTH WARNING
  *
@@ -200,6 +212,36 @@ const MOVEMENT_SOURCES = Object.freeze([
     statuses: WITHDRAWAL_DONE.fiat_withdrawals,
     statusIsText: true,
   },
+  /**
+   * Direct User Wallet — `credits_ledger` rows, filtered by reason + refType
+   * instead of a status (a ledger row is only ever written once it is done).
+   */
+  {
+    key: 'direct_wallet_deposit',
+    label: 'Direct wallet credit',
+    direction: 'deposit',
+    model: 'CreditsLedger',
+    id: 'id',
+    user: 'user_id',
+    date: 'created_at',
+    amount: 'amount',
+    currency: 'currency',
+    ledgerReason: DIRECT_WALLET_LEDGER.deposit,
+  },
+  {
+    key: 'direct_wallet_withdrawal',
+    label: 'Direct wallet debit',
+    direction: 'withdrawal',
+    model: 'CreditsLedger',
+    id: 'id',
+    user: 'user_id',
+    date: 'created_at',
+    amount: 'amount',
+    currency: 'currency',
+    ledgerReason: DIRECT_WALLET_LEDGER.withdrawal,
+    /** Stored negative — flipped back to a positive withdrawal. */
+    negative: true,
+  },
 ]);
 
 const MOVEMENT_SOURCE_KEYS = Object.freeze(MOVEMENT_SOURCES.map((s) => s.key));
@@ -254,6 +296,7 @@ module.exports = {
   COIN_IDS,
   DEPOSIT_SUCCESS,
   WITHDRAWAL_DONE,
+  DIRECT_WALLET_LEDGER,
   VALUATION_NOTE,
   TREND_DAYS,
   TOP_COUNTRIES,

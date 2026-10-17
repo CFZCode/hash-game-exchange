@@ -4,7 +4,9 @@ const { money } = require('@ibitplay/common');
 const { INHOUSE_PAYOUT, V2_STAKE, V2_PAYOUT } = require('../statements/casinoRounds');
 
 const { visibleStaffIds } = require('../staff-directory/staffDirectory.service');
-const { COIN_IDS, DEPOSIT_SUCCESS, WITHDRAWAL_DONE, VALUATION_NOTE, SPORT_NAMES, SPORTS_REFUNDED_RESULTS } = require('./dashboard.constants');
+const {
+  COIN_IDS, DEPOSIT_SUCCESS, WITHDRAWAL_DONE, DIRECT_WALLET_LEDGER, VALUATION_NOTE, SPORT_NAMES, SPORTS_REFUNDED_RESULTS,
+} = require('./dashboard.constants');
 const { gisKindSql, gisSideAmountSql, gisBetCountSql, gisPlayFilterSql } = require('../statements/statements.constants');
 
 /**
@@ -308,6 +310,19 @@ class DashboardStatsService {
          WHERE ${status} AND ${this.#window(s.date)} ${currencyFilter} ${this.#owned(ctx, s.owner, s.ownerIsText)}
          GROUP BY 1, 3`);
     });
+
+    // Direct User Wallet credits / debits — `credits_ledger`, debit stored negative.
+    replacements.dwRef = DIRECT_WALLET_LEDGER.refType;
+    for (const side of ['deposit', 'withdrawal']) {
+      replacements[`dw_${side}`] = DIRECT_WALLET_LEDGER[side];
+      parts.push(`
+        SELECT ${this.#bucket('created_at')} AS bucket, '${side}' AS side, UPPER(currency) AS currency,
+               COALESCE(SUM(ABS(amount)), 0)::text AS total, COUNT(*) AS n
+          FROM credits_ledger
+         WHERE reason = :dw_${side} AND meta->>'refType' = :dwRef AND ${this.#window('created_at')}
+               ${ctx.currency ? 'AND UPPER(currency) = :currency' : ''} ${this.#owned(ctx, 'user_id', true)}
+         GROUP BY 1, 3`);
+    }
 
     return this.#query(parts.join(' UNION ALL '), replacements);
   }

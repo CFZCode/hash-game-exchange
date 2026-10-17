@@ -280,6 +280,7 @@ export const navItems: NavItem[] = [
       // wagers); users:read alone falls back to the player directory `admin/user/directory`.
       { icon: 'Users', label: 'Users', href: '/users', activePath: '/users', permission: ['reports:read', 'users:read'] } as MenuItem,
       { icon: 'Wallet', label: 'Wallets', href: '/wallets', permission: 'wallet:adjust' },
+      { icon: 'Globe', label: 'Login & IP history', href: '/ip-tracker', permission: 'reports:read' },
 
       // Zip ke Main jaisa: Redeem Codes (Promotions se yahan) aur Turnover Report (direct users ka wager vs target).
       { icon: 'Ticket', label: 'Redeem Codes', href: '/redeem-codes', permission: 'reports:read', promotions: true },
@@ -328,15 +329,6 @@ export const navItems: NavItem[] = [
     ]
   },
   {
-    groupLabel: 'Users',
-    groupIcon: 'UsersRound',
-    items: [
-      { icon: 'Globe', label: 'Login & IP history', href: '/ip-tracker', permission: 'reports:read' },
-      { icon: 'ShieldCheck', label: 'KYC', href: '/kyc', permission: 'users:read', feature: 'kyc' },
-      { icon: 'Building2', label: 'Bank details', href: '/bank-details', permission: 'config:read' }
-    ]
-  },
-  {
     /*
      * Transactions — admin-structure.zip jaisa: Deposit, Withdraw (dono me Direct Users / Agent Users tab)
      * aur Account Statement. Purane Fiat / Crypto / Payment orders screens Direct Users tab ke andar.
@@ -348,7 +340,11 @@ export const navItems: NavItem[] = [
       { icon: 'ArrowUpFromLine', label: 'Withdraw', href: '/transactions/withdraw', permission: ['withdrawals:read', 'users:read'] },
 
       // The transfer list is `admin/accounts/statement` (users:read); the drill-down is `admin/statements` (reports:read).
-      { icon: 'BookOpen', label: 'Account Statement', href: '/reports/statements', permission: ['users:read', 'reports:read'] }
+      { icon: 'BookOpen', label: 'Account Statement', href: '/reports/statements', permission: ['users:read', 'reports:read'] },
+
+      // Users section se yahan: KYC aur Bank details (routes wahi).
+      { icon: 'ShieldCheck', label: 'KYC', href: '/kyc', permission: 'users:read', feature: 'kyc' },
+      { icon: 'Building2', label: 'Bank details', href: '/bank-details', permission: 'config:read' }
     ]
   },
   {

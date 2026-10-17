@@ -23,12 +23,25 @@ const {
   COIN_IDS,
   DEPOSIT_SUCCESS,
   WITHDRAWAL_DONE,
+  DIRECT_WALLET_LEDGER,
   VALUATION_NOTE,
   TREND_DAYS,
   TOP_COUNTRIES,
   MOVEMENT_SOURCES,
   MAX_MOVEMENT_ROWS,
 } = require('./dashboard.constants');
+
+/** `credits_ledger` rows the Direct User Wallet wrote with this reason (see DIRECT_WALLET_LEDGER). */
+const directWalletWhere = (reason) => ({
+  reason,
+  [Op.and]: [sqlWhere(literal(`meta->>'refType'`), DIRECT_WALLET_LEDGER.refType)],
+});
+
+/** A summed / single amount from a source whose withdrawals are stored negative, made positive. */
+const unsign = (source, amount) => {
+  const minor = money.toMinorQuantised(String(amount ?? '0'));
+  return money.toDecimalString(source.negative ? -minor : minor);
+};
 
 /**
  * The operator dashboard.
@@ -329,7 +342,7 @@ class DashboardService {
         const [rows, grouped, count] = await Promise.all([
           this.models[s.model].findAll({
             where,
-            attributes: [s.id, s.user, s.date, s.amount, 'status', s.currency ?? s.coinId],
+            attributes: [s.id, s.user, s.date, s.amount, ...(s.ledgerReason ? [] : ['status']), s.currency ?? s.coinId],
             order: [[s.date, 'DESC']],
             limit: depth,
             raw: true,
@@ -351,7 +364,7 @@ class DashboardService {
           count,
           groups: grouped.map((row) => ({
             currency: s.coinId ? COIN_IDS[row[s.coinId]] ?? null : row[s.currency],
-            total: row.total,
+            total: unsign(s, row.total),
             count: Number(row.count),
           })),
           rows: rows.map((row) => ({
@@ -362,8 +375,9 @@ class DashboardService {
             at: row[s.date] ?? null,
             userId: row[s.user] != null ? String(row[s.user]) : null,
             currency: s.coinId ? COIN_IDS[row[s.coinId]] ?? null : row[s.currency] ?? null,
-            amount: money.toDecimalString(money.toMinor(row[s.amount] ?? '0')),
-            status: row.status != null ? String(row.status) : null,
+            amount: unsign(s, row[s.amount]),
+            // A ledger row exists only once the move is done.
+            status: s.ledgerReason ? 'success' : row.status != null ? String(row.status) : null,
           })),
         };
       })
@@ -548,6 +562,7 @@ class DashboardService {
       this.#groupByCurrency(this.models.FiatDeposits, DEPOSIT_SUCCESS.fiat_deposits, 'created_at', since, 'currency', this.#ownerWhere(scope, 'user_id')),
       this.#groupByCurrency(this.models.Apaydeposits, DEPOSIT_SUCCESS.apaydeposits, 'created_at', since, 'currency', this.#ownerWhere(scope, 'user_id')),
       this.#groupPayIn(since, scope),
+      this.#groupDirectWallet(DIRECT_WALLET_LEDGER.deposit, since, scope),
     ];
 
     const [lifetime, today, inRange] = await Promise.all([
@@ -567,6 +582,7 @@ class DashboardService {
     const window = (since) => [
       this.#groupByCurrency(this.models.Withdrawals, WITHDRAWAL_DONE.withdrawals, 'date', since, 'coin', this.#ownerWhere(scope, 'uid')),
       this.#groupByCurrency(this.models.FiatWithdrawals, WITHDRAWAL_DONE.fiat_withdrawals, 'date', since, 'currency', this.#ownerWhere(scope, 'uid')),
+      this.#groupDirectWallet(DIRECT_WALLET_LEDGER.withdrawal, since, scope),
     ];
 
     const [lifetime, today, inRange] = await Promise.all([
@@ -616,6 +632,21 @@ class DashboardService {
         ...this.#ownerWhere(scope, 'user_id'),
       },
       attributes: ['currency', [fn('COALESCE', fn('SUM', col('amount')), 0), 'total'], [fn('COUNT', literal('*')), 'count']],
+      group: ['currency'],
+      raw: true,
+    });
+    return rows.map((row) => ({ currency: row.currency, total: row.total, count: Number(row.count) }));
+  }
+
+  /** Direct User Wallet credits (or debits, made positive) by currency. */
+  async #groupDirectWallet(reason, since, scope) {
+    const rows = await this.models.CreditsLedger.findAll({
+      where: {
+        ...directWalletWhere(reason),
+        ...this.#windowWhere('created_at', since),
+        ...this.#ownerWhere(scope, 'user_id'),
+      },
+      attributes: ['currency', [fn('COALESCE', fn('SUM', fn('ABS', col('amount'))), 0), 'total'], [fn('COUNT', literal('*')), 'count']],
       group: ['currency'],
       raw: true,
     });
@@ -801,9 +832,11 @@ class DashboardService {
    */
   #movementWhere(source, { range, owners }) {
     return {
-      ...(source.statusIsText
-        ? { [Op.and]: [statusIn(source.statuses)] }
-        : { status: { [Op.in]: source.statuses } }),
+      ...(source.ledgerReason
+        ? directWalletWhere(source.ledgerReason)
+        : source.statusIsText
+          ? { [Op.and]: [statusIn(source.statuses)] }
+          : { status: { [Op.in]: source.statuses } }),
       ...this.#windowWhere(source.date, range),
       ...(owners ? { [source.user]: owners } : {}),
     };
