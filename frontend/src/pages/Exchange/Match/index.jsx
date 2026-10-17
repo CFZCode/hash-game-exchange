@@ -38,6 +38,10 @@ import { useMatchSlip, placementOdds, slipFigures, projectedBook, slipStakeInr }
 import { TAB_LABELS, marketTab, marketKind, ladder, rowStatus } from './shape';
 import { sportIconOf } from '../model';
 import { markMatchGone, reviveMatch } from '../../../services/exchange/deadMatches';
+import CricketScorecard from '../../../components/exchange/CricketScorecard';
+
+const SPORTS_STREAM_BASE = process.env.NEXT_PUBLIC_SPORTS_STREAM_BASE || '';
+const SCORECARD_BASE = process.env.NEXT_PUBLIC_SCORECARD_BASE || '';
 
 /* ─── /sports/match/:sid/:gmid — the exchange match page ─────────────────────────────────
  *
@@ -118,7 +122,10 @@ export default function ExchangeMatchPage() {
   const [stakeSaving, setStakeSaving] = React.useState(false);
   const [stakeError, setStakeError] = React.useState(null);
   const [score, setScore] = React.useState({ key: null, url: null });
-  const [showScore, setShowScore] = React.useState(true);
+  const [showTv, setShowTv] = React.useState(false);
+  const [coveredFor, setCoveredFor] = React.useState(null);
+  // Read once per mount; `iplay` flips a live match on its own, this covers a late iplay.
+  const [mountedAt] = React.useState(() => Date.now());
 
   /* Bets a reload left in flight — once per mount. */
   React.useEffect(() => {
@@ -137,18 +144,37 @@ export default function ExchangeMatchPage() {
     if (signedIn) refreshStakes();
   }, [signedIn, refreshStakes]);
 
-  /* Scoreboard iframe for non-cricket (single-use token: one fetch per match). */
+  /* Scorecard + stream, gated as TENEXCH's GameDetails gates them (signed-in only):
+     - cricket: the socket card, once the match has started (iplay, or stime has passed);
+     - other sports: the score iframe only when the feed assigns a graphic (gtv > 0). Sticky per
+       match: a poll without gtv must not unmount it, since a remount spends another single-use
+       token. Fetched once per match; the scorecard host is the fallback when score-url fails;
+     - stream: `tv` on the header → SPORTS_STREAM_BASE + gmid. For non-cricket it replaces the
+       score iframe while on (one box, as the reference's eye/TV pair); cricket keeps its card. */
+  const isCricket = String(sid) === '4';
+  const gtvNow = Number(match?.gtv) > 0;
+  if (gtvNow && coveredFor !== gmid) setCoveredFor(gmid);
+  const scoreCovered = isCricket || gtvNow || coveredFor === gmid;
+  const hasTv = signedIn && Number(match?.tv) > 0 && Boolean(SPORTS_STREAM_BASE);
+  const tvOn = hasTv && showTv;
+  const matchStarted = Boolean(match?.iplay) || (() => {
+    const t = new Date(match?.stime || '').getTime();
+    return !Number.isNaN(t) && t <= mountedAt;
+  })();
+
   const scoreKey = `${gmid}|${sid}`;
+  const wantScoreUrl = signedIn && !isCricket && scoreCovered && Boolean(gmid && sid);
   React.useEffect(() => {
-    if (!gmid || !sid || String(sid) === '4') return undefined;
+    if (!wantScoreUrl) return undefined;
     let alive = true;
+    const fallback = SCORECARD_BASE ? `${SCORECARD_BASE}?etid=${sid}&gmid=${gmid}` : null;
     getScoreUrl(gmid, sid).then((url) => {
-      if (alive) setScore({ key: scoreKey, url });
+      if (alive) setScore({ key: scoreKey, url: url || fallback });
     });
     return () => {
       alive = false;
     };
-  }, [gmid, sid, scoreKey]);
+  }, [wantScoreUrl, gmid, sid, scoreKey]);
   const scoreUrl = score.key === scoreKey ? score.url : null;
 
   /* ── markets ── */
@@ -307,6 +333,7 @@ export default function ExchangeMatchPage() {
   /* ── render ── */
   const gone = mk.noMarkets || mk.matchGone;
   const sport = sportIconOf(sid);
+  const isTournament = visible.some((m) => String(m.mname || '').toUpperCase().includes('TOURNAMENT_WINNER'));
 
   const header = (
     <MatchHeader
@@ -316,17 +343,33 @@ export default function ExchangeMatchPage() {
       startTime={match?.stime}
       inPlay={Boolean(match?.iplay)}
       onBack={() => navigate('/sports')}
-      tvAvailable={Boolean(scoreUrl)}
-      showTv={showScore}
-      onToggleTv={setShowScore}
+      tvAvailable={hasTv}
+      showTv={tvOn}
+      onToggleTv={setShowTv}
       scoreSlot={
-        scoreUrl && showScore ? (
-          <iframe
-            title="Live score"
-            src={scoreUrl}
-            className="block h-48 w-full border-0 bg-layer2 sm:h-56"
-            loading="lazy"
-          />
+        isTournament ? null : (isCricket && signedIn && matchStarted) || tvOn || (scoreUrl && signedIn) ? (
+          <>
+            {isCricket && signedIn && matchStarted && <CricketScorecard gmid={gmid} started />}
+            {tvOn ? (
+              <iframe
+                key={gmid}
+                title="Live stream"
+                src={`${SPORTS_STREAM_BASE}${gmid}`}
+                className="block aspect-video w-full border-0 bg-black"
+                allow="autoplay; encrypted-media; picture-in-picture"
+                allowFullScreen
+              />
+            ) : (
+              !isCricket && scoreUrl && signedIn && (
+                <iframe
+                  title="Live score"
+                  src={scoreUrl}
+                  className="block h-48 w-full border-0 bg-layer2 sm:h-56"
+                  loading="lazy"
+                />
+              )
+            )}
+          </>
         ) : null
       }
     />
