@@ -388,19 +388,19 @@ export const navItems: NavItem[] = [
     groupLabel: 'Promotions',
     groupIcon: 'Sparkles',
     collapsible: true,
+    // Only direct users get promotions (user, 2026-10-17), so only the Super Admin and its executives see this section.
     items: [
       // The campaigns on the player site's /promotions. Reads are the public routes (staff see drafts); writes are config:write.
-      { icon: 'Megaphone', label: 'Promotions', href: '/promotions/campaigns', permission: 'config:read', promotions: true, feature: 'promotions' },
-      { icon: 'Gift', label: 'Bonus', href: '/bonus', permission: 'reports:read', promotions: true, flag: 'bonus', feature: 'bonus' },
+      { icon: 'Megaphone', label: 'Promotions', href: '/promotions/campaigns', permission: 'config:read', promotions: true, direct: true, feature: 'promotions' },
+      { icon: 'Gift', label: 'Bonus', href: '/bonus', permission: 'reports:read', promotions: true, direct: true, flag: 'bonus', feature: 'bonus' },
 
-      // Tree-scoped by the backend (like player data), so not house-only.
       // `admin/user/bonus-balance` and its stats answer any of reports:read, users:read, wallet:read.
-      { icon: 'LockKeyhole', label: 'Bonus balances', href: '/bonus-balances', permission: ['reports:read', 'users:read', 'wallet:read'] },
-      { icon: 'CreditCard', label: 'Gift cards', href: '/gift-cards', permission: 'reports:read', promotions: true, flag: 'giftcards', feature: 'gift_cards' },
-      { icon: 'Disc3', label: 'Spin wheel', href: '/spin-wheel', permission: 'reports:read', promotions: true, flag: 'wheelspin', feature: 'spin_wheel' },
-      { icon: 'Crown', label: 'VIP & club', href: '/vip', permission: 'reports:read', promotions: true, flag: 'vipclub', feature: 'vip' },
-      { icon: 'Link', label: 'Affiliate', href: '/affiliate', permission: 'reports:read', promotions: true, flag: 'affiliate', feature: 'affiliate' },
-      { icon: 'Flag', label: 'Races', href: '/races', permission: 'reports:read', promotions: true, feature: 'races' }
+      { icon: 'LockKeyhole', label: 'Bonus balances', href: '/bonus-balances', permission: ['reports:read', 'users:read', 'wallet:read'], promotions: true, direct: true },
+      { icon: 'CreditCard', label: 'Gift cards', href: '/gift-cards', permission: 'reports:read', promotions: true, direct: true, flag: 'giftcards', feature: 'gift_cards' },
+      { icon: 'Disc3', label: 'Spin wheel', href: '/spin-wheel', permission: 'reports:read', promotions: true, direct: true, flag: 'wheelspin', feature: 'spin_wheel' },
+      { icon: 'Crown', label: 'VIP & club', href: '/vip', permission: 'reports:read', promotions: true, direct: true, flag: 'vipclub', feature: 'vip' },
+      { icon: 'Link', label: 'Affiliate', href: '/affiliate', permission: 'reports:read', promotions: true, direct: true, flag: 'affiliate', feature: 'affiliate' },
+      { icon: 'Flag', label: 'Races', href: '/races', permission: 'reports:read', promotions: true, direct: true, feature: 'races' }
     ]
   },
   {
