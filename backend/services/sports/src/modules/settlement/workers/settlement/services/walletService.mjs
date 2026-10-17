@@ -12,6 +12,7 @@ import { POINT_EVENT, POINT_CATEGORY, pointEntryRef, LEDGER_CATEGORY_ALIASES } f
 import { creditsChain, addPoints, isChildUser } from "../../../../../lib/services/creditsPoints.mjs";
 import { QueryTypes } from "sequelize";
 import { writeDirectEntry, reverseDirectEntry } from "../../../../../lib/services/directPointLedger.mjs";
+import { inrToCurrency } from "../../../../../lib/helper/toInr.mjs";
 import { emitBalanceUpdate } from "../utils/socketUtils.mjs";
 import { withVoidSuffix } from "../helper/voidLabel.mjs";
 import { MESSAGES } from "../constants/messages.mjs";
@@ -637,6 +638,7 @@ var WalletService = {
       return { success: false, error: `invalid betType "${betType}" \u2014 SPORTS chahiye` };
     }
     let gtype = null;
+    let betCurrency = "INR";
     const ledgerCategories = LEDGER_CATEGORY_ALIASES[category] || [category];
     let credit = await CreditsLedger_default.findOne({
       where: {
@@ -659,8 +661,9 @@ var WalletService = {
     const userId = Number(credit.user_id);
     const entryRef = pointEntryRef.bet(category, betId);
     if (category === POINT_CATEGORY.SPORTS) {
-      const sportsBet = await SportsBet_default.findByPk(betId, { attributes: ["gtype"] });
+      const sportsBet = await SportsBet_default.findByPk(betId, { attributes: ["gtype", "original_currency"] });
       gtype = sportsBet?.gtype || null;
+      betCurrency = sportsBet?.original_currency || "INR";
     }
     if (!gtype) gtype = credit?.market_type || credit?.meta?.market_type || null;
     const tx = await db_default.transaction();
@@ -694,6 +697,7 @@ var WalletService = {
       const walletIds = await creditsChain(db_default, userId, tx);
       const updated = await addPoints(db_default, walletIds, net, { transaction: tx });
       const wallets = updated;
+      const deltaCurrency = await inrToCurrency(net, betCurrency);
       await PointLedger_default.bulkCreate(
         updated.map((w) => ({
           entry_ref: entryRef,
@@ -703,6 +707,7 @@ var WalletService = {
           wallet_id: w.wallet_id,
           username: w.username,
           delta: net,
+          delta_currency: deltaCurrency,
           all_point_after: parseFloat(w?.all_point || 0),
           closing_inr_balance: parseFloat(w?.inr_balance || 0),
           sport_id: credit?.sport_id || null,

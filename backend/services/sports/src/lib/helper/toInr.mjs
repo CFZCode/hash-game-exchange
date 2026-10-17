@@ -9,19 +9,35 @@ init_db();
 // The rate table may carry no row for these; they are the dollar itself.
 var ONE_USD = ["USD", "USDT"];
 
-var toInr = async (amount, currency) => {
-  const code = String(currency || "").trim().toUpperCase();
-  const n = Number(amount);
-  if (code === "INR") return n;
+/** USD per unit of `code` and of INR, or an error when either has no rate. */
+var ratesOf = async (code) => {
   const rows = await db_default.query(
     "SELECT UPPER(currency) AS currency, usd_rate FROM public.exchangerate WHERE UPPER(currency) IN (:codes)",
     { replacements: { codes: [code, "INR"] }, type: QueryTypes.SELECT }
   );
   const rate = (c) => Number(rows.find((r) => r.currency === c)?.usd_rate) || (ONE_USD.includes(c) ? 1 : 0);
-  const from = rate(code);
+  const coin = rate(code);
   const inr = rate("INR");
-  if (!(from > 0) || !(inr > 0)) throw new Error(`No exchange rate for ${code}`);
-  return Math.round(n * from / inr * 100) / 100;
+  if (!(coin > 0) || !(inr > 0)) throw new Error(`No exchange rate for ${code}`);
+  return { coin, inr };
 };
 
-export { toInr };
+var toInr = async (amount, currency) => {
+  const code = String(currency || "").trim().toUpperCase();
+  const n = Number(amount);
+  if (code === "INR") return n;
+  const { coin, inr } = await ratesOf(code);
+  return Math.round(n * coin / inr * 100) / 100;
+};
+
+// The other way: an INR figure (a point-ledger delta, sign kept) in the bet's coin. Not rounded
+// to 2 places — a coin like BTC needs its decimals (8, the ledger column's scale).
+var inrToCurrency = async (amount, currency) => {
+  const code = String(currency || "INR").trim().toUpperCase();
+  const n = Number(amount);
+  if (code === "INR") return n;
+  const { coin, inr } = await ratesOf(code);
+  return Math.round(n * inr / coin * 1e8) / 1e8;
+};
+
+export { toInr, inrToCurrency };

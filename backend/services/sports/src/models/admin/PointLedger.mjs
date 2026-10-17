@@ -34,6 +34,8 @@ var PointLedger = db_default.define(
     settled_with_wallet_id: { type: DataTypes31.INTEGER, allowNull: true },
     // Sign ke saath: jeet +, haar − (BET_SETTLEMENT me chain ke har wallet me same delta)
     delta: { type: DataTypes31.DECIMAL(18, 2), allowNull: false },
+    // `delta` (INR) in the bet's coin (`bet_currency`), sign kept — inrToCurrency at settlement.
+    delta_currency: { type: DataTypes31.DECIMAL(30, 8), allowNull: true },
     // Entry lagne ke turant baad all_point kya bana (audit ke liye)
     all_point_after: { type: DataTypes31.DECIMAL(18, 2), allowNull: true },
     // Kis user ke event se ye entry aayi (jeetne/haarne wala user)
