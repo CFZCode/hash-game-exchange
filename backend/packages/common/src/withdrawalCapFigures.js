@@ -22,6 +22,11 @@ const QueryTypes = Object.freeze({ SELECT: 'SELECT' });
  *   ccdeposit            'Success' (CCPayment crypto)         coinid → coin; `price`
  *   staff_transfers      to_type 'user', a player-funding type  always INR (no currency column)
  *     (transfer / refill / issuance / adjust; the gt / casino settlement rows are not funding)
+ *   owner_direct_ledger  entry_type 'user_deposit' (Super Admin's Direct User Wallet → a direct
+ *                        user)                                 currency (NULL = INR); currency_amount
+ *     The same move writes a 'direct' staff_transfers row on some paths; 'direct' is not in the
+ *     funding list above, so it is counted once, here. Rule (user, 2026-10-17): admin credit,
+ *     approved manual deposit and every gateway are all the player's deposit.
  *
  * WITHDRAWN  money that left, or is held to leave: pending and paid count (else a player could
  *            queue several requests past the cap); rejected / failed-and-refunded do not.
@@ -31,6 +36,7 @@ const QueryTypes = Object.freeze({ SELECT: 'SELECT' });
  *                        ('Failed' with refunded = false still holds the player's money)
  *   pay_out_transactions status 0 (pending) or 1 (paid); 2 = failed and refunded
  *   staff_transfers      from_type 'user', a player-funding type (an agent collecting), INR
+ *   owner_direct_ledger  entry_type 'user_withdraw' (Super Admin took it back), as above
  *
  * Each rail writes exactly one table (gateway settlements never write fiat_deposits, gateway
  * payouts never fiat_withdrawals), so nothing is counted twice. `deposits` and `inr_deposit`
@@ -47,6 +53,9 @@ const CCPAYMENT_COINS = Object.freeze({
 const CC_CASE = `CASE coinid ${Object.entries(CCPAYMENT_COINS).map(([id, c]) => `WHEN ${Number(id)} THEN '${c}'`).join(' ')} END`;
 
 const FUNDING = `('transfer','refill','issuance','adjust')`;
+const DIRECT_CUR = `COALESCE(upper(currency), 'INR')`;
+const directSum = (type) => `(SELECT COALESCE(SUM(COALESCE(currency_amount, amount)), 0) FROM owner_direct_ledger
+        WHERE user_id::text = :uidText AND entry_type = '${type}' AND ${DIRECT_CUR} = :cur)`;
 const NOT_OUT = `('rejected','declined','cancelled','canceled')`;
 
 const DEPOSITED_SQL = `
@@ -65,6 +74,7 @@ const DEPOSITED_SQL = `
         WHERE userid = :uidText AND ${CC_CASE} = :cur AND lower(status) = 'success')
     + (SELECT COALESCE(SUM(amount), 0) FROM staff_transfers
         WHERE :cur = 'INR' AND to_type = 'user' AND to_id = :uid AND transfer_type IN ${FUNDING})
+    + ${directSum('user_deposit')}
     AS total`;
 
 const WITHDRAWN_SQL = `
@@ -80,6 +90,7 @@ const WITHDRAWN_SQL = `
         WHERE user_id = :uid AND upper(currency) = :cur AND status IN (0, 1))
     + (SELECT COALESCE(SUM(amount), 0) FROM staff_transfers
         WHERE :cur = 'INR' AND from_type = 'user' AND from_id = :uid AND transfer_type IN ${FUNDING})
+    + ${directSum('user_withdraw')}
     AS total`;
 
 /**
@@ -154,6 +165,7 @@ const CURRENCIES_SQL = `
     UNION SELECT upper(currency) FROM pay_in_transactions WHERE user_id = :uid AND status = 1
     UNION SELECT ${CC_CASE} FROM ccdeposit WHERE userid = :uidText AND lower(status) = 'success'
     UNION SELECT 'INR' FROM staff_transfers WHERE to_type = 'user' AND to_id = :uid AND transfer_type IN ${FUNDING}
+    UNION SELECT ${DIRECT_CUR} FROM owner_direct_ledger WHERE user_id::text = :uidText AND entry_type IN ('user_deposit', 'user_withdraw')
     UNION SELECT upper(currency) FROM fiat_withdrawals WHERE uid = :uid AND lower(status) NOT IN ${NOT_OUT}
     UNION SELECT upper(coin) FROM withdrawals WHERE uid = :uid AND lower(status) NOT IN ${NOT_OUT}
     UNION SELECT upper(currency) FROM apaywithdrawals WHERE user_id = :uidText AND refunded IS NOT TRUE AND lower(status) NOT IN ${NOT_OUT}
