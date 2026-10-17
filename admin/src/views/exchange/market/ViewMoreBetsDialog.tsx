@@ -135,7 +135,7 @@ const ViewMoreBetsDialog = ({ open, bets, onClose, onReload }: Props) => {
             ))}
           </RadioGroup>
           <h5 className='font-semibold'>
-            Total Soda: <span className='text-success mr-2'>{rows.length}</span> Total Amount:{' '}
+            Total Bets: <span className='text-success mr-2'>{rows.length}</span> Total Amount:{' '}
             <span className={totalAmount < 0 ? 'text-destructive' : 'text-success'}>{currency(totalAmount)}</span>
           </h5>
         </div>

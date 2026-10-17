@@ -16,7 +16,7 @@ import { bucketKeys, GRANULARITIES, type Granularity } from './format'
  * `apiRange` is the same window as half-open ISO instants `[from, to)`.
  */
 
-export type Preset = 'today' | '7d' | '30d' | '90d' | 'mtd' | 'custom'
+export type Preset = 'today' | '7d' | '30d' | '90d' | 'mtd' | 'all' | 'custom'
 
 export const PRESETS: { value: Preset; label: string }[] = [
   { value: 'today', label: 'Today' },
@@ -24,6 +24,7 @@ export const PRESETS: { value: Preset; label: string }[] = [
   { value: '30d', label: 'Last 30 days' },
   { value: '90d', label: 'Last 90 days' },
   { value: 'mtd', label: 'This month' },
+  { value: 'all', label: 'All time' },
   { value: 'custom', label: 'Custom range' }
 ]
 
@@ -54,6 +55,9 @@ function presetRange(preset: Preset, today: string): { from: string; to: string 
       return { from: addDays(today, -89), to: today }
     case 'mtd':
       return { from: `${today.slice(0, 7)}-01`, to: today }
+    case 'all':
+      // The longest window the backend answers (MAX_RANGE_DAYS) — older than the site itself.
+      return { from: addDays(today, -(MAX_RANGE_DAYS - 1)), to: today }
     default:
       return { from: addDays(today, -29), to: today }
   }

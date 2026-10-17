@@ -4,7 +4,7 @@ import { useState, type FormEvent } from 'react'
 
 import { toast } from 'sonner'
 
-import ChannelTabs, { type Channel } from '@/components/shared/ChannelTabs'
+import type { Channel } from '@/components/shared/ChannelTabs'
 import PageHeader from '@/components/shared/PageHeader'
 import { DateRangePicker } from '@/components/ui/date-picker'
 import { api, errorMessage } from '@/lib/api/client'
@@ -135,11 +135,11 @@ const UserWinLossReport = ({ channel }: { channel: Channel }) => {
   )
 }
 
-/** Upar Direct Users | Agent Users tab — dono ka report alag (API ko `channel`). */
+/** Agent Management: sirf Agent Users (`channel=agent`) — direct users ka tab yahan nahi. */
 const UserWinLoss = () => (
   <div>
     <PageHeader title='User Win Loss' />
-    <ChannelTabs>{channel => <UserWinLossReport channel={channel} />}</ChannelTabs>
+    <UserWinLossReport channel='agent' />
   </div>
 )
 

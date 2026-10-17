@@ -39,7 +39,8 @@ const bounded = (schema) =>
     if (span > MAX_SPAN_DAYS * DAY_MS) {
       ctx.addIssue({ code: 'custom', path: ['from'], message: `A window may span at most ${MAX_SPAN_DAYS} days` });
     }
-    if ((q.granularity ?? 'day') === 'day' && span > MAX_DAILY_SPAN_DAYS * DAY_MS) {
+    // Only bucketed routes (series) carry a granularity; `top` has none, so it is not capped by day.
+    if (q.granularity === 'day' && span > MAX_DAILY_SPAN_DAYS * DAY_MS) {
       ctx.addIssue({
         code: 'custom',
         path: ['granularity'],
