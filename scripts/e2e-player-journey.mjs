@@ -229,12 +229,13 @@ try {
   if (created.betIds.length) {
     const ids = created.betIds.join(',')
     sql(`update mssports."SportsBet" set result_status='void' where id in (${ids})`)
-    for (let i = 0; i < 12; i += 1) {
-      const left = sql(`select count(*) from mssports.sports_wager_sync where bet_id in (${ids}) and reversed_at is null`)
+    // sports-service's wager-report sync reverses voided bets (every SPORTS_WAGER_SYNC_INTERVAL_MS, 60 s).
+    const refs = created.betIds.map((id) => `'${id}'`).join(',')
+    for (let i = 0; i < 24; i += 1) {
+      const left = sql(`select count(*) from wager_activity where source='sports' and ref in (${refs}) and reversed_at is null`)
       if (left === '0') break
       await sleep(5000)
     }
-    sql(`delete from mssports.sports_wager_sync where bet_id in (${ids})`)
     sql(`delete from mssports."SportsBet" where id in (${ids})`)
     console.log(`cleanup: sports bets ${ids} voided (wager reversed by the sync) and deleted`)
   }

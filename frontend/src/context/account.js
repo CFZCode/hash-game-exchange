@@ -66,11 +66,11 @@ export const ACCOUNT_DEFAULTS = {
     currencyFullName: false,
     /* The pair that decides whether an amount prints in its own currency or converts. See
        `printCurrency` in index-BsFv7ByC.js: `target = enableLocaleCurrency ?
-       setting.localeCurrencyName : currencyName`. It is off here, which is why the bet feed
-       shows raw token amounts rather than the `-$6.00` a visitor with it on would see. */
+       setting.localeCurrencyName : currencyName`. ON by default with USD (user's request,
+       2026-10-18: "View in currency" opens on USD, matching the USDT default coin, not "None"). */
     localeCurrencyName: 'USDFIAT',
-    enableLocaleCurrency: false,
-    currencyName: 'BTC',
+    enableLocaleCurrency: true,
+    currencyName: 'USDT', // the owner's default coin (owner panel default_currency) until the player picks one
     currencyBonusType: '',
     hideSmallCurrency: false,
     lastFiatCurrency: '',

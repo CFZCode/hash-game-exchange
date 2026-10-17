@@ -1,13 +1,11 @@
 import { CHAT_AVAILABLE } from '../../../../services/availability';
 import React from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useSession } from '../../../../context/session';
 import { useGates } from '../../../../context/gates';
 import { siteName, useSiteMark } from '../../../../services/siteBranding';
 import useResource from '../../../../hooks/useResource';
 import useMediaQuery from '../../../../hooks/useMediaQuery';
-import useLiveExposure from '../../../../hooks/useLiveExposure';
-import { useSelectedCurrency } from '../../../../hooks/useSelectedCurrency';
 import { getRewards } from '../../../../services/rewards';
 import { printCurrency } from '../../../../utils/currency';
 import { coinIcon } from '../../../../utils/coinArt';
@@ -239,21 +237,6 @@ function Wallet({ mobile = false }) {
      "0 BCD" for a moment on every cold load. Until a real row lands, draw a placeholder. */
   const walletLoading = !current || current.currencyName === 'BCD';
 
-  /* ON THE SPORTS PAGES the pill also carries the open exposure, under the balance — this
-     build's addition (the exchange needs it in view while betting; bc.game has no exchange).
-     Inside the pill rather than beside it so the phone header keeps its width. The figure is
-     INR from mssports and is printed in the player's selected currency like every other amount. */
-  const { pathname } = useLocation();
-  const onSports = pathname === '/sports' || pathname.startsWith('/sports/');
-  const exposure = useLiveExposure(onSports);
-  const cur = useSelectedCurrency();
-  const exposureText =
-    exposure === null
-      ? '—'
-      : `${exposure > 0 ? '−' : ''}${
-          cur.canConvert('INRFIAT') ? cur.show(exposure, 'INRFIAT') : printCurrency(exposure, 'INRFIAT')
-        }`;
-
   return (
     /* The dropdown is a SIBLING of the pill rather than a child of it, and that is a React
        constraint rather than a preference: it portals itself to <body>, but a portal still
@@ -291,16 +274,6 @@ function Wallet({ mobile = false }) {
           <div className="flex w-0 flex-auto items-center truncate font-extrabold">
             {walletLoading ? (
               <span className="h-4 w-20 animate-pulse rounded bg-layer5" aria-label="Loading balance" />
-            ) : onSports ? (
-              <span className="flex min-w-0 flex-col leading-4">
-                <span className="truncate">{amount}</span>
-                <span
-                  className={`truncate text-xs font-semibold ${exposure > 0 ? 'text-error' : 'text-tertiary'}`}
-                  title="Exposure"
-                >
-                  Exp {exposureText}
-                </span>
-              </span>
             ) : (
               <span>{amount}</span>
             )}
