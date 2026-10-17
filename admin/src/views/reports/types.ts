@@ -72,21 +72,11 @@ export type Statement = {
   [k: string]: unknown
 }
 
-export type UserRisk = {
-  currency: string
-  user: Record<string, unknown> & { id: string; name: string; email: string | null; staffId: string | null; staffName: string | null; lastIp: string | null; lastLoginAt: string | null; twoFaEnabled: boolean }
-  locks: Record<string, boolean>
-  financials: { totalDeposit: string; totalWithdrawal: string; net: string }
-  activity: { distinctIpCount: number; distinctIps: string[]; ipBreakdown: Record<string, unknown>[]; recentLogins: Record<string, unknown>[]; recentBets: Record<string, unknown>[] }
-  riskFlags: Record<string, boolean>
-}
-
 export type Exposure = { total: number; rows: Record<string, unknown>[] }
 
 export const STATEMENT_CATEGORIES = ['all', 'money', 'sports', 'casino'] as const
 export const STATEMENT_CATEGORY_LABEL: Record<(typeof STATEMENT_CATEGORIES)[number], string> = { all: 'All activity', money: 'Money', sports: 'Sports', casino: 'Casino' }
 export const ACCOUNT_TYPES = ['user', 'staff'] as const
-export const LOCK_KINDS = ['system', 'casino', 'sports'] as const
 
 export const isoDay = (d: Date) => d.toISOString().slice(0, 10)
 

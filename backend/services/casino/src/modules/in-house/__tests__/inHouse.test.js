@@ -731,6 +731,20 @@ test('the engine against a database', async (t) => {
     assert.equal(await balanceOf(), '10.00000000');
   });
 
+  await t.test('a casino-locked player is refused and moves nothing', async () => {
+    await setBalance('100');
+    await models.Users.update({ casino_locked: true }, { where: { id: player } });
+    try {
+      await assert.rejects(
+        () => engine.placeBet({ userId: player, game: 'limbo', coin: 'INR', amount: '10' }),
+        (err) => err.code === 'INHOUSE_CASINO_LOCKED'
+      );
+      assert.equal(await balanceOf(), '100.00000000');
+    } finally {
+      await models.Users.update({ casino_locked: false }, { where: { id: player } });
+    }
+  });
+
   await t.test('a currency carrying SQL is refused', async () => {
     // Legacy interpolated `_.lowerCase(coin)` into
     // `UPDATE credits SET ${coin} = ${coin} - $2`.

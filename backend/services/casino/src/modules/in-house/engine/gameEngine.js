@@ -108,6 +108,10 @@ class GameEngine {
     // must be in it before a stake is taken. 403 NOT_ENTITLED, nothing debited.
     await assertInHouseEntitled(game);
 
+    // The admin's Casino lock / Account lock (Risk management) stops in-house play too, as it does provider games.
+    const locks = await this.models.Users.findOne({ where: { id: userId }, attributes: ['casino_locked', 'system_locked'], raw: true });
+    if (locks?.casino_locked || locks?.system_locked) throw errors.CASINO_LOCKED({ userId });
+
     const decimal = money.toDecimalString(stake);
 
     const opened = await this.db.transaction(async (transaction) => {

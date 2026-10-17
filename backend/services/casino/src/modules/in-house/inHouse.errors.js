@@ -28,6 +28,8 @@ module.exports = defineErrors('INHOUSE', {
     message: 'Your balance is not enough',
   },
 
+  CASINO_LOCKED: { status: 403, message: 'Casino play is locked on this account' },
+
   BET_NOT_FOUND: { status: 404, message: 'No such bet' },
 
   ALREADY_SETTLED: {
