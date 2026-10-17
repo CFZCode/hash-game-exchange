@@ -333,6 +333,23 @@ const PLATFORM_EVENTS = Object.freeze({
    */
   CURRENCIES_UPDATED: 'currenciesUpdated',
   /**
+   * The signed-in player's own account changed — an operator locked or
+   * unlocked it (system / casino / sports / withdrawal) or changed its status.
+   * Pushed to `user:<id>` only, `{ reason: 'account' }`; the client re-reads
+   * `/user/auth/me` and its capabilities. The source is the `account_changed`
+   * database notification (migration 113), so it fires whichever service made
+   * the change.
+   */
+  ACCOUNT_UPDATED: 'accountUpdated',
+  /**
+   * The whole client state in one read — the player's record and capabilities, balances and
+   * preferences (signed in), plus the site's flags, features and coin list. The Parker567 client
+   * asks every 2 s over its one socket instead of polling six HTTP routes. PUBLIC: a signed-out
+   * visitor gets the site half. The name is opaque and the reply is scrambled
+   * (`services/user/src/modules/sync/`) so the frames are not readable at a glance.
+   */
+  SYNC_STATE: '3b84d3951808e13e1b8c65a67d6b7235',
+  /**
    * Load the site's public config over the socket — the flags and the
    * feature list together, as `{ flags, features }` on the ack.
    *

@@ -1,5 +1,6 @@
 import { io } from 'socket.io-client';
-import { API_BASE, request } from '../client';
+import { request } from '../client';
+import { SOCKET_BASE } from '../realtime';
 
 /**
  * ─── Sports balance push (mssports socket) ───────────────────────────────────────────────
@@ -29,7 +30,7 @@ export const SPORTS_SOCKET_PATH = '/ws/sports/socket.io';
  * @returns {() => void} disconnect
  */
 export function connectBalanceSocket({ token, userId, onBalance, onStatus }) {
-  const socket = io(API_BASE || undefined, {
+  const socket = io(SOCKET_BASE || undefined, {
     path: SPORTS_SOCKET_PATH,
     transports: ['websocket'],
     auth: { token },
