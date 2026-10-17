@@ -33,9 +33,9 @@ import { check, cleanErrors, firstError } from '@/lib/validate'
  * URLs, CORS, worker intervals. Those say where the software runs, which is a
  * deployment's business, not an operator's.
  *
- * Each row shows where its value comes from. `Deployment` means nothing is
- * stored and the service is reading the environment variable named beside it;
- * saving makes it yours, and `Use deployment value` hands it back.
+ * A row with nothing stored runs on the default; saving sets it, and `Reset to
+ * default` hands it back. Cashier limits are the owner's, per currency
+ * (owner panel → Cashier), and only shown here.
  */
 
 type Setting = {
@@ -58,22 +58,9 @@ const GROUPS: { title: string; hint: string; keys: string[] }[] = [
     keys: ['casino_house_edge', 'casino_min_bet', 'casino_max_bet', 'casino_seed_rotate_after']
   },
   {
-    title: 'Sportsbook',
-    hint: 'Stake and payout limits per betslip, how far the odds may drift between the board and the bet, and the day boundary.',
-    keys: [
-      'sports_min_stake',
-      'sports_max_stake',
-      'sports_max_selections',
-      'sports_max_payout',
-      'sports_odds_tolerance',
-      'sports_timezone',
-      'race_timezone'
-    ]
-  },
-  {
-    title: 'Cashier',
-    hint: 'Deposit and withdrawal limits, and the amount below which a withdrawal needs no human.',
-    keys: ['deposit_minimum', 'deposit_maximum', 'withdraw_maximum', 'withdrawal_auto_approve_limit']
+    title: 'Races',
+    hint: 'When the weekly race leaderboard resets.',
+    keys: ['race_timezone']
   },
   {
     title: 'User accounts',
@@ -103,7 +90,7 @@ const OperatorSettings = () => {
   const header = (
     <PageHeader
       title='Limits and policy'
-      description='The numbers this site runs on. Each one used to be an environment variable; changing one is now a save, not a deploy.'
+      description='The numbers this site runs on. Cashier limits are set by the owner and shown here read-only.'
     />
   )
 
@@ -147,11 +134,7 @@ const OperatorSettings = () => {
       found[key] = check.number(String(v), s.label, { min: s.min ?? 0, max: s.max, integer: s.kind === 'number' })
     }
 
-    const pairs: [string, string][] = [
-      ['casino_min_bet', 'casino_max_bet'],
-      ['sports_min_stake', 'sports_max_stake'],
-      ['deposit_minimum', 'deposit_maximum']
-    ]
+    const pairs: [string, string][] = [['casino_min_bet', 'casino_max_bet']]
 
     for (const [lo, hi] of pairs) {
       if (!(lo in draft) && !(hi in draft)) continue
@@ -268,26 +251,13 @@ const OperatorSettings = () => {
                   <div key={key} className='flex flex-wrap items-center justify-between gap-3 border-b pb-3 last:border-0 last:pb-0'>
                     <div className='min-w-56'>
                       <span className='block text-sm font-medium'>{s.label}</span>
-                      <span className='text-muted-foreground font-mono text-[11px]'>{s.env}</span>
                     </div>
                     <div className='flex items-center gap-2'>
                       {field(s)}
-                      {s.source === 'operator' ? (
-                        <>
-                          <Badge variant='outline'>yours</Badge>
-                          {canWrite && (
-                            <Button
-                              size='sm'
-                              variant='ghost'
-                              onClick={() => setDraft(d => ({ ...d, [s.key]: null }))}
-                              title={`Fall back to ${s.env}`}
-                            >
-                              Use deployment value
-                            </Button>
-                          )}
-                        </>
-                      ) : (
-                        <Badge variant='secondary'>deployment</Badge>
+                      {s.source === 'operator' && canWrite && (
+                        <Button size='sm' variant='ghost' onClick={() => setDraft(d => ({ ...d, [s.key]: null }))} title='Back to the default value'>
+                          Reset to default
+                        </Button>
                       )}
                     </div>
                   </div>
@@ -296,8 +266,66 @@ const OperatorSettings = () => {
             </CardContent>
           </Card>
         ))}
+        <CashierLimitsCard />
       </div>
     </div>
+  )
+}
+
+type CashierRow = { code: string; name: string | null; depositMin: string | null; depositMax: string | null; withdrawMin: string | null; withdrawMax: string | null }
+
+/** The owner's per-currency cashier limits — read-only here; set in the owner panel (Features & plan → Cashier). */
+const CashierLimitsCard = () => {
+  const q = useApi<{ currencies: CashierRow[] }>('admin/site-config/cashier-limits')
+  const rows = q.data?.currencies ?? []
+  const cell = (v: string | null) => (v === null ? <span className='text-muted-foreground'>No limit</span> : <span className='tabular-nums'>{Number(v).toLocaleString('en-IN')}</span>)
+
+  return (
+    <Card className='shadow-none'>
+      <CardHeader>
+        <CardTitle className='flex items-center gap-2 text-base'>
+          Cashier <Badge variant='outline' className='font-normal'>Set in the owner panel</Badge>
+        </CardTitle>
+        <CardDescription>Deposit and withdrawal limits for each currency, in that currency.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {q.error ? (
+          <ErrorState error={q.error} />
+        ) : q.isLoading ? (
+          <Loader2Icon className='text-muted-foreground animate-spin' />
+        ) : rows.length === 0 ? (
+          <p className='text-muted-foreground text-sm'>No currencies are switched on.</p>
+        ) : (
+          <div className='overflow-x-auto'>
+            <table className='w-full text-sm'>
+              <thead>
+                <tr className='text-muted-foreground border-b text-left text-xs'>
+                  <th className='py-2 pr-4 font-medium'>Currency</th>
+                  <th className='px-3 py-2 text-right font-medium'>Min deposit</th>
+                  <th className='px-3 py-2 text-right font-medium'>Max deposit</th>
+                  <th className='px-3 py-2 text-right font-medium'>Min withdrawal</th>
+                  <th className='px-3 py-2 text-right font-medium'>Max withdrawal</th>
+                </tr>
+              </thead>
+              <tbody className='divide-y'>
+                {rows.map(r => (
+                  <tr key={r.code}>
+                    <td className='py-2.5 pr-4'>
+                      <span className='font-mono font-semibold'>{r.code}</span>
+                      {r.name && <span className='text-muted-foreground ml-2 text-xs'>{r.name}</span>}
+                    </td>
+                    <td className='px-3 py-2.5 text-right'>{cell(r.depositMin)}</td>
+                    <td className='px-3 py-2.5 text-right'>{cell(r.depositMax)}</td>
+                    <td className='px-3 py-2.5 text-right'>{cell(r.withdrawMin)}</td>
+                    <td className='px-3 py-2.5 text-right'>{cell(r.withdrawMax)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 

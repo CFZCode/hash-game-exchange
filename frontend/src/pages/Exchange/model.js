@@ -199,3 +199,39 @@ export function statementRangeError(from, to) {
   if (days > MAX_STATEMENT_DAYS) return `The range can be at most ${MAX_STATEMENT_DAYS} days.`;
   return null;
 }
+
+/* ── Racing (Horse Racing 10, Greyhound Racing 65) ─────────────────────────────────────────
+   The tree lists their races flat in `racing` (t2): `{ gmid, etid, name: "Venue (CC)",
+   sdatetime }`. Shaped here into sport → country → race, the same nesting the sidebar draws for
+   every other sport, with each race named "Venue · HH:MM" and the venue/time kept for the board. */
+export const RACING_SIDS = new Set([10, 65]);
+
+const COUNTRY_NAMES = {
+  AU: 'Australia', GB: 'United Kingdom', UK: 'United Kingdom', IE: 'Ireland', IN: 'India', FR: 'France',
+  US: 'United States', NZ: 'New Zealand', ZA: 'South Africa', JP: 'Japan', HK: 'Hong Kong', SG: 'Singapore',
+};
+const pad2 = (n) => String(n).padStart(2, '0');
+
+export function racingSports(racing) {
+  return (Array.isArray(racing) ? racing : [])
+    .filter((s) => s?.etid != null && Array.isArray(s.children) && s.children.length > 0)
+    .map((sport) => {
+      const byCode = new Map();
+      for (const r of sport.children) {
+        if (r?.gmid == null) continue;
+        const raw = String(r.name ?? '');
+        const code = raw.match(/\(([A-Z]{2,3})\)\s*$/)?.[1] ?? '';
+        const venue = raw.replace(/\s*\([A-Z]{2,3}\)\s*$/, '').trim() || raw;
+        const at = parseFeedTime(r.sdatetime);
+        const time = at ? `${pad2(at.getHours())}:${pad2(at.getMinutes())}` : '';
+        if (!byCode.has(code)) byCode.set(code, []);
+        byCode.get(code).push({ gmid: String(r.gmid), etid: Number(r.etid ?? sport.etid), venue, time, ts: at ? at.getTime() : Infinity, name: time ? `${venue} · ${time}` : venue });
+      }
+      const children = [...byCode].map(([code, races]) => ({
+        cid: `race-${sport.etid}-${code || 'all'}`,
+        name: COUNTRY_NAMES[code] ?? (code || 'Other'),
+        children: races.sort((a, b) => a.ts - b.ts || a.venue.localeCompare(b.venue)),
+      }));
+      return { etid: Number(sport.etid), name: sport.name, children };
+    });
+}

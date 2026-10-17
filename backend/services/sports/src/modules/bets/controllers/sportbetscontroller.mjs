@@ -1,5 +1,6 @@
 // sportsbet/sportbetscontroller.js — mssports core, moved unchanged
 import { db_default, init_db } from "../../../lib/config/db.mjs";
+import { isHiddenSport, isHiddenLeague } from "../../../lib/constants/hiddenSports.mjs";
 import { TotalExposure_default, init_TotalExposure } from "../../../models/user/TotalExposure.mjs";
 import { User_default } from "../../../models/user/User.mjs";
 import { Staff_default } from "../../../models/admin/Staff.mjs";
@@ -575,6 +576,11 @@ var placeBet = async (req, res, opts) => {
     } catch (leagueErr) {
       console.warn("[PlaceBet] league resolve failed:", leagueErr.message);
       effectiveLeagueName = league_name ? String(league_name).slice(0, 255) : null;
+    }
+    // Not offered on this site (lib/constants/hiddenSports.mjs) — whatever the client sent.
+    if (isHiddenSport(sid) || isHiddenLeague(null, effectiveLeagueName)) {
+      if (!externalTx) await transaction.rollback();
+      return res.status(400).json({ success: false, error: "This market is not available" });
     }
     const hierarchyAllowed = await BetLockService_default.isBettingAllowed(user_id, { transaction });
     if (!hierarchyAllowed) {

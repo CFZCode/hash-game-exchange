@@ -237,8 +237,7 @@ const MaxOdds = () => {
             and T20&quot;.
           </p>
           <p className='text-muted-foreground text-xs'>
-            Cricket&apos;s <b>E-Cricket (Dim), T10 XI, T5 XI</b> and <b>Virtual Cricket League</b> (and Wrestling&apos;s <b>WWE Virtual</b>)
-            have their own rows under the sport. <b>Inherit</b> follows the sport&apos;s limit; <b>Own</b> sets a separate one for that
+            Wrestling&apos;s <b>WWE Virtual</b> has its own row under the sport. <b>Inherit</b> follows the sport&apos;s limit; <b>Own</b> sets a separate one for that
             league (0 = no limit there).
           </p>
 

@@ -356,9 +356,8 @@ const BufferTime = () => {
           </p>
           <p className='text-muted-foreground text-xs'>
             <b>Match Odds</b> means only the market actually named Match Odds — Over/Under, Correct Score, Match Result and Inning
-            EvenOdd sit under <b>Other Main Markets</b>. Cricket&apos;s <b>E-Cricket (Dim), T10 XI, T5 XI</b> and{' '}
-            <b>Virtual Cricket League</b> have their own tabs: leave a cell on <b>Inherit</b> to follow the main sport, or pick
-            <b> Own</b> to give that league its own buffer.
+            EvenOdd sit under <b>Other Main Markets</b>. A league with its own tab (Wrestling&apos;s <b>WWE Virtual</b>) can
+            stay on <b>Inherit</b> to follow the main sport, or pick <b>Own</b> to give that league its own buffer.
           </p>
 
           <div className='flex flex-wrap items-center gap-3'>

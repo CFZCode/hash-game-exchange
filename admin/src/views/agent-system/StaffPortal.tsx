@@ -183,7 +183,7 @@ const StaffPortal = () => {
         </Section>
       </div>
 
-      <Section icon={<LockIcon />} tone='bg-warning/10 text-warning' title='Close Sports / Casino for a User' subtitle='Block sportsbook or casino for an individual ID in your hierarchy'>
+      <Section icon={<LockIcon />} tone='bg-warning/10 text-warning' title='Close Sports / Casino for a User' subtitle='Block sports or casino for an individual ID in your hierarchy'>
         <Field label='User UID'>
           <Input inputMode='numeric' value={lk.userId} onChange={e => setLk({ ...lk, userId: e.target.value })} />
         </Field>

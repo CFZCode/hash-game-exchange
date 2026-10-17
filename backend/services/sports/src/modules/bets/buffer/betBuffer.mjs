@@ -5,6 +5,7 @@ import { placeBet } from "../controllers/sportbetscontroller.mjs";
 import { isLineMarket } from "../../../lib/helper/lineMarket.mjs";
 import { isBadloBet } from "../../../lib/helper/badloMarket.mjs";
 import { leagueNameForBet } from "../../../lib/services/SportsLeagueResolver.mjs";
+import { isHiddenSport, isHiddenLeague } from "../../../lib/constants/hiddenSports.mjs";
 import { isLaySide, readBufferTick, finalSuspensionStatus, fancyOddsDrift, deriveBufferFlags, manualBetLiveCheck, autoBetCheck } from "./betBufferRules.mjs";
 import { liveOdds_default } from "./liveOdds.mjs";
 import { cleanRef, betInflight_default } from "./betInflight.mjs";
@@ -190,6 +191,10 @@ function applyDecision(body, d) {
   }
 }
 var placeBetBuffered = async (req, res) => {
+  // Sports / leagues this site does not offer (Politics, E Games, Virtual Cricket) are refused outright.
+  if (isHiddenSport(req.body?.sid) || isHiddenLeague(null, req.body?.league_name)) {
+    return res.status(400).json({ success: false, error: "This market is not available" });
+  }
   let sb = req.body?.server_buffer;
   if (req.body) delete req.body.server_buffer;
   if (isLineMarket(req.body?.market_type)) {

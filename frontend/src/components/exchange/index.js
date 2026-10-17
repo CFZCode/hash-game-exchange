@@ -14,6 +14,7 @@ export { default as StakeButtonsModal } from './StakeButtonsModal';
 export { default as SportTabs } from './SportTabs';
 export { default as MatchRow } from './MatchRow';
 export { default as InPlayList } from './InPlayList';
+export { default as RaceBoard } from './RaceBoard';
 export { default as LatestEventsStrip } from './LatestEventsStrip';
 export { default as MatchHeader } from './MatchHeader';
 export { default as MarketFilterTabs } from './MarketFilterTabs';

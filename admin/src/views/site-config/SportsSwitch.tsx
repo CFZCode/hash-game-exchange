@@ -21,7 +21,7 @@ const SportsSwitch = () => {
   const set = useApiMutation({
     fn: (enabled: boolean) => api.put('admin/site-config/sports', { enabled }),
     invalidate: [['api', 'admin/site-config/sports'], ['api', 'admin/site-config/global']],
-    success: (_r, enabled) => (enabled ? 'Sportsbook is ON' : 'Sportsbook is OFF — bet placement refused'),
+    success: (_r, enabled) => (enabled ? 'Sports is ON' : 'Sports is OFF — bet placement refused'),
     onSuccess: () => refreshFlags()
   })
 
@@ -29,12 +29,12 @@ const SportsSwitch = () => {
 
   return (
     <div>
-      <PageHeader title='Sports kill switch' description='One flag, read by sports-service on every bet. Off refuses new bets everywhere and hides the sportsbook; settlement of open bets continues.' />
+      <PageHeader title='Sports kill switch' description='One flag, read by sports-service on every bet. Off refuses new bets everywhere and hides sports; settlement of open bets continues.' />
       {q.error && <ErrorState error={q.error} />}
       <Card className='max-w-xl shadow-none'>
         <CardHeader>
           <CardTitle className='flex items-center gap-3 text-base'>
-            Sportsbook <StatusBadge value={q.isLoading ? undefined : on ? 'enabled' : 'disabled'} />
+            Sports <StatusBadge value={q.isLoading ? undefined : on ? 'enabled' : 'disabled'} />
           </CardTitle>
           <CardDescription>Has its own audit line, separate from the feature-flag screen.</CardDescription>
         </CardHeader>
@@ -42,7 +42,7 @@ const SportsSwitch = () => {
           {on ? (
             <ConfirmDialog
               trigger={<Button variant='destructive' disabled={!can('config:write')}>Turn sports OFF</Button>}
-              title='Turn the sportsbook off?'
+              title='Turn sports off?'
               description='Users will not be able to place any sports bet until it is turned back on.'
               confirmLabel='Turn off'
               destructive

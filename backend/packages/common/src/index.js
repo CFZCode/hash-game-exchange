@@ -68,6 +68,8 @@ const featureOptions = require('./featureOptions');
 const regionPolicy = require('./regionPolicy');
 /** Withdrawal cap: the owner's deposit-cap switch of `withdrawal_requirements` (withdrawalCap.js). */
 const withdrawalCap = require('./withdrawalCap');
+/** Cashier limits per currency: the owner's `cashierLimits` block (cashierLimits.js). */
+const cashierLimits = require('./cashierLimits');
 /** Deposit cap figures (deposited / withdrawn / wagered) — user-service cap + admin Users → Financial. */
 const withdrawalCapFigures = require('./withdrawalCapFigures');
 const currencyRegistry = require('./currencyRegistry');
@@ -124,6 +126,7 @@ module.exports = {
   regionPolicy,
   withdrawalCap,
   withdrawalCapFigures,
+  cashierLimits,
   configureEntitlements: entitlements.configureEntitlements,
   currencyRegistry,
   configureCurrencyRegistry: currencyRegistry.configureCurrencyRegistry,

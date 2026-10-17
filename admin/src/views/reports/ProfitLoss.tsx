@@ -700,8 +700,7 @@ const ProfitLossView = ({ channel }: { channel: Channel }) => {
             <li>
               <strong className='text-foreground'>GGR (gross gaming revenue)</strong> is what players staked minus what they won back: the
               house&apos;s share of the play. Casino GGR covers our in-house originals, Slotegrator and jsGames (bot and test rounds are left out;
-              refunded rounds are not stakes). Sports GGR is the house side of the sportsbook settlement ledger, plus the partner sportsbook&apos;s
-              stakes minus wins. These are the same figures as the Dashboard.
+              refunded rounds are not stakes). Sports GGR is the house side of the sports settlement ledger. These are the same figures as the Dashboard.
             </li>
             <li>
               <strong className='text-foreground'>Player costs</strong> are rewards actually credited to players&apos; wallets: rakeback claimed,

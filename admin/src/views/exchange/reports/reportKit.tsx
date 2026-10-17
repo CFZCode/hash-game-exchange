@@ -25,11 +25,11 @@ import { cn } from '@/lib/utils'
 export const SPORTS_LIST: [string, string][] = [
   ['1', 'Football'], ['2', 'Tennis'], ['3', 'Mixed Martial Arts'], ['4', 'Cricket'],
   ['5', 'Golf'], ['6', 'Boxing'], ['7', 'Beach Volleyball'], ['8', 'Table Tennis'],
-  ['9', 'Futsal'], ['10', 'Horse Racing'], ['11', 'E Games'], ['15', 'Basketball'],
+  ['9', 'Futsal'], ['10', 'Horse Racing'], ['15', 'Basketball'],
   ['16', 'MotoGP'], ['17', 'Chess'], ['18', 'Volleyball'], ['19', 'Ice Hockey'],
   ['22', 'Badminton'], ['25', 'Hockey'], ['29', 'Cycling'], ['32', 'Motorbikes'],
   ['33', 'Athletics'], ['35', 'Basketball 3X3'], ['37', 'Sumo'], ['38', 'Virtual sports'],
-  ['39', 'Handball'], ['40', 'Politics'], ['52', 'Motor Sports'], ['53', 'Baseball'],
+  ['39', 'Handball'], ['52', 'Motor Sports'], ['53', 'Baseball'],
   ['54', 'Rugby Union'], ['55', 'Rugby League'], ['57', 'Darts'], ['58', 'American Football'],
   ['59', 'Snooker'], ['62', 'Soccer'], ['64', 'Esports'], ['65', 'Greyhound Racing'],
   ['66', 'Kabaddi'], ['67', 'Boat Racing'], ['68', 'Esoccer'], ['69', 'Wrestling']

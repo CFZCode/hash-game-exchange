@@ -1,6 +1,7 @@
 // constants/sportsList.js — mssports core, moved unchanged
+import { isHiddenSport } from "./hiddenSports.mjs";
 
-var SPORTS_LIST = [
+var ALL_SPORTS = [
   ["1", "Football"],
   ["2", "Tennis"],
   ["3", "Mixed Martial Arts"],
@@ -42,8 +43,11 @@ var SPORTS_LIST = [
   ["68", "Esoccer"],
   ["69", "Wrestling"]
 ];
+// Settings and pickers list only the sports this site offers; names of the hidden ones stay
+// resolvable for old bets and reports.
+var SPORTS_LIST = ALL_SPORTS.filter(([sid]) => !isHiddenSport(sid));
 var sportNameById = (id) => {
-  const hit = SPORTS_LIST.find(([sid]) => String(sid) === String(id));
+  const hit = ALL_SPORTS.find(([sid]) => String(sid) === String(id));
   return hit ? hit[1] : `Sport ${id}`;
 };
 

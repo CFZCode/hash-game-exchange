@@ -14,6 +14,7 @@ import { assetExists } from './brandingAssets'
 import { cleanCoin, coinProblem, diffCoins, droppedCoins } from './coins'
 import { cleanRegion, regionProblem, type RegionSetting } from './region'
 import { cleanWithdrawalCap, withdrawalCapProblem, type WithdrawalCap } from './withdrawalCap'
+import { cashierLimitsProblem, cleanCashierLimits, type CashierLimits } from './cashierLimits'
 import { diffDocs, type AuditEntry, type Change, type CoinDefinition, type EditableDoc, type EntitlementsDoc, type VariantsSeed } from './types'
 
 /**
@@ -162,6 +163,9 @@ export async function readEntitlements(): Promise<EntitlementsDoc> {
     // Withdrawal requirements' deposit cap; absent = off (KYC / wagering are the policy's variant).
     ...(stored.withdrawalCap !== undefined ? { withdrawalCap: cleanWithdrawalCap(stored.withdrawalCap) } : {}),
 
+    // Cashier limits per currency; absent = no owner limits.
+    ...(stored.cashierLimits !== undefined ? { cashierLimits: cleanCashierLimits(stored.cashierLimits) } : {}),
+
     // Site name, metadata and logo files (./branding); absent = not branded, the site keeps its own.
     ...(stored.branding !== undefined ? { branding: cleanBranding(stored.branding) } : {})
   }
@@ -213,9 +217,10 @@ export async function readForEdit(): Promise<EditableDoc> {
   const options = resolveOptions(doc.options)
   const region = cleanRegion(doc.region)
   const withdrawalCap = cleanWithdrawalCap(doc.withdrawalCap)
+  const cashierLimits = cleanCashierLimits(doc.cashierLimits)
   const branding = cleanBranding(doc.branding)
 
-  if (FEATURE_KEYS.every(key => key in stored)) return { ...doc, variants: { ...stored }, options, region, withdrawalCap, branding, seededFrom: null }
+  if (FEATURE_KEYS.every(key => key in stored)) return { ...doc, variants: { ...stored }, options, region, withdrawalCap, cashierLimits, branding, seededFrom: null }
 
   const live = await liveVariants()
   const template = templateByKey(doc.template)
@@ -239,7 +244,7 @@ export async function readForEdit(): Promise<EditableDoc> {
     }
   }
 
-  return { ...doc, features: normalise(features, variants), variants, options, region, withdrawalCap, branding, seededFrom }
+  return { ...doc, features: normalise(features, variants), variants, options, region, withdrawalCap, cashierLimits, branding, seededFrom }
 }
 
 // One save at a time inside this process; the version check guards against a stale screen.
@@ -256,6 +261,7 @@ export function saveEntitlements(
     options?: Record<string, Record<string, boolean>>
     region?: RegionSetting
     withdrawalCap?: WithdrawalCap
+    cashierLimits?: CashierLimits
     branding?: Partial<Branding>
   },
   user: string
@@ -314,6 +320,15 @@ export function saveEntitlements(
 
     const withdrawalCap = input.withdrawalCap !== undefined ? cleanWithdrawalCap(input.withdrawalCap) : current.withdrawalCap
 
+    // Cashier limits per currency: amounts above 0 (8 dp) or empty, min ≤ max, exact.
+    if (input.cashierLimits !== undefined) {
+      const problem = cashierLimitsProblem(input.cashierLimits)
+
+      if (problem) throw new HttpError(422, 'VALIDATION_ERROR', problem)
+    }
+
+    const cashierLimits = input.cashierLimits !== undefined ? cleanCashierLimits(input.cashierLimits) : current.cashierLimits
+
     // Branding: strict (unknown field, bad text, bad colour → 422), and every image it names
     // must be one uploaded here — the document is what vouches for the bytes the site fetches.
     let branding = current.branding
@@ -343,6 +358,7 @@ export function saveEntitlements(
       options,
       region,
       withdrawalCap,
+      cashierLimits,
       branding
     }
 

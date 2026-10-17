@@ -5,6 +5,7 @@ import { CricketService_default } from "../../../lib/services/CricketService.mjs
 import { getStoredMarkets } from "../../../lib/helper/marketListStore.mjs";
 import { ScoreAnimationService_default } from "../services/ScoreAnimationService.mjs";
 import { SportsEventsService_default } from "../services/SportsEventsService.mjs";
+import { isHiddenSport } from "../../../lib/constants/hiddenSports.mjs";
 
 import dotenv5 from "dotenv";
 import axios3 from "axios";
@@ -43,6 +44,9 @@ var CricketController = {
   },
   getSportdetailsById: async (req, res) => {
     const { gmid, sid } = req.body;
+    if (isHiddenSport(sid)) {
+      return res.status(404).json({ success: false, error: "This sport is not available" });
+    }
     if (!sid || !gmid) {
       return res.status(400).json({
         success: false,
@@ -108,6 +112,9 @@ var CricketController = {
   },
   GetMatchPrivateData: async (req, res) => {
     const { gmid, sid } = req.body;
+    if (isHiddenSport(sid)) {
+      return res.status(404).json({ success: false, error: "This sport is not available" });
+    }
     if (!gmid || !sid) {
       return res.status(400).json({
         success: false,
@@ -801,9 +808,12 @@ var CricketController = {
         params: { key: AVRKHUB_SPORTS_KEY2 },
         timeout: 3e4
       });
+      // Sports the site does not offer are left out (lib/constants/hiddenSports.mjs).
+      const latest = result?.data?.data;
+      const rows = Array.isArray(latest?.data) ? latest.data : null;
       return res.status(200).json({
         success: true,
-        data: result?.data?.data
+        data: rows ? { ...latest, data: rows.filter((e) => !isHiddenSport(e?.sportId)) } : latest
       });
     } catch (error) {
       console.error("Error in getLatestEvents:", error);
@@ -816,6 +826,9 @@ var CricketController = {
   // Single event detail from AVRKHUB sports feed (proxied) — gmid & etid required
   getGameDetailPrivate: async (req, res) => {
     const { gmid, etid } = req.query;
+    if (isHiddenSport(etid)) {
+      return res.status(404).json({ success: false, error: "This sport is not available" });
+    }
     if (!gmid || !etid) {
       return res.status(400).json({
         success: false,

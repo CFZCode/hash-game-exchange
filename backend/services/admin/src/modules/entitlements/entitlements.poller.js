@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-const { featureCatalogue, featureOptions, regionPolicy, withdrawalCap } = require('@ibitplay/common');
+const { featureCatalogue, featureOptions, regionPolicy, withdrawalCap, cashierLimits } = require('@ibitplay/common');
 const { cleanBranding } = require('../branding/branding.rules');
 
 /**
@@ -169,6 +169,8 @@ function normalise(data) {
     region: regionPolicy.cleanRegion(data.region),
     // Withdrawal requirements' deposit cap (withdrawalCap.js); KYC / wagering are the policy's variant.
     withdrawalCap: withdrawalCap.cleanWithdrawalCap(data.withdrawalCap),
+    // Deposit / withdrawal min and max per currency (cashierLimits.js); absent = no owner limits.
+    cashierLimits: cashierLimits.cleanCashierLimits(data.cashierLimits),
     // Site name, metadata and logo file references (modules/branding); null = not branded.
     branding: cleanBranding(data.branding),
   };
@@ -300,7 +302,7 @@ function createEntitlementsPoller({ config, logger, filePath, onChange: initialO
 
   /** `{ features, flags, template, variants, version, fetchedAt, source }` — never a secret. */
   function current() {
-    if (!doc) return { features: {}, flags: {}, template: null, variants: null, coins: [], options: {}, region: regionPolicy.cleanRegion(null), withdrawalCap: withdrawalCap.cleanWithdrawalCap(null), branding: null, version: 0, fetchedAt: null, source: 'default' };
+    if (!doc) return { features: {}, flags: {}, template: null, variants: null, coins: [], options: {}, region: regionPolicy.cleanRegion(null), withdrawalCap: withdrawalCap.cleanWithdrawalCap(null), cashierLimits: {}, branding: null, version: 0, fetchedAt: null, source: 'default' };
     return {
       features: { ...doc.features },
       flags: { ...doc.flags },
@@ -310,6 +312,7 @@ function createEntitlementsPoller({ config, logger, filePath, onChange: initialO
       options: JSON.parse(JSON.stringify(doc.options ?? {})),
       region: regionPolicy.cleanRegion(doc.region),
       withdrawalCap: withdrawalCap.cleanWithdrawalCap(doc.withdrawalCap),
+      cashierLimits: cashierLimits.cleanCashierLimits(doc.cashierLimits),
       branding: doc.branding ? JSON.parse(JSON.stringify(doc.branding)) : null,
       version: doc.version,
       fetchedAt,
