@@ -4,11 +4,12 @@ import { useRouter } from 'next/navigation'
 
 import { LockIcon, ReceiptTextIcon, ShieldIcon, TrendingDownIcon, TrendingUpIcon, UsersIcon, WalletIcon } from 'lucide-react'
 
+import useReportMoney from '@/components/shared/ReportMoney'
 import DataTable, { type Column } from '@/components/shared/DataTable'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useApi, useListState, usePagedApi } from '@/hooks/use-api'
-import { Chip, StatCard, StatusChip, UserCell, inr, pnlOf, type Channel, type UserRow, type UsersSummary } from './shared'
+import { Chip, StatCard, StatusChip, UserCell, pnlOf, type Channel, type UserRow, type UsersSummary } from './shared'
 
 type Props = {
   channel: Exclude<Channel, 'all'>
@@ -30,6 +31,7 @@ type Props = {
  * ke cards aur columns nahi dikhte; sirf Direct Users me.
  */
 const UsersTable = ({ channel, title, showStaffColumn, onOpenRisk, onOpenBalanceSheet }: Props) => {
+  const money = useReportMoney()
   const router = useRouter()
   const { state, set, query } = useListState()
   const summary = useApi<UsersSummary>('admin/reports/players/summary', { channel })
@@ -79,9 +81,9 @@ const UsersTable = ({ channel, title, showStaffColumn, onOpenRisk, onOpenBalance
       : []),
     ...(showMoney
       ? [
-          { key: 'dep', header: 'Deposits', cell: (r: UserRow) => <Chip tone='success'>{inr(r.totalDeposited)}</Chip> },
-          { key: 'wd', header: 'Withdrawals', cell: (r: UserRow) => <Chip tone='danger'>{inr(r.totalWithdrawn)}</Chip> },
-          { key: 'pnl', header: 'PNL', cell: (r: UserRow) => <Chip tone={pnlOf(r) >= 0 ? 'success' : 'danger'}>{inr(pnlOf(r))}</Chip> }
+          { key: 'dep', header: 'Deposits', cell: (r: UserRow) => <Chip tone='success'>{money.format(r.totalDeposited)}</Chip> },
+          { key: 'wd', header: 'Withdrawals', cell: (r: UserRow) => <Chip tone='danger'>{money.format(r.totalWithdrawn)}</Chip> },
+          { key: 'pnl', header: 'PNL', cell: (r: UserRow) => <Chip tone={pnlOf(r) >= 0 ? 'success' : 'danger'}>{money.format(pnlOf(r))}</Chip> }
         ]
       : []),
     { key: 'status', header: 'Status', cell: r => <StatusChip row={r} /> }
@@ -94,8 +96,8 @@ const UsersTable = ({ channel, title, showStaffColumn, onOpenRisk, onOpenBalance
         <StatCard label='Active Users' value={(s?.activeUsers ?? 0).toLocaleString('en-IN')} icon={<TrendingUpIcon />} tone='success' loading={summary.isLoading} />
         {showMoney && (
           <>
-            <StatCard label='Total Deposits' value={inr(s?.totalDeposits)} icon={<WalletIcon />} tone='warning' loading={summary.isLoading} />
-            <StatCard label='Total Withdrawals' value={inr(s?.totalWithdrawals)} icon={<TrendingDownIcon />} tone='danger' loading={summary.isLoading} />
+            <StatCard label='Total Deposits' value={money.format(s?.totalDeposits)} icon={<WalletIcon />} tone='warning' loading={summary.isLoading} />
+            <StatCard label='Total Withdrawals' value={money.format(s?.totalWithdrawals)} icon={<TrendingDownIcon />} tone='danger' loading={summary.isLoading} />
           </>
         )}
         <StatCard label='Locked' value={(s?.lockedUsers ?? 0).toLocaleString('en-IN')} icon={<LockIcon />} tone='info' loading={summary.isLoading} />

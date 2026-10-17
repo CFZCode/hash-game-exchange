@@ -6,6 +6,7 @@ import Link from 'next/link'
 
 import { PencilIcon, PinIcon, PinOffIcon, RefreshCwIcon } from 'lucide-react'
 
+import useReportMoney from '@/components/shared/ReportMoney'
 import DataTable, { type Column } from '@/components/shared/DataTable'
 import FormDialog from '@/components/shared/FormDialog'
 import { TextField } from '@/components/shared/FormField'
@@ -17,7 +18,6 @@ import { useSession } from '@/contexts/SessionContext'
 import { useApi, useApiMutation, useInvalidate, useListState, usePagedApi } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
 import { cn } from '@/lib/utils'
-import { inr } from '@/views/players/users/shared'
 
 type Row = {
   id: string
@@ -55,6 +55,7 @@ type Sort = { key: string; order: 'asc' | 'desc' }
  *   PUT admin/turnover-report/:id        one player's TargetX / pin
  */
 const TurnoverReport = () => {
+  const money = useReportMoney()
   const { can } = useSession()
   const canEdit = can('config:write')
   const invalidate = useInvalidate()
@@ -124,8 +125,8 @@ const TurnoverReport = () => {
         </Link>
       )
     },
-    { key: 'dep', header: 'Deposited', align: 'right', sortKey: 'totalDeposit', cell: r => <span className='tabular-nums'>{inr(r.totalDeposit)}</span> },
-    { key: 'wager', header: 'Wagered', align: 'right', sortKey: 'wager', cell: r => <span className='tabular-nums'>{inr(r.wager)}</span> },
+    { key: 'dep', header: 'Deposited', align: 'right', sortKey: 'totalDeposit', cell: r => <span className='tabular-nums'>{money.format(r.totalDeposit)}</span> },
+    { key: 'wager', header: 'Wagered', align: 'right', sortKey: 'wager', cell: r => <span className='tabular-nums'>{money.format(r.wager)}</span> },
     {
       key: 'target',
       header: 'Target',
@@ -133,7 +134,7 @@ const TurnoverReport = () => {
       sortKey: 'target',
       cell: r => (
         <div className='tabular-nums'>
-          <p>{inr(r.target)}</p>
+          <p>{money.format(r.target)}</p>
           <p className='text-muted-foreground text-xs'>
             deposits × {Number(r.multiplier)}
             {r.locked && ' · pinned'}
@@ -272,7 +273,7 @@ const TurnoverReport = () => {
         onOpenChange={o => !o && setEditing(null)}
         trigger={null}
         title={`TargetX for ${editing?.name ?? `#${editing?.id}`}`}
-        description={editing ? `Deposited ${inr(editing.totalDeposit)} · wagered ${inr(editing.wager)}` : undefined}
+        description={editing ? `Deposited ${money.format(editing.totalDeposit)} · wagered ${money.format(editing.wager)}` : undefined}
         submitLabel='Save'
         validate={() => (validX(editX) ? null : X_ERROR)}
         onSubmit={() => saveOne.mutateAsync()}
@@ -283,7 +284,7 @@ const TurnoverReport = () => {
           inputMode='decimal'
           value={editX}
           onChange={e => setEditX(e.target.value.replace(/[^0-9.]/g, ''))}
-          hint={validX(editX) && editing ? `New target: ${inr(Number(editing.totalDeposit) * Number(editX))}` : X_ERROR}
+          hint={validX(editX) && editing ? `New target: ${money.format(Number(editing.totalDeposit) * Number(editX))}` : X_ERROR}
         />
       </FormDialog>
     </div>

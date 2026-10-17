@@ -36,6 +36,7 @@ import GeoAttribution from './GeoAttribution'
 import { RiskManagementDialog, RiskManagementPanel } from './RiskManagement'
 import PlayerStatsTab from './PlayerStatsTab'
 import { BalanceSheetView } from './users/BalanceSheetDialog'
+import useReportMoney from '@/components/shared/ReportMoney'
 import WithdrawBlockAction, { BetLockedBadge, WithdrawBlockedBadge, type AccountLocks } from './WithdrawBlockAction'
 import type { PlayerRow } from './types'
 
@@ -510,6 +511,11 @@ const ReportDetail = ({ id }: { id: string }) => {
   const p = report.data
   const currencies = Object.keys(p?.wallets ?? {})
 
+  // Money in the owner's default coin (one helper for the whole admin); native figures in the hints.
+  const money = useReportMoney()
+  const held = currencies.filter(c => Number(p?.wallets[c]) !== 0)
+  const walletTotal = held.length ? money.sum(held.map(c => [p?.wallets[c], c] as const)) : null
+
   return (
     <div>
       <PageHeader
@@ -590,10 +596,20 @@ const ReportDetail = ({ id }: { id: string }) => {
       {report.error && <ErrorState error={report.error} />}
 
       <div className='grid grid-cols-2 gap-4 lg:grid-cols-4'>
-        <StatCard label='Balance' value={<Money value={p?.balance} currency='INR' />} loading={report.isLoading} hint={currencies.filter(c => Number(p?.wallets[c]) !== 0).map(c => formatAmount(p?.wallets[c], c)).join(' · ') || undefined} />
-        <StatCard label='Gateway deposits' value={<Money value={p?.totalDeposited} currency='INR' />} loading={report.isLoading} hint='Lifetime bank + gateway, paid in by the player · excludes credits from upline' />
-        <StatCard label='Withdrawn' value={<Money value={p?.totalWithdrawn} currency='INR' />} loading={report.isLoading} />
-        <StatCard label='Wagered' value={<Money value={p?.wager} currency={p?.wagerCurrency ?? 'USD'} digits={2} />} loading={report.isLoading} hint={`${formatNumber(p?.gamesPlayed)} bets · ref ${p?.referralCode ?? ''}`} />
+        <StatCard
+          label='Balance'
+          value={walletTotal ? walletTotal.text : money.format(p?.balance, 'INR')}
+          loading={report.isLoading}
+          hint={held.map(c => formatAmount(p?.wallets[c], c)).join(' · ') || undefined}
+        />
+        <StatCard label='Gateway deposits' value={money.format(p?.totalDeposited, 'INR')} loading={report.isLoading} hint={`${formatAmount(p?.totalDeposited, 'INR')} · lifetime bank + gateway, paid in by the player · excludes credits from upline`} />
+        <StatCard label='Withdrawn' value={money.format(p?.totalWithdrawn, 'INR')} loading={report.isLoading} hint={formatAmount(p?.totalWithdrawn, 'INR')} />
+        <StatCard
+          label='Wagered'
+          value={money.format(p?.wager, p?.wagerCurrency ?? 'USD')}
+          loading={report.isLoading}
+          hint={`${formatAmount(p?.wager, p?.wagerCurrency ?? 'USD')} · ${formatNumber(p?.gamesPlayed)} bets · ref ${p?.referralCode ?? ''}`}
+        />
       </div>
 
       <Tabs value={tab} onValueChange={value => void setTab(value as Tab)} className='mt-6'>

@@ -6,6 +6,7 @@ import Link from 'next/link'
 
 import { BanIcon, CalendarClockIcon, CircleCheckIcon, DicesIcon, GaugeIcon, LockIcon, ShieldCheckIcon, UsersIcon, WalletIcon } from 'lucide-react'
 
+import useReportMoney from '@/components/shared/ReportMoney'
 import DataTable, { type Column } from '@/components/shared/DataTable'
 import FormDialog from '@/components/shared/FormDialog'
 import { TextField } from '@/components/shared/FormField'
@@ -240,10 +241,12 @@ const WithdrawalControl = () => {
 
 /** Withdrawn vs max: amount + patli bar (hara → peela → laal jaise limit bharti hai). */
 const WithdrawnBar = ({ withdrawn, max }: { withdrawn: string; max: string | null }) => {
+  const money = useReportMoney()
+
   if (max === null)
     return (
       <div className='text-right whitespace-nowrap'>
-        <p className='font-semibold tabular-nums'>{inr(withdrawn)}</p>
+        <p className='font-semibold tabular-nums'>{money.format(withdrawn)}</p>
         <p className='text-muted-foreground text-xs'>no limit</p>
       </div>
     )
@@ -254,8 +257,8 @@ const WithdrawnBar = ({ withdrawn, max }: { withdrawn: string; max: string | nul
   return (
     <div className='ml-auto w-36'>
       <p className='text-right text-sm whitespace-nowrap tabular-nums'>
-        <span className='font-semibold'>{inr(withdrawn)}</span>
-        <span className='text-muted-foreground'> / {inr(max)}</span>
+        <span className='font-semibold'>{money.format(withdrawn)}</span>
+        <span className='text-muted-foreground'> / {money.format(max)}</span>
       </p>
       <div className='bg-muted mt-1.5 h-1.5 overflow-hidden rounded-full'>
         <div className={cn('h-full rounded-full', pct >= 100 ? 'bg-danger' : pct >= 70 ? 'bg-warning' : 'bg-success')} style={{ width: `${pct}%` }} />
@@ -266,6 +269,7 @@ const WithdrawnBar = ({ withdrawn, max }: { withdrawn: string; max: string | nul
 
 /** Per-user withdrawal lock — direct users. Lock switch = `POST admin/locks`. Phone pe sirf user, balance, lock. */
 const LockTable = ({ locked }: { locked?: number }) => {
+  const money = useReportMoney()
   const { can } = useSession()
   const { state, set, query } = useListState(['status'])
   const status = query.status === 'locked' ? 'locked' : 'all'
@@ -308,14 +312,14 @@ const LockTable = ({ locked }: { locked?: number }) => {
         )
       }
     },
-    { key: 'bal', header: 'Balance', align: 'right', cell: r => <span className='font-semibold tabular-nums'>{inr(r.inrBalance)}</span> },
+    { key: 'bal', header: 'Balance', align: 'right', cell: r => <span className='font-semibold tabular-nums'>{money.format(r.inrBalance)}</span> },
     {
       key: 'dep',
       header: 'Deposited',
       align: 'right',
       className: 'hidden md:table-cell',
       headerClassName: 'hidden md:table-cell',
-      cell: r => <span className='text-success tabular-nums'>{inr(r.deposited)}</span>
+      cell: r => <span className='text-success tabular-nums'>{money.format(r.deposited)}</span>
     },
     {
       key: 'wager',
@@ -325,8 +329,8 @@ const LockTable = ({ locked }: { locked?: number }) => {
       headerClassName: 'hidden lg:table-cell',
       cell: r => (
         <span className='tabular-nums'>
-          {inr(r.wagered)}
-          {Number(r.wagerBonus) > 0 && <span className='text-info block text-xs'>+{inr(r.wagerBonus)} bonus</span>}
+          {money.format(r.wagered)}
+          {Number(r.wagerBonus) > 0 && <span className='text-info block text-xs'>+{money.format(r.wagerBonus)} bonus</span>}
         </span>
       )
     },

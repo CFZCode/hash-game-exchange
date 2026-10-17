@@ -7,12 +7,11 @@ import { useState } from 'react'
 import { WalletIcon } from 'lucide-react'
 
 // Component Imports
+import { formatIn, useReportMoney } from '@/components/shared/ReportMoney'
 import { useSession } from '@/contexts/SessionContext'
 import { useApi } from '@/hooks/use-api'
 import OwnerDirectLedger from '@/views/exchange/OwnerDirectLedger'
 import type { OwnerWallet } from '@/views/exchange/types'
-
-const fmt = (value: string | undefined) => (value === undefined ? '…' : Number(value || 0).toLocaleString())
 
 /**
  * Header me owner (super admin) ka Direct Users balance (`staff_balances`) — theme
@@ -25,6 +24,10 @@ const OwnerBalanceInner = () => {
   const { data, error } = useApi<OwnerWallet>('admin/exchange/owner/wallet')
   const [ledgerOpen, setLedgerOpen] = useState(false)
 
+  // The wallet is kept in INR; shown in the owner's default coin at the live rate.
+  const money = useReportMoney()
+  const inr = data?.directBalance
+
   if (error && !data) return null
 
   return (
@@ -33,10 +36,10 @@ const OwnerBalanceInner = () => {
         type='button'
         onClick={() => setLedgerOpen(true)}
         className='border-border bg-muted/40 hover:bg-muted flex items-center gap-2 rounded-full border px-3 py-1 text-xs transition-colors'
-        title='Direct Users balance — click for the ledger'
+        title={`Direct Users balance${inr !== undefined ? ` (${formatIn(Number(inr) || 0, 'INR')})` : ''} — click for the ledger`}
       >
         <WalletIcon className='text-primary size-3.5 shrink-0' />
-        <span className='text-foreground font-semibold tabular-nums'>{fmt(data?.directBalance)}</span>
+        <span className='text-foreground font-semibold tabular-nums'>{inr === undefined ? '…' : money.format(inr, 'INR')}</span>
       </button>
       <OwnerDirectLedger open={ledgerOpen} onOpenChange={setLedgerOpen} />
     </>

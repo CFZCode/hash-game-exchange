@@ -4,14 +4,18 @@ import { useState } from 'react'
 
 import { HourglassIcon, ReceiptTextIcon, RefreshCwIcon, TrendingDownIcon, TrendingUpIcon, WalletIcon } from 'lucide-react'
 
+import { useQueries } from '@tanstack/react-query'
+
 import { SelectField } from '@/components/shared/FormField'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+
+import { formatIn, useReportMoney } from '@/components/shared/ReportMoney'
 import { useApi } from '@/hooks/use-api'
-import { errorMessage } from '@/lib/api/client'
+import { api, errorMessage } from '@/lib/api/client'
 import { cn } from '@/lib/utils'
 import { useCurrencyCodes } from '@/views/finance/useCurrencyCodes'
 import { Chip, StatCard, type Tone } from './shared'
@@ -32,6 +36,12 @@ type Sheet = {
 }
 
 const LIMITS = [25, 50, 100, 200]
+
+/** The currency select's default: every coin, converted into the owner's default coin. */
+const ALL = 'ALL'
+
+/** The route's page ceiling (reports.constants MAX_PAGE_SIZE): the merged view reads at most this per coin. */
+const MAX_ROWS = 200
 
 const fmt = (value: string | number | null | undefined, cur: string) =>
   `${cur === 'INR' ? '₹' : ''}${(Number(value) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -66,25 +76,89 @@ export const BalanceSheetView = ({
   inDialog?: boolean
 }) => {
   const currencies = useCurrencyCodes()
-  const [currency, setCurrency] = useState('INR')
+  const money = useReportMoney()
+
+  // ALL = every coin the owner enabled, converted into the default coin (the default view).
+  const [currency, setCurrency] = useState(ALL)
   const [limit, setLimit] = useState(50)
   const [page, setPage] = useState(0)
   const [live, setLive] = useState(true)
 
-  const q = useApi<Sheet>(
-    active && userId ? `admin/reports/${client ? 'client-balance-sheet' : 'balance-sheet'}/${userId}` : null,
+  const all = currency === ALL
+  const path = active && userId ? `admin/reports/${client ? 'client-balance-sheet' : 'balance-sheet'}/${userId}` : null
+  const refetchInterval = live ? 10_000 : false
+
+  // One currency (or a client user's INR point ledger): the page as the server cuts it.
+  const one = useApi<Sheet>(
+    path && (client || !all) ? path : null,
     client ? { limit, offset: page * limit } : { currency, limit, offset: page * limit },
-    { retry: false, refetchInterval: live ? 10_000 : false, placeholderData: prev => prev }
+    { retry: false, refetchInterval, placeholderData: prev => prev }
   )
 
-  const d = q.data
-  const cur = d?.currency ?? currency
-  const credited = Number(d?.balance.credited ?? 0)
-  const debited = Math.abs(Number(d?.balance.debited ?? 0))
+  // Every currency: the route is per currency, so each is read from the top far enough to cut this
+  // page out of the merged, time-sorted list (at most MAX_ROWS per currency).
+  const span = Math.min(MAX_ROWS, (page + 1) * limit)
+
+  const many = useQueries({
+    queries: (path && all && !client ? currencies : []).map(c => ({
+      queryKey: ['api', path, { currency: c, limit: span, offset: 0 }],
+      queryFn: ({ signal }: { signal: AbortSignal }) => api.get<Sheet>(path as string, { currency: c, limit: span, offset: 0 }, signal),
+      retry: false,
+      refetchInterval,
+      placeholderData: (prev: Sheet | undefined) => prev
+    }))
+  })
+
+  const sheets: Sheet[] = client || !all ? (one.data ? [one.data] : []) : many.map(m => m.data).filter((x): x is Sheet => !!x)
+  const loading = client || !all ? !one.data : many.some(m => !m.data && !m.error)
+  const error = client || !all ? one.error : (many.find(m => m.error)?.error ?? null)
+  const fetching = client || !all ? one.isFetching : many.some(m => m.isFetching)
+  const refetch = () => (client || !all ? void one.refetch() : many.forEach(m => void m.refetch()))
+
+  /** Converted (default view) or native (one currency) — figures shown on the cards and lines. */
+  const converted = all
+  const curOf = (sh: Sheet) => (sh.currency || (client ? 'INR' : currency)).toUpperCase()
+
+  const total = (pick: (sh: Sheet) => string | number | undefined, abs = false) =>
+    converted
+      ? money.sum(sheets.map(sh => [abs ? Math.abs(Number(pick(sh) ?? 0)) : pick(sh), curOf(sh)] as const)).value
+      : abs
+        ? Math.abs(Number(sheets[0] ? pick(sheets[0]) : 0))
+        : Number(sheets[0] ? pick(sheets[0]) : 0)
+
+  const cur = converted ? money.code : sheets[0] ? curOf(sheets[0]) : currency
+  const show = (v: number) => (converted ? formatIn(v, money.code) : fmt(v, cur))
+  const credited = total(sh => sh.balance.credited)
+  const debited = total(sh => sh.balance.debited, true)
   const net = credited - debited
-  const exposure = Number(d?.balance.openExposure ?? 0)
-  const reconciled = Number(d?.balance.unexplained ?? 0) === 0
-  const pages = Math.max(1, Math.ceil((d?.total ?? 0) / limit))
+  const exposure = total(sh => sh.balance.openExposure)
+  const liveBalance = total(sh => sh.balance.live)
+  const ledgerBalance = total(sh => sh.balance.ledger)
+  const unexplained = sheets.reduce((n, sh) => n + Math.abs(Number(sh.balance.unexplained ?? 0)), 0)
+  const reconciled = unexplained === 0
+
+  const rows = (
+    converted && !client
+      ? sheets
+          .flatMap(sh => sh.rows.map(r => ({ ...r, cur: curOf(sh) })))
+          .sort((a, b) => (a.ts < b.ts ? 1 : a.ts > b.ts ? -1 : 0))
+          .slice(page * limit, (page + 1) * limit)
+      : (sheets[0]?.rows ?? []).map(r => ({ ...r, cur: sheets[0] ? curOf(sheets[0]) : cur }))
+  ) as (Sheet['rows'][number] & { cur: string })[]
+
+  const rowTotal = sheets.reduce((n, sh) => n + (sh.total ?? 0), 0)
+  const pages = Math.max(1, Math.ceil(rowTotal / limit))
+
+  /** A ledger figure: converted with the native amount under it, or native. */
+  const cell = (v: number, rowCur: string) =>
+    converted ? (
+      <span className='flex flex-col'>
+        <span>{money.format(v, rowCur)}</span>
+        {rowCur !== money.code && <span className='text-muted-foreground text-[11px] font-normal'>{fmt(v, rowCur)}{rowCur === 'INR' ? '' : ` ${rowCur}`}</span>}
+      </span>
+    ) : (
+      fmt(v, rowCur)
+    )
 
   const Title = inDialog ? DialogTitle : 'h2'
   const Description = inDialog ? DialogDescription : 'p'
@@ -98,9 +172,9 @@ export const BalanceSheetView = ({
                 <ReceiptTextIcon className='text-primary size-4' /> Balance Sheet
               </Title>
               <Description className='text-muted-foreground text-sm'>
-                {d?.subject.name || name || 'Player'} · <span className='font-mono'>UID {userId}</span>
-                {d?.subject.agent ? ` · under ${d.subject.agent}` : ''}
-                {d?.source === 'point_ledger' ? ' · from point ledger' : ''}
+                {sheets[0]?.subject.name || name || 'Player'} · <span className='font-mono'>UID {userId}</span>
+                {sheets[0]?.subject.agent ? ` · under ${sheets[0].subject.agent}` : ''}
+                {sheets[0]?.source === 'point_ledger' ? ' · from point ledger' : ''}
               </Description>
             </div>
             <div className='flex items-center gap-3'>
@@ -109,7 +183,7 @@ export const BalanceSheetView = ({
               </label>
               {/* Client user ki sheet point ledger se, sirf INR. */}
               {!client && (
-                <div className='w-28'>
+                <div className='w-40'>
                   <SelectField
                     id='bs-currency'
                     label=''
@@ -118,39 +192,49 @@ export const BalanceSheetView = ({
                       setCurrency(v)
                       setPage(0)
                     }}
-                    options={currencies.map(c => ({ value: c, label: c }))}
+                    options={[{ value: ALL, label: `All (in ${money.code})` }, ...currencies.map(c => ({ value: c, label: c }))]}
                   />
                 </div>
                 )}
-              <Button variant='ghost' size='icon-sm' title='Refresh' aria-label='Refresh' disabled={q.isFetching} onClick={() => void q.refetch()}>
-                <RefreshCwIcon className={cn(q.isFetching && 'animate-spin')} />
+              <Button variant='ghost' size='icon-sm' title='Refresh' aria-label='Refresh' disabled={fetching} onClick={refetch}>
+                <RefreshCwIcon className={cn(fetching && 'animate-spin')} />
               </Button>
             </div>
           </div>
         </div>
 
         <div className={cn('flex flex-col gap-4 px-6 py-4', inDialog && 'overflow-y-auto')}>
-          {q.error && <p className='text-danger text-sm'>{errorMessage(q.error)}</p>}
+          {error && <p className='text-danger text-sm'>{errorMessage(error)}</p>}
+          {converted && (
+            <p className='text-muted-foreground text-xs'>
+              Every {client ? 'INR' : 'currency'} figure converted into {money.code} at today’s rate. Pick a currency to see its own figures.
+            </p>
+          )}
 
           <div className='grid gap-3 sm:grid-cols-2 lg:grid-cols-5'>
-            <StatCard label='Current Balance' value={fmt(d?.balance.live, cur)} icon={<WalletIcon />} tone='primary' loading={!d} />
-            {exposure > 0 && <StatCard label='In Play (Unsettled)' value={fmt(exposure, cur)} icon={<HourglassIcon />} tone='warning' />}
-            <StatCard label='Total Credit' value={fmt(credited, cur)} icon={<TrendingUpIcon />} tone='success' loading={!d} />
-            <StatCard label='Total Debit' value={fmt(debited, cur)} icon={<TrendingDownIcon />} tone='danger' loading={!d} />
-            <StatCard label='Net' value={fmt(net, cur)} icon={<ReceiptTextIcon />} tone={net >= 0 ? 'success' : 'danger'} loading={!d} />
+            <StatCard label='Current Balance' value={show(liveBalance)} icon={<WalletIcon />} tone='primary' loading={loading} />
+            {exposure > 0 && <StatCard label='In Play (Unsettled)' value={show(exposure)} icon={<HourglassIcon />} tone='warning' />}
+            <StatCard label='Total Credit' value={show(credited)} icon={<TrendingUpIcon />} tone='success' loading={loading} />
+            <StatCard label='Total Debit' value={show(debited)} icon={<TrendingDownIcon />} tone='danger' loading={loading} />
+            <StatCard label='Net' value={show(net)} icon={<ReceiptTextIcon />} tone={net >= 0 ? 'success' : 'danger'} loading={loading} />
           </div>
 
-          {d && (
+          {!loading && sheets.length > 0 && (
             <p className='bg-muted/40 rounded-md border px-3 py-2 text-sm'>
-              Current Balance <b>{fmt(d.balance.live, cur)}</b>
+              Current Balance <b>{show(liveBalance)}</b>
               {exposure > 0 && (
                 <>
-                  {' + '}In Play <b className='text-warning'>{fmt(exposure, cur)}</b>
+                  {' + '}In Play <b className='text-warning'>{show(exposure)}</b>
                 </>
               )}
-              {' · '}Ledger <b>{fmt(d.balance.ledger, cur)}</b>{' '}
+              {' · '}Ledger <b>{show(ledgerBalance)}</b>{' '}
               <span className={cn('font-semibold', reconciled ? 'text-success' : 'text-danger')}>
-                {reconciled ? '✓ reconciled' : `⚠ mismatch ${fmt(d.balance.unexplained, cur)} — needs review`}
+                {reconciled
+                  ? '✓ reconciled'
+                  : `⚠ mismatch ${sheets
+                      .filter(sh => Number(sh.balance.unexplained ?? 0) !== 0)
+                      .map(sh => `${fmt(sh.balance.unexplained, curOf(sh))}${curOf(sh) === 'INR' ? '' : ` ${curOf(sh)}`}`)
+                      .join(', ')} — needs review`}
               </span>
             </p>
           )}
@@ -167,7 +251,7 @@ export const BalanceSheetView = ({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {!d
+                {loading
                   ? Array.from({ length: 6 }).map((_, i) => (
                       <TableRow key={i}>
                         <TableCell colSpan={6}>
@@ -175,26 +259,26 @@ export const BalanceSheetView = ({
                         </TableCell>
                       </TableRow>
                     ))
-                  : d.rows.map((r, i) => {
+                  : rows.map((r, i) => {
                       const amount = Number(r.amount)
 
                       return (
-                        <TableRow key={`${r.ts}-${i}`}>
+                        <TableRow key={`${r.cur}-${r.ts}-${i}`}>
                           <TableCell className='text-muted-foreground text-xs whitespace-nowrap'>{fmtDate(r.ts)}</TableCell>
                           <TableCell>
                             <Chip tone={CATEGORY_TONE[r.category] ?? 'info'}>{r.category}</Chip>
                           </TableCell>
                           <TableCell className='max-w-96 text-sm break-words whitespace-normal'>{r.description}</TableCell>
-                          <TableCell className='text-success font-semibold whitespace-nowrap'>{amount > 0 ? fmt(amount, cur) : ''}</TableCell>
-                          <TableCell className='text-danger font-semibold whitespace-nowrap'>{amount < 0 ? fmt(Math.abs(amount), cur) : ''}</TableCell>
-                          <TableCell className={cn('font-semibold whitespace-nowrap', Number(r.balance) < 0 && 'text-danger')}>{r.balance !== undefined ? fmt(r.balance, cur) : ''}</TableCell>
+                          <TableCell className='text-success font-semibold whitespace-nowrap'>{amount > 0 ? cell(amount, r.cur) : ''}</TableCell>
+                          <TableCell className='text-danger font-semibold whitespace-nowrap'>{amount < 0 ? cell(Math.abs(amount), r.cur) : ''}</TableCell>
+                          <TableCell className={cn('font-semibold whitespace-nowrap', Number(r.balance) < 0 && 'text-danger')}>{r.balance !== undefined ? cell(Number(r.balance), r.cur) : ''}</TableCell>
                         </TableRow>
                       )
                     })}
-                {d && d.rows.length === 0 && (
+                {!loading && rows.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={6} className='text-muted-foreground py-8 text-center'>
-                      No transactions in {cur} for this user.
+                      {converted && !client ? 'No transactions for this user.' : `No transactions in ${cur} for this user.`}
                     </TableCell>
                   </TableRow>
                 )}
@@ -215,13 +299,13 @@ export const BalanceSheetView = ({
             </select>
           </label>
           <span>
-            {d?.total ? `${page * limit + 1}–${Math.min((page + 1) * limit, d.total)} of ${d.total}` : '0 rows'}
+            {rowTotal ? `${page * limit + 1}–${Math.min((page + 1) * limit, rowTotal)} of ${rowTotal}` : '0 rows'}
           </span>
           <div className='flex gap-1'>
             <Button variant='outline' size='sm' disabled={page === 0} onClick={() => setPage(p => p - 1)}>
               Prev
             </Button>
-            <Button variant='outline' size='sm' disabled={page + 1 >= pages} onClick={() => setPage(p => p + 1)}>
+            <Button variant='outline' size='sm' disabled={page + 1 >= pages || (converted && !client && (page + 1) * limit >= MAX_ROWS)} onClick={() => setPage(p => p + 1)}>
               Next
             </Button>
           </div>
