@@ -15,7 +15,10 @@ import {
   login as apiLogin,
   logout as apiLogout,
   register as apiRegister,
+  toWalletRows,
 } from '../services/auth';
+import { setEnabledCurrencies } from '../services/currencies';
+import { onLiveState, startRealtime, stopRealtime } from '../services/realtime';
 import { primeUsdPrices } from '../services/exchangeRate';
 import { toast } from '../components/shared/Toast/toast';
 
@@ -171,6 +174,32 @@ export function SessionProvider({ children }) {
       clearTimeout(timer);
     };
   }, []);
+
+  /* ── The realtime socket (services/realtime.js) ─────────────────────────────────────────
+   *
+   * Opened on sign-in and on a restored session, closed on sign-out. Its state lands every ~2 s
+   * and at once when the balance moves anywhere on the platform (a settled bet, an approved
+   * deposit, an operator's adjustment), so the wallet never waits for a reload. The rows are built
+   * exactly as `loadAccount` builds them, and only when the balances or the coin list changed,
+   * so an unchanged tick re-renders nothing.
+   */
+  React.useEffect(() => {
+    if (!account.login || USE_FIXTURES) return undefined;
+    startRealtime();
+    let key = null;
+    const off = onLiveState((state) => {
+      if (!state.signedIn || !state.balances) return;
+      const next = JSON.stringify([state.balances, state.flags, state.currencies]);
+      if (next === key) return;
+      key = next;
+      if (Array.isArray(state.currencies)) setEnabledCurrencies(state.currencies);
+      setBalances(toWalletRows(state.balances, state.flags, state.currencies));
+    });
+    return () => {
+      off();
+      stopRealtime();
+    };
+  }, [account.login]);
 
   /* ── The FX table ────────────────────────────────────────────────────────────────────────
    *

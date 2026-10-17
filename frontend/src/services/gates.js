@@ -233,6 +233,18 @@ async function readPublicGates() {
   return { flags: flags ?? null, features: Array.isArray(features) ? features : null };
 }
 
+/** The same `{ flags, features }` out of a realtime sync state (services/realtime.js), with the
+ *  owner's theme applied as `readPublicGates` does. Also refreshes the shared read so a page that
+ *  calls `loadPublicGates` next gets the pushed answer. */
+export function publicGatesFrom(state) {
+  const features = Array.isArray(state?.features) ? state.features : null;
+  if (features) applyTheme(themeOf(features));
+  const next = { flags: state?.flags ?? null, features };
+  lastPublic = Promise.resolve(next);
+  lastAt = Date.now();
+  return next;
+}
+
 /**
  * The signed-in player's capabilities off `/user/auth/me`. `null` when the read failed or the
  * backend left the field out (owner lookup failed) — the site then shows everything.

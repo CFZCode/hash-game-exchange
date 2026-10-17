@@ -1,7 +1,16 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { USE_FIXTURES } from '../services/client';
-import { ALL_ON, gateOf, loadCapabilities, loadPublicGates, makeGates } from '../services/gates';
+import {
+  ALL_ON,
+  capabilitiesOf,
+  gateOf,
+  loadCapabilities,
+  loadPublicGates,
+  makeGates,
+  publicGatesFrom,
+} from '../services/gates';
+import { onLiveState } from '../services/realtime';
 import { useGates } from './gates';
 import { GatesContext } from './gates';
 import { useSession } from './session';
@@ -11,9 +20,9 @@ import Loading from '../components/shared/Loading';
    moment (SmartBet's UNKNOWN_CAPS), and a gated route waits for `ready` before redirecting. */
 const UNKNOWN_CAPS = { promotions: false, vault: false, deposit: false, swap: false, withdraw: false, tips: false };
 
-/* How often a refocus may re-read. SmartBet re-reads on the backend's `featuresUpdated` /
-   `siteConfigUpdated` socket pushes; this build has no socket client, so an owner or admin
-   change is picked up on the next load and whenever the tab regains focus. */
+/* How often a refocus may re-read. A signed-in player also gets every owner / admin change from
+   the realtime socket within ~2 s (services/realtime.js); the refocus read covers visitors and a
+   socket that is down. */
 const REFRESH_MS = 10_000;
 
 /**
@@ -48,6 +57,28 @@ function LiveGates({ children }) {
 
   React.useEffect(readPublic, [readPublic]);
   React.useEffect(readCaps, [readCaps]);
+
+  /* The realtime socket's state, every ~2 s and at once on a push. Set only when something
+     actually changed, so an unchanged tick re-renders nothing. */
+  React.useEffect(() => {
+    let pubKey = null;
+    let capsKey = null;
+    return onLiveState((state) => {
+      const nextPubKey = JSON.stringify([state.flags, state.features]);
+      if (state.flags && nextPubKey !== pubKey) {
+        pubKey = nextPubKey;
+        setPub(publicGatesFrom(state));
+      }
+      if (userId && state.signedIn && state.me) {
+        const value = capabilitiesOf(state.me);
+        const nextCapsKey = JSON.stringify(value);
+        if (nextCapsKey !== capsKey) {
+          capsKey = nextCapsKey;
+          setCaps({ userId, value });
+        }
+      }
+    });
+  }, [userId]);
 
   React.useEffect(() => {
     let last = Date.now();

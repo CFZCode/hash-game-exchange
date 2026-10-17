@@ -22,6 +22,11 @@ for (const key of KEYS) {
    server — nothing changes. */
 const PROXY_TARGET = (process.env.API_PROXY_TARGET ?? '').replace(/\/+$/, '');
 if (PROXY_TARGET) env.NEXT_PUBLIC_API_BASE = '';
+/* The proxy carries HTTP only — Vercel does not forward a WebSocket upgrade — so the realtime
+   socket (src/services/realtime.js) dials the gateway itself. That origin must be on the
+   gateway's SOCKET_ALLOWED_ORIGINS. An explicit NEXT_PUBLIC_SOCKET_BASE wins. */
+const SOCKET_BASE = process.env.NEXT_PUBLIC_SOCKET_BASE ?? (PROXY_TARGET || undefined);
+if (SOCKET_BASE) env.NEXT_PUBLIC_SOCKET_BASE = SOCKET_BASE;
 
 const ASSET = '*.{png,jpg,jpeg,avif,webp,gif,svg}';
 const RAW = { query: /[?&]raw(?=&|$)/ };
