@@ -315,8 +315,6 @@ export const navItems: NavItem[] = [
     groupIcon: 'Network',
     collapsible: true,
     items: [
-      // Zip ka Agent System (AdminManagement): Agent Listing, Staff Portal, My Account, Executives, Marketing, Activity Log — tabs me.
-      { icon: 'Network', label: 'Agent System', href: '/agent-system' },
       { icon: 'BookUser', label: 'Account List', href: '/exchange/users', activePath: '/exchange/users', permission: ['users:read', 'staff:read'] } as MenuItem,
       { icon: 'Landmark', label: 'Bank', href: '/exchange/bank', permission: WALLET_ANY },
 

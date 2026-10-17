@@ -5,6 +5,7 @@ import type { ReactNode } from 'react'
 import { DateRangePicker } from '@/components/ui/date-picker'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { useDefaultCurrency } from '@/components/shared/DefaultCurrency'
 import { cn } from '@/lib/utils'
 
 import { bucketLabel, GRANULARITIES, type Granularity } from './format'
@@ -36,8 +37,12 @@ const shortDay = (day: string) => `${bucketLabel(day, 'day')} ${day.slice(0, 4)}
  * One row of filters above a stats screen: period, custom range, bucket size and currency.
  * Everything it changes goes to the URL through `useStatsFilters`.
  */
-const FilterBar = ({ filters, currencies, allCurrenciesLabel = 'All currencies (USD)', allowAll = true, showGranularity = true, children, className }: Props) => {
+const FilterBar = ({ filters, currencies, allCurrenciesLabel, allowAll = true, showGranularity = true, children, className }: Props) => {
   const today = new Date().toISOString().slice(0, 10)
+
+  // "Every currency" totals come back valued in the site's default coin (the owner's choice).
+  const reportCoin = useDefaultCurrency().code
+  const allLabel = allCurrenciesLabel ?? `All currencies (${reportCoin})`
 
   // The default and the current pick are always offered, even when the caller's list lacks them.
   const currencyOptions = currencies?.length
@@ -107,7 +112,7 @@ const FilterBar = ({ filters, currencies, allCurrenciesLabel = 'All currencies (
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {(allowAll || !filters.currency) && <SelectItem value='ALL'>{allCurrenciesLabel}</SelectItem>}
+            {(allowAll || !filters.currency) && <SelectItem value='ALL'>{allLabel}</SelectItem>}
             {currencyOptions.map(c => (
               <SelectItem key={c} value={c}>
                 {c}

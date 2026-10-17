@@ -1,5 +1,7 @@
 'use strict';
 
+const { reportingCurrency } = require('../reports/reportingCurrency');
+
 const { money } = require('@ibitplay/common');
 const { INHOUSE_PAYOUT, V2_STAKE, V2_PAYOUT } = require('../statements/casinoRounds');
 
@@ -235,7 +237,7 @@ class DashboardStatsService {
     return {
       range: { from: ctx.from.toISOString(), to: ctx.to.toISOString() },
       granularity,
-      currency: currency ?? 'USD',
+      currency: currency ?? rates.target,
       converted: !currency,
       valuation: currency ? null : { note: VALUATION_NOTE, ratesAsOf: rates.asOf },
       buckets,
@@ -272,7 +274,7 @@ class DashboardStatsService {
 
     return {
       range: { from: ctx.from.toISOString(), to: ctx.to.toISOString() },
-      currency: currency ?? 'USD',
+      currency: currency ?? rates.target,
       converted: !currency,
       games: merge(gameRows, (r) => r.game_key, (r) => ({ name: r.name || r.game_key, provider: r.provider ?? null })),
       // By sport (`sport_id`), not `game_type` — MO/BM/FAN are market families, not sports.
@@ -553,13 +555,15 @@ class DashboardStatsService {
     return s.toUpperCase() || null;
   }
 
-  /** Minor units of `amount`, in USD when `rates` is given; `null` when no rate covers it. */
+  /** Minor units of `amount`, in `rates.target` when `rates` is given; `null` when no rate covers it. */
   #value(amount, currency, rates) {
     const minor = money.toMinorQuantised(String(amount ?? '0'));
     if (!rates) return minor;
+    if (currency && currency === rates.target) return minor;
     const rate = currency ? rates.map.get(currency) : null;
     if (rate == null) return minor === 0n ? 0n : null;
-    return (minor * money.toMinor(rate)) / 100_000_000n;
+    const usd = (minor * money.toMinor(rate)) / 100_000_000n;
+    return rates.perTarget ? (usd * 100_000_000n) / rates.perTarget : usd;
   }
 
   #finish(b) {
@@ -571,10 +575,16 @@ class DashboardStatsService {
   }
 
   async #rates() {
-    const rows = await this.models.Exchangerate.findAll({ raw: true });
+    const [rows, want] = await Promise.all([this.models.Exchangerate.findAll({ raw: true }), reportingCurrency(this.models)]);
+    // USD and USDT are 1:1 even when `exchangerate` has no row for them.
+    const map = new Map([['USD', '1'], ['USDT', '1'], ...rows.map((r) => [String(r.currency ?? '').toUpperCase(), r.usd_rate])]);
+    // Converted totals are in the site's default coin; USD when that coin has no rate.
+    const rate = want === 'USD' ? null : map.get(want);
+    const perTarget = rate != null && Number(rate) > 0 ? money.toMinorQuantised(String(rate)) : null;
     return {
-      // USD is the reporting currency: 1:1 even when `exchangerate` has no row for it.
-      map: new Map([['USD', '1'], ...rows.map((r) => [String(r.currency ?? '').toUpperCase(), r.usd_rate])]),
+      map,
+      target: perTarget ? want : 'USD',
+      perTarget,
       asOf: rows.reduce((latest, r) => (r.updated_at && (!latest || r.updated_at > latest) ? r.updated_at : latest), null),
     };
   }

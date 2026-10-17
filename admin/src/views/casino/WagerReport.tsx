@@ -193,7 +193,7 @@ const WagerReportView = ({ area, channel }: Props & { channel: Channel }) => {
         {s && s.unconverted.length > 0 && (
           <Alert className='mb-4'>
             <AlertDescription>
-              Not in the USD totals (no exchange rate): {s.unconverted.map(u => `${u.currency ?? 'unknown currency'}`).join(', ')}. Pick that currency to see it.
+              Not in the {currency} totals (no exchange rate): {s.unconverted.map(u => `${u.currency ?? 'unknown currency'}`).join(', ')}. Pick that currency to see it.
             </AlertDescription>
           </Alert>
         )}

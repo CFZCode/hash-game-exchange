@@ -59,16 +59,6 @@ Reference: `admin-structure.zip` → adminpanel/src/components/users. Teen tab (
 - **Balance sheet:** direct user → deposits/withdrawals/bets (`balance-sheet`). Client user (parent wala) → sab kuch `mssports.point_ledger` me hai, wahin se (`client-balance-sheet`).
 - **Rule:** existing API kabhi mat badlo — naya endpoint banao.
 
-## 3c. Agent System page (`/agent-system`) — sidebar "Agent Management" me sabse upar
-
-Reference: `admin-structure.zip` → components/AdminManagement.tsx (Dashboard tab chhod ke; Dashboard = `/dashboard?tab=agent`). Flow apna Sports Exchange agent setup, UI zip jaisa. Tabs (`?tab=`):
-- **Agent Listing** (`agents`): `GET admin/exchange/accounts` (direct children, `parentId` = drill-down, sirf dekhna). Deposit/Withdraw = `admin/staff/transfer`, Settlement = `admin/exchange/points/settle`, Settings = MoreDialog (password / lock / credit history). Create Agent → `/exchange/users/create`.
-- **Staff Portal**: Quick ID = `admin/exchange/accounts-admin/create` (userType USER). Wallet Refill = owner `admin/accounts/refill` (note ke saath; direct user ho to owner ke Direct Users balance se), baaki `admin/staff/transfer`. Lock = `admin/accounts/status` (sportsLocked / casinoLocked / systemLocked).
-- **My Account**: owner ko dono balance + Add Balance; phir `/account` wala MyAccount.
-- **Executives / Marketing**: `admin/access/executives` / `admin/access/marketing-users`.
-- **Hierarchy**: zip Percentage Hierarchy jaisa tree, bina percentage — `GET admin/agent-hierarchy` (naya; upline + aap + downline staff, har node pe direct users ki ginti).
-- **Activity Log**: `admin/audit/activity` (audit:read).
-
 ## 3d. Transactions (sidebar group, zip jaisa)
 
 - **Deposit** `/transactions/deposit`, **Withdraw** `/transactions/withdraw` — zip `DepositPage` / `WithdrawPage` jaisa tab bar (`?tab=direct|agent`):

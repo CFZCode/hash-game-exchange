@@ -54,7 +54,7 @@ export function useFinanceFilters(options: Omit<Parameters<typeof useStatsFilter
 }
 
 /** "All currencies (in USDT)": the label of the converted-totals option, in the default coin. */
-export const allConvertedLabel = (defaultCurrency?: string) => `All currencies (in ${defaultCurrency || 'USD'})`
+export const allConvertedLabel = (defaultCurrency?: string) => `All currencies (in ${defaultCurrency || 'USDT'})`
 
 const FIAT = new Set<string>([...FIAT_CURRENCIES, 'MVR'])
 

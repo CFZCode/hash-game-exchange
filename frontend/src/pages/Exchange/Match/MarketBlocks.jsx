@@ -78,7 +78,7 @@ function RunnerMarket({ market, book, projected, slip, slipNode, disabled, signe
     <MatchOddsBlock
       market={block}
       depth={g === 'match' && hasDepth(market) ? 3 : 1}
-      showSize={g !== 'match1'}
+      showSize
       formatPrice={price}
       formatSize={formatSize}
       selected={mine ? slip.kitSel : null}

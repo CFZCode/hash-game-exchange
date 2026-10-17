@@ -228,6 +228,12 @@ const EXTENSIONS = {
   // A crypto withdrawal is settled by broadcasting a transaction, and the
   // table had nowhere to record its hash — see the migration for the variable
   // named `txid` that holds the string "In Queue".
+  // ── migration 113-fiat-deposit-claimed-amount ─────────────────────────
+  // `amount` is what was credited once approved; this is what the player entered.
+  FiatDeposits: {
+    claimed_amount: { type: DataTypes.DECIMAL, allowNull: true, field: 'claimed_amount' },
+  },
+
   Withdrawals: {
     txid: { type: DataTypes.STRING(120), allowNull: true, field: 'txid' },
     /** The staff member who authorised it, from a verified token. */

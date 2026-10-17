@@ -153,6 +153,7 @@ async function loadRates(models) {
     const rate = Number(row.usd_rate);
     if (code && Number.isFinite(rate) && rate > 0) map.set(code, minor(row.usd_rate));
   }
+  if (!map.has('USDT')) map.set('USDT', SCALE);
   return map;
 }
 

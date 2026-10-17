@@ -78,11 +78,13 @@ describe('cashout (spec §8.3)', () => {
   });
 });
 
-describe('ball running (improvement over TENEXCH spec §10.1 #1)', () => {
-  it('br:true suspends even with an empty gstatus and live odds', () => {
+describe('ball running (TENEXCH: status text only)', () => {
+  it('ignores the feed br flag: an empty gstatus with live odds is open', () => {
     const s = { br: true, gstatus: '', odds: [rung('back', 'back1', 146)] };
-    expect(isSectionSuspended(s)).toBe(true);
-    expect(isSectionSuspended(s, { ignoreBallRunning: true })).toBe(false); // TENEXCH's answer
+    expect(isSectionSuspended(s)).toBe(false);
+  });
+  it('a BALL RUNNING status still suspends the row', () => {
+    expect(isSectionSuspended({ gstatus: 'BALL RUNNING', odds: [rung('back', 'back1', 146)] })).toBe(true);
   });
 });
 
@@ -105,7 +107,7 @@ describe('bet flow', () => {
     expect(prevalidateBet({ ...base, stake: 2500 }).code).toBe('OUT_OF_RANGE');
     expect(prevalidateBet({ ...base, odds: 2.1, isUserModifiedOdds: true }).code).toBe('UNMATCHED');
     expect(prevalidateBet(base)).toBeNull();
-    const ballRunning = { ...market, section: [{ ...market.section[0], br: true }, market.section[1]] };
+    const ballRunning = { ...market, section: [{ ...market.section[0], gstatus: 'BALL RUNNING' }, market.section[1]] };
     expect(prevalidateBet({ ...base, markets: [ballRunning] }).code).toBe('BALL_RUNNING');
     const hi = { ...bv, odds: 4.5 };
     expect(prevalidateBet({ ...base, bv: hi, odds: 4.5, originalOdds: 4.5 }).code).toBe('RATE_CAP');

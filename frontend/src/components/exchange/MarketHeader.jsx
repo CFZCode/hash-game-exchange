@@ -1,4 +1,4 @@
-import { cx, formatAmount as defaultFormatAmount } from './utils';
+import { cx, compactAmount, formatAmount as defaultFormatAmount } from './utils';
 import { IconArrow } from './icons';
 
 /**
@@ -8,7 +8,7 @@ import { IconArrow } from './icons';
  * @param {React.ReactNode} props.name        Market name ("Match Odds", "Bookmaker", "Fancy").
  * @param {number}   [props.min]              Min stake; omitted → no min/max line.
  * @param {number}   [props.max]              Max stake.
- * @param {(n)=>string} [props.formatAmount]  Formatter for min/max (default 2dp grouped; whole numbers print without decimals).
+ * @param {(n)=>string} [props.formatAmount]  Formatter for min/max (default: Indian compact, 100 · 25K · 1L — as TENEXCH).
  * @param {React.ReactNode} [props.cashout]   Slot on the right, before the chevron — pass a <button> (e.g. the wiring layer's Cashout).
  * @param {React.ReactNode} [props.badge]     Slot right after the name (e.g. "In-play", "0% commission").
  * @param {boolean}  [props.collapsed]        Chevron points right when true.
@@ -18,13 +18,13 @@ export default function MarketHeader({
   name,
   min,
   max,
-  formatAmount = defaultFormatAmount,
+  formatAmount = compactAmount,
   cashout,
   badge,
   collapsed = false,
   onToggle,
 }) {
-  const fmt = (n) => (Number(n) % 1 === 0 ? Number(n).toLocaleString('en-US') : formatAmount(n));
+  const fmt = (n) => formatAmount(n);
   const hasLimits = min != null || max != null;
 
   return (

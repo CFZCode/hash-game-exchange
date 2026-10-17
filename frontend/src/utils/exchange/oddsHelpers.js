@@ -1,5 +1,5 @@
 /* Ported from TENEXCH frontend/src/utils/oddsHelpers.js. Changes: isSectionSuspended also suspends on
- * ball running (section.br) — see the note on it. Addaplay's display formatter is
+ * ball running (status text only, not section.br) — see the note on it. Addaplay's display formatter is
  * addaplay.formatOddAddaplay (integers bare, else 2 dp) — use it for odds cells; formatOdd here is
  * TENEXCH's (as-is). classifyMarket is UI-only — never send it as market_type (spec §3.3). */
 
@@ -242,19 +242,17 @@ export function calculateRunnerPL(currentBet, runnerNames) {
   return results;
 }
 
-/* BALL RUNNING (`section.br === true`) now suspends the runner — an IMPROVEMENT over TENEXCH,
-   whose own master spec lists "section.br is checked nowhere" as known gap #1 (§10.1): taking a
-   bet while the ball is in the air hands the punter a free option. The live feed really sends it
-   — a cricket "Normal" fancy row answered `br: true` with `gstatus: ""` on 2026-10-13, which the
-   TENEXCH rule below would have read as OPEN (its odds were > 0). Pass `{ ignoreBallRunning: true }`
-   to get TENEXCH's exact answer. */
+/* BALL RUNNING is read from the row's status text only, as TENEXCH does. `section.br` is NOT
+   used: the live feed sends `br: true` on every cricket Normal / fancy1 row all the time, odds open
+   or not (77 of 77 rows on 2026-10-17, while TENEXCH showed them open and taking bets), so honouring
+   it closed the whole fancy board. The server still refuses a bet on a row whose status is
+   BALL RUNNING / SUSPENDED. `ignoreBallRunning` is kept for older callers and changes nothing. */
 export function isBallRunning(section) {
-  return section?.br === true
-    || String(section?.gstatus || section?.status || '').toUpperCase() === 'BALL RUNNING';
+  return String(section?.gstatus || section?.status || '').toUpperCase() === 'BALL RUNNING';
 }
 
+// eslint-disable-next-line no-unused-vars
 export function isSectionSuspended(section, { ignoreBallRunning = false } = {}) {
-  if (!ignoreBallRunning && section?.br === true) return true;
   const s = (section.gstatus || section.status || '').toUpperCase();
   // Football feeds use gstatus "OPEN" for live rows (cricket uses "ACTIVE")
   if (s === 'ACTIVE' || s === 'OPEN') return false;
