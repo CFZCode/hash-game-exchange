@@ -1816,6 +1816,10 @@ class ReportsService {
          -- In-house rounds with no ledger stake row (played before the engine wrote them).
          SELECT b.uid::text, COUNT(*) FROM bets b
           WHERE b.uid IN (:numIds) AND ${INHOUSE_UNLEDGERED('b')} GROUP BY b.uid
+         UNION ALL
+         -- Sports Exchange bets: mssports writes its own ledger, never a platform BET_STAKE row.
+         SELECT s.user_id::text, COUNT(*) FROM mssports."SportsBet" s
+          WHERE s.user_id IN (:numIds) GROUP BY s.user_id
        ) x GROUP BY user_id`,
       { replacements: { ids: ids.map(String), numIds: ids.map(Number) }, type: sequelize.constructor.QueryTypes.SELECT }
     );

@@ -548,6 +548,19 @@ const OVERRIDES = {
 };
 
 /**
+ * Tables a migration MOVED to another schema, and the baseline columns the moved table does not have.
+ *
+ * ── migration 094-mssports-schema ────────────────────────────────────
+ * The Sports Exchange (TENEXCH "mssports") writes its bets to `mssports."SportsBet"`; the baseline
+ * `public."SportsBet"` is dead and empty. Every platform reader of this model (Risk, Statements,
+ * the sports wager report / bet admin) read the empty table, so a player with settled bets showed
+ * "no activity". The mssports table has no `lay_size` / `back_size`.
+ */
+const RELOCATED = {
+  SportsBet: { schema: 'mssports', drop: ['lay_size', 'back_size'] },
+};
+
+/**
  * Apply the declared extensions to already-registered models.
  *
  * Uses `Model.rawAttributes` + `refreshAttributes()` rather than re-`init`,
@@ -556,6 +569,20 @@ const OVERRIDES = {
 function applyExtensions(models, logger) {
   const applied = [];
   const skipped = [];
+
+  for (const [modelName, { schema, drop = [] }] of Object.entries(RELOCATED)) {
+    const model = models[modelName];
+    if (!model) {
+      skipped.push({ model: modelName, reason: 'model not loaded in this service' });
+      continue;
+    }
+    // In place (not `Model.schema()`, which returns a clone) so associations keep pointing here.
+    model.options.schema = schema;
+    model._schema = schema;
+    for (const name of drop) delete model.rawAttributes[name];
+    model.refreshAttributes();
+    applied.push(`${modelName} -> ${schema}`);
+  }
 
   for (const [modelName, columns] of Object.entries(OVERRIDES)) {
     const model = models[modelName];
@@ -597,4 +624,4 @@ function applyExtensions(models, logger) {
   return { applied, skipped };
 }
 
-module.exports = { applyExtensions, EXTENSIONS, OVERRIDES };
+module.exports = { applyExtensions, EXTENSIONS, OVERRIDES, RELOCATED };

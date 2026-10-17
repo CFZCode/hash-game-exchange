@@ -23,6 +23,7 @@ import StatusBadge from '@/components/shared/StatusBadge'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useSession } from '@/contexts/SessionContext'
 import { useApi, useApiMutation, useListState, usePagedApi } from '@/hooks/use-api'
@@ -252,6 +253,80 @@ const LoginsTab = ({ userId }: { userId: string }) => {
   )
 }
 
+/** One row of `admin/statements/user/:id/bets` — sports (mssports) or casino, see statements.service. */
+type BetRow = {
+  id: string
+  ts: string
+  match?: string | null
+  selection?: string | null
+  market?: string | null
+  side?: string | null
+  odds?: string | null
+  game?: string | null
+  source?: string | null
+  action?: string | null
+  currency?: string | null
+  stake: string | null
+  profit?: string | null
+  amount?: string | null
+  status: string | null
+  result?: string | null
+}
+
+const sportsBetColumns: Column<BetRow>[] = [
+  { key: 'ts', header: 'Placed', cell: r => <DateTime value={r.ts} /> },
+  { key: 'match', header: 'Event', cell: r => r.match ?? '—' },
+  { key: 'market', header: 'Market', cell: r => r.market ?? '—' },
+  { key: 'selection', header: 'Selection', cell: r => r.selection ?? '—' },
+  { key: 'side', header: 'Side', cell: r => <Badge variant={r.side === 'lay' || r.side === 'no' ? 'secondary' : 'outline'}>{r.side ?? '—'}</Badge> },
+  { key: 'odds', header: 'Odds', align: 'right', cell: r => r.odds ?? '—' },
+  { key: 'stake', header: 'Stake', align: 'right', cell: r => <Money value={r.stake} currency='INR' /> },
+  { key: 'result', header: 'Result', cell: r => <StatusBadge value={r.status === 'open' ? 'open' : (r.result ?? r.status)} /> }
+]
+
+const casinoBetColumns: Column<BetRow>[] = [
+  { key: 'ts', header: 'Time', cell: r => <DateTime value={r.ts} /> },
+  { key: 'game', header: 'Game', cell: r => r.game ?? '—' },
+  { key: 'action', header: 'Action', cell: r => r.action ?? '—' },
+  { key: 'stake', header: 'Stake', align: 'right', cell: r => (r.stake == null ? '—' : <Money value={r.stake} currency={r.currency ?? 'INR'} />) },
+  { key: 'amount', header: 'Amount', align: 'right', cell: r => (r.amount == null ? '—' : <Money value={r.amount} currency={r.currency ?? 'INR'} />) },
+  { key: 'status', header: 'Status', cell: r => <StatusBadge value={r.status} /> }
+]
+
+/** Every bet the player placed — Sports Exchange or casino — newest first. */
+const BetsTab = ({ userId }: { userId: string }) => {
+  const [kind, setKind] = useState<'sports' | 'casino'>('sports')
+  const { set, query } = useListState()
+  const bets = usePagedApi<BetRow>(`admin/statements/user/${userId}/bets`, { kind, limit: query.limit, page: query.page })
+
+  return (
+    <DataTable
+      columns={kind === 'sports' ? sportsBetColumns : casinoBetColumns}
+      rows={bets.data?.rows}
+      rowKey={r => r.id}
+      loading={bets.isLoading}
+      fetching={bets.isFetching}
+      error={bets.error}
+      pagination={bets.data?.pagination}
+      onPageChange={page => set({ page })}
+      onLimitChange={limit => set({ limit })}
+      toolbar={
+        <Select value={kind} onValueChange={v => v && (setKind(v as 'sports' | 'casino'), set({ page: 1 }))}>
+          <SelectTrigger className='w-32' aria-label='Bet type'>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value='sports'>Sports</SelectItem>
+            <SelectItem value='casino'>Casino</SelectItem>
+          </SelectContent>
+        </Select>
+      }
+      dense
+      emptyMessage={`No ${kind} bets yet.`}
+    />
+  )
+}
+
 const WalletTab = ({ userId }: { userId: string }) => {
   const { state, set, query } = useListState()
   const history = usePagedApi<Ledger>(`admin/user/wallet/${userId}/history`, { limit: query.limit, page: query.page })
@@ -335,7 +410,7 @@ const BalancesTab = ({ userId }: { userId: string }) => {
 }
 
 /** The tabs, in order; `?tab=` picks one, so `/users/<id>?tab=stats` links straight to it. */
-const TABS = ['wallet', 'stats', 'logins', 'balances', 'bonuses', 'prefs', 'risk', 'sheet', 'transfers', 'notifications'] as const
+const TABS = ['wallet', 'bets', 'stats', 'logins', 'balances', 'bonuses', 'prefs', 'risk', 'sheet', 'transfers', 'notifications'] as const
 
 type Tab = (typeof TABS)[number]
 
@@ -524,6 +599,7 @@ const ReportDetail = ({ id }: { id: string }) => {
       <Tabs value={tab} onValueChange={value => void setTab(value as Tab)} className='mt-6'>
         <TabsList className='mb-4 flex-wrap'>
           <TabsTrigger value='wallet'>Ledger</TabsTrigger>
+          <TabsTrigger value='bets'>Bets</TabsTrigger>
           <TabsTrigger value='stats'>Stats</TabsTrigger>
           <TabsTrigger value='logins'>Logins</TabsTrigger>
           <TabsTrigger value='balances'>Balances</TabsTrigger>
@@ -536,6 +612,9 @@ const ReportDetail = ({ id }: { id: string }) => {
         </TabsList>
         <TabsContent value='wallet'>
           <WalletTab userId={id} />
+        </TabsContent>
+        <TabsContent value='bets'>
+          <BetsTab userId={id} />
         </TabsContent>
         <TabsContent value='stats'>
           <PlayerStatsTab userId={id} />

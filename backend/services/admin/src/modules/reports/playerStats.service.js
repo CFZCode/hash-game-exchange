@@ -6,7 +6,10 @@ const { resolveVipLadder } = require('@ibitplay/common');
 const { canManagePromotions } = require('@ibitplay/auth');
 
 const errors = require('./reports.errors');
-const { COIN_IDS, DEPOSIT_SUCCESS, SPORT_NAMES, SPORTS_REFUNDED_RESULTS } = require('../dashboard/dashboard.constants');
+const { COIN_IDS, DEPOSIT_SUCCESS, DIRECT_WALLET_LEDGER, SPORT_NAMES, SPORTS_REFUNDED_RESULTS } = require('../dashboard/dashboard.constants');
+
+/** staff_transfers types that fund a player (agent refill / transfer / adjust). INR, no currency column. */
+const AGENT_FUNDING = ['transfer', 'refill', 'issuance', 'adjust'];
 const { TOP_N, PLAY_REASONS, WITHDRAWAL_DONE } = require('./audienceStats.constants');
 const {
   playerScope,
@@ -656,6 +659,9 @@ class PlayerStatsService {
       okApay: DEPOSIT_SUCCESS.apaydeposits,
       okPayIn: DEPOSIT_SUCCESS.pay_in_transactions,
       okCc: DEPOSIT_SUCCESS.ccdeposit,
+      dwRef: DIRECT_WALLET_LEDGER.refType,
+      dwIn: DIRECT_WALLET_LEDGER.deposit,
+      agentFunding: AGENT_FUNDING,
     };
     const coinCase = Object.entries(COIN_IDS)
       .map(([id, code], i) => {
@@ -681,6 +687,14 @@ class PlayerStatsService {
       `SELECT CASE WHEN c.userid ~ '^[0-9]{1,18}$' THEN c.userid::bigint END, c.created_at, ${ccCurrency}, c.price
          FROM ccdeposit c
         WHERE LOWER(c.status) IN (:okCc) AND ${rangeSql('c.created_at')}${who('c.userid', true)}${cur(ccCurrency)}`,
+      // Admin credit is a deposit too (user, 2026-10-17): the Super Admin's Direct User Wallet…
+      `SELECT CASE WHEN l.user_id ~ '^[0-9]{1,18}$' THEN l.user_id::bigint END, l.created_at, UPPER(l.currency), ABS(l.amount)
+         FROM credits_ledger l
+        WHERE l.reason = :dwIn AND l.meta->>'refType' = :dwRef AND ${rangeSql('l.created_at')}${who('l.user_id', true)}${cur('l.currency')}`,
+      // …and an agent funding its player.
+      `SELECT t.to_id, t.created_at, 'INR', t.amount
+         FROM staff_transfers t
+        WHERE t.to_type = 'user' AND t.transfer_type IN (:agentFunding) AND ${rangeSql('t.created_at')}${who('t.to_id')}${cur("'INR'")}`,
     ].join('\n UNION ALL \n');
 
     return { sql, replacements };
@@ -696,7 +710,9 @@ class PlayerStatsService {
              WHERE EXISTS (SELECT 1 FROM fiat_deposits d WHERE d.user_id = f.uid AND LOWER(d.status) IN (:okFiat) AND d.created_at < CAST(:rangeFrom AS timestamptz))
                 OR EXISTS (SELECT 1 FROM apaydeposits a WHERE a.user_id = f.uid AND LOWER(a.status) IN (:okApay) AND a.created_at < CAST(:rangeFrom AS timestamptz))
                 OR EXISTS (SELECT 1 FROM pay_in_transactions p WHERE p.user_id = f.uid AND p.status IN (:okPayIn) AND p.created_at < CAST(:rangeFrom AS timestamptz))
-                OR EXISTS (SELECT 1 FROM ccdeposit c WHERE c.userid = f.uid::text AND LOWER(c.status) IN (:okCc) AND c.created_at < CAST(:rangeFrom AS timestamptz))`;
+                OR EXISTS (SELECT 1 FROM ccdeposit c WHERE c.userid = f.uid::text AND LOWER(c.status) IN (:okCc) AND c.created_at < CAST(:rangeFrom AS timestamptz))
+                OR EXISTS (SELECT 1 FROM credits_ledger l WHERE l.user_id = f.uid::text AND l.reason = :dwIn AND l.meta->>'refType' = :dwRef AND l.created_at < CAST(:rangeFrom AS timestamptz))
+                OR EXISTS (SELECT 1 FROM staff_transfers t WHERE t.to_type = 'user' AND t.to_id = f.uid AND t.transfer_type IN (:agentFunding) AND t.created_at < CAST(:rangeFrom AS timestamptz))`;
   }
 
   /** Completed withdrawals in the window: crypto, bank and gateway (not refunded). */
@@ -705,6 +721,9 @@ class PlayerStatsService {
       okCrypto: WITHDRAWAL_DONE.withdrawals,
       okBank: WITHDRAWAL_DONE.fiat_withdrawals,
       okGateway: WITHDRAWAL_DONE.apaywithdrawals,
+      dwRef: DIRECT_WALLET_LEDGER.refType,
+      dwOut: DIRECT_WALLET_LEDGER.withdrawal,
+      agentFunding: AGENT_FUNDING,
     };
     const cur = (expr) => (currency ? ` AND UPPER(${expr}) = :currency` : '');
     const who = (column, text = false) => (single ? ` AND ${column} = ${text ? ':uid' : ':uidNum'}` : '');
@@ -720,6 +739,13 @@ class PlayerStatsService {
          FROM apaywithdrawals g
         WHERE LOWER(g.status) IN (:okGateway) AND (g.refunded IS NOT TRUE)
           AND ${rangeSql('g.created_at')}${who('g.user_id', true)}${cur('g.currency')}`,
+      // Admin debit (Direct User Wallet; stored negative) and an agent collecting from its player.
+      `SELECT CASE WHEN l.user_id ~ '^[0-9]{1,18}$' THEN l.user_id::bigint END, l.created_at, UPPER(l.currency), ABS(l.amount)
+         FROM credits_ledger l
+        WHERE l.reason = :dwOut AND l.meta->>'refType' = :dwRef AND ${rangeSql('l.created_at')}${who('l.user_id', true)}${cur('l.currency')}`,
+      `SELECT t.from_id, t.created_at, 'INR', t.amount
+         FROM staff_transfers t
+        WHERE t.from_type = 'user' AND t.transfer_type IN (:agentFunding) AND ${rangeSql('t.created_at')}${who('t.from_id')}${cur("'INR'")}`,
     ].join('\n UNION ALL \n');
 
     return { sql, replacements };
