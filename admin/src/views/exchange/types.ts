@@ -97,6 +97,9 @@ export type AccountRow = {
   city: string | null
   createdAt: string | null
   sportsPts: string
+
+  /** Third-party (casino) game points (`credits.thirdparty_pts`). */
+  casinoPts: string
   upperPoint: string
   downPoint: string
 }

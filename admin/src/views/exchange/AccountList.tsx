@@ -4,7 +4,7 @@ import { useState } from 'react'
 
 import Link from 'next/link'
 
-import { ArrowLeftRightIcon, FileSpreadsheetIcon, FileTextIcon, HandCoinsIcon, InfoIcon, PlusIcon, ReceiptTextIcon, ShieldIcon } from 'lucide-react'
+import { ArrowLeftRightIcon, NetworkIcon, FileSpreadsheetIcon, FileTextIcon, HandCoinsIcon, InfoIcon, PlusIcon, ReceiptTextIcon, ShieldIcon } from 'lucide-react'
 
 import type { Channel } from '@/components/shared/ChannelTabs'
 import DataTable, { type Column } from '@/components/shared/DataTable'
@@ -81,6 +81,14 @@ const AccountListBody = ({ channel }: { channel?: Channel }) => {
     cell: r => <span className='text-warning block text-right tabular-nums'>{fmt(r.credit)}</span>
   }
 
+  // Agent / staff row: opens its downline (same list, `?parentId=`).
+  const downline = (r: AccountRow) =>
+    r.accountType === 'staff' && (
+      <Button size='sm' title='Downline users' nativeButton={false} render={<Link href={`?parentId=${r.accountId}`} />} className={`${PILL} bg-primary/10 text-primary ring-primary/30 hover:bg-primary hover:shadow-primary/40`}>
+        <NetworkIcon /> Downline
+      </Button>
+    )
+
   const action: Column<AccountRow> = {
     key: 'action',
     header: 'Action',
@@ -88,9 +96,13 @@ const AccountListBody = ({ channel }: { channel?: Channel }) => {
       parentId ? (
 
         // Drill-down list sirf dekhne ke liye: D/W nahi, More ki jagah "P".
-        <MoreDialog row={r} profileOnly trigger={<Button size='sm' variant='secondary'>P</Button>} />
+        <div className='flex gap-1.5'>
+          {downline(r)}
+          <MoreDialog row={r} profileOnly trigger={<Button size='sm' variant='secondary'>P</Button>} />
+        </div>
       ) : (
         <div className='flex gap-1.5'>
+          {downline(r)}
           <Button size='sm' title='Deposit / Withdraw' className={`${PILL} bg-success-soft text-success ring-success/30 hover:bg-success hover:shadow-success/40`} onClick={() => setOpen({ row: r, kind: 'dw' })}>
             <ArrowLeftRightIcon /> D / W
           </Button>
@@ -108,6 +120,26 @@ const AccountListBody = ({ channel }: { channel?: Channel }) => {
         </div>
       )
   }
+
+  // Points columns (user, 2026-10-17): balance, exposure, sports / casino (third-party) points, P/L = settlement points.
+  const num = (key: string, header: string, pick: (r: AccountRow) => string, tone = '') => ({
+    key,
+    header,
+    align: 'right' as const,
+    cell: (r: AccountRow) => {
+      const n = Number(pick(r) || 0)
+
+      return <span className={`block text-right tabular-nums ${tone || (n < 0 ? 'text-danger' : '')}`}>{fmt(n)}</span>
+    }
+  })
+
+  const points: Column<AccountRow>[] = [
+    num('bal', 'Balance', r => r.available),
+    num('exp', 'Exposure', r => r.exposure, 'text-danger'),
+    num('spts', 'Sports Pts', r => r.sportsPts),
+    num('cpts', 'Casino Pts', r => r.casinoPts),
+    num('pl', 'P/L', r => r.settlementPoints)
+  ]
 
   // Risk management + balance sheet: only on rows whose Account Type is User.
   const userTools: Column<AccountRow> = {
@@ -134,16 +166,16 @@ const AccountListBody = ({ channel }: { channel?: Channel }) => {
     action
   ]
 
-  const columns: Column<AccountRow>[] = [userName, userTools, cr, ...tail]
+  const columns: Column<AccountRow>[] = [userName, userTools, cr, ...points, ...tail]
 
   // Export — zip jaisa: wahi columns, raw numbers.
-  const exportHead = ['User Name', 'CR', 'B st', 'U st', 'PName', 'Account Type']
+  const exportHead = ['User Name', 'CR', 'Balance', 'Exposure', 'Sports Pts', 'Casino Pts', 'P/L', 'B st', 'U st', 'PName', 'Account Type']
 
   const exportRows = () =>
     rows.map(r => {
       const locks = [r.betLocked ? 'Locked' : 'Open', r.userLocked ? 'Locked' : 'Open', `${r.percentage ?? 1} Pt`, accountTypeLabel(r)]
 
-      return [r.username, r.credit, ...locks]
+      return [r.username, r.credit, r.available, r.exposure, r.sportsPts, r.casinoPts, r.settlementPoints, ...locks]
     })
 
   const fileName = 'userlist'
