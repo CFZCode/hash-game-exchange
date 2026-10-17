@@ -41,6 +41,19 @@ async function creditsChain(db, userId, transaction) {
 }
 
 /**
+ * Point ledger sirf agent ke child users (aur unke staff) ka — direct user (koi parent nahi)
+ * ka flow bina point ledger ke chalta hai.
+ */
+async function isChildUser(db, userId, transaction) {
+  const [row] = await db.query('SELECT parent_staff_id FROM public.users WHERE id = :userId', {
+    replacements: { userId },
+    type: QueryTypes.SELECT,
+    transaction
+  });
+  return row?.parent_staff_id != null;
+}
+
+/**
  * Wallets ke all_point (+ sports_pts) me `delta` jodo aur naye figures lautao
  * (point_ledger entry ke liye username, all_point, inr).
  */
@@ -67,4 +80,4 @@ async function readWallets(db, walletIds, transaction) {
   );
 }
 
-export { creditsChain, addPoints, readWallets };
+export { creditsChain, addPoints, readWallets, isChildUser };

@@ -416,18 +416,17 @@ test('agent-tree money', async (t) => {
     });
   });
 
-  await t.test('a staff transfer from an agent never reaches a player, and to staff never uses the credit line', async () => {
+  await t.test('an agent funds its own player through the staff transfer (credit line allowed); to staff never uses the credit line', async () => {
     const master = await seedStaff(newStaffId(), { inr: '0' });
     const agent = await seedStaff(newStaffId(), { inr: '0', creditLimit: '100', parentId: master });
     const sub = await seedStaff(newStaffId(), { inr: '0', parentId: agent });
     const player = await seedPlayer(newUid(), agent, '0');
-    // Even holding `wallet:adjust`: only the owner takes the wide path now.
     const actor = { id: agent, level: 5, canIssueFunds: false, canAdjustWallets: true, canCredit: true, canDebit: true };
 
-    await assert.rejects(
-      () => staffService.transfer({ actor, toType: 'user', toId: player, amount: '60', direction: 'deposit', transactionPassword: TXN_PASSWORD }),
-      (err) => err.code === 'STAFF_NOT_PERMITTED'
-    );
+    // TENEXCH: its DIRECT child player is a target of the same API; agent → player may use the
+    // credit line. Withdrawn back so the float is 0 again.
+    await staffService.transfer({ actor, toType: 'user', toId: player, amount: '60', direction: 'deposit', transactionPassword: TXN_PASSWORD });
+    await staffService.transfer({ actor, toType: 'user', toId: player, amount: '60', direction: 'withdraw', transactionPassword: TXN_PASSWORD });
     await assert.rejects(
       () => staffService.transfer({ actor, toType: 'staff', toId: sub, amount: '10', direction: 'deposit', transactionPassword: TXN_PASSWORD }),
       (err) => err.code === 'INSUFFICIENT_FUNDS' && err.status === 422

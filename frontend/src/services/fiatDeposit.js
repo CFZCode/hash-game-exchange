@@ -73,3 +73,42 @@ export const readFiatDepositScreenshot = (depositId) =>
     .catch(() => null);
 
 export default getFiatDepositByReference;
+
+/* ── SUBMITTING A MANUAL DEPOSIT (direct players, when the site has it on) ─────────────────────
+ *
+ * The house's own receiving accounts are `GET /user/bank-details/:coin` (bank / UPI rows the site
+ * admin enters under Bank details, `hasQrImage` for a QR at `/:id/qr`). The player transfers, then
+ * files `POST /user/deposits/fiat` as multipart: amount, currency, `transactionId` (the bank
+ * reference / UTR), which destination they paid (its bank / UPI fields) and the `screenshot`.
+ * Staff approve or reject it in the admin (Transactions → Deposit → Manual). Not in `endpoints.js`
+ * on purpose, the way `gates.js` keeps its one path: this file is the only reader. */
+const BANK_DETAILS = (coin) => `/api/v1/user/bank-details/${encodeURIComponent(coin)}`;
+
+/** The active house accounts for one fiat (`INR`), `[]` when there are none or the read fails. */
+export const getBankDetails = (coin) =>
+  Promise.resolve(request(BANK_DETAILS(coin), { live: true, fixture: [] }))
+    .then((rows) => (Array.isArray(rows) ? rows : []))
+    .catch(() => []);
+
+/** One destination's QR as an object URL (caller revokes), or null. */
+export const readBankQr = (coin, id) =>
+  Promise.resolve(request(`${BANK_DETAILS(coin)}/${id}/qr`, { live: true, fixture: null }))
+    .then((blob) => (blob instanceof Blob ? URL.createObjectURL(blob) : null))
+    .catch(() => null);
+
+/**
+ * File the deposit. `destination` is the bank-details row the player paid into; only the fields the
+ * validator declares are sent. Rejects with the platform's `{code, message}` (e.g.
+ * MANUAL_DEPOSIT_DISABLED, DEPOSIT_NOT_FOR_AGENT_USERS, a duplicate reference).
+ */
+export function submitFiatDeposit({ amount, currency, transactionId, destination }, screenshot) {
+  const form = new FormData();
+  form.append('amount', String(amount));
+  form.append('currency', currency);
+  form.append('transactionId', transactionId);
+  [['bankName', 'bankName'], ['accountNumber', 'accountNumber'], ['ifscCode', 'ifscCode'], ['accountHolderName', 'accountHolderName'], ['upiId', 'upiId']]
+    .filter(([from]) => destination?.[from])
+    .forEach(([from, to]) => form.append(to, destination[from]));
+  if (screenshot) form.append('screenshot', screenshot, screenshot.name);
+  return request(PLATFORM.user.fiatDeposits.list, { live: true, method: 'POST', body: form, fixture: null });
+}

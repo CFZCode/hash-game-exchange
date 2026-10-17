@@ -1,6 +1,6 @@
 'use strict';
 
-const { Op, literal } = require('sequelize');
+const { Op, QueryTypes, literal } = require('sequelize');
 const {
   hashPassword,
   verifyPassword,
@@ -15,7 +15,7 @@ const errors = require('./staff.errors');
 const { TRANSFER_DIRECTION, TARGET_TYPE, BALANCE_CURRENCY, PASSWORD_ROUNDS } = require('./staff.constants');
 const { manageableStaffIds } = require('../staff-directory/staffDirectory.service');
 const { debitStaffFloat, insufficientStaffBalance, insufficientFunds } = require('../lords/staffFloat');
-const { addPointEntry } = require('../lords/pointLedger');
+const { addPointEntry, SPENDABLE_SQL } = require('../lords/pointLedger');
 const { assertTransactionPassword } = require('../staff-auth/transactionPassword');
 
 /**
@@ -91,17 +91,18 @@ class StaffService {
    * row count decides the outcome, and the history row is written inside it.
    * ─────────────────────────────────────────────────────────────────────
    */
-  async transfer({ actor, toType, toId, amount, direction, transactionPassword }) {
+  async transfer({ actor, toType, toId, amount, direction, transactionPassword, opening = false }, { transaction: outer } = {}) {
     /**
-     * Two ways in.
+     * Sports Exchange ka EK deposit / withdraw API (TENEXCH `/admin/wallet/deposit/add` aur
+     * `/withdraw` jaisa): owner ho ya koi bhi staff, apne DIRECT child — staff ya player — ke saath.
      *
-     *   the Super Admin (`canIssueFunds`, holding `wallet:adjust`) — any
-     *     account in scope, staff or player, paid from the owner's own wallet.
+     *   the Super Admin (`canIssueFunds`, holding `wallet:adjust`) — paid from the owner's own wallet.
+     *   everyone else, Admin and Sub Admin included — out of its own float, and needs the
+     *     `wallet:credit` / `wallet:debit` grant (`#assertParentFunding`).
      *
-     *   everyone else, Admin and Sub Admin included — a PARENT settling with a
-     *     DIRECT CHILD STAFF account out of its own float (the addaplay rule).
-     *     See `#assertParentFunding`. `wallet:adjust` alone no longer widens
-     *     this: an Admin moving money with a grandchild skipped a ledger.
+     * Grandchild / kisi aur ka account: nahi (system tracker ka rule bhi — Credit / Debit
+     * hamesha direct parent ke saath). `opening`: Create Account ka opening credit
+     * ('User creation' entry). `outer`: Create Account apne transaction me bulata hai.
      */
     const parentFunding = !(actor.canAdjustWallets && actor.canIssueFunds);
     if (parentFunding) this.#assertParentFunding(actor, toType, toId, direction);
@@ -115,9 +116,7 @@ class StaffService {
       required: parentFunding || AGENT_TREE_LEVELS.includes(Number(actor.level)),
       executiveId: actor.executiveId ?? null,
     });
-    const target = parentFunding
-      ? await this.#assertDirectChildStaff(actor, toId)
-      : await this.#assertTransferTarget(actor, toType, toId);
+    const target = await this.#assertDirectChild(actor, toType, toId, outer);
 
     // Who pays and who receives. A `withdraw` pulls money UP from the target;
     // a `deposit` pushes it DOWN from the actor.
@@ -138,11 +137,13 @@ class StaffService {
     if (isWithdraw) {
       await withdrawBlock.assertWithdrawAllowed(
         this.models,
-        source.type === TARGET_TYPE.USER ? { userId: source.id } : { staffId: source.id }
+        source.type === TARGET_TYPE.USER ? { userId: source.id } : { staffId: source.id },
+        { transaction: outer }
       );
     }
 
-    return this.db.transaction(async (transaction) => {
+    const run = (fn) => (outer ? fn(outer) : this.db.transaction(fn));
+    return run(async (transaction) => {
       // An agent funding a PLAYER may draw on its credit line; a transfer to
       // another staff account never does. See `lords/staffFloat.js`.
       const allowCredit = source.type === TARGET_TYPE.STAFF && destination.type === TARGET_TYPE.USER;
@@ -172,7 +173,8 @@ class StaffService {
           amount,
           isDeposit: !isWithdraw,
           transferId: row.id,
-          remark: isWithdraw ? 'Withdraw' : 'Deposit',
+          remark: opening ? 'Opening balance' : isWithdraw ? 'Withdraw' : 'Deposit',
+          opening,
         },
         { transaction }
       );
@@ -214,7 +216,7 @@ class StaffService {
    * that subtree. Without this an Admin could create a Super Admin: the role
    * was taken from the body and never compared with anything.
    */
-  async create({ actor, name, email, password, phone, country, roleId, percentage, parentId }) {
+  async create({ actor, name, email, password, phone, country, roleId, percentage, parentId }, { transaction: outer } = {}) {
     const level = await this.#roleLevel(roleId);
     if (level === null) throw errors.UNKNOWN_ROLE({ roleId });
     this.#assertCreatableLevel(actor, level);
@@ -228,10 +230,11 @@ class StaffService {
       this.#assertChildOfParent(actor, parentLevel, level);
     }
 
-    const existing = await this.models.Staff.findOne({ where: { email }, raw: true });
+    const existing = await this.models.Staff.findOne({ where: { email }, raw: true, transaction: outer });
     if (existing) throw errors.NOT_PERMITTED({ reason: 'that email is already in use' });
 
-    return this.db.transaction(async (transaction) => {
+    const run = (fn) => (outer ? fn(outer) : this.db.transaction(fn));
+    return run(async (transaction) => {
       const row = await this.models.Staff.create(
         {
           name,
@@ -390,6 +393,19 @@ class StaffService {
   }
 
   async #debit(party, amount, { actor, transaction, allowCredit = false }) {
+    // TENEXCH: settlement points (`upper_point + down_point`) aage nahi jaate — staff ka deposit /
+    // child staff ka withdraw `inr − settlement points` tak. Agent ka credit line (player ko dena) alag.
+    if (party.type === TARGET_TYPE.STAFF && !allowCredit) {
+      const [ok] = await this.models.StaffCredits.sequelize.query(
+        `SELECT 1 FROM credits WHERE staff_id = :id AND ${SPENDABLE_SQL}`,
+        { replacements: { id: party.id, amount: money.toDecimalString(money.toMinor(amount)) }, type: QueryTypes.SELECT, transaction }
+      );
+      if (!ok) {
+        if (Number(party.id) === Number(actor.id)) throw insufficientStaffBalance({ staffId: party.id, amount });
+        throw insufficientFunds({ party: party.type, id: party.id, amount });
+      }
+    }
+
     /**
      * Owner bhi apne wallet se deta hai (migration 099). Pehle owner yahan se
      * bina kate paisa bana deta tha; ab owner pehle "Add balance" se apne
@@ -403,6 +419,8 @@ class StaffService {
             where: {
               uid: party.id,
               inr: { [Op.gte]: amount },
+              // TENEXCH: player sirf `credit` (diya − liya) tak nikal sakta hai; profit settlement se.
+              credit: { [Op.gte]: amount },
             },
             transaction,
           }
@@ -526,9 +544,6 @@ class StaffService {
    * grants the player money dialogs use.
    */
   #assertParentFunding(actor, toType, toId, direction) {
-    if (toType !== TARGET_TYPE.STAFF) {
-      throw errors.NOT_PERMITTED({ reason: 'fund a player from the player wallet screen' });
-    }
     const isWithdraw = direction === TRANSFER_DIRECTION.WITHDRAW;
     if (isWithdraw ? !actor.canDebit : !actor.canCredit) {
       throw errors.NOT_PERMITTED({ reason: `your role cannot ${isWithdraw ? 'withdraw from' : 'deposit to'} an account` });
@@ -541,26 +556,27 @@ class StaffService {
    * settled by its own parent, so every ledger in the chain stays complete
    * (addaplay's `assertDirectChild`). Anything else reads as not found.
    */
-  async #assertDirectChildStaff(actor, toId) {
+  async #assertDirectChildStaff(actor, toId, transaction) {
     const child = await this.models.Staff.findOne({
       where: { id: toId, parent_id: actor.id },
       attributes: ['id', 'role_id'],
       raw: true,
+      transaction,
     });
     if (!child) throw errors.NOT_IN_YOUR_TREE({ staffId: toId });
     this.#assertCanActOn(actor, await this.#roleLevel(child.role_id), child.id);
     return Number(child.id);
   }
 
-  /** A transfer target must be a descendant account, or a player under one. */
-  async #assertTransferTarget(actor, toType, toId) {
-    if (toType === TARGET_TYPE.STAFF) return this.#assertVisible(actor, toId);
+  /** Target = caller ka DIRECT child: staff (`parent_id`) ya player (`parent_staff_id`). */
+  async #assertDirectChild(actor, toType, toId, transaction) {
+    if (toType === TARGET_TYPE.STAFF) return this.#assertDirectChildStaff(actor, toId, transaction);
 
-    const ids = await this.#visibleStaffIds(actor);
     const player = await this.models.Users.findOne({
-      where: { id: toId, parent_staff_id: ids },
+      where: { id: toId, parent_staff_id: actor.id },
       attributes: ['id'],
       raw: true,
+      transaction,
     });
     if (!player) throw errors.PLAYER_NOT_IN_YOUR_TREE({ toId });
     return Number(player.id);

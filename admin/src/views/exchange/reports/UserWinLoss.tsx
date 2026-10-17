@@ -56,8 +56,11 @@ const UserWinLossReport = ({ channel }: { channel: Channel }) => {
     setLoading(true)
 
     try {
+      // Direct users ki point entry nahi banti — unka report bets + sports ledger se (alag API, INR = pts).
       const res = await withMinimumDelay(
-        api.post<{ rows: WinLossRow[] }>('admin/exchange/reports/user-win-loss', { ...clientBody(client), channel, fromDate: range.from, toDate: range.to })
+        channel === 'direct'
+          ? api.post<{ rows: WinLossRow[] }>('admin/exchange/reports/direct-user-win-loss', { ...clientBody(client), fromDate: range.from, toDate: range.to })
+          : api.post<{ rows: WinLossRow[] }>('admin/exchange/reports/user-win-loss', { ...clientBody(client), channel, fromDate: range.from, toDate: range.to })
       )
 
       setRows(res.rows)

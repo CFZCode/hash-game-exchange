@@ -276,13 +276,13 @@ class WagerStatsService {
        COALESCE(SUM(${SPORTS_STAKE}) FILTER (WHERE LOWER(result_status) = 'refund'), 0)::text AS refunded,
        COALESCE(SUM(${SPORTS_STAKE}) FILTER (WHERE ${OPEN}), 0)::text AS "openStake"`;
 
-    // Payouts: settlement credits, windowed on the ledger's own (indexed)
+    // Payouts: Sports Exchange settlement credits (mssports.credits_ledger, reason settlement = stake + profit), windowed on the ledger's own (indexed)
     // `created_at`, joined to the bet by primary key for its owner and currency.
     // A refund credit carries the bet_id too, but it returns a stake that was
     // never turnover; and a bet refunded or voided after settlement is not in
     // `wagered`, so whatever it was paid is not in `won` either.
     const payoutFilters = `${S.windowSql('l.created_at')} AND l.bet_id IS NOT NULL AND l.amount > 0
-      AND COALESCE(l.reason, '') NOT IN ('BET_REFUND', 'BET_ROLLBACK')
+      AND l.reason = 'settlement'
       AND LOWER(COALESCE(b.result_status, '')) NOT IN ('refund', 'refunded', 'voided_after_settlement')${owned('b.user_id')}${
       currency ? ` AND UPPER(COALESCE(NULLIF(b.original_currency, ''), 'USD')) = :currency` : ''
     }`;
@@ -292,21 +292,21 @@ class WagerStatsService {
       S.select(
         this.models,
         `SELECT ${S.bucketSql('created_at')} AS bucket, ${SPORTS_CURRENCY} AS currency, ${betStats}
-           FROM "SportsBet" WHERE ${betFilters} GROUP BY 1, 2`,
+           FROM mssports."SportsBet" WHERE ${betFilters} GROUP BY 1, 2`,
         replacements
       ),
       S.select(
         this.models,
         `SELECT ${S.bucketSql('l.created_at')} AS bucket, UPPER(COALESCE(NULLIF(b.original_currency, ''), 'USD')) AS currency,
                 COALESCE(SUM(l.amount), 0)::text AS won
-           FROM credits_ledger l JOIN "SportsBet" b ON b.id = l.bet_id
+           FROM mssports.credits_ledger l JOIN mssports."SportsBet" b ON b.id = l.bet_id
           WHERE ${payoutFilters} GROUP BY 1, 2`,
         replacements
       ),
       S.select(
         this.models,
         `SELECT ${market} AS game, ${SPORTS_CURRENCY} AS currency, ${betStats}
-           FROM "SportsBet" WHERE ${betFilters} GROUP BY 1, 2`,
+           FROM mssports."SportsBet" WHERE ${betFilters} GROUP BY 1, 2`,
         replacements
       ),
       S.select(
@@ -314,7 +314,7 @@ class WagerStatsService {
         `SELECT COALESCE(NULLIF(UPPER(b.game_type), ''), 'OTHER') AS game,
                 UPPER(COALESCE(NULLIF(b.original_currency, ''), 'USD')) AS currency,
                 COALESCE(SUM(l.amount), 0)::text AS won
-           FROM credits_ledger l JOIN "SportsBet" b ON b.id = l.bet_id
+           FROM mssports.credits_ledger l JOIN mssports."SportsBet" b ON b.id = l.bet_id
           WHERE ${payoutFilters} GROUP BY 1, 2`,
         replacements
       ),
@@ -322,13 +322,13 @@ class WagerStatsService {
         this.models,
         `SELECT COALESCE(NULLIF(event_name, ''), NULLIF(match_title, ''), match_id, 'Unknown event') AS name,
                 ${SPORTS_CURRENCY} AS currency, ${betStats}
-           FROM "SportsBet" WHERE ${betFilters}
+           FROM mssports."SportsBet" WHERE ${betFilters}
           GROUP BY 1, 2 ORDER BY SUM(${SPORTS_STAKE}) DESC LIMIT ${MAX_GAMES_PER_SOURCE}`,
         replacements
       ),
       S.select(
         this.models,
-        `SELECT COUNT(DISTINCT user_id)::int AS n FROM "SportsBet" WHERE ${betFilters}`,
+        `SELECT COUNT(DISTINCT user_id)::int AS n FROM mssports."SportsBet" WHERE ${betFilters}`,
         replacements
       ),
     ]);

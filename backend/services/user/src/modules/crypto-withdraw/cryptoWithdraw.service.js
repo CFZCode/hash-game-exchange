@@ -502,6 +502,8 @@ class CryptoWithdrawService {
 
     // The operator's withdrawal block (migration 091) — the same refusal every rail gives.
     if (user.withdraw_locked) throw withdrawBlock.errors.BLOCKED({ reason: 'withdraw' });
+    // Admin ka Global Withdrawals switch (Users → Financial) — OFF ho to crypto bhi nahi.
+    if (!(await withdrawBlock.withdrawalsEnabled(this.models.Users.sequelize))) throw withdrawBlock.errors.DISABLED({ reason: 'global' });
     return user;
   }
 

@@ -124,6 +124,10 @@ test('exchange accounts screens', async (t) => {
 
     const [entry] = await sql('SELECT * FROM mssports.point_ledger WHERE wallet_id = :id', { id: wallet.id });
     assert.equal(Number(entry.delta), 1500);
+    // TENEXCH createStaff: the opening credit is 'User creation' / open:<walletId>, remark #parent/child.
+    assert.equal(entry.event_type, 'User creation');
+    assert.equal(entry.entry_ref, `open:${wallet.id}`);
+    assert.match(entry.remark, new RegExp(`#[^/]+/${username}$`));
   });
 
   await t.test('owner creates a player with Credit Amount: opening balance through PlayersService', async () => {
@@ -136,6 +140,30 @@ test('exchange accounts screens', async (t) => {
     const wallet = await models.Credits.findOne({ where: { uid: user.id }, raw: true });
     assert.equal(dec(wallet.inr), 200);
     assert.equal(dec(wallet.all_point), 200);
+    const [entry] = await sql('SELECT * FROM mssports.point_ledger WHERE wallet_id = :id', { id: wallet.id });
+    assert.equal(entry.event_type, 'User creation');
+    assert.equal(entry.entry_ref, `open:${wallet.id}`);
+  });
+
+  await t.test('staff create + opening credit are ONE transaction: a refused opening leaves no account', async () => {
+    // A Master without the wallet:credit grant cannot move its float → the whole create rolls back.
+    const masterId = await seedStaff({ roleId: 5, parentId: ownerId, inr: '500' });
+    const noGrant = actors(masterId, 5);
+    noGrant.staffActor = { ...noGrant.staffActor, canCredit: false };
+    const username = `xagt${tag}z`;
+    await assert.rejects(() => accounts.create({ ...noGrant, username, password: 'StrongPassword12', creditAmount: '100', userType: 6, transactionPassword: TXN }));
+    assert.equal(await models.Staff.count({ where: { name: username } }), 0, 'no half-made account');
+    assert.equal(dec((await models.StaffCredits.findOne({ where: { staff_id: masterId }, raw: true })).inr), 500);
+  });
+
+  await t.test('settlement points are not spendable: parent short → created with 0 credit', async () => {
+    const agentId = await seedStaff({ roleId: 6, parentId: ownerId, inr: '300' });
+    await sequelize.query('UPDATE credits SET upper_point = 250 WHERE staff_id = :id', { replacements: { id: agentId } });
+    const username = `xply${tag}s`;
+    const result = await accounts.create({ ...actors(agentId, 6), username, password: 'Player1234', creditAmount: '100', userType: 'USER', transactionPassword: TXN });
+    assert.equal(result.creditSkipped, true, '300 − 250 settlement points = 50 < 100');
+    assert.match(result.message, /Client Credit is : 50.00/);
+    assert.equal(dec((await models.StaffCredits.findOne({ where: { staff_id: agentId }, raw: true })).inr), 300);
   });
 
   await t.test('parent short: account still created with 0 credit (zip creditSkipped)', async () => {

@@ -5,6 +5,7 @@ const { Op } = require('sequelize');
 const { money } = require('@ibitplay/common');
 
 const E = require('./jsGames.errors');
+const { addChildGamePoints } = require('./pointLedger');
 /**
  * `recordPlay` and its trim live with the catalogue they are about. Imported
  * rather than duplicated — the alternative was a second copy of the "keep the
@@ -806,7 +807,7 @@ class JsGamesService {
     const magnitude = money.toDecimalString(isCredit ? delta : -delta);
 
     try {
-      return await this.db.transaction(async (transaction) => {
+      const result = await this.db.transaction(async (transaction) => {
         const created = await model.create(record, { transaction });
 
         const movement = await this.wallet[isCredit ? 'credit' : 'debit']({
@@ -822,6 +823,24 @@ class JsGamesService {
 
         return { balance: movement.newBalance };
       });
+
+      // Child user (agent ke neeche) ka point ledger — paisa move hone ke baad, alag transaction me.
+      // Fail ho to paisa wapas nahi hota (wo user-service me ho chuka); sirf zor se log.
+      if (currency === 'INR') {
+        try {
+          await addChildGamePoints(this.models.Users.sequelize, {
+            userId,
+            delta: money.toDecimalString(delta),
+            entryRef: `jsgames:${refId}`,
+            gameType: record.game_type ?? record.game_uid ?? null,
+            remark: `jsGames ${record.transaction_type ?? ''} ${refId}`,
+          });
+        } catch (error) {
+          this.logger?.error({ err: error, refId, userId }, 'jsGames point ledger write failed — all_point drift');
+        }
+      }
+
+      return result;
     } catch (error) {
       if (error?.name === 'SequelizeUniqueConstraintError') return { duplicate: true };
       if (error?.code === 'WALLET_INSUFFICIENT_FUNDS' || error?.status === 402) return { insufficient: true };

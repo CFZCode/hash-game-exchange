@@ -7,6 +7,7 @@ const db = require('@ibitplay/db');
 const { createLogger, money } = require('@ibitplay/common');
 
 const { BonusService } = require('../bonus.service');
+const { configureAgentPlayers, resetAgentPlayers } = require('@ibitplay/auth');
 const { vipLevelFor, VIP_LEVELS } = require('@ibitplay/common');
 const { BONUS_TYPES } = require('../bonus.constants');
 
@@ -462,6 +463,21 @@ test('bonus', async (t) => {
       () => service.grantBonusGame({ userId: uid, idempotencyKey: `grant-${uid}-none`, dailybonus: '5' }),
       (err) => err.code === 'BONUS_NO_GAME_COUNTERS' && err.status === 404
     );
+    assert.equal(await bonusBalance(uid), '0.00000000');
+  });
+
+  await t.test('a CHILD user (any parent) gets no bonus grant', async () => {
+    const uid = newUid();
+    await seed(uid);
+    configureAgentPlayers({ isAgentPlayer: async (id) => Number(id) === uid });
+    try {
+      await assert.rejects(
+        () => service.grantBonusGame({ userId: uid, idempotencyKey: `grant-${uid}-child`, dailybonus: '5' }),
+        (err) => err.code === 'PROMOTIONS_NOT_FOR_AGENT_USERS' && err.status === 403
+      );
+    } finally {
+      resetAgentPlayers();
+    }
     assert.equal(await bonusBalance(uid), '0.00000000');
   });
 

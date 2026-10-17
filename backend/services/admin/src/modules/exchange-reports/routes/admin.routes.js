@@ -24,6 +24,7 @@ const actorFrom = (req) => ({
  *   POST /admin/exchange/reports/statement/bet-export        game row → bets CSV
  *   GET  /admin/exchange/reports/party-win-loss              Party Win Loss (profitloss/all)
  *   POST /admin/exchange/reports/user-win-loss               User Win Loss (point-category-report)
+ *   POST /admin/exchange/reports/direct-user-win-loss        User Win Loss — Direct Users tab (bets se)
  *   POST /admin/exchange/reports/total-profit-loss           Total Profit Loss
  *   POST /admin/exchange/reports/turnover                    Turn Over
  */
@@ -48,6 +49,7 @@ module.exports = function adminRoutes(deps) {
   router.post('/statement/bet-export', validate(v.statementRow), read('body', 'statementBetExport'));
   router.get('/party-win-loss', validate(v.partyWinLoss), read('query', 'partyWinLoss'));
   router.post('/user-win-loss', validate(v.userWinLoss), read('body', 'userWinLoss'));
+  router.post('/direct-user-win-loss', validate(v.directUserWinLoss), read('body', 'directUserWinLoss'));
   router.post('/total-profit-loss', validate(v.totalProfitLoss), read('body', 'totalProfitLoss'));
   router.post('/turnover', validate(v.turnover), read('body', 'turnover'));
 

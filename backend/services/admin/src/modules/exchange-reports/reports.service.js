@@ -4,7 +4,7 @@ const { AppError } = require('@ibitplay/common');
 
 const { treeOf, searchClients } = require('./reportScope');
 const { statement, betDetail, betExport } = require('./accountStatement');
-const { partyWinLoss, userWinLoss, totalProfitLoss, turnover } = require('./winLossReports');
+const { partyWinLoss, userWinLoss, directUserWinLoss, totalProfitLoss, turnover } = require('./winLossReports');
 
 const noBets = () => new AppError('No bets found for this entry', 404, 'EXCHANGE_NO_BETS');
 
@@ -56,6 +56,11 @@ class ExchangeReportsService {
 
   async userWinLoss({ actor, channel, ...filters }) {
     return userWinLoss(this.sequelize, await this.#tree(actor, channel), filters);
+  }
+
+  /** User Win Loss ka Direct Users tab — bets + mssports.credits_ledger se (direct ki point entry nahi). */
+  async directUserWinLoss({ actor, ...filters }) {
+    return directUserWinLoss(this.sequelize, await this.#tree(actor, 'direct'), filters);
   }
 
   async totalProfitLoss({ actor, channel, ...filters }) {

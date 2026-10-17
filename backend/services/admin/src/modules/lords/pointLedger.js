@@ -25,13 +25,23 @@ const POINT_EVENT = Object.freeze({
   DEBIT: 'Debit', // parent ne child se liya (−)
   BANK_DEPOSIT: 'Bank Deposite', // owner ne DIRECT user ko diya — owner ke Direct User balance (staff_balances) se
   BANK_WITHDRAW: 'Bank Withdraw', // owner ne DIRECT user se liya — owner ke Direct User balance me gaya
+  USER_CREATION: 'User creation', // account bante waqt parent ka diya opening credit (TENEXCH createUserUnderParent / createStaff)
 });
 
 /** entry_ref — transfer ki id se, taaki entry dobara na lage. */
 const pointEntryRef = Object.freeze({
   deposit: (transferId) => `deposit:${transferId}`,
   withdraw: (transferId) => `withdraw:${transferId}`,
+  // Opening credit — child wallet ki pehli entry (TENEXCH `open:<walletId>`).
+  opening: (walletId) => `open:${walletId}`,
 });
+
+/**
+ * TENEXCH ka rule: settlement points (`upper_point + down_point`) aage nahi diye ja sakte —
+ * parent ka deposit / child staff ka withdraw sirf `inr − settlement points` tak.
+ * `credits` row pe SQL condition (`:amount` replacement chahiye).
+ */
+const SPENDABLE_SQL = 'inr - GREATEST(COALESCE(upper_point, 0) + COALESCE(down_point, 0), 0) >= :amount';
 
 /** Player ya staff ka wallet (credits row) — id, inr aur naam. */
 async function findWallet(models, party, transaction) {
@@ -64,8 +74,9 @@ async function findWallet(models, party, transaction) {
  * @param {string|number} p.transferId  staff_transfers.id
  * @param {string} [p.eventType]  default Credit / Debit
  * @param {string} [p.remark]
+ * @param {boolean} [p.opening] account ka opening credit: event 'User creation', entry_ref `open:<walletId>`
  */
-async function addPointEntry(models, { child, parent, amount, isDeposit, transferId, eventType, remark }, { transaction }) {
+async function addPointEntry(models, { child, parent, amount, isDeposit, transferId, eventType, remark, opening = false }, { transaction }) {
   const childWallet = await findWallet(models, child, transaction);
   const parentWallet = await findWallet(models, parent, transaction);
   if (!childWallet || !parentWallet) return null; // wallet hi nahi hai — kuch likhne ko nahi
@@ -93,8 +104,8 @@ async function addPointEntry(models, { child, parent, amount, isDeposit, transfe
         :closingInr, :closingInrParent, :sourceUserId, :remark, NOW())`,
     {
       replacements: {
-        entryRef: isDeposit ? pointEntryRef.deposit(transferId) : pointEntryRef.withdraw(transferId),
-        eventType: eventType ?? (isDeposit ? POINT_EVENT.CREDIT : POINT_EVENT.DEBIT),
+        entryRef: opening ? pointEntryRef.opening(childWallet.id) : isDeposit ? pointEntryRef.deposit(transferId) : pointEntryRef.withdraw(transferId),
+        eventType: eventType ?? (opening ? POINT_EVENT.USER_CREATION : isDeposit ? POINT_EVENT.CREDIT : POINT_EVENT.DEBIT),
         username: childWallet.username,
         walletId: childWallet.id,
         parentWalletId: parentWallet.id,
@@ -103,7 +114,9 @@ async function addPointEntry(models, { child, parent, amount, isDeposit, transfe
         closingInr: childWallet.inr ?? 0,
         closingInrParent: parentWallet.inr ?? 0,
         sourceUserId: child.type === 'user' ? child.id : null,
-        remark: `${remark ?? ''}#${childWallet.username}/${parentWallet.username}`.slice(0, 255),
+        // TENEXCH: "#bhejne-wala/paane-wala" — deposit pe parent/child, withdraw pe child/parent
+        // (Credit History isi se "Super User" padhta hai).
+        remark: `${remark ?? ''}#${isDeposit ? `${parentWallet.username}/${childWallet.username}` : `${childWallet.username}/${parentWallet.username}`}`.slice(0, 255),
       },
       transaction,
     }
@@ -112,4 +125,4 @@ async function addPointEntry(models, { child, parent, amount, isDeposit, transfe
   return { walletId: childWallet.id, delta, allPointAfter: updated?.all_point ?? null };
 }
 
-module.exports = { addPointEntry, POINT_EVENT, pointEntryRef };
+module.exports = { addPointEntry, POINT_EVENT, pointEntryRef, SPENDABLE_SQL };

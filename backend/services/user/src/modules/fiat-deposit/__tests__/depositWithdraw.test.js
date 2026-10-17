@@ -9,6 +9,7 @@ const db = require('@ibitplay/db');
 const { createLogger, money } = require('@ibitplay/common');
 
 const { FiatDepositService } = require('../fiatDeposit.service');
+const { configureAgentPlayers, resetAgentPlayers } = require('@ibitplay/auth');
 const { FiatWithdrawService } = require('../../fiat-withdraw/fiatWithdraw.service');
 
 /**
@@ -124,6 +125,22 @@ test('fiat deposit and withdrawal', async (t) => {
       pending.rows.some((r) => r.depositId === created.depositId),
       'the deposit must appear in the admin queue'
     );
+  });
+
+  await t.test('a pending deposit of a CHILD user (any parent) cannot be approved', async () => {
+    const uid = newUid();
+    await seed(uid, '100');
+    const created = await lodge(uid, '500');
+    configureAgentPlayers({ isAgentPlayer: async (id) => Number(id) === uid });
+    try {
+      await assert.rejects(
+        () => deposits.approve({ depositId: created.depositId }, { id: 1 }),
+        (err) => err.code === 'DEPOSIT_NOT_FOR_AGENT_USERS' && err.status === 403
+      );
+    } finally {
+      resetAgentPlayers();
+    }
+    assert.equal(await balanceOf(uid), '100.00000000');
   });
 
   await t.test('approval credits credits.inr — legacy credited users.balance', async () => {

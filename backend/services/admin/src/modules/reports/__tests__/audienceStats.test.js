@@ -145,7 +145,8 @@ test('stats against a database', async (t) => {
     await sql('DELETE FROM tips WHERE from_user_id IN (:ids) OR to_user_id IN (:ids)', { ids: [playerA, playerB, playerB2] });
     await sql('DELETE FROM fiat_deposits WHERE user_id IN (:ids)', { ids: [playerA, playerB, playerC1, playerC2] });
     await sql('DELETE FROM fiat_withdrawals WHERE uid IN (:ids)', { ids: [playerA, playerB] });
-    await sql('DELETE FROM "SportsBet" WHERE user_id IN (:ids)', { ids: [playerA, playerB, playerC1, playerC2] });
+    await sql('DELETE FROM mssports."SportsBet" WHERE user_id IN (:ids)', { ids: [playerA, playerB, playerC1, playerC2] });
+    await sql('DELETE FROM mssports.users WHERE user_id IN (:ids)', { ids: [playerA, playerB, playerC1, playerC2] });
     await sql('DELETE FROM wager_activity WHERE user_id IN (:ids)', { ids: [playerC1, playerC2] });
     await sql('DELETE FROM credits_ledger WHERE user_id IN (:ids)', { ids: [String(playerA), String(playerB)] });
     await models.Users.destroy({ where: { id: [playerA, playerB, playerB2, playerC1, playerC2] } });
@@ -176,9 +177,15 @@ test('stats against a database', async (t) => {
     );
     // C's play: a settled 30 USD sports stake (counts) and a feed-only demo_seed wager
     // with no game row behind it (does not — it is not in the wager reports either).
+    // Sports Exchange tables (mssports); "SportsBet".user_id → mssports.users (the sports mirror row).
     await sql(
-      `INSERT INTO "SportsBet" (user_id, sport_id, category, stake_amount, original_amount, original_currency, usd_amount, status, result_status, created_at)
-       VALUES (:c1, '4', '01', 30, 30, 'USD', 30, 'closed', 'loss', now())`,
+      `INSERT INTO mssports.users (user_id, username, password, role_id, "createdAt", "updatedAt")
+       VALUES (:c1, :n1, 'x', 4, now(), now()), (:a, :na, 'x', 4, now(), now()) ON CONFLICT (user_id) DO NOTHING`,
+      { c1: playerC1, a: playerA, n1: `c1-${playerC1}`, na: `a-${playerA}` }
+    );
+    await sql(
+      `INSERT INTO mssports."SportsBet" (user_id, game_type, bet_type, odds, sport_id, category, stake_amount, original_amount, original_currency, usd_amount, status, result_status, created_at)
+       VALUES (:c1, 'MO', 'back', 2, '4', '01', 30, 30, 'USD', 30, 'closed', 'loss', now())`,
       { c1: playerC1 }
     );
     await sql(
@@ -207,8 +214,9 @@ test('stats against a database', async (t) => {
     );
     // Sports by the feed's sport id ('4' = Cricket); `category` is a code, and a refund is not a stake.
     await sql(
-      `INSERT INTO "SportsBet" (user_id, sport_id, category, stake_amount, usd_amount, status, result_status, created_at)
-       VALUES (:a, '4', '01', 200, 2, 'closed', 'won', now()), (:a, '4', '01', 900, 9, 'closed', 'refund', now())`,
+      // In USD (mssports defaults original_currency to INR), so the INR figures below stay casino-only.
+      `INSERT INTO mssports."SportsBet" (user_id, game_type, bet_type, odds, sport_id, category, stake_amount, original_currency, usd_amount, status, result_status, created_at)
+       VALUES (:a, 'MO', 'back', 2, '4', '01', 200, 'USD', 2, 'closed', 'won', now()), (:a, 'MO', 'back', 2, '4', '01', 900, 'USD', 9, 'closed', 'refund', now())`,
       { a: playerA }
     );
     await models.CreditsLedger.bulkCreate([
@@ -250,6 +258,9 @@ test('stats against a database', async (t) => {
     assert.equal(stats.kpis.won, '15.00000000');
     assert.equal(stats.kpis.ggr, '25.00000000', 'the deposit is not play');
     assert.equal(stats.breakdown.products.find((p) => p.key === 'casino').wagered, '40.00000000');
+    // The Sports Exchange stake (mssports, USD) is in the USD view, not the INR one.
+    const usd = await players.forPlayer({ staff: asA, userId: playerA, ...window, currency: 'USD' });
+    assert.equal(usd.breakdown.products.find((p) => p.key === 'sports').wagered, '200.00000000');
     assert.equal(stats.breakdown.providers[0].key, 'GIS');
     assert.equal(stats.kpis.withdrawn, '530.00000000', 'Approved and Paid both count, each once; In Queue and Rejected do not');
     assert.deepEqual(

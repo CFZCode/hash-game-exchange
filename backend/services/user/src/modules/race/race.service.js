@@ -3,7 +3,7 @@
 const { createRewardMoney, USD_CODES } = require('../../lib/rewardMoney');
 const { Op } = require('sequelize');
 const { money, operatorSettings } = require('@ibitplay/common');
-const { siteHasNoPromotions } = require('@ibitplay/auth');
+const { siteHasNoPromotions, promotionsBlocked } = require('@ibitplay/auth');
 
 const { WalletService } = require('../wallet/wallet.service');
 const errors = require('./race.errors');
@@ -474,9 +474,14 @@ class RaceService {
      * the real players in order, and rank N's prize goes to the Nth real
      * player.
      */
-    const payable = entries
-      .filter((e) => !e.isBoat && money.gte(e.points, config.minPoints))
-      .slice(0, config.winnerCount);
+    // Races sirf direct users ke: child user (koi parent) board pe dikh sakta hai par prize nahi — agla direct player le.
+    const payable = [];
+    for (const e of entries) {
+      if (payable.length >= config.winnerCount) break;
+      if (e.isBoat || !money.gte(e.points, config.minPoints)) continue;
+      if (await promotionsBlocked(e.userId)) continue;
+      payable.push(e);
+    }
 
     const prizeByRank = new Map(config.rankPrizes.map((r) => [r.rank, r]));
 

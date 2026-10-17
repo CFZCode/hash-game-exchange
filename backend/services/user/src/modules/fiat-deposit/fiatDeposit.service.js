@@ -6,6 +6,7 @@ const crypto = require('crypto');
 
 const { money, sitePolicy, currencyRegistry, manualPayments, entitlements, cashierLimits } = require('@ibitplay/common');
 const { Op: SequelizeOp } = require('@ibitplay/db');
+const { assertPlayerCapability } = require('@ibitplay/auth');
 
 const errors = require('./fiatDeposit.errors');
 const {
@@ -232,6 +233,8 @@ class FiatDepositService {
       if (deposit.status !== DEPOSIT_STATUS.PENDING) {
         throw errors.ALREADY_PROCESSED({ depositId, status: deposit.status });
       }
+      // Manual deposit sirf direct user ka — child user (koi parent) ka paisa Sports Exchange D/W se.
+      await assertPlayerCapability(deposit.user_id, 'deposit');
 
       // Normalised either way, so the response and the ledger always carry a
       // canonical 8-dp string rather than whatever the operator typed.

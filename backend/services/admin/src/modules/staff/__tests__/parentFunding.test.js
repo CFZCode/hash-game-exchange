@@ -23,10 +23,11 @@ const { StatementsService } = require('../../statements/statements.service');
  *     CHILD STAFF account out of its own float
  *   - the transaction password is always required on that path
  *   - a grandchild, a sibling or a parent reads as not in your tree
- *   - no self-transfer, no player target (players keep their own route)
+ *   - no self-transfer; a DIRECT CHILD PLAYER is a target too (TENEXCH: one deposit /
+ *     withdraw API for staff and players), and a player withdraw is capped at its `credit`
  *   - every move is a `staff_transfers` row on the transfer and agent statements
- *   - only the Super Admin (the owner, `wallet:adjust` + `canIssueFunds`)
- *     reaches any account in scope, and mints; an Admin holding
+ *   - the Super Admin (the owner, `wallet:adjust` + `canIssueFunds`) pays from its own
+ *     wallet, and is held to its DIRECT children too; an Admin holding
  *     `wallet:adjust` is a parent like any other
  */
 
@@ -230,13 +231,29 @@ test('parent funds its direct child staff', async (t) => {
     await models.StaffCredits.update({ inr: '0' }, { where: { staff_id: agentA } });
   });
 
-  await t.test('no self-transfer, no player target, and the wallet grant is needed', async () => {
+  await t.test('no self-transfer; its own player is a target (credit-capped withdraw); the wallet grant is needed', async () => {
     await assert.rejects(() => move(treeActor(master, 5), master, '5'), (err) => err.code === 'STAFF_CANNOT_TRANSFER_TO_SELF');
 
+    // TENEXCH: the same API funds a direct child PLAYER — inr, credit, all_point up, ledger 'Credit'.
     const player = await seedPlayer(master, '0');
+    const toPlayer = (amount, direction) =>
+      service.transfer({ actor: treeActor(master, 5), toType: 'user', toId: player, amount, direction, transactionPassword: TXN });
+    await toPlayer('5', 'deposit');
+    const wallet = await models.Credits.findOne({ where: { uid: player }, raw: true });
+    assert.equal(money.toDecimalString(money.toMinorQuantised(wallet.inr)), '5.00000000');
+    assert.equal(money.toDecimalString(money.toMinorQuantised(wallet.credit)), '5.00000000');
+    assert.equal(money.toDecimalString(money.toMinorQuantised(wallet.all_point)), '5.00000000');
+    assert.equal(await floatOf(master), '95.00000000');
+    // Profit (inr above credit) leaves only through settlement: withdraw caps at min(inr, credit).
+    await models.Credits.update({ inr: '9' }, { where: { uid: player } });
+    await assert.rejects(() => toPlayer('6', 'withdraw'), (err) => err.code === 'INSUFFICIENT_FUNDS');
+    await toPlayer('5', 'withdraw');
+    assert.equal(await floatOf(master), '100.00000000');
+    // Someone else's player (not a direct child) is not in your tree.
+    const other = await seedPlayer(agentA, '0');
     await assert.rejects(
-      () => service.transfer({ actor: treeActor(master, 5), toType: 'user', toId: player, amount: '5', direction: 'deposit', transactionPassword: TXN }),
-      (err) => err.code === 'STAFF_NOT_PERMITTED'
+      () => service.transfer({ actor: treeActor(master, 5), toType: 'user', toId: other, amount: '5', direction: 'deposit', transactionPassword: TXN }),
+      (err) => err.code === 'STAFF_PLAYER_NOT_IN_YOUR_TREE' && err.status === 404
     );
 
     await assert.rejects(
@@ -248,6 +265,14 @@ test('parent funds its direct child staff', async (t) => {
       (err) => err.code === 'STAFF_NOT_PERMITTED'
     );
     assert.equal(await floatOf(master), '100.00000000');
+  });
+
+  await t.test('settlement points are not spendable (TENEXCH): float − upper/down points', async () => {
+    // master float 100, 90 of it settlement points → only 10 can go down.
+    await connection.sequelize.query('UPDATE credits SET upper_point = 90 WHERE staff_id = :id', { replacements: { id: master } });
+    await assert.rejects(() => move(treeActor(master, 5), agentA, '20'), (err) => err.code === 'INSUFFICIENT_FUNDS' && err.status === 422);
+    assert.equal(await floatOf(master), '100.00000000');
+    await connection.sequelize.query('UPDATE credits SET upper_point = 0 WHERE staff_id = :id', { replacements: { id: master } });
   });
 
   await t.test('insufficient own balance is the 422 INSUFFICIENT_FUNDS and moves nothing', async () => {
@@ -290,20 +315,20 @@ test('parent funds its direct child staff', async (t) => {
     assert.equal(await floatOf(agentA), '0.00000000');
   });
 
-  await t.test('wallet:adjust alone is no longer the wide path: an Admin is a parent like any other; only the owner reaches past its children', async () => {
+  await t.test('wallet:adjust alone is no longer the wide path: an Admin is a parent like any other; the owner too is held to its direct children', async () => {
     const admin = await seedStaff(2, { inr: '100' });
     const sMaster = await seedStaff(4, { parentId: admin });
     const mMaster = await seedStaff(5, { parentId: sMaster });
     const player = await seedPlayer(mMaster, '0');
 
-    // A grandchild and a player — beyond the direct-child rule, refused.
+    // A grandchild and a grandchild's player — beyond the direct-child rule, refused.
     await assert.rejects(
       () => service.transfer({ actor: adminActor(admin), toType: 'staff', toId: mMaster, amount: '30', direction: 'deposit', transactionPassword: TXN }),
       (err) => err.code === 'STAFF_NOT_IN_YOUR_TREE' && err.status === 404
     );
     await assert.rejects(
       () => service.transfer({ actor: adminActor(admin), toType: 'user', toId: player, amount: '20', direction: 'deposit', transactionPassword: TXN }),
-      (err) => err.code === 'STAFF_NOT_PERMITTED'
+      (err) => err.code === 'STAFF_PLAYER_NOT_IN_YOUR_TREE'
     );
     // Its direct child, out of its own float.
     await service.transfer({ actor: adminActor(admin), toType: 'staff', toId: sMaster, amount: '30', direction: 'deposit', transactionPassword: TXN });
@@ -316,12 +341,16 @@ test('parent funds its direct child staff', async (t) => {
       (err) => err.code === 'INSUFFICIENT_FUNDS' && err.status === 422
     );
 
-    // The owner reaches any account in scope, paid from its own wallet (migration 099).
+    // The owner too: DIRECT children only (TENEXCH; the tracker wants every Credit / Debit with the
+    // direct parent), paid from its own wallet (migration 099). A grandchild is not in its tree.
     await models.StaffCredits.update({ inr: '100' }, { where: { staff_id: admin } });
-    await service.transfer({
-      actor: adminActor(admin, { level: 1, canIssueFunds: true }), toType: 'staff', toId: mMaster, amount: '40', direction: 'deposit', transactionPassword: TXN,
-    });
+    const owner = adminActor(admin, { level: 1, canIssueFunds: true });
+    await assert.rejects(
+      () => service.transfer({ actor: owner, toType: 'staff', toId: mMaster, amount: '40', direction: 'deposit', transactionPassword: TXN }),
+      (err) => err.code === 'STAFF_NOT_IN_YOUR_TREE'
+    );
+    await service.transfer({ actor: owner, toType: 'staff', toId: sMaster, amount: '40', direction: 'deposit', transactionPassword: TXN });
     assert.equal(await floatOf(admin), '60.00000000');
-    assert.equal(await floatOf(mMaster), '40.00000000');
+    assert.equal(await floatOf(sMaster), '70.00000000');
   });
 });

@@ -9,7 +9,7 @@ import { Owner_default } from "../models/admin/Owner.mjs";
 import { Transaction_default } from "../models/admin/Transaction.mjs";
 import { PointLedger_default } from "../models/admin/PointLedger.mjs";
 import { POINT_EVENT, POINT_CATEGORY, pointEntryRef, LEDGER_CATEGORY_ALIASES } from "../constants/pointLedger.mjs";
-import { creditsChain, addPoints } from "../../../../../lib/services/creditsPoints.mjs";
+import { creditsChain, addPoints, isChildUser } from "../../../../../lib/services/creditsPoints.mjs";
 import { QueryTypes } from "sequelize";
 import { emitBalanceUpdate } from "../utils/socketUtils.mjs";
 import { withVoidSuffix } from "../helper/voidLabel.mjs";
@@ -670,6 +670,12 @@ var WalletService = {
         await tx.commit();
         return { success: true, skipped: true, reason: `bet ${betId} belongs to demo user ${userId} \u2014 points not rolled up` };
       }
+      // Direct user: point ledger nahi (flow pehle jaisa). points_applied set nahi karte, isliye
+      // void pe reverseAllPointHierarchy bhi kuch nahi karta.
+      if (!(await isChildUser(db_default, userId, tx))) {
+        await tx.commit();
+        return { success: true, skipped: true, reason: `bet ${betId} direct user ${userId} ki hai \u2014 point ledger sirf child users ka` };
+      }
       // Chain: player + upar ke saare staff, sabke `credits` rows (Wallets ki jagah).
       const walletIds = await creditsChain(db_default, userId, tx);
       const updated = await addPoints(db_default, walletIds, net, { transaction: tx });
@@ -879,7 +885,8 @@ var WalletService = {
       sportId,
       gtype,
       eventType: POINT_EVENT.COMMISSION,
-      entryRef: pointEntryRef.commission(POINT_CATEGORY.SPORTS, betId)
+      entryRef: pointEntryRef.commission(POINT_CATEGORY.SPORTS, betId),
+      childOnly: true
     });
   },
   // Settlement void ke saath commission bhi wapas — ulti entry, original kabhi delete nahi hoti.
@@ -895,10 +902,12 @@ var WalletService = {
       sportId,
       gtype,
       eventType: POINT_EVENT.REVERSAL,
-      entryRef: pointEntryRef.commissionReversal(POINT_CATEGORY.SPORTS, betId)
+      entryRef: pointEntryRef.commissionReversal(POINT_CATEGORY.SPORTS, betId),
+      // Ulti entry tabhi jab asli commission entry likhi gayi thi (direct user ki nahi likhi jaati).
+      onlyIfRef: pointEntryRef.commission(POINT_CATEGORY.SPORTS, betId)
     });
   },
-  _writeCommissionChain: async ({ betId, userId, delta, remark, sportId, gtype, eventType, entryRef }) => {
+  _writeCommissionChain: async ({ betId, userId, delta, remark, sportId, gtype, eventType, entryRef, childOnly = false, onlyIfRef = null }) => {
     const category = POINT_CATEGORY.SPORTS;
     const tx = await db_default.transaction();
     try {
@@ -911,6 +920,14 @@ var WalletService = {
       if (already) {
         await tx.commit();
         return { success: true, duplicate: true, reason: `${entryRef} already written` };
+      }
+      if (childOnly && !(await isChildUser(db_default, userId, tx))) {
+        await tx.commit();
+        return { success: true, skipped: true, reason: `bet ${betId} direct user ki hai — commission points nahi` };
+      }
+      if (onlyIfRef && !(await PointLedger_default.findOne({ where: { entry_ref: onlyIfRef }, attributes: ["id"], transaction: tx }))) {
+        await tx.commit();
+        return { success: true, skipped: true, reason: `${onlyIfRef} likhi hi nahi gayi thi — ulti entry nahi` };
       }
       // Chain: player + upar ke saare staff, sabke `credits` rows (Wallets ki jagah).
       const walletIds = await creditsChain(db_default, userId, tx);
