@@ -11,7 +11,7 @@ import { PointLedger_default } from "../models/admin/PointLedger.mjs";
 import { POINT_EVENT, POINT_CATEGORY, pointEntryRef, LEDGER_CATEGORY_ALIASES } from "../constants/pointLedger.mjs";
 import { creditsChain, addPoints, isChildUser } from "../../../../../lib/services/creditsPoints.mjs";
 import { QueryTypes } from "sequelize";
-import { writeDirectEntry, reverseDirectEntry, deleteDirectEntries } from "../../../../../lib/services/directPointLedger.mjs";
+import { writeDirectEntry, reverseDirectEntry } from "../../../../../lib/services/directPointLedger.mjs";
 import { emitBalanceUpdate } from "../utils/socketUtils.mjs";
 import { withVoidSuffix } from "../helper/voidLabel.mjs";
 import { MESSAGES } from "../constants/messages.mjs";
@@ -840,11 +840,17 @@ var WalletService = {
         transaction: tx,
         lock: tx.LOCK.UPDATE
       });
-      // Direct user ki entry `point_ledger_direct` me hoti hai — wahan bhi mitao.
-      const direct = await deleteDirectEntries(db_default, entryRef, { transaction: tx });
+      // Direct user (`point_ledger_direct`): silent void par bhi entry NAHI mitti — sab history
+      // rehni chahiye, isliye ulti entry likhi jaati hai (settle:… → reverse:…).
+      const direct = await reverseDirectEntry(db_default, {
+        originalRef: entryRef,
+        reversalRef: entryRef.startsWith("settle:") ? entryRef.replace(/^settle:/, "reverse:") : `reverse:${entryRef}`,
+        eventType: POINT_EVENT.REVERSAL,
+        remark: null
+      }, { transaction: tx });
       if (!rows.length) {
         await tx.commit();
-        if (direct.deleted) return { success: true, direct: true, deleted: direct.deleted, entry_ref: entryRef };
+        if (direct.written) return { success: true, direct: true, reversed: true, entry_ref: entryRef };
         return { success: true, skipped: true, reason: `${entryRef} ki koi entry nahi mili` };
       }
       const touched = [];

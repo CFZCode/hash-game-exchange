@@ -2,6 +2,7 @@
 import { BetVoidAudit_default } from "../../models/admin/BetVoidAudit.mjs";
 
 import { randomUUID } from "crypto";
+import { writeDirectVoids } from "../../../../../../lib/services/directPointLedger.mjs";
 var newVoidGroupId = () => randomUUID();
 var num = (v) => v === null || v === void 0 || v === "" ? null : Number(v);
 var recordVoidAudit = async ({
@@ -61,7 +62,13 @@ var recordVoidAudit = async ({
     backfilled,
     created_at: /* @__PURE__ */ new Date()
   }));
-  return BetVoidAudit_default.bulkCreate(rows, t ? { transaction: t } : {});
+  const created = await BetVoidAudit_default.bulkCreate(rows, t ? { transaction: t } : {});
+  // Direct users ka point ledger: settle se pehle wale har void ki entry (AFTER_SETTLEMENT ki ulti
+  // entry alag se likhi jaati hai). Usi transaction me — void rollback ho to entry bhi nahi.
+  if (voidType !== "AFTER_SETTLEMENT" && betKind === "SPORTS") {
+    await writeDirectVoids(BetVoidAudit_default.sequelize, { voidType, voidGroupId, bets }, t ? { transaction: t } : {});
+  }
+  return created;
 };
 
 export { newVoidGroupId, recordVoidAudit };

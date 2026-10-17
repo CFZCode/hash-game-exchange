@@ -6,6 +6,7 @@
 // settlement pehle hi move kar chuka hota hai. `balance_after` = us currency ka wallet balance.
 // `entry_ref` unique hai — wahi event dobara aaye to row dobara nahi banti.
 import { QueryTypes } from "sequelize";
+import { withVoidSuffix } from "../helper/voidLabel.mjs";
 
 const TABLE = "mssports.point_ledger_direct";
 
@@ -78,13 +79,61 @@ async function reverseDirectEntry(db, { originalRef, reversalRef, eventType, rem
       betId: original.bet_id,
       sportId: original.sport_id,
       gameType: original.game_type,
-      remark: remark ?? original.remark
+      remark: remark ?? withVoidSuffix(original.remark || "")
     },
     { transaction }
   );
 }
 
-/** Silent void: entry hi mita do (statement me kuch na dikhe). */
+/**
+ * Settle hone se PEHLE wale void (OPEN_BET, MARKET, FEED_SUSPENDED, AUTO_TIMEOUT) — direct users ki
+ * har bet ki ek `VOID` row, delta 0: settle se pehle koi jeet/haar nahi hui thi, sirf exposure
+ * chhoota. Child users skip (unka agent ledger alag hai). AFTER_SETTLEMENT yahan nahi — uski
+ * ulti entry reverseAllPointHierarchy / deletePointEntries likhte hain.
+ * entry_ref `void:bet:SPORTS:<betId>:<voidGroupId>` — wahi void dobara aaye to dobara nahi.
+ */
+async function writeDirectVoids(db, args, { transaction } = {}) {
+  // Savepoint: ledger ki koi galti void ko fail na kare (void ho, entry na bane — log zor se).
+  try {
+    if (transaction) return await db.transaction({ transaction }, (sp) => writeVoidRows(db, args, sp));
+    return await writeVoidRows(db, args, undefined);
+  } catch (err) {
+    console.error("[pointLedgerDirect] void entry write failed:", args?.voidType, err.message);
+    return { written: 0, error: err.message };
+  }
+}
+
+async function writeVoidRows(db, { voidType, voidGroupId, bets }, transaction) {
+  const userIds = [...new Set(bets.map((b) => String(b.user_id)).filter(Boolean))];
+  if (!userIds.length) return { written: 0 };
+  const direct = await db.query(
+    "SELECT id::text AS id FROM public.users WHERE id::text IN (:userIds) AND parent_staff_id IS NULL",
+    { replacements: { userIds }, type: QueryTypes.SELECT, transaction }
+  );
+  const directIds = new Set(direct.map((r) => r.id));
+  let written = 0;
+  for (const b of bets) {
+    if (!directIds.has(String(b.user_id))) continue;
+    const what = [b.match_title || b.event_name, b.market_type, b.selection_name || b.selection].filter(Boolean).join(" / ");
+    const stake = b.stake_amount ?? b.stake;
+    const res = await writeDirectEntry(db, {
+      entryRef: `void:bet:SPORTS:${b.id}:${voidGroupId}`,
+      eventType: "VOID",
+      category: "SPORTS",
+      userId: b.user_id,
+      currency: b.original_currency || "INR",
+      delta: 0,
+      betId: b.id,
+      sportId: b.sport_id ?? null,
+      gameType: b.gtype || b.game_type || null,
+      remark: `${voidType} void${what ? ` — ${what}` : ""}${stake != null ? ` (stake ${stake})` : ""}`
+    }, { transaction });
+    if (res.written) written += 1;
+  }
+  return { written };
+}
+
+/** Entry hi mita do — ab kisi void flow me use nahi hota (direct ledger me sab rehta hai). */
 async function deleteDirectEntries(db, entryRef, { transaction } = {}) {
   const rows = await db.query(`DELETE FROM ${TABLE} WHERE entry_ref = :entryRef RETURNING id`, {
     replacements: { entryRef },
@@ -94,4 +143,4 @@ async function deleteDirectEntries(db, entryRef, { transaction } = {}) {
   return { deleted: rows.length };
 }
 
-export { writeDirectEntry, reverseDirectEntry, deleteDirectEntries };
+export { writeDirectEntry, reverseDirectEntry, writeDirectVoids, deleteDirectEntries };
