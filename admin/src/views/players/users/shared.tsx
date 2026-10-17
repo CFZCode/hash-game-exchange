@@ -53,11 +53,11 @@ export type Tone = keyof typeof TONES
 
 /** Upar wala card: rangeen icon box + label + value. */
 export const StatCard = ({ label, value, icon, tone, loading }: { label: string; value: ReactNode; icon: ReactNode; tone: Tone; loading?: boolean }) => (
-  <Card className='flex min-w-0 flex-row items-center gap-4 p-5'>
-    <span className={cn('flex size-12 shrink-0 items-center justify-center rounded-xl [&_svg]:size-5', TONES[tone])}>{icon}</span>
+  <Card className='flex min-w-0 flex-row items-center gap-3 p-3.5 sm:gap-4 sm:p-5'>
+    <span className={cn('flex size-10 shrink-0 items-center justify-center rounded-xl sm:size-12 [&_svg]:size-5', TONES[tone])}>{icon}</span>
     <div className='min-w-0'>
-      <p className='text-muted-foreground text-xs font-semibold tracking-wide uppercase'>{label}</p>
-      {loading ? <Skeleton className='mt-1 h-6 w-24' /> : <p className='truncate text-xl font-bold tabular-nums'>{value}</p>}
+      <p className='text-muted-foreground text-[11px] font-semibold tracking-wide uppercase sm:text-xs'>{label}</p>
+      {loading ? <Skeleton className='mt-1 h-6 w-24' /> : <p className='truncate text-lg font-bold tabular-nums sm:text-xl'>{value}</p>}
     </div>
   </Card>
 )
@@ -69,7 +69,7 @@ export const Chip = ({ tone, children, className }: { tone: Tone; children: Reac
 
 const AVATAR = ['bg-chart-5', 'bg-chart-2', 'bg-success', 'bg-warning', 'bg-danger', 'bg-info']
 
-const avatarClass = (name: string) => {
+export const avatarClass = (name: string) => {
   let hash = 0
 
   for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash)
