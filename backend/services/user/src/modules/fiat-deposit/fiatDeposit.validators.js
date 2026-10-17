@@ -50,6 +50,8 @@ const approve = {
       // player entered (with a comment). Never more — the service refuses that.
       creditAmount: moneyAmount.optional(),
       comment: z.string().trim().max(500).optional(),
+      // Checked by admin-service (required) before anything is credited.
+      transactionPassword: z.string().max(200).optional(),
     })
     .strict(),
 };

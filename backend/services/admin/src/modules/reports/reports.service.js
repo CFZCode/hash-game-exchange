@@ -55,6 +55,21 @@ const ratioOf = (deposited, withdrawn) =>
  * three of these routes had no authentication at all and the fourth reasoned
  * that ids outside a caller's downline were unobtainable.
  */
+
+/** `credits_ledger` reasons the balance sheet reads in section 6d, with the category shown. */
+const OTHER_LEDGER = Object.freeze({
+  credit: ['BONUS', 'TIP_RECEIVED', 'ADMIN_CREDIT'],
+  debit: ['BONUS_REVERSAL', 'TIP_SENT', 'ADMIN_DEBIT'],
+  category: { BONUS: 'Bonus', BONUS_REVERSAL: 'Bonus', TIP_RECEIVED: 'Tip', TIP_SENT: 'Tip', ADMIN_CREDIT: 'Adjustment', ADMIN_DEBIT: 'Adjustment' },
+});
+
+const safeJson = (v) => {
+  try {
+    return JSON.parse(v);
+  } catch {
+    return null;
+  }
+};
 class ReportsService {
   constructor({ models, db, logger, config }) {
     this.models = models;
@@ -1627,6 +1642,28 @@ class ReportsService {
       const credit = row.reason === DIRECT_WALLET_LEDGER.deposit;
       const abs = money.toDecimalString(money.toMinorQuantised(String(row.amount ?? '0').replace(/^-/, '')));
       push(row.created_at, 'Deposit', credit ? 'CREDIT' : 'DEBIT', row.description || (credit ? 'Admin deposit' : 'Admin withdrawal'), credit ? abs : `-${abs}`, Number(row.id) || 0);
+    }
+
+    /**
+     * 6d. Promotions, tips and operator adjustments: `credits_ledger` rows no section above reads
+     *     (first-deposit / VIP / claimed bonuses, their reversals, tips, staff adjustments that are
+     *     not the Direct User Wallet). Without them every bonus showed as an "unexplained" mismatch.
+     *     The sign comes from the reason, as in 6c — stored signs differ by writer.
+     */
+    const otherMoves = await this.models.CreditsLedger.findAll({
+      where: {
+        user_id: uid,
+        currency: { [Op.iLike]: currency },
+        reason: { [Op.in]: [...OTHER_LEDGER.credit, ...OTHER_LEDGER.debit] },
+      },
+      raw: true,
+    });
+    for (const row of otherMoves) {
+      const meta = typeof row.meta === 'string' ? safeJson(row.meta) : row.meta;
+      if (meta?.refType === DIRECT_WALLET_LEDGER.refType) continue; // read in 6c
+      const credit = OTHER_LEDGER.credit.includes(row.reason);
+      const abs = money.toDecimalString(money.toMinorQuantised(String(row.amount ?? '0').replace(/^-/, '')));
+      push(row.created_at, OTHER_LEDGER.category[row.reason], credit ? 'CREDIT' : 'DEBIT', row.description || row.reason, credit ? abs : `-${abs}`, Number(row.id) || 0);
     }
 
     /**

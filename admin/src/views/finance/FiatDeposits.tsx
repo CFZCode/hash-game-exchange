@@ -36,11 +36,11 @@ const INVALIDATE = [['paged', LIST], ['api', 'admin/reports/finance-stats']]
 const APPROVE = ['deposits:approve', 'withdrawals:approve']
 
 const Approve = ({ row }: { row: FiatDepositRow }) => {
-  const [form, setForm] = useState({ creditAmount: '', comment: '' })
+  const [form, setForm] = useState({ creditAmount: '', comment: '', transactionPassword: '' })
 
   const approve = useApiMutation({
     fn: () => {
-      const body: Record<string, string> = {}
+      const body: Record<string, string> = { transactionPassword: form.transactionPassword }
 
       if (form.creditAmount) body.creditAmount = form.creditAmount
       if (form.comment) body.comment = form.comment
@@ -75,12 +75,14 @@ const Approve = ({ row }: { row: FiatDepositRow }) => {
         comment:
           form.creditAmount.trim() && Number(form.creditAmount) < Number(row.amount) && !form.comment.trim()
             ? 'Say why you credit less than requested (the user sees it)'
-            : check.length(form.comment, 'Comment', { max: 500 })
+            : check.length(form.comment, 'Comment', { max: 500 }),
+        transactionPassword: form.transactionPassword ? undefined : 'Enter your transaction password'
       })}
       onSubmit={() => approve.mutateAsync()}
     >
       <TextField id={`ap-amt-${row.depositId}`} name='creditAmount' inputMode='decimal' label='Credit amount' placeholder={row.amount} hint={`Leave blank to credit the requested ${Number(row.amount).toLocaleString('en-IN')} ${row.currency}; at most that`} value={form.creditAmount} onChange={e => setForm({ ...form, creditAmount: e.target.value })} />
       <TextAreaField id={`ap-c-${row.depositId}`} name='comment' label='Comment' value={form.comment} onChange={e => setForm({ ...form, comment: e.target.value })} />
+      <TextField id={`ap-pw-${row.depositId}`} name='transactionPassword' label='Transaction password' type='password' autoComplete='off' required value={form.transactionPassword} onChange={e => setForm({ ...form, transactionPassword: e.target.value })} />
     </FormDialog>
   )
 }
@@ -167,7 +169,16 @@ const DepositMethod = ({ row }: { row: FiatDepositRow }) => {
 
 const columns: Column<FiatDepositRow>[] = [
   { key: 'id', header: 'ID', cell: r => <span className='font-mono text-xs'>{r.depositId}</span> },
-  { key: 'user', header: 'User', cell: r => <Link href={`/users/${r.userId}`} className='font-mono text-xs hover:underline'>#{r.userId}</Link> },
+  {
+    key: 'user',
+    header: 'User',
+    cell: r => (
+      <Link href={`/users/${r.userId}`} className='hover:underline'>
+        <span className='block font-medium'>{r.username || `#${r.userId}`}</span>
+        {r.username && <span className='text-muted-foreground block font-mono text-xs'>#{r.userId}</span>}
+      </Link>
+    )
+  },
   { key: 'amount', header: 'Amount', align: 'right', cell: r => <Money value={r.amount} currency={r.currency} /> },
   { key: 'ref', header: 'Bank reference', cell: r => <span className='font-mono text-xs'>{r.transactionId}</span> },
   { key: 'bank', header: 'Method', cell: r => <DepositMethod row={r} /> },

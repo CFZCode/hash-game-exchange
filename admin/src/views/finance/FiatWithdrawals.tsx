@@ -10,7 +10,7 @@ import Can from '@/components/shared/Can'
 import DataTable, { type Column } from '@/components/shared/DataTable'
 import DateTime from '@/components/shared/DateTime'
 import FormDialog from '@/components/shared/FormDialog'
-import { SelectField, TextAreaField } from '@/components/shared/FormField'
+import { TextField, SelectField, TextAreaField } from '@/components/shared/FormField'
 import Money from '@/components/shared/Money'
 import { FilterBar } from '@/components/shared/charts'
 import PageHeader from '@/components/shared/PageHeader'
@@ -33,11 +33,11 @@ const LIST = 'admin/user/withdrawals/fiat'
 
 /** `POST admin/user/withdrawals/fiat/status { withdrawalId, status, comment? }`. Rejected refunds the held funds. */
 const Decide = ({ row }: { row: FiatWithdrawalRow }) => {
-  const [form, setForm] = useState({ status: row.status === 'In Queue' ? 'Approved' : row.status, comment: '' })
+  const [form, setForm] = useState({ status: row.status === 'In Queue' ? 'Approved' : row.status, comment: '', transactionPassword: '' })
 
   const decide = useApiMutation({
     fn: () => {
-      const body: Record<string, string | number> = { withdrawalId: row.withdrawalId, status: form.status }
+      const body: Record<string, string | number> = { withdrawalId: row.withdrawalId, status: form.status, transactionPassword: form.transactionPassword }
 
       if (form.comment) body.comment = form.comment
 
@@ -64,12 +64,14 @@ const Decide = ({ row }: { row: FiatWithdrawalRow }) => {
       destructive={form.status === 'Rejected'}
       validate={() => ({
         status: form.status === row.status ? `Already ${row.status} — pick a different status` : undefined,
-        comment: check.length(form.comment, 'Comment', { max: 500 })
+        comment: check.length(form.comment, 'Comment', { max: 500 }),
+        transactionPassword: form.transactionPassword ? undefined : 'Enter your transaction password'
       })}
       onSubmit={() => decide.mutateAsync()}
     >
       <SelectField id={`fw-st-${row.withdrawalId}`} name='status' label='New status' value={form.status} onChange={status => setForm({ ...form, status })} options={FIAT_WITHDRAW_STATUSES.map(v => ({ value: v, label: v }))} />
       <TextAreaField id={`fw-c-${row.withdrawalId}`} name='comment' label='Comment' hint='Recorded on the audit trail' value={form.comment} onChange={e => setForm({ ...form, comment: e.target.value })} />
+      <TextField id={`fw-pw-${row.withdrawalId}`} name='transactionPassword' label='Transaction password' type='password' autoComplete='off' required value={form.transactionPassword} onChange={e => setForm({ ...form, transactionPassword: e.target.value })} />
     </FormDialog>
   )
 }

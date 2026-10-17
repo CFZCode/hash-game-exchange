@@ -17,6 +17,7 @@ export type FiatDepositRow = {
   ifscCode?: string | null
   handledBy?: number | string | null
   handledAt?: string | null
+  username?: string | null
 }
 
 export type DepositStats = {

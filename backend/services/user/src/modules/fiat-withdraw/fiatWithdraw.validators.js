@@ -104,6 +104,8 @@ const updateStatus = {
       withdrawalId: z.coerce.number().int().positive(),
       status: z.enum(WITHDRAW_STATUSES),
       comment: z.string().trim().max(500).optional(),
+      // Checked by admin-service (required): paying out or refunding moves money.
+      transactionPassword: z.string().max(200).optional(),
     })
     .strict(),
 };
