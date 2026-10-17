@@ -5,6 +5,7 @@ const { Op } = require('sequelize');
 const { money } = require('@ibitplay/common');
 
 const E = require('./gis.errors');
+const { addChildGamePoints, addDirectGamePoints } = require('../js-games/pointLedger');
 const { responseIdFor } = require('./responseId');
 const { chosenAggregator, LIVE, PARKED } = require('../games/catalogueSwitch');
 const {
@@ -463,6 +464,8 @@ class GisService {
         return movement.newBalance;
       });
 
+      await this.#writePoints({ userId, settlement, amount, isCredit, storageId, action, body, balanceAfter: result });
+
       return { balance: this.#quote(result), rawBalance: result, transaction_id: this.#responseId(body.transaction_id) };
     } catch (error) {
       /**
@@ -589,6 +592,30 @@ class GisService {
    * unknown player look real with a zero balance, and the provider then retries
    * a member that does not exist.
    */
+  /**
+   * Point ledger — JS games jaisa: agent ka child user → `point_ledger` (poori chain, sirf INR),
+   * direct user → `point_ledger_direct` (sirf uski ek row, har currency). Paisa move ho chuka hota
+   * hai; yahan sirf points likhte hain, alag transaction me. Fail ho to callback fail nahi hota
+   * (provider ko 200 hi jaata hai) — sirf zor se log. `gis:<storageId>` se dobara nahi likhta.
+   */
+  async #writePoints({ userId, settlement, amount, isCredit, storageId, action, body, balanceAfter }) {
+    const sequelize = this.models.Users.sequelize;
+    const delta = isCredit ? amount : money.toDecimalString(money.negate(amount));
+    const entry = {
+      userId,
+      delta,
+      entryRef: `gis:${storageId}`,
+      gameType: body.game_uuid ?? null,
+      remark: `GIS ${action} ${storageId}`,
+    };
+    try {
+      if (settlement === 'INR') await addChildGamePoints(sequelize, entry);
+      await addDirectGamePoints(sequelize, { ...entry, currency: settlement, balanceAfter });
+    } catch (error) {
+      this.logger?.error({ err: error, storageId, userId }, 'GIS point ledger write failed — all_point drift');
+    }
+  }
+
   async #balanceOf(userId, currency) {
     try {
       const result = await this.wallet.balance(userId, currency);

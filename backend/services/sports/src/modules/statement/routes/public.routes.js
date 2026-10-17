@@ -19,6 +19,8 @@ module.exports = function publicRoutes() {
 
   router.post('/account-statement-v2', authMiddleware, maxDateRange31, Statement('getAccountStatementV2'));
   router.post('/account-statement-v2/bets', authMiddleware, Statement('getStatementMarketBets'));
+  // Direct user (koi parent nahi): `point_ledger_direct` se — sports + casino, har currency. Result modal wahi `/account-statement-v2/bets`.
+  router.post('/account-statement-direct', authMiddleware, maxDateRange31, Statement('getDirectAccountStatement'));
 
   return router;
 };

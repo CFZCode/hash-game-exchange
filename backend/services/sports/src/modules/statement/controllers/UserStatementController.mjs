@@ -4,6 +4,7 @@
 import { Credits_default } from "../../../models/user/Credits.mjs";
 import { User_default } from "../../../models/user/User.mjs";
 import { UserStatementService_default } from "../services/UserStatementService.mjs";
+import { DirectStatementService } from "../services/DirectStatementService.mjs";
 
 var UserStatementController = {
   getAccountStatementV2: async (req, res) => {
@@ -50,6 +51,40 @@ var UserStatementController = {
       return res.status(200).json(result);
     } catch (error) {
       console.error("\u274C [UserStatementController] getAccountStatementV2 Error:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  },
+  /**
+   * Direct user (koi parent nahi) ka statement — `point_ledger_direct` se (DirectStatementService).
+   * Body: { fromDate, toDate, reportType: ALL|SPORTS|CASINO, currency?, search?, page?, limit? }.
+   * Agent user ke liye nahi (unka `account-statement-v2`) — 403.
+   */
+  getDirectAccountStatement: async (req, res) => {
+    try {
+      const id = req.user.user_id || req?.user?.account?.id;
+      if (!id) {
+        return res.status(401).json({ success: false, message: "User not authenticated or ID missing" });
+      }
+      const user = await User_default.findByPk(id, { attributes: ["id", "parent_staff_id"], raw: true });
+      if (!user) return res.status(404).json({ success: false, message: "User not found" });
+      if (user.parent_staff_id != null) {
+        return res.status(403).json({ success: false, message: "Agent users use /account-statement-v2" });
+      }
+      const { reportType, fromDate, toDate, currency, search, page, limit } = req.body || {};
+      const rt = String(reportType || "ALL").toUpperCase().trim();
+      if (!DirectStatementService.REPORT_TYPES.includes(rt)) {
+        return res.status(400).json({ success: false, message: "reportType must be ALL, SPORTS or CASINO" });
+      }
+      if (currency != null && !/^[A-Za-z]{2,10}$/.test(String(currency))) {
+        return res.status(400).json({ success: false, message: "currency must be a coin code like INR or USDT" });
+      }
+      const result = await DirectStatementService.getAccountStatement(
+        { id, db: User_default.sequelize },
+        { reportType: rt, fromDate, toDate, currency, search, page, limit }
+      );
+      return res.status(200).json(result);
+    } catch (error) {
+      console.error("\u274C [UserStatementController] getDirectAccountStatement Error:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   },

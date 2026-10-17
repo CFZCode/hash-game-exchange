@@ -346,4 +346,4 @@ var UserStatementService = {
 };
 var UserStatementService_default = UserStatementService;
 
-export { UserStatementService_default };
+export { UserStatementService_default, sportsMarketKey };
