@@ -1,7 +1,6 @@
 import { requestPage } from './client';
 import { PLATFORM } from './endpoints';
 import { isFiatCode } from '../utils/currency';
-import { getSportsBets } from './exchange/history';
 
 /* `/wallet/bet-history` — the last of the nine wallet panes. `_` in `index-D5N4LJZ-.js` is its
  * whole request module: two paths, and the split between them is the interesting part.
@@ -131,7 +130,7 @@ export function toBetRow(row) {
  *
  * Type → `?category=original|live|slots` and Assets → `?currency=<code>` on the casino route
  * (casino bet-history `myHistory`; the rule for each category is `categoryOf` there). Sports is a
- * different service: Type = Sports reads the player's exchange bets instead (`sportsPage`).
+ * different service: Type = Sports is drawn by BetHistory/SportsBets from the exchange's own bets.
  *
  * AN OLDER BACKEND REFUSES THE TWO PARAMS — its validator is strict, so an unknown key is a 422,
  * not an ignored one. On that answer the read is repeated without them and the rows are filtered
@@ -171,7 +170,8 @@ const isRefusedParam = (error) => error?.status === 422 || error?.status === 400
 /* `minDistributeId` is still PASSED by the pane and not destructured: the cursor is answered rather
    than consumed (see `toPage`). */
 export function getBetHistory({ beginTime, endTime, page = 1, type = '', currencyName = '' }) {
-  if (String(type) === SPORTS_TYPE) return sportsPage({ beginTime, endTime, currencyName });
+  /* Sports is not a casino read: the pane draws the exchange's bets itself (BetHistory/SportsBets). */
+  if (String(type) === SPORTS_TYPE) return Promise.resolve({ ...EMPTY_PAGE, totalPage: 0, first: true });
 
   const first = page === 1;
   const category = CATEGORY_OF_TYPE[type] ?? '';
@@ -232,41 +232,6 @@ export function getBetHistory({ beginTime, endTime, page = 1, type = '', currenc
       return read(false).then((out) => toPage(out, true));
     },
   );
-}
-
-/* ── Type = Sports: the exchange's own bets ───────────────────────────────────────────────────
- *
- * mssports keeps them (`GET /cricket/sports-bets/user`, the My Bets page's read) and has no date
- * filter, so the latest page is read and the window applied here; cancelled bets are left out.
- * Every exchange bet is in INR, so an Assets filter naming another coin is an empty list. */
-const SPORTS_PAGE = 100;
-
-export function toSportsRow(bet) {
-  const stake = Number(bet.stake) || 0;
-  const profit = bet.isOpen ? 0 : Number(bet.profit) || 0;
-  const market = [bet.selection, bet.marketType].filter(Boolean).join(' · ');
-  return {
-    distributeId: `sports-${bet.id}`,
-    type: [bet.matchTitle, market].filter(Boolean).join(' — ') || 'Sports bet',
-    time: Date.parse(bet.createdAt ?? '') || undefined,
-    payout: !bet.isOpen && stake > 0 ? Math.max(0, Math.round(((stake + profit) / stake) * 1e4)) : 0,
-    profit: String(profit),
-    currencyName: 'INRFIAT',
-  };
-}
-
-async function sportsPage({ beginTime, endTime, currencyName }) {
-  const currency = bareCode(currencyName);
-  if (currency && currency !== 'INR') return { resList: [], minDistributeId: undefined, totalPage: 0, first: true };
-  const { rows } = await getSportsBets({ page: 1, limit: SPORTS_PAGE, status: 'all' });
-  const from = beginTime ? Number(beginTime) : -Infinity;
-  const to = endTime ? Number(endTime) : Infinity;
-  const resList = rows
-    .filter((bet) => !/delete|cancel|void/.test(bet.status))
-    .map(toSportsRow)
-    .filter((row) => row.time && row.time >= from && row.time <= to)
-    .sort((a, b) => b.time - a.time);
-  return { resList, minDistributeId: resList.at(-1)?.distributeId, totalPage: 1, first: true };
 }
 
 /* `x` — the Type filter's options, with bc.game's values kept ("" then 1, 3, 4, 5; there never was

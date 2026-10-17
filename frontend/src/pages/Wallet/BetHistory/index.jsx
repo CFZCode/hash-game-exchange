@@ -21,6 +21,10 @@ import {
   BET_TYPE_OPTIONS,
   linksToGameDetail,
 } from '../../../services/betHistory';
+import SportsBets from './SportsBets';
+
+/* Type = Sports (value "4"): the exchange's bets, drawn by SportsBets instead of the casino table. */
+const SPORTS_TYPE = '4';
 
 /* `/wallet/bet-history` — the ninth and last wallet pane. `DialogBetHistory` resolves to
  * `index-D5N4LJZ-.js` (6.4 KB) and that one file is the whole page; every other module it needs is
@@ -163,6 +167,11 @@ function BetList({ settings }) {
   );
 }
 
+function BetBody({ settings }) {
+  const { get } = useWalletFilter();
+  return get('type') === SPORTS_TYPE ? <SportsBets /> : <BetList settings={settings} />;
+}
+
 export default function BetHistory() {
   const { session } = useSession();
   const settings = session.setting;
@@ -185,7 +194,7 @@ export default function BetHistory() {
         {/* The `center` slot sits here on the original — `ProviderBalanceList`, which is not built.
             See the header note; it renders nothing in the capture either. */}
 
-        <BetList settings={settings} />
+        <BetBody settings={settings} />
       </div>
     </WalletFilterProvider>
   );
