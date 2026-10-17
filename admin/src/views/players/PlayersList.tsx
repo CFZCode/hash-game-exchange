@@ -12,7 +12,7 @@ import DateTime from '@/components/shared/DateTime'
 import PageHeader from '@/components/shared/PageHeader'
 import StatusBadge from '@/components/shared/StatusBadge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { isAgentTreeLevel, useSession } from '@/contexts/SessionContext'
+import { useSession } from '@/contexts/SessionContext'
 import { useListState, usePagedApi } from '@/hooks/use-api'
 import { cn } from '@/lib/utils'
 import { RiskManagementDialog } from './RiskManagement'
@@ -114,7 +114,7 @@ const UsersPage = () => {
   const pathname = usePathname()
   const params = useSearchParams()
   const { actor } = useSession()
-  const house = !isAgentTreeLevel(actor?.level)
+  const house = actor?.direct === true
   const promotions = actor?.promotions === true
 
   const sections: { value: Section; label: string; icon: React.ReactNode }[] = [

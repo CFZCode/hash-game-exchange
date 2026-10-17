@@ -611,14 +611,14 @@ type Tab = 'direct' | 'agent'
  * refresh / link pe wahi tab khule. Jis tab ki permission nahi, wo tab nahi dikhta.
  */
 const Dashboard = () => {
-  const { can } = useSession()
+  const { actor, can } = useSession()
   const router = useRouter()
   const pathname = usePathname()
   const params = useSearchParams()
 
   const tabs = (
     [
-      { value: 'direct', label: 'Direct Users', allowed: can('reports:read') },
+      { value: 'direct', label: 'Direct Users', allowed: actor?.direct === true && can('reports:read') },
       { value: 'agent', label: 'Agent System', allowed: can(WALLET_ANY) }
     ] as const
   ).filter(t => t.allowed)

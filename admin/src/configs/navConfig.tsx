@@ -202,6 +202,9 @@ export type MenuLeafSubItem = {
 
   /** A promotions screen (or the vault, or swap history): hidden from agent-tree logins (staff levels 4–6 and their executives). */
   promotions?: boolean
+
+  /** A direct-user screen: only the Super Admin and its executives (`actor.direct`). */
+  direct?: boolean
 }
 
 export type MenuGroupSubItem = {
@@ -214,6 +217,9 @@ export type MenuGroupSubItem = {
   feature?: string
   account?: 'marketing'
   promotions?: boolean
+
+  /** A direct-user screen: only the Super Admin and its executives (`actor.direct`). */
+  direct?: boolean
 }
 
 export type MenuSubItem = MenuLeafSubItem | MenuGroupSubItem
@@ -227,6 +233,9 @@ export type MenuItem = {
   feature?: string
   account?: 'marketing'
   promotions?: boolean
+
+  /** A direct-user screen: only the Super Admin and its executives (`actor.direct`). */
+  direct?: boolean
 } & (
   | {
       href: string
@@ -280,12 +289,12 @@ export const navItems: NavItem[] = [
       // Either grant opens the list: reports:read reads `admin/reports/players` (balances, deposits,
       // wagers); users:read alone falls back to the player directory `admin/user/directory`.
       { icon: 'Users', label: 'Users', href: '/users', activePath: '/users', permission: ['reports:read', 'users:read'] } as MenuItem,
-      { icon: 'Wallet', label: 'Wallets', href: '/wallets', permission: 'wallet:adjust' },
+      { icon: 'Wallet', label: 'Wallets', href: '/wallets', permission: 'wallet:adjust', direct: true },
       { icon: 'Globe', label: 'Login & IP history', href: '/ip-tracker', permission: 'reports:read' },
 
       // Zip ke Main jaisa: Redeem Codes (Promotions se yahan) aur Turnover Report (direct users ka wager vs target).
       { icon: 'Ticket', label: 'Redeem Codes', href: '/redeem-codes', permission: 'reports:read', promotions: true },
-      { icon: 'Activity', label: 'Turnover Report', href: '/turnover-report', permission: 'reports:read', promotions: true }
+      { icon: 'Activity', label: 'Turnover Report', href: '/turnover-report', permission: 'reports:read', promotions: true, direct: true }
     ]
   },
   {
@@ -338,14 +347,14 @@ export const navItems: NavItem[] = [
     collapsible: true,
     // House only (user, 2026-10-17): an agent's player has no deposit / withdraw / KYC, so agent logins get no Transactions section.
     items: [
-      { icon: 'ArrowDownToLine', label: 'Deposit', href: '/transactions/deposit', permission: ['deposits:read', 'users:read'], promotions: true },
-      { icon: 'ArrowUpFromLine', label: 'Withdraw', href: '/transactions/withdraw', permission: ['withdrawals:read', 'users:read'], promotions: true },
+      { icon: 'ArrowDownToLine', label: 'Deposit', href: '/transactions/deposit', permission: ['deposits:read', 'users:read'], promotions: true, direct: true },
+      { icon: 'ArrowUpFromLine', label: 'Withdraw', href: '/transactions/withdraw', permission: ['withdrawals:read', 'users:read'], promotions: true, direct: true },
 
       // The transfer list is `admin/accounts/statement` (users:read); the drill-down is `admin/statements` (reports:read).
-      { icon: 'BookOpen', label: 'Account Statement', href: '/reports/statements', permission: ['users:read', 'reports:read'], promotions: true },
+      { icon: 'BookOpen', label: 'Account Statement', href: '/reports/statements', permission: ['users:read', 'reports:read'], promotions: true, direct: true },
 
       // Users section se yahan: KYC aur Bank details (routes wahi).
-      { icon: 'ShieldCheck', label: 'KYC', href: '/kyc', permission: 'users:read', feature: 'kyc', promotions: true },
+      { icon: 'ShieldCheck', label: 'KYC', href: '/kyc', permission: 'users:read', feature: 'kyc', promotions: true, direct: true },
       { icon: 'Building2', label: 'Bank details', href: '/bank-details', permission: 'config:read', promotions: true }
     ]
   },
@@ -522,6 +531,9 @@ export const PROMOTION_ROUTES = [
   '/bank-details'
 ]
 
+/** Direct-user screens with no sidebar entry (the old cashier): Super Admin and its executives only, like `direct: true`. */
+export const DIRECT_ROUTES = ['/deposits', '/withdrawals']
+
 export const isPromotionRoute = (pathname: string) =>
   PROMOTION_ROUTES.some(route => pathname === route || pathname.startsWith(`${route}/`))
 
@@ -538,10 +550,11 @@ export type RouteRequirement = {
   href: string
   permissions: Array<string | string[]>
   promotions: boolean
+  direct: boolean
   account?: 'marketing'
 }
 
-type Marks = { permission?: string | string[]; promotions?: boolean; account?: 'marketing' }
+type Marks = { permission?: string | string[]; promotions?: boolean; direct?: boolean; account?: 'marketing' }
 
 const collectRoutes = (): RouteRequirement[] => {
   const out: RouteRequirement[] = []
@@ -554,6 +567,7 @@ const collectRoutes = (): RouteRequirement[] => {
         href: entry.href,
         permissions: marks.map(m => m.permission).filter((p): p is string | string[] => !!p && (!Array.isArray(p) || p.length > 0)),
         promotions: marks.some(m => m.promotions),
+        direct: marks.some(m => m.direct),
         account: marks.find(m => m.account)?.account
       })
     }
@@ -579,6 +593,9 @@ export type NavMarks = {
   feature?: string
   account?: 'marketing'
   promotions?: boolean
+
+  /** A direct-user screen: only the Super Admin and its executives (`actor.direct`). */
+  direct?: boolean
 }
 
 type NavEntry = NavMarks & { href?: string; childItems?: MenuSubItem[] }

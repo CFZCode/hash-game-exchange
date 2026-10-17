@@ -22,6 +22,9 @@ export type Actor = {
    * 4–6 and their executives. Computed by `/api/auth/me`; re-derived from `level` here as a guard.
    */
   promotions: boolean
+
+  /** May this session see anything about DIRECT users? Only the Super Admin and its executives (`/api/auth/me`). */
+  direct: boolean
   permissions: string[]
   expiresAt: string
   name?: string
@@ -99,7 +102,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     queryFn: () =>
       request<Actor>('/api/auth/me', { raw: true }).then(r => ({
         ...r.data,
-        promotions: r.data.promotions !== false && !isAgentTreeLevel(r.data.level)
+        promotions: r.data.promotions !== false && !isAgentTreeLevel(r.data.level),
+        direct: r.data.direct === true && !isAgentTreeLevel(r.data.level)
       })),
     staleTime: 60_000,
     retry: false
