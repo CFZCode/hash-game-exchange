@@ -5,7 +5,7 @@
 export const SITE_KEY = 'hash-game-exchange'
 export const SITE_NAME = 'Hash Game Exchange'
 export const SITE_TEMPLATE = 'bcgame' // resolves to the catalogue template `emerald_dark`
-export const DB_NAME = 'cfz_hash_game_exchange'
+export const DB_NAME = 'parker567'
 export const TEST_DB_NAME = 'cfz_hash_game_exchange_test'
 
 export const PORTS = {
