@@ -236,6 +236,9 @@ export type MenuItem = {
 
   /** A direct-user screen: only the Super Admin and its executives (`actor.direct`). */
   direct?: boolean
+
+  /** Staff's own logins only — an executive session never sees it. */
+  notExecutive?: boolean
 } & (
   | {
       href: string

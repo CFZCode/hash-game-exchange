@@ -128,7 +128,9 @@ test('only a Super Admin issues funds — level 1, not 0', () => {
   assert.equal(canIssueFunds({ level: '1' }), true);
   assert.equal(canIssueFunds({ level: 0 }), false, 'there is no level 0');
   assert.equal(canIssueFunds({ level: 2 }), false);
-  assert.equal(canIssueFunds({ level: 1, executiveId: 9 }), false, 'not an executive under the owner');
+  // The owner's executive acts as owner; each money route still needs its own granted permission.
+  assert.equal(canIssueFunds({ level: 1, executiveId: 9 }), true, 'an executive under the owner');
+  assert.equal(canIssueFunds({ level: 4, executiveId: 9 }), false, 'not an executive under an agent');
   assert.equal(canIssueFunds(null), false);
 });
 
