@@ -397,6 +397,7 @@ const OfferStatus = ({ row }: { row: P2pOfferRow }) => {
 
 const CreateOffer = ({ accounts }: { accounts: P2pPaymentAccount[] }) => {
   const coins = useP2pCoins()
+  const ownerCoins = useOwnerCoinFilter()
   const [form, setForm] = useState({ coin: 'USDT', fiat: 'INR', segment: 'BUY', price: '', availableAmount: '', minLimit: '', maxLimit: '', username: '', paymentAccountIds: '', paymentTime: '', isFeatured: false, isVerified: false, isKycVerified: false })
 
   // USDT is the usual pick; when the owner has it off, the first coin P2P still trades.
@@ -464,7 +465,7 @@ const CreateOffer = ({ accounts }: { accounts: P2pPaymentAccount[] }) => {
     >
       <div className='grid grid-cols-3 gap-4'>
         <SelectField id='of-coin' name='coin' label='Coin' value={coin} onChange={coin => setForm({ ...form, coin })} options={coins.map(c => ({ value: c, label: c }))} />
-        <SelectField id='of-fiat' label='Fiat' value={form.fiat} onChange={fiat => setForm({ ...form, fiat })} options={P2P_FIAT.map(c => ({ value: c, label: c }))} />
+        <SelectField id='of-fiat' label='Fiat' value={form.fiat} onChange={fiat => setForm({ ...form, fiat })} options={ownerCoins(P2P_FIAT).map(c => ({ value: c, label: c }))} />
         <SelectField id='of-seg' label='Segment' value={form.segment} onChange={segment => setForm({ ...form, segment })} options={[{ value: 'BUY', label: 'BUY (user buys crypto)' }, { value: 'SELL', label: 'SELL (user sells crypto)' }]} />
       </div>
       <div className='grid grid-cols-2 gap-4'>

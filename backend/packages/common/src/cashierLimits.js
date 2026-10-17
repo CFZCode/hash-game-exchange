@@ -4,15 +4,15 @@ const money = require('./money');
 const { AppError } = require('./errors');
 
 /**
- * Cashier limits per currency — the owner's `cashierLimits` block (owner panel → Features & plan →
- * Cashier). The site admin shows them read-only.
+ * Cashier limits per currency — set by the Super Admin in the site admin (Site config → Limits and
+ * policy → Cashier), stored in `cashier_limits` (migration 112), checked on every deposit and
+ * withdrawal rail.
  *
  *   { INR:  { depositMin: '100', depositMax: '100000', withdrawMin: '500', withdrawMax: '50000' },
  *     USDT: { depositMin: '10',  depositMax: null,     withdrawMin: null,  withdrawMax: '5000'  } }
  *
- * Each amount is in that currency, a decimal string above 0, or null = no owner limit (the rail's
- * own minimum still applies). A currency missing from the block has no owner limits. Mirrors
- * owner-panel/src/lib/entitlements/cashierLimits.ts.
+ * Each amount is in that currency, a decimal string above 0, or null = no limit (the rail's own
+ * minimum still applies). A currency with no row has no limits.
  */
 
 const FIELDS = Object.freeze(['depositMin', 'depositMax', 'withdrawMin', 'withdrawMax']);
@@ -84,4 +84,45 @@ function assertWithinCashierLimits(all, { currency, amount, flow }) {
   if (max && money.gt(String(amount), max)) throw aboveMaximum({ maximum: max, currency: code, flow });
 }
 
-module.exports = { FIELDS, cleanCashierLimits, cashierLimitsProblem, limitsFor, assertWithinCashierLimits, codeOf };
+const COLUMN = { depositMin: 'deposit_min', depositMax: 'deposit_max', withdrawMin: 'withdraw_min', withdrawMax: 'withdraw_max' };
+
+/** Every stored row as the block above. An older database without the table reads as no limits. */
+async function readCashierLimits(sequelize, { transaction } = {}) {
+  if (!sequelize?.query) return {};
+  try {
+    const [rows] = await sequelize.query('SELECT currency, deposit_min, deposit_max, withdraw_min, withdraw_max FROM cashier_limits', { transaction });
+    const block = {};
+    for (const r of rows) {
+      block[r.currency] = Object.fromEntries(FIELDS.map((f) => [f, r[COLUMN[f]] == null ? null : String(r[COLUMN[f]]).replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '')]));
+    }
+    return cleanCashierLimits(block);
+  } catch (error) {
+    const code = error?.original?.code ?? error?.parent?.code;
+    if (code === '42P01') return {};
+    throw error;
+  }
+}
+
+/** Replace the stored limits with `block` (already validated): currencies left out are cleared. */
+async function writeCashierLimits(sequelize, block, { staffId = null, transaction } = {}) {
+  const clean = cleanCashierLimits(block);
+  await sequelize.query('DELETE FROM cashier_limits', { transaction });
+  for (const [currency, l] of Object.entries(clean)) {
+    await sequelize.query(
+      `INSERT INTO cashier_limits (currency, deposit_min, deposit_max, withdraw_min, withdraw_max, updated_by, updated_at)
+       VALUES (:currency, :dmin, :dmax, :wmin, :wmax, :staffId, now())`,
+      { transaction, replacements: { currency, dmin: l.depositMin, dmax: l.depositMax, wmin: l.withdrawMin, wmax: l.withdrawMax, staffId } }
+    );
+  }
+  return clean;
+}
+
+/** Read the stored limits and refuse an amount outside them (`flow`: 'deposit' | 'withdraw'). */
+async function assertCashierLimits(sequelize, { currency, amount, flow }) {
+  assertWithinCashierLimits(await readCashierLimits(sequelize), { currency, amount, flow });
+}
+
+module.exports = {
+  FIELDS, cleanCashierLimits, cashierLimitsProblem, limitsFor, assertWithinCashierLimits, codeOf,
+  readCashierLimits, writeCashierLimits, assertCashierLimits,
+};

@@ -5,6 +5,7 @@ const {
 } = require('@ibitplay/common');
 
 const errors = require('./siteConfig.errors');
+const { assertTransactionPassword } = require('../staff-auth/transactionPassword');
 const ownerErrors = require('../features/owner.errors');
 
 /** The `site_features` row holding the owner's reward currency (a catalogue policy). */
@@ -871,14 +872,17 @@ class SiteConfigService {
     );
   }
 
+  get #sequelize() {
+    return this.models.Staff?.sequelize ?? this.db?.sequelize;
+  }
+
   /**
-   * The owner's cashier limits, read-only here (set in the owner panel → Cashier):
+   * Cashier limits per currency (`cashier_limits`, migration 112):
    * `{ currencies: [{ code, name, depositMin, depositMax, withdrawMin, withdrawMax }] }` — one row
-   * per coin the site has switched on, null = no owner limit for that side.
+   * per coin the site has switched on, null = no limit on that side. Every rail checks them.
    */
   async cashierLimits() {
-    const [doc, coins] = await Promise.all([entitlements.getEntitlements(), currencyRegistry.listCurrencies()]);
-    const limits = cashierLimitsLib.cleanCashierLimits(doc.cashierLimits);
+    const [limits, coins] = await Promise.all([cashierLimitsLib.readCashierLimits(this.#sequelize), currencyRegistry.listCurrencies()]);
     const enabled = (coins ?? []).filter((c) => c && c.enabled !== false);
     const codes = enabled.length ? enabled.map((c) => cashierLimitsLib.codeOf(c.code)) : Object.keys(limits);
     const nameOf = new Map(enabled.map((c) => [cashierLimitsLib.codeOf(c.code), c.name ?? null]));
@@ -889,6 +893,21 @@ class SiteConfigService {
         ...cashierLimitsLib.limitsFor(limits, code),
       })),
     };
+  }
+
+  /**
+   * Replace the cashier limits — the Super Admin only, with the transaction password.
+   * `limits` is `{ [CODE]: { depositMin, depositMax, withdrawMin, withdrawMax } }`, each an amount
+   * above 0 or null; a currency left out has no limits.
+   */
+  async setCashierLimits({ actor, limits, transactionPassword }) {
+    if (!actor?.isSuperAdmin) throw errors.CASHIER_LIMITS_SUPER_ADMIN_ONLY();
+    const problem = cashierLimitsLib.cashierLimitsProblem(limits);
+    if (problem) throw errors.CASHIER_LIMITS_INVALID({ problem });
+    await assertTransactionPassword(this.models, actor.id, transactionPassword, { required: true });
+    await this.#sequelize.transaction((transaction) => cashierLimitsLib.writeCashierLimits(this.#sequelize, limits, { staffId: actor.id, transaction }));
+    this.logger?.warn({ actorStaffId: actor.id, limits }, 'Cashier limits changed');
+    return this.cashierLimits();
   }
 
   /**

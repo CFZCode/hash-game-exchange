@@ -200,6 +200,16 @@ const updateTipSettings = {
  * A real boolean, not a truthy string — `{"enabled":"false"}` would otherwise
  * turn sports ON, which is the wrong direction for a kill switch to fail in.
  */
+/** Super Admin: the whole cashier-limits block (checked strictly in the service) + transaction password. */
+const setCashierLimits = {
+  body: z
+    .object({
+      limits: z.record(z.string(), z.record(z.string(), z.union([z.string(), z.number(), z.null()]))),
+      transactionPassword: z.string().min(1).max(200),
+    })
+    .strict(),
+};
+
 const setSportsEnabled = {
   body: z.object({ enabled: z.boolean() }).strict(),
 };
@@ -321,6 +331,7 @@ module.exports = {
   updateTipSettings,
   updateReferralUnlockSettings,
   setSportsEnabled,
+  setCashierLimits,
   updateRewardCurrencies,
   updateEmailSettings,
   updateGlobalSettings,

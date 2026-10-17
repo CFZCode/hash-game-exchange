@@ -13,12 +13,12 @@ export const CURRENCIES_PATH = 'admin/currencies'
 export const PUBLIC_CURRENCIES_PATH = 'admin/currencies/public'
 
 /**
- * The coins in the owner's plan, in the site's order — `null` until known.
+ * The coins this site runs on, in the site's order — `null` until known.
  *
- * House staff read the registry (`GET admin/currencies`): every coin the owner enabled that is not
- * retired, site-switched-off ones included (staff still filter and adjust them). The agent tree is
- * refused the registry (403 CURRENCIES_HOUSE_ONLY), so it reads the public list instead, which is
- * also narrowed by the site's own switch.
+ * House staff read the registry (`GET admin/currencies`) and keep the coins that are live
+ * (`enabled` = the owner's pick AND the site's switch, not retired): the owner picks INR + USDT →
+ * every admin picker, filter and dropdown shows only INR + USDT. The agent tree is refused the
+ * registry (403 CURRENCIES_HOUSE_ONLY), so it reads the public list, which is the same set.
  */
 function useOwnerCodes(): string[] | null {
   const { actor } = useSession()
@@ -27,7 +27,7 @@ function useOwnerCodes(): string[] | null {
   const registry = useApi<CurrencyRow[]>(house ? CURRENCIES_PATH : null, undefined, options)
   const open = useApi<Array<{ code: string }>>(house ? null : PUBLIC_CURRENCIES_PATH, undefined, options)
 
-  if (house) return Array.isArray(registry.data) ? registry.data.filter(c => c.ownerEnabled && !c.retired).map(c => c.code) : null
+  if (house) return Array.isArray(registry.data) ? registry.data.filter(c => c.enabled && !c.retired).map(c => c.code) : null
 
   return Array.isArray(open.data) ? open.data.map(c => c.code) : null
 }

@@ -15,6 +15,7 @@ import { Switch } from '@/components/ui/switch'
 import { useSession } from '@/contexts/SessionContext'
 import { useApi, useApiMutation } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
+import { useOwnerCoinFilter } from '@/views/finance/useCurrencyCodes'
 import { CRYPTO_COIN_FLAGS, CRYPTO_MASTER_FLAG, FLAG_GROUPS, FLAGS_ELSEWHERE, flagLabel } from './flagGroups'
 
 type Flags = Record<string, boolean>
@@ -27,7 +28,13 @@ const FeatureFlags = () => {
   const { can, refreshFlags, flagEntitled: inPlan } = useSession()
 
   // In the owner's plan: the flag itself, and for a crypto coin the crypto master switch as well.
-  const flagEntitled = (key: string) => inPlan(key) && !(CRYPTO_COIN_FLAGS.has(key) && !inPlan(CRYPTO_MASTER_FLAG))
+  const ownerCoins = useOwnerCoinFilter()
+  const COIN_FLAGS = new Set(FLAG_GROUPS.filter(g => g.title === 'Fiat currencies' || g.title === 'Crypto currencies').flatMap(g => g.keys).filter(k => k !== CRYPTO_MASTER_FLAG))
+
+  // A coin flag is listed only for a coin the owner picked (owner panel → Coins): INR + USDT picked → only those.
+  const flagEntitled = (key: string) =>
+    inPlan(key) && !(CRYPTO_COIN_FLAGS.has(key) && !inPlan(CRYPTO_MASTER_FLAG)) && (!COIN_FLAGS.has(key) || ownerCoins([key]).length > 0)
+
   const flags = useApi<Flags>('admin/site-config/global', undefined, { select: data => onlyBooleans(data) })
   const [draft, setDraft] = useState<Flags>({})
   const [filter, setFilter] = useState('')

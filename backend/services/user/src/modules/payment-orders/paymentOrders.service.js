@@ -2,7 +2,7 @@
 
 const crypto = require('crypto');
 
-const { money, sitePolicy, operatorSettings, withdrawBlock, currencyRegistry, entitlements, cashierLimits } = require('@ibitplay/common');
+const { money, sitePolicy, operatorSettings, withdrawBlock, currencyRegistry, cashierLimits } = require('@ibitplay/common');
 
 const errors = require('./paymentOrders.errors');
 const { FLOW, userIdFor, APAY_DEPOSIT_SYSTEMS, APAY_WITHDRAWAL_SYSTEMS, APAY_SYSTEM_LABELS } = require('./paymentOrders.constants');
@@ -564,9 +564,9 @@ class PaymentOrdersService {
   }
 
   async #assertWithinLimits(amount, currency, flow) {
-    // The owner's min / max for this currency (owner panel → Cashier); where the owner set none,
-    // the deployment's default. The site admin only shows them.
-    const owner = cashierLimits.limitsFor((await entitlements.getEntitlements()).cashierLimits, currency);
+    // The Super Admin's min / max for this currency (Limits and policy → Cashier); where none is
+    // set, the deployment's default.
+    const owner = cashierLimits.limitsFor(await cashierLimits.readCashierLimits(this.models.Users?.sequelize ?? this.db?.sequelize), currency);
     const min = flow === FLOW.PAY_OUT ? (owner.withdrawMin ?? this.config.WITHDRAW_MINIMUM) : (owner.depositMin ?? this.config.DEPOSIT_MINIMUM);
     const max = flow === FLOW.PAY_OUT ? (owner.withdrawMax ?? this.config.WITHDRAW_MAXIMUM) : (owner.depositMax ?? this.config.DEPOSIT_MAXIMUM);
 

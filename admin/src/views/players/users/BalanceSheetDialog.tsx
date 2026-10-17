@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useApi } from '@/hooks/use-api'
 import { errorMessage } from '@/lib/api/client'
 import { cn } from '@/lib/utils'
+import { useCurrencyCodes } from '@/views/finance/useCurrencyCodes'
 import { Chip, StatCard, type Tone } from './shared'
 
 /**
@@ -30,7 +31,6 @@ type Sheet = {
   rows: { ts: string; category: string; type: string; description: string; amount: string; balance?: string }[]
 }
 
-const CURRENCIES = ['INR', 'PKR', 'USDT', 'EUR', 'BDT', 'NPR']
 const LIMITS = [25, 50, 100, 200]
 
 const fmt = (value: string | number | null | undefined, cur: string) =>
@@ -65,6 +65,7 @@ export const BalanceSheetView = ({
   /** Dialog ke andar: title DialogTitle, body scroll karta hai. Page pe: card. */
   inDialog?: boolean
 }) => {
+  const currencies = useCurrencyCodes()
   const [currency, setCurrency] = useState('INR')
   const [limit, setLimit] = useState(50)
   const [page, setPage] = useState(0)
@@ -117,7 +118,7 @@ export const BalanceSheetView = ({
                       setCurrency(v)
                       setPage(0)
                     }}
-                    options={CURRENCIES.map(c => ({ value: c, label: c }))}
+                    options={currencies.map(c => ({ value: c, label: c }))}
                   />
                 </div>
                 )}

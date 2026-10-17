@@ -48,7 +48,6 @@ import {
   type RegionListType,
   type RegionSetting
 } from '@/lib/entitlements/region'
-import { CASHIER_FIELDS, cashierLimitsProblem, EMPTY_LIMIT, type CashierField, type CashierLimits } from '@/lib/entitlements/cashierLimits'
 import {
   DEFAULT_WITHDRAWAL_CAP,
   isMultiplier,
@@ -75,8 +74,8 @@ const FIAT_COIN_FLAGS = new Set(FLAG_GROUPS.find(g => g.title === 'Fiat currenci
 type Row = { kind: Kind; key: string; label: string; description?: string; hint?: string; note?: string }
 type Group = { id: string; title: string; description: string; rows: Row[]; bulk?: boolean }
 
-type Tab = 'template' | 'withdrawals' | 'cashier' | 'policies' | 'features' | 'flags'
-type Section = { id: Exclude<Tab, 'template' | 'withdrawals' | 'cashier'>; section: string; description?: string; groups: Group[] }
+type Tab = 'template' | 'withdrawals' | 'policies' | 'features' | 'flags'
+type Section = { id: Exclude<Tab, 'template' | 'withdrawals'>; section: string; description?: string; groups: Group[] }
 
 const GROUPS: Section[] = [
   {
@@ -153,7 +152,6 @@ const WITHDRAWAL_ROW: Row = { kind: 'policy', key: WITHDRAWAL_REQUIREMENTS, labe
 const TABS: { id: Tab; label: string }[] = [
   { id: 'template', label: 'Template' },
   { id: 'withdrawals', label: 'Withdrawals' },
-  { id: 'cashier', label: 'Cashier' },
   { id: 'policies', label: 'Policies' },
   { id: 'features', label: 'Features' },
   { id: 'flags', label: 'Site flags' }
@@ -165,7 +163,6 @@ const POLICY_KEYS = new Set(FEATURE_CATALOGUE.filter(f => f.policy).map(f => f.k
 const tabOf = (c: Change): Tab => {
   if (c.kind === 'template') return 'template'
   if (c.kind === 'withdrawal_cap' || c.key === WITHDRAWAL_REQUIREMENTS) return 'withdrawals'
-  if (c.kind === 'cashier_limits') return 'cashier'
   if (c.kind === 'flag') return 'flags'
   if ((c.kind === 'variant' || c.kind === 'feature') && POLICY_KEYS.has(c.key)) return 'policies'
 
@@ -494,75 +491,6 @@ const WithdrawalRequirementsEditor = ({
   )
 }
 
-const CASHIER_COLUMNS: { field: CashierField; label: string }[] = [
-  { field: 'depositMin', label: 'Min deposit' },
-  { field: 'depositMax', label: 'Max deposit' },
-  { field: 'withdrawMin', label: 'Min withdrawal' },
-  { field: 'withdrawMax', label: 'Max withdrawal' }
-]
-
-/**
- * Cashier limits per currency: one row per coin the site has switched on (Site flags), four amounts
- * each. Empty = no owner limit on that side (the payment rail's own minimum still applies).
- */
-const CashierLimitsEditor = ({
-  coins,
-  limits,
-  changed,
-  onChange
-}: {
-  coins: string[]
-  limits: CashierLimits
-  changed: (code: string) => boolean
-  onChange: (next: CashierLimits) => void
-}) => {
-  const set = (code: string, field: CashierField, raw: string) => {
-    const row = { ...EMPTY_LIMIT, ...limits[code], [field]: raw.trim() === '' ? null : raw.trim() }
-    const next = { ...limits, [code]: row }
-
-    if (CASHIER_FIELDS.every(f => row[f] === null)) delete next[code]
-    onChange(next)
-  }
-
-  if (!coins.length) return <p className='text-muted-foreground text-sm'>No currency is switched on under Site flags.</p>
-
-  return (
-    <div className='overflow-x-auto'>
-      <table className='w-full text-sm' data-cashier-limits>
-        <thead>
-          <tr className='text-muted-foreground text-left text-xs'>
-            <th className='py-2 pr-4 font-medium'>Currency</th>
-            {CASHIER_COLUMNS.map(c => (
-              <th key={c.field} className='px-2 py-2 font-medium'>
-                {c.label}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className='divide-y'>
-          {coins.map(code => (
-            <tr key={code} data-currency={code} className={cn(changed(code) && 'bg-primary/5')}>
-              <td className='py-2 pr-4 font-mono font-semibold'>{code}</td>
-              {CASHIER_COLUMNS.map(c => (
-                <td key={c.field} className='px-2 py-2'>
-                  <Input
-                    inputMode='decimal'
-                    aria-label={`${code} ${c.label}`}
-                    placeholder='No limit'
-                    className='w-36'
-                    value={limits[code]?.[c.field] ?? ''}
-                    onChange={e => set(code, c.field, e.target.value.replace(/[^0-9.]/g, ''))}
-                  />
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
 const TemplateCard = ({
   template,
   selected,
@@ -660,8 +588,7 @@ const Entitlements = () => {
         variants: { ...prev?.variants },
         options: Object.fromEntries(Object.entries(prev?.options ?? {}).map(([f, v]) => [f, { ...v }])),
         ...(prev?.region ? { region: { ...prev.region, countries: [...prev.region.countries] } } : {}),
-        ...(prev?.withdrawalCap ? { withdrawalCap: { ...prev.withdrawalCap } } : {}),
-        ...(prev?.cashierLimits ? { cashierLimits: Object.fromEntries(Object.entries(prev.cashierLimits).map(([c, l]) => [c, { ...l }])) } : {})
+        ...(prev?.withdrawalCap ? { withdrawalCap: { ...prev.withdrawalCap } } : {})
       }
 
       fn(next)
@@ -719,8 +646,7 @@ const Entitlements = () => {
         variants: draft!.variants,
         options: draft!.options,
         region: draft!.region,
-        withdrawalCap: draft!.withdrawalCap,
-        cashierLimits: draft!.cashierLimits
+        withdrawalCap: draft!.withdrawalCap
       }),
     invalidate: [['api']],
     errorTitle: 'Features & plan not saved',
@@ -917,13 +843,6 @@ const Entitlements = () => {
 
   const withdrawalVariant = draft?.variants[WITHDRAWAL_REQUIREMENTS]
 
-  // Coins the site has switched on (Site flags): fiat by its flag, crypto also behind the master switch.
-  const entitledCoins = draft
-    ? FLAG_GROUPS.filter(g => g.title === 'Fiat currencies' || g.title === 'Crypto currencies')
-        .flatMap(g => g.keys)
-        .filter(k => k !== 'cryptocoin' && draft.flags[k] !== false && (FIAT_COIN_FLAGS.has(k) || draft.flags.cryptocoin !== false))
-        .map(k => k.toUpperCase())
-    : []
 
   return (
     <div className={cn(changes.length > 0 && 'pb-20')}>
@@ -1056,30 +975,6 @@ const Entitlements = () => {
                           The site has not reported its withdrawal requirements yet.
                         </p>
                       )}
-                    </CardContent>
-                  </Card>
-                </section>
-              </TabsContent>
-              <TabsContent value='cashier' className='mt-4'>
-                <section className='flex flex-col gap-4' data-tab='cashier'>
-                  <div>
-                    <h2 className='text-lg font-semibold'>Cashier</h2>
-                    <p className='text-muted-foreground text-sm'>
-                      Deposit and withdrawal limits for each currency, in that currency. Set here only: the site admin shows them read-only. Leave a box empty for
-                      no limit on that side.
-                    </p>
-                  </div>
-                  <Card className='gap-4 shadow-none'>
-                    <CardContent>
-                      <CashierLimitsEditor
-                        coins={entitledCoins}
-                        limits={draft.cashierLimits ?? {}}
-                        changed={code => changed.has(`cashier_limits:${code}`)}
-                        onChange={cashierLimits => {
-                          report('cashierLimits', cashierLimitsProblem(cashierLimits))
-                          edit(next => void (next.cashierLimits = cashierLimits))
-                        }}
-                      />
                     </CardContent>
                   </Card>
                 </section>
