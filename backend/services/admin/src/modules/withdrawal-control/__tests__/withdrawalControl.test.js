@@ -6,7 +6,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 
 const db = require('@ibitplay/db');
-const { createLogger, withdrawBlock, withdrawalCap } = require('@ibitplay/common');
+const { createLogger, entitlements, withdrawBlock, withdrawalCap } = require('@ibitplay/common');
 const { hashPassword } = require('@ibitplay/auth');
 
 const { WithdrawalControlService } = require('../withdrawalControl.service');
@@ -103,22 +103,24 @@ test('global withdrawal switch against a database', async (t) => {
     await withdrawBlock.assertWithdrawAllowed(models, { staffId: ownerId });
   });
 
-  await t.test('limit + wagering bonus: saved by the owner, read by the withdraw cap', async () => {
-    await assert.rejects(() => service.setLimit({ actor: owner, depositMultiplier: 0, transactionPassword: TXN }), (e) => e.status === 400);
-    const saved = await service.setLimit({ actor: owner, enabled: true, depositMultiplier: 2, wagerBonus: false, transactionPassword: TXN });
-    assert.deepEqual(
-      { ...saved.limit },
-      { enabled: true, depositMultiplier: 2, wagerBonus: false, wagerMultiplier: saved.limit.wagerMultiplier, source: 'admin' }
+  await t.test('limit + wagering bonus come from the owner panel only; old admin columns are ignored', async () => {
+    await sequelize.query(
+      `UPDATE withdrawal_control SET limit_enabled = TRUE, deposit_multiplier = 2, wager_bonus_enabled = FALSE, wager_multiplier = 7 WHERE id = 1`
     );
-    const inForce = await withdrawalCap.readAdminWithdrawalCap(sequelize);
-    assert.equal(inForce.enabled, true);
-    assert.equal(inForce.depositMultiplier, 2);
-    assert.equal(inForce.wagerBonus, false);
+    let ownerCap = {};
+    try {
+      ownerCap = (await entitlements.getEntitlements())?.withdrawalCap ?? {};
+    } catch {
+      // No owner document reachable in the test run → the defaults.
+    }
+    const { limit } = await service.read();
+    assert.deepEqual({ ...limit }, { ...withdrawalCap.cleanWithdrawalCap(ownerCap), source: 'owner' });
+    assert.equal(typeof service.setLimit, 'undefined', 'the admin can no longer save a limit');
 
     const list = await service.users({ search: String(uid), status: 'all', limit: 10, offset: 0 });
     const me = list.rows.find((r) => r.id === String(uid));
     assert.ok(me, 'direct user listed');
-    assert.equal(me.maxWithdrawable, '0.00000000', 'nothing deposited → max 0 while the limit is on');
+    assert.equal(me.maxWithdrawable, limit.enabled ? '0.00000000' : null, 'nothing deposited → max 0 while the limit is on, none while off');
   });
 
   await t.test('ON lets them withdraw again', async () => {

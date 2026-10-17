@@ -7,22 +7,9 @@ const { PERMISSIONS, canIssueFunds } = require('@ibitplay/auth');
 const { WithdrawalControlService } = require('../withdrawalControl.service');
 
 const password = z.string().min(1).max(200);
-const multiplier = z.coerce.number().positive().max(100);
 
 const v = {
   setGlobal: { body: z.object({ enabled: z.boolean(), transactionPassword: password }).strict() },
-  setLimit: {
-    body: z
-      .object({
-        enabled: z.boolean().optional(),
-        depositMultiplier: multiplier.optional(),
-        wagerBonus: z.boolean().optional(),
-        wagerMultiplier: multiplier.optional(),
-        transactionPassword: password,
-      })
-      .strict()
-      .refine((b) => Object.keys(b).length > 1, { message: 'nothing to change' }),
-  },
   users: {
     query: z
       .object({
@@ -39,7 +26,7 @@ const v = {
  *   GET /admin/withdrawal-control          summary (global, limit, wagering bonus, ginti)   reports:read
  *   GET /admin/withdrawal-control/users    direct users: balance, deposited, wagered, withdrawn / max, lock
  *   PUT /admin/withdrawal-control/global   ON / OFF                                          owner + txn password
- *   PUT /admin/withdrawal-control/limit    limit / multiplier / wagering bonus               owner + txn password
+ * Limit / wagering bonus: owner panel only (GET me read-only `limit`, `source: 'owner'`).
  * Per-user lock: purana `POST admin/locks` (users:write).
  */
 module.exports = function adminRoutes(deps) {
@@ -73,22 +60,6 @@ module.exports = function adminRoutes(deps) {
     }),
     asyncHandler(async (req, res) =>
       response.ok(res, await service.setGlobal({ actor: actorOf(req), ...req.body }))
-    )
-  );
-
-  router.put(
-    '/limit',
-    auth.requirePermission(PERMISSIONS.WALLET_ADJUST),
-    validate(v.setLimit),
-    withActivity({
-      action: 'withdrawals.limit',
-      describe: (req) => {
-        const { transactionPassword, ...details } = req.body;
-        return { targetType: 'SITE', targetId: 'withdrawal-limit', details };
-      },
-    }),
-    asyncHandler(async (req, res) =>
-      response.ok(res, await service.setLimit({ actor: actorOf(req), ...req.body }))
     )
   );
 

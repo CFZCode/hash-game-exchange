@@ -6,7 +6,6 @@ const { AppError, entitlements, money, withdrawalCap, withdrawalCapFigures } = r
 const { assertTransactionPassword } = require('../staff-auth/transactionPassword');
 
 const onlyOwner = () => new AppError('Only the owner (Super Admin) can manage withdrawal controls', 403, 'WITHDRAWAL_CONTROL_OWNER_ONLY');
-const badRequest = (message) => new AppError(message, 400, 'WITHDRAWAL_CONTROL_BAD_REQUEST');
 
 const escapeLike = (v) => String(v).replace(/[\\%_]/g, (c) => `\\${c}`);
 
@@ -15,12 +14,13 @@ const escapeLike = (v) => String(v).replace(/[\\%_]/g, (c) => `\\${c}`);
  * siteconfig/routes/withdrawalControlRoutes.js) jaisa:
  *
  *   Global withdrawals ON / OFF   `withdrawal_control.withdrawals_enabled` → withdrawBlock
- *   Withdrawal limit              `limit_enabled` + `deposit_multiplier`       → user-service capSettings
- *   Wagering bonus                `wager_bonus_enabled` + `wager_multiplier`   → same
+ *   Withdrawal limit              owner panel → Features & plan → Withdrawals (read-only yahan)
+ *   Wagering bonus                same
  *   Per-user withdrawal lock      list yahan; lock/unlock purane `POST admin/locks` se
  *
- * Limit columns NULL = admin ne save nahi kiya → owner panel wali setting chalti hai
- * (`withdrawalCap.readAdminWithdrawalCap`). Badalna sirf owner, transaction password ke saath.
+ * Limit / wagering bonus sirf owner panel badalta hai (signed document ka `withdrawalCap`);
+ * `withdrawal_control` ke purane limit columns ab padhe nahi jaate. Global switch badalna sirf
+ * owner (Super Admin), transaction password ke saath.
  */
 class WithdrawalControlService {
   constructor({ models, db, logger }) {
@@ -34,10 +34,8 @@ class WithdrawalControlService {
     return this.models.Staff.sequelize;
   }
 
-  /** Limit settings in force + kahan se (admin ne save kiya ya owner ki). */
+  /** Limit settings in force — hamesha owner panel ki. */
   async #capInForce() {
-    const admin = await withdrawalCap.readAdminWithdrawalCap(this.sequelize);
-    if (admin) return { ...admin, source: 'admin' };
     let owner = {};
     try {
       owner = (await entitlements.getEntitlements())?.withdrawalCap ?? {};
@@ -51,7 +49,7 @@ class WithdrawalControlService {
   async read() {
     const [[row], cap, [counts]] = await Promise.all([
       this.sequelize.query(
-        `SELECT w.withdrawals_enabled, w.updated_at, w.updated_by, s.name AS updated_by_name, w.limit_updated_at
+        `SELECT w.withdrawals_enabled, w.updated_at, w.updated_by, s.name AS updated_by_name
            FROM withdrawal_control w LEFT JOIN staff s ON s.id = w.updated_by
           WHERE w.id = 1`,
         { type: QueryTypes.SELECT }
@@ -65,11 +63,9 @@ class WithdrawalControlService {
       ),
     ]);
 
-    const lastChange = [row?.updated_at, row?.limit_updated_at].filter(Boolean).sort((a, b) => new Date(b) - new Date(a))[0] ?? null;
-
     return {
       enabled: row ? row.withdrawals_enabled !== false : true,
-      updatedAt: lastChange,
+      updatedAt: row?.updated_at ?? null,
       updatedBy: row?.updated_by != null ? { id: String(row.updated_by), name: row.updated_by_name ?? null } : null,
       limit: {
         enabled: cap.enabled,
@@ -101,43 +97,6 @@ class WithdrawalControlService {
     );
 
     this.logger?.warn({ actorStaffId: actor.id, enabled }, `Global withdrawals switched ${enabled ? 'ON' : 'OFF'}`);
-    return this.read();
-  }
-
-  /**
-   * Withdrawal limit / wagering bonus — jo bheja wahi badalta hai, baaki abhi wali setting se.
-   * Pehli baar save pe owner wali setting admin ki ban jaati hai (aage admin ki chalegi).
-   */
-  async setLimit({ actor, enabled, depositMultiplier, wagerBonus, wagerMultiplier, transactionPassword }) {
-    const next = { ...(await this.#capInForce()) };
-    if (enabled !== undefined) next.enabled = enabled;
-    if (wagerBonus !== undefined) next.wagerBonus = wagerBonus;
-    if (depositMultiplier !== undefined) next.depositMultiplier = depositMultiplier;
-    if (wagerMultiplier !== undefined) next.wagerMultiplier = wagerMultiplier;
-
-    for (const [key, value] of [['Multiplier', next.depositMultiplier], ['Bonus multiplier', next.wagerMultiplier]]) {
-      if (!withdrawalCap.isMultiplier(value)) {
-        throw badRequest(`${key} must be between 0.01 and ${withdrawalCap.MAX_MULTIPLIER}, at most 2 decimal places`);
-      }
-    }
-
-    await this.#owner(actor, transactionPassword);
-
-    await this.sequelize.query(
-      `INSERT INTO withdrawal_control (id, limit_enabled, deposit_multiplier, wager_bonus_enabled, wager_multiplier, limit_updated_by, limit_updated_at)
-       VALUES (1, :enabled, :dm, :wb, :wm, :staffId, now())
-       ON CONFLICT (id) DO UPDATE
-         SET limit_enabled = EXCLUDED.limit_enabled, deposit_multiplier = EXCLUDED.deposit_multiplier,
-             wager_bonus_enabled = EXCLUDED.wager_bonus_enabled, wager_multiplier = EXCLUDED.wager_multiplier,
-             limit_updated_by = EXCLUDED.limit_updated_by, limit_updated_at = now()`,
-      {
-        replacements: {
-          enabled: next.enabled, dm: next.depositMultiplier, wb: next.wagerBonus, wm: next.wagerMultiplier, staffId: actor.id,
-        },
-      }
-    );
-
-    this.logger?.warn({ actorStaffId: actor.id, limit: next }, 'Withdrawal limit settings changed');
     return this.read();
   }
 

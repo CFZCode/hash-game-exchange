@@ -126,13 +126,12 @@ function createWithdrawRequirements(deps) {
   const capFigures = deps.capFigures ?? createCapFigures(deps);
 
   /**
-   * The deposit-cap settings in force: the Super Admin's own (Admin → Users → Financial, saved in
-   * `withdrawal_control`) once saved, else the owner's (the signed document's `withdrawalCap`,
-   * defaults filled).
+   * The deposit-cap settings in force: the owner's only (the signed document's `withdrawalCap`,
+   * defaults filled). The site admin shows them read-only; whatever an older admin saved in
+   * `withdrawal_control` is no longer read.
    */
   async function capSettings() {
-    const admin = await withdrawalCap.readAdminWithdrawalCap(models?.Users?.sequelize ?? deps.db?.sequelize);
-    return admin ?? withdrawalCap.cleanWithdrawalCap((await entitlements.getEntitlements()).withdrawalCap);
+    return withdrawalCap.cleanWithdrawalCap((await entitlements.getEntitlements()).withdrawalCap);
   }
 
   /**

@@ -7,9 +7,7 @@ import { BanIcon, CircleCheckIcon, DicesIcon, GaugeIcon, LockIcon, UsersIcon, Wa
 import DataTable, { type Column } from '@/components/shared/DataTable'
 import FormDialog from '@/components/shared/FormDialog'
 import { TextField } from '@/components/shared/FormField'
-import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
 import { useSession } from '@/contexts/SessionContext'
@@ -24,24 +22,21 @@ import { Chip, StatCard, TONES, inr, type Tone } from './shared'
  * components/users/FinancialTab.tsx `WithdrawalControl`) jaisa:
  *
  *   Global Withdrawals  ON / OFF                           PUT admin/withdrawal-control/global
- *   Withdrawal limit    ON / OFF + multiplier (× deposits) PUT admin/withdrawal-control/limit
- *   Wagering bonus      ON / OFF + "bonus up to"           PUT admin/withdrawal-control/limit
+ *   Withdrawal limit    read-only — owner panel → Features & plan → Withdrawals
+ *   Wagering bonus      read-only — same
  *   Direct users / Withdrawal locked cards
  *   Per-user withdrawal lock table                         GET admin/withdrawal-control/users + POST admin/locks
  *
- * Har setting change transaction password se confirm hota hai (sirf owner). Limit jab tak admin
- * save na kare, owner panel wali setting chalti hai (`limit.source = 'owner'`).
+ * Global switch transaction password se confirm hota hai (sirf owner / Super Admin).
  */
 
 const API = 'admin/withdrawal-control'
-const MULTIPLIER_MIN = 0.1
-const MULTIPLIER_MAX = 100
 
 type Summary = {
   enabled: boolean
   updatedAt: string | null
   updatedBy: { id: string; name: string | null } | null
-  limit: { enabled: boolean; depositMultiplier: number; wagerBonus: boolean; wagerMultiplier: number; source: 'admin' | 'owner' }
+  limit: { enabled: boolean; depositMultiplier: number; wagerBonus: boolean; wagerMultiplier: number; source: 'owner' }
   directUsers: number
   lockedDirectUsers: number
 }
@@ -63,24 +58,11 @@ type LockUser = {
   maxWithdrawable: string | null
 }
 
-/** Ek pending change — confirm dialog (transaction password) ke baad jaata hai. */
-type Pending =
-  | { kind: 'global'; enabled: boolean }
-  | { kind: 'limit'; enabled?: boolean; depositMultiplier?: number }
-  | { kind: 'wager'; wagerBonus?: boolean; wagerMultiplier?: number }
+/** Global switch ka pending change — confirm dialog (transaction password) ke baad jaata hai. */
+type Pending = { enabled: boolean }
 
 const fmtMult = (n: number) => `${Number(n)}×`
 const fmtDate = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : '—')
-
-const multiplierError = (raw: string) => {
-  const n = Number(raw)
-
-  if (raw.trim() === '' || !Number.isFinite(n)) return 'Enter a number'
-  if (n < MULTIPLIER_MIN || n > MULTIPLIER_MAX) return `Between ${MULTIPLIER_MIN} and ${MULTIPLIER_MAX}`
-  if (Math.round(n * 100) !== n * 100) return 'At most 2 decimals'
-
-  return null
-}
 
 /** Ek setting card: icon box + title + text, right me ON/OFF chip + switch (+ multiplier input). */
 const SettingCard = ({
@@ -120,50 +102,10 @@ const OnOff = ({ on, tone }: { on: boolean; tone: Tone }) => (
   </Chip>
 )
 
-/** Multiplier input + Save (Enter bhi). */
-const MultiplierInput = ({ id, label, value, disabled, onSave }: { id: string; label: string; value: number | undefined; disabled?: boolean; onSave: (n: number) => void }) => {
-  // Draft: jab tak user ne kuch type nahi kiya, saved value hi dikhti hai.
-  const [draft, setDraft] = useState<string | null>(null)
-  const raw = draft ?? (value !== undefined ? String(value) : '')
-  const setRaw = (v: string) => setDraft(v)
-
-  const submit = () => {
-    onSave(Number(raw))
-    setDraft(null)
-  }
-
-  const error = multiplierError(raw)
-  const dirty = value !== undefined && !error && Number(raw) !== Number(value)
-
-  return (
-    <div className='flex items-start gap-2'>
-      <div>
-        <div className='relative'>
-          <Input
-            id={id}
-            aria-label={label}
-            type='number'
-            min={MULTIPLIER_MIN}
-            max={MULTIPLIER_MAX}
-            step={0.5}
-            className='w-28 pr-7'
-            value={raw}
-            disabled={disabled}
-            onChange={e => setRaw(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === 'Enter' && dirty) submit()
-            }}
-          />
-          <span className='text-muted-foreground pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 text-sm'>×</span>
-        </div>
-        <p className={cn('mt-1 h-4 text-xs', error ? 'text-danger' : 'text-muted-foreground')}>{value !== undefined && error ? error : label}</p>
-      </div>
-      <Button disabled={!dirty || disabled} onClick={submit}>
-        Save
-      </Button>
-    </div>
-  )
-}
+/** Owner panel se aane wali setting ka badge — admin yahan badal nahi sakta. */
+const OwnerBadge = () => (
+  <span className='text-muted-foreground bg-muted inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium whitespace-nowrap'>Set in the owner panel</span>
+)
 
 const WithdrawalControl = () => {
   const { can } = useSession()
@@ -183,9 +125,8 @@ const WithdrawalControl = () => {
   const save = useApiMutation({
     fn: () => {
       if (!pending) return Promise.resolve(null)
-      const { kind, ...body } = pending
 
-      return api.put(`${API}/${kind === 'global' ? 'global' : 'limit'}`, { ...body, transactionPassword: password })
+      return api.put(`${API}/global`, { enabled: pending.enabled, transactionPassword: password })
     },
     invalidate: [['api', API], ['paged', `${API}/users`]],
     success: 'Saved',
@@ -197,27 +138,14 @@ const WithdrawalControl = () => {
   const limitOn = Boolean(limit?.enabled)
   const wagerOn = Boolean(limit?.wagerBonus)
   const m = limit?.depositMultiplier ?? 3
+  const w = limit?.wagerMultiplier ?? 5
 
   // Confirm dialog ka title / text — reference jaisa.
-  const confirm = (() => {
-    if (!pending) return null
-    if (pending.kind === 'global')
-      return pending.enabled
-        ? { title: 'Turn withdrawals ON?', body: 'Players can request withdrawals again by every method.' }
-        : { title: 'Turn withdrawals OFF?', body: 'No player will be able to withdraw by any method until you switch it back on.' }
-    if (pending.kind === 'limit')
-      return pending.depositMultiplier !== undefined
-        ? { title: `Set the withdrawal limit to ${fmtMult(pending.depositMultiplier)}?`, body: 'Every player can then withdraw at most this many times their deposits (plus the wagering bonus).' }
-        : pending.enabled
-          ? { title: 'Turn the withdrawal limit ON?', body: `Every player can withdraw at most ${fmtMult(m)} their deposits, plus the wagering bonus.` }
-          : { title: 'Turn the withdrawal limit OFF?', body: 'Players can withdraw their whole balance again (other rules still apply).' }
-
-    return pending.wagerMultiplier !== undefined
-      ? { title: `Set the wagering bonus to ${fmtMult(pending.wagerMultiplier)}?`, body: 'The bonus unlocks rupee for rupee with the amount bet, up to this many times the deposits.' }
-      : pending.wagerBonus
-        ? { title: 'Turn the wagering bonus ON?', body: 'Betting raises the withdrawal limit rupee for rupee, up to the bonus multiplier.' }
-        : { title: 'Turn the wagering bonus OFF?', body: 'The withdrawal limit will be deposits × multiplier only.' }
-  })()
+  const confirm = !pending
+    ? null
+    : pending.enabled
+      ? { title: 'Turn withdrawals ON?', body: 'Players can request withdrawals again by every method.' }
+      : { title: 'Turn withdrawals OFF?', body: 'No player will be able to withdraw by any method until you switch it back on.' }
 
   return (
     <div className='flex flex-col gap-4'>
@@ -234,7 +162,7 @@ const WithdrawalControl = () => {
             <Chip tone={enabled ? 'success' : 'danger'} className='min-w-12 text-center tracking-widest'>
               {enabled ? 'ON' : 'OFF'}
             </Chip>
-            <Switch checked={enabled} disabled={!s || !canEdit} onCheckedChange={() => setPending({ kind: 'global', enabled: !enabled })} aria-label='Global withdrawals' />
+            <Switch checked={enabled} disabled={!s || !canEdit} onCheckedChange={() => setPending({ enabled: !enabled })} aria-label='Global withdrawals' />
           </>
         }
       >
@@ -251,7 +179,7 @@ const WithdrawalControl = () => {
         </p>
       )}
 
-      {/* Deposit-based withdrawal limit */}
+      {/* Deposit-based withdrawal limit — owner panel ki setting, yahan read-only */}
       <SettingCard
         icon={<GaugeIcon />}
         tone='warning'
@@ -261,39 +189,36 @@ const WithdrawalControl = () => {
         control={
           <>
             <OnOff on={limitOn} tone='warning' />
-            <Switch checked={limitOn} disabled={!s || !canEdit} onCheckedChange={() => setPending({ kind: 'limit', enabled: !limitOn })} aria-label='Deposit-based withdrawal limit' />
-            <MultiplierInput id='wc-mult' label='Multiplier' value={limit?.depositMultiplier} disabled={!s || !canEdit} onSave={n => setPending({ kind: 'limit', depositMultiplier: n })} />
+            <OwnerBadge />
           </>
         }
       >
         Every player can withdraw at most this many times what they have deposited, in each currency, plus the wagering bonus below. Agent transfers count as INR deposits, and pending
         withdrawals count toward the limit.
-        {limit?.source === 'owner' && <p className='text-warning mt-1 text-xs'>Using the owner panel setting until you save a change here.</p>}
       </SettingCard>
 
-      {/* Wagering bonus on top of the deposit limit */}
+      {/* Wagering bonus on top of the deposit limit — owner panel ki setting, yahan read-only */}
       <SettingCard
         icon={<DicesIcon />}
         tone='info'
         on={limitOn && wagerOn}
         loading={loading}
-        title={<>Wagering bonus: {wagerOn ? `up to ${fmtMult(limit?.wagerMultiplier ?? 5)} total deposits` : 'off'}</>}
+        title={<>Wagering bonus: {wagerOn ? `up to ${fmtMult(w)} total deposits` : 'off'}</>}
         control={
           <>
-            <OnOff on={wagerOn} tone='info' />
-            <Switch checked={wagerOn} disabled={!s || !canEdit} onCheckedChange={() => setPending({ kind: 'wager', wagerBonus: !wagerOn })} aria-label='Wagering bonus' />
-            <MultiplierInput id='wc-wager' label='Bonus up to' value={limit?.wagerMultiplier} disabled={!s || !canEdit} onSave={n => setPending({ kind: 'wager', wagerMultiplier: n })} />
+            <OnOff on={limitOn && wagerOn} tone='info' />
+            <OwnerBadge />
           </>
         }
       >
-        Added on top of the withdrawal limit. It unlocks rupee for rupee with the amount the player has bet (casino and settled sports bets, refunds excluded) and stops at this many
-        times their deposits.
+        Extra room on top of the withdrawal limit, earned by playing: every rupee the player bets (casino and settled sports bets, refunds excluded) adds a rupee to their limit, until it
+        reaches this many times their deposits.
         {s && (
           <p className='mt-1 text-xs'>
             {!limitOn
               ? 'No effect while the withdrawal limit is off.'
               : wagerOn
-                ? `Example: ₹1,000 deposited and ₹1,000 wagered → ${inr(1000 * m)} + ${inr(1000)} = ${inr(1000 * m + 1000)}.`
+                ? `Example: ₹1,000 deposited and ₹1,000 wagered → ${inr(1000 * m)} + ${inr(Math.min(1000, 1000 * w))} = ${inr(1000 * m + Math.min(1000, 1000 * w))}.`
                 : `Example: ₹1,000 deposited → max ${inr(1000 * m)}, however much is wagered.`}
           </p>
         )}
@@ -435,7 +360,7 @@ const LockTable = () => {
 const FinancialTab = () => (
   <div className='flex flex-col gap-4'>
     <div className='flex'>
-      <span className='border-primary/50 bg-primary/15 flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-semibold'>
+      <span className='bg-card flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-semibold'>
         <WalletIcon className='size-4' /> Withdrawal
       </span>
     </div>
