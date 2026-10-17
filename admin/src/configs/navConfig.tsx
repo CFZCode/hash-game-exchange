@@ -331,7 +331,7 @@ export const navItems: NavItem[] = [
     groupLabel: 'Users',
     groupIcon: 'UsersRound',
     items: [
-      { icon: 'Globe', label: 'IP tracker', href: '/ip-tracker', permission: 'reports:read' },
+      { icon: 'Globe', label: 'Login & IP history', href: '/ip-tracker', permission: 'reports:read' },
       { icon: 'ShieldCheck', label: 'KYC', href: '/kyc', permission: 'users:read', feature: 'kyc' },
       { icon: 'Building2', label: 'Bank details', href: '/bank-details', permission: 'config:read' }
     ]

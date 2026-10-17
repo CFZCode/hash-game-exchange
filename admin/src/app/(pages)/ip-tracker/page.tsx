@@ -2,7 +2,7 @@ import { Suspense } from 'react'
 
 import View from '@/views/players/IpTracker'
 
-export const metadata = { title: 'IP tracker' }
+export const metadata = { title: 'Login & IP history' }
 
 export default function Page() {
   return (

@@ -181,7 +181,7 @@ export const LeagueTabs = ({
           onClick={() => onSelect(l.key)}
           className={cn(
             'rounded-md px-3 py-1 text-sm',
-            l.key === active ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-foreground'
+            l.key === active ? 'bg-accent text-foreground shadow-sm ring-1 ring-border' : 'hover:bg-muted text-foreground'
           )}
         >
           {l.label}

@@ -14,8 +14,8 @@ const PAGE_SIZE = 25
 
 /* admin-structure.zip `Deposit.tsx` / `Withdraw.tsx` ke colours. */
 const card = 'rounded-lg border border-border bg-card'
-const input = 'h-10 rounded-md border border-border bg-muted px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground hover:border-[#2B6EF5] focus:border-[#2B6EF5] dark:[color-scheme:dark]'
-const outlineBtn = 'inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1 text-sm text-muted-foreground hover:border-[#2B6EF5] hover:text-[#2B6EF5] disabled:opacity-40'
+const input = 'h-10 rounded-md border border-border bg-muted px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground hover:border-primary focus:border-primary dark:[color-scheme:dark]'
+const outlineBtn = 'inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1 text-sm text-muted-foreground hover:border-primary hover:text-primary disabled:opacity-40'
 const th = 'whitespace-nowrap border-b border-border bg-muted px-4 py-2.5 text-left text-[0.72rem] font-bold tracking-[0.06em] text-muted-foreground uppercase'
 const td = 'border-b border-border px-4 py-3 text-[0.82rem] text-foreground/80'
 
@@ -41,7 +41,7 @@ const TYPE_TONE: Record<string, string> = {
   Credit: 'bg-[rgba(14,204,104,0.12)] text-[#0ECC68]',
   Debit: 'bg-[rgba(224,27,79,0.12)] text-[#E01B4F]',
   Settlement: 'bg-[rgba(255,194,63,0.12)] text-[#FFC23F]',
-  'User creation': 'bg-[rgba(43,110,245,0.12)] text-[#2B6EF5]'
+  'User creation': 'bg-primary/10 text-primary'
 }
 
 /** Date input (YYYY-MM-DD) → poore din ka range. */
@@ -191,8 +191,8 @@ const AgentLedger = ({ direction }: { direction: 'deposit' | 'withdraw' }) => {
                 </tr>
               ) : (
                 rows.map(r => (
-                  <tr key={r.id} className='transition-colors hover:bg-[rgba(43,110,245,0.04)]'>
-                    <td className={`${td} font-semibold text-[#5581F7]`}>#{r.id}</td>
+                  <tr key={r.id} className='transition-colors hover:bg-accent/50'>
+                    <td className={`${td} font-semibold text-info`}>#{r.id}</td>
                     <td className={td}>{party(r.from)}</td>
                     <td className={td}>{party(r.to)}</td>
                     <td className={td}>

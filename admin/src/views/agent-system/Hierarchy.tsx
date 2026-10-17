@@ -108,8 +108,8 @@ const Hierarchy = () => {
     <div className='rounded-xl bg-background p-4 sm:p-6'>
       <div className='mx-auto max-w-[1400px]'>
         <div className='mb-6 flex items-center gap-3'>
-          <span className='flex rounded-lg bg-[rgba(43,110,245,0.15)] p-2'>
-            <GitBranchIcon className='size-[22px] text-[#2B6EF5]' />
+          <span className='flex rounded-lg bg-primary/15 p-2'>
+            <GitBranchIcon className='size-[22px] text-primary' />
           </span>
           <div>
             <h2 className='text-2xl font-bold text-foreground'>Agent Hierarchy</h2>

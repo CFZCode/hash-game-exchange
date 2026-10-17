@@ -438,7 +438,7 @@ const IpTrackerList = ({ channel }: { channel: Channel }) => {
 const IpTracker = () => (
   <div>
     <PageHeader
-      title='IP tracker'
+      title='Login & IP history'
       description='Where your users sign in from, and which addresses several accounts share. Only users in your own tree are shown.'
     />
     <ChannelTabs>{channel => <IpTrackerList channel={channel} />}</ChannelTabs>

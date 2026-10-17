@@ -131,9 +131,9 @@ const UsersPage = () => {
   const [risk, setRisk] = useState<UserRow | null>(null)
   const [sheet, setSheet] = useState<UserRow | null>(null)
 
+  // Tabs ki line me hi, right side (Financial pe nahi).
   const viewToggle = (
-    <div className='mb-4 flex justify-end'>
-      <div className='flex rounded-md border p-0.5'>
+    <div className='ml-auto flex rounded-md border p-0.5'>
         {(
           [
             { v: 'users', label: 'Users', icon: <UsersIcon /> },
@@ -146,20 +146,18 @@ const UsersPage = () => {
             onClick={() => setView(o.v)}
             className={cn(
               'flex items-center gap-1.5 rounded px-3 py-1 text-sm font-semibold [&_svg]:size-4',
-              view === o.v ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'
+              view === o.v ? 'bg-accent text-foreground shadow-sm ring-1 ring-border' : 'text-muted-foreground hover:text-foreground'
             )}
           >
             {o.icon}
             {o.label}
           </button>
         ))}
-      </div>
     </div>
   )
 
   const userSection = (channel: 'direct' | 'agent') => (
     <>
-      {viewToggle}
       {view === 'users' ? (
         <UsersTable
           channel={channel}
@@ -178,16 +176,19 @@ const UsersPage = () => {
     <div>
       <PageHeader title='Users' description='Manage direct users and agent-system accounts with per-user risk controls' />
       <Tabs value={section} onValueChange={v => select(v as Section)}>
-        {sections.length > 1 && (
-          <TabsList variant='line' className='mb-4'>
-            {sections.map(s => (
-              <TabsTrigger key={s.value} value={s.value}>
-                {s.icon}
-                {s.label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        )}
+        <div className='mb-4 flex flex-wrap items-center gap-3'>
+          {sections.length > 1 && (
+            <TabsList variant='line'>
+              {sections.map(s => (
+                <TabsTrigger key={s.value} value={s.value}>
+                  {s.icon}
+                  {s.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          )}
+          {section !== 'financial' && viewToggle}
+        </div>
         {house && <TabsContent value='direct'>{section === 'direct' && userSection('direct')}</TabsContent>}
         <TabsContent value='agent'>{section === 'agent' && userSection('agent')}</TabsContent>
         {house && <TabsContent value='financial'>{section === 'financial' && <FinancialTab />}</TabsContent>}

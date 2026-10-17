@@ -71,7 +71,7 @@ const TabStrip = ({
       key={id || 'all'}
       type='button'
       onClick={() => onSelect(id)}
-      className={cn('rounded-md px-2 py-1 text-sm whitespace-nowrap', active === id ? 'bg-primary text-primary-foreground' : 'hover:bg-muted')}
+      className={cn('rounded-md px-2 py-1 text-sm whitespace-nowrap', active === id ? 'bg-accent text-foreground shadow-sm ring-1 ring-border' : 'hover:bg-muted')}
     >
       {label}
       <span className='bg-background/80 text-foreground ml-1 rounded px-1.5 text-xs'>{count}</span>

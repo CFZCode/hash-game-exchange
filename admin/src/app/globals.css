@@ -121,21 +121,21 @@
 }
 
 .dark {
-  /* Neutral dark (no navy tint): near-black page, grey cards and borders. Accents stay from
-     admin-structure.zip: blue #2B6EF5, green #0ECC68, red #E01B4F, yellow #FFC23F. */
+  /* Neutral dark, no blue: near-black page, grey cards and borders, white primary. Status
+     colours stay from admin-structure.zip: green #0ECC68, red #E01B4F, yellow #FFC23F. */
   --background: #0a0a0b;
   --foreground: #fafafa;
   --card: #141416;
   --card-foreground: #fafafa;
   --popover: #18181b;
   --popover-foreground: #f9f9f9;
-  --primary: #2b6ef5;
-  --primary-foreground: #ffffff;
+  --primary: #fafafa;
+  --primary-foreground: #0a0a0b;
   --secondary: #1f1f23;
   --secondary-foreground: #f9f9f9;
   --muted: #18181b;
   --muted-foreground: #8b8b93;
-  --accent: #232327;
+  --accent: #2a2a2f;
   --accent-foreground: #f9f9f9;
   --destructive: #e01b4f;
 
@@ -145,12 +145,12 @@
   --warning-soft: rgb(255 194 63 / 14%);
   --danger: #e01b4f;
   --danger-soft: rgb(224 27 79 / 16%);
-  --info: #5581f7;
-  --info-soft: rgb(85 129 247 / 16%);
+  --info: #a1a1aa;
+  --info-soft: rgb(161 161 170 / 14%);
   --border: #27272a;
   --input: #2e2e33;
-  --ring: #2b6ef5;
-  --chart-1: #3987e5;
+  --ring: #52525b;
+  --chart-1: #d4d4d8;
   --chart-2: #d95926;
   --chart-3: #199e70;
   --chart-4: #c98500;
@@ -160,12 +160,12 @@
   --chart-8: #e66767;
   --sidebar: #111113;
   --sidebar-foreground: #f9f9f9;
-  --sidebar-primary: #2b6ef5;
-  --sidebar-primary-foreground: #ffffff;
+  --sidebar-primary: #fafafa;
+  --sidebar-primary-foreground: #0a0a0b;
   --sidebar-accent: #1f1f23;
-  --sidebar-accent-foreground: #2b6ef5;
+  --sidebar-accent-foreground: #fafafa;
   --sidebar-border: #27272a;
-  --sidebar-ring: #2b6ef5;
+  --sidebar-ring: #52525b;
 }
 
 .input-default {

@@ -21,7 +21,7 @@ type Part = { key: string; label: string; view: () => ReactNode }
 /** Zip ka tab button (DepositPage / SelfDeposit ke tab bar jaisa). */
 const tabClass = (active: boolean) =>
   `flex items-center gap-1.5 whitespace-nowrap border-b-2 px-5 py-3 text-[0.8rem] transition-colors ${
-    active ? 'border-[#2B6EF5] bg-[rgba(43,110,245,0.08)] font-bold text-[#2B6EF5]' : 'border-transparent text-muted-foreground hover:bg-accent hover:text-foreground'
+    active ? 'border-primary bg-primary/10 font-bold text-primary' : 'border-transparent text-muted-foreground hover:bg-accent hover:text-foreground'
   }`
 
 /** Direct Users → zip ka "Crypto | Fiat" switcher; andar apne purane screens (unke actions ke saath). */

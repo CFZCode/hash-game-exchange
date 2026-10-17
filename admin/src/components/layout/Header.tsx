@@ -26,7 +26,8 @@ import { SidebarTrigger } from '@/components/ui/sidebar'
  * that way ("Pnl"), so they are spelled out.
  */
 const SEGMENT_LABELS: Record<string, string> = {
-  pnl: 'Profit & loss'
+  pnl: 'Profit & loss',
+  'ip-tracker': 'Login & IP history'
 }
 
 const segmentLabel = (segment: string) => {

@@ -344,7 +344,7 @@ const LockTable = () => {
                 key={v}
                 type='button'
                 onClick={() => set({ status: v === 'all' ? '' : v, page: 1 })}
-                className={cn('rounded px-3 py-1 text-sm font-semibold capitalize', status === v ? 'bg-primary text-primary-foreground' : 'text-muted-foreground')}
+                className={cn('rounded px-3 py-1 text-sm font-semibold capitalize', status === v ? 'bg-accent text-foreground shadow-sm ring-1 ring-border' : 'text-muted-foreground hover:text-foreground')}
               >
                 {v}
               </button>

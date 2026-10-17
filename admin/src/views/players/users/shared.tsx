@@ -67,7 +67,7 @@ export const Chip = ({ tone, children, className }: { tone: Tone; children: Reac
   <span className={cn('inline-block rounded-md px-2 py-0.5 text-xs font-semibold whitespace-nowrap tabular-nums', TONES[tone], className)}>{children}</span>
 )
 
-const AVATAR = ['bg-primary', 'bg-chart-2', 'bg-success', 'bg-warning', 'bg-danger', 'bg-info']
+const AVATAR = ['bg-chart-5', 'bg-chart-2', 'bg-success', 'bg-warning', 'bg-danger', 'bg-info']
 
 const avatarClass = (name: string) => {
   let hash = 0
