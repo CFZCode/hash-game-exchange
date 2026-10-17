@@ -412,7 +412,7 @@ class UserStatusStatsService {
     // ── VIP ───────────────────────────────────────────────────────────────
     let vip = null;
     if (house) {
-      const [ladder, wagerIn] = await Promise.all([resolveVipLadder(this.models, { logger: this.logger }), wagerValuer(this.models)]);
+      const [ladder, wagerIn] = await Promise.all([resolveVipLadder(this.models, { logger: this.logger }), wagerValuer(this.models, staff)]);
       const v = ladder.levelFor(String(wager?.wager ?? '0').replace(/,/g, '') || '0');
       vip = {
         level: v.level,

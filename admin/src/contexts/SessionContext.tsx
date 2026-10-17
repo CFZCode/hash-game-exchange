@@ -5,6 +5,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, typ
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { api, request } from '@/lib/api/client'
+import { setPlainInr } from '@/lib/format'
 
 export type Actor = {
   staffId: number
@@ -100,11 +101,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const me = useQuery<Actor>({
     queryKey: ['session', 'me'],
     queryFn: () =>
-      request<Actor>('/api/auth/me', { raw: true }).then(r => ({
-        ...r.data,
-        promotions: r.data.promotions !== false && !isAgentTreeLevel(r.data.level),
-        direct: r.data.direct === true && !isAgentTreeLevel(r.data.level)
-      })),
+      request<Actor>('/api/auth/me', { raw: true }).then(r => {
+        const direct = r.data.direct === true && !isAgentTreeLevel(r.data.level)
+
+        setPlainInr(!direct)
+
+        return { ...r.data, promotions: r.data.promotions !== false && !isAgentTreeLevel(r.data.level), direct }
+      }),
     staleTime: 60_000,
     retry: false
   })

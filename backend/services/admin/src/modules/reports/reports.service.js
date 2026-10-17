@@ -129,7 +129,7 @@ class ReportsService {
       house ? resolveVipLadder(this.models, { logger: this.logger }) : null,
       this.#betCountsFor(ids),
       this.#agentTreeParents(rows.map((r) => r.parent_staff_id)),
-      wagerValuer(this.models),
+      wagerValuer(this.models, staff),
     ]);
 
     return {
@@ -202,7 +202,7 @@ class ReportsService {
       this.#betCountsFor(ids),
       this.#agentTreeParents(rows.map((r) => r.parent_staff_id)),
       this.#parentStaff(rows.map((r) => r.parent_staff_id)),
-      wagerValuer(this.models),
+      wagerValuer(this.models, staff),
     ]);
 
     return {
@@ -307,7 +307,7 @@ class ReportsService {
         raw: true,
       }),
       this.#agentTreeParents([user.parent_staff_id]),
-      wagerValuer(this.models),
+      wagerValuer(this.models, staff),
     ]);
 
     const report = this.#describePlayer(user, credits.get(String(user.id)), wagers.get(String(user.id)), {

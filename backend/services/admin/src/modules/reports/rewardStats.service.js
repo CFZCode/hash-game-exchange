@@ -56,7 +56,7 @@ class RewardStatsService {
     const window = statsWindow({ from, to, granularity });
     const scope = await playerScope(this.models, staff, { logger: this.logger });
     const rates = await loadRates(this.models);
-    const valuer = createValuer(rates, currency, currency ? null : await reportingCurrency(this.models));
+    const valuer = createValuer(rates, currency, currency ? null : await reportingCurrency(this.models, staff));
     const ctx = {
       window,
       scope,

@@ -158,7 +158,7 @@ class WagerStatsService {
       S.bucketsFor(this.models, window),
       currency ? null : S.loadRates(this.models),
     ]);
-    const convertTo = currency ? null : await reportingCurrency(this.models);
+    const convertTo = currency ? null : await reportingCurrency(this.models, staff);
 
     const replacements = S.replacementsFor(window, scope, currency ? { currency } : {});
     const empty = S.isEmptyScope(scope);

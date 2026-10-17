@@ -108,7 +108,7 @@ const AccountListBody = ({ channel }: { channel?: Channel }) => {
   const tail: Column<AccountRow>[] = [
     { key: 'bst', header: 'B st', cell: r => lockSwitch(r.betLocked) },
     { key: 'ust', header: 'U st', cell: r => lockSwitch(r.userLocked) },
-    { key: 'pname', header: 'PName', cell: r => `${r.percentage ?? 1} Pt/ INR` },
+    { key: 'pname', header: 'PName', cell: r => `${r.percentage ?? 1} Pt` },
     { key: 'type', header: 'Account Type', cell: r => accountTypeLabel(r) },
     action
   ]
@@ -120,7 +120,7 @@ const AccountListBody = ({ channel }: { channel?: Channel }) => {
 
   const exportRows = () =>
     rows.map(r => {
-      const locks = [r.betLocked ? 'Locked' : 'Open', r.userLocked ? 'Locked' : 'Open', `${r.percentage ?? 1} Pt/ INR`, accountTypeLabel(r)]
+      const locks = [r.betLocked ? 'Locked' : 'Open', r.userLocked ? 'Locked' : 'Open', `${r.percentage ?? 1} Pt`, accountTypeLabel(r)]
 
       return [r.username, r.credit, ...locks]
     })

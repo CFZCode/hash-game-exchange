@@ -29,3 +29,11 @@ test('USDT (and an unset policy) is 1:1 with USD', async () => {
   const w = await wagerValuer(models(null, {}));
   assert.equal(w.of('24'), '24.00000000');
 });
+
+test('the agent system (anyone below the Super Admin) is valued in INR', async () => {
+  const rates = { INR: '0.01' };
+  assert.equal((await wagerValuer(models('USDT', rates), { level: 5 })).currency, 'INR');
+  assert.equal((await wagerValuer(models('USDT', rates), { level: 2 })).currency, 'INR');
+  assert.equal((await wagerValuer(models('USDT', rates), { level: 7, parentLevel: 1 })).currency, 'USDT');
+  assert.equal((await wagerValuer(models('USDT', rates), { level: 1 })).currency, 'USDT');
+});

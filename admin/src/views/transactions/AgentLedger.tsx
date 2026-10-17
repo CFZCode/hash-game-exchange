@@ -111,8 +111,8 @@ const AgentLedger = ({ direction }: { direction: 'deposit' | 'withdraw' }) => {
       <div className='mb-4 grid grid-cols-2 gap-4 lg:grid-cols-4'>
         {[
           ['Transactions', String(total)],
-          ['Total Amount', `₹${money(list.data?.sum ?? 0)}`],
-          ['This Page', `₹${money(pageSum)}`],
+          ['Total Amount', `${money(list.data?.sum ?? 0)}`],
+          ['This Page', `${money(pageSum)}`],
           ['Page', `${page} / ${totalPages}`]
         ].map(([label, value]) => (
           <div key={label} className={`${card} p-4`}>
@@ -136,8 +136,8 @@ const AgentLedger = ({ direction }: { direction: 'deposit' | 'withdraw' }) => {
           To
           <input type='date' className={`${input} min-w-[150px]`} value={f.to} onChange={e => change('to', e.target.value)} />
         </label>
-        <input className={`${input} w-[110px]`} placeholder='Min ₹' value={f.min} onChange={e => change('min', e.target.value)} />
-        <input className={`${input} w-[110px]`} placeholder='Max ₹' value={f.max} onChange={e => change('max', e.target.value)} />
+        <input className={`${input} w-[110px]`} placeholder='Min' value={f.min} onChange={e => change('min', e.target.value)} />
+        <input className={`${input} w-[110px]`} placeholder='Max' value={f.max} onChange={e => change('max', e.target.value)} />
         {hasFilters && (
           <button
             type='button'
@@ -158,7 +158,7 @@ const AgentLedger = ({ direction }: { direction: 'deposit' | 'withdraw' }) => {
           <table className='w-full border-collapse'>
             <thead>
               <tr>
-                {['ID', 'From', 'To', 'Type', 'Amount (₹)', 'Date & Time'].map(h => (
+                {['ID', 'From', 'To', 'Type', 'Amount', 'Date & Time'].map(h => (
                   <th key={h} className={`${th} ${h.startsWith('Amount') ? 'text-right' : ''}`}>
                     {h}
                   </th>
@@ -200,7 +200,7 @@ const AgentLedger = ({ direction }: { direction: 'deposit' | 'withdraw' }) => {
                       {r.remark && <span className='ml-2 text-xs text-muted-foreground'>{r.remark}</span>}
                     </td>
                     <td className={`${td} text-right font-semibold tabular-nums ${deposit ? 'text-[#0ECC68]' : 'text-[#E01B4F]'}`}>
-                      {deposit ? '+' : '−'}₹{money(r.amount)}
+                      {deposit ? '+' : '−'}{money(r.amount)}
                     </td>
                     <td className={`${td} whitespace-nowrap text-muted-foreground`}>{fmt(r.createdAt)}</td>
                   </tr>

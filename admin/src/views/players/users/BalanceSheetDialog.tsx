@@ -14,6 +14,7 @@ import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
 import { formatIn, useReportMoney } from '@/components/shared/ReportMoney'
+import { inrSign } from '@/lib/format'
 import { useApi } from '@/hooks/use-api'
 import { api, errorMessage } from '@/lib/api/client'
 import { cn } from '@/lib/utils'
@@ -44,7 +45,7 @@ const ALL = 'ALL'
 const MAX_ROWS = 200
 
 const fmt = (value: string | number | null | undefined, cur: string) =>
-  `${cur === 'INR' ? '₹' : ''}${(Number(value) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  `${cur === 'INR' ? inrSign() : ''}${(Number(value) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 const fmtDate = (iso: string) => (iso ? new Date(iso).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : '—')
 
