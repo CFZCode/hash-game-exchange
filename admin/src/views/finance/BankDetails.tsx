@@ -17,7 +17,8 @@ import { useApi, useApiMutation } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
 import { check } from '@/lib/validate'
 
-import { useOwnerCoinFilter } from './useCurrencyCodes'
+import type { CurrencyRow } from './types'
+import { CURRENCIES_PATH, useOwnerCoinFilter } from './useCurrencyCodes'
 
 /**
  * The payment destinations a user is shown when they deposit — one list per
@@ -31,15 +32,38 @@ type BankRow = {
   ifscCode?: string | null
   accountHolderName?: string | null
   upiId?: string | null
+  network?: string | null
+  walletAddress?: string | null
   isActive?: boolean
   qrImage?: string | null
   createdAt?: string
 }
 
-const CURRENCIES = ['INR', 'PKR', 'BDT', 'NPR', 'AED', 'MVR', 'EUR', 'USDT']
+const CURRENCIES = ['INR', 'PKR', 'BDT', 'NPR', 'AED', 'MVR', 'EUR', 'USDT', 'BTC']
+
+/** The same per-network address formats the backend enforces (bank-details/cryptoAddress.js). */
+const ADDRESS_FORMATS: Record<string, RegExp> = {
+  TRC20: /^T[1-9A-HJ-NP-Za-km-z]{33}$/,
+  ERC20: /^0x[0-9a-fA-F]{40}$/,
+  BEP20: /^0x[0-9a-fA-F]{40}$/,
+  BTC: /^(bc1[02-9ac-hj-np-z]{11,71}|[13][1-9A-HJ-NP-Za-km-z]{25,34})$/
+}
+
+/** The coin's registry row: crypto coins take a network + wallet address instead of bank fields. */
+const useCoin = (coin: string) => {
+  const registry = useApi<CurrencyRow[]>(CURRENCIES_PATH, undefined, { retry: false, staleTime: 60_000 })
+
+  return Array.isArray(registry.data) ? registry.data.find(c => c.code === coin) : undefined
+}
 
 const DetailForm = ({ coin, row, onDone }: { coin: string; row?: BankRow; onDone?: () => void }) => {
+  const info = useCoin(coin)
+  const crypto = info?.kind === 'crypto'
+  const networks = (info?.networks ?? []).filter(n => n.enabled !== false)
+
   const [form, setForm] = useState({
+    network: row?.network ?? '',
+    walletAddress: row?.walletAddress ?? '',
     bankName: row?.bankName ?? '',
     accountNumber: row?.accountNumber ?? '',
     ifscCode: row?.ifscCode ?? '',
@@ -51,7 +75,18 @@ const DetailForm = ({ coin, row, onDone }: { coin: string; row?: BankRow; onDone
   const [file, setFile] = useState<File | null>(null)
 
   // bankDetails.validators.js: every text ≤ 255 (account ≤ 100, IFSC ≤ 50); a new row needs an account number or a UPI id.
-  const validate = () => ({
+  const validate = () =>
+    crypto
+      ? {
+          network: form.network ? undefined : 'Pick the network',
+          walletAddress: !form.walletAddress.trim()
+            ? 'The wallet address is required'
+            : (ADDRESS_FORMATS[form.network] ?? /^[A-Za-z0-9:_-]{10,128}$/).test(form.walletAddress.trim())
+              ? undefined
+              : `This is not a valid ${form.network || 'network'} address`,
+          accountHolderName: check.length(form.accountHolderName, 'Label', { max: 255 })
+        }
+      : {
     accountHolderName: check.length(form.accountHolderName, 'Account holder', { max: 255 }),
     bankName: check.length(form.bankName, 'Bank name', { max: 255 }),
     ifscCode: check.length(form.ifscCode, 'IFSC / SWIFT', { max: 50 }),
@@ -59,7 +94,7 @@ const DetailForm = ({ coin, row, onDone }: { coin: string; row?: BankRow; onDone
       !form.accountNumber.trim() && !form.upiId.trim() ? 'Either an account number or a UPI id is required' : check.length(form.accountNumber, 'Account number', { max: 100 }),
     upiId: check.length(form.upiId, 'UPI id', { max: 255 }),
     'bd-qr': file && !['image/png', 'image/jpeg'].includes(file.type) ? 'QR image must be a PNG or JPEG' : file && file.size > 2 * 1024 * 1024 ? 'QR image must be 2 MB or smaller' : undefined
-  })
+  }
 
   const save = useApiMutation({
     fn: () => {
@@ -92,11 +127,37 @@ const DetailForm = ({ coin, row, onDone }: { coin: string; row?: BankRow; onDone
         )
       }
       title={row ? `Edit ${coin} destination` : `New ${coin} destination`}
-      description='Either an account number or a UPI id is required. The QR image is optional and replaces the stored one.'
+      description={
+        crypto
+          ? 'The address players send this coin to. Double-check it — money sent to a wrong address is lost. The QR image is optional.'
+          : 'Either an account number or a UPI id is required. The QR image is optional and replaces the stored one.'
+      }
       submitLabel={row ? 'Save' : 'Add'}
       validate={validate}
       onSubmit={() => save.mutateAsync()}
     >
+      {crypto ? (
+        <>
+          <div className='grid gap-2'>
+            <label className='text-sm font-medium'>Network</label>
+            <Select value={form.network} onValueChange={v => v && setForm({ ...form, network: v })}>
+              <SelectTrigger aria-label='Network'>
+                <SelectValue placeholder='Pick a network' />
+              </SelectTrigger>
+              <SelectContent>
+                {networks.map(n => (
+                  <SelectItem key={n.key} value={n.key}>
+                    {n.name || n.key}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <TextField id='bd-address' name='walletAddress' label='Wallet address' value={form.walletAddress} onChange={e => setForm({ ...form, walletAddress: e.target.value })} />
+          <TextField id='bd-holder' name='accountHolderName' label='Label (optional)' value={form.accountHolderName} onChange={e => setForm({ ...form, accountHolderName: e.target.value })} />
+        </>
+      ) : (
+        <>
       <TextField id='bd-holder' name='accountHolderName' label='Account holder' value={form.accountHolderName} onChange={e => setForm({ ...form, accountHolderName: e.target.value })} />
       <div className='grid grid-cols-2 gap-4'>
         <TextField id='bd-bank' name='bankName' label='Bank name' value={form.bankName} onChange={e => setForm({ ...form, bankName: e.target.value })} />
@@ -104,6 +165,8 @@ const DetailForm = ({ coin, row, onDone }: { coin: string; row?: BankRow; onDone
       </div>
       <TextField id='bd-acct' name='accountNumber' label='Account number' value={form.accountNumber} onChange={e => setForm({ ...form, accountNumber: e.target.value })} />
       <TextField id='bd-upi' name='upiId' label='UPI id' value={form.upiId} onChange={e => setForm({ ...form, upiId: e.target.value })} />
+        </>
+      )}
       <div className='grid gap-2'>
         <label htmlFor='bd-qr' className='text-sm font-medium'>
           QR image (PNG or JPEG, max 2 MB)
@@ -129,12 +192,24 @@ const BankDetails = () => {
     success: 'Destination deactivated'
   })
 
-  const columns: Column<BankRow>[] = [
+  const crypto = useCoin(coin)?.kind === 'crypto'
+
+  const columns: Column<BankRow>[] = crypto
+    ? [
+        { key: 'label', header: 'Label', cell: r => <span className='font-medium'>{r.accountHolderName ?? '—'}</span> },
+        { key: 'network', header: 'Network', cell: r => <span>{r.network ?? '—'}</span> },
+        { key: 'address', header: 'Wallet address', cell: r => <span className='font-mono text-xs break-all'>{r.walletAddress ?? '—'}</span> },
+        { key: 'active', header: 'Status', cell: r => <StatusBadge value={r.isActive === false ? 'inactive' : 'active'} /> }
+      ]
+    : [
     { key: 'holder', header: 'Account holder', cell: r => <span className='font-medium'>{r.accountHolderName ?? '—'}</span> },
     { key: 'bank', header: 'Bank', cell: r => <span>{r.bankName ?? '—'}{r.ifscCode ? <span className='text-muted-foreground'> · {r.ifscCode}</span> : null}</span> },
     { key: 'acct', header: 'Account', cell: r => <span className='font-mono text-xs'>{r.accountNumber ?? '—'}</span> },
     { key: 'upi', header: 'UPI', cell: r => <span className='font-mono text-xs'>{r.upiId ?? '—'}</span> },
-    { key: 'active', header: 'Status', cell: r => <StatusBadge value={r.isActive === false ? 'inactive' : 'active'} /> },
+    { key: 'active', header: 'Status', cell: r => <StatusBadge value={r.isActive === false ? 'inactive' : 'active'} /> }
+  ]
+
+  columns.push(
     {
       key: 'actions',
       header: '',
@@ -159,13 +234,13 @@ const BankDetails = () => {
         </Can>
       )
     }
-  ]
+  )
 
   return (
     <div>
       <PageHeader
         title='Bank details'
-        description='Where users send fiat deposits, one list per currency. Only active rows are offered at the cashier.'
+        description='Where users send manual deposits, one list per currency: bank or UPI for fiat, a wallet address per network for crypto. Only active rows are offered at the cashier.'
         actions={
           <>
             <Select value={coin} onValueChange={v => v && setCoin(v)}>

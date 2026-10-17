@@ -9,6 +9,10 @@ export type FiatDepositRow = {
   bankName?: string | null
   accountHolderName?: string | null
   upiId?: string | null
+
+  /** Manual crypto deposit (migration 118): the network and the house address it was sent to. */
+  network?: string | null
+  walletAddress?: string | null
   status: 'pending' | 'approved' | 'rejected' | string
   hasScreenshot: boolean
   adminComment?: string | null

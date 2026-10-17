@@ -1,6 +1,19 @@
 'use strict';
 
+const { currencyRegistry } = require('@ibitplay/common');
+
 const errors = require('./bankDetails.errors');
+const { addressProblem } = require('./cryptoAddress');
+
+/** For a crypto coin: the network must be one the registry enables, and the address must fit it. */
+async function assertCryptoDestination(coinType, network, walletAddress) {
+  const coin = await currencyRegistry.describe(coinType);
+  if (coin?.kind !== 'crypto') return;
+  const problem = addressProblem(network, walletAddress);
+  if (problem) throw errors.CRYPTO_ADDRESS_INVALID({ coinType, network, reason: problem });
+  const networks = (await currencyRegistry.networksOf(coinType)) ?? [];
+  if (!networks.some((n) => n.key === network)) throw errors.NETWORK_NOT_ENABLED({ coinType, network, enabled: networks.map((n) => n.key) });
+}
 
 /**
  * The house's own payment destinations — the bank accounts and UPI ids a
@@ -48,6 +61,7 @@ class BankDetailsService {
 
   /** @legacy POST /bankdetails/:coin_type */
   async create({ coinType, details, qrImage }) {
+    await assertCryptoDestination(coinType, details.network, details.walletAddress);
     const row = await this.models.CurrencyPaymentDetails.create({
       coin_type: coinType,
       bank_name: details.bankName ?? null,
@@ -55,6 +69,8 @@ class BankDetailsService {
       ifsc_code: details.ifscCode ?? null,
       account_holder_name: details.accountHolderName ?? null,
       upi_id: details.upiId ?? null,
+      network: details.network ?? null,
+      wallet_address: details.walletAddress ?? null,
       qr_image: qrImage ?? null,
       is_active: details.isActive ?? true,
     });
@@ -69,6 +85,9 @@ class BankDetailsService {
       where: { id, coin_type: coinType },
     });
     if (!row) throw errors.NOT_FOUND({ id, coinType });
+    if (details.network !== undefined || details.walletAddress !== undefined) {
+      await assertCryptoDestination(coinType, details.network ?? row.network, details.walletAddress ?? row.wallet_address);
+    }
 
     await row.update({
       ...(details.bankName !== undefined ? { bank_name: details.bankName } : {}),
@@ -76,6 +95,8 @@ class BankDetailsService {
       ...(details.ifscCode !== undefined ? { ifsc_code: details.ifscCode } : {}),
       ...(details.accountHolderName !== undefined ? { account_holder_name: details.accountHolderName } : {}),
       ...(details.upiId !== undefined ? { upi_id: details.upiId } : {}),
+      ...(details.network !== undefined ? { network: details.network } : {}),
+      ...(details.walletAddress !== undefined ? { wallet_address: details.walletAddress } : {}),
       ...(details.isActive !== undefined ? { is_active: details.isActive } : {}),
       ...(qrImage ? { qr_image: qrImage } : {}),
     });
@@ -117,6 +138,8 @@ class BankDetailsService {
       ifscCode: row.ifsc_code,
       accountHolderName: row.account_holder_name,
       upiId: row.upi_id,
+      network: row.network ?? null,
+      walletAddress: row.wallet_address ?? null,
       hasQrImage: Boolean(row.qr_image),
       ...(includeInactive ? { isActive: row.is_active } : {}),
     };

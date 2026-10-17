@@ -1529,7 +1529,8 @@ class ReportsService {
       raw: true,
     });
     for (const row of fiatDeposits) {
-      push(row.created_at, 'Deposit', 'CREDIT', `Bank deposit${row.transaction_id ? ` (${row.transaction_id})` : ''}`, row.amount, Number(row.id) || 0);
+      const via = row.network ? `Crypto deposit ${String(row.currency).toUpperCase()}·${row.network}` : 'Bank deposit';
+      push(row.created_at, 'Deposit', 'CREDIT', `${via}${row.transaction_id ? ` (${row.transaction_id})` : ''}`, row.amount, Number(row.id) || 0);
     }
 
     // 3. Gateway deposits.

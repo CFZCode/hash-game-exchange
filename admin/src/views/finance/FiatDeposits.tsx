@@ -133,7 +133,7 @@ const Detail = ({ row }: { row: FiatDepositRow }) => (
       items={[
         ['User', <Link key='p' href={`/users/${row.userId}`} className='underline'>#{row.userId}</Link>],
         ['Amount', <Money key='a' value={row.amount} currency={row.currency} />],
-        ['Bank reference', <span key='t' className='font-mono'>{row.transactionId}</span>],
+        [row.network ? 'Transaction hash' : 'Bank reference', <span key='t' className='font-mono break-all'>{row.transactionId}</span>],
         ['Method', <DepositMethod key='m' row={row} />],
         ['Bank', row.bankName],
         ['Account holder', row.accountHolderName],
@@ -160,7 +160,16 @@ const Detail = ({ row }: { row: FiatDepositRow }) => (
  * bank transfer; older rows carry both (the site used to send every receiving detail), so a row
  * with a UPI id and no account number is UPI, one with both shows both.
  */
+/** Crypto coins a manual deposit may arrive in (the owner filter keeps only the enabled ones). */
+const MANUAL_CRYPTO = ['USDT', 'BTC']
+
 const DepositMethod = ({ row }: { row: FiatDepositRow }) => {
+  if (row.network)
+    return (
+      <span className='text-sm'>
+        Crypto · {row.currency}·{row.network} <span className='text-muted-foreground block font-mono text-xs'>{row.walletAddress ?? ''}</span>
+      </span>
+    )
   if (row.upiId && !row.accountNumber) return <span className='text-sm'>UPI <span className='text-muted-foreground font-mono text-xs'>{row.upiId}</span></span>
   if (row.upiId && row.bankName) return <span className='text-sm'>UPI or {row.bankName} <span className='text-muted-foreground font-mono text-xs'>{row.upiId}</span></span>
 
@@ -180,7 +189,7 @@ const columns: Column<FiatDepositRow>[] = [
     )
   },
   { key: 'amount', header: 'Amount', align: 'right', cell: r => <Money value={r.amount} currency={r.currency} /> },
-  { key: 'ref', header: 'Bank reference', cell: r => <span className='font-mono text-xs'>{r.transactionId}</span> },
+  { key: 'ref', header: 'Reference / tx hash', cell: r => <span className='font-mono text-xs'>{r.transactionId}</span> },
   { key: 'bank', header: 'Method', cell: r => <DepositMethod row={r} /> },
   { key: 'status', header: 'Status', cell: r => <StatusBadge value={r.status} /> },
   { key: 'proof', header: 'Proof', cell: r => (r.hasScreenshot ? <span className='text-xs'>yes</span> : <span className='text-muted-foreground text-xs'>none</span>) },
@@ -226,7 +235,7 @@ const FiatDeposits = () => {
   return (
     <div>
       <PageHeader title='Manual deposits' description='Manual bank-transfer deposits awaiting review. Approving credits the user; rejecting records a reason they can see.' />
-      <FilterBar filters={filters} currencies={ownerCoins(FIAT_CURRENCIES)} allCurrenciesLabel={allConvertedLabel(filters.defaultCurrency)} className='mb-4' />
+      <FilterBar filters={filters} currencies={ownerCoins([...FIAT_CURRENCIES, ...MANUAL_CRYPTO])} allCurrenciesLabel={allConvertedLabel(filters.defaultCurrency)} className='mb-4' />
       <ListStatsTabs stats={can('reports:read') ? <FinanceStatsPanel kind='deposits' rail='fiat' filters={filters} statusLabels={{ success: 'Successful', pending: 'Pending', failed: 'Failed' }} /> : null}>
         <DataTable
           columns={columns}

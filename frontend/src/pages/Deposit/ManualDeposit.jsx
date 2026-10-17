@@ -6,6 +6,10 @@ import { getBankDetails, readBankQr, submitFiatDeposit } from '../../services/fi
 import { printCurrency } from '../../utils/currency';
 import { depositBonusConfig, extraBonusAmount } from './deposit';
 import { useSelectedCurrency } from '../../hooks/useSelectedCurrency';
+import QrCode from './QrCode';
+import useResource from '../../hooks/useResource';
+import { getRechargeBonusConfig } from '../../services/bonus';
+import { coinIcon } from '../../utils/coinArt';
 
 /* The manual (bank transfer) deposit — THIS BUILD'S, not bc.game's (the original's fiat tab is a
  * payment-channel grid; this platform's fiat rail is "send to the house account, then file the
@@ -53,7 +57,9 @@ function Qr({ coin, id }) {
   return <img alt="Payment QR" src={url} className="mx-auto mt-3 size-40 rounded-lg bg-white object-contain p-2" />;
 }
 
-export default function ManualDeposit({ currency }) {
+/* `crypto`: the Crypto tab's manual transfer — the house rows are wallet addresses per network
+   (admin → Bank details), the reference is the transaction hash and a screenshot is optional. */
+export default function ManualDeposit({ currency, crypto = false }) {
   const coin = String(currency).toUpperCase().replace(/FIAT$/, '');
   const [accounts, setAccounts] = React.useState(null);
   const [picked, setPicked] = React.useState(0);
@@ -73,14 +79,16 @@ export default function ManualDeposit({ currency }) {
 
   /* The first-deposit offer, as FiatTab's channel form shows it: the same recharge config (FiatTab
      mounts its read; null when this player can't get the bonus — claimed, agent, or switched off). */
-  const walletCode = `${coin}FIAT`;
+  // The Crypto tab doesn't mount FiatTab's read of the first-deposit terms, so read it here (shared).
+  useResource(getRechargeBonusConfig);
+  const walletCode = crypto ? coin : `${coin}FIAT`;
   const bonus = depositBonusConfig(walletCode);
   const extra = extraBonusAmount(amount, walletCode);
   const site = useSelectedCurrency({ site: true });
   const fiat = (value) => printCurrency(value, walletCode, { target: walletCode });
 
   const account = accounts?.[picked];
-  const ready = account && Number(amount) > 0 && reference.trim() && file && !busy;
+  const ready = account && Number(amount) > 0 && reference.trim() && (file || crypto) && !busy;
 
   const submit = async (event) => {
     event.preventDefault();
@@ -105,7 +113,11 @@ export default function ManualDeposit({ currency }) {
     return (
       <div className="my-4 flex rounded-xl bg-warning/10 p-2 text-secondary">
         <IconInform className="icon -mt-0.5 mr-1.5 size-6 flex-none fill-warning" />
-        <div>No {coin} bank account is set up for deposits right now. Please try again later.</div>
+        <div>
+          {crypto
+            ? `Sorry, ${coin} deposits are not currently available. Please try again later or contact support.`
+            : `No ${coin} bank account is set up for deposits right now. Please try again later.`}
+        </div>
       </div>
     );
   }
@@ -115,8 +127,9 @@ export default function ManualDeposit({ currency }) {
       <div className="my-4 flex rounded-xl bg-success/10 p-2 text-secondary">
         <IconInform className="icon -mt-0.5 mr-1.5 size-6 flex-none fill-success" />
         <div>
-          Transfer the amount to the account below, then enter the bank reference (UTR) and upload the
-          payment screenshot. Your balance is credited once the deposit is approved.
+          {crypto
+            ? `Send ${coin} to the address below on the network shown, then enter the transaction hash. Your balance is credited once the deposit is approved.`
+            : 'Transfer the amount to the account below, then enter the bank reference (UTR) and upload the payment screenshot. Your balance is credited once the deposit is approved.'}
         </div>
       </div>
 
@@ -142,15 +155,32 @@ export default function ManualDeposit({ currency }) {
                 className={`button button-m h-10 ${index === picked ? 'button-brand' : 'button-second'}`}
                 onClick={() => setPicked(index)}
               >
-                {row.upiId && !row.accountNumber ? 'UPI' : row.bankName || `Account ${index + 1}`}
+                {row.network || (row.upiId && !row.accountNumber ? 'UPI' : row.bankName || `Account ${index + 1}`)}
               </button>
             ))}
           </div>
         </>
       )}
 
+      {account.walletAddress && (
+        <>
+          <div className="mt-4 flex justify-center">
+            <div className="rounded-xl bg-layer3_alt p-2">
+              <QrCode value={account.walletAddress} logo={coinIcon(coin)} className="block" />
+            </div>
+          </div>
+          <CopyRow label="Network" value={account.network} />
+          <CopyRow label="Deposit Address" value={account.walletAddress} />
+          <div className="mt-3 flex rounded-xl bg-warning/10 p-2 text-secondary">
+            <IconInform className="icon -mt-0.5 mr-1.5 size-6 flex-none fill-warning" />
+            <div>
+              Send only {coin} on the {account.network} network to this address. Anything else sent here will be lost.
+            </div>
+          </div>
+        </>
+      )}
       <CopyRow label="Bank" value={account.bankName} />
-      <CopyRow label="Account Holder" value={account.accountHolderName} />
+      {!account.walletAddress && <CopyRow label="Account Holder" value={account.accountHolderName} />}
       <CopyRow label="Account Number" value={account.accountNumber} />
       <CopyRow label="IFSC" value={account.ifscCode} />
       <CopyRow label="UPI ID" value={account.upiId} />
@@ -163,12 +193,12 @@ export default function ManualDeposit({ currency }) {
         {extra > 0 && <div className="px-2 font-extrabold text-success">Extra +{fiat(extra)}</div>}
       </div>
 
-      <div className="mb-1 mt-3 text-secondary">Bank Reference / UTR</div>
+      <div className="mb-1 mt-3 text-secondary">{crypto ? 'Transaction Hash' : 'Bank Reference / UTR'}</div>
       <div className="input bg-input_bright text-base">
         <input name="transactionId" value={reference} maxLength={128} onChange={(e) => setReference(e.target.value)} />
       </div>
 
-      <div className="mb-1 mt-3 text-secondary">Payment Screenshot</div>
+      <div className="mb-1 mt-3 text-secondary">Payment Screenshot{crypto ? ' (optional)' : ''}</div>
       <label
         htmlFor={fileId}
         className="flex h-24 w-full cursor-pointer items-center justify-center rounded-lg border border-dashed border-third px-3 text-center text-sm text-secondary"

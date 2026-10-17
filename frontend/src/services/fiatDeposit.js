@@ -106,7 +106,7 @@ export function submitFiatDeposit({ amount, currency, transactionId, destination
   form.append('amount', String(amount));
   form.append('currency', currency);
   form.append('transactionId', transactionId);
-  [['bankName', 'bankName'], ['accountNumber', 'accountNumber'], ['ifscCode', 'ifscCode'], ['accountHolderName', 'accountHolderName'], ['upiId', 'upiId']]
+  [['bankName', 'bankName'], ['accountNumber', 'accountNumber'], ['ifscCode', 'ifscCode'], ['accountHolderName', 'accountHolderName'], ['upiId', 'upiId'], ['network', 'network'], ['walletAddress', 'walletAddress']]
     .filter(([from]) => destination?.[from])
     .forEach(([from, to]) => form.append(to, destination[from]));
   if (screenshot) form.append('screenshot', screenshot, screenshot.name);

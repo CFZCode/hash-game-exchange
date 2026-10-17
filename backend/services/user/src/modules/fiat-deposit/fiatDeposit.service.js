@@ -9,6 +9,12 @@ const { Op: SequelizeOp } = require('@ibitplay/db');
 const { assertPlayerCapability } = require('@ibitplay/auth');
 
 const errors = require('./fiatDeposit.errors');
+
+/** The ledger line for an approved manual deposit: crypto names its coin, network and tx hash. */
+const depositDescription = (deposit, depositId) =>
+  deposit.network
+    ? `Crypto deposit ${deposit.currency}·${deposit.network} #${depositId} (${deposit.transaction_id})`
+    : `Fiat deposit #${depositId} approved`;
 const {
   DEPOSIT_STATUS,
   MAGIC_BYTES,
@@ -89,7 +95,18 @@ class FiatDepositService {
     await currencyRegistry.assertCurrencyEnabled(details.currency);
     // The deposit min / max for this currency (set by the Super Admin: Limits and policy → Cashier).
     await cashierLimits.assertCashierLimits(this.models.Users?.sequelize ?? this.db?.sequelize, { currency: details.currency, amount: details.amount, flow: 'deposit' });
-    if (!screenshot) throw errors.SCREENSHOT_REQUIRED();
+    // A crypto coin is a manual on-chain transfer: the network is required and the tx hash
+    // (`transactionId`) is the proof, so a screenshot is optional.
+    const isCrypto = (await currencyRegistry.describe(details.currency))?.kind === 'crypto';
+    if (isCrypto) {
+      if (!details.network) throw errors.NETWORK_REQUIRED();
+      const networks = (await currencyRegistry.networksOf(details.currency)) ?? [];
+      if (!networks.some((n) => n.key === details.network)) {
+        throw errors.NETWORK_NOT_ENABLED({ currency: details.currency, network: details.network });
+      }
+    } else if (!screenshot) {
+      throw errors.SCREENSHOT_REQUIRED();
+    }
 
     // A bank reference identifies one real transfer. Two deposits claiming the
     // same one is either a double submission or an attempt to be credited twice
@@ -100,7 +117,7 @@ class FiatDepositService {
     });
     if (duplicate) throw errors.DUPLICATE_TRANSACTION({ transactionId: details.transactionId });
 
-    const storedFile = await this.#storeScreenshot(userId, screenshot);
+    const storedFile = screenshot ? await this.#storeScreenshot(userId, screenshot) : null;
 
     const row = await this.models.FiatDeposits.create({
       user_id: userId,
@@ -113,6 +130,8 @@ class FiatDepositService {
       ifsc_code: details.ifscCode ?? null,
       account_holder_name: details.accountHolderName ?? null,
       upi_id: details.upiId ?? null,
+      network: isCrypto ? details.network : null,
+      wallet_address: isCrypto ? details.walletAddress ?? null : null,
       screenshot_path: storedFile,
       status: DEPOSIT_STATUS.PENDING,
     });
@@ -271,7 +290,7 @@ class FiatDepositService {
           idempotencyKey: `fiat-deposit:${depositId}`,
           refType: 'FIAT_DEPOSIT',
           refId: String(depositId),
-          description: `Fiat deposit #${depositId} approved`,
+          description: depositDescription(deposit, depositId),
         },
         { sourceService: 'user-service', transaction }
       );
@@ -469,6 +488,8 @@ class FiatDepositService {
       bankName: row.bank_name,
       accountHolderName: row.account_holder_name,
       upiId: row.upi_id,
+      network: row.network ?? null,
+      walletAddress: row.wallet_address ?? null,
       status: row.status,
       hasScreenshot: Boolean(row.screenshot_path),
       adminComment: row.admin_comment,
@@ -485,4 +506,4 @@ class FiatDepositService {
   }
 }
 
-module.exports = { FiatDepositService };
+module.exports = { FiatDepositService, depositDescription };

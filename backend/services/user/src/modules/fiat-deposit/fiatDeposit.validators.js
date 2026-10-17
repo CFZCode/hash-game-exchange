@@ -16,6 +16,10 @@ const create = {
     ifscCode: z.string().trim().max(50).optional(),
     accountHolderName: z.string().trim().max(255).optional(),
     upiId: z.string().trim().max(255).optional(),
+    // Manual crypto deposit (migration 118): the network sent on and the house address paid to;
+    // the transaction hash travels as `transactionId`.
+    network: z.string().trim().toUpperCase().max(32).optional(),
+    walletAddress: z.string().trim().max(128).optional(),
   }).strict(),
 };
 

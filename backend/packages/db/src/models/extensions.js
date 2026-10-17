@@ -232,6 +232,15 @@ const EXTENSIONS = {
   // `amount` is what was credited once approved; this is what the player entered.
   FiatDeposits: {
     claimed_amount: { type: DataTypes.DECIMAL, allowNull: true, field: 'claimed_amount' },
+    // ── migration 118-manual-crypto-deposit: the network and house address of a manual crypto deposit.
+    network: { type: DataTypes.STRING(32), allowNull: true, field: 'network' },
+    wallet_address: { type: DataTypes.STRING(128), allowNull: true, field: 'wallet_address' },
+  },
+
+  // ── migration 118-manual-crypto-deposit: a house receiving address for a crypto coin.
+  CurrencyPaymentDetails: {
+    network: { type: DataTypes.STRING(32), allowNull: true, field: 'network' },
+    wallet_address: { type: DataTypes.STRING(128), allowNull: true, field: 'wallet_address' },
   },
 
   Withdrawals: {

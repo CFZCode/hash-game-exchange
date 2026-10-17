@@ -11,6 +11,14 @@ module.exports = defineErrors('FIAT_DEPOSIT', {
     status: 409,
     message: 'This deposit has already been approved or rejected',
   },
+  NETWORK_REQUIRED: {
+    status: 422,
+    message: 'Choose the network you sent the crypto on',
+  },
+  NETWORK_NOT_ENABLED: {
+    status: 422,
+    message: 'This network is not enabled for the coin',
+  },
   SCREENSHOT_REQUIRED: {
     status: 422,
     message: 'Proof of payment is required',

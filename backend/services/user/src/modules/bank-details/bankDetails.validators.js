@@ -19,6 +19,9 @@ const detailBody = z.object({
   ifscCode: z.string().trim().max(50).optional(),
   accountHolderName: z.string().trim().max(255).optional(),
   upiId: z.string().trim().max(255).optional(),
+  // A crypto coin's house address (migration 118); the network is the registry's key (TRC20, BTC, …).
+  network: z.string().trim().toUpperCase().max(32).optional(),
+  walletAddress: z.string().trim().max(128).optional(),
   isActive: z.coerce.boolean().default(true),
 }).strict();
 
@@ -26,8 +29,8 @@ const create = {
   params: z.object({ coin_type: coinType }),
   // multipart, so the body arrives as strings — coercion is doing real work here.
   body: detailBody.refine(
-    (v) => v.accountNumber || v.upiId,
-    { message: 'Either an account number or a UPI id is required', path: ['accountNumber'] }
+    (v) => v.accountNumber || v.upiId || v.walletAddress,
+    { message: 'An account number, a UPI id or a wallet address is required', path: ['accountNumber'] }
   ),
 };
 
