@@ -3,8 +3,8 @@
 const { QueryTypes } = require('sequelize');
 
 /**
- * JS games ka point ledger — sirf agent ke CHILD users (users.parent_staff_id hai) ke liye.
- * Direct user ka flow pehle jaisa: koi point entry nahi.
+ * JS games ka point ledger — agent ke CHILD users (users.parent_staff_id hai) ke liye `point_ledger`
+ * (poori chain); DIRECT users ke liye `point_ledger_direct` (sirf unki ek row) — neeche addDirectGamePoints.
  *
  * Sports settlement (sports `walletService.updateAllPointHierarchy`) jaisa: player + upar ke
  * saare staff ke `credits` rows me `all_point` (+ `thirdparty_pts`) += delta, aur har wallet ki
@@ -106,4 +106,47 @@ async function addChildGamePoints(sequelize, { userId, delta, entryRef, gameType
   });
 }
 
-module.exports = { addChildGamePoints, CATEGORY };
+/**
+ * Direct user (koi parent nahi) ka JS games callback — `mssports.point_ledger_direct` me EK row,
+ * usi currency me jisme khela (migration 116). `credits.all_point` nahi chhuta: direct user ka
+ * "all point" uska paisa hai; `balanceAfter` = movement ke baad us currency ka wallet balance.
+ * `entry_ref` unique: wahi callback dobara aaye to row dobara nahi banti.
+ *
+ * @param {{ userId: number, currency: string, delta: string, balanceAfter?: string|null,
+ *           entryRef: string, gameType?: string, remark?: string }} p   delta = signed decimal
+ * @returns {Promise<null | { written: boolean }>} null = child user (ye uska ledger nahi)
+ */
+async function addDirectGamePoints(sequelize, { userId, currency, delta, balanceAfter, entryRef, gameType, remark }) {
+  const [user] = await sequelize.query('SELECT name, parent_staff_id FROM public.users WHERE id = :userId', {
+    replacements: { userId },
+    type: QueryTypes.SELECT,
+  });
+  if (!user || user.parent_staff_id != null) return null;
+
+  const rows = await sequelize.query(
+    `INSERT INTO mssports.point_ledger_direct
+       (entry_ref, event_type, category, user_id, username, currency, delta, balance_after, game_type, remark, created_at)
+     VALUES
+       (:entryRef, :event, :category, :userId, :username, :currency, :delta, :balanceAfter, :gameType, :remark, NOW())
+     ON CONFLICT (entry_ref) DO NOTHING
+     RETURNING id`,
+    {
+      replacements: {
+        entryRef,
+        event: EVENT,
+        category: CATEGORY,
+        userId,
+        username: user.name ?? null,
+        currency: String(currency || 'INR').toUpperCase().slice(0, 10),
+        delta,
+        balanceAfter: balanceAfter ?? null,
+        gameType: gameType ? String(gameType).slice(0, 50) : null,
+        remark: String(remark ?? '').slice(0, 255),
+      },
+      type: QueryTypes.SELECT,
+    }
+  );
+  return { written: rows.length > 0 };
+}
+
+module.exports = { addChildGamePoints, addDirectGamePoints, CATEGORY };

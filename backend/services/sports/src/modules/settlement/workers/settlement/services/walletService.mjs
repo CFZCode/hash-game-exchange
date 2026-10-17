@@ -11,6 +11,7 @@ import { PointLedger_default } from "../models/admin/PointLedger.mjs";
 import { POINT_EVENT, POINT_CATEGORY, pointEntryRef, LEDGER_CATEGORY_ALIASES } from "../constants/pointLedger.mjs";
 import { creditsChain, addPoints, isChildUser } from "../../../../../lib/services/creditsPoints.mjs";
 import { QueryTypes } from "sequelize";
+import { writeDirectEntry, reverseDirectEntry, deleteDirectEntries } from "../../../../../lib/services/directPointLedger.mjs";
 import { emitBalanceUpdate } from "../utils/socketUtils.mjs";
 import { withVoidSuffix } from "../helper/voidLabel.mjs";
 import { MESSAGES } from "../constants/messages.mjs";
@@ -670,11 +671,24 @@ var WalletService = {
         await tx.commit();
         return { success: true, skipped: true, reason: `bet ${betId} belongs to demo user ${userId} \u2014 points not rolled up` };
       }
-      // Direct user: point ledger nahi (flow pehle jaisa). points_applied set nahi karte, isliye
-      // void pe reverseAllPointHierarchy bhi kuch nahi karta.
+      // Direct user: agent chain nahi — `point_ledger_direct` me sirf uski EK entry, bet ki
+      // currency me (credits.all_point nahi chhuta). points_applied set nahi hota; void pe
+      // reverseAllPointHierarchy direct user ko alag pehchaan ke ulti entry likhta hai.
       if (!(await isChildUser(db_default, userId, tx))) {
+        const direct = await writeDirectEntry(db_default, {
+          entryRef,
+          eventType: POINT_EVENT.BET_SETTLEMENT,
+          category,
+          userId,
+          currency: credit?.currency || "INR",
+          delta: net,
+          betId,
+          sportId: credit?.sport_id || null,
+          gameType: gtype,
+          remark: credit?.description
+        }, { transaction: tx });
         await tx.commit();
-        return { success: true, skipped: true, reason: `bet ${betId} direct user ${userId} ki hai \u2014 point ledger sirf child users ka` };
+        return { success: true, direct: true, duplicate: !direct.written, status: outcome, point: Math.abs(net), entry_ref: entryRef };
       }
       // Chain: player + upar ke saare staff, sabke `credits` rows (Wallets ki jagah).
       const walletIds = await creditsChain(db_default, userId, tx);
@@ -748,6 +762,16 @@ var WalletService = {
       order: [["id", "ASC"]]
     });
     if (!credit) return { success: true, skipped: true, reason: `credits_ledger entry not found for ${category} bet ${betId}` };
+    // Direct user: `point_ledger_direct` ki entry ki ulti entry (agar settlement ki entry likhi thi).
+    if (!(await isChildUser(db_default, Number(credit.user_id)))) {
+      const direct = await reverseDirectEntry(db_default, {
+        originalRef: pointEntryRef.bet(category, betId),
+        reversalRef: pointEntryRef.betReversal(category, betId),
+        eventType: POINT_EVENT.REVERSAL,
+        remark: withVoidSuffix(credit?.description || "")
+      });
+      return { success: true, direct: true, skipped: !direct.written, entry_ref: pointEntryRef.betReversal(category, betId) };
+    }
     if (!credit.points_applied) return { success: true, skipped: true, reason: `bet ${betId} ke points kabhi apply hi nahi hue` };
     const net = Math.round((parseFloat(credit.profit || 0) + parseFloat(credit.loss || 0)) * 100) / 100;
     if (net === 0) return { success: true, skipped: true, reason: `bet ${betId} ka net 0 hai` };
@@ -816,8 +840,11 @@ var WalletService = {
         transaction: tx,
         lock: tx.LOCK.UPDATE
       });
+      // Direct user ki entry `point_ledger_direct` me hoti hai — wahan bhi mitao.
+      const direct = await deleteDirectEntries(db_default, entryRef, { transaction: tx });
       if (!rows.length) {
         await tx.commit();
+        if (direct.deleted) return { success: true, direct: true, deleted: direct.deleted, entry_ref: entryRef };
         return { success: true, skipped: true, reason: `${entryRef} ki koi entry nahi mili` };
       }
       const touched = [];
