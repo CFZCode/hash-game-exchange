@@ -53,11 +53,6 @@ type Setting = {
 
 const GROUPS: { title: string; hint: string; keys: string[] }[] = [
   {
-    title: 'Casino',
-    hint: 'What a user may stake on an in-house game, and how often the provably-fair seed rotates.',
-    keys: ['casino_house_edge', 'casino_min_bet', 'casino_max_bet', 'casino_seed_rotate_after']
-  },
-  {
     title: 'Races',
     hint: 'When the weekly race leaderboard resets.',
     keys: ['race_timezone']
@@ -134,7 +129,7 @@ const OperatorSettings = () => {
       found[key] = check.number(String(v), s.label, { min: s.min ?? 0, max: s.max, integer: s.kind === 'number' })
     }
 
-    const pairs: [string, string][] = [['casino_min_bet', 'casino_max_bet']]
+    const pairs: [string, string][] = []
 
     for (const [lo, hi] of pairs) {
       if (!(lo in draft) && !(hi in draft)) continue

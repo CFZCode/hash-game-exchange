@@ -30,6 +30,9 @@ import {
 } from './featureTypes'
 
 /** How often the features read is refreshed so what the platform changes shows up live. */
+
+/** Not shown to the site admin: the owner's commercial setup, and features this backend does not have. */
+const OWNER_ONLY_FEATURES = new Set(['business_model', 'raffles'])
 const FEATURES_POLL_MS = 15_000
 
 /** The variant's label as staff see it (read-only: the platform picks the variant). */
@@ -153,10 +156,13 @@ const Features = () => {
     // This site's UI (configs/siteUi.ts): features it has no screen for are listed together, last.
     const absent = (key: string) => uiSupport(key)?.status === 'absent'
 
+    // Owner-only policies and missing features: the site admin does not see them at all.
+    const ownerOnly = (key: string) => OWNER_ONLY_FEATURES.has(key)
+
     return [...CATEGORY_ORDER, 'not_in_ui'].map(cat => ({
       cat,
       items: catalogue
-        .data!.features.filter(f => (cat === 'not_in_ui' ? absent(f.key) : f.category === cat && !absent(f.key)))
+        .data!.features.filter(f => !ownerOnly(f.key) && (cat === 'not_in_ui' ? absent(f.key) : f.category === cat && !absent(f.key)))
         .flatMap(spec => {
           const cur = byKey.get(spec.key)
 
@@ -174,10 +180,7 @@ const Features = () => {
 
   return (
     <div>
-      <PageHeader
-        title='Features'
-        description='This site’s business model, how it takes and pays money, and which variant of each feature it offers. Business settings are enforced by the backend on the next request.'
-      />
+      <PageHeader title='Features' />
 
       <Alert className='mb-4'>
         <InfoIcon />

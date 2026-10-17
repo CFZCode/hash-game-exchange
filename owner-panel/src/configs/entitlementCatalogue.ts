@@ -524,7 +524,7 @@ export const FLAG_KEYS = [...new Set(FLAG_GROUPS.flatMap(g => g.keys))]
 
 export const FLAG_LABELS: Record<string, string> = {
   casino: 'Casino',
-  sports: 'Sportsbook (kill switch)',
+  sports: 'Sports (kill switch: off refuses every new bet, open bets still settle)',
   lotto: 'Lottery',
   vipclub: 'VIP club',
   clubmembership: 'Club membership',

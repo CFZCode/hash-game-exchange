@@ -184,29 +184,7 @@ module.exports = function adminRoutes(deps) {
     asyncHandler(async (_req, res) => response.ok(res, await service.sportsEnabled()))
   );
 
-  /**
-   * The platform-wide sports kill switch.
-   *
-   * Audited because it is the loudest configuration change there is: turning it
-   * off takes every sports market off the board for every player at once.
-   */
-  router.put(
-    '/sports',
-    auth.requirePermission(PERMISSIONS.CONFIG_WRITE),
-    validate(v.setSportsEnabled),
-    withActivity({
-      action: 'site-config.sports.toggle',
-      describe: (req) => ({
-        targetType: 'SITE_CONFIG', targetId: 'sports', details: { enabled: req.body.enabled },
-      }),
-    }),
-    asyncHandler(async (req, res) =>
-      response.ok(
-        res,
-        await service.setSportsEnabled({ enabled: req.body.enabled, staffId: req.staff?.id ?? null })
-      )
-    )
-  );
+  // The sports kill switch is the owner's (owner panel → Site flags → Sports); no write here.
 
   // ── Reward payout currencies ────────────────────────────────────────
 

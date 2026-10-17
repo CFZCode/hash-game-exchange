@@ -471,7 +471,6 @@ export const navItems: NavItem[] = [
       { icon: 'Percent', label: 'Affiliate rates', href: '/site-config/affiliate', permission: 'config:read', feature: 'affiliate', promotions: true },
       { icon: 'PartyPopper', label: 'Welcome bonuses', href: '/site-config/welcome-bonuses', permission: 'config:read', promotions: true },
       { icon: 'Mail', label: 'Email (SMTP)', href: '/site-config/email', permission: 'config:read' },
-      { icon: 'Power', label: 'Sports switch', href: '/site-config/sports', permission: 'config:read', ownerFlag: 'sports' }
     ]
   },
   {

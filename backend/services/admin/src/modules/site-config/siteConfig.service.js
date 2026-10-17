@@ -195,7 +195,8 @@ const PUBLIC_AMOUNTS = Object.freeze([
  * a commission of a billion percent.
  * ═════════════════════════════════════════════════════════════════════════
  */
-const OPERATOR_FLAGS = Object.freeze([...PUBLIC_FLAGS, 'sports']);
+// `sports` is the owner's kill switch now (owner panel → Site flags → Sports), not the site admin's.
+const OPERATOR_FLAGS = Object.freeze([...PUBLIC_FLAGS]);
 
 /**
  * A player's own preferences — `GET`/`PUT /site-config/user/:userId`.
@@ -550,42 +551,11 @@ class SiteConfigService {
    * a few times a year.
    */
   async sportsEnabled() {
-    const row = await this.#configRow(['id', 'sports']);
-    // Absent config reads as ON. The board being up is the normal state, and
-    // a missing row is a deployment that has not been configured yet rather
-    // than an operator switching sports off.
-    const enabled = row ? Boolean(row.sports) : true;
-    // Effective = in the owner's plan AND switched on by the site. sports-service
-    // reads `sportsEnabled` from here, so its kill switch follows the plan too.
+    // The owner's kill switch only (owner panel → Site flags → Sports). The old site-admin
+    // switch (`siteconfig.sports`) is no longer read, so a value left there cannot keep sports
+    // off once the owner has them on. sports-service reads `sportsEnabled` from here.
     const entitled = await entitlements.isFlagEntitled('sports');
-    return {
-      sportsEnabled: enabled && entitled,
-      enabled,
-      entitled,
-      configured: Boolean(row),
-    };
-  }
-
-  /** Turn the whole sports board on or off. */
-  async setSportsEnabled({ enabled, staffId = null }) {
-    if (enabled) await this.#assertFlagsEntitled(['sports']);
-    const row = await this.#configRow(['id']);
-    if (!row) throw errors.NOT_CONFIGURED();
-
-    await this.models.Siteconfig.update(
-      { sports: enabled, updatedat: new Date() },
-      { where: { id: row.id } }
-    );
-
-    this.logger?.warn(
-      { staffId, enabled, configId: row.id },
-      enabled ? 'Sports betting switched ON platform-wide' : 'Sports betting switched OFF platform-wide'
-    );
-
-    // The public view carries the effective `sports` value — see `publicSettings`.
-    await this.pushPublic();
-
-    return this.sportsEnabled();
+    return { sportsEnabled: entitled, enabled: entitled, entitled, configured: true };
   }
 
   /**
@@ -712,7 +682,6 @@ class SiteConfigService {
   async publicSettings() {
     const row = await this.#configRow([
       'id',
-      'sports',
       ...PUBLIC_FLAGS,
       ...PUBLIC_AMOUNTS,
       ...Object.values(AFFILIATE_CURRENCY_FIELDS),
@@ -728,11 +697,9 @@ class SiteConfigService {
     const flags = Object.fromEntries(
       PUBLIC_FLAGS.map((name) => [name, plan[name] !== false && (row ? Boolean(row[name]) : true)])
     );
-    // The kill switch stays out of PUBLIC_FLAGS (it is written only through its
-    // own route), but its effective value is read-only here so a browser can
-    // hide the sportsbook entries (docs/OWNER-PANEL.md §6). Same rule as
-    // `sportsEnabled()`.
-    flags.sports = plan.sports !== false && (row ? Boolean(row.sports) : true);
+    // The owner's kill switch (owner panel → Site flags → Sports), read-only here so a
+    // browser can hide sports. Same rule as `sportsEnabled()`.
+    flags.sports = plan.sports !== false;
 
     const amounts = Object.fromEntries(
       PUBLIC_AMOUNTS.map((name) => [name, this.#amount(row?.[name])])

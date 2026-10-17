@@ -29,7 +29,7 @@ export const SITE_UI: Record<string, UiSupport> = {
   affiliate: { status: 'toggle', variant: 'referral_hub', surfaces: '/referral, /referral-exhibition' },
   races: { status: 'toggle', variant: 'daily_contest', surfaces: '/promotions/daily-contest' },
   challenges: { status: 'toggle', variant: 'quest_hub', surfaces: '/quests' },
-  raffles: { status: 'toggle', variant: 'ticket_raffle', surfaces: '/promotions/weekly-raffle' },
+  raffles: { status: 'absent', why: 'No raffle in this backend; the weekly raffle page is hidden.' },
   vault: { status: 'toggle', variant: 'flat_balance', surfaces: 'wallet Vault Pro tab, /wallet/vault' },
   swap: { status: 'toggle', variant: 'swap_page', surfaces: 'wallet Swap tab, /wallet/swap' },
   notifications: { status: 'toggle', variant: 'notice_centre', surfaces: '/notification' },
