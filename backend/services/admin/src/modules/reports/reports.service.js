@@ -26,7 +26,11 @@ const { COIN_IDS, DEPOSIT_SUCCESS } = require('../dashboard/dashboard.constants'
 const { WITHDRAWAL_DONE: STATS_WITHDRAWAL_DONE } = require('./audienceStats.constants');
 const { visibleStaffIds } = require('../staff-directory/staffDirectory.service');
 // transfer, refill, issuance, adjust — money handed over; never 'gt'/'casino'.
-const { PLAYER_FUNDING_TYPES } = require('../lords/lords.constants');
+const { PLAYER_FUNDING_TYPES, TRANSFER_TYPE } = require('../lords/lords.constants');
+const { LEDGER_TYPE } = require('../lords/ownerWallet');
+
+/** staff_transfers types that fund an agent-tree player (DIRECT is counted from owner_direct_ledger). */
+const AGENT_FUNDING_TYPES = [TRANSFER_TYPE.TRANSFER, TRANSFER_TYPE.REFILL, TRANSFER_TYPE.ISSUANCE, TRANSFER_TYPE.ADJUST];
 const { gisMagnitude } = require('../statements/statements.constants');
 const { casinoRoundsSql, INHOUSE_UNLEDGERED } = require('../statements/casinoRounds');
 // The one "withdrawn" rule (bank Approved or Paid) — see dashboard.constants.js.
@@ -1680,7 +1684,9 @@ class ReportsService {
     const asText = ids.map(String);
     const sum = [[fn('COALESCE', fn('SUM', col('amount')), 0), 'total']];
 
-    const [bankIn, gatewayIn, bankOut, gatewayOut] = await Promise.all([
+    const { sequelize } = this.models.FiatDeposits;
+
+    const [bankIn, gatewayIn, bankOut, gatewayOut, directMoves, agentMoves] = await Promise.all([
       this.models.FiatDeposits.findAll({
         where: {
           user_id: asText,
@@ -1721,6 +1727,30 @@ class ReportsService {
         group: ['user_id'],
         raw: true,
       }),
+
+      // Super Admin ka Direct User Wallet (D / W): INR `amount` per user.
+      sequelize.query(
+        `SELECT user_id::text AS user_id,
+                COALESCE(SUM(amount) FILTER (WHERE entry_type = :dep), 0) AS deposited,
+                COALESCE(SUM(amount) FILTER (WHERE entry_type = :wd), 0) AS withdrawn
+           FROM owner_direct_ledger
+          WHERE user_id::text IN (:ids) AND entry_type IN (:dep, :wd)
+          GROUP BY user_id`,
+        { replacements: { ids: asText, dep: LEDGER_TYPE.USER_DEPOSIT, wd: LEDGER_TYPE.USER_WITHDRAW }, type: QueryTypes.SELECT }
+      ),
+
+      // Agent → player deposit / withdraw. `direct` rows (owner → direct user) are already in
+      // owner_direct_ledger above, and points settlement is P&L, not funding.
+      sequelize.query(
+        `SELECT CASE WHEN to_type = 'user' THEN to_id ELSE from_id END::text AS user_id,
+                COALESCE(SUM(amount) FILTER (WHERE to_type = 'user'), 0) AS deposited,
+                COALESCE(SUM(amount) FILTER (WHERE from_type = 'user'), 0) AS withdrawn
+           FROM staff_transfers
+          WHERE transfer_type IN (:types)
+            AND ((to_type = 'user' AND to_id::text IN (:ids)) OR (from_type = 'user' AND from_id::text IN (:ids)))
+          GROUP BY 1`,
+        { replacements: { ids: asText, types: AGENT_FUNDING_TYPES }, type: QueryTypes.SELECT }
+      ),
     ]);
 
     const totals = new Map(asText.map((id) => [id, { deposited: 0n, withdrawn: 0n }]));
@@ -1735,6 +1765,10 @@ class ReportsService {
     add(gatewayIn, 'user_id', 'deposited');
     add(bankOut, 'uid', 'withdrawn');
     add(gatewayOut, 'user_id', 'withdrawn');
+    for (const rows of [directMoves, agentMoves]) {
+      add(rows.map((r) => ({ user_id: r.user_id, total: r.deposited })), 'user_id', 'deposited');
+      add(rows.map((r) => ({ user_id: r.user_id, total: r.withdrawn })), 'user_id', 'withdrawn');
+    }
 
     return new Map(
       [...totals].map(([id, value]) => [
