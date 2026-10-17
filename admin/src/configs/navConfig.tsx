@@ -274,9 +274,6 @@ export type NavItem = {
 /** Wallet dekhne ki koi bhi permission (Agent System dashboard tab, bank, point ledger). */
 const WALLET_ANY = ['wallet:credit', 'wallet:debit', 'wallet:adjust', 'users:read']
 
-/** Zip ke owner-only screens: `wallet:adjust` sirf Super Admin (owner) ke paas hai. */
-const OWNER_ONLY = 'wallet:adjust'
-
 export const navItems: NavItem[] = [
   {
     // Main: Dashboard (Direct Users + Agent System tab), Users (Direct / Agent / Financial) aur Wallets (zip jaisa Direct User Wallet).
