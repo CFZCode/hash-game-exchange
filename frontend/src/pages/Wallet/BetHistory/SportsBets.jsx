@@ -1,9 +1,9 @@
 import React from 'react';
 import EmptyPlaceholder from '../../../components/shared/EmptyPlaceholder';
-import Loading from '../../../components/shared/Loading';
 import Pagination from '../../../components/shared/Pagination';
 import Select from '../../../components/shared/Select';
 import { SportIcon } from '../../../components/exchange/icons';
+import { SkeletonBetRows, SkeletonSportsBets } from '../../../components/exchange/Skeletons';
 import { useWalletFilter } from '../../../context/walletFilter';
 import useResource from '../../../hooks/useResource';
 import { useSelectedCurrency } from '../../../hooks/useSelectedCurrency';
@@ -144,8 +144,8 @@ function MarketBets({ drill, cur }) {
   const { data, loading, error } = useResource(read);
   if (loading) {
     return (
-      <div className="center h-12">
-        <Loading />
+      <div className="mt-3 rounded-lg bg-layer2 p-3" aria-busy="true" aria-label="Loading bets">
+        <SkeletonBetRows rows={2} compact />
       </div>
     );
   }
@@ -230,9 +230,7 @@ export default function SportsBets() {
 
   if (loading) {
     return (
-      <div className="center h-[72px]">
-        <Loading />
-      </div>
+      <SkeletonSportsBets rows={5} />
     );
   }
   if (error) return <p className="py-10 text-center text-sm text-error">Could not load your sports bets. Please try again.</p>;

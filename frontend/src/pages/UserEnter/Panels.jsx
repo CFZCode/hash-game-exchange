@@ -8,6 +8,7 @@ import { amount2usd, getAlias, printCurrency } from '../../utils/currency';
 import { VIP_LEVELS, vipTier, vipTypeNum } from '../../data/vipConfig';
 import { getInvitationCode } from '../../services/referral';
 import { getVipStanding } from '../../services/vip';
+import { useSelectedCurrency } from '../../hooks/useSelectedCurrency';
 import useResource from '../../hooks/useResource';
 import SOCIALS from '../../components/modals/RegionBlock/icons';
 import DisturbSetting from '../../layouts/MainLayout/Header/AfterLogin/DisturbSetting';
@@ -207,11 +208,15 @@ function VipCard() {
      looking the level up in the captured ladder printed bc.game's tier names. Null in fixture
      mode, so the values above are what renders there. */
   const { data: standing } = useResource(getVipStanding);
+  const cur = useSelectedCurrency();
+  /* Live: the distance is WAGER in money, printed in the selected currency, not bc.game's XP. */
+  let toNextLabel = null;
   if (standing) {
     fullName = standing.name;
     percent = standing.percent;
-    showNext = standing.toNext > 0 && Boolean(standing.nextName);
+    showNext = standing.toNextAmount > 0 && Boolean(standing.nextName);
     toNextXp = Math.ceil(standing.toNext);
+    toNextLabel = cur.show(standing.toNextAmount, standing.currency, { precision: 2 });
     nextName = standing.nextName;
   }
   const width = `${percent.toFixed(2)}%`;
@@ -249,7 +254,7 @@ function VipCard() {
 
           {showNext && (
             <div className="ml-2 flex h-5 flex-none items-center">
-              <span>{compactXp(toNextXp)} XP</span>
+              <span>{toNextLabel ?? `${compactXp(toNextXp)} XP`}</span>
               <span className="mx-1">to</span>
               <span className="uppercase text-secondary">
                 {nextName}

@@ -1,7 +1,7 @@
 'use strict';
 
 const { Op } = require('sequelize');
-const { resolveVipLadder, vipRewards, money } = require('@ibitplay/common');
+const { resolveVipLadder, vipRewards, money, defaultCurrencyOf } = require('@ibitplay/common');
 const { promotionsBlocked } = require('@ibitplay/auth');
 
 const { WalletService } = require('../wallet/wallet.service');
@@ -112,7 +112,48 @@ class VipService {
     const cleaned = raw == null ? '0' : String(raw).replace(/,/g, '').trim();
     const wager = /^-?\d+(\.\d+)?$/.test(cleaned) ? cleaned : '0';
 
-    return { ...ladder.levelFor(wager), ladder: ladder.key, totalLevels: ladder.levels.length };
+    const standing = { ...ladder.levelFor(wager), ladder: ladder.key, totalLevels: ladder.levels.length };
+    return { ...standing, ...(await this.#inDefaultCurrency(standing)) };
+  }
+
+  /**
+   * The standing's money valued in the owner's DEFAULT COIN (`default_currency` policy, USDT
+   * unless the owner picks another) — what the site shows VIP progress in before the player's
+   * own selected currency is applied.
+   *
+   * ── THE LEVEL ITSELF STAYS IN USD ────────────────────────────────────────
+   * `userwager` counts every stake converted to USD when it was placed, from every currency the
+   * player bets in, and the ladder's bands are designed in USD. The level is decided on that
+   * stored USD total, never on a converted figure, so a rate move can never drop a player a
+   * level or hand one out. Only the DISPLAY is converted, at today's rate: `currency`,
+   * `wagerInCurrency`, `wagerToNextLevelInCurrency`. `wager` / `wagerToNextLevel` stay USD, as
+   * the admin's VIP and report screens read them ("USD by design"). USD and USDT are 1:1 when the
+   * rate table has no row for them; a default coin with no rate reports USD.
+   */
+  async #inDefaultCurrency(standing) {
+    let code = 'USDT';
+    try {
+      const row = await this.models.SiteFeature?.findByPk?.('default_currency', { attributes: ['variant'], raw: true });
+      code = defaultCurrencyOf(row?.variant);
+    } catch {
+      /* keep USDT */
+    }
+    let rate = null;
+    if (code === 'USD' || code === 'USDT') rate = '1';
+    try {
+      const fx = await this.models.Exchangerate?.findOne?.({ where: { currency: code }, attributes: ['usd_rate'], raw: true });
+      if (fx?.usd_rate && Number(fx.usd_rate) > 0) rate = String(fx.usd_rate);
+    } catch {
+      /* fall through */
+    }
+    if (!rate) return { currency: 'USD', wagerInCurrency: standing.wager, wagerToNextLevelInCurrency: standing.wagerToNextLevel };
+    const convert = (usd) =>
+      usd == null ? null : money.toDecimalString(money.divide(money.toDecimalString(money.toMinorQuantised(String(usd))), rate));
+    return {
+      currency: code,
+      wagerInCurrency: convert(standing.wager),
+      wagerToNextLevelInCurrency: convert(standing.wagerToNextLevel),
+    };
   }
 
   /**

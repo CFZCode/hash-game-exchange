@@ -8,6 +8,7 @@ import { PencilIcon, PercentIcon, Trash2Icon } from 'lucide-react'
 
 import { useStatsFilters } from '@/components/shared/charts'
 import Can from '@/components/shared/Can'
+import { useReportMoney } from '@/components/shared/ReportMoney'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import DataTable, { type Column } from '@/components/shared/DataTable'
 import DateTime from '@/components/shared/DateTime'
@@ -27,7 +28,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useApi, useApiMutation, useListState, usePagedApi } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
 import { check } from '@/lib/validate'
-import { formatMoney, formatNumber } from '@/lib/format'
+import { formatNumber } from '@/lib/format'
 import RewardStats from './RewardStats'
 import type { Club, ClubEarning, ClubMember, VipLadder, VipLevel } from './types'
 import { useLocalList } from './useLocalList'
@@ -46,6 +47,9 @@ const CARD_TONE: Record<string, string> = {
 const VipLadder = () => {
   const q = useApi<VipLadder>('user/vip/levels')
 
+  // Bands are stored in USD; shown in the owner's default coin at today's rate.
+  const money = useReportMoney()
+
   // The route answers `{ ladder, label, unranked, bonusGates, levels }`; never trust a non-array.
   const levels: VipLevel[] = Array.isArray(q.data?.levels) ? q.data.levels : []
   const gates = q.data?.bonusGates
@@ -54,20 +58,20 @@ const VipLadder = () => {
   const columns: Column<VipLevel>[] = [
     { key: 'level', header: 'Level', cell: r => <span className='font-semibold tabular-nums'>L{r.level}</span> },
     { key: 'card', header: 'Card', cell: r => <Badge variant='outline' className={`border-transparent capitalize ${CARD_TONE[r.card] ?? ''}`}>{r.card}</Badge> },
-    { key: 'min', header: 'From (USD wagered)', align: 'right', cell: r => <Money value={r.minXp} digits={2} /> },
-    { key: 'max', header: 'To', align: 'right', cell: r => (r.maxXp === null ? <span className='text-muted-foreground'>and above</span> : <Money value={r.maxXp} digits={2} />) }
+    { key: 'min', header: `From (${money.code} wagered)`, align: 'right', cell: r => <span className='tabular-nums'>{money.format(r.minXp, 'USD', { digits: 2 })}</span> },
+    { key: 'max', header: 'To', align: 'right', cell: r => (r.maxXp === null ? <span className='text-muted-foreground'>and above</span> : <span className='tabular-nums'>{money.format(r.maxXp, 'USD', { digits: 2 })}</span>) }
   ]
 
   return (
     <div className='grid gap-4'>
       <RewardCurrencyNotice />
       <p className='text-muted-foreground text-sm'>
-        The ladder the site shows users, read from the public <code>user/vip/levels</code> route. Thresholds are wagering totals in USD (every bet is converted to USD when it is recorded); level-up and rank-up rewards are designed in USD and paid in the reward currency at the day’s rate. The platform has no staff route to change them; the daily / weekly / monthly bonus thresholds (VIP {gates?.daily ?? 20} / {gates?.weekly ?? 25} / {gates?.monthly ?? 30}) live on the <Link href='/bonus' className='underline'>Bonus</Link> screen.
+        The ladder the site shows users, read from the public <code>user/vip/levels</code> route. Thresholds are wagering totals kept in USD (every bet — casino and sports, in any currency — is converted to USD when it is recorded) and shown here in the site’s default coin at today’s rate; level-up and rank-up rewards are designed in USD and paid in the reward currency at the day’s rate. The platform has no staff route to change them; the daily / weekly / monthly bonus thresholds (VIP {gates?.daily ?? 20} / {gates?.weekly ?? 25} / {gates?.monthly ?? 30}) live on the <Link href='/bonus' className='underline'>Bonus</Link> screen.
       </p>
       <div className='grid grid-cols-2 gap-4 lg:grid-cols-4'>
         <StatCard label='Levels' value={formatNumber(levels.length)} hint={q.data?.label} loading={q.isLoading} />
         <StatCard label='Tiers' value={formatNumber(tiers.length)} hint={tiers.join(' · ')} loading={q.isLoading} />
-        <StatCard label='Top level from' value={formatMoney(levels[levels.length - 1]?.minXp, undefined, { digits: 2 })} loading={q.isLoading} />
+        <StatCard label='Top level from' value={money.format(levels[levels.length - 1]?.minXp, 'USD', { digits: 2 })} loading={q.isLoading} />
       </div>
       <div className='flex flex-wrap gap-2'>
         {tiers.map(t => {

@@ -20,4 +20,5 @@ export { default as MatchHeader } from './MatchHeader';
 export { default as MarketFilterTabs } from './MarketFilterTabs';
 export { default as OpenBetsPanel } from './OpenBetsPanel';
 export { default as ExposureBadge } from './ExposureBadge';
+export * from './Skeletons';
 export * from './utils';

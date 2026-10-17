@@ -1,8 +1,7 @@
 import React from 'react';
-import { MarketFilterTabs, formatAmount, formatStartTime } from '../../../components/exchange';
+import { MarketFilterTabs, SkeletonBetRows, formatAmount, formatStartTime } from '../../../components/exchange';
 import Select from '../../../components/shared/Select';
 import Input from '../../../components/shared/Input';
-import Loading from '../../../components/shared/Loading';
 import EmptyPlaceholder from '../../../components/shared/EmptyPlaceholder';
 import Pagination from '../../../components/shared/Pagination';
 import { usePolling, useExchangeCurrency } from '../../../hooks/exchange';
@@ -164,9 +163,7 @@ export default function ExchangeMyBets() {
               )}
             </div>
           ) : (
-            <div className="flex h-[72px] items-center justify-center">
-              <Loading />
-            </div>
+            <SkeletonBetRows rows={5} />
           )
         ) : rows.length === 0 ? (
           <EmptyPlaceholder>

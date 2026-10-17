@@ -8,6 +8,7 @@ import { CoinsIcon, PencilIcon, PlusIcon, SearchIcon, Trash2Icon } from 'lucide-
 
 import { useStatsFilters } from '@/components/shared/charts'
 import Can from '@/components/shared/Can'
+import { useReportMoney } from '@/components/shared/ReportMoney'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import DataTable, { type Column } from '@/components/shared/DataTable'
 import DateTime from '@/components/shared/DateTime'
@@ -235,6 +236,7 @@ const Records = ({ userId }: { userId: string }) => {
 const Inspect = ({ userId, onClose }: { userId: string; onClose: () => void }) => {
   const q = useApi<BonusUserInspect>(`admin/user/bonus/users/${userId}`)
   const d = q.data
+  const money = useReportMoney()
 
   return (
     <Card className='shadow-none'>
@@ -246,7 +248,7 @@ const Inspect = ({ userId, onClose }: { userId: string; onClose: () => void }) =
         <CardDescription>
           {d ? (
             <>
-              VIP level {d.vip.level} <Badge variant='secondary' className='capitalize'>{d.vip.card}</Badge> · wagered <Money value={d.vip.wager} currency='USD' /> · {d.vip.nextLevel == null ? 'top level' : `${d.vip.progressPct}% to level ${d.vip.nextLevel}`} · paid in {d.currency}
+              VIP level {d.vip.level} <Badge variant='secondary' className='capitalize'>{d.vip.card}</Badge> · wagered {money.format(d.vip.wager, 'USD', { digits: 2 })} · {d.vip.nextLevel == null ? 'top level' : `${d.vip.progressPct}% to level ${d.vip.nextLevel}`} · paid in {d.currency}
             </>
           ) : 'Loading…'}
         </CardDescription>

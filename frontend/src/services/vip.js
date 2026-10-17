@@ -1,3 +1,4 @@
+import { walletCode } from '../utils/currency';
 import { request, USE_FIXTURES, getAccessToken } from './client';
 import ENDPOINTS, { PLATFORM } from './endpoints';
 import {
@@ -80,6 +81,13 @@ export function toVipStanding(row) {
     nextName: row.nextName ?? null,
     percent: Math.min(100, Math.max(0, Number(row.progressPct) || 0)),
     toNext: row.nextLevel == null ? 0 : Number(row.wagerToNextLevel) || 0,
+    /* MONEY, NOT XP. The platform's ladder is wager: `wagerToNextLevelInCurrency` is the
+       distance in the owner's default coin (`currency`), which the cards print in the player's
+       selected currency (useSelectedCurrency). An older backend sends only the USD figures. */
+    currency: walletCode(row.currency || 'USD'),
+    toNextAmount:
+      row.nextLevel == null ? 0 : Number(row.wagerToNextLevelInCurrency ?? row.wagerToNextLevel) || 0,
+    wagered: Number(row.wagerInCurrency ?? row.wager) || 0,
   };
 }
 

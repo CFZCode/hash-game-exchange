@@ -46,6 +46,9 @@ const config = loadEnv(
     // ── mssports ───────────────────────────────────────────────────────
     // The Postgres schema its tables live in (migration 094-mssports-schema).
     MSSPORTS_DB_SCHEMA: coercers.str('mssports'),
+    // How often settled sports bets are posted to the player's wager (VIP level etc.) —
+    // modules/settlement/sportsWagerSync.js. 0 turns the sync off.
+    SPORTS_WAGER_SYNC_MS: coercers.int(30_000),
 
     // Odds + events: AVRKHUB, called directly (`SPORTS_API_VERSION=v2`, the live path).
     // Without them the board is empty and every bet is refused FEED_UNAVAILABLE (fail-closed).

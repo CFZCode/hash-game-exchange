@@ -42,7 +42,7 @@ const Header = () => {
 
   return (
     <header className='bg-background/80 border-border sticky top-0 z-50 border-b backdrop-blur-md'>
-      <div className='mx-auto flex h-14 max-w-360 items-center justify-between gap-6 px-4 sm:px-6'>
+      <div className='mx-auto flex h-14 items-center justify-between gap-6 px-4 sm:px-6'>
         <div className='flex min-w-0 items-center gap-3'>
           <SidebarTrigger className='text-muted-foreground hover:text-foreground size-8 [&_svg]:size-4.5!' />
           <Separator orientation='vertical' className='bg-border hidden h-4! data-vertical:self-center sm:block' />

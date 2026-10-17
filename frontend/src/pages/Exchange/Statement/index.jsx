@@ -1,9 +1,8 @@
 import React from 'react';
-import { formatAmount, formatStartTime } from '../../../components/exchange';
+import { SkeletonBetRows, formatAmount, formatStartTime } from '../../../components/exchange';
 import { IconArrow } from '../../../components/exchange/icons';
 import Select from '../../../components/shared/Select';
 import Input from '../../../components/shared/Input';
-import Loading from '../../../components/shared/Loading';
 import EmptyPlaceholder from '../../../components/shared/EmptyPlaceholder';
 import Pagination from '../../../components/shared/Pagination';
 import { usePolling, useExchangeCurrency } from '../../../hooks/exchange';
@@ -124,9 +123,7 @@ export default function ExchangeStatement() {
               {error.status === 401 ? 'Please sign in again.' : error.message || 'The statement could not be loaded.'}
             </p>
           ) : (
-            <div className="flex h-[72px] items-center justify-center">
-              <Loading />
-            </div>
+            <SkeletonBetRows rows={6} accent={false} />
           )
         ) : data.rows.length === 0 ? (
           <EmptyPlaceholder>No entries in this period</EmptyPlaceholder>

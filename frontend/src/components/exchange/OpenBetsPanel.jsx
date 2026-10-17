@@ -1,3 +1,4 @@
+import { SkeletonBetRows } from './Skeletons';
 import { cx, formatAmount as defaultFormatAmount, formatStartTime } from './utils';
 
 const SIDE = { back: 'Back', lay: 'Lay', yes: 'Yes', no: 'No' };
@@ -12,7 +13,7 @@ const backish = (s) => s === 'back' || s === 'yes';
  *
  * @param {object}   props
  * @param {object[]} [props.matched]
- * @param {boolean}  [props.loading]                Muted "Loading…" in place of rows.
+ * @param {boolean}  [props.loading]                Skeleton rows in place of the list (first load only).
  * @param {string}   [props.currency]
  * @param {(n)=>string} [props.formatAmount]
  * @param {(t)=>string} [props.formatTime]
@@ -35,7 +36,7 @@ export default function OpenBetsPanel({
 
       <div className="mt-2 flex flex-col gap-1.5">
         {loading ? (
-          <p className="py-6 text-center text-xs text-tertiary">Loading…</p>
+          <SkeletonBetRows rows={2} compact />
         ) : rows.length === 0 ? (
           <p className="py-6 text-center text-xs text-tertiary">No matched bets</p>
         ) : (

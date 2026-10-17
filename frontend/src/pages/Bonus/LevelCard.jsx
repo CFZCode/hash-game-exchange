@@ -5,6 +5,7 @@ import { VIP_LEVELS, vipTier, tierColor } from '../../data/vipConfig';
 import * as tiers from './icons';
 import { useResource } from '../../hooks/useResource';
 import { getVipStanding } from '../../services/vip';
+import { useSelectedCurrency } from '../../hooks/useSelectedCurrency';
 
 /* `L` in fx-B6Xikin5.js (`D` before minification) — the Level card at the top of the Rewards
  * panel, and the same component the /vip-detail page would use for its signed-in level widget.
@@ -81,6 +82,7 @@ export default function LevelCard({ session }) {
   /* LIVE: the platform's own standing replaces the three printed values — see
      services/vip.js. Null in fixture mode, so the lines above are what renders there. */
   const { data: standing } = useResource(getVipStanding);
+  const cur = useSelectedCurrency();
   let fullName = tier.fullName;
   let family = tier.base;
   if (standing) {
@@ -88,8 +90,8 @@ export default function LevelCard({ session }) {
     family = standing.family;
     percent = standing.percent;
     toNext =
-      standing.toNext > 0 && standing.nextName
-        ? `${compactXp(Math.ceil(standing.toNext))} XP to ${standing.nextName}`
+      standing.toNextAmount > 0 && standing.nextName
+        ? `Wager ${cur.show(standing.toNextAmount, standing.currency, { precision: 2 })} to ${standing.nextName}`
         : '';
   }
 

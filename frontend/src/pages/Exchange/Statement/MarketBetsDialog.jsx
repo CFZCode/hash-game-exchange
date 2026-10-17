@@ -1,7 +1,6 @@
 import React from 'react';
 import DialogShell from '../../../components/shared/DialogShell';
-import Loading from '../../../components/shared/Loading';
-import { formatAmount, formatStartTime } from '../../../components/exchange';
+import { Bone, SkeletonBetRows, formatAmount, formatStartTime } from '../../../components/exchange';
 import { usePolling, useExchangeCurrency } from '../../../hooks/exchange';
 import { getStatementMarketBets } from '../../../services/exchange';
 
@@ -42,8 +41,12 @@ export default function MarketBetsDialog({ row, onClose }) {
           error ? (
             <p className="py-10 text-center text-tertiary">The result could not be loaded.</p>
           ) : (
-            <div className="flex h-24 items-center justify-center">
-              <Loading />
+            <div aria-busy="true" aria-label="Loading result">
+              <Bone className="h-3 w-3/4 rounded" />
+              <Bone className="mt-3 h-24 w-full rounded-xl" />
+              <div className="mt-3">
+                <SkeletonBetRows rows={2} compact />
+              </div>
             </div>
           )
         ) : (

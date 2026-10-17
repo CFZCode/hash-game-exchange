@@ -62,7 +62,9 @@ function makeLadder({ key, label, bands, unranked, bonusGates }) {
         // Distance to the first band, not the band's floor — a player 300 into
         // a 500 threshold needs 200 more, not 500.
         wagerToNextLevel: String(Number(first.minXp) - amount),
-        progressPct: '0.00',
+        // How far toward the first band. A flat 0.00 here kept every unranked player's bar empty
+        // however much they had wagered (the "VIP level not moving" report).
+        progressPct: Number(first.minXp) > 0 ? Math.min(100, Math.max(0, (amount / Number(first.minXp)) * 100)).toFixed(2) : '0.00',
       };
     }
 

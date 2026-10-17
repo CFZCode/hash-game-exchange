@@ -7,9 +7,10 @@ import {
   OneClickToggle,
   OpenBetsPanel,
   StakeButtonsModal,
+  Bone,
+  SkeletonMatchBoard,
   cx,
 } from '../../../components/exchange';
-import Loading from '../../../components/shared/Loading';
 import { toast } from '../../../components/shared/Toast/toast';
 import { useSession } from '../../../context/session';
 import { isSignedIn } from '../../../services/tokens';
@@ -309,7 +310,7 @@ export default function ExchangeMatchPage() {
 
   const header = (
     <MatchHeader
-      name={match?.ename || (headerQ.loading ? 'Loading…' : 'Match')}
+      name={match?.ename || (headerQ.loading ? <Bone inline className="h-[1em] w-48 max-w-full rounded" /> : 'Match')}
       competition={match?.cname}
       sport={sport}
       startTime={match?.stime}
@@ -391,12 +392,7 @@ export default function ExchangeMatchPage() {
 
   let board;
   if (mk.loading) {
-    board = (
-      <Card className="flex items-center justify-center gap-2 !py-12">
-        <Loading className="size-5" />
-        <span className="text-sm text-tertiary">Loading markets…</span>
-      </Card>
-    );
+    board = <SkeletonMatchBoard />;
   } else if (!visible.length) {
     board = (
       <Card>

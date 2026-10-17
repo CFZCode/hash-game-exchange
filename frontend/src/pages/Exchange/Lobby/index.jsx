@@ -1,6 +1,5 @@
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { SportTabs, LatestEventsStrip, InPlayList, RaceBoard } from '../../../components/exchange';
-import Loading from '../../../components/shared/Loading';
+import { SportTabs, LatestEventsStrip, InPlayList, RaceBoard, SkeletonMatchList } from '../../../components/exchange';
 import { useSportsList, useLatestEvents, useSportsTree } from '../../../hooks/exchange';
 import { treeWithoutDead, useDeadMatchesVersion, withoutDeadMatches } from '../../../services/exchange/deadMatches';
 import ExchangeFrame from '../ExchangeFrame';
@@ -137,9 +136,7 @@ export default function ExchangeLobby() {
         pending.every((v) => v.board.error) ? (
           <Notice>Matches could not be loaded. Retrying…</Notice>
         ) : (
-          <Notice>
-            <Loading />
-          </Notice>
+          <SkeletonMatchList rows={6} />
         )
       ) : (
         <InPlayList
@@ -156,17 +153,17 @@ export default function ExchangeLobby() {
       <Notice>No {current.label.toLowerCase()} right now.</Notice>
     );
   } else if (holding) {
-    body = (
-      <Notice>
-        <Loading />
-      </Notice>
-    );
+    body = <SkeletonMatchList rows={6} />;
   } else {
     const view = otherView ?? views.find((v) => v.id === tab);
     const { live, upcoming } = view.rows;
     body =
       view.board.data === undefined ? (
-        <Notice>{view.board.error ? 'Matches could not be loaded. Retrying…' : <Loading />}</Notice>
+        view.board.error ? (
+          <Notice>Matches could not be loaded. Retrying…</Notice>
+        ) : (
+          <SkeletonMatchList rows={6} />
+        )
       ) : live.length + upcoming.length === 0 ? (
         <Notice>No {view.label.toLowerCase()} matches right now.</Notice>
       ) : (

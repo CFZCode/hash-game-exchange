@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { SportIcon } from '../../../components/exchange/icons';
-import Loading from '../../../components/shared/Loading';
+import { SkeletonSportsMenu } from '../../../components/exchange/Skeletons';
 import { useSportsTree } from '../../../hooks/exchange';
 import { matchPath, racingSports, sportIconOf } from '../../../pages/Exchange/model';
 import { treeWithoutDead, useDeadMatchesVersion } from '../../../services/exchange/deadMatches';
@@ -36,9 +36,7 @@ export default function SportsMenu({ Arrow, onCloseMobile }) {
     return error ? (
       <p className="px-3 py-3 text-center text-xs font-semibold text-tertiary">Sports could not be loaded.</p>
     ) : (
-      <div className="center flex h-12">
-        <Loading />
-      </div>
+      <SkeletonSportsMenu rows={8} />
     );
   }
   if (sports.length === 0) {
