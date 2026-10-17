@@ -66,10 +66,12 @@ export const ACCOUNT_DEFAULTS = {
     currencyFullName: false,
     /* The pair that decides whether an amount prints in its own currency or converts. See
        `printCurrency` in index-BsFv7ByC.js: `target = enableLocaleCurrency ?
-       setting.localeCurrencyName : currencyName`. ON by default with USD (user's request,
-       2026-10-18: "View in currency" opens on USD, matching the USDT default coin, not "None"). */
+       setting.localeCurrencyName : currencyName`. OFF by default (user's request, 2026-10-17:
+       the sidebar / header currency must read USDT, the owner panel's `default_currency`, not
+       USD). With it off they print `useSiteCurrency()` and amounts stay in the wallet's own coin;
+       a player can still turn on a fiat view from the picker. */
     localeCurrencyName: 'USDFIAT',
-    enableLocaleCurrency: true,
+    enableLocaleCurrency: false,
     currencyName: 'USDT', // the owner's default coin (owner panel default_currency) until the player picks one
     currencyBonusType: '',
     hideSmallCurrency: false,
