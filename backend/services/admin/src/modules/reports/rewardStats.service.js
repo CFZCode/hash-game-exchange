@@ -1,5 +1,7 @@
 'use strict';
 
+const { reportingCurrency } = require('./reportingCurrency');
+
 const { resolveVipLadder } = require('@ibitplay/common');
 
 const { TOP_N, BONUS_LOST_STATUSES, VAULT_IN_TYPE, VAULT_OUT_PREFIX } = require('./audienceStats.constants');
@@ -54,7 +56,7 @@ class RewardStatsService {
     const window = statsWindow({ from, to, granularity });
     const scope = await playerScope(this.models, staff, { logger: this.logger });
     const rates = await loadRates(this.models);
-    const valuer = createValuer(rates, currency);
+    const valuer = createValuer(rates, currency, currency ? null : await reportingCurrency(this.models));
     const ctx = {
       window,
       scope,
@@ -78,7 +80,7 @@ class RewardStatsService {
     const body = scope.empty ? { kpis: {}, series: [], breakdown: {} } : await handlers[section]();
     return {
       section,
-      range: rangeBlock(window, currency),
+      range: rangeBlock(window, valuer.currency),
       ...body,
       unconverted: [...valuer.unconverted],
     };

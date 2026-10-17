@@ -1,5 +1,7 @@
 'use strict';
 
+const { reportingCurrency } = require('./reportingCurrency');
+
 const { resolveVipLadder } = require('@ibitplay/common');
 const { canManagePromotions } = require('@ibitplay/auth');
 
@@ -66,9 +68,9 @@ class PlayerStatsService {
     const window = statsWindow({ from, to, granularity });
     const scope = await playerScope(this.models, staff, { channel, logger: this.logger });
     const rates = await loadRates(this.models);
-    const valuer = createValuer(rates, currency);
+    const valuer = createValuer(rates, currency, currency ? null : await reportingCurrency(this.models));
 
-    const empty = this.#emptyOverview(window, currency);
+    const empty = this.#emptyOverview(window, valuer.currency);
     if (scope.empty) return empty;
 
     const base = { ...window.replacements, ...scope.replacements };
@@ -187,7 +189,7 @@ class PlayerStatsService {
     const depositors = Number(totals.depositors ?? 0);
 
     return {
-      range: rangeBlock(window, currency),
+      range: rangeBlock(window, valuer.currency),
       channel,
       kpis: {
         totalPlayers: Number(totalPlayers[0]?.players ?? 0),
@@ -202,7 +204,7 @@ class PlayerStatsService {
         depositAmount: decimal(depositAmount),
         averageDeposit: depositCount ? decimal(depositAmount / BigInt(depositCount)) : '0.00000000',
         wagerUsd: decimal(wagerTotal),
-        wagerCurrency: currency || 'USD',
+        wagerCurrency: valuer.currency,
       },
       series: byBucket(series).map((s) => ({ ...s, depositAmount: decimal(s.depositAmount) })),
       breakdown: {
@@ -226,7 +228,7 @@ class PlayerStatsService {
       kpis: {
         totalPlayers: 0, newPlayers: 0, activePlayers: 0, depositors: 0, firstTimeDepositors: 0,
         newDepositors: 0, conversionRate: null, deposits: 0, depositAmount: '0.00000000',
-        averageDeposit: '0.00000000', wagerUsd: '0.00000000', wagerCurrency: currency || 'USD',
+        averageDeposit: '0.00000000', wagerUsd: '0.00000000', wagerCurrency: currency,
       },
       series: [],
       breakdown: { channel: [], countries: [], activeByProduct: [] },
@@ -247,7 +249,7 @@ class PlayerStatsService {
     const houseOnly = (query) => (house ? query() : []);
     const window = statsWindow({ from, to, granularity });
     const rates = await loadRates(this.models);
-    const valuer = createValuer(rates, currency);
+    const valuer = createValuer(rates, currency, currency ? null : await reportingCurrency(this.models));
     const uid = String(user.id);
 
     const base = { ...window.replacements, uid, uidNum: user.id, ...(currency ? { currency } : {}) };
@@ -490,7 +492,7 @@ class PlayerStatsService {
     /** A house-only figure: the value for house staff, null for the agent tree. */
     const h = (v) => (house ? v : null);
     return {
-      range: rangeBlock(window, currency),
+      range: rangeBlock(window, valuer.currency),
       player: { id: uid, name: user.name ?? null, registeredAt: user.created ?? null },
       house,
       note: house ? null : HOUSE_ONLY_NOTE,

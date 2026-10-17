@@ -1,12 +1,9 @@
 import MarketCard from './MarketCard';
 import RunnerRow from './RunnerRow';
-import { statusLabel } from './utils';
+import { compactAmount, statusLabel } from './utils';
 
 const asIs = (v) => (v == null ? '' : String(v));
-const limits = (min, max) => {
-  const f = (n) => Number(n || 0).toLocaleString('en-US');
-  return `${f(min)} – ${f(max)}`;
-};
+const limits = (min, max) => `Min: ${compactAmount(min || 0)} · Max: ${compactAmount(max || 0)}`;
 
 /**
  * FancyBlock — session/fancy markets: No (lay colour) | Yes (back colour), each cell a run LINE

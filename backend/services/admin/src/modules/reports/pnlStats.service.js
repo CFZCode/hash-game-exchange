@@ -1,5 +1,7 @@
 'use strict';
 
+const { reportingCurrency } = require('./reportingCurrency');
+
 const { canManagePromotions } = require('@ibitplay/auth');
 const { INHOUSE_PAYOUT, V2_STAKE, V2_PAYOUT } = require('../statements/casinoRounds');
 
@@ -161,7 +163,7 @@ class PnlStatsService {
       loadRates(this.models),
       this.#buckets(window),
     ]);
-    const valuer = createValuer(rates, currency);
+    const valuer = createValuer(rates, currency, currency ? null : await reportingCurrency(this.models));
     const ctx = this.#ctx(window, scope, currency);
 
     const [gaming, costRows] = await Promise.all([
@@ -226,7 +228,7 @@ class PnlStatsService {
     const unconverted = new Set([...valuer.unconverted, ...gaming.unconverted.map((u) => u.currency || 'UNKNOWN')]);
 
     return {
-      range: this.#range(window, currency),
+      range: this.#range(window, valuer.currency),
       converted: !currency,
       valuation: currency ? null : { note: VALUATION_NOTE },
       house,
@@ -275,7 +277,7 @@ class PnlStatsService {
   async breakdown({ staff, from, to, granularity = 'day', currency, channel }) {
     const window = statsWindow({ from, to, granularity });
     const [scope, rates] = await Promise.all([playerScope(this.models, staff, { channel, logger: this.logger }), loadRates(this.models)]);
-    const valuer = createValuer(rates, currency);
+    const valuer = createValuer(rates, currency, currency ? null : await reportingCurrency(this.models));
     const ctx = this.#ctx(window, scope, currency);
 
     const [gameRows, sportRows, playerRows] = scope.empty
@@ -375,7 +377,7 @@ class PnlStatsService {
     const originals = new Map([...games].filter(([, g]) => g.source === 'inhouse'));
 
     return {
-      range: this.#range(window, currency),
+      range: this.#range(window, valuer.currency),
       converted: !currency,
       valuation: currency ? null : { note: VALUATION_NOTE },
       totals: { casino: out({ key: 'casino', label: 'Casino', ...casino }), sports: out({ key: 'sports', label: 'Sports', ...sportsTotal }) },

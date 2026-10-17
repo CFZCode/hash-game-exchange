@@ -30,6 +30,7 @@ import Money from '@/components/shared/Money'
 import PageHeader from '@/components/shared/PageHeader'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useDefaultCurrency } from '@/components/shared/DefaultCurrency'
 import { useSession } from '@/contexts/SessionContext'
 import { useApi, usePagedApi } from '@/hooks/use-api'
 import { formatMoney, formatNumber } from '@/lib/format'
@@ -237,7 +238,7 @@ const DirectUserDashboard = () => {
   const inNetwork = useSession().actor?.promotions === false
   const f = useStatsFilters({ defaultPreset: '30d' })
   const currencies = useCurrencyCodes()
-  const unit = f.currency || 'USD'
+  const reportCoin = useDefaultCurrency().code
 
   const series = useApi<StatsSeries>(SERIES, f.query, { placeholderData: prev => prev })
 
@@ -255,6 +256,8 @@ const DirectUserDashboard = () => {
 
   const s = series.data
   const p = previous.data
+  // The answer names its unit: the picked coin, or the site's default coin for "every currency".
+  const unit = f.currency || s?.currency || reportCoin
   const loading = series.isLoading
   const labels = useMemo(() => f.buckets.map(b => bucketLabel(b, f.granularity)), [f.buckets, f.granularity])
 
@@ -413,7 +416,7 @@ const DirectUserDashboard = () => {
 
         {s && s.unconverted.length > 0 && (
           <p role='note' className='text-muted-foreground text-xs'>
-            Not in the USD figures (no exchange rate):{' '}
+            Not in the {unit} figures (no exchange rate):{' '}
             {s.unconverted
               .map(u => `${formatValue(u.amount, 'money')} ${u.currency ?? 'unknown coin'} of ${METRIC_LABEL[u.metric] ?? u.metric}`)
               .join(' · ')}

@@ -317,7 +317,7 @@ const ProfitLossView = ({ channel }: { channel: Channel }) => {
     <div>
       <p className='text-muted-foreground mb-4 text-sm'>
         {s?.converted || !f.currency
-          ? (s?.valuation?.note ?? 'All currencies, converted to USD at current rates.')
+          ? (s?.valuation?.note ?? `All currencies, converted to ${unit} at current rates.`)
           : `Figures in ${unit}, for rows in that currency only.`}
       </p>
 
@@ -328,7 +328,7 @@ const ProfitLossView = ({ channel }: { channel: Channel }) => {
 
         {unconverted.length > 0 && (
           <p role='note' className='text-warning text-xs'>
-            No exchange rate for {unconverted.join(', ')}. Those rows are left out of the USD figures; pick the currency to see them.
+            No exchange rate for {unconverted.join(', ')}. Those rows are left out of the {unit} figures; pick the currency to see them.
           </p>
         )}
 
@@ -717,9 +717,9 @@ const ProfitLossView = ({ channel }: { channel: Channel }) => {
               <strong className='text-foreground'>Currency.</strong>{' '}
               {f.currency
                 ? `Only rows in ${f.currency}, unconverted.`
-                : 'With "All currencies", every amount is converted to USD at today’s exchange rates, so older periods move as rates move.'}{' '}
+                : `With "All currencies", every amount is converted to ${unit} at today’s exchange rates, so older periods move as rates move.`}{' '}
               {unconverted.length > 0
-                ? `No rate for: ${unconverted.join(', ')}; those rows are not in the USD figures.`
+                ? `No rate for: ${unconverted.join(', ')}; those rows are not in the ${unit} figures.`
                 : 'Every currency in this period has a rate.'}
             </li>
             <li>

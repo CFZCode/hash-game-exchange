@@ -157,7 +157,7 @@ const CONFIG: StatsPanelConfig = {
     },
     {
       title: 'Top sports',
-      description: 'Stakes by sport, in USD.',
+      description: 'Stakes by sport, in the report currency.',
       path: 'sports',
       kind: 'bar',
       horizontal: true,

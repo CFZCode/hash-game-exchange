@@ -164,7 +164,7 @@ const StatsPanel = ({ path, filters: f, extraQuery, config, compare = true, clas
     <div className={cn('flex flex-col gap-4', className)}>
       {(s?.unconverted?.length ?? 0) > 0 && (
         <p className='text-warning text-xs'>
-          No exchange rate for {s?.unconverted?.join(', ')} — those rows are left out of the USD figures. Pick the currency to see them.
+          No exchange rate for {s?.unconverted?.join(', ')} — those rows are left out of the {unit} figures. Pick the currency to see them.
         </p>
       )}
 

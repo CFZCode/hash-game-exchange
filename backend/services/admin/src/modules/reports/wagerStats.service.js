@@ -1,5 +1,7 @@
 'use strict';
 
+const { reportingCurrency } = require('./reportingCurrency');
+
 const S = require('./stats.shared');
 const { gisKindSql, gisSideAmountSql, gisPlayFilterSql } = require('../statements/statements.constants');
 const { V2_STAKE, V2_PAYOUT } = require('../statements/casinoRounds');
@@ -156,6 +158,7 @@ class WagerStatsService {
       S.bucketsFor(this.models, window),
       currency ? null : S.loadRates(this.models),
     ]);
+    const convertTo = currency ? null : await reportingCurrency(this.models);
 
     const replacements = S.replacementsFor(window, scope, currency ? { currency } : {});
     const empty = S.isEmptyScope(scope);
@@ -166,7 +169,7 @@ class WagerStatsService {
         ? await this.#casino(this.#owned(scope, channel), currency, replacements)
         : await this.#sports(this.#owned(scope, channel), currency, replacements);
 
-    return this.#fold({ area, window, buckets, rates, currency, ...data });
+    return this.#fold({ area, window, buckets, rates, currency, convertTo, ...data });
   }
 
   // ══════════════════════════════════════════════════════════════════════
@@ -354,8 +357,8 @@ class WagerStatsService {
 
   // ══════════════════════════════════════════════════════════════════════
 
-  #fold({ area, window, buckets, rates, currency, series: rows, items, uniqueUsers, dimension }) {
-    const converter = S.createConverter(rates, currency);
+  #fold({ area, window, buckets, rates, currency, convertTo, series: rows, items, uniqueUsers, dimension }) {
+    const converter = S.createConverter(rates, currency, convertTo);
     const totals = point();
     const series = new Map(buckets.map((b) => [b, point()]));
     const byCurrency = new Map();
@@ -398,7 +401,7 @@ class WagerStatsService {
     // The breakdown: providers / markets, and the top games / events.
     const vendors = new Map();
     const named = new Map();
-    const quiet = S.createConverter(rates, currency);
+    const quiet = S.createConverter(rates, currency, convertTo);
     for (const item of items) {
       const target = item.vendor
         ? (vendors.get(item.vendor) ?? vendors.set(item.vendor, point()).get(item.vendor))

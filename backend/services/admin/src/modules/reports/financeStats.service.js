@@ -1,5 +1,7 @@
 'use strict';
 
+const { reportingCurrency } = require('./reportingCurrency');
+
 const S = require('./stats.shared');
 const { COIN_IDS, WITHDRAWAL_DONE } = require('../dashboard/dashboard.constants');
 
@@ -153,6 +155,7 @@ class FinanceStatsService {
       empty ? 0 : this.#uniqueUsers(tables, scope, currency, replacements),
       currency ? null : S.loadRates(this.models),
     ]);
+    if (!currency && !convertTo) convertTo = await reportingCurrency(this.models);
 
     return this.#fold({ window, kind, rail, definition, buckets, rows: grouped.flat(), uniqueUsers, rates, currency, convertTo });
   }

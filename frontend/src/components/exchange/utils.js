@@ -108,3 +108,15 @@ export function statusLabel(status) {
   const s = String(status).toUpperCase().replace(/_/g, ' ');
   return s === 'ACTIVE' || s === 'OPEN' ? null : s;
 }
+
+/** Indian compact amount, as TENEXCH prints limits and bhav: 100 · 25K · 1L · 2.5L · 1Cr. */
+export function compactAmount(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n === 0) return '0';
+  const unit = (v, s) => (v % 1 === 0 ? String(v) : String(Number(v.toFixed(2)))) + s;
+  const a = Math.abs(n);
+  if (a >= 1e7) return unit(n / 1e7, 'Cr');
+  if (a >= 1e5) return unit(n / 1e5, 'L');
+  if (a >= 1e3) return unit(n / 1e3, 'K');
+  return String(n);
+}

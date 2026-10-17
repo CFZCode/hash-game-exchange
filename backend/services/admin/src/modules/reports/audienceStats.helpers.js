@@ -139,22 +139,31 @@ const decimal = (value) => money.toDecimalString(typeof value === 'bigint' ? val
  * as they are. Without one every row is valued in USD at today's rate (the
  * dashboard's rule — `VALUATION_NOTE`); a currency with no rate is left out of
  * the USD figure and named under `unconverted`, never counted as zero.
+ * With `target`, the USD value is carried on into that coin.
  */
-function createValuer(rates, currency) {
+function createValuer(rates, currency, target) {
   const unconverted = new Set();
+  // "All currencies" is reported in `target` (the site's default coin) when it
+  // has a rate; otherwise in USD as before.
+  const want = !currency && target ? String(target).toUpperCase() : 'USD';
+  const targetRate = want === 'USD' ? null : rates.get(want);
+  const reportIn = want === 'USD' || targetRate != null ? want : 'USD';
+  const perTarget = reportIn === 'USD' ? null : minor(targetRate);
   return {
-    currency: currency || 'USD',
+    currency: currency || reportIn,
     unconverted,
     /** amount (decimal string) in `rowCurrency` → minor units in the report currency. */
     value(amount, rowCurrency) {
       if (currency) return minor(amount);
       const code = String(rowCurrency ?? '').toUpperCase();
+      if (code === reportIn) return minor(amount);
       const rate = rates.get(code);
       if (rate == null) {
         if (minor(amount) !== 0n) unconverted.add(code || 'UNKNOWN');
         return 0n;
       }
-      return (minor(amount) * minor(rate)) / 100_000_000n;
+      const usd = (minor(amount) * minor(rate)) / 100_000_000n;
+      return perTarget ? (usd * 100_000_000n) / perTarget : usd;
     },
   };
 }

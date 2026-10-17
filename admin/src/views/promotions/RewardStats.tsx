@@ -289,8 +289,7 @@ const RewardStats = ({ section, filters, children, rewardNote = true, className 
       </FilterBar>
       {paidInRewardCurrency && !reward.loading && (
         <p className='text-muted-foreground -mt-2 text-xs'>
-          Rewards are paid in {reward.code}. Pick it as the currency to see amounts as paid; “All currencies” values every coin in USD at
-          today’s rate.
+          Rewards are paid in {reward.code}. Pick it as the currency to see amounts as paid; “All currencies” values every coin in the site’s default coin at today’s rate.
         </p>
       )}
       <StatsPanel path={`admin/reports/reward-stats/${section}`} filters={filters} config={CONFIGS[section]} />
