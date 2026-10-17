@@ -80,6 +80,8 @@ async function applyWinCommission(p) {
         currency: "INR",
         amount: -comm,
         reason: COMMISSION_REASON,
+        // So the trigger stamps bet_currency, and the duplicate check above (by bet_id) can match.
+        bet_id: bet.id || null,
         description,
         eventid: p.eventid || null,
         match_id: p.match_id || null,
