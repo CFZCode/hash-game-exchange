@@ -60,6 +60,7 @@ const INTERNAL_SURFACE = Object.freeze({
     '/internal/admin/accounts',
     '/internal/admin/audit',
     '/internal/admin/auth',
+    '/internal/admin/avatars',
     '/internal/admin/branding',
     '/internal/admin/currencies',
     '/internal/admin/entitlements',
@@ -105,6 +106,11 @@ const INTERNAL_ACL = Object.freeze({
     '/internal/admin/accounts',
     '/internal/admin/audit',
     '/internal/admin/auth',
+    /**
+     * The avatar set: the public list for the state sync socket, and one avatar's unlock level
+     * for `POST /user/profile/avatar`.
+     */
+    '/internal/admin/avatars',
     /** The public branding block, for the state sync socket (`modules/sync/sockets.js`). */
     '/internal/admin/branding',
     /**

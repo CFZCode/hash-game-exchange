@@ -49,6 +49,8 @@ module.exports = function userRoutes(deps) {
     )
   );
   router.put('/', validate(v.updateProfile), ctrl.update);
+  /** One of Admin → Avatars' pictures, refused above the player's VIP level (`AVATAR_LOCKED`). */
+  router.post('/avatar', validate(v.setAvatar), ctrl.setAvatar);
   // A referral link is affiliate business — not for agent-tree players.
   router.get('/referral', noQuery(), denyAgentPlayer('promotions'), ctrl.referral);
   /**

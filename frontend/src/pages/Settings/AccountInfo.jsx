@@ -13,7 +13,7 @@ import {
   IconTwitter,
   IconSteam,
 } from './icons';
-import avatarArt from '../../assets/avatars/105522617.png';
+import { avatarSrc } from '../../services/avatars';
 /* `F.tips` — the green tick beside a verified field, and it is an IMAGE rather than an icon
    component on the original: the remote's asset map (`index-DCuiUMn6.js`, which IS in the mirror)
    holds sixteen entries, fifteen of them base64 data URIs and this one a real file at
@@ -179,7 +179,7 @@ export default function SettingsAccountInfo() {
               account has no live avatar, so it is the same local default the header uses. */}
           <div className="size-16 rounded-full bg-layer5 p-1">
             <div className="h-full w-full overflow-hidden rounded-full">
-              <img alt="avatar" className="h-full w-full" src={avatarArt} />
+              <img alt="avatar" className="h-full w-full" src={avatarSrc(session?.avatar)} />
             </div>
           </div>
           <div className="ml-2.5">

@@ -422,6 +422,9 @@ export const navItems: NavItem[] = [
     groupIcon: 'LayoutTemplate',
     items: [
       { icon: 'Image', label: 'Banners', href: '/content/banners', permission: 'config:read', feature: 'banners' },
+
+      // Level-gated profile pictures for the site's Edit avatar screen.
+      { icon: 'CircleUserRound', label: 'Avatars', href: '/content/avatars', permission: 'config:read' },
       { icon: 'Newspaper', label: 'Blogs', href: '/content/blogs', permission: 'config:read', feature: 'blog' },
 
       // The device list and per-user history are users:read; sending (gated on the page) is config:write.

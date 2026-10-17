@@ -23,7 +23,7 @@ import {
 /* `j.avatar(userId)` — the CDN's per-account avatar, which is `img2.distributedresourcestorage.com`
    and reachable, but this account has no live avatar to fetch. The same local file the signed-in
    header uses; see the note there on why the purple ring is part of the PNG rather than a frame. */
-import avatarArt from '../../../assets/avatars/105522617.png';
+import { avatarSrc } from '../../../services/avatars';
 import favouriteFallback from '../../../assets/profile/detail.png';
 import achieveBg from '../../../assets/profile/achieve_bg.png';
 import Loading from '../../shared/Loading';
@@ -362,7 +362,7 @@ export default function Profile({ onClose, enter }) {
     <DialogShell title={isMyself ? 'My Profile' : 'Profile'} onClose={onClose} enter={enter}>
       <div className="center relative w-full flex-col pb-3 pt-6">
         <div className="center relative h-16 w-16 cursor-pointer rounded-full border-2 border-solid border-layer4">
-          <img className="absolute rounded-full sm:cursor-pointer" alt="avatar" src={avatarArt} />
+          <img className="absolute rounded-full sm:cursor-pointer" alt="avatar" src={avatarSrc(isMyself ? session.avatar : profile?.avatar)} />
         </div>
         {vipOn && (
           <LevelName level={level} className="z-10 -mt-2">

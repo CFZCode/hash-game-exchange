@@ -14,9 +14,10 @@ const { RegionService } = require('../region/region.service');
  *
  *   { me, profile, balances, preferences }   signed in only (the same bodies as /user/auth/me,
  *                                            /user/profile, /user/wallet/balances, /user/preferences)
- *   { flags, features, currencies, branding } everyone (/admin/site-config/public,
+ *   { flags, features, currencies, branding, avatars }
+ *                                            everyone (/admin/site-config/public,
  *                                            /admin/features/public, /admin/currencies/public,
- *                                            /admin/branding/public)
+ *                                            /admin/branding/public, /admin/avatars/public)
  *   { region }                               everyone, for THIS socket's address (/user/region)
  *
  * The site half is admin-service's and the same for every player, so it is read at most once per
@@ -54,20 +55,23 @@ function register({ on, deps }) {
   const body = (result) => (result && typeof result === 'object' && 'data' in result ? result.data : result);
 
   async function readSite() {
-    const [config, currencies, branding] = await Promise.all([
+    const quiet = (what) => (error) => {
+      logger?.debug({ err: error.message }, `Sync could not read the ${what}`);
+      return null;
+    };
+    const [config, currencies, branding, avatars] = await Promise.all([
       clients.admin.get('/internal/admin/site-config/public').then(body),
       clients.admin.get('/internal/admin/currencies/public').then(body),
       // An older admin-service has no internal branding route: the client then reads it over HTTP.
-      clients.admin.get('/internal/admin/branding/public').then(body).catch((error) => {
-        logger?.debug({ err: error.message }, 'Sync could not read the branding');
-        return null;
-      }),
+      clients.admin.get('/internal/admin/branding/public').then(body).catch(quiet('branding')),
+      clients.admin.get('/internal/admin/avatars/public').then(body).catch(quiet('avatars')),
     ]);
     return {
       flags: config?.flags ?? {},
       features: Array.isArray(config?.features) ? config.features : [],
       currencies: Array.isArray(currencies) ? currencies : [],
       ...(branding ? { branding } : {}),
+      ...(Array.isArray(avatars) ? { avatars } : {}),
     };
   }
 

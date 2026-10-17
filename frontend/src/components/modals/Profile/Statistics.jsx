@@ -17,7 +17,7 @@ import {
   PAGE_SIZE,
 } from '../../../services/profile';
 import { IconStatistics, IconTotalWins, IconTotalBets, IconTotalWagered } from './icons';
-import avatarArt from '../../../assets/avatars/105522617.png';
+import { avatarSrc } from '../../../services/avatars';
 
 /* `/user/statistics` — Statistics details, reached from the Details link on the profile's Statistics
  * card. `index-DVoHgAYe.js` off `hash.game/modules/account/assets/`; see index.jsx for how the
@@ -153,7 +153,7 @@ export default function Statistics({ onClose, enter }) {
         >
           {(option) => <span className="whitespace-nowrap">{option.label}</span>}
         </Select>
-        <img alt="avatar" className="ml-2 h-9 w-9 rounded-full" src={avatarArt} />
+        <img alt="avatar" className="ml-2 h-9 w-9 rounded-full" src={avatarSrc(userId === session.userId ? session.avatar : '')} />
         <p className="ml-2 whitespace-nowrap font-extrabold">{userName || '-'}</p>
       </div>
 

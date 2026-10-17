@@ -755,6 +755,9 @@ export const PLATFORM = {
        each with its enabled networks `[{key, name}]`. An allow-list, read beside the flags above
        because an owner-created coin has a row here and no flag there. See services/currencies.js. */
     currencies: '/api/v1/admin/currencies/public',
+    /* THE AVATAR CATALOGUE the site admin uploads: `[{id, url, minLevel, sort}]`, enabled only,
+       `url` a path on this API. `minLevel` is the VIP level that unlocks it. See services/avatars.js. */
+    avatars: '/api/v1/admin/avatars/public',
     banners: '/api/v1/admin/banners',
     banner: (type) => `/api/v1/admin/banners/${type}`,
     bannerImage: (type) => `/api/v1/admin/banners/image/${encodeURIComponent(type)}`,
@@ -863,6 +866,9 @@ export const PLATFORM = {
        rather than inferred from the source. This build reads `profile`. */
     profile: {
       get: '/api/v1/user/profile',
+      /* `POST {avatarId}` — wear a catalogue avatar; answers the updated profile. 403
+         `AVATAR_LOCKED` below its `minLevel`, 404 `AVATAR_NOT_FOUND`. */
+      avatar: '/api/v1/user/profile/avatar',
       referral: '/api/v1/user/profile/referral',
       verifyReferral: (code) => `/api/v1/user/profile/verify-referral/${code}`,
     },

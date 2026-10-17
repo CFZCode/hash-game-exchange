@@ -88,7 +88,10 @@ function sync() {
     if (!body?.status || typeof body.d !== 'string') return;
     const token = openedWith;
     unscramble(body.d, id).then(
-      (state) => publishLiveState(state, token),
+      (state) => {
+        console.log('[socket] SYNC_STATE', state);
+        publishLiveState(state, token);
+      },
       () => {},
     );
   });

@@ -11,7 +11,7 @@ import { useSession } from '../../../context/session';
 import { useIsDesktop } from '../../../hooks/useMediaQuery';
 import { useResource } from '../../../hooks/useResource';
 import { getContestRank } from '../../../services/contest';
-import accountAvatar from '../../../assets/avatars/105522617.png';
+import { avatarSrc } from '../../../services/avatars';
 import './Contest.css';
 
 /* The wager-contest widget — three summary cards over a standings table.
@@ -237,7 +237,7 @@ function MyPosition({ contest, standings, currency }) {
     return (
       <div className="rounded-xl bg-layer4 p-4">
         <div className="flex">
-          <img className="mr-2 h-10 w-10 rounded-full" alt="user avatar" src={accountAvatar} />
+          <img className="mr-2 h-10 w-10 rounded-full" alt="user avatar" src={avatarSrc(session?.avatar)} />
           <div>
             <div className="text-base font-extrabold text-primary">{session.name}</div>
             {reachLine}
@@ -262,7 +262,7 @@ function MyPosition({ contest, standings, currency }) {
   return (
     <div className="flex rounded-xl bg-layer4 p-4">
       <div className="center flex-1">
-        <img className="mr-2 h-10 w-10 rounded-full" alt="user avatar" src={accountAvatar} />
+        <img className="mr-2 h-10 w-10 rounded-full" alt="user avatar" src={avatarSrc(session?.avatar)} />
         <div className="font-extrabold text-primary">{session.name}</div>
       </div>
       <div className="flex-1 border-l border-solid border-third">

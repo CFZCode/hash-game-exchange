@@ -1,10 +1,11 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import RouteDialog from '../../shared/RouteDialog';
 import Input from '../../shared/Input';
 import { toast, toastError } from '../../shared/Toast/toast';
 import { useSession } from '../../../context/session';
 import { updateProfile } from '../../../services/auth';
-import avatarImg from '../../../assets/avatars/105522617.png';
+import { avatarSrc } from '../../../services/avatars';
 import { AVATAR_FRAMES } from './frames';
 import { FrameRing, IconFrameLock } from './frames.jsx';
 
@@ -30,9 +31,9 @@ import { FrameRing, IconFrameLock } from './frames.jsx';
  * original's grid does before a save this platform cannot make. `frames.jsx` carries what is
  * recovered and what is approximated, and the rings are the approximated part.
  *
- * The avatar circle draws a real avatar — the same `105522617.png` the header imports. Its "Edit
- * Your Avatar" button is kept and INERT: it navigates to `/settings/edit-avatar`, a second 55 KB
- * chunk that is the frame picker again, and there is still nothing behind it to pick from.
+ * The avatar circle draws the account's own avatar (`avatarSrc`: the profile's `avatar`, else the
+ * shipped `105522617.png`). Its "Edit Your Avatar" button opens `/settings/edit-avatar`, the
+ * picker over the site admin's catalogue (components/modals/EditAvatar).
  *
  * ── TWO CHECKS THE ORIGINAL MAKES AND THIS CANNOT ─────────────────────────────────────────────
  *
@@ -66,6 +67,7 @@ function shapeProblem(value) {
 
 export default function EditProfileDialog({ onClose, onBack, enter }) {
   const { session, setAccountField } = useSession();
+  const navigate = useNavigate();
 
   const [name, setName] = React.useState(session?.name ?? '');
   /* TWO DIFFERENT THINGS, and the chunk keeps them apart: the "In use" pill hangs off the frame's
@@ -116,11 +118,14 @@ export default function EditProfileDialog({ onClose, onBack, enter }) {
             mirror's stylesheet nor the current deploy's, both checked. Kept. */}
         <div className="fix-bglayer5 relative mx-auto size-40 rounded-full">
           <div className="h-full w-full overflow-hidden rounded-full">
-            <img alt="avatar" className="h-full w-full" src={avatarImg} />
+            <img alt="avatar" className="h-full w-full" src={avatarSrc(session?.avatar)} />
           </div>
           <div className="absolute bottom-0 left-1/2 -translate-x-1/2">
-            {/* Inert: `/settings/edit-avatar` is the frame picker, which has no feed here. */}
-            <button type="button" className="button button-brand h-8 min-w-32 px-2 py-0">
+            <button
+              type="button"
+              className="button button-brand h-8 min-w-32 px-2 py-0"
+              onClick={() => navigate('/settings/edit-avatar')}
+            >
               <span className="whitespace-nowrap">Edit Your Avatar</span>
             </button>
           </div>

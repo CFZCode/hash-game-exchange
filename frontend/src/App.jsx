@@ -37,6 +37,7 @@ import PasskeyDialog from './components/modals/Passkey';
 import VerificationDialog from './components/modals/Verification';
 import VerifyEnterDialog from './components/modals/VerifyEnter';
 import EditProfileDialog from './components/modals/EditProfile';
+import EditAvatarDialog from './components/modals/EditAvatar';
 import DepositDetailDialog from './components/modals/DepositDetail';
 import WithdrawDetailDialog from './components/modals/WithdrawDetail';
 import SettingsAccountInfo from './pages/Settings/AccountInfo';
@@ -321,11 +322,12 @@ function AppShell() {
      country picker and is not built; see components/modals/Verification. */
   /* `/settings/edit-profile` — `DialogEditProfile`, a dialog at every width like its two
      `/settings/edit-*` siblings. Held out of `settingsRoute` for the reason the verify pair is:
-     the pane layout would otherwise claim the path. `/settings/edit-avatar` is the frame picker
-     and is not built, so it is not matched here either — it keeps its URL and renders the pane
-     shell, which is what the catch-all does with every unbuilt route. */
+     the pane layout would otherwise claim the path. `/settings/edit-avatar` is its sibling, the
+     avatar picker (components/modals/EditAvatar), held out the same way. */
   const editProfileRoute = pathname === '/settings/edit-profile';
   const editProfileDialog = editProfileRoute && session.login;
+  const editAvatarRoute = pathname === '/settings/edit-avatar';
+  const editAvatarDialog = editAvatarRoute && session.login;
 
   /* `/wallet/deposit-detail?orderId=…` — `DialogTransactionDepositDetail`, and the destination
      every deposit row in the Transaction pane has always linked to. It is a dialog at every width
@@ -385,6 +387,7 @@ function AppShell() {
   const settingsRoute =
     !verifyRoute &&
     !editProfileRoute &&
+    !editAvatarRoute &&
     !whitelistFormRoute &&
     !phishingRoute &&
     !passkeyRoute &&
@@ -527,6 +530,7 @@ function AppShell() {
     verifyDialog ||
     verifyEnterDialog ||
     editProfileDialog ||
+    editAvatarDialog ||
     depositDetailDialog ||
     withdrawDetailDialog ||
     verifyNeedsAuth ||
@@ -1064,6 +1068,9 @@ function AppShell() {
       )}
       {editProfileDialog && (
         <EditProfileDialog onClose={closeOverlay} onBack={backOverlay} enter={dialogEnter} />
+      )}
+      {editAvatarDialog && (
+        <EditAvatarDialog onClose={closeOverlay} onBack={backOverlay} enter={dialogEnter} />
       )}
       {verifyEnterDialog && (
         <VerifyEnterDialog onClose={closeOverlay} onBack={backOverlay} enter={dialogEnter} />

@@ -17,7 +17,7 @@ import DisturbSetting from './DisturbSetting';
 import { useConfirm } from './useConfirm';
 import BonusPanel, { BonusLayer } from './BonusPanel';
 import { IconGift, IconArrow, IconAdd } from './icons';
-import avatarImg from '../../../../assets/avatars/105522617.png';
+import { avatarSrc } from '../../../../services/avatars';
 import logoSmall from '../../../../assets/logo_small.png';
 import './AfterLogin.css';
 
@@ -386,7 +386,7 @@ function AccountMenu() {
         onClick={() => setOpen((v) => !v)}
         aria-label="Account"
       >
-        <img className="size-full rounded-full" alt="avatar" src={avatarImg} />
+        <img className="size-full rounded-full" alt="avatar" src={avatarSrc(session?.avatar)} />
       </button>
 
       {open && (
@@ -538,6 +538,7 @@ export default function AfterLogin({ onToggleChat, onToggleNotice }) {
  */
 export function MobileAfterLogin() {
   const navigate = useNavigate();
+  const { session } = useSession();
   const bonusOn = useGates().on('bonus');
   /* The owner panel's square mark (live mode), in the same h-9 w-9 box; else the original. */
   const mark = useSiteMark();
@@ -588,7 +589,7 @@ export function MobileAfterLogin() {
           onClick={() => navigate('/user/enter')}
           aria-label="Account"
         >
-          <img className="size-full rounded-full" alt="avatar" src={avatarImg} />
+          <img className="size-full rounded-full" alt="avatar" src={avatarSrc(session?.avatar)} />
         </button>
       </div>
     </div>

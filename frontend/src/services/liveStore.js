@@ -6,11 +6,12 @@
  * calling the API, and components subscribe through `onLiveState` / `useLiveState`. Its own
  * module so `client.js` can read it without importing the socket (realtime.js imports client.js).
  *
- * One SYNC_STATE reply carries what used to be seven HTTP reads:
+ * One SYNC_STATE reply carries what used to be eight HTTP reads:
  *
  *   branding     GET /admin/branding/public        everyone
  *   region       GET /user/region                  everyone (this socket's address)
  *   currencies   GET /admin/currencies/public      everyone
+ *   avatars      GET /admin/avatars/public         everyone
  *   me           GET /user/auth/me                 signed in
  *   profile      GET /user/profile                 signed in
  *   balances     GET /user/wallet/balances         signed in
@@ -25,6 +26,7 @@ export const SOCKET_READS = Object.freeze({
   '/api/v1/admin/branding/public': { key: 'branding', player: false },
   '/api/v1/user/region': { key: 'region', player: false },
   '/api/v1/admin/currencies/public': { key: 'currencies', player: false },
+  '/api/v1/admin/avatars/public': { key: 'avatars', player: false },
   '/api/v1/user/auth/me': { key: 'me', player: true },
   '/api/v1/user/profile': { key: 'profile', player: true },
   '/api/v1/user/wallet/balances': { key: 'balances', player: true },

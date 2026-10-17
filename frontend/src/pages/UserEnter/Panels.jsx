@@ -43,7 +43,7 @@ import {
 } from './icons';
 import CopyInput from '../../components/shared/CopyInput';
 import { useSettings } from '../../context/settings';
-import avatarImg from '../../assets/avatars/105522617.png';
+import { avatarSrc } from '../../services/avatars';
 import balanceCoin from '../../assets/user-enter/balance_coin.png';
 import referArt from '../../assets/user-enter/refer.png';
 import { toast } from '../../components/shared/Toast/toast';
@@ -141,7 +141,7 @@ function ProfileHeader() {
           <div className="flex h-16 w-full items-center px-4">
             <div className="size-16 rounded-full bg-layer5 p-1">
               <div className="center h-full w-full rounded-full">
-                <img alt="avatar" className="h-full w-full rounded-full" src={avatarImg} />
+                <img alt="avatar" className="h-full w-full rounded-full" src={avatarSrc(session?.avatar)} />
               </div>
             </div>
 

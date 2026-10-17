@@ -61,3 +61,19 @@ export type NotificationRow = {
   delivered: boolean
   createdAt: string | null
 }
+
+/**
+ * `GET admin/avatars` — one profile picture players may choose. `minLevel` 0 is everyone; a
+ * player below it sees the avatar locked. `url` is the public image path
+ * (`/api/v1/admin/avatars/:id/image?v=…`), versioned so a replaced image is fetched again.
+ */
+export type Avatar = {
+  id: number
+  url: string
+  minLevel: number
+  sort: number
+  enabled: boolean
+  byteSize?: number | null
+  contentType?: string | null
+  updatedAt?: string | null
+}
