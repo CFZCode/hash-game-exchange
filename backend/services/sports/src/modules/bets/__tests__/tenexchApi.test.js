@@ -98,7 +98,7 @@ function mountedRoutes() {
   const modules = loadModules(path.resolve(__dirname, '../..')).filter((m) => MSSPORTS_MODULES.includes(m.name));
   const root = mountModules({
     modules,
-    deps: { config: {}, logger: { info() {}, warn() {}, debug() {}, error() {} }, clients: { admin: {} } },
+    deps: { config: {}, logger: { info() {}, warn() {}, debug() {}, error() {} }, clients: { admin: {} }, auth: { requirePermission: () => passthrough } },
     guards: { public: [], user: [passthrough], admin: [passthrough], internal: [passthrough] },
   });
 

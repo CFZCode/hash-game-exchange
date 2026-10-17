@@ -138,5 +138,8 @@ module.exports = function adminRoutes(deps) {
   router.get('/activity', canAudit, validate(v.allActivity), ctrl.activity);
   router.get('/executives/:executiveId/activity', canAudit, validate(v.activity), ctrl.executiveActivity);
 
+  // canGrantExecutive is not a permission guard by design: every staff login manages its own executives.
+  router.authorizationReviewed =
+    'Executive routes: any non-executive staff session (canGrantExecutive); the service scopes each executive to its owner (#assertOwned) and refuses any grant the owner does not hold (#assertGrantable). Other routes carry requirePermission.';
   return router;
 };
