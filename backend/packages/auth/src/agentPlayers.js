@@ -29,6 +29,9 @@ const { isAgentTree } = require('./permissions');
  *               out. Withdrawal HISTORY stays readable.
  *   tips        no sending peer-to-peer tips (POST /user/tip/send). They can
  *               still receive one, and their tip HISTORY stays readable.
+ *   kyc         no KYC submission (POST /user/kyc/submit). KYC is for direct users only:
+ *               an agent's player has no withdrawal rail, so nothing of theirs waits on
+ *               it, and the admin KYC queue lists direct users only. See docs/KYC.md.
  *
  * With all four money capabilities gone the player site shows no wallet
  * actions at all — only the read-only balance and the transaction history.
@@ -69,12 +72,16 @@ const AGENT_PLAYER_RESTRICTIONS = Object.freeze({
     code: 'TIPS_NOT_FOR_AGENT_USERS',
     message: 'Sending tips is not available for your account',
   }),
+  kyc: Object.freeze({
+    code: 'KYC_NOT_FOR_AGENT_USERS',
+    message: 'Verification is not available for your account',
+  }),
 });
 
 /** The capability names the player site is told about, in a stable order. */
 const PLAYER_CAPABILITIES = Object.freeze(Object.keys(AGENT_PLAYER_RESTRICTIONS));
 
-/** `{ promotions, vault, deposit, swap, withdraw, tips }` — true = the player has it. */
+/** `{ promotions, vault, deposit, swap, withdraw, tips, kyc }` — true = the player has it. */
 function capabilitiesFor(agentTree) {
   const out = {};
   for (const name of PLAYER_CAPABILITIES) out[name] = !agentTree;

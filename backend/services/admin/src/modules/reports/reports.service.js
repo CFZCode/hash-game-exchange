@@ -1686,7 +1686,7 @@ class ReportsService {
 
     const { sequelize } = this.models.FiatDeposits;
 
-    const [bankIn, gatewayIn, bankOut, gatewayOut, directMoves, agentMoves] = await Promise.all([
+    const [bankIn, gatewayIn, bankOut, gatewayOut, directMoves, agentMoves, otherGateways] = await Promise.all([
       this.models.FiatDeposits.findAll({
         where: {
           user_id: asText,
@@ -1751,6 +1751,24 @@ class ReportsService {
           GROUP BY 1`,
         { replacements: { ids: asText, types: AGENT_FUNDING_TYPES }, type: QueryTypes.SELECT }
       ),
+
+      // The other INR gateways (same statuses as packages/common withdrawalCapFigures).
+      sequelize.query(
+        `SELECT user_id, SUM(deposited) AS deposited, SUM(withdrawn) AS withdrawn FROM (
+           SELECT uid::text AS user_id, amount AS deposited, 0 AS withdrawn FROM cricpaytransactions
+            WHERE uid::text IN (:ids) AND lower(status) = 'successful'
+           UNION ALL
+           SELECT uid::text, CASE WHEN amount ~ '^[0-9]+(\\.[0-9]+)?$' THEN amount::numeric ELSE 0 END, 0 FROM upideposit
+            WHERE uid::text IN (:ids) AND lower(status) = 'success'
+           UNION ALL
+           SELECT user_id::text, amount, 0 FROM pay_in_transactions
+            WHERE user_id::text IN (:ids) AND upper(currency) = 'INR' AND status = 1
+           UNION ALL
+           SELECT user_id::text, 0, amount FROM pay_out_transactions
+            WHERE user_id::text IN (:ids) AND upper(currency) = 'INR' AND status = 1
+         ) g GROUP BY user_id`,
+        { replacements: { ids: asText }, type: QueryTypes.SELECT }
+      ),
     ]);
 
     const totals = new Map(asText.map((id) => [id, { deposited: 0n, withdrawn: 0n }]));
@@ -1765,7 +1783,7 @@ class ReportsService {
     add(gatewayIn, 'user_id', 'deposited');
     add(bankOut, 'uid', 'withdrawn');
     add(gatewayOut, 'user_id', 'withdrawn');
-    for (const rows of [directMoves, agentMoves]) {
+    for (const rows of [directMoves, agentMoves, otherGateways]) {
       add(rows.map((r) => ({ user_id: r.user_id, total: r.deposited })), 'user_id', 'deposited');
       add(rows.map((r) => ({ user_id: r.user_id, total: r.withdrawn })), 'user_id', 'withdrawn');
     }

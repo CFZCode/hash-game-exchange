@@ -59,7 +59,7 @@ Last updated: 2026-10-17
 | Vault | ✅ | `flat_balance` |
 | Swap | ✅ | `swap_page` |
 | Notifications | ✅ | `notice_centre` |
-| KYC | ✅ | `document_cockpit` |
+| KYC | ✅ | `document_cockpit` — sirf direct users, flow: [docs/KYC.md](docs/KYC.md) |
 | Spin wheel | ❌ | Is UI me nahi hai |
 | Gift cards | ❌ | Is UI me nahi hai |
 | Tips | ❌ | Is UI me nahi hai |
@@ -164,11 +164,10 @@ Frontend bc.game ki copy hai, par ye cheezein hata di ya chhupa di hain (detail:
 
 | Section | Pages |
 |---|---|
-| Main | Dashboard (Direct Users / Agent System), Users (Direct / Agent / Financial), Wallets, Redeem Codes, Turnover Report |
+| Main | Dashboard (Direct Users / Agent System), Users (Direct / Agent / Financial), Wallets, Login & IP history, Redeem Codes, Turnover Report |
 | Sports Exchange | Market Analysis, Current Bets, Turn Over, Settlement, Global Settings, Events |
 | Agent Management | Account List, Bank, Account Statement, Party Win Loss, Total Profit Loss, User Win Loss, General Lock |
-| Users | Login & IP history, KYC, Bank details |
-| Transactions | Deposit, Withdraw (Crypto / Fiat / Manual), Account Statement |
+| Transactions | Deposit, Withdraw (Crypto / Fiat / Manual), Account Statement, KYC (sirf direct users — [docs/KYC.md](docs/KYC.md)), Bank details |
 | Finance | Exchange rates, Coins, Vault, Swap history, Tips, P2P trading |
 | Promotions | Campaigns, Bonus, Bonus balances, Gift cards, Spin wheel, VIP & club, Affiliate, Races |
 | Casino | Game catalogue, Lobby curation, Providers, In-house games, Bet history, Wager report, Providers / Vendor / Type Priority |

@@ -36,7 +36,8 @@ class UserReportsService {
    * Zip `Home.jsx` ke cards — login wale ka apna `credits` row:
    *   Balance = inr, Credit pts = credit, All pts = all_point,
    *   Settlement pts = all_point − credit, Upper / Down pts, Sports pts (P/L ke liye).
-   * Exposure = tree ke saare players ka open exposure (zip: downline ka total).
+   * Exposure = tree ke agent players ka open exposure (zip: downline ka total). Direct users
+   * (koi parent nahi) Agent System ke nahi — owner ke liye bhi yahan kabhi nahi gine jaate.
    */
   async home({ actor }) {
     const [wallet] = await this.#query(
@@ -61,7 +62,7 @@ class UserReportsService {
     };
   }
 
-  /** Tree ke players ka exposure — har player ka |SUM(total_exposure)|, phir sabka jod. */
+  /** Tree ke agent players ka exposure — har player ka |SUM(total_exposure)|, phir sabka jod. Direct users nahi. */
   async #downlineExposure(actor) {
     const staffIds = await this.#treeStaffIds(actor);
     const [row] = await this.#query(
@@ -69,9 +70,9 @@ class UserReportsService {
          SELECT ABS(SUM(e.total_exposure)) AS exp
            FROM mssports.total_exposures e
            JOIN users u ON u.id = e.user_id
-          WHERE u.parent_staff_id IN (:staffIds) OR (:withDirect AND u.parent_staff_id IS NULL)
+          WHERE u.parent_staff_id IN (:staffIds)
           GROUP BY e.user_id) x`,
-      { staffIds: staffIds.length ? staffIds : [0], withDirect: this.#isOwner(actor) }
+      { staffIds: staffIds.length ? staffIds : [0] }
     );
     return row.total;
   }

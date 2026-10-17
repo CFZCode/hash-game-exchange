@@ -4,11 +4,11 @@ import { Owner_default } from "../../models/admin/Owner.mjs";
 import { MESSAGES } from "../constants/messages.mjs";
 import { createRequire } from "node:module";
 
-// TXN_PASSWORD_MODE=login (the platform default): the transaction password IS the platform login
-// password, which admin-service owns — so the check is admin-service's, not this mirror row's
-// `transaction_password` (which the mirror never sets). `separate` keeps the mssports compare.
+// admin-service owns the staff transaction password in BOTH modes (TXN_PASSWORD_MODE=login: the
+// login password; separate: the bcrypt `staff.transaction_password` set under My account), so the
+// check is always admin-service's — never this mirror row's `transaction_password`, which the
+// mirror never sets (comparing it refused every correct password in `separate` mode).
 const require = createRequire(import.meta.url);
-const { isLoginPasswordMode } = require("@ibitplay/auth");
 const { ServiceClient, resolveInternalKey } = require("@ibitplay/common");
 const config = require("../../config");
 let adminClient = null;
@@ -20,8 +20,7 @@ const admin = () => adminClient ??= new ServiceClient({
   timeoutMs: config.SERVICE_TIMEOUT_MS,
   retries: 0
 });
-async function passwordMatches(reqUser, user, transactionPassword) {
-  if (!isLoginPasswordMode()) return user.transaction_password === transactionPassword;
+async function passwordMatches(reqUser, transactionPassword) {
   const staffId = Number(reqUser.platformStaffId);
   if (!Number.isSafeInteger(staffId) || staffId <= 0) return false;
   try {
@@ -58,7 +57,7 @@ async function verifyTxnPasswordWithAttempts(reqUser, transactionPassword) {
   if (!isOwner && attemptsLeft <= 0) {
     return { ok: false, status: 403, message: MESSAGES.ADMIN.TXN.LIMIT_REACHED, attemptsLeft: 0 };
   }
-  if (!(await passwordMatches(reqUser, user, transactionPassword))) {
+  if (!(await passwordMatches(reqUser, transactionPassword))) {
     const remaining = Math.max(0, attemptsLeft - 1);
     const updates = { txn_password_attempts: remaining };
     let message = MESSAGES.ADMIN.TXN.NOT_VALID_ATTEMPTS_LEFT(remaining);
