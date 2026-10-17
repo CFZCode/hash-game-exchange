@@ -336,16 +336,17 @@ export const navItems: NavItem[] = [
     groupLabel: 'Transactions',
     groupIcon: 'ArrowLeftRight',
     collapsible: true,
+    // House only (user, 2026-10-17): an agent's player has no deposit / withdraw / KYC, so agent logins get no Transactions section.
     items: [
-      { icon: 'ArrowDownToLine', label: 'Deposit', href: '/transactions/deposit', permission: ['deposits:read', 'users:read'] },
-      { icon: 'ArrowUpFromLine', label: 'Withdraw', href: '/transactions/withdraw', permission: ['withdrawals:read', 'users:read'] },
+      { icon: 'ArrowDownToLine', label: 'Deposit', href: '/transactions/deposit', permission: ['deposits:read', 'users:read'], promotions: true },
+      { icon: 'ArrowUpFromLine', label: 'Withdraw', href: '/transactions/withdraw', permission: ['withdrawals:read', 'users:read'], promotions: true },
 
       // The transfer list is `admin/accounts/statement` (users:read); the drill-down is `admin/statements` (reports:read).
-      { icon: 'BookOpen', label: 'Account Statement', href: '/reports/statements', permission: ['users:read', 'reports:read'] },
+      { icon: 'BookOpen', label: 'Account Statement', href: '/reports/statements', permission: ['users:read', 'reports:read'], promotions: true },
 
       // Users section se yahan: KYC aur Bank details (routes wahi).
-      { icon: 'ShieldCheck', label: 'KYC', href: '/kyc', permission: 'users:read', feature: 'kyc' },
-      { icon: 'Building2', label: 'Bank details', href: '/bank-details', permission: 'config:read' }
+      { icon: 'ShieldCheck', label: 'KYC', href: '/kyc', permission: 'users:read', feature: 'kyc', promotions: true },
+      { icon: 'Building2', label: 'Bank details', href: '/bank-details', permission: 'config:read', promotions: true }
     ]
   },
   {
@@ -404,7 +405,6 @@ export const navItems: NavItem[] = [
       { icon: 'Server', label: 'Providers', href: '/casino/providers', permission: 'casino:read', flag: 'casino' },
 
       // The house-games and bet-history admin reads are guarded by reports:read, not casino:read.
-      { icon: 'House', label: 'In-house games', href: '/casino/in-house', permission: 'reports:read', flag: 'casino' },
       { icon: 'History', label: 'Bet history', href: '/casino/bets', permission: 'reports:read', flag: 'casino' },
 
       // Like bet history: `GET admin/reports/wager-stats` is reports:read and tree-scoped.
@@ -511,7 +511,15 @@ export const PROMOTION_ROUTES = [
   '/site-config/welcome-bonuses',
 
   // Not a promotion: the coin registry is house configuration, refused to the agent tree the same way.
-  '/coins'
+  '/coins',
+
+  // Transactions (and the old cashier screens behind it): house only — an agent's player has none.
+  '/transactions',
+  '/deposits',
+  '/withdrawals',
+  '/reports/statements',
+  '/kyc',
+  '/bank-details'
 ]
 
 export const isPromotionRoute = (pathname: string) =>

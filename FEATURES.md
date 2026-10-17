@@ -167,10 +167,10 @@ Frontend bc.game ki copy hai, par ye cheezein hata di ya chhupa di hain (detail:
 | Main | Dashboard (Direct Users / Agent System), Users (Direct / Agent / Financial), Wallets, Login & IP history, Redeem Codes, Turnover Report |
 | Sports Exchange | Market Analysis, Current Bets, Turn Over, Settlement, Global Settings, Events |
 | Agent Management | Account List, Bank, Account Statement, Party Win Loss, Total Profit Loss, User Win Loss, General Lock |
-| Transactions | Deposit, Withdraw (Crypto / Fiat / Manual), Account Statement, KYC (sirf direct users — [docs/KYC.md](docs/KYC.md)), Bank details |
+| Transactions (sirf Super Admin / house — agent logins ko nahi dikhta) | Deposit, Withdraw (Crypto / Fiat / Manual), Account Statement, KYC (sirf direct users — [docs/KYC.md](docs/KYC.md)), Bank details |
 | Finance | Exchange rates, Coins, Vault, Swap history, Tips, P2P trading |
 | Promotions | Campaigns, Bonus, Bonus balances, Gift cards, Spin wheel, VIP & club, Affiliate, Races |
-| Casino | Game catalogue, Lobby curation, Providers, In-house games, Bet history, Wager report, Providers / Vendor / Type Priority |
+| Casino | Game catalogue, Lobby curation, Providers, Bet history, Wager report, Providers / Vendor / Type Priority (In-house games page hata diya, 2026-10-17) |
 | Team | Executives, Marketing, Activity log |
 | Content | Banners, Blogs, Notifications, Push (Compose, Campaigns, Templates, Settings) |
 | Reports | User reports, Profit & loss, Risk |
