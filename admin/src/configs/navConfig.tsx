@@ -471,10 +471,11 @@ export const navItems: NavItem[] = [
     groupLabel: 'Reports',
     groupIcon: 'ChartPie',
     collapsible: true,
+    // Not for agent logins (user, 2026-10-17): agents have their own reports under Agent Management.
     items: [
-      { icon: 'ClipboardList', label: 'User reports', href: '/reports/players', permission: 'reports:read' },
-      { icon: 'BadgeDollarSign', label: 'Profit & loss', href: '/reports/pnl', permission: 'reports:read' },
-      { icon: 'ShieldAlert', label: 'Risk', href: '/reports/risk', permission: 'reports:read' }
+      { icon: 'ClipboardList', label: 'User reports', href: '/reports/players', permission: 'reports:read', promotions: true },
+      { icon: 'BadgeDollarSign', label: 'Profit & loss', href: '/reports/pnl', permission: 'reports:read', promotions: true },
+      { icon: 'ShieldAlert', label: 'Risk', href: '/reports/risk', permission: 'reports:read', promotions: true }
     ]
   },
   {
@@ -533,8 +534,9 @@ export const PROMOTION_ROUTES = [
   '/kyc',
   '/bank-details',
 
-  // Casino wager report: Super Admin side only, not the agent system.
-  '/casino/wager-report'
+  // Casino wager report and the Reports section: Super Admin side only, not the agent system.
+  '/casino/wager-report',
+  '/reports'
 ]
 
 /** Direct-user screens with no sidebar entry (the old cashier): Super Admin and its executives only, like `direct: true`. */
