@@ -175,7 +175,7 @@ export function getUserProfile(userId, account) {
               level: row.level ?? 0,
               /* The card tier is the ladder's own name for the band — `brownz`, `silver`,
                  `gold`, `platinum`, `diamond`. The dialog prints `levelName` beside the number. */
-              levelName: row.card ?? '',
+              levelName: row.levelName ?? row.card ?? '',
               createTime: row.joinedAt ? Date.parse(row.joinedAt) : 0,
               betNum: row.bets ?? PROFILE_DEFAULT.betNum,
               winNum: row.wins ?? PROFILE_DEFAULT.winNum,

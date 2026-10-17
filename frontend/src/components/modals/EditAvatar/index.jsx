@@ -4,6 +4,8 @@ import { toast, toastError } from '../../shared/Toast/toast';
 import { useSession } from '../../../context/session';
 import { avatarSrc, chooseAvatar, loadAvatars } from '../../../services/avatars';
 import { IconFrameLock } from '../EditProfile/frames.jsx';
+import useResource from '../../../hooks/useResource';
+import { getVipLevelNames } from '../../../services/vip';
 
 /* `/settings/edit-avatar` — `DialogEditAvatar`, the "Edit Your Avatar" button's destination in
  * Edit Profile. Markup read off the live page (hash.game/en-IN/settings/edit-avatar):
@@ -28,6 +30,8 @@ export default function EditAvatarDialog({ onClose, onBack, enter }) {
   const level = Number(session?.vipLevel) || 0;
 
   const [avatars, setAvatars] = React.useState(null); // null = still reading
+  // The admin's level names ("Bronze II") for the lock label; null → "VIP n".
+  const { data: levelNames } = useResource(getVipLevelNames);
   const [selected, setSelected] = React.useState(null);
   const [pending, setPending] = React.useState(false);
 
@@ -105,7 +109,7 @@ export default function EditAvatarDialog({ onClose, onBack, enter }) {
                     <>
                       <IconFrameLock className="icon pointer-events-none absolute left-1/2 top-1/2 size-5 -translate-x-1/2 -translate-y-1/2 fill-primary" />
                       <span className="pointer-events-none absolute -bottom-1 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-layer6 px-1 text-[10px] font-extrabold text-secondary">
-                        VIP {a.minLevel}
+                        {levelNames?.[a.minLevel] || `VIP ${a.minLevel}`}
                       </span>
                     </>
                   ) : null}

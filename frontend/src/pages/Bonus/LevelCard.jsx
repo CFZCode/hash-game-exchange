@@ -122,7 +122,11 @@ export default function LevelCard({ session }) {
 
           <IconBox className="mt-0.5 border border-brand bg-layer3 p-1">
             <div className="center size-full rounded-lg bg-brand/5">
-              <TierIcon name={family} className="icon size-6 !text-brand" />
+              {standing?.badgeUrl ? (
+                <img alt={fullName} className="size-6 object-contain" src={standing.badgeUrl} />
+              ) : (
+                <TierIcon name={family} className="icon size-6 !text-brand" />
+              )}
             </div>
           </IconBox>
 

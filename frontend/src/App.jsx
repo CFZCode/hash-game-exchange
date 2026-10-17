@@ -70,6 +70,7 @@ import DailyContestDialog from './pages/DailyContest/Dialog';
 import PageDialog from './components/shared/PageDialog';
 import NotificationDialog from './components/Notification/Dialog';
 import Auth from './components/modals/Auth';
+import GoogleCallback from './components/modals/Auth/GoogleCallback';
 import FreePlay from './components/modals/FreePlay';
 import Profile from './components/modals/Profile';
 import ProfileMedals from './components/modals/Profile/Medals';
@@ -1026,6 +1027,7 @@ function AppShell() {
           `/deposit` / `/free-plays` at any width) mounted for an agent-tree player and fired the
           reads the backend refuses (403 /user/bonus, /user/affiliate…). Gated on the CURRENT path:
           one dialog path matches at a time, and ungated ones (sign-in, profile) pass through. */}
+      {authMode === 'google' && <GoogleCallback />}
       <RouteGate pathname={pathname}>
       {/* `/deposit`'s guard names the sign-up tab, `/user/enter`'s the sign-in one; on
           `/login/*` the path itself is the tab. */}

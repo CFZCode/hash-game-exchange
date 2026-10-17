@@ -29,7 +29,7 @@ const { loadModules, mountModules, collectJobs, collectDomains, AUDIENCES } = re
  */
 const { VIP_LEVELS, UNRANKED, vipLevelName, vipLevelFor, PLATFORM_LADDER } = require('./vipLevels');
 /** Every ladder a site can choose through its `vip` variant, and the resolver that reads the choice. */
-const { VIP_LADDERS, vipLadderFor, resolveVipLadder } = require('./vipLadders');
+const { VIP_LADDERS, vipLadderFor, resolveVipLadder, rebrand: rebrandVipLadder, clearVipBranding } = require('./vipLadders');
 /**
  * The rewards table behind a VIP card — the rakeback rate and the rest.
  *
@@ -118,6 +118,8 @@ module.exports = {
   VIP_LADDERS,
   vipLadderFor,
   resolveVipLadder,
+  rebrandVipLadder,
+  clearVipBranding,
   vipRewards,
   ...raceBuckets,
   ...currencies,

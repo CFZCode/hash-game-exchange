@@ -124,7 +124,11 @@ const revokeSession = {
   params: z.object({ sessionId: z.string().trim().regex(/^\d+$/, 'sessionId must be numeric') }),
 };
 
+/** The one-time code the Google callback handed the player site. */
+const googleExchange = { body: z.object({ code: z.string().trim().min(16).max(128) }).strict() };
+
 module.exports = {
+  googleExchange,
   login,
   refresh,
   logout,

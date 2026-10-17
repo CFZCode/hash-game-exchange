@@ -1,6 +1,7 @@
 'use strict';
 
 const { response, asyncHandler } = require('@ibitplay/common');
+const google = require('../google');
 
 /** Unauthenticated auth endpoints — the ones that MINT a session. */
 function createPublicController({ service }) {
@@ -23,6 +24,35 @@ function createPublicController({ service }) {
       const result = await service.refresh(req.body, context(req));
       return response.ok(res, result);
     }),
+
+    /** Whether the player site should draw the Google button. */
+    googleStatus: asyncHandler(async (_req, res) => response.ok(res, { enabled: service.googleEnabled() })),
+
+    /** 302 to Google, after setting the signed state cookie the callback needs. */
+    googleStart: asyncHandler(async (req, res) => {
+      const { url, cookie } = service.googleStart();
+      res.cookie(google.COOKIE, cookie, {
+        httpOnly: true,
+        secure: req.secure || req.headers['x-forwarded-proto'] === 'https',
+        sameSite: 'lax', // Google's redirect back is a top-level GET, which Lax still carries.
+        path: google.COOKIE_PATH,
+        maxAge: 10 * 60_000,
+      });
+      return res.redirect(302, url);
+    }),
+
+    /** Google's redirect back → 302 to the player site with a one-time code (or an error code). */
+    googleCallback: asyncHandler(async (req, res) => {
+      const target = await service.googleCallback(
+        { code: req.query.code, state: req.query.state, cookie: google.readCookie(req.headers.cookie) },
+        context(req)
+      );
+      res.clearCookie(google.COOKIE, { path: google.COOKIE_PATH });
+      return res.redirect(302, target);
+    }),
+
+    /** The one-time code → the token pair, as login answers it. */
+    googleExchange: asyncHandler(async (req, res) => response.ok(res, await service.googleExchange(req.body, context(req)))),
 
     /**
      * Create an account.

@@ -46,6 +46,8 @@ const EXTENSIONS = {
   // Legacy created these with an ALTER TABLE run on every request that touched
   // the targetX endpoints, so they never reached the baseline schema.
   Users: {
+    // ── migration 119-google-login: the Google account (`sub`) this player signs in with.
+    google_sub: { type: DataTypes.STRING(64), allowNull: true, field: 'google_sub' },
     wager_multiplier: { type: DataTypes.DECIMAL(10, 4), allowNull: true, defaultValue: 3, field: 'wager_multiplier' },
     lock_targetx: { type: DataTypes.BOOLEAN, allowNull: true, defaultValue: false, field: 'lock_targetx' },
     // ── migration 043-user-withdrawal-whitelist ────────────────────────

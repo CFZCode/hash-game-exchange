@@ -66,6 +66,12 @@ module.exports = function publicRoutes(deps) {
   router.post('/login', loginLimiter, validate(v.login), ctrl.login);
   router.post('/refresh', validate(v.refresh), ctrl.refresh);
 
+  // Google sign-in (../google.js). Metered with login: every path ends in a session.
+  router.get('/google/status', ctrl.googleStatus);
+  router.get('/google/start', loginLimiter, ctrl.googleStart);
+  router.get('/google/callback', loginLimiter, ctrl.googleCallback);
+  router.post('/google/exchange', loginLimiter, validate(v.googleExchange), ctrl.googleExchange);
+
   /**
    * @legacy SOCKET `C.REGISTER_USER` / `C.RESET_PASSWORD`
    *

@@ -160,13 +160,64 @@ const vipLadderFor = (variant) => VIP_LADDERS[variant] ?? PLATFORM_LADDER;
 async function resolveVipLadder(models, { logger } = {}) {
   const SiteFeature = models?.SiteFeature;
   if (!SiteFeature) return PLATFORM_LADDER;
+  let ladder = PLATFORM_LADDER;
   try {
     const row = await SiteFeature.findByPk('vip', { raw: true, attributes: ['variant'] });
-    return vipLadderFor(row?.variant);
+    ladder = vipLadderFor(row?.variant);
   } catch (error) {
     logger?.warn({ err: error }, 'vip: could not read the site ladder, using the platform ladder');
     return PLATFORM_LADDER;
   }
+  return rebrand(ladder, await vipBranding(SiteFeature.sequelize, { logger }));
 }
 
-module.exports = { VIP_LADDERS, ADDAPLAY_LADDER, ADDAPLAY_BANDS, PLATFORM_BANDS, vipLadderFor, resolveVipLadder };
+/* ── Admin branding: per-level display names and per-card badges (migration 120) ──────────────
+ * Names and pictures only. Bands, thresholds, cards and every reward key are untouched, so a
+ * rename can never move a player or re-pay a reward. Read at most every BRANDING_TTL_MS. */
+const BRANDING_TTL_MS = 10_000;
+let branding = { at: 0, value: null };
+
+/** For the admin routes: drop the cache after a rename or a badge upload. */
+function clearVipBranding() {
+  branding = { at: 0, value: null };
+}
+
+async function vipBranding(sequelize, { logger } = {}) {
+  if (!sequelize?.query) return { names: new Map(), badges: new Map() };
+  if (branding.value && Date.now() - branding.at < BRANDING_TTL_MS) return branding.value;
+  try {
+    const [names, badges] = await Promise.all([
+      sequelize.query('SELECT level, name FROM vip_level_names', { type: 'SELECT' }),
+      sequelize.query('SELECT card, version FROM vip_badges', { type: 'SELECT' }),
+    ]);
+    branding = {
+      at: Date.now(),
+      value: {
+        names: new Map(names.map((r) => [Number(r.level), String(r.name)])),
+        badges: new Map(badges.map((r) => [String(r.card), String(r.version)])),
+      },
+    };
+  } catch (error) {
+    // Tables not migrated yet (or unreadable): the built-in names, no badges.
+    logger?.warn({ err: error.message }, 'vip: branding unreadable, using the built-in names');
+    branding = { at: Date.now(), value: { names: new Map(), badges: new Map() } };
+  }
+  return branding.value;
+}
+
+const badgeUrlOf = (card, badges) =>
+  badges.has(card) ? `/api/v1/admin/vip-branding/badges/${encodeURIComponent(card)}/image?v=${badges.get(card)}` : null;
+
+/** The ladder with admin names and badge URLs laid over it; the same ladder when there are none. */
+function rebrand(ladder, { names, badges }) {
+  if (!names.size && !badges.size) return ladder;
+  return makeLadder({
+    key: ladder.key,
+    label: ladder.label,
+    bonusGates: ladder.bonusGates,
+    unranked: { ...ladder.unranked, name: names.get(0) ?? ladder.unranked.name, badgeUrl: badgeUrlOf(ladder.unranked.card, badges) },
+    bands: ladder.levels.map((b) => ({ ...b, name: names.get(b.level) ?? b.name, badgeUrl: badgeUrlOf(b.card, badges) })),
+  });
+}
+
+module.exports = { VIP_LADDERS, ADDAPLAY_LADDER, ADDAPLAY_BANDS, PLATFORM_BANDS, vipLadderFor, resolveVipLadder, rebrand, clearVipBranding };

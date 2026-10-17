@@ -1,5 +1,5 @@
 import { walletCode } from '../utils/currency';
-import { request, USE_FIXTURES, getAccessToken } from './client';
+import { API_BASE, request, USE_FIXTURES, getAccessToken } from './client';
 import ENDPOINTS, { PLATFORM } from './endpoints';
 import {
   ACCESS,
@@ -88,8 +88,21 @@ export function toVipStanding(row) {
     toNextAmount:
       row.nextLevel == null ? 0 : Number(row.wagerToNextLevelInCurrency ?? row.wagerToNextLevel) || 0,
     wagered: Number(row.wagerInCurrency ?? row.wager) || 0,
+    /* The card's badge the site admin uploaded (VIP branding); null → the built-in glyph. */
+    badgeUrl: badgeSrc(row.badgeUrl),
   };
 }
+
+/** A badge path from the platform → a loadable URL; null when the admin set none. */
+export const badgeSrc = (path) => (path ? `${String(path).startsWith('/') ? API_BASE : ''}${path}` : null);
+
+/** The ladder's display names by level (admin VIP branding), `{ [level]: name }`. Null in fixture mode. */
+export const getVipLevelNames = () =>
+  USE_FIXTURES
+    ? null
+    : Promise.resolve(request(PLATFORM.user.vip.levels, { live: true, fixture: null }))
+        .then((d) => Object.fromEntries([[0, d?.unranked?.name], ...(d?.levels ?? []).map((l) => [l.level, l.name])]))
+        .catch(() => null);
 
 export const getVipStanding = () =>
   USE_FIXTURES || !getAccessToken()

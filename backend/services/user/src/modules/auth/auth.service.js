@@ -28,6 +28,7 @@ const { resolveReferrerOwner } = require('../affiliate/referrerResolver');
  * so an operator-created account and a self-registered one are the same shape.
  */
 const { PLAYER_ROLE_ID, WALLET_SEED } = require('./registration.constants');
+const google = require('./google');
 
 /**
  * One spelling per client address. Node reports an IPv4 client on a dual-stack
@@ -487,35 +488,15 @@ class AuthService {
       if (!referrer) throw errors.REFERRAL_CODE_INVALID({ referredBy: typedReferral });
     }
 
-    const created = await this.db.transaction(async (transaction) => {
-      const id = await this.#allocateUserId(transaction);
-      const referralCode = await this.#uniqueReferralCode(username, transaction);
-
-      const user = await this.models.Users.create(
-        {
-          id,
-          name: username,
-          email: email || null,
-          // Hash only. `password2` is left null — see the reset flow for why
-          // that column exists and what depends on it.
-          password: await hashPassword(password),
-          phone: phone || null,
-          country: country || null,
-          role_id: PLAYER_ROLE_ID,
-          friends: 'Support,',
-          wallet: WALLET_SEED,
-          referalcode: referralCode,
-          refree: referrer?.referalcode ?? null,
-          status: 'active',
-          created: new Date(),
-          last_ip: context.ip ?? null,
-        },
-        { transaction }
-      );
-
-      await this.models.Credits.create({ uid: user.id, inr: '0' }, { transaction });
-
-      return user;
+    const created = await this.#insertPlayer({
+      username,
+      email,
+      // Hash only. `password2` is left null — see the reset flow for why that column exists.
+      passwordHash: await hashPassword(password),
+      phone,
+      country,
+      refree: referrer?.referalcode ?? null,
+      ip: context.ip,
     });
 
     /*
@@ -595,6 +576,124 @@ class AuthService {
         'Registration bonuses were not applied'
       );
     }
+  }
+
+  /** The user row and its wallet, in one transaction — shared by password and Google sign-up. */
+  async #insertPlayer({ username, email, passwordHash, phone, country, refree, ip, googleSub = null }) {
+    return this.db.transaction(async (transaction) => {
+      const id = await this.#allocateUserId(transaction);
+      const referralCode = await this.#uniqueReferralCode(username, transaction);
+      const user = await this.models.Users.create(
+        {
+          id,
+          name: username,
+          email: email || null,
+          password: passwordHash,
+          phone: phone || null,
+          country: country || null,
+          role_id: PLAYER_ROLE_ID,
+          friends: 'Support,',
+          wallet: WALLET_SEED,
+          referalcode: referralCode,
+          refree: refree ?? null,
+          status: 'active',
+          created: new Date(),
+          last_ip: ip ?? null,
+          ...(googleSub ? { google_sub: googleSub } : {}),
+        },
+        { transaction }
+      );
+      await this.models.Credits.create({ uid: user.id, inr: '0' }, { transaction });
+      return user;
+    });
+  }
+
+  // ══ Google sign-in (./google.js) ═══════════════════════════════════════
+
+  googleEnabled() {
+    return google.configured(this.config);
+  }
+
+  /** `{ url, cookie }`: where to send the browser, and the signed state cookie to set first. */
+  googleStart() {
+    if (!this.googleEnabled()) throw errors.GOOGLE_NOT_CONFIGURED();
+    return google.startRequest(this.config);
+  }
+
+  /**
+   * Google's redirect back. Answers the PLAYER SITE URL to send the browser to: on success with a
+   * one-time `code` (traded by `googleExchange`, never tokens in a URL), else with `error=<code>`.
+   *
+   * Find-or-create: the Google account (`sub`) first; a new `sub` whose verified email already
+   * belongs to a password account is refused, not linked — emails are not verified here, so that
+   * account may not be this person's. A new player is a SIGN-UP, so the B2B rule applies; region
+   * and locks apply exactly as at password login.
+   */
+  async googleCallback({ code, state, cookie }, rawContext = {}, { fetchImpl } = {}) {
+    const back = (params) => `${String(this.config.PUBLIC_SITE_URL).replace(/\/+$/, '')}/login/google?${new URLSearchParams(params)}`;
+    if (!this.googleEnabled()) return back({ error: 'AUTH_GOOGLE_NOT_CONFIGURED' });
+    const context = withClientIp(rawContext);
+    try {
+      const verifier = google.verifierFor(cookie, state, this.config);
+      if (!verifier || !code) throw errors.GOOGLE_SIGNIN_FAILED();
+      let identity;
+      try {
+        const idToken = await google.exchangeCode({ code, verifier, config: this.config, fetchImpl });
+        identity = await google.verifyIdToken(idToken, { clientId: this.config.GOOGLE_CLIENT_ID, fetchImpl });
+      } catch (error) {
+        this.logger?.warn({ err: error.message }, 'Google sign-in rejected');
+        throw errors.GOOGLE_SIGNIN_FAILED();
+      }
+      await this.region.assertAllowed(context.ip);
+      const user = await this.#googleUser(identity, context);
+      await this.#assertUsable(user);
+      const oneTime = randomToken(32);
+      await this.db.sequelize.query(
+        `INSERT INTO oauth_login_codes (code_hash, user_id, expires_at) VALUES (:hash, :userId, NOW() + INTERVAL '2 minutes')`,
+        { replacements: { hash: hashToken(oneTime), userId: user.id } }
+      );
+      return back({ code: oneTime });
+    } catch (error) {
+      return back({ error: error.code ?? 'AUTH_GOOGLE_SIGNIN_FAILED' });
+    }
+  }
+
+  async #googleUser({ sub, email }, context) {
+    const linked = await this.models.Users.findOne({ where: { google_sub: sub } });
+    if (linked) return linked;
+    const holder = await this.models.Users.findOne({ where: { email }, attributes: ['id'], raw: true });
+    if (holder) throw errors.GOOGLE_EMAIL_IN_USE();
+    await sitePolicy.assertAllowed(this.models, 'business_model', 'public_signup', this.logger);
+    const base = google.usernameBase(email);
+    let username = base;
+    for (let i = 0; i < 5 && (await this.models.Users.findOne({ where: { name: username }, attributes: ['id'], raw: true })); i += 1) {
+      username = `${base}${crypto.randomInt(1000, 9999)}`;
+    }
+    const created = await this.#insertPlayer({ username, email, passwordHash: null, ip: context.ip, googleSub: sub });
+    await this.#linkReferrer({ userId: created.id, referredBy: null });
+    this.logger?.info({ userId: String(created.id) }, 'Player registered with Google');
+    this.#trackLogin(created.id, context, 'register');
+    return created;
+  }
+
+  /** The one-time code → the usual token pair. Single use, two minutes. */
+  async googleExchange({ code }, rawContext = {}) {
+    const context = withClientIp(rawContext);
+    const [rows] = await this.db.sequelize.query(
+      `UPDATE oauth_login_codes SET used_at = NOW()
+        WHERE code_hash = :hash AND used_at IS NULL AND expires_at > NOW()
+        RETURNING user_id`,
+      { replacements: { hash: hashToken(String(code ?? '')) } }
+    );
+    const userId = rows?.[0]?.user_id;
+    if (!userId) throw errors.GOOGLE_CODE_INVALID();
+    const user = await this.models.Users.findByPk(userId);
+    if (!user) throw errors.GOOGLE_CODE_INVALID();
+    await this.#assertUsable(user);
+    await user.update({ last_login_at: new Date(), last_ip: context.ip || null });
+    const session = await this.#issueSession(user, context);
+    this.#trackLogin(user.id, context, 'login');
+    return session;
   }
 
   /**

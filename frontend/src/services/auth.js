@@ -324,6 +324,20 @@ export async function login(credentials, previous) {
   return loadAccount(previous);
 }
 
+/* Google sign-in: the one-time code the backend's Google callback put in the URL → the same
+   token pair `login` gets (`POST /user/auth/google/exchange`), then the same account load. */
+export async function loginWithGoogle(code, previous) {
+  const session = await request('/api/v1/user/auth/google/exchange', {
+    live: true,
+    method: 'POST',
+    json: { code },
+    fixture: null,
+  });
+  if (!session?.accessToken) return FIXTURE_ACCOUNT;
+  setTokens(session);
+  return loadAccount(previous);
+}
+
 /* The bonus summary, read only for an account allowed promotions. An agent-tree player's
    `/user/bonus` answers `403 PROMOTIONS_NOT_FOR_AGENT_USERS` on every load, so the account's
    capabilities (`/user/auth/me`) are asked first and the read is skipped when promotions is

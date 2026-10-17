@@ -4,7 +4,7 @@ import { useState } from 'react'
 
 import Link from 'next/link'
 
-import { PencilIcon, PercentIcon, Trash2Icon } from 'lucide-react'
+import { PencilIcon, PercentIcon, Trash2Icon, UploadIcon } from 'lucide-react'
 
 import { useStatsFilters } from '@/components/shared/charts'
 import Can from '@/components/shared/Can'
@@ -44,8 +44,98 @@ const CARD_TONE: Record<string, string> = {
 
 // ── VIP ladder (read-only; no staff route exists) ─────────────────────
 
+// ── VIP branding: per-level names and per-card badges (admin/vip-branding, migration 120) ──
+
+type Branding = {
+  ladder: string
+  levels: { level: number; name: string; defaultName: string; card: string }[]
+  badges: { card: string; url: string | null }[]
+}
+
+const BRANDING = 'admin/vip-branding'
+const BRANDING_INVALIDATE = [['api', BRANDING], ['api', 'user/vip/levels']]
+
+/** `/api/v1/admin/vip-branding/badges/…` → through the admin's proxy, so it loads from here. */
+const proxied = (url: string | null) => {
+  const m = /\/api\/v1\/(.+)$/.exec(url ?? '')
+
+  return m ? `/api/gw/api/v1/${m[1]}` : null
+}
+
+const RenameLevel = ({ level, name, defaultName }: { level: number; name: string; defaultName: string }) => {
+  const [value, setValue] = useState(name)
+
+  const save = useApiMutation({
+    fn: () => api.put(`${BRANDING}/levels/${level}`, { name: value.trim() }),
+    invalidate: BRANDING_INVALIDATE,
+    success: () => `L${level} renamed`
+  })
+
+  return (
+    <FormDialog
+      trigger={
+        <Button size='icon' variant='ghost' className='size-7' aria-label={`Rename level ${level}`}>
+          <PencilIcon />
+        </Button>
+      }
+      title={`Rename L${level}`}
+      description={`What players see for this level. The wager threshold and rewards don't change. Built-in name: ${defaultName}.`}
+      submitLabel='Save name'
+      onSubmit={() => save.mutateAsync()}
+      validate={() => ({ [`vip-name-${level}`]: value.trim() ? (value.trim().length > 40 ? 'At most 40 characters' : undefined) : 'Enter a name' })}
+    >
+      <TextField id={`vip-name-${level}`} label='Level name' required maxLength={40} value={value} onChange={e => setValue(e.target.value)} />
+    </FormDialog>
+  )
+}
+
+const BadgeCard = ({ card, url }: { card: string; url: string | null }) => {
+  const upload = useApiMutation({
+    fn: (file: File) => {
+      const fd = new FormData()
+
+      fd.set('image', file)
+
+      return api.upload(`${BRANDING}/badges/${card}`, fd, 'PUT')
+    },
+    invalidate: BRANDING_INVALIDATE,
+    success: () => `${card} badge saved`
+  })
+
+  const src = proxied(url)
+
+  return (
+    <div className='flex flex-col items-center gap-2 rounded-lg border p-3'>
+      {src ? (
+        <img src={src} alt={`${card} badge`} className='size-12 object-contain' />
+      ) : (
+        <div className={`flex size-12 items-center justify-center rounded-full text-xs capitalize ${CARD_TONE[card] ?? 'bg-muted'}`}>{card.slice(0, 2)}</div>
+      )}
+      <span className='text-xs font-medium capitalize'>{card}</span>
+      <Can permission='config:write'>
+        <label className='text-primary flex cursor-pointer items-center gap-1 text-xs hover:underline'>
+          <UploadIcon className='size-3' /> {src ? 'Replace' : 'Upload'}
+          <input
+            type='file'
+            accept='image/png,image/jpeg,image/webp'
+            className='sr-only'
+            onChange={e => {
+              const file = e.target.files?.[0]
+
+              if (file) void upload.mutateAsync(file)
+              e.target.value = ''
+            }}
+          />
+        </label>
+      </Can>
+    </div>
+  )
+}
+
 const VipLadder = () => {
   const q = useApi<VipLadder>('user/vip/levels')
+  const branding = useApi<Branding>(BRANDING)
+  const named = new Map((branding.data?.levels ?? []).map(l => [l.level, l]))
 
   // Bands are stored in USD; shown in the owner's default coin at today's rate.
   const money = useReportMoney()
@@ -57,6 +147,24 @@ const VipLadder = () => {
 
   const columns: Column<VipLevel>[] = [
     { key: 'level', header: 'Level', cell: r => <span className='font-semibold tabular-nums'>L{r.level}</span> },
+    {
+      key: 'name',
+      header: 'Name',
+      cell: r => {
+        const b = named.get(r.level)
+
+        return (
+          <span className='flex items-center gap-1'>
+            <span className='font-medium'>{b?.name ?? r.name}</span>
+            {b && (
+              <Can permission='config:write'>
+                <RenameLevel level={r.level} name={b.name} defaultName={b.defaultName} />
+              </Can>
+            )}
+          </span>
+        )
+      }
+    },
     { key: 'card', header: 'Card', cell: r => <Badge variant='outline' className={`border-transparent capitalize ${CARD_TONE[r.card] ?? ''}`}>{r.card}</Badge> },
     { key: 'min', header: `From (${money.code} wagered)`, align: 'right', cell: r => <span className='tabular-nums'>{money.format(r.minXp, 'USD', { digits: 2 })}</span> },
     { key: 'max', header: 'To', align: 'right', cell: r => (r.maxXp === null ? <span className='text-muted-foreground'>and above</span> : <span className='tabular-nums'>{money.format(r.maxXp, 'USD', { digits: 2 })}</span>) }
@@ -85,6 +193,17 @@ const VipLadder = () => {
           )
         })}
       </div>
+      <Card className='shadow-none'>
+        <CardHeader>
+          <CardTitle className='text-base'>Badges</CardTitle>
+          <CardDescription>One picture per card, shown wherever a player’s VIP level appears. PNG, JPEG or WebP, up to 1 MB. Without one, the site’s built-in art is used.</CardDescription>
+        </CardHeader>
+        <CardContent className='grid grid-cols-3 gap-3 sm:grid-cols-5 lg:grid-cols-10'>
+          {(branding.data?.badges ?? []).map(b => (
+            <BadgeCard key={b.card} card={b.card} url={b.url} />
+          ))}
+        </CardContent>
+      </Card>
       <DataTable columns={columns} rows={q.data ? levels : undefined} rowKey={r => r.level} loading={q.isLoading} error={q.error} dense />
     </div>
   )

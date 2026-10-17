@@ -32,6 +32,7 @@ import './Auth.css';
    arms. */
 import '../../shared/DialogShell/DialogShell.css';
 import { PASSKEY_ENABLED, SOCIAL_LOGINS } from '../../../config/hiddenFeatures';
+import { startGoogleLogin, useGoogleLogin } from '../../../services/googleAuth';
 
 /* The sign-in / sign-up dialog.
  *
@@ -187,10 +188,11 @@ const THIRD_PARTY = [
 const SHOWN_THIRD_PARTY = THIRD_PARTY.filter((item) => SOCIAL_LOGINS.includes(item.label));
 
 /* `labelled`: a lone button spans the row, so it carries its name beside the icon. */
-const ThirdPartyButton = ({ label, Icon, labelled = false }) => (
+const ThirdPartyButton = ({ label, Icon, labelled = false, onClick }) => (
   <button
     type="button"
     aria-label={label}
+    onClick={onClick}
     className="button button-m h-11 flex-1 rounded-lg border border-solid border-third p-0 shadow-[0px_2px_4px_rgba(0,0,0,0.10)]"
   >
     <Icon className="size-5 fill-secondary" />
@@ -223,6 +225,9 @@ function DirectRow({ heading, children }) {
 }
 
 function SignInForm({ onSubmit, pending, error, onForgot }) {
+  // Google shows only while the backend has its keys.
+  const googleOn = useGoogleLogin();
+  const thirdParty = SHOWN_THIRD_PARTY.filter((item) => item.label !== 'Google' || googleOn);
   /* Username vs Email — THIS BUILD'S TABS (user's request, 2026-10-16), in place of bc.game's
      Password / One-time Code: the platform has no one-time code, and its login takes either an
      email or a username in the same `identifier` field. Both tabs are the Password capture's form;
@@ -379,6 +384,7 @@ function SignInForm({ onSubmit, pending, error, onForgot }) {
           </form>
       </div>
 
+      {(PASSKEY_ENABLED || thirdParty.length > 0) && (
       <DirectRow heading="Log in directly with">
         {/* Cwallet (BC.GAME's partner wallet) sign-in is not drawn — no Parker567 integration. */}
         {/* Hidden: no WebAuthn on the platform (config/hiddenFeatures.js). */}
@@ -393,11 +399,17 @@ function SignInForm({ onSubmit, pending, error, onForgot }) {
         )}
 
         <div className="third-group-wrap mt-6 flex h-11 w-full items-center gap-2">
-          {SHOWN_THIRD_PARTY.map((item) => (
-            <ThirdPartyButton key={item.label} {...item} labelled={SHOWN_THIRD_PARTY.length === 1} />
+          {thirdParty.map((item) => (
+            <ThirdPartyButton
+              key={item.label}
+              {...item}
+              labelled={thirdParty.length === 1}
+              onClick={item.label === 'Google' ? startGoogleLogin : undefined}
+            />
           ))}
         </div>
       </DirectRow>
+      )}
     </>
   );
 }
@@ -407,6 +419,8 @@ function SignInForm({ onSubmit, pending, error, onForgot }) {
 const USERNAME_RULE = /^[A-Za-z0-9_.-]{3,30}$/;
 
 function SignUpForm({ onSubmit, error, onClearError }) {
+  const googleOn = useGoogleLogin();
+  const othersShown = SHOWN_THIRD_PARTY.some((item) => item.label !== 'Google');
   /* Username vs Email, as on the Sign In tab (user's request): Username first. */
   const [method, setMethod] = React.useState(0);
   const byUsername = method === 0;
@@ -652,6 +666,7 @@ function SignUpForm({ onSubmit, error, onClearError }) {
         </button>
       </form>
 
+      {(googleOn || othersShown) && (
       <DirectRow heading="Sign up directly with">
         <div>
           {/* Three across, `gap-3`, all h-11 — one step shorter than the Sign In tab's stacked
@@ -659,8 +674,10 @@ function SignUpForm({ onSubmit, error, onClearError }) {
               `text-base`; reproduced as written. */}
           <div className="mt-4 flex items-center gap-3">
             {/* Cwallet sign-up is not drawn (BC.GAME's partner wallet). */}
+            {googleOn && (
             <button
               type="button"
+              onClick={startGoogleLogin}
               className="button button-m h-11 flex-1 bg-layer4 shadow-[0px_2px_4px_rgba(0,0,0,0.10)]"
             >
               {/* An <img>, not an SVG — the original inlines the four-colour mark as a 40x40
@@ -669,8 +686,9 @@ function SignUpForm({ onSubmit, error, onClearError }) {
               <img alt="google" className="size-[0.875rem] sm:size-4" src={googleImg} />
               <span className="ml-2 text-base font-extrabold text-primary">Google</span>
             </button>
+            )}
 
-            {SHOWN_THIRD_PARTY.some((item) => item.label !== 'Google') && (
+            {othersShown && (
             <button
               type="button"
               aria-expanded={moreOpen}
@@ -705,6 +723,7 @@ function SignUpForm({ onSubmit, error, onClearError }) {
           </div>
         </div>
       </DirectRow>
+      )}
     </>
   );
 }

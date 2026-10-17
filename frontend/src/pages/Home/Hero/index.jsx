@@ -9,6 +9,7 @@ const DEFAULT_HERO_ART = '/brand/parker567-hero.jpg';
 /* Figma "Frame 146" (372×215 @2x): the phone banner, two players on the right. */
 const DEFAULT_HERO_ART_MOBILE = '/brand/parker567-hero-mobile.jpg';
 import googleIcon from '../../../assets/google.png';
+import { startGoogleLogin, useGoogleLogin } from '../../../services/googleAuth';
 import telegramIcon from '../../../assets/telegram.png';
 import './Hero.css';
 
@@ -22,6 +23,7 @@ const HeroCopy = () => {
   /* A B2B site has no sign-up (context/gates.js): the headline stays, the Sign Up button and the
      "Or Register With" row are not rendered. */
   const canSignUp = useCanSignUp();
+  const googleOn = useGoogleLogin();
 
   return (
     <div className="center relative z-[1] flex h-full w-1/2 min-w-[11.25rem] flex-col whitespace-nowrap">
@@ -40,10 +42,11 @@ const HeroCopy = () => {
         Sign Up
       </button>
 
-      {/* "Or Register With" — Google only (user's request, 2026-10-16). The platform has no
-          Google OAuth yet, so the button opens the same sign-up form the Sign Up button does
-          rather than sitting dead; Telegram stays hidden (SOCIAL_SIGN_IN). Wire it to the real
-          OAuth start the day the backend has one. */}
+      {/* "Or Register With" — Google only (user's request, 2026-10-16), and only while the
+          backend has its Google keys (services/googleAuth.js); Telegram stays hidden
+          (SOCIAL_SIGN_IN). */}
+      {googleOn && (
+      <>
       <p className="mt-3 p-0 font-semibold leading-[150%] text-secondary">Or Register With</p>
 
       <div className="mt-1.5 h-8">
@@ -52,7 +55,7 @@ const HeroCopy = () => {
             <button
               className="button h-8 w-[5.5rem] flex-none gap-1 rounded-lg border border-third bg-black_alpha5 p-0 text-xs backdrop-blur-sm sm:h-10 sm:w-[120px] sm:text-base"
               type="button"
-              onClick={() => navigate('/login/regist')}
+              onClick={startGoogleLogin}
             >
               <img alt="google" className="size-[0.875rem] sm:size-5" src={googleIcon} />
               <span className="font-extrabold text-primary">Google</span>
@@ -71,6 +74,8 @@ const HeroCopy = () => {
           </div>
         </div>
       </div>
+      </>
+      )}
         </>
       )}
     </div>

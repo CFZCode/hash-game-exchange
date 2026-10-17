@@ -135,6 +135,13 @@ const config = loadEnv(
     // a link to production.
     PUBLIC_SITE_URL: coercers.str('http://localhost:3000'),
 
+    // Google sign-in (modules/auth/google.js). All three set = the button shows; any missing =
+    // sign-in with Google is off and its routes answer 503. The redirect URI is registered in the
+    // Google Cloud console: <API origin>/api/v1/user/auth/google/callback.
+    GOOGLE_CLIENT_ID: coercers.optionalStr(),
+    GOOGLE_CLIENT_SECRET: coercers.optionalStr(),
+    GOOGLE_REDIRECT_URI: coercers.optionalStr(),
+
     // ── Payment limits ────────────────────────────────────────────────
     // Legacy had none, in either direction. A missing upper bound on a payout
     // is what turns a compromised account into an unbounded loss.

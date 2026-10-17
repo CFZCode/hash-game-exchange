@@ -225,6 +225,7 @@ function VipCard() {
     <div className="relative z-[11] px-4">
       <div className={`relative rounded-xl bg-layer4 p-3 user-vip-${num}-bg`}>
         <div className="flex h-5 items-center">
+          {standing?.badgeUrl && <img alt="" className="mr-1.5 size-5 object-contain" src={standing.badgeUrl} />}
           <span className="mr-2 text-base font-extrabold uppercase">{fullName}</span>
         </div>
 

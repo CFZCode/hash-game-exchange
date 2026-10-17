@@ -115,6 +115,9 @@ class ProfileService {
          shows beside it. */
       level: vip.level,
       card: vip.card,
+      // The admin's name for the level and its card badge (VIP branding, migration 120).
+      levelName: vip.name,
+      badgeUrl: vip.badgeUrl ?? null,
       gamesPlayed: user.games_played,
       bets: stats?.bets ?? null,
       wins: stats?.wins ?? null,

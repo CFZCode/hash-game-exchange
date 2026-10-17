@@ -13,6 +13,7 @@ import { isSignedIn, onAuthExpired } from '../services/tokens';
 import {
   loadAccount,
   login as apiLogin,
+  loginWithGoogle,
   logout as apiLogout,
   register as apiRegister,
   toWalletRows,
@@ -288,6 +289,8 @@ export function SessionProvider({ children }) {
        * Rejects with the transport's `ApiError`, whose `code` is the platform's stable string.
        */
       authenticate: (credentials) => apiLogin(credentials, account),
+      /* Google sign-in: the callback's one-time code, same contract as `authenticate`. */
+      authenticateGoogle: (code) => loginWithGoogle(code, account),
 
       /**
        * Create an account, then sign into it.

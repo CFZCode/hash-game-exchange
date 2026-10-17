@@ -56,6 +56,7 @@ function makeLadder({ key, label, bands, unranked, bonusGates }) {
         level: zero.level,
         name: zero.name,
         card: zero.card,
+        badgeUrl: zero.badgeUrl ?? null,
         wager: String(wager ?? '0'),
         nextLevel: first.level,
         nextName: first.name,
@@ -73,6 +74,7 @@ function makeLadder({ key, label, bands, unranked, bonusGates }) {
         level: top.level,
         name: top.name,
         card: top.card,
+        badgeUrl: top.badgeUrl ?? null,
         wager: String(wager ?? '0'),
         nextLevel: null,
         nextName: null,
@@ -97,6 +99,7 @@ function makeLadder({ key, label, bands, unranked, bonusGates }) {
       level: band.level,
       name: band.name,
       card: band.card,
+      badgeUrl: band.badgeUrl ?? null,
       wager: String(wager ?? '0'),
       nextLevel: next ? next.level : null,
       nextName: next ? next.name : null,
@@ -118,6 +121,7 @@ function makeLadder({ key, label, bands, unranked, bonusGates }) {
       minXp: String(band.minXp),
       maxXp: band.level === top.level ? null : String(band.maxXp),
       card: band.card,
+      badgeUrl: band.badgeUrl ?? null,
     }));
 
   return Object.freeze({

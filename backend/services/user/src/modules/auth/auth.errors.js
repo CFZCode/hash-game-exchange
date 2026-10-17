@@ -114,6 +114,15 @@ module.exports = defineErrors('AUTH', {
     message: 'That reset link is not valid or has expired',
   },
 
+  /** Google sign-in is switched off: its keys are not set. */
+  GOOGLE_NOT_CONFIGURED: { status: 503, message: 'Sign in with Google is not available' },
+  /** Google proved the email, but a password account already holds it. Never linked automatically:
+   *  this platform does not verify emails, so the existing account may not belong to this person. */
+  GOOGLE_EMAIL_IN_USE: { status: 409, message: 'An account with this email already exists. Sign in with your password.' },
+  GOOGLE_SIGNIN_FAILED: { status: 401, message: 'Google sign-in did not complete. Try again.' },
+  /** One code for missing, used and expired — same reasoning as the reset link. */
+  GOOGLE_CODE_INVALID: { status: 401, message: 'That sign-in link is not valid or has expired' },
+
   ALREADY_REGISTERED: {
     status: 409,
     /**
