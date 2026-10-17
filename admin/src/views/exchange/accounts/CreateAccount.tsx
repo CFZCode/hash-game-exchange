@@ -33,6 +33,7 @@ import { check } from '@/lib/validate'
 type Form = {
   username: string
   fullname: string
+  email: string
   password: string
   cpassword: string
   city: string
@@ -48,6 +49,7 @@ type Form = {
 const EMPTY: Form = {
   username: '',
   fullname: '',
+  email: '',
   password: '',
   cpassword: '',
   city: '',
@@ -69,7 +71,7 @@ const STAFF_TYPES: { level: number; label: string }[] = [
   { level: 6, label: 'Agent' }
 ]
 
-const REQUIRED_FIELDS: (keyof Form)[] = ['username', 'fullname', 'password', 'cpassword', 'mpassword', 'city', 'mono', 'point', 'camt']
+const REQUIRED_FIELDS: (keyof Form)[] = ['username', 'fullname', 'email', 'password', 'cpassword', 'mpassword', 'city', 'mono', 'point', 'camt']
 
 type CreateResult = { success: boolean; creditSkipped: boolean; message: string }
 
@@ -87,6 +89,14 @@ const validateField = (name: keyof Form, value: string, all: Form) => {
       if (!value.trim()) return 'The Full Name field is required'
       if (value.trim().length < 4) return 'The Full Name field must be at least 4 characters'
       if (value.trim().length > 120) return 'The Full Name field may not be greater than 120 characters'
+
+      return ''
+    case 'email':
+      // Sirf staff (Admin … Agent) ke liye — User banate waqt field nahi dikhti.
+      if (all.newlvlno === 'USER') return ''
+      if (!value.trim()) return 'The Email field is required'
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())) return 'The Email field must be a valid email'
+      if (value.trim().length > 190) return 'The Email field may not be greater than 190 characters'
 
       return ''
     case 'password':
@@ -236,6 +246,7 @@ const CreateAccount = () => {
       const res = await api.post<CreateResult>(`${ACCOUNTS_API}/create`, {
         username: form.username,
         fullname: form.fullname,
+        email: isUser ? undefined : form.email.trim().toLowerCase(),
         password: form.password,
         city: form.city || undefined,
         phone: form.mono || undefined,
@@ -253,6 +264,7 @@ const CreateAccount = () => {
       const msg = errorMessage(err)
 
       if (/user ?name already exists/i.test(msg)) setNameCheck('taken')
+      if (/email is already in use/i.test(msg)) setErrors(prev => ({ ...prev, email: 'This email is already in use' }))
       toast.error(msg)
     } finally {
       setLoading(false)
@@ -299,6 +311,7 @@ const CreateAccount = () => {
           <CardContent className='space-y-4'>
             {field('username', 'User name', { required: true })}
             {field('fullname', 'Full Name', { required: true })}
+            {!isUser && field('email', 'Email', { required: true, type: 'email' })}
             {field('password', 'Password', { required: true, type: 'password' })}
             {field('cpassword', 'Confirm Password', { required: true, type: 'password' })}
             {field('city', 'City')}

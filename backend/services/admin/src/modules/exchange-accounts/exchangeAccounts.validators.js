@@ -21,6 +21,8 @@ const createAccount = {
     .object({
       username: username.min(4, 'The User Name field must be at least 4 characters').max(60),
       fullname: z.string().trim().max(120).optional(),
+      // Staff (Admin … Agent) ke liye zaroori — login aur contact ke liye asli email. User pe nahi lagti.
+      email: z.string().trim().toLowerCase().email('The Email field must be a valid email').max(190).optional(),
       password: z.string().min(8).max(200),
       city: z.string().trim().max(120).optional(),
       phone: z.string().trim().regex(/^\d*$/, 'The Mobile Number field may only contain numeric characters').max(15).optional(),

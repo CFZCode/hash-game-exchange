@@ -98,11 +98,22 @@ test('exchange accounts screens', async (t) => {
   const ownerId = await seedStaff({ roleId: 1, inr: '10000' });
   const owner = actors(ownerId, 1);
 
+  await t.test('a staff account needs an email, and an email already in use is refused', async () => {
+    const base = { ...owner, password: 'StrongPassword12', creditAmount: '0', userType: 2, percentage: '1', transactionPassword: TXN };
+    await assert.rejects(accounts.create({ ...base, username: `xnoem${tag}` }), { code: 'EXCHANGE_ACCOUNTS_EMAIL_REQUIRED' });
+    await accounts.create({ ...base, username: `xem${tag}a`, email: `dup${tag}@example.com` });
+    await assert.rejects(
+      accounts.create({ ...base, username: `xem${tag}b`, email: `DUP${tag}@example.com`.toLowerCase() }),
+      { code: 'EXCHANGE_ACCOUNTS_EMAIL_EXISTS', status: 409 }
+    );
+  });
+
   await t.test('owner creates an Admin with Credit Amount: credits row, money moved, point ledger entry', async () => {
     const username = `xadm${tag}a`;
     const result = await accounts.create({
       ...owner,
       username,
+      email: `${username}@example.com`,
       password: 'StrongPassword12',
       creditAmount: '1500',
       userType: 2,
@@ -113,6 +124,7 @@ test('exchange accounts screens', async (t) => {
     assert.equal(result.creditSkipped, false);
     assert.equal(result.message, 'User created successfully under parent');
     const staff = await models.Staff.findOne({ where: { name: username }, raw: true });
+    assert.equal(staff.email, `${username}@example.com`);
     assert.equal(Number(staff.parent_id), ownerId);
     assert.equal(Number(staff.percentage), 2.5);
 
@@ -151,7 +163,7 @@ test('exchange accounts screens', async (t) => {
     const noGrant = actors(masterId, 5);
     noGrant.staffActor = { ...noGrant.staffActor, canCredit: false };
     const username = `xagt${tag}z`;
-    await assert.rejects(() => accounts.create({ ...noGrant, username, password: 'StrongPassword12', creditAmount: '100', userType: 6, transactionPassword: TXN }));
+    await assert.rejects(() => accounts.create({ ...noGrant, username, email: `${username}@example.com`, password: 'StrongPassword12', creditAmount: '100', userType: 6, transactionPassword: TXN }));
     assert.equal(await models.Staff.count({ where: { name: username } }), 0, 'no half-made account');
     assert.equal(dec((await models.StaffCredits.findOne({ where: { staff_id: masterId }, raw: true })).inr), 500);
   });

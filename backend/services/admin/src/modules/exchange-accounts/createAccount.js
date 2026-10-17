@@ -95,7 +95,7 @@ class CreateAccountService {
    * @param {object} p.staffActor   StaffService wala actor (actorFrom)
    * @param {object} p.playerActor  PlayersService wala actor (req.staff)
    */
-  async create({ staffActor, playerActor, username, password, phone, creditAmount, userType, percentage, transactionPassword }) {
+  async create({ staffActor, playerActor, username, email, password, phone, creditAmount, userType, percentage, transactionPassword }) {
     // 1. Naam pehle — zip bhi sabse pehle duplicate check karta hai.
     if (await isUsernameTaken(this.models, username)) {
       throw new AppError(MESSAGES.USERNAME_EXISTS, 409, 'EXCHANGE_ACCOUNTS_USERNAME_EXISTS');
@@ -107,6 +107,17 @@ class CreateAccountService {
     const roleId = isPlayer ? null : await staffRoleIdFor(this.models, userType);
     // Hamare platform pe staff password kam se kam 12 ka (staff module ka rule).
     if (!isPlayer && String(password).length < 12) throw badRequest('The Password field must be at least 12 characters');
+    // Staff ki email form se aati hai (pehle username se banti thi). Zaroori aur unique.
+    if (!isPlayer) {
+      if (!email) throw badRequest('The Email field is required', 'EXCHANGE_ACCOUNTS_EMAIL_REQUIRED');
+      const { sequelize } = this.models.Staff;
+      const taken = await this.models.Staff.findOne({
+        where: sequelize.where(sequelize.fn('LOWER', sequelize.col('email')), email),
+        attributes: ['id'],
+        raw: true,
+      });
+      if (taken) throw new AppError('This email is already in use', 409, 'EXCHANGE_ACCOUNTS_EMAIL_EXISTS');
+    }
 
     // 2. Transaction Code — form pe hamesha hai. Owner ka sirf tab check hota hai jab set ho.
     await assertTransactionPassword(this.models, staffActor.id, transactionPassword, {
@@ -124,7 +135,7 @@ class CreateAccountService {
 
     const account = isPlayer
       ? await this.#createPlayer({ playerActor, username, password, phone, opening, transactionPassword })
-      : await this.#createStaff({ staffActor, username, password, phone, roleId, percentage: rate, opening, transactionPassword });
+      : await this.#createStaff({ staffActor, username, email, password, phone, roleId, percentage: rate, opening, transactionPassword });
 
     this.logger?.info({ actorStaffId: staffActor.id, accountType: account.accountType, accountId: account.id, opening }, 'Exchange account created');
 
@@ -163,13 +174,13 @@ class CreateAccountService {
    * (jaise parent ke paas grant / balance nahi) to account bhi nahi banta. Opening ki point entry
    * 'User creation' / open:<walletId>.
    */
-  async #createStaff({ staffActor, username, password, phone, roleId, percentage, opening, transactionPassword }) {
+  async #createStaff({ staffActor, username, email, password, phone, roleId, percentage, opening, transactionPassword }) {
     return this.db.transaction(async (transaction) => {
-    // Staff ko email chahiye; form me nahi hai, isliye username se banate hain (login naam se hota hai).
+    // Email Create Account form se (zaroori, `create` me check ho chuki).
     const staff = await this.staffService.create({
       actor: staffActor,
       name: username,
-      email: `${username.toLowerCase()}@exchange.invalid`,
+      email,
       password,
       phone: phone || undefined,
       roleId,
