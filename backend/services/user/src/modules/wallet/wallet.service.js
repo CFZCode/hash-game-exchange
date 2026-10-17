@@ -3,6 +3,7 @@
 const crypto = require('node:crypto');
 
 const { money, currencyRegistry } = require('@ibitplay/common');
+const { isAgentPlayer } = require('@ibitplay/auth');
 const { EVENTS, roomForUser, encode } = require('@ibitplay/socket');
 
 const errors = require('./wallet.errors');
@@ -87,6 +88,9 @@ class WalletService {
     if (!wallet) return {};
 
     const { uid, ...balances } = wallet;
+
+    // An agent's player runs on INR alone (user, 2026-10-17): no other coin is listed for them.
+    if (await isAgentPlayer(userId)) return { INR: money.fromStored(balances.inr ?? '0') };
     /**
      * Canonical decimal strings, so a client never sees "0" for one currency
      * and "0.00000000" for another.

@@ -174,7 +174,7 @@ const UsersPage = () => {
 
   return (
     <div>
-      <PageHeader title='Users' description='Manage direct users and agent-system accounts with per-user risk controls' />
+      <PageHeader title='Users' description={house ? 'Manage direct users and agent-system accounts with per-user risk controls' : 'Manage your users with per-user risk controls'} />
       <Tabs value={section} onValueChange={v => select(v as Section)}>
         <div className='mb-4 flex flex-wrap items-center gap-3'>
           {sections.length > 1 && (

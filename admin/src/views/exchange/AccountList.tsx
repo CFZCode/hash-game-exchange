@@ -198,7 +198,7 @@ const AccountList = () => {
     <div>
       <PageHeader
         title='Account List'
-        description={parentId ? 'Downline of the selected account (view only).' : 'Your direct accounts. Deposit / Withdraw moves credit; Settlement settles the Client(P/L).'}
+        description={parentId ? 'Downline of the selected account (view only).' : 'Your accounts. Deposit / Withdraw moves credit; Settlement settles the Client(P/L).'}
       />
       <AccountListBody channel='agent' />
     </div>
