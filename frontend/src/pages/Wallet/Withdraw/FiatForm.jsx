@@ -103,7 +103,7 @@ function SubmittedPop({ onClose }) {
   return (
     <PopCenter open onClose={onClose} label="Withdraw">
       <div className="space-y-4 text-center">
-        <p className="text-gray-700">
+        <p className="text-secondary">
           To check the result of withdraw, please go to
           <Link
             className="hover:text-brand-dark mx-1 text-brand underline transition-colors"

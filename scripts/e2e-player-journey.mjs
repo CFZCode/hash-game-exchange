@@ -68,6 +68,8 @@ try {
     firstDepositBonus: { enabled: true, tiers, wagerMultiplier: fd.wagerMultiplier ?? null, expiryDays: fd.expiryDays ?? 30 },
   })
   if (!check('enable first-deposit bonus', on.status === 200, `${on.status} ${on.code ?? ''}`)) throw new Error('stop')
+  // user-service caches the welcome-bonus terms for 5 s (bonus/welcomeBonusSettings.js): wait them out.
+  await new Promise((r) => setTimeout(r, 6000))
 
   // ── 2. SIGNUP ─────────────────────────────────────────────────────────────
   const username = `e2e${RUN}`
