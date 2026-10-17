@@ -208,7 +208,7 @@ function VipCard() {
      looking the level up in the captured ladder printed bc.game's tier names. Null in fixture
      mode, so the values above are what renders there. */
   const { data: standing } = useResource(getVipStanding);
-  const cur = useSelectedCurrency();
+  const cur = useSelectedCurrency({ site: true });
   /* Live: the distance is WAGER in money, printed in the selected currency, not bc.game's XP. */
   let toNextLabel = null;
   if (standing) {

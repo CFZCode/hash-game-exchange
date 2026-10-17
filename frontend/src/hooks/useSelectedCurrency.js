@@ -1,7 +1,8 @@
 import React from 'react';
 import { useSession } from '../context/session';
 import { getUsdPrice } from '../data/usdPrice';
-import { convertCurrency, getAlias, printCurrency } from '../utils/currency';
+import { convertCurrency, getAlias, printCurrency, walletCode } from '../utils/currency';
+import { useSiteCurrency } from './useSiteCurrency';
 
 /**
  * The currency every amount on the player site is SHOWN in, and the helpers that put a figure
@@ -22,12 +23,17 @@ import { convertCurrency, getAlias, printCurrency } from '../utils/currency';
  *   cur.convert(row.amount, 'INRFIAT')     // a number in the selected currency, for maths
  *   cur.toSource(typed, 'INRFIAT')         // a typed amount back into what the backend takes
  */
-export function useSelectedCurrency() {
+export function useSelectedCurrency({ site = false } = {}) {
   const { session } = useSession();
+  const siteCode = useSiteCurrency();
   const setting = session?.setting ?? {};
   const signedIn = Boolean(session?.login);
+  // `site`: bonus / promotion / VIP / wager figures always read in the owner's default coin
+  // (owner panel `default_currency`), whatever the player picked in the header.
   const code = String(
-    (setting.enableLocaleCurrency && setting.localeCurrencyName) || (signedIn && setting.currencyName) || 'USDT'
+    site
+      ? walletCode(siteCode || 'USDT')
+      : (setting.enableLocaleCurrency && setting.localeCurrencyName) || (signedIn && setting.currencyName) || 'USDT'
   ).toUpperCase();
   const rate = getUsdPrice(code);
 

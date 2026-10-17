@@ -82,7 +82,7 @@ export default function LevelCard({ session }) {
   /* LIVE: the platform's own standing replaces the three printed values — see
      services/vip.js. Null in fixture mode, so the lines above are what renders there. */
   const { data: standing } = useResource(getVipStanding);
-  const cur = useSelectedCurrency();
+  const cur = useSelectedCurrency({ site: true });
   let fullName = tier.fullName;
   let family = tier.base;
   if (standing) {

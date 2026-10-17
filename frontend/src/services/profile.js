@@ -181,8 +181,10 @@ export function getUserProfile(userId, account) {
               winNum: row.wins ?? PROFILE_DEFAULT.winNum,
             }
           : {}),
-        /* Only your OWN wagered total is readable — the public profile carries no money. */
+        /* Only your OWN wagered total is readable — the public profile carries no money. Your own
+           bets / wins come from the same read: casino AND sports, where the public row may be casino only. */
         ...(stats?.wagered?.usd != null ? { betAmountUsd: String(stats.wagered.usd) } : {}),
+        ...(typeof stats?.bets === 'number' ? { betNum: stats.bets, winNum: stats.wins ?? 0 } : {}),
       }));
   }
 

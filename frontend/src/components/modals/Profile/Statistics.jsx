@@ -74,7 +74,7 @@ export default function Statistics({ onClose, enter }) {
   const [params] = useSearchParams();
   const { session } = useSession();
   // Wagered totals are USD by design; printed in the viewer's selected currency.
-  const cur = useSelectedCurrency();
+  const cur = useSelectedCurrency({ site: true });
   const { agentPlayer } = useGates();
 
   const userId = Number(params.get('userId') || '0');

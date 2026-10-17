@@ -73,7 +73,7 @@ const walletKey = (code) => {
    contest's currency; the contest's own formatting above when that currency has no price.
    `pool` keeps the headline's two decimals. */
 function useContestMoney(currency) {
-  const cur = useSelectedCurrency();
+  const cur = useSelectedCurrency({ site: true });
   const src = walletKey(currency);
   return (value, pool = false) =>
     cur.canConvert(src)

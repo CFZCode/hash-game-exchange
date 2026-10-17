@@ -93,6 +93,18 @@ class ProfileService {
     } catch (error) {
       this.logger?.warn({ err: error, userId: String(userId) }, 'public profile stats unavailable');
     }
+    // Sports bets count too (sportsbook's own profile-stats, per currency); a sports outage leaves the casino counts.
+    if (stats && this.clients.sports) {
+      try {
+        const sports = await this.clients.sports.get(`/internal/sports/wager/player/${userId}/profile-stats`);
+        for (const row of sports?.byCurrency ?? []) {
+          stats.bets += Number(row.bets) || 0;
+          stats.wins += Number(row.wins) || 0;
+        }
+      } catch (error) {
+        this.logger?.warn({ err: error, userId: String(userId) }, 'public profile sports stats unavailable');
+      }
+    }
 
     return {
       userId: String(user.id),

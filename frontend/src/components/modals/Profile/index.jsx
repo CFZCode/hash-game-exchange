@@ -178,7 +178,7 @@ function MedalsCard({ profile, userId }) {
    by one word there ("Total Bets" against "Total Bet Counts") and the icons are the same four. */
 function StatisticsCard({ profile, userId, userName, hideWagered }) {
   // Wagered is USD by design; printed in the viewer's selected currency.
-  const cur = useSelectedCurrency();
+  const cur = useSelectedCurrency({ site: true });
   const navigate = useNavigate();
 
   const cells = [
@@ -237,7 +237,7 @@ function StatisticsCard({ profile, userId, userName, hideWagered }) {
    cover, which the site replaces rather than showing. `detail_ko` is the Korean twin and is
    deliberately not fetched, for the reason the VIP page's light backdrops are not. */
 function FavouriteGame({ item, hideWagered }) {
-  const cur = useSelectedCurrency();
+  const cur = useSelectedCurrency({ site: true });
   const navigate = useNavigate();
 
   const href = () => {

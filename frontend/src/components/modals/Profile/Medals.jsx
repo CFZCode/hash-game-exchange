@@ -96,7 +96,7 @@ const REWARD_LINES = [
 
 function RewardsTooltip() {
   // The rewards are USD by design; printed in the viewer's selected currency.
-  const cur = useSelectedCurrency();
+  const cur = useSelectedCurrency({ site: true });
   return (
     <>
       {REWARD_LINES.map((line) => (

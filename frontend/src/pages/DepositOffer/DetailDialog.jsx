@@ -84,7 +84,7 @@ const PANEL_EDGE = {
 /* The minimum deposit in the viewer's selected currency (selected-currency skill), converted from
    the offer's own currency; printed as the offer wrote it when that currency has no price. */
 function useMinDeposit(value, currency) {
-  const cur = useSelectedCurrency();
+  const cur = useSelectedCurrency({ site: true });
   const c = String(currency ?? '').toUpperCase();
   const src = isFiatCode(c) ? `${c}FIAT` : c;
   return cur.canConvert(src) ? cur.show(value, src, { precision: 2 }) : `${value} ${currency}`;

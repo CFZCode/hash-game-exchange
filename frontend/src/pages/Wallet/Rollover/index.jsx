@@ -188,7 +188,7 @@ const rolloverTypeLabel = (isBuy, taskType, taskTypeDesc) =>
 /* The turnover cell: wagered so far / the target, and a progress bar under it. `originalAmount`
    is the target (services/rollover.js); `wagered` rides along on the row. */
 function Turnover({ item }) {
-  const cur = useSelectedCurrency();
+  const cur = useSelectedCurrency({ site: true });
   const target = Number(item.originalAmount) || 0;
   const wagered = Math.max(0, Number(item.wagered) || 0);
   const pct = target > 0 ? Math.min(100, (wagered / target) * 100) : 100;
@@ -213,7 +213,7 @@ const usd = (amount, cur) => cur.show(Number(amount) || 0, 'USDFIAT');
 /* The account's turnover at a glance (user's request, 2026-10-16), above the table and shown even
    before a deposit: wagered so far, the required turnover (deposits x multiplier) and what is left. */
 function TurnoverSummary() {
-  const cur = useSelectedCurrency();
+  const cur = useSelectedCurrency({ site: true });
   const { data } = useResource(getWagerProgress);
   if (!data) return null;
   const target = Number(data.target) || 0;

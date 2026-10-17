@@ -138,7 +138,7 @@ const IconChevron = ({ className = '' }) => (
 function FreePlayRow({ item }) {
   const navigate = useNavigate();
   const { session, setSetting } = useSession();
-  const cur = useSelectedCurrency();
+  const cur = useSelectedCurrency({ site: true });
 
   const isFreeSpin = item.bonusType === 'Free Spin';
   const isBti = item.provider === 'bti';

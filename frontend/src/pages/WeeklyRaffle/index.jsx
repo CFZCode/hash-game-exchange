@@ -69,7 +69,7 @@ import './WeeklyRaffle.css';
    viewer's selected currency (selected-currency skill). Each component takes `money` from the
    hook, so the call sites read as before. */
 function useRaffleMoney() {
-  const cur = useSelectedCurrency();
+  const cur = useSelectedCurrency({ site: true });
   return (value) => cur.show(value, 'USDFIAT', { precision: 2, minDecimals: 2 });
 }
 
