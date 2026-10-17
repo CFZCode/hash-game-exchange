@@ -34,6 +34,8 @@ const accounts = {
       ...paging,
       parentId: id.optional(),
       search: z.string().trim().max(100).optional(),
+      // Direct Users | Agent Users tab; na ho = dono
+      channel: z.enum(['direct', 'agent']).optional(),
     })
     .strict(),
 };

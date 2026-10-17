@@ -149,7 +149,7 @@ class ExchangeService {
    * Direct children ki list (zip `users/all-details`).
    * `parentId` do to us staff ke children — wo staff login wale ke tree me hona chahiye.
    */
-  async accounts({ actor, parentId, search, limit, offset }) {
+  async accounts({ actor, parentId, search, channel, limit, offset }) {
     let listOf = Number(actor.id);
     if (parentId && Number(parentId) !== listOf) {
       const staffIds = await this.#treeStaffIds(actor);
@@ -159,7 +159,7 @@ class ExchangeService {
 
     // Direct users (koi parent nahi) owner ke apne children hain.
     const withDirectUsers = Boolean(actor.canIssueFunds) && listOf === Number(actor.id);
-    const result = await listChildren(this.sequelize, { parentId: listOf, withDirectUsers, search, limit, offset });
+    const result = await listChildren(this.sequelize, { parentId: listOf, withDirectUsers, search, channel, limit, offset });
 
     // `me` — D/W modal ki pehli line (parent ka naam aur balance).
     const staff = await this.models.Staff.findByPk(actor.id, { attributes: ['name'], raw: true });

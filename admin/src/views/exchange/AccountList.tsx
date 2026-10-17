@@ -1,22 +1,28 @@
 'use client'
 
+import { useState } from 'react'
+
 import Link from 'next/link'
 
-import { FileSpreadsheetIcon, FileTextIcon, PlusIcon } from 'lucide-react'
+import { ArrowLeftRightIcon, FileSpreadsheetIcon, FileTextIcon, HandCoinsIcon, InfoIcon, PlusIcon } from 'lucide-react'
 
+import ChannelTabs, { type Channel } from '@/components/shared/ChannelTabs'
 import DataTable, { type Column } from '@/components/shared/DataTable'
 import PageHeader from '@/components/shared/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { useApi, useListState } from '@/hooks/use-api'
 import { fmt } from './accountMoney'
-import CreditDialog from './CreditDialog'
 import { exportExcel, exportPdf } from './exportList'
+import FundsDialog, { type FundsKind } from './FundsDialog'
 import MoreDialog from './MoreDialog'
 import type { AccountRow, AccountsResponse } from './types'
 
 /** Zip ke "Account Type" label: User, Agent, Master … */
 export const accountTypeLabel = (row: AccountRow) => (row.accountType === 'user' ? 'User' : row.role)
+
+/** Action buttons: halka rangeen pill, hover pe poora rang + glow. */
+const PILL = 'h-7 rounded-full px-3 text-xs ring-1 ring-inset hover:text-white hover:shadow-md hover:-translate-y-px'
 
 const lockSwitch = (on: boolean) => <Switch checked={on} disabled aria-label={on ? 'Locked' : 'Not locked'} />
 
@@ -24,20 +30,26 @@ const lockSwitch = (on: boolean) => <Switch checked={on} disabled aria-label={on
  * Account List — zip ka `users/Users.jsx`.
  *
  * Sirf DIRECT children. Staff ke naam pe click = uske children (drill-down, sirf dekhna — wahan
- * D/W nahi, sirf "P"). D / W = Credit Deposit / Credit Withdraw (`admin/staff/transfer`).
+ * D/W nahi, sirf "P"). Har row pe rangeen button — "Deposit / Withdraw" (simple, `admin/staff/transfer`),
+ * "Settlement" (points settle) — dabane pe zip ke wallet jaisa − / + popup khulta hai; aur More.
+ * Apni list pe Direct Users | Agent Users tab (`channel`); drill-down me tab nahi.
  */
-const AccountList = () => {
+const AccountListBody = ({ channel }: { channel?: Channel }) => {
   const title = 'Account List'
   const { state, set, query } = useListState(['parentId'])
   const limit = Number(query.limit ?? 20)
   const page = Number(query.page ?? 1)
   const parentId = query.parentId || undefined
 
+  // Kis row ka kaun sa popup khula hai (Deposit / Withdraw ya Settlement).
+  const [open, setOpen] = useState<{ row: AccountRow; kind: FundsKind } | null>(null)
+
   const { data, isLoading, isFetching, error } = useApi<AccountsResponse>('admin/exchange/accounts', {
     limit,
     offset: (page - 1) * limit,
     search: query.search || undefined,
-    parentId
+    parentId,
+    channel
   })
 
   const rows = data?.rows ?? []
@@ -61,7 +73,7 @@ const AccountList = () => {
     header: 'CR',
     align: 'right',
 
-    // Sirf number — deposit / withdraw Action ke D / W se.
+    // Sirf number — deposit / withdraw Action menu se.
     cell: r => <span className='text-warning block text-right tabular-nums'>{fmt(r.credit)}</span>
   }
 
@@ -74,14 +86,21 @@ const AccountList = () => {
         // Drill-down list sirf dekhne ke liye: D/W nahi, More ki jagah "P".
         <MoreDialog row={r} profileOnly trigger={<Button size='sm' variant='secondary'>P</Button>} />
       ) : (
-        <div className='flex gap-1'>
-          {data && (
-            <>
-              <CreditDialog mode='deposit' row={r} me={data.me} trigger={<Button size='sm' className='bg-success text-white hover:bg-success/90'>D</Button>} />
-              <CreditDialog mode='withdraw' row={r} me={data.me} trigger={<Button size='sm' variant='destructive'>W</Button>} />
-            </>
-          )}
-          <MoreDialog row={r} trigger={<Button size='sm' variant='secondary'>More</Button>} />
+        <div className='flex gap-1.5'>
+          <Button size='sm' title='Deposit / Withdraw' className={`${PILL} bg-success-soft text-success ring-success/30 hover:bg-success hover:shadow-success/40`} onClick={() => setOpen({ row: r, kind: 'dw' })}>
+            <ArrowLeftRightIcon /> D / W
+          </Button>
+          <Button size='sm' title='Settlement' className={`${PILL} bg-warning-soft text-warning ring-warning/30 hover:bg-warning hover:text-black hover:shadow-warning/40`} onClick={() => setOpen({ row: r, kind: 'settle' })}>
+            <HandCoinsIcon /> Settle
+          </Button>
+          <MoreDialog
+            row={r}
+            trigger={
+              <Button size='sm' title='More details' className={`${PILL} bg-info-soft text-info ring-info/30 hover:bg-info hover:shadow-info/40`}>
+                <InfoIcon /> More
+              </Button>
+            }
+          />
         </div>
       )
   }
@@ -110,11 +129,9 @@ const AccountList = () => {
 
   return (
     <div>
-      <PageHeader
-        title={title}
-        description={parentId ? 'Downline of the selected account (view only).' : 'Your direct accounts. D / W deposits or withdraws credit.'}
-        actions={
-          <div className='flex flex-wrap gap-2'>
+      <DataTable
+        toolbar={
+          <div className='ml-auto flex flex-wrap gap-2'>
             {parentId && (
               <Button variant='outline' onClick={() => set({ parentId: '', page: 1 })}>
                 Back to my list
@@ -131,9 +148,6 @@ const AccountList = () => {
             </Button>
           </div>
         }
-      />
-
-      <DataTable
         columns={columns}
         rows={rows}
         rowKey={r => `${r.accountType}-${r.accountId}`}
@@ -148,6 +162,22 @@ const AccountList = () => {
         onPageChange={p => set({ page: p })}
         onLimitChange={l => set({ limit: l, page: 1 })}
       />
+      {open && data && <FundsDialog kind={open.kind} row={open.row} me={data.me} open onOpenChange={o => !o && setOpen(null)} />}
+    </div>
+  )
+}
+
+const AccountList = () => {
+  const { query } = useListState(['parentId'])
+  const parentId = query.parentId || undefined
+
+  return (
+    <div>
+      <PageHeader
+        title='Account List'
+        description={parentId ? 'Downline of the selected account (view only).' : 'Your direct accounts. Deposit / Withdraw moves credit; Settlement settles the Client(P/L).'}
+      />
+      {parentId ? <AccountListBody /> : <ChannelTabs>{channel => <AccountListBody channel={channel} />}</ChannelTabs>}
     </div>
   )
 }

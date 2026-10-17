@@ -1,13 +1,6 @@
-import { Suspense } from 'react'
+import { redirect } from 'next/navigation'
 
-import DirectUserWallet from '@/views/players/DirectUserWallet'
-
-export const metadata = { title: 'Direct User Wallet' }
-
+// Purana link: Direct User Wallet ab Main → Wallets (`/wallets`) pe hai.
 export default function Page() {
-  return (
-    <Suspense>
-      <DirectUserWallet />
-    </Suspense>
-  )
+  redirect('/wallets')
 }

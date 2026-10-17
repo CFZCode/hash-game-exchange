@@ -22,18 +22,18 @@ class ExchangeReportsService {
     return this.models.Credits.sequelize;
   }
 
-  #tree(actor) {
-    return treeOf(this.models, actor, this.logger);
+  #tree(actor, channel) {
+    return treeOf(this.models, actor, this.logger, channel);
   }
 
   /** "Search By Client Name" ke suggestions. */
-  async clients({ actor, search }) {
-    return searchClients(this.sequelize, await this.#tree(actor), search);
+  async clients({ actor, search, channel }) {
+    return searchClients(this.sequelize, await this.#tree(actor, channel), search);
   }
 
   /** Account Statement (zip statementv2). */
-  async statement({ actor, ...filters }) {
-    return statement(this.sequelize, await this.#tree(actor), actor, filters);
+  async statement({ actor, channel, ...filters }) {
+    return statement(this.sequelize, await this.#tree(actor, channel), actor, filters);
   }
 
   /** Game row par click — Details modal. */
@@ -50,29 +50,22 @@ class ExchangeReportsService {
     return sheet;
   }
 
-  async partyWinLoss({ actor, type, search }) {
-    return partyWinLoss(this.sequelize, await this.#tree(actor), { type, search });
+  async partyWinLoss({ actor, type, search, channel }) {
+    return partyWinLoss(this.sequelize, await this.#tree(actor, channel), { type, search });
   }
 
-  async userWinLoss({ actor, ...filters }) {
-    return userWinLoss(this.sequelize, await this.#tree(actor), filters);
+  async userWinLoss({ actor, channel, ...filters }) {
+    return userWinLoss(this.sequelize, await this.#tree(actor, channel), filters);
   }
 
-  async totalProfitLoss({ actor, ...filters }) {
-    return totalProfitLoss(this.sequelize, await this.#tree(actor), filters);
+  async totalProfitLoss({ actor, channel, ...filters }) {
+    return totalProfitLoss(this.sequelize, await this.#tree(actor, channel), filters);
   }
 
-  async turnover({ actor, ...filters }) {
-    return turnover(this.sequelize, await this.#tree(actor), filters);
+  async turnover({ actor, channel, ...filters }) {
+    return turnover(this.sequelize, await this.#tree(actor, channel), filters);
   }
 
-  /**
-   * SportBook Report — zip me iska backend tha hi nahi (provider list khaali).
-   * Hamare paas bhi koi sportbook provider nahi, isliye hamesha khaali list.
-   */
-  async sportbookReport() {
-    return [];
-  }
 }
 
 module.exports = { ExchangeReportsService };

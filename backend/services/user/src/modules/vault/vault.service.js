@@ -6,7 +6,7 @@ const { Op, fn, col } = require('@ibitplay/db');
 const errors = require('./vault.errors');
 const { WalletService } = require('../wallet/wallet.service');
 const { REASON } = require('../wallet/wallet.constants');
-const { ownerWhere } = require('../directory/playerScope');
+const { ownerWhere, withChannel } = require('../directory/playerScope');
 
 /**
  * Vault Pro — fixed-term, interest-bearing deposits.
@@ -397,9 +397,9 @@ class VaultService {
    */
 
   /** @legacy GET /vaultpro/admin/vault/users */
-  async listVaultUsers({ staff, limit, offset }) {
+  async listVaultUsers({ staff, channel, limit, offset }) {
     const result = await this.models.VaultPro.findAndCountAll({
-      where: { status: { [Op.ne]: 'withdrawn' }, ...(await ownerWhere(this, staff?.id, 'userid')) },
+      where: withChannel({ status: { [Op.ne]: 'withdrawn' }, ...(await ownerWhere(this, staff?.id, 'userid')) }, 'userid', channel),
       order: [['id', 'DESC']],
       limit,
       offset,
@@ -466,9 +466,9 @@ class VaultService {
   }
 
   /** @legacy GET /vaultpro/admin/vault/interest-history */
-  async listAllInterest({ staff, limit, offset }) {
+  async listAllInterest({ staff, channel, limit, offset }) {
     const result = await this.models.VaultInterestHistory.findAndCountAll({
-      where: await ownerWhere(this, staff?.id, 'userid'),
+      where: withChannel(await ownerWhere(this, staff?.id, 'userid'), 'userid', channel),
       order: [['id', 'DESC']],
       limit,
       offset,

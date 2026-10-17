@@ -59,6 +59,8 @@ const ipTrackerQuery = () =>
       ip: z.string().trim().min(1).max(64).regex(/^[0-9a-fA-F.:]+\*?$/, 'Not an IP address or prefix').optional(),
       country: z.string().trim().min(2).max(80).optional(),
       source: z.enum(['login', 'register']).optional(),
+      /** Direct Users | Agent Users tab. Na ho = dono. */
+      channel: z.enum(['direct', 'agent']).optional(),
       from: day.optional(),
       to: day.optional(),
       proxyOnly: z

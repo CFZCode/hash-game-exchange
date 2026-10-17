@@ -286,6 +286,16 @@ test('admin notifications', async (t) => {
     assert.ok('email' in list.rows[0]);
   });
 
+  await t.test('device listing channel: agent keeps a tree player, direct drops them', async () => {
+    const v = require('../notifications.validators');
+    assert.equal(v.listDevices.query.parse({ channel: 'agent' }).channel, 'agent');
+    const uid = newUid();
+    await seedPlayer(uid); // parent_staff_id = staff tree → agent
+    const svc = build(makePush());
+    assert.equal((await svc.listDevices({ staff, userId: uid, channel: 'agent' })).rows.length, 1);
+    await assert.rejects(() => svc.listDevices({ staff, userId: uid, channel: 'direct' }));
+  });
+
   await t.test('marking read records WHEN, and only once', async () => {
     // Legacy stored `is_read` as a bare boolean, so "when did they see it" had
     // no answer.

@@ -24,6 +24,7 @@ import { api } from '@/lib/api/client'
 import { check } from '@/lib/validate'
 import { allConvertedLabel, useFinanceFilters } from './currencyFilter'
 import FinanceStatsPanel from './FinanceStatsPanel'
+import ListStatsTabs from './ListStatsTabs'
 import { Details, ImageDialog, ViewDialog, stop } from './shared'
 import { FIAT_CURRENCIES, type FiatDepositRow } from './types'
 import { useOwnerCoinFilter } from './useCurrencyCodes'
@@ -194,6 +195,8 @@ const FiatDeposits = () => {
   const ownerCoins = useOwnerCoinFilter()
 
   const list = usePagedApi<FiatDepositRow>(LIST, {
+    // Agent ke users ye use nahi kar sakte — sirf direct users.
+    channel: 'direct',
     limit: query.limit,
     page: query.page,
     status: query.status,
@@ -204,42 +207,41 @@ const FiatDeposits = () => {
 
   return (
     <div>
-      <PageHeader title='Fiat deposits' description='Manual bank-transfer deposits awaiting review. Approving credits the user; rejecting records a reason they can see.' />
+      <PageHeader title='Manual deposits' description='Manual bank-transfer deposits awaiting review. Approving credits the user; rejecting records a reason they can see.' />
       <FilterBar filters={filters} currencies={ownerCoins(FIAT_CURRENCIES)} allCurrenciesLabel={allConvertedLabel(filters.defaultCurrency)} className='mb-4' />
-      {can('reports:read') && (
-        <FinanceStatsPanel kind='deposits' rail='fiat' filters={filters} statusLabels={{ success: 'Successful', pending: 'Pending', failed: 'Failed' }} />
-      )}
-      <DataTable
-        columns={columns}
-        rows={list.data?.rows}
-        rowKey={r => r.depositId}
-        loading={list.isLoading}
-        fetching={list.isFetching}
-        error={list.error}
-        pagination={list.data?.pagination}
-        onPageChange={page => set({ page })}
-        onLimitChange={limit => set({ limit })}
-        search={String(state.search ?? '')}
-        onSearchChange={search => set({ search })}
-        searchPlaceholder='Bank reference, holder…'
-        emptyMessage={state.status ? `No ${state.status} deposits.` : 'No deposits.'}
-        toolbar={
-          <>
-            <Select value={String(state.status || 'all')} onValueChange={v => v && set({ status: v === 'all' ? '' : v })}>
-              <SelectTrigger className='w-36'>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value='all'>All statuses</SelectItem>
-                <SelectItem value='pending'>Pending</SelectItem>
-                <SelectItem value='approved'>Approved</SelectItem>
-                <SelectItem value='rejected'>Rejected</SelectItem>
-              </SelectContent>
-            </Select>
-            <Input placeholder='User id' inputMode='numeric' aria-label='User id' value={String(state.userId ?? '')} onChange={e => set({ userId: e.target.value.replace(/\D/g, '') })} className='w-28' />
-          </>
-        }
-      />
+      <ListStatsTabs stats={can('reports:read') ? <FinanceStatsPanel kind='deposits' rail='fiat' filters={filters} statusLabels={{ success: 'Successful', pending: 'Pending', failed: 'Failed' }} /> : null}>
+        <DataTable
+          columns={columns}
+          rows={list.data?.rows}
+          rowKey={r => r.depositId}
+          loading={list.isLoading}
+          fetching={list.isFetching}
+          error={list.error}
+          pagination={list.data?.pagination}
+          onPageChange={page => set({ page })}
+          onLimitChange={limit => set({ limit })}
+          search={String(state.search ?? '')}
+          onSearchChange={search => set({ search })}
+          searchPlaceholder='Bank reference, holder…'
+          emptyMessage={state.status ? `No ${state.status} deposits.` : 'No deposits.'}
+          toolbar={
+            <>
+              <Select value={String(state.status || 'all')} onValueChange={v => v && set({ status: v === 'all' ? '' : v })}>
+                <SelectTrigger className='w-36'>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='all'>All statuses</SelectItem>
+                  <SelectItem value='pending'>Pending</SelectItem>
+                  <SelectItem value='approved'>Approved</SelectItem>
+                  <SelectItem value='rejected'>Rejected</SelectItem>
+                </SelectContent>
+              </Select>
+              <Input placeholder='User id' inputMode='numeric' aria-label='User id' value={String(state.userId ?? '')} onChange={e => set({ userId: e.target.value.replace(/\D/g, '') })} className='w-28' />
+            </>
+          }
+        />
+      </ListStatsTabs>
     </div>
   )
 }

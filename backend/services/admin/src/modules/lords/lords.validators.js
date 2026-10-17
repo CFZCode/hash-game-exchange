@@ -93,6 +93,8 @@ const transferStatement = {
     accountId: id.optional(),
     from: z.coerce.date().optional(),
     to: z.coerce.date().optional(),
+    // Direct Users | Agent Users tab; na ho = dono
+    channel: z.enum(['direct', 'agent']).optional(),
   }),
 };
 

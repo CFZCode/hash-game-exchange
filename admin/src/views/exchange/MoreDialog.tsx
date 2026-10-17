@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { useApiMutation } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
-import { CreditHistory } from './CreditDialog'
+import CreditHistory from './CreditHistory'
 import { fmt, SETTLE_INVALIDATE } from './accountMoney'
 import type { AccountRow } from './types'
 
@@ -183,7 +183,15 @@ const TABS = [
  * More — zip ka `components/MoreModal.jsx`: account ki poori jaankari, password, lock, credit history.
  * Drill-down list me sirf Profile ("P" button).
  */
-const MoreDialog = ({ row, trigger, profileOnly = false }: { row: AccountRow; trigger: ReactNode; profileOnly?: boolean }) => {
+type MoreDialogProps = {
+  row: AccountRow
+  profileOnly?: boolean
+
+  /** Button jo popup kholta hai (drill-down ka "P", list ka More icon). */
+  trigger: ReactNode
+}
+
+const MoreDialog = ({ row, trigger, profileOnly = false }: MoreDialogProps) => {
   const [open, setOpen] = useState(false)
   const [tab, setTab] = useState<(typeof TABS)[number]['key']>('profile')
   const tabs = profileOnly ? TABS.slice(0, 1) : TABS

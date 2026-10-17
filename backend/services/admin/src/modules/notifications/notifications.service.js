@@ -95,8 +95,8 @@ class NotificationsService {
    * Scoped to the caller's tree, paged, and the token itself is truncated —
    * enough to identify a row in a support conversation, not enough to use.
    */
-  async listDevices({ staff, userId, activeOnly = true, limit = 50, offset = 0 }) {
-    const visible = await this.#visibleUserIds(staff);
+  async listDevices({ staff, userId, activeOnly = true, channel, limit = 50, offset = 0 }) {
+    const visible = await this.#visibleUserIds(staff, channel);
     const scope = userId ? [this.#assertVisible(visible, userId)] : visible;
 
     const { rows, count } = await this.models.UserFcmToken.findAndCountAll({
@@ -578,14 +578,17 @@ class NotificationsService {
     return out;
   }
 
-  async #visibleUserIds(staff) {
+  /** `channel` (devices list ka Direct Users | Agent Users tab): direct = koi parent nahi, agent = agent ke neeche. */
+  async #visibleUserIds(staff, channel) {
     const staffIds = await visibleStaffIds(this.models, staff.id, { logger: this.logger });
     const includeUnassigned = staffIds.map(Number).includes(1);
+    const tree = includeUnassigned
+      ? { [Op.or]: [{ parent_staff_id: staffIds }, { parent_staff_id: null }] }
+      : { parent_staff_id: staffIds };
+    const tab = channel === 'direct' ? { parent_staff_id: null } : channel === 'agent' ? { parent_staff_id: { [Op.ne]: null } } : null;
 
     const users = await this.models.Users.findAll({
-      where: includeUnassigned
-        ? { [Op.or]: [{ parent_staff_id: staffIds }, { parent_staff_id: null }] }
-        : { parent_staff_id: staffIds },
+      where: tab ? { [Op.and]: [tree, tab] } : tree,
       attributes: ['id'],
       raw: true,
     });

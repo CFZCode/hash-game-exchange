@@ -36,13 +36,15 @@ const myCodes = {
 
 // ── Staff ─────────────────────────────────────────────────────────────
 
-const listRecords = { query: paging.extend({ userId: userId.optional() }) };
+// `channel`: Direct Users | Agent Users — na ho to sab (purana jawab). Admin sirf direct bhejta hai.
+const listRecords = { query: paging.extend({ userId: userId.optional(), channel: z.enum(['direct', 'agent']).optional() }) };
 
 const listAwards = {
   query: paging.extend({
     userId: userId.optional(),
     type: bonusType.optional(),
     claimed: z.coerce.boolean().optional(),
+    channel: z.enum(['direct', 'agent']).optional(),
   }),
 };
 
@@ -50,6 +52,7 @@ const listCodes = {
   query: paging.extend({
     userId: userId.optional(),
     status: z.enum(['active', 'redeemed', 'expired', 'superseded']).optional(),
+    channel: z.enum(['direct', 'agent']).optional(),
   }),
 };
 

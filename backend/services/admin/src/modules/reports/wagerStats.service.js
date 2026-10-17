@@ -148,7 +148,7 @@ class WagerStatsService {
     this.config = config;
   }
 
-  async stats({ staff, area, currency, ...query }) {
+  async stats({ staff, area, currency, channel, ...query }) {
     const window = S.resolveWindow(query);
 
     const [scope, buckets, rates] = await Promise.all([
@@ -163,17 +163,26 @@ class WagerStatsService {
     const data = empty
       ? { series: [], items: [], uniqueUsers: 0 }
       : area === 'casino'
-        ? await this.#casino(scope, currency, replacements)
-        : await this.#sports(scope, currency, replacements);
+        ? await this.#casino(this.#owned(scope, channel), currency, replacements)
+        : await this.#sports(this.#owned(scope, channel), currency, replacements);
 
     return this.#fold({ area, window, buckets, rates, currency, ...data });
   }
 
   // ══════════════════════════════════════════════════════════════════════
 
-  async #casino(scope, currency, replacements) {
+  /**
+   * Player ka scope SQL — tree (`S.scopeSql`) + Direct Users | Agent Users tab (`channel`).
+   * Channel na ho = pehle jaisa.
+   */
+  #owned(scope, channel) {
+    const tab = channel ? ` AND u.parent_staff_id IS ${channel === 'direct' ? '' : 'NOT '}NULL` : '';
+    return (column) => S.scopeSql(column, scope) + (tab ? ` AND ${column} IN (SELECT u.id FROM users u WHERE TRUE${tab})` : '');
+  }
+
+  async #casino(owned, currency, replacements) {
     const filters = (s) =>
-      `${S.windowSql(s.time)}${S.scopeSql(s.owner, scope)}${s.where}${currency ? ` AND ${s.currencySql} = :currency` : ''}`;
+      `${S.windowSql(s.time)}${owned(s.owner)}${s.where}${currency ? ` AND ${s.currencySql} = :currency` : ''}`;
     const currencyExpr = (s) => s.currencySql;
     const stats = (s) =>
       `${s.bets}::int AS bets, ${s.paidWins}::int AS "paidWins", ${s.refunds}::int AS refunds,
@@ -257,8 +266,8 @@ class WagerStatsService {
 
   // ══════════════════════════════════════════════════════════════════════
 
-  async #sports(scope, currency, replacements) {
-    const betFilters = `${S.windowSql('created_at')}${S.scopeSql('user_id', scope)}${currency ? ` AND ${SPORTS_CURRENCY} = :currency` : ''}`;
+  async #sports(owned, currency, replacements) {
+    const betFilters = `${S.windowSql('created_at')}${owned('user_id')}${currency ? ` AND ${SPORTS_CURRENCY} = :currency` : ''}`;
     const betStats = `COUNT(*) FILTER (WHERE ${SETTLED})::int AS bets,
        COUNT(*) FILTER (WHERE LOWER(result_status) = 'won')::int AS "paidWins",
        COUNT(*) FILTER (WHERE LOWER(result_status) = 'refund')::int AS refunds,
@@ -274,7 +283,7 @@ class WagerStatsService {
     // `wagered`, so whatever it was paid is not in `won` either.
     const payoutFilters = `${S.windowSql('l.created_at')} AND l.bet_id IS NOT NULL AND l.amount > 0
       AND COALESCE(l.reason, '') NOT IN ('BET_REFUND', 'BET_ROLLBACK')
-      AND LOWER(COALESCE(b.result_status, '')) NOT IN ('refund', 'refunded', 'voided_after_settlement')${S.scopeSql('b.user_id', scope)}${
+      AND LOWER(COALESCE(b.result_status, '')) NOT IN ('refund', 'refunded', 'voided_after_settlement')${owned('b.user_id')}${
       currency ? ` AND UPPER(COALESCE(NULLIF(b.original_currency, ''), 'USD')) = :currency` : ''
     }`;
     const market = `COALESCE(NULLIF(UPPER(game_type), ''), 'OTHER')`;

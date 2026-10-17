@@ -1,5 +1,6 @@
 'use strict';
 
+const { Op, literal } = require('sequelize');
 const { defineErrors } = require('@ibitplay/common');
 
 /**
@@ -94,4 +95,18 @@ async function assertPlayerVisible(deps, staffId, userId) {
   if (!player) throw errors.PLAYER_NOT_IN_YOUR_TREE({ userId });
 }
 
-module.exports = { visibleStaff, visibleUserIds, ownerWhere, assertPlayerVisible, errors };
+/** `channel` → users ki SQL shart: direct = koi parent nahi, agent = Sports Exchange agent ke neeche. */
+const CHANNEL_SQL = { direct: 'parent_staff_id IS NULL', agent: 'parent_staff_id IS NOT NULL' };
+
+/**
+ * Direct Users | Agent Users tab — listing ke `where` me ek aur shart jodo: `column` ka player
+ * us channel ka ho. `channel` na ho to `where` jaisa tha waisa (purana jawab). `text: true` jab
+ * column VARCHAR ho (`user_kyc.user_id`, `p2p_orders.user_id`).
+ */
+function withChannel(where, column, channel, { text = false } = {}) {
+  if (!CHANNEL_SQL[channel]) return where;
+  const ids = literal(`(SELECT id${text ? '::text' : ''} FROM users WHERE ${CHANNEL_SQL[channel]})`);
+  return { ...where, [Op.and]: [...(where[Op.and] ?? []), { [column]: { [Op.in]: ids } }] };
+}
+
+module.exports = { visibleStaff, visibleUserIds, ownerWhere, assertPlayerVisible, withChannel, CHANNEL_SQL, errors };

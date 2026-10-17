@@ -275,4 +275,16 @@ test('ip tracker against a database', async (t) => {
     assert.equal((await service.sharedIps({ staff: asA, ip: SHARED, from: '2026-01-06' })).total, 0);
     assert.equal((await service.sharedIps({ staff: asA, ip: SHARED, proxyOnly: true })).total, 0);
   });
+
+  // ── Direct Users | Agent Users tab ───────────────────────────────────
+
+  await t.test('channel: agent keeps agent players, direct drops them; absent = both', async () => {
+    assert.equal(v.ipTracker.query.parse({ channel: 'direct' }).channel, 'direct');
+    assert.throws(() => v.ipTracker.query.parse({ channel: 'x' }));
+    const agent = await service.ipTracker({ staff: asOwner, ip: SHARED, channel: 'agent', limit: 100 });
+    assert.deepEqual(userIds(agent), players.map(String).sort());
+    const direct = await service.ipTracker({ staff: asOwner, ip: SHARED, channel: 'direct', limit: 100 });
+    assert.equal(direct.rows.filter((r) => players.map(String).includes(r.user.id)).length, 0);
+    assert.equal((await service.sharedIps({ staff: asOwner, ip: SHARED, channel: 'direct' })).rows.filter((r) => r.ipAddress === SHARED && r.accounts > 1 && r.users.some((u) => players.map(String).includes(u.id))).length, 0);
+  });
 });

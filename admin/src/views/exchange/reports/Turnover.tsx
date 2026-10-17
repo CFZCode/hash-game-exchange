@@ -4,6 +4,7 @@ import { useState, type FormEvent } from 'react'
 
 import { toast } from 'sonner'
 
+import ChannelTabs, { type Channel } from '@/components/shared/ChannelTabs'
 import PageHeader from '@/components/shared/PageHeader'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { DatePicker } from '@/components/ui/date-picker'
@@ -41,7 +42,7 @@ const valuesOf = (r: TurnoverResult) => [r.loss_turnover, r.loss, r.win_turnover
  * Range + sport (+ game type) ki bets: jeeti / haari bets ki liability (Turn Over)
  * aur ledger ka Win / Loss. Type aur Sports List zaroori (laal outline).
  */
-const Turnover = () => {
+const TurnoverReport = ({ channel }: { channel: Channel }) => {
   const initial = defaultRange()
   const [client, setClient] = useState<Client | null>(null)
   const [fromDate, setFromDate] = useState(initial.from)
@@ -78,7 +79,7 @@ const Turnover = () => {
     try {
       const res = await withMinimumDelay(
         api.post<TurnoverResult>('admin/exchange/reports/turnover', {
-          ...clientBody(client),
+          ...clientBody(client), channel,
           fromDate,
           toDate,
           sportId: sportVal,
@@ -122,7 +123,6 @@ const Turnover = () => {
 
   return (
     <div>
-      <PageHeader title='Turnover Report' />
 
       <ReportCard>
         <div className='space-y-4 border-b p-4'>
@@ -133,7 +133,7 @@ const Turnover = () => {
           <form onSubmit={handleLoad} className='space-y-4'>
             <div className='grid gap-4 md:grid-cols-3 lg:grid-cols-6'>
               <FilterField label='Search By Client Name'>
-                <ClientSearch value={client} onChange={setClient} />
+                <ClientSearch value={client} onChange={setClient} channel={channel} />
               </FilterField>
               <FilterField label='From Date:'>
                 <DatePicker value={fromDate} onChange={setFromDate} max={initial.to} clearable={false} />
@@ -189,5 +189,13 @@ const Turnover = () => {
     </div>
   )
 }
+
+/** Upar Direct Users | Agent Users tab — dono ka report alag (API ko `channel`). */
+const Turnover = () => (
+  <div>
+    <PageHeader title='Turnover Report' />
+    <ChannelTabs>{channel => <TurnoverReport channel={channel} />}</ChannelTabs>
+  </div>
+)
 
 export default Turnover

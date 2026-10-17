@@ -125,7 +125,7 @@ const recordColumns: Column<BonusRecord>[] = [
 
 const Records = ({ userId }: { userId: string }) => {
   const { page, limit, set } = useLocalList()
-  const list = usePagedApi<BonusRecord>('admin/user/bonus/records', { limit, page, userId: userId || undefined })
+  const list = usePagedApi<BonusRecord>('admin/user/bonus/records', { channel: 'direct', limit, page, userId: userId || undefined })
   const [create, setCreate] = useState({ userId: '', name: '' })
   const [edit, setEdit] = useState<{ userId: string } & Record<BonusType, string>>({ userId: '', daily: '', weekly: '', monthly: '' })
   const [inspectId, setInspectId] = useState<string | null>(null)
@@ -307,7 +307,7 @@ const pickCounters = (v: Record<string, string>) => {
 
 const Games = ({ userId }: { userId: string }) => {
   const { page, limit, set } = useLocalList()
-  const list = usePagedApi<BonusGameRow>('admin/user/bonus/games', { limit, page, userId: userId || undefined })
+  const list = usePagedApi<BonusGameRow>('admin/user/bonus/games', { channel: 'direct', limit, page, userId: userId || undefined })
   const [create, setCreate] = useState<Record<string, string>>({ userId: '' })
   const [grant, setGrant] = useState<Record<string, string>>({ userId: '', note: '' })
 
@@ -412,7 +412,7 @@ const Games = ({ userId }: { userId: string }) => {
 
 const Events = ({ userId }: { userId: string }) => {
   const { page, limit, set } = useLocalList()
-  const list = usePagedApi<BonusEvent>('admin/user/bonus/events', { limit, page, userId: userId || undefined })
+  const list = usePagedApi<BonusEvent>('admin/user/bonus/events', { channel: 'direct', limit, page, userId: userId || undefined })
   const [create, setCreate] = useState({ userId: '', event: '', amount: '' })
   const [edit, setEdit] = useState({ id: 0, event: '', amount: '' })
 
@@ -517,6 +517,8 @@ const Awards = ({ userId }: { userId: string }) => {
   const [claimed, setClaimed] = useState('all')
 
   const list = usePagedApi<BonusAward>('admin/user/bonus/awards', {
+    // Agent ke users ye use nahi kar sakte — sirf direct users.
+    channel: 'direct',
     limit,
     page,
     userId: userId || undefined,

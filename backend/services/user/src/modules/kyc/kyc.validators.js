@@ -43,6 +43,8 @@ const listApplications = {
   query: z.object({
     status: z.enum(KYC_STATUSES).optional(),
     search: z.string().trim().max(100).optional(),
+    // Direct Users | Agent Users — na ho to sab (purana jawab).
+    channel: z.enum(['direct', 'agent']).optional(),
     limit: z.coerce.number().int().min(1).max(200).default(50),
     offset: z.coerce.number().int().min(0).default(0),
   }).strict(),

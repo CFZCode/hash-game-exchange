@@ -9,6 +9,7 @@ const { WalletService } = require('../wallet/wallet.service');
 const errors = require('./race.errors');
 const { buildRankPrizes, buildCustomLadder } = require('./race.prizes');
 const { windowFor } = require('./race.window');
+const { withChannel, CHANNEL_SQL } = require('../directory/playerScope');
 const {
   RACE_TYPES,
   RACE_STATUS,
@@ -735,9 +736,28 @@ class RaceService {
     };
   }
 
+  /**
+   * Admin board: wahi standings, Direct Users | Agent Users tab ke hisaab se chhaanti. Rank wahi
+   * rehta hai jo poore board me hai (prize rank se milta hai). Boats (dikhawati entries) sirf
+   * Direct tab me — wo site ke public board pe hoti hain.
+   */
+  async adminLeaderboard({ type, channel }) {
+    const board = await this.leaderboard({ type });
+    if (!CHANNEL_SQL[channel]) return board;
+
+    const ids = board.leaderboard.filter((r) => !r.isBoat).map((r) => r.userId);
+    const keep = ids.length
+      ? new Set((await this.models.Users.findAll({ where: withChannel({ id: ids }, 'id', channel), attributes: ['id'], raw: true })).map((u) => String(u.id)))
+      : new Set();
+    return {
+      ...board,
+      leaderboard: board.leaderboard.filter((r) => (r.isBoat ? channel === 'direct' : keep.has(String(r.userId)))),
+    };
+  }
+
   /** Every prize, for the operator's console. */
-  async listRewards({ type, userId, raceId, claimed, limit = 50, offset = 0 }) {
-    const where = {};
+  async listRewards({ type, userId, raceId, claimed, channel, limit = 50, offset = 0 }) {
+    const where = withChannel({}, 'user_id', channel);
     if (type) where.type = type;
     if (raceId) where.race_id = raceId;
     if (userId) where.user_id = userId;

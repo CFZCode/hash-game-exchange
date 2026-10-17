@@ -247,4 +247,23 @@ test('points settlement and the account list', async (t) => {
       (err) => err.status === 404
     );
   });
+
+  await t.test('Direct Users | Agent Users tab (channel): owner list split', async () => {
+    const owner = await seedStaff(newStaffId(), { owner: true, inr: '0' });
+    const child = await seedStaff(newStaffId(), { parentId: owner, inr: '0' });
+    const direct = await seedPlayer(newUid(), null, { inr: '5' });
+    const ids = (r) => r.rows.map((x) => x.accountId);
+
+    const directTab = await exchange.accounts({ actor: ownerActor(owner), channel: 'direct', search: `settle-player-${direct}`, limit: 50, offset: 0 });
+    assert.deepEqual(ids(directTab), [String(direct)]);
+    const directAll = await exchange.accounts({ actor: ownerActor(owner), channel: 'direct', limit: 200, offset: 0 });
+    assert.ok(directAll.rows.every((r) => r.accountType === 'user'), 'direct tab: koi staff nahi');
+
+    const agentTab = await exchange.accounts({ actor: ownerActor(owner), channel: 'agent', limit: 200, offset: 0 });
+    assert.ok(ids(agentTab).includes(String(child)));
+    assert.ok(!ids(agentTab).includes(String(direct)), 'agent tab: direct user nahi');
+
+    const both = await exchange.accounts({ actor: ownerActor(owner), search: `settle-player-${direct}`, limit: 50, offset: 0 });
+    assert.deepEqual(ids(both), [String(direct)], 'na bheja = purana (dono)');
+  });
 });

@@ -96,8 +96,8 @@ module.exports = function adminRoutes(deps) {
     canSeeWallets,
     validate(v.accounts),
     asyncHandler(async (req, res) => {
-      const { limit, offset, parentId, search } = req.query;
-      const result = await service.accounts({ actor: actorFrom(req), parentId, search, limit, offset });
+      const { limit, offset, parentId, search, channel } = req.query;
+      const result = await service.accounts({ actor: actorFrom(req), parentId, search, channel, limit, offset });
       return response.ok(res, {
         rows: result.rows,
         me: result.me,

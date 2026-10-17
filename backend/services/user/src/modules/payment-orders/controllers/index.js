@@ -61,6 +61,11 @@ function createControllers({ service }) {
 
     // ── Staff ─────────────────────────────────────────────────────────
 
+    /** Payment Methods page — A-Pay systems overview. */
+    paymentSystems: asyncHandler(async (req, res) =>
+      response.ok(res, await service.paymentSystemsOverview({ fresh: ['1', 'true'].includes(req.query.fresh) }))
+    ),
+
     /** @legacy POST /api/payments/utr/repair — was unauthenticated */
     repairUtr: asyncHandler(async (req, res) =>
       response.ok(res, await service.repairUtr({ ...req.body, staffId: req.staff?.id }))

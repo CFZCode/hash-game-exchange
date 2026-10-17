@@ -17,7 +17,7 @@ const { REASON } = require('../wallet/wallet.constants');
 const { VipService } = require('../vip/vip.service');
 const { createRewardMoney } = require('../../lib/rewardMoney');
 const { addToUserbonus } = require('../../lib/userbonusTotals');
-const { ownerWhere, assertPlayerVisible } = require('../directory/playerScope');
+const { ownerWhere, assertPlayerVisible, withChannel } = require('../directory/playerScope');
 
 
 /**
@@ -436,9 +436,9 @@ class BonusService {
    */
 
   /** @legacy GET /bonus/admin/userbonus */
-  async listRecords({ staff, userId, limit = 50, offset = 0 }) {
+  async listRecords({ staff, userId, channel, limit = 50, offset = 0 }) {
     const { rows, count } = await this.models.Userbonus.findAndCountAll({
-      where: await ownerWhere(this, staff?.id, 'userid', userId),
+      where: withChannel(await ownerWhere(this, staff?.id, 'userid', userId), 'userid', channel),
       order: [['userid', 'ASC']],
       limit,
       offset,
@@ -449,9 +449,9 @@ class BonusService {
   }
 
   /** @legacy GET /bonus/admin/bonusgame */
-  async listBonusGames({ staff, userId, limit = 50, offset = 0 }) {
+  async listBonusGames({ staff, userId, channel, limit = 50, offset = 0 }) {
     const { rows, count } = await this.models.Bonusgame.findAndCountAll({
-      where: await ownerWhere(this, staff?.id, 'userid', userId),
+      where: withChannel(await ownerWhere(this, staff?.id, 'userid', userId), 'userid', channel),
       order: [['userid', 'ASC']],
       limit,
       offset,
@@ -461,9 +461,9 @@ class BonusService {
   }
 
   /** @legacy GET /bonus/admin/bonushistory */
-  async listEvents({ staff, userId, limit = 50, offset = 0 }) {
+  async listEvents({ staff, userId, channel, limit = 50, offset = 0 }) {
     const { rows, count } = await this.models.Bonushistory.findAndCountAll({
-      where: await ownerWhere(this, staff?.id, 'userid', userId),
+      where: withChannel(await ownerWhere(this, staff?.id, 'userid', userId), 'userid', channel),
       order: [['createdat', 'DESC']],
       limit,
       offset,
@@ -473,13 +473,13 @@ class BonusService {
   }
 
   /** @legacy GET /bonus/admin/bonushistory (awards, not events) */
-  async listAwards({ staff, userId, type, claimed, limit = 50, offset = 0 }) {
+  async listAwards({ staff, userId, type, claimed, channel, limit = 50, offset = 0 }) {
     const { rows, count } = await this.models.BonusClaim.findAndCountAll({
-      where: {
+      where: withChannel({
         ...(await ownerWhere(this, staff?.id, 'userid', userId)),
         ...(type ? { bonus_type: type } : {}),
         ...(claimed !== undefined ? { is_claimed: claimed } : {}),
-      },
+      }, 'userid', channel),
       order: [['created_at', 'DESC']],
       limit,
       offset,
@@ -880,9 +880,9 @@ class BonusService {
    * Scoped to the caller's tree: a redeem code is issued to one player, and
    * the code and its owner are both on the row.
    */
-  async listCodes({ staff, userId, status, limit = 50, offset = 0 }) {
+  async listCodes({ staff, userId, status, channel, limit = 50, offset = 0 }) {
     const { rows, count } = await this.models.Redeembonus.findAndCountAll({
-      where: { ...(await ownerWhere(this, staff?.id, 'userid', userId)), ...(status ? { status } : {}) },
+      where: withChannel({ ...(await ownerWhere(this, staff?.id, 'userid', userId)), ...(status ? { status } : {}) }, 'userid', channel),
       order: [['createdat', 'DESC']],
       limit,
       offset,
@@ -892,9 +892,9 @@ class BonusService {
   }
 
   /** @legacy GET /bonus/users */
-  async listUserIds({ staff, limit = 200, offset = 0 }) {
+  async listUserIds({ staff, channel, limit = 200, offset = 0 }) {
     const rows = await this.models.Userbonus.findAll({
-      where: await ownerWhere(this, staff?.id, 'userid'),
+      where: withChannel(await ownerWhere(this, staff?.id, 'userid'), 'userid', channel),
       attributes: ['userid', 'name'],
       order: [['userid', 'ASC']],
       limit,

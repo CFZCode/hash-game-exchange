@@ -60,6 +60,8 @@ const adminList = {
       .optional(),
     from: isoDay.optional(),
     to: isoDay.optional(),
+    // Direct Users | Agent Users (tip PAANE wale ke hisaab se) — na ho to sab (purana jawab).
+    channel: z.enum(['direct', 'agent']).optional(),
   }).strict(),
 };
 

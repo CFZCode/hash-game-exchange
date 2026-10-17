@@ -33,6 +33,8 @@ const query = z
     to: instant.optional(),
     granularity: z.enum(GRANULARITIES).default('day'),
     currency: currency.optional(),
+    /** Direct Users | Agent Users tab. Na ho = dono. */
+    channel: z.enum(['direct', 'agent']).optional(),
     tz: z.enum(['UTC']).default('UTC'),
   })
   .strict()

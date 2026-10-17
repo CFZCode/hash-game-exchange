@@ -32,6 +32,8 @@ const listAll = {
     coin: coin.optional(),
     from: z.coerce.date().optional(),
     to: z.coerce.date().optional(),
+    // Direct Users | Agent Users — na ho to sab (purana jawab).
+    channel: z.enum(['direct', 'agent']).optional(),
   }),
 };
 

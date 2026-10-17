@@ -9,6 +9,7 @@ import { toast } from 'sonner'
 
 import DataTable, { type Column } from '@/components/shared/DataTable'
 import DateTime from '@/components/shared/DateTime'
+import ChannelTabs, { type Channel } from '@/components/shared/ChannelTabs'
 import PageHeader from '@/components/shared/PageHeader'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -160,7 +161,7 @@ const useDebounced = (value: string, apply: (next: string) => void) => {
   return [term, setTerm] as const
 }
 
-const IpTracker = () => {
+const IpTrackerList = ({ channel }: { channel: Channel }) => {
   const { state, set, query } = useListState(['tab', 'ip', 'country', 'source', 'from', 'to', 'proxyOnly'])
   const tab = state.tab === 'shared' ? 'shared' : state.tab === 'countries' ? 'countries' : 'logins'
   const [open, setOpen] = useState<Set<string>>(() => new Set())
@@ -189,7 +190,8 @@ const IpTracker = () => {
     source: query.source,
     from: query.from,
     to: query.to,
-    proxyOnly: query.proxyOnly === 'true' ? 'true' : undefined
+    proxyOnly: query.proxyOnly === 'true' ? 'true' : undefined,
+    channel
   }
 
   const logins = usePagedApi<IpLoginRow>(tab === 'logins' ? LOGINS : null, filters, { retry: false })
@@ -314,10 +316,6 @@ const IpTracker = () => {
   return (
     <div>
       <RiskManagementDialog userId={risk?.id ?? null} name={risk?.name} open={riskOpen} onOpenChange={setRiskOpen} />
-      <PageHeader
-        title='IP tracker'
-        description='Where your users sign in from, and which addresses several accounts share. Only users in your own tree are shown.'
-      />
 
       <Tabs value={tab} onValueChange={v => set({ tab: v === 'shared' || v === 'countries' ? v : '' })} className='mb-4'>
         <TabsList>
@@ -435,5 +433,16 @@ const IpTracker = () => {
     </div>
   )
 }
+
+/** IP tracker — Direct Users | Agent Users alag tab (dono ki listing alag). */
+const IpTracker = () => (
+  <div>
+    <PageHeader
+      title='IP tracker'
+      description='Where your users sign in from, and which addresses several accounts share. Only users in your own tree are shown.'
+    />
+    <ChannelTabs>{channel => <IpTrackerList channel={channel} />}</ChannelTabs>
+  </div>
+)
 
 export default IpTracker

@@ -25,6 +25,7 @@ import { truncateId } from '@/lib/format'
 import { check } from '@/lib/validate'
 import { allConvertedLabel, useCurrencyChoices, useFinanceFilters } from './currencyFilter'
 import FinanceStatsPanel from './FinanceStatsPanel'
+import ListStatsTabs from './ListStatsTabs'
 import { usePageNumbered } from './shared'
 import type { CryptoDepositRow } from './types'
 
@@ -121,7 +122,7 @@ const CryptoDeposits = () => {
   const filters = useFinanceFilters()
   const choices = useCurrencyChoices()
   const range = { startDate: filters.from, endDate: filters.to }
-  const list = usePageNumbered<CryptoDepositRow>(LIST, { limit: query.limit, page: query.page, status: query.status, chain: query.chain, userid: query.userid, coin: filters.currency || undefined, ...range })
+  const list = usePageNumbered<CryptoDepositRow>(LIST, { channel: 'direct', limit: query.limit, page: query.page, status: query.status, chain: query.chain, userid: query.userid, coin: filters.currency || undefined, ...range })
 
   return (
     <div>
@@ -135,37 +136,36 @@ const CryptoDeposits = () => {
         }
       />
       <FilterBar filters={filters} currencies={choices.crypto} allCurrenciesLabel={allConvertedLabel(filters.defaultCurrency)} className='mb-4' />
-      {can('reports:read') && (
-        <FinanceStatsPanel kind='deposits' rail='crypto' filters={filters} statusLabels={{ success: 'Successful', pending: 'Processing', failed: 'Failed' }} />
-      )}
-      <DataTable
-        columns={columns}
-        rows={list.data?.rows}
-        rowKey={r => r.id}
-        loading={list.isLoading}
-        fetching={list.isFetching}
-        error={list.error}
-        pagination={list.data?.pagination}
-        onPageChange={page => set({ page })}
-        onLimitChange={limit => set({ limit })}
-        toolbar={
-          <>
-            <Select value={String(state.status || 'all')} onValueChange={v => v && set({ status: v === 'all' ? '' : v })}>
-              <SelectTrigger className='w-36'>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value='all'>All statuses</SelectItem>
-                <SelectItem value='success'>Success</SelectItem>
-                <SelectItem value='pending'>Pending</SelectItem>
-                <SelectItem value='failed'>Failed</SelectItem>
-              </SelectContent>
-            </Select>
-            <Input placeholder='Chain' aria-label='Chain' value={String(state.chain ?? '')} onChange={e => set({ chain: e.target.value })} className='w-28' />
-            <Input placeholder='User id' aria-label='User id' inputMode='numeric' value={String(state.userid ?? '')} onChange={e => set({ userid: e.target.value.replace(/\D/g, '') })} className='w-28' />
-          </>
-        }
-      />
+      <ListStatsTabs stats={can('reports:read') ? <FinanceStatsPanel kind='deposits' rail='crypto' filters={filters} statusLabels={{ success: 'Successful', pending: 'Processing', failed: 'Failed' }} /> : null}>
+        <DataTable
+          columns={columns}
+          rows={list.data?.rows}
+          rowKey={r => r.id}
+          loading={list.isLoading}
+          fetching={list.isFetching}
+          error={list.error}
+          pagination={list.data?.pagination}
+          onPageChange={page => set({ page })}
+          onLimitChange={limit => set({ limit })}
+          toolbar={
+            <>
+              <Select value={String(state.status || 'all')} onValueChange={v => v && set({ status: v === 'all' ? '' : v })}>
+                <SelectTrigger className='w-36'>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='all'>All statuses</SelectItem>
+                  <SelectItem value='success'>Success</SelectItem>
+                  <SelectItem value='pending'>Pending</SelectItem>
+                  <SelectItem value='failed'>Failed</SelectItem>
+                </SelectContent>
+              </Select>
+              <Input placeholder='Chain' aria-label='Chain' value={String(state.chain ?? '')} onChange={e => set({ chain: e.target.value })} className='w-28' />
+              <Input placeholder='User id' aria-label='User id' inputMode='numeric' value={String(state.userid ?? '')} onChange={e => set({ userid: e.target.value.replace(/\D/g, '') })} className='w-28' />
+            </>
+          }
+        />
+      </ListStatsTabs>
     </div>
   )
 }

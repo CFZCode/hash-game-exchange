@@ -6,6 +6,7 @@ import { MegaphoneIcon, SendIcon } from 'lucide-react'
 
 import Can from '@/components/shared/Can'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
+import ChannelTabs, { type Channel } from '@/components/shared/ChannelTabs'
 import DataTable, { type Column } from '@/components/shared/DataTable'
 import DateTime from '@/components/shared/DateTime'
 import { SelectField, TextAreaField, TextField } from '@/components/shared/FormField'
@@ -87,7 +88,8 @@ const Compose = () => {
   )
 }
 
-const Devices = () => {
+/** Devices list — Direct Users | Agent Users tab (`channel`). */
+const Devices = ({ channel }: { channel: Channel }) => {
   const { state, set, query } = useListState(['userId'])
   const [activeOnly, setActiveOnly] = useState(true)
 
@@ -95,6 +97,7 @@ const Devices = () => {
     limit: query.limit,
     page: query.page,
     activeOnly,
+    channel,
     userId: query.userId || undefined
   })
 
@@ -191,7 +194,7 @@ const Notifications = () => {
         )}
         {canRead && (
           <TabsContent value='devices'>
-            <Devices />
+            <ChannelTabs>{channel => <Devices channel={channel} />}</ChannelTabs>
           </TabsContent>
         )}
         {canRead && (

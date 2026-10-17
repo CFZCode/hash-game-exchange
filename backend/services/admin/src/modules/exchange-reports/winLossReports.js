@@ -75,8 +75,8 @@ async function partyWinLoss(sequelize, tree, { type, search }) {
 //  User Win Loss (point category report)
 // ════════════════════════════════════════════════════════════════════════
 
-/** point_ledger.category → report column (zip POINT_CATEGORY_FIELD, casino wale chhod ke). */
-const POINT_CATEGORY_FIELD = { SPORTS: 'sports_pts', SPORTSBOOK: 'sportsbook_pts' };
+/** point_ledger.category → report column (zip POINT_CATEGORY_FIELD; casino / sportbook hamare yahan nahi). */
+const POINT_CATEGORY_FIELD = { SPORTS: 'sports_pts' };
 
 /**
  * Har player ka category-wise SUM(delta) — range ke andar. delta signed hai
@@ -117,7 +117,7 @@ async function userWinLoss(sequelize, tree, f) {
 }
 
 function emptyTotals() {
-  return { sports_pts: 0, sportsbook_pts: 0, total: 0 };
+  return { sports_pts: 0, total: 0 };
 }
 
 // ════════════════════════════════════════════════════════════════════════
@@ -127,13 +127,11 @@ function emptyTotals() {
 /**
  * Sports ledger (mssports.credits_ledger) ka jod — sport naam + game type (bet ka gtype) ke hisaab se.
  *   Opening = kul loss,  Closing = kul profit,  Profit/Loss = profit − loss
- * type: '0' All, '2' Sports Report, '5' Sportbook (sportbook provider abhi nahi, khaali).
  */
 async function totalProfitLoss(sequelize, tree, f) {
   const client = await findClient(sequelize, tree, f);
   const players = await playersFor(sequelize, tree, client);
-  const empty = { sports: [], sportbook: [] };
-  if (!players.length || f.type === '5') return empty;
+  if (!players.length) return { sports: [] };
 
   const ledger = await sequelize.query(
     `SELECT l.sport_id, b.gtype, l.profit, l.loss
@@ -161,7 +159,7 @@ async function totalProfitLoss(sequelize, tree, f) {
     closing: round2(g.profit),
     profit_loss: round2(g.profit - g.loss),
   }));
-  return { sports, sportbook: [] };
+  return { sports };
 }
 
 // ════════════════════════════════════════════════════════════════════════

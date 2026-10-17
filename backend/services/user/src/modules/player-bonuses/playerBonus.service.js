@@ -8,7 +8,7 @@ const { WalletService } = require('../wallet/wallet.service');
 const { REASON } = require('../wallet/wallet.constants');
 const { createRewardMoney } = require('../../lib/rewardMoney');
 const { notifyPlayer } = require('../notifications/notifyPlayer');
-const { ownerWhere, assertPlayerVisible } = require('../directory/playerScope');
+const { ownerWhere, assertPlayerVisible, withChannel } = require('../directory/playerScope');
 const errors = require('./playerBonus.errors');
 const { settleItem } = require('../wager/stakeShare');
 const {
@@ -544,9 +544,9 @@ class PlayerBonusService {
   }
 
   /** Staff: the bonuses report (tree-scoped), with totals per status and currency. */
-  async report({ staff, userId, status, source, from, to, limit = 50, offset = 0 }) {
+  async report({ staff, userId, status, source, from, to, channel, limit = 50, offset = 0 }) {
     const scope = await ownerWhere(this.deps, staff?.id, 'user_id', userId);
-    const where = { ...scope };
+    const where = withChannel({ ...scope }, 'user_id', channel);
     if (status) where.status = status;
     if (source) where.source = source;
     if (from || to) {

@@ -59,7 +59,7 @@ const columnsFor = (cur: string): Column<RedeemCode>[] => [
 const CreateCode = () => {
   const { code: cur } = useRewardCurrency()
   const [form, setForm] = useState({ userId: '', code: generateCode(), amount: '' })
-  const users = useApi<BonusUserId[]>('admin/user/bonus/users', { limit: 200 })
+  const users = useApi<BonusUserId[]>('admin/user/bonus/users', { channel: 'direct', limit: 200 })
 
   const create = useApiMutation({
     fn: () => api.post('admin/user/bonus/codes', { userId: Number(form.userId), code: form.code.trim().toUpperCase(), amount: form.amount }),
@@ -120,6 +120,8 @@ const RedeemCodes = () => {
   const { code: cur } = useRewardCurrency()
 
   const list = usePagedApi<RedeemCode>('admin/user/bonus/codes', {
+    // Agent ke users ye use nahi kar sakte — sirf direct users.
+    channel: 'direct',
     limit: query.limit,
     page: query.page,
     status: state.status && state.status !== 'all' ? state.status : undefined,

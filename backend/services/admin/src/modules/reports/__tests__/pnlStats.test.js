@@ -292,6 +292,16 @@ test('P&L against a database', async (t) => {
     assert.equal(m(s.kpis.casinoGgr), m(d.totals.casinoGgr));
   });
 
+  await t.test('channel: agent = both fixture players (they have a parent), direct = none of them', async () => {
+    assert.equal(v.pnlSummary.query.parse({ channel: 'agent' }).channel, 'agent');
+    assert.throws(() => v.pnlSummary.query.parse({ channel: 'all' }));
+    const all = await pnl.summary({ staff: house, ...inCoin });
+    const agentOnly = await pnl.summary({ staff: house, ...inCoin, channel: 'agent' });
+    assert.equal(m(agentOnly.kpis.ggr), m(all.kpis.ggr));
+    const direct = await pnl.breakdown({ staff: house, ...inCoin, channel: 'direct' });
+    assert.ok(direct.players.houseWon.every((p) => ![String(playerA), String(playerB)].includes(p.id)));
+  });
+
   await t.test('no staff is an empty scope, never everything', async () => {
     const s = await pnl.summary({ staff: null, ...inCoin });
     assert.equal(m(s.kpis.ggr), 0n);
@@ -395,6 +405,19 @@ test('P&L against a database', async (t) => {
 
     const top = await dashboard.top({ actor: { id: agentD }, ...gisWindow, currency: 'INR' });
     assert.deepEqual(top.games.map((g) => [g.key, m(g.wagered), g.bets]), [['gis:gr-slot', m('10'), 2]]);
+  });
+
+  await t.test('wager channel: agent = same as all for an agent tree, direct = nothing', async () => {
+    const statsV = require('../stats.validators');
+    assert.equal(statsV.wagerStats.query.parse({ area: 'casino', channel: 'direct' }).channel, 'direct');
+    const staff = { id: agentC, level: 6, permissions: ['*'] };
+    const q = { ...gisWindow, currency: 'INR', area: 'casino', granularity: 'day', tz: 'UTC' };
+    const all = await wager.stats({ staff, ...q });
+    const agentOnly = await wager.stats({ staff, ...q, channel: 'agent' });
+    assert.equal(agentOnly.totals.bets, all.totals.bets);
+    assert.ok(all.totals.bets > 0, 'fixture has a bet');
+    const direct = await wager.stats({ staff, ...q, channel: 'direct' });
+    assert.equal(direct.totals.bets, 0);
   });
 
   await t.test('(cleanup) Slotegrator refunds and rollbacks', cleanupGis);

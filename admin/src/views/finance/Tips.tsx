@@ -12,6 +12,7 @@ import DateTime from '@/components/shared/DateTime'
 import ErrorState from '@/components/shared/ErrorState'
 import { TextField } from '@/components/shared/FormField'
 import Money from '@/components/shared/Money'
+import ChannelTabs, { type Channel } from '@/components/shared/ChannelTabs'
 import PageHeader from '@/components/shared/PageHeader'
 import StatCard from '@/components/shared/StatCard'
 import { Button } from '@/components/ui/button'
@@ -191,16 +192,13 @@ const columns: Column<TipRow>[] = [
   { key: 'id', header: 'Tip ID', cell: r => <span className='font-mono text-xs'>{r.id}</span> }
 ]
 
-const Tips = () => {
+/** Ek tab ki tips list — channel tip PAANE wale (receiver) ke hisaab se: agent ke users tip bhej nahi sakte, sirf paa sakte hain. */
+const TipsList = ({ channel }: { channel: Channel }) => {
   const { state, set, query } = useListState()
-  const { actor, can } = useSession()
 
   // The charts' filter bar drives the table too: its period (inclusive UTC days) and currency — the
   // site's default coin until somebody picks another.
   const f = useFinanceFilters({ defaultPreset: '30d' })
-
-  // Same gate as the welcome-bonus settings: config:read to see, house staff only (not the agent tree).
-  const showLimits = Boolean(actor?.promotions) && can('config:read')
 
   // A new period or currency starts the table again at page 1 (not on first load: keep a deep link).
   const filterKey = `${f.from}|${f.to}|${f.currency}`
@@ -231,6 +229,7 @@ const Tips = () => {
     {
       limit: PAGE_SIZE,
       offset: (page - 1) * PAGE_SIZE,
+      channel,
       search: query.search,
       currency: f.currency || undefined,
       from: f.from,
@@ -257,12 +256,6 @@ const Tips = () => {
 
   return (
     <div>
-      <PageHeader title='Tips' description='Player-to-player tips, newest first. The charts, totals and table all follow the period and currency below.' />
-
-      {showLimits && <LimitsCard />}
-
-      <RewardStats section='tips' filters={f} />
-
       {!list.error && (
         <div className='mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4'>
           <StatCard
@@ -317,6 +310,26 @@ const Tips = () => {
           emptyMessage={filtered ? 'No tips match these filters.' : 'No tips yet'}
         />
       )}
+    </div>
+  )
+}
+
+const Tips = () => {
+  const { actor, can } = useSession()
+  const f = useFinanceFilters({ defaultPreset: '30d' })
+
+  // Same gate as the welcome-bonus settings: config:read to see, house staff only (not the agent tree).
+  const showLimits = Boolean(actor?.promotions) && can('config:read')
+
+  return (
+    <div>
+      <PageHeader title='Tips' description='Player-to-player tips, newest first. The charts, totals and table all follow the period and currency below.' />
+
+      {showLimits && <LimitsCard />}
+
+      <RewardStats section='tips' filters={f} />
+
+      <ChannelTabs>{channel => <TipsList channel={channel} />}</ChannelTabs>
     </div>
   )
 }

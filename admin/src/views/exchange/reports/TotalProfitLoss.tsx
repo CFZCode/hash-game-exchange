@@ -4,6 +4,7 @@ import { useState, type FormEvent } from 'react'
 
 import { toast } from 'sonner'
 
+import ChannelTabs, { type Channel } from '@/components/shared/ChannelTabs'
 import PageHeader from '@/components/shared/PageHeader'
 import { DateRangePicker } from '@/components/ui/date-picker'
 import { api, errorMessage } from '@/lib/api/client'
@@ -14,7 +15,6 @@ import {
   defaultRange,
   EntriesBar,
   FilterField,
-  Pick,
   ReportCard,
   ReportTable,
   withMinimumDelay,
@@ -24,11 +24,7 @@ import {
 } from './reportKit'
 
 type SportsRow = { event_name: string; game_type: string; opening: number; closing: number; profit_loss: number }
-type SportbookRow = { sportbook_name: string; opening: number; closing: number; profit_loss: number }
-type TotalPL = { sports: SportsRow[]; sportbook: SportbookRow[] }
-
-// Type filter: 0 All, 2 Sports, 5 Sportbook (zip ke Casino / Third Party Casino yahan nahi).
-const TYPE_OPTIONS: [string, string][] = [['0', 'All'], ['2', 'Sports Report'], ['5', 'Sportbook']]
+type TotalPL = { sports: SportsRow[] }
 
 /** Footer total aur export — 2 decimal (zip `fmt`). */
 const fixed = (v: unknown) => {
@@ -50,14 +46,13 @@ const totalOf = (rows: { profit_loss: number }[]) => rows.reduce((sum, r) => sum
  * Total Profit Loss — zip ka `reports/TotalProfitLoss.jsx` (`POST /admin/reports/total-profit-loss`).
  *
  * Sports Report: sport + game type ke hisaab se Opening (kul loss), Closing (kul profit), Profit/Loss.
- * Sportbook Report: sportbook provider abhi nahi, isliye khaali (zip me bhi backend khaali bhejta tha).
+ * Sportbook nahi (hamare yahan koi sportbook nahi), isliye Type filter bhi nahi.
  */
-const TotalProfitLoss = () => {
+const TotalProfitLossReport = ({ channel }: { channel: Channel }) => {
   const [client, setClient] = useState<Client | null>(null)
   const [range, setRange] = useState(defaultRange())
-  const [typeVal, setTypeVal] = useState('0')
   const [search, setSearch] = useState('')
-  const [data, setData] = useState<TotalPL>({ sports: [], sportbook: [] })
+  const [data, setData] = useState<TotalPL>({ sports: [] })
   const [loading, setLoading] = useState(false)
 
   const handleLoad = async (e: FormEvent) => {
@@ -75,12 +70,12 @@ const TotalProfitLoss = () => {
     try {
       setData(
         await withMinimumDelay(
-          api.post<TotalPL>('admin/exchange/reports/total-profit-loss', { ...clientBody(client), fromDate: range.from, toDate: range.to, type: typeVal })
+          api.post<TotalPL>('admin/exchange/reports/total-profit-loss', { ...clientBody(client), channel, fromDate: range.from, toDate: range.to })
         )
       )
     } catch (err) {
       toast.error(errorMessage(err))
-      setData({ sports: [], sportbook: [] })
+      setData({ sports: [] })
     } finally {
       setLoading(false)
     }
@@ -89,11 +84,10 @@ const TotalProfitLoss = () => {
   const handleReset = () => {
     setClient(null)
     setRange(defaultRange())
-    setTypeVal('0')
     setSearch('')
     setLoading(true)
     setTimeout(() => {
-      setData({ sports: [], sportbook: [] })
+      setData({ sports: [] })
       setLoading(false)
     }, 1000)
   }
@@ -102,15 +96,11 @@ const TotalProfitLoss = () => {
     search.trim() ? rows.filter(r => Object.values(r).some(v => String(v ?? '').toLowerCase().includes(search.toLowerCase()))) : rows
 
   const sportsRows = bySearch(data.sports)
-  const sportbookRows = bySearch(data.sportbook)
-  const showSports = typeVal === '0' || typeVal === '2'
-  const showSportbook = typeVal === '0' || typeVal === '5'
-  const hasAnyData = sportsRows.length + sportbookRows.length > 0
+  const hasAnyData = sportsRows.length > 0
   const emptyMessage = search ? 'There are no records matching your request' : 'There are no records to show'
 
   const sportsSection = ['Sports Report', ['Event Name', 'Game Type', 'Opening', 'Closing', 'Profit/Loss'], sportsRows.map(r => [r.event_name, r.game_type, fixed(r.opening), fixed(r.closing), fixed(r.profit_loss)])] as const
-  const sportbookSection = ['Sportbook Report', ['Sportbook Name', 'Opening', 'Closing', 'Profit/Loss'], sportbookRows.map(r => [r.sportbook_name, fixed(r.opening), fixed(r.closing), fixed(r.profit_loss)])] as const
-  const sections = [...(showSports ? [sportsSection] : []), ...(showSportbook ? [sportbookSection] : [])]
+  const sections = [sportsSection]
 
   // Excel — har section ka title, header aur rows ek hi table me (zip jaisa).
   const handleExcel = () => {
@@ -168,28 +158,17 @@ const TotalProfitLoss = () => {
     { key: 'pl', header: 'Profit/Loss', align: 'right', cell: r => raw(r.profit_loss) }
   ]
 
-  const sportbookColumns: ReportColumn<SportbookRow>[] = [
-    { key: 'name', header: 'Sportbook Name', cell: r => r.sportbook_name },
-    { key: 'opening', header: 'Opening', align: 'right', cell: r => raw(r.opening) },
-    { key: 'closing', header: 'Closing', align: 'right', cell: r => raw(r.closing) },
-    { key: 'pl', header: 'Profit/Loss', align: 'right', cell: r => raw(r.profit_loss) }
-  ]
-
   return (
     <div>
-      <PageHeader title='Total Profit Loss' />
 
       <ReportCard>
         <form onSubmit={handleLoad} className='space-y-4 border-b p-4'>
           <div className='grid gap-4 md:grid-cols-3 lg:grid-cols-4'>
             <FilterField label='Search By Client Name'>
-              <ClientSearch value={client} onChange={setClient} />
+              <ClientSearch value={client} onChange={setClient} channel={channel} />
             </FilterField>
             <FilterField label='Select Date Range'>
               <DateRangePicker from={range.from} to={range.to} max={defaultRange().to} clearable={false} onChange={r => setRange({ from: r.from, to: r.to })} />
-            </FilterField>
-            <FilterField label='Type'>
-              <Pick value={typeVal} onChange={setTypeVal} options={TYPE_OPTIONS} />
             </FilterField>
           </div>
           <ActionButtons busy={loading} onReset={handleReset} canExport={hasAnyData} onExcel={handleExcel} onPdf={handlePdf} />
@@ -197,8 +176,7 @@ const TotalProfitLoss = () => {
 
         <EntriesBar search={search} onSearch={setSearch} />
 
-        {showSports && (
-          <div className='pb-2'>
+        <div className='pb-2'>
             <h4 className='px-4 pt-2 font-semibold'>Sports Report</h4>
             <ReportTable
               columns={sportsColumns}
@@ -208,22 +186,17 @@ const TotalProfitLoss = () => {
               footer={['', '', '', 'Total Profit/Loss', fixed(totalOf(sportsRows))]}
             />
           </div>
-        )}
-        {showSportbook && (
-          <div className='pb-2'>
-            <h4 className='px-4 pt-2 font-semibold'>Sportbook Report</h4>
-            <ReportTable
-              columns={sportbookColumns}
-              rows={sportbookRows}
-              rowKey={r => r.sportbook_name}
-              emptyMessage={emptyMessage}
-              footer={['', '', 'Total Profit/Loss', fixed(totalOf(sportbookRows))]}
-            />
-          </div>
-        )}
       </ReportCard>
     </div>
   )
 }
+
+/** Upar Direct Users | Agent Users tab — dono ka report alag (API ko `channel`). */
+const TotalProfitLoss = () => (
+  <div>
+    <PageHeader title='Total Profit Loss' />
+    <ChannelTabs>{channel => <TotalProfitLossReport channel={channel} />}</ChannelTabs>
+  </div>
+)
 
 export default TotalProfitLoss

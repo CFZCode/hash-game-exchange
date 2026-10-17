@@ -1,43 +1,82 @@
 // Third-party Imports
 import {
+  ActivityIcon,
+  ArrowBigUpIcon,
   ArrowDownToLineIcon,
+  ArrowLeftRightIcon,
+  ArrowRightLeftIcon,
   ArrowUpFromLineIcon,
+  BadgeDollarSignIcon,
+  BanknoteIcon,
   BellIcon,
   BellRingIcon,
+  BitcoinIcon,
   BookOpenIcon,
+  BookUserIcon,
+  Building2Icon,
+  CalendarDaysIcon,
   ChartColumnIcon,
-  GavelIcon,
-  ListTreeIcon,
-  CircleDollarSignIcon,
-  CoinsIcon,
+  ChartPieIcon,
+  CircleUserRoundIcon,
+  ClipboardListIcon,
+  ContactIcon,
   CreditCardIcon,
   CrownIcon,
   DicesIcon,
   Disc3Icon,
-  FileBarChartIcon,
+  FileSpreadsheetIcon,
+  FlagIcon,
+  Gamepad2Icon,
+  GaugeIcon,
+  GavelIcon,
   GiftIcon,
   GlobeIcon,
-  GoalIcon,
   HandCoinsIcon,
   HandshakeIcon,
+  HistoryIcon,
+  HouseIcon,
   ImageIcon,
   KeyRoundIcon,
   LandmarkIcon,
   LayoutDashboardIcon,
+  LayoutGridIcon,
+  LayoutTemplateIcon,
   LinkIcon,
+  ListOrderedIcon,
+  LockIcon,
   LockKeyholeIcon,
+  MailIcon,
   MegaphoneIcon,
+  NetworkIcon,
   NewspaperIcon,
+  PaletteIcon,
+  PartyPopperIcon,
+  PercentIcon,
+  PowerIcon,
+  RadioIcon,
+  ReceiptTextIcon,
   RepeatIcon,
+  RotateCwIcon,
+  ScaleIcon,
   ScrollTextIcon,
+  SendIcon,
+  ServerIcon,
+  SettingsIcon,
   Settings2Icon,
   ShieldAlertIcon,
   ShieldCheckIcon,
+  SlidersHorizontalIcon,
+  SpadeIcon,
+  SparklesIcon,
+  SquarePenIcon,
+  TargetIcon,
   TicketIcon,
+  ToggleRightIcon,
   TrendingUpIcon,
   TrophyIcon,
-  UserCogIcon,
+  UserRoundCheckIcon,
   UsersIcon,
+  UsersRoundIcon,
   VaultIcon,
   WalletIcon,
   type LucideIcon
@@ -51,51 +90,91 @@ import {
  * loads — the bulk of the slow first load. Add an icon here to use it below.
  */
 export const navIcons = {
-  ChartColumn: ChartColumnIcon,
-  Gavel: GavelIcon,
-  ListTree: ListTreeIcon,
+  Activity: ActivityIcon,
+  ArrowBigUp: ArrowBigUpIcon,
   ArrowDownToLine: ArrowDownToLineIcon,
+  ArrowLeftRight: ArrowLeftRightIcon,
+  ArrowRightLeft: ArrowRightLeftIcon,
   ArrowUpFromLine: ArrowUpFromLineIcon,
+  BadgeDollarSign: BadgeDollarSignIcon,
+  Banknote: BanknoteIcon,
   Bell: BellIcon,
   BellRing: BellRingIcon,
+  Bitcoin: BitcoinIcon,
   BookOpen: BookOpenIcon,
-  CircleDollarSign: CircleDollarSignIcon,
-  Coins: CoinsIcon,
+  BookUser: BookUserIcon,
+  Building2: Building2Icon,
+  CalendarDays: CalendarDaysIcon,
+  ChartColumn: ChartColumnIcon,
+  ChartPie: ChartPieIcon,
+  CircleUserRound: CircleUserRoundIcon,
+  ClipboardList: ClipboardListIcon,
+  Contact: ContactIcon,
   CreditCard: CreditCardIcon,
   Crown: CrownIcon,
   Dices: DicesIcon,
   Disc3: Disc3Icon,
-  FileBarChart: FileBarChartIcon,
+  FileSpreadsheet: FileSpreadsheetIcon,
+  Flag: FlagIcon,
+  Gamepad2: Gamepad2Icon,
+  Gauge: GaugeIcon,
+  Gavel: GavelIcon,
   Gift: GiftIcon,
   Globe: GlobeIcon,
-  Goal: GoalIcon,
   HandCoins: HandCoinsIcon,
   Handshake: HandshakeIcon,
+  History: HistoryIcon,
+  House: HouseIcon,
   Image: ImageIcon,
   KeyRound: KeyRoundIcon,
   Landmark: LandmarkIcon,
   LayoutDashboard: LayoutDashboardIcon,
+  LayoutGrid: LayoutGridIcon,
+  LayoutTemplate: LayoutTemplateIcon,
   Link: LinkIcon,
+  ListOrdered: ListOrderedIcon,
+  Lock: LockIcon,
+  LockKeyhole: LockKeyholeIcon,
+  Mail: MailIcon,
   Megaphone: MegaphoneIcon,
+  Network: NetworkIcon,
   Newspaper: NewspaperIcon,
+  Palette: PaletteIcon,
+  PartyPopper: PartyPopperIcon,
+  Percent: PercentIcon,
+  Power: PowerIcon,
+  Radio: RadioIcon,
+  ReceiptText: ReceiptTextIcon,
   Repeat: RepeatIcon,
+  RotateCw: RotateCwIcon,
+  Scale: ScaleIcon,
   ScrollText: ScrollTextIcon,
+  Send: SendIcon,
+  Server: ServerIcon,
+  Settings: SettingsIcon,
   Settings2: Settings2Icon,
   ShieldAlert: ShieldAlertIcon,
   ShieldCheck: ShieldCheckIcon,
+  SlidersHorizontal: SlidersHorizontalIcon,
+  Spade: SpadeIcon,
+  Sparkles: SparklesIcon,
+  SquarePen: SquarePenIcon,
+  Target: TargetIcon,
   Ticket: TicketIcon,
-  LockKeyhole: LockKeyholeIcon,
+  ToggleRight: ToggleRightIcon,
   TrendingUp: TrendingUpIcon,
   Trophy: TrophyIcon,
-  UserCog: UserCogIcon,
+  UserRoundCheck: UserRoundCheckIcon,
   Users: UsersIcon,
+  UsersRound: UsersRoundIcon,
   Vault: VaultIcon,
-  Wallet: WalletIcon,
+  Wallet: WalletIcon
 } satisfies Record<string, LucideIcon>
 
 type IconName = keyof typeof navIcons
 
 export type MenuLeafSubItem = {
+  icon?: IconName
   label: string
   href: string
   activePath?: string
@@ -126,6 +205,7 @@ export type MenuLeafSubItem = {
 }
 
 export type MenuGroupSubItem = {
+  icon?: IconName
   label: string
   childItems: MenuLeafSubItem[]
   permission?: string | string[]
@@ -166,6 +246,9 @@ export type MenuItem = {
 export type NavItem = {
   groupLabel?: string
 
+  /** Section heading ke bagal ka icon (zip jaisa har section/item ka apna icon). */
+  groupIcon?: IconName
+
   /** true: group ka label click karke poora section khulta / band hota hai (dropdown jaisa). */
   collapsible?: boolean
   items: MenuItem[]
@@ -187,14 +270,20 @@ const OWNER_ONLY = 'wallet:adjust'
 
 export const navItems: NavItem[] = [
   {
-    // Main: Dashboard (Direct Users + Agent System tab) aur Users (Direct / Agent / Financial).
+    // Main: Dashboard (Direct Users + Agent System tab), Users (Direct / Agent / Financial) aur Wallets (zip jaisa Direct User Wallet).
     groupLabel: 'Main',
+    groupIcon: 'LayoutGrid',
     items: [
       { icon: 'LayoutDashboard', label: 'Dashboard', href: '/dashboard', permission: ['reports:read', ...WALLET_ANY] },
 
       // Either grant opens the list: reports:read reads `admin/reports/players` (balances, deposits,
       // wagers); users:read alone falls back to the player directory `admin/user/directory`.
-      { icon: 'Users', label: 'Users', href: '/users', activePath: '/users', permission: ['reports:read', 'users:read'] } as MenuItem
+      { icon: 'Users', label: 'Users', href: '/users', activePath: '/users', permission: ['reports:read', 'users:read'] } as MenuItem,
+      { icon: 'Wallet', label: 'Wallets', href: '/wallets', permission: 'wallet:adjust' },
+
+      // Zip ke Main jaisa: Redeem Codes (Promotions se yahan) aur Turnover Report (direct users ka wager vs target).
+      { icon: 'Ticket', label: 'Redeem Codes', href: '/redeem-codes', permission: 'reports:read', promotions: true },
+      { icon: 'Activity', label: 'Turnover Report', href: '/turnover-report', permission: 'reports:read', promotions: true }
     ]
   },
   {
@@ -204,83 +293,72 @@ export const navItems: NavItem[] = [
      * hain. Casino ka kuch nahi. Sabka balance `credits` table me hai (owner, staff, player).
      */
     groupLabel: 'Sports Exchange',
+    groupIcon: 'Trophy',
     collapsible: true,
     items: [
       { icon: 'ChartColumn', label: 'Market Analysis', href: '/exchange/market-analysis', permission: 'sports:read' },
-      {
-        icon: 'FileBarChart',
-        label: 'Reports',
-        permission: 'reports:read',
-        childItems: [
-          { label: 'Account Statement', href: '/exchange/reports/account-statement' },
-          { label: 'Party Win Loss', href: '/exchange/reports/party-win-loss' },
-          { label: 'Current Bets', href: '/exchange/reports/current-bets' },
-          { label: 'User History', href: '/exchange/reports/user-history' },
-          { label: 'General Lock', href: '/exchange/reports/general-lock' },
-          { label: 'Sportbook Report', href: '/exchange/reports/sportbook-report' },
-          { label: 'Turn Over', href: '/exchange/reports/turnover' },
-          { label: 'User Authentication', href: '/exchange/reports/user-authentication' },
-          { label: 'Fraud Report', href: '/exchange/reports/fraud' },
-          { label: 'User Register Detail', href: '/exchange/reports/user-register-detail' },
-          { label: 'Total Profit Loss', href: '/exchange/reports/total-profit-loss' },
-          { label: 'User Win Loss', href: '/exchange/reports/user-win-loss' }
-        ]
-      },
+      { icon: 'Radio', label: 'Current Bets', href: '/exchange/reports/current-bets', permission: 'reports:read' },
+      { icon: 'RotateCw', label: 'Turn Over', href: '/exchange/reports/turnover', permission: 'reports:read' },
 
       // Zip me owner only. Casino Settlement nahi. Match / Fancy / Void Bets ek page pe tabs me.
       { icon: 'Gavel', label: 'Settlement', href: '/exchange/settlement', permission: OWNER_ONLY },
 
       // Zip me owner only (sports config): Buffer Time, Commission, Max Odds, Auto Void, Virtual / Bet Limits — tabs me.
-      { icon: 'Settings2', label: 'Global Settings', href: '/exchange/settings', permission: OWNER_ONLY },
-      { icon: 'ListTree', label: 'Events', href: '/exchange/events', permission: 'sports:read' }
+      { icon: 'SlidersHorizontal', label: 'Global Settings', href: '/exchange/settings', permission: OWNER_ONLY },
+      { icon: 'CalendarDays', label: 'Events', href: '/exchange/events', permission: 'sports:read' }
     ]
   },
   {
     // Sports Exchange ka agent system — sidebar me alag section. Create Account Account List ke button se.
     groupLabel: 'Agent Management',
+    groupIcon: 'Network',
     collapsible: true,
     items: [
-      { icon: 'Users', label: 'Account List', href: '/exchange/users', activePath: '/exchange/users', permission: ['users:read', 'staff:read'] } as MenuItem,
-      { icon: 'Landmark', label: 'Bank', href: '/exchange/bank', permission: WALLET_ANY }
+      // Zip ka Agent System (AdminManagement): Agent Listing, Staff Portal, My Account, Executives, Marketing, Activity Log — tabs me.
+      { icon: 'Network', label: 'Agent System', href: '/agent-system' },
+      { icon: 'BookUser', label: 'Account List', href: '/exchange/users', activePath: '/exchange/users', permission: ['users:read', 'staff:read'] } as MenuItem,
+      { icon: 'Landmark', label: 'Bank', href: '/exchange/bank', permission: WALLET_ANY },
+
+      // Agent ke reports.
+      { icon: 'ReceiptText', label: 'Account Statement', href: '/exchange/reports/account-statement', permission: 'reports:read' },
+      { icon: 'Scale', label: 'Party Win Loss', href: '/exchange/reports/party-win-loss', permission: 'reports:read' },
+      { icon: 'TrendingUp', label: 'Total Profit Loss', href: '/exchange/reports/total-profit-loss', permission: 'reports:read' },
+      { icon: 'UserRoundCheck', label: 'User Win Loss', href: '/exchange/reports/user-win-loss', permission: 'reports:read' },
+      { icon: 'Lock', label: 'General Lock', href: '/exchange/reports/general-lock', permission: 'reports:read' }
     ]
   },
   {
     groupLabel: 'Users',
+    groupIcon: 'UsersRound',
     items: [
-      // Sirf Super Admin: direct users ko kisi bhi currency me credit / debit (admin-structure.zip ka Wallet page).
-      { icon: 'Wallet', label: 'Direct User Wallet', href: '/direct-wallet', permission: 'wallet:adjust' },
       { icon: 'Globe', label: 'IP tracker', href: '/ip-tracker', permission: 'reports:read' },
       { icon: 'ShieldCheck', label: 'KYC', href: '/kyc', permission: 'users:read', feature: 'kyc' },
-      { icon: 'Landmark', label: 'Bank details', href: '/bank-details', permission: 'config:read' }
+      { icon: 'Building2', label: 'Bank details', href: '/bank-details', permission: 'config:read' }
+    ]
+  },
+  {
+    /*
+     * Transactions — admin-structure.zip jaisa: Deposit, Withdraw (dono me Direct Users / Agent Users tab)
+     * aur Account Statement. Purane Fiat / Crypto / Payment orders screens Direct Users tab ke andar.
+     */
+    groupLabel: 'Transactions',
+    groupIcon: 'ArrowLeftRight',
+    items: [
+      { icon: 'ArrowDownToLine', label: 'Deposit', href: '/transactions/deposit', permission: ['deposits:read', 'users:read'] },
+      { icon: 'ArrowUpFromLine', label: 'Withdraw', href: '/transactions/withdraw', permission: ['withdrawals:read', 'users:read'] },
+
+      // The transfer list is `admin/accounts/statement` (users:read); the drill-down is `admin/statements` (reports:read).
+      { icon: 'BookOpen', label: 'Account Statement', href: '/reports/statements', permission: ['users:read', 'reports:read'] }
     ]
   },
   {
     groupLabel: 'Finance',
+    groupIcon: 'Banknote',
     items: [
-      {
-        icon: 'ArrowDownToLine',
-        label: 'Deposits',
-        permission: 'deposits:read',
-        childItems: [
-          { label: 'Fiat', href: '/deposits/fiat' },
-          { label: 'Crypto', href: '/deposits/crypto' },
-          { label: 'Payment orders', href: '/deposits/orders' }
-        ]
-      },
-      {
-        icon: 'ArrowUpFromLine',
-        label: 'Withdrawals',
-        permission: 'withdrawals:read',
-        childItems: [
-          { label: 'Fiat', href: '/withdrawals/fiat' },
-          { label: 'Crypto', href: '/withdrawals/crypto' }
-        ]
-      },
-      { icon: 'Wallet', label: 'Wallets', href: '/wallets', permission: 'wallet:read' },
-      { icon: 'Coins', label: 'Exchange rates', href: '/exchange-rates', permission: 'config:read' },
+      { icon: 'ArrowRightLeft', label: 'Exchange rates', href: '/exchange-rates', permission: 'config:read' },
 
       // House only: `promotions` is the mark that hides a screen from agent-tree logins.
-      { icon: 'CircleDollarSign', label: 'Coins', href: '/coins', permission: 'config:read', promotions: true },
+      { icon: 'Bitcoin', label: 'Coins', href: '/coins', permission: 'config:read', promotions: true },
       { icon: 'Vault', label: 'Vault', href: '/vault', permission: 'reports:read', promotions: true, feature: 'vault' },
       {
         icon: 'Repeat',
@@ -300,11 +378,11 @@ export const navItems: NavItem[] = [
   },
   {
     groupLabel: 'Promotions',
+    groupIcon: 'Sparkles',
     items: [
       // The campaigns on the player site's /promotions. Reads are the public routes (staff see drafts); writes are config:write.
       { icon: 'Megaphone', label: 'Promotions', href: '/promotions/campaigns', permission: 'config:read', promotions: true, feature: 'promotions' },
       { icon: 'Gift', label: 'Bonus', href: '/bonus', permission: 'reports:read', promotions: true, flag: 'bonus', feature: 'bonus' },
-      { icon: 'Ticket', label: 'Redeem codes', href: '/redeem-codes', permission: 'reports:read', promotions: true },
 
       // Tree-scoped by the backend (like player data), so not house-only.
       // `admin/user/bonus-balance` and its stats answer any of reports:read, users:read, wallet:read.
@@ -313,62 +391,41 @@ export const navItems: NavItem[] = [
       { icon: 'Disc3', label: 'Spin wheel', href: '/spin-wheel', permission: 'reports:read', promotions: true, flag: 'wheelspin', feature: 'spin_wheel' },
       { icon: 'Crown', label: 'VIP & club', href: '/vip', permission: 'reports:read', promotions: true, flag: 'vipclub', feature: 'vip' },
       { icon: 'Link', label: 'Affiliate', href: '/affiliate', permission: 'reports:read', promotions: true, flag: 'affiliate', feature: 'affiliate' },
-      { icon: 'Trophy', label: 'Races', href: '/races', permission: 'reports:read', promotions: true, feature: 'races' }
+      { icon: 'Flag', label: 'Races', href: '/races', permission: 'reports:read', promotions: true, feature: 'races' }
     ]
   },
   {
+    // Casino — ek hi section: andar koi doosra "Casino" dropdown nahi; priority screens bhi yahin (Settings se aaye).
     groupLabel: 'Casino',
+    groupIcon: 'Spade',
     items: [
-      {
-        icon: 'Dices',
-        label: 'Casino',
-        permission: ['casino:read', 'reports:read'],
-        flag: 'casino',
-        childItems: [
-          { label: 'Game catalogue', href: '/casino/games', permission: 'casino:read' },
-          { label: 'Curation & priority', href: '/casino/curation', permission: 'casino:read' },
-          { label: 'Providers', href: '/casino/providers', permission: 'casino:read' },
+      { icon: 'Gamepad2', label: 'Game catalogue', href: '/casino/games', permission: 'casino:read', flag: 'casino' },
+      { icon: 'ListOrdered', label: 'Lobby curation', href: '/casino/curation', permission: 'casino:read', flag: 'casino' },
+      { icon: 'Server', label: 'Providers', href: '/casino/providers', permission: 'casino:read', flag: 'casino' },
 
-          // The house-games and bet-history admin reads are guarded by reports:read, not casino:read.
-          { label: 'In-house games', href: '/casino/in-house', permission: 'reports:read' },
-          { label: 'Bet history', href: '/casino/bets', permission: 'reports:read' },
+      // The house-games and bet-history admin reads are guarded by reports:read, not casino:read.
+      { icon: 'House', label: 'In-house games', href: '/casino/in-house', permission: 'reports:read', flag: 'casino' },
+      { icon: 'History', label: 'Bet history', href: '/casino/bets', permission: 'reports:read', flag: 'casino' },
 
-          // Like bet history: `GET admin/reports/wager-stats` is reports:read and tree-scoped.
-          { label: 'Wager report', href: '/casino/wager-report', permission: 'reports:read' }
-        ]
-      }
-    ]
-  },
-  {
-    groupLabel: 'Sports',
-    items: [
-      {
-        icon: 'Goal',
-        label: 'Sports',
-        permission: ['sports:read', 'reports:read'],
-        flag: 'sports',
-        childItems: [
-          { label: 'Bets', href: '/sports/bets', permission: 'sports:read' },
-          { label: 'Settlement', href: '/sports/settlement', permission: 'sports:settle' },
-          { label: 'Catalogue & locks', href: '/sports/catalogue', permission: 'sports:read' },
-
-          // The wager report reads `admin/reports/wager-stats` (reports:read, tree-scoped), so a
-          // master — reports:read without sports:read — gets it, as the API already answers.
-          { label: 'Wager report', href: '/sports/wager-report', permission: 'reports:read' }
-        ]
-      }
+      // Like bet history: `GET admin/reports/wager-stats` is reports:read and tree-scoped.
+      { icon: 'FileSpreadsheet', label: 'Wager report', href: '/casino/wager-report', permission: 'reports:read', flag: 'casino' },
+      { icon: 'Trophy', label: 'Providers Priority', href: '/providers-priority', permission: 'casino:read', flag: 'casino' },
+      { icon: 'ArrowBigUp', label: 'Vendor Priority', href: '/vendor-priority', permission: 'casino:read', flag: 'casino' },
+      { icon: 'Gamepad2', label: 'Type Priority', href: '/type-priority', permission: 'casino:read', flag: 'casino' },
     ]
   },
   {
     groupLabel: 'Team',
+    groupIcon: 'Contact',
     items: [
       { icon: 'KeyRound', label: 'Executives', href: '/access/executives', permission: 'staff:read' },
-      { icon: 'Megaphone', label: 'Marketing', href: '/marketing', account: 'marketing' },
+      { icon: 'Target', label: 'Marketing', href: '/marketing', account: 'marketing' },
       { icon: 'ScrollText', label: 'Activity log', href: '/audit', permission: 'audit:read' }
     ]
   },
   {
     groupLabel: 'Content',
+    groupIcon: 'LayoutTemplate',
     items: [
       { icon: 'Image', label: 'Banners', href: '/content/banners', permission: 'config:read', feature: 'banners' },
       { icon: 'Newspaper', label: 'Blogs', href: '/content/blogs', permission: 'config:read', feature: 'blog' },
@@ -385,44 +442,45 @@ export const navItems: NavItem[] = [
         permission: 'config:read',
         feature: 'push_notifications',
         childItems: [
-          { label: 'Compose', href: '/push/compose' },
-          { label: 'Campaigns', href: '/push/campaigns' },
-          { label: 'Push templates', href: '/push/templates' },
-          { label: 'Prompt & settings', href: '/push/settings' }
+          { icon: 'SquarePen', label: 'Compose', href: '/push/compose' },
+          { icon: 'Send', label: 'Campaigns', href: '/push/campaigns' },
+          { icon: 'LayoutTemplate', label: 'Push templates', href: '/push/templates' },
+          { icon: 'Settings', label: 'Prompt & settings', href: '/push/settings' }
         ]
       }
     ]
   },
   {
     groupLabel: 'Reports',
+    groupIcon: 'ChartPie',
     items: [
-      { icon: 'FileBarChart', label: 'User reports', href: '/reports/players', permission: 'reports:read' },
-      { icon: 'TrendingUp', label: 'Profit & loss', href: '/reports/pnl', permission: 'reports:read' },
-
-      // The transfer list is `admin/accounts/statement` (users:read); the drill-down is `admin/statements` (reports:read).
-      { icon: 'BookOpen', label: 'Statements', href: '/reports/statements', permission: ['users:read', 'reports:read'] },
+      { icon: 'ClipboardList', label: 'User reports', href: '/reports/players', permission: 'reports:read' },
+      { icon: 'BadgeDollarSign', label: 'Profit & loss', href: '/reports/pnl', permission: 'reports:read' },
       { icon: 'ShieldAlert', label: 'Risk', href: '/reports/risk', permission: 'reports:read' }
     ]
   },
   {
-    groupLabel: 'Settings',
+    // Site Config — Settings ke barabar alag section (pehle Settings ke andar dropdown tha).
+    groupLabel: 'Site Config',
+    groupIcon: 'Settings2',
     items: [
-      {
-        icon: 'Settings2',
-        label: 'Site config',
-        permission: 'config:read',
-        childItems: [
-          { label: 'Features', href: '/site-config/features' },
-          { label: 'Branding', href: '/site-config/branding' },
-          { label: 'Feature flags', href: '/site-config/flags' },
-          { label: 'Limits and policy', href: '/site-config/limits' },
-          { label: 'Affiliate rates', href: '/site-config/affiliate', feature: 'affiliate', promotions: true },
-          { label: 'Welcome bonuses', href: '/site-config/welcome-bonuses', promotions: true },
-          { label: 'Email (SMTP)', href: '/site-config/email' },
-          { label: 'Sports switch', href: '/site-config/sports', ownerFlag: 'sports' }
-        ]
-      },
-      { icon: 'UserCog', label: 'My account', href: '/account' }
+      { icon: 'ToggleRight', label: 'Features', href: '/site-config/features', permission: 'config:read' },
+      { icon: 'Palette', label: 'Branding', href: '/site-config/branding', permission: 'config:read' },
+      { icon: 'Flag', label: 'Feature flags', href: '/site-config/flags', permission: 'config:read' },
+      { icon: 'Gauge', label: 'Limits and policy', href: '/site-config/limits', permission: 'config:read' },
+      { icon: 'Percent', label: 'Affiliate rates', href: '/site-config/affiliate', permission: 'config:read', feature: 'affiliate', promotions: true },
+      { icon: 'PartyPopper', label: 'Welcome bonuses', href: '/site-config/welcome-bonuses', permission: 'config:read', promotions: true },
+      { icon: 'Mail', label: 'Email (SMTP)', href: '/site-config/email', permission: 'config:read' },
+      { icon: 'Power', label: 'Sports switch', href: '/site-config/sports', permission: 'config:read', ownerFlag: 'sports' }
+    ]
+  },
+  {
+    // Zip jaisa Settings: Payment Methods (+ My account). Priority screens Casino me, Site Config alag section.
+    groupLabel: 'Settings',
+    groupIcon: 'Settings',
+    items: [
+      { icon: 'CreditCard', label: 'Payment Methods', href: '/payment-methods', permission: 'config:read' },
+      { icon: 'CircleUserRound', label: 'My account', href: '/account' }
     ]
   }
 ]

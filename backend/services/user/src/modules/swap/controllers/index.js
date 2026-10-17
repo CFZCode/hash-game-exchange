@@ -31,8 +31,8 @@ function createControllers({ service }) {
 
     /** @legacy GET /internalswap/history */
     adminHistory: asyncHandler(async (req, res) => {
-      const { limit, offset, userId, currency } = req.query;
-      const result = await service.listAllHistory({ staff: req.staff, userId, currency, limit, offset });
+      const { limit, offset, userId, currency, channel } = req.query;
+      const result = await service.listAllHistory({ staff: req.staff, userId, currency, channel, limit, offset });
       return response.paginated(res, result, { page: Math.floor(offset / limit) + 1, limit });
     }),
 

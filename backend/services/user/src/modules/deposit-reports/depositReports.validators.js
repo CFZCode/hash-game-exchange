@@ -21,6 +21,8 @@ const cryptoList = {
     chain: z.string().trim().min(1).max(20).optional(),
     // The coin (ticker) — the site admin's currency filter on Finance → Deposits → Crypto.
     coin: z.string().trim().toUpperCase().min(2).max(12).regex(/^[A-Z0-9]+$/).optional(),
+    // Direct Users | Agent Users — na ho to sab (purana jawab).
+    channel: z.enum(['direct', 'agent']).optional(),
   }),
 };
 

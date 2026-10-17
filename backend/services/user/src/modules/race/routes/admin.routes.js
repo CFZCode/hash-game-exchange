@@ -39,7 +39,7 @@ module.exports = function adminRoutes(deps) {
   router.get('/rewards', canRead, validate(v.adminListing), ctrl.listRewards);
   router.get('/boats', canRead, ctrl.listBoats);
   router.get('/config/:type', canRead, validate(v.typeParam), ctrl.getConfig);
-  router.get('/leaderboard/:type', canRead, validate(v.typeParam), ctrl.adminLeaderboard);
+  router.get('/leaderboard/:type', canRead, validate(v.adminLeaderboard), ctrl.adminLeaderboard);
 
   // ── Configuration ───────────────────────────────────────────────────
   router.put(

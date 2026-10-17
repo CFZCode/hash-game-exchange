@@ -310,6 +310,23 @@ test('staff listings are scoped to the caller’s tree', async (t) => {
     assert.deepEqual(ours(all.rows, 'userId'), players.slice().sort());
   });
 
+  await t.test('channel=agent keeps agent players, channel=direct drops them (Direct Users | Agent Users tabs)', async () => {
+    // Dono test players agent ke neeche hain (parent_staff_id set) — direct tab me nahi aane chahiye.
+    const opts = { staff: asAdmin, limit: 500, offset: 0 };
+    const lists = [
+      ['swap', (c) => new SwapService(deps).listAllHistory({ ...opts, channel: c }), 'uid'],
+      ['redeem codes', (c) => new BonusService(deps).listCodes({ ...opts, channel: c }), 'userId'],
+      ['gift cards', (c) => new GiftCardsService(deps).records({ ...opts, channel: c }), 'userId'],
+      ['vault users', (c) => new VaultService(deps).listVaultUsers({ ...opts, channel: c }), 'userid'],
+      ['kyc (varchar user_id)', (c) => new KycService(deps).listApplications({ ...opts, channel: c }), 'userId'],
+      ['spin claims', (c) => new SpinWheelService(deps).listClaims({ ...opts, channel: c }), 'userId'],
+    ];
+    for (const [name, list, key] of lists) {
+      assert.deepEqual(ours((await list('agent')).rows, key), players.slice().sort(), `${name}: agent`);
+      assert.deepEqual(ours((await list('direct')).rows, key), [], `${name}: direct`);
+    }
+  });
+
   await t.test('no caller is no rows, not every row', async () => {
     const swap = new SwapService(deps);
     const none = await swap.listAllHistory({ limit: 500, offset: 0 });

@@ -100,6 +100,14 @@ const isExternalLink = (href: string) => href.startsWith('http://') || href.star
 const subGroupKey = (itemLabel: string, subItemLabel: string) => `${itemLabel}::${subItemLabel}`
 
 // Collapsible sidebar group (section) ka key — item labels se takraye nahi.
+/** navIcons se icon (sub-item / section heading ke liye chhota). */
+const NavIcon = ({ name, className }: { name?: keyof typeof navIcons; className?: string }) => {
+  if (!name) return null
+  const Tag = navIcons[name] as ComponentType<{ className?: string }>
+
+  return <Tag className={cn('size-3.5! shrink-0 opacity-80', className)} />
+}
+
 const groupKey = (groupLabel: string) => `group::${groupLabel}`
 
 function isLinkActive(
@@ -263,6 +271,7 @@ const FlyoutMenuItem = ({
 const SidebarGroupedMenuItems = ({
   data,
   groupLabel,
+  groupIcon,
   collapsible,
   pathname,
   searchParams,
@@ -272,6 +281,7 @@ const SidebarGroupedMenuItems = ({
 }: {
   data: MenuItem[]
   groupLabel?: string
+  groupIcon?: keyof typeof navIcons
   collapsible?: boolean
   pathname: string
   searchParams: Pick<URLSearchParams, 'get'>
@@ -353,6 +363,7 @@ const SidebarGroupedMenuItems = ({
                                 />
                               }
                             >
+                              <NavIcon name={subItem.icon} />
                               {subItem.label}
                               <ChevronRightIcon className='ml-auto shrink-0 transition-transform duration-200 group-data-open/subcollapsible:rotate-90' />
                             </CollapsibleTrigger>
@@ -365,6 +376,7 @@ const SidebarGroupedMenuItems = ({
                                       render={<Link href={leaf.href} target={leaf.target} />}
                                       isActive={isLinkActive(leaf.href, leaf.activePath, pathname, searchParams)}
                                     >
+                                      <NavIcon name={leaf.icon} />
                                       <span
                                         className={cn(
                                           'min-w-0 flex-1 truncate',
@@ -404,6 +416,7 @@ const SidebarGroupedMenuItems = ({
                             render={<Link href={subItem.href} target={subItem.target} />}
                             isActive={isLinkActive(subItem.href, subItem.activePath, pathname, searchParams)}
                           >
+                            <NavIcon name={subItem.icon} />
                             <span
                               className={cn(
                                 'min-w-0 flex-1 truncate',
@@ -490,6 +503,7 @@ const SidebarGroupedMenuItems = ({
               />
             }
           >
+            <NavIcon name={groupIcon} className='mr-1.5' />
             <span className='min-w-0 flex-1 truncate'>{groupLabel}</span>
             <ChevronRightIcon className='ml-auto transition-transform duration-200 group-data-open/section:rotate-90' />
           </CollapsibleTrigger>
@@ -503,7 +517,12 @@ const SidebarGroupedMenuItems = ({
 
   return (
     <SidebarGroup className='gap-1 px-2 py-1.5'>
-      {groupLabel && <SidebarGroupLabel className={labelClass}>{groupLabel}</SidebarGroupLabel>}
+      {groupLabel && (
+        <SidebarGroupLabel className={labelClass}>
+          <NavIcon name={groupIcon} className='mr-1.5' />
+          {groupLabel}
+        </SidebarGroupLabel>
+      )}
       {menu}
     </SidebarGroup>
   )
@@ -610,6 +629,7 @@ const SidebarLayout = () => {
               key={navItem.groupLabel || index}
               data={navItem.items}
               groupLabel={navItem.groupLabel}
+              groupIcon={navItem.groupIcon}
               collapsible={navItem.collapsible}
               pathname={pathname}
               searchParams={searchParams}

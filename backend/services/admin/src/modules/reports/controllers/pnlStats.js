@@ -17,6 +17,7 @@ function createPnlStatsControllers(deps) {
     to: req.query.to,
     granularity: req.query.granularity,
     currency: req.query.currency,
+    channel: req.query.channel,
   });
 
   return {

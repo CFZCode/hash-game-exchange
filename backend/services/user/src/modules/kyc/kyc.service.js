@@ -13,7 +13,7 @@ const {
   MAX_FILE_BYTES,
   DOCUMENT_FIELDS,
 } = require('./kyc.constants');
-const { ownerWhere, assertPlayerVisible } = require('../directory/playerScope');
+const { ownerWhere, assertPlayerVisible, withChannel } = require('../directory/playerScope');
 const { notifyPlayer } = require('../notifications/notifyPlayer');
 
 /**
@@ -196,8 +196,9 @@ class KycService {
    * The caller's tree only. `users:read` reaches every agent, and this listed
    * every player's name, date of birth and address site-wide.
    */
-  async listApplications({ staff, status, search, limit, offset }) {
-    const where = {
+  async listApplications({ staff, status, search, channel, limit, offset }) {
+    // `user_kyc.user_id` VARCHAR hai.
+    const where = withChannel({
       ...(await ownerWhere(this, staff?.id, 'user_id')),
       ...(status ? { status } : {}),
       ...(search
@@ -209,7 +210,7 @@ class KycService {
             ],
           }
         : {}),
-    };
+    }, 'user_id', channel, { text: true });
 
     const result = await this.models.UserKyc.findAndCountAll({
       where,

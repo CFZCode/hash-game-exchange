@@ -6,6 +6,7 @@ const { money } = require('@ibitplay/common');
 const errors = require('./depositReports.errors');
 const { SOURCES, statusBucket, BUCKET, CCPAYMENT_COINS, FIAT_WITHDRAWN } = require('./depositReports.constants');
 const { ccpaymentTicker } = require('../payment-orders/gateways');
+const { withChannel } = require('../directory/playerScope');
 
 /** `money`'s minor units per one unit. */
 const USD_SCALE = money.toMinor('1');
@@ -67,8 +68,9 @@ class DepositReportsService {
    * charts (`reports/financeStats.service.js`) follow. An unpriced coin is
    * `amountUsd: null`, never a made-up figure.
    */
-  async listCryptoDeposits({ staff, status, from, to, userId, chain, coin, limit = 10, offset = 0 }) {
-    const where = await this.#cryptoScope(staff, { status, from, to, userId, chain });
+  async listCryptoDeposits({ staff, status, from, to, userId, chain, coin, channel, limit = 10, offset = 0 }) {
+    // `ccdeposit.userid` VARCHAR hai.
+    const where = withChannel(await this.#cryptoScope(staff, { status, from, to, userId, chain }), 'userid', channel, { text: true });
     // `ccdeposit` keys the coin by CCPayment's numeric id: a ticker filter is
     // every id that reads as it (the configured map, then the built-in one).
     // A coin no id maps to matches nothing.

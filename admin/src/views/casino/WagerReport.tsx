@@ -18,6 +18,7 @@ import {
 } from '@/components/shared/charts'
 import DataTable, { type Column } from '@/components/shared/DataTable'
 import Money from '@/components/shared/Money'
+import ChannelTabs, { type Channel } from '@/components/shared/ChannelTabs'
 import PageHeader from '@/components/shared/PageHeader'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useApi } from '@/hooks/use-api'
@@ -63,10 +64,10 @@ const pct = (v: number | null | undefined) => (v === null || v === undefined ? '
  * Turnover, payouts and GGR (wagered − won, the house's side) for casino or sports, from
  * `GET admin/reports/wager-stats` (reports:read, scoped to the caller's agent tree).
  */
-const WagerReport = ({ area }: Props) => {
+const WagerReportView = ({ area, channel }: Props & { channel: Channel }) => {
   const filters = useStatsFilters()
   const currencies = useCurrencyCodes()
-  const query = { area, ...filters.query }
+  const query = { area, channel, ...filters.query }
   const stats = useApi<WagerStats>(STATS, query)
   const prev = useApi<WagerStats>(STATS, { ...query, ...filters.previous.apiRange })
 
@@ -122,14 +123,6 @@ const WagerReport = ({ area }: Props) => {
 
   return (
     <div>
-      <PageHeader
-        title={`${title} wager report`}
-        description={
-          area === 'casino'
-            ? 'Stakes, payouts and gross gaming revenue (GGR = wagered − won) across every casino provider, for the players in your tree. Refunds are kept out of both sides.'
-            : 'Stakes of settled bets (when they were placed) against settlement payouts (when they were paid), for the players in your tree. GGR = wagered − won.'
-        }
-      />
       <FilterBar filters={filters} currencies={currencies} className='mb-4' />
 
       <Can
@@ -291,5 +284,20 @@ const WagerReport = ({ area }: Props) => {
     </div>
   )
 }
+
+/** Wager report — Direct Users | Agent Users alag tab (dono ke figures alag). */
+const WagerReport = ({ area }: Props) => (
+  <div>
+    <PageHeader
+      title={`${area === 'casino' ? 'Casino' : 'Sports'} wager report`}
+      description={
+        area === 'casino'
+          ? 'Stakes, payouts and gross gaming revenue (GGR = wagered − won) across every casino provider, for the players in your tree. Refunds are kept out of both sides.'
+          : 'Stakes of settled bets (when they were placed) against settlement payouts (when they were paid), for the players in your tree. GGR = wagered − won.'
+      }
+    />
+    <ChannelTabs>{channel => <WagerReportView area={area} channel={channel} />}</ChannelTabs>
+  </div>
+)
 
 export default WagerReport

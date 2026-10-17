@@ -8,7 +8,7 @@ const errors = require('./giftCards.errors');
 const { STATUS, DEPOSIT_SOURCES } = require('./giftCards.constants');
 const { WalletService } = require('../wallet/wallet.service');
 const { REASON } = require('../wallet/wallet.constants');
-const { ownerWhere } = require('../directory/playerScope');
+const { ownerWhere, withChannel } = require('../directory/playerScope');
 
 /**
  * Gift cards — a promotional credit a player unlocks by depositing, wagering,
@@ -216,9 +216,9 @@ class GiftCardsService {
   }
 
   /** @legacy GET /giftCard/admin/records — the caller's tree only. */
-  async records({ staff, status, userId, limit = 50, offset = 0 }) {
+  async records({ staff, status, userId, channel, limit = 50, offset = 0 }) {
     const { rows, count } = await this.models.UserGiftCards.findAndCountAll({
-      where: { ...(status ? { status } : {}), ...(await ownerWhere(this, staff?.id, 'user_id', userId)) },
+      where: withChannel({ ...(status ? { status } : {}), ...(await ownerWhere(this, staff?.id, 'user_id', userId)) }, 'user_id', channel),
       order: [['id', 'DESC']],
       limit,
       offset,

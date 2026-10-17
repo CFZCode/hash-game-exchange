@@ -59,7 +59,7 @@ const interestColumns: Column<VaultInterestRow>[] = [
 /** `coin`: the page's currency filter ('' = every coin). */
 const Deposits = ({ coin }: { coin: string }) => {
   const { set, query } = useListState()
-  const list = usePagedApi<VaultDepositRow>(`${BASE}/users`, { limit: query.limit, page: query.page, coin: coin || undefined })
+  const list = usePagedApi<VaultDepositRow>(`${BASE}/users`, { channel: 'direct', limit: query.limit, page: query.page, coin: coin || undefined })
 
   return (
     <DataTable
@@ -79,7 +79,7 @@ const Deposits = ({ coin }: { coin: string }) => {
 
 const Interest = ({ coin }: { coin: string }) => {
   const { set, query } = useListState()
-  const list = usePagedApi<VaultInterestRow>(`${BASE}/interest`, { limit: query.limit, page: query.page, coin: coin || undefined })
+  const list = usePagedApi<VaultInterestRow>(`${BASE}/interest`, { channel: 'direct', limit: query.limit, page: query.page, coin: coin || undefined })
 
   return (
     <DataTable

@@ -338,6 +338,26 @@ test('admin account controls', async (t) => {
     assert.equal(Number(entry.delta), 700);
   });
 
+  await t.test('transfer statement: Direct Users | Agent Users tab (channel)', async () => {
+    const owner = await seedStaff(newStaffId(), { inr: '1000' });
+    const actor = actorFor(owner, { canIssueFunds: true, level: 0 });
+    const child = await seedPlayer(newUid(), owner, '0');
+    const direct = await seedPlayer(newUid(), owner, '0');
+    await connection.models.Users.update({ parent_staff_id: null }, { where: { id: direct } });
+    await connection.models.StaffBalances.destroy({ where: { staff_id: owner } });
+    await connection.models.StaffBalances.create({ staff_id: owner, inr: '100' });
+    await service.refill({ actor, accountId: child, amount: '10', transactionPassword: TXN_PASSWORD });
+    await service.refill({ actor, accountId: direct, amount: '20', transactionPassword: TXN_PASSWORD });
+
+    const toIds = async (channel) =>
+      (await service.transferStatement({ actor, accountType: 'staff', accountId: owner, channel, limit: 50, offset: 0 })).rows.map((r) => String(r.to?.id ?? r.toId ?? r.to_id));
+    const directIds = await toIds('direct');
+    const agentIds = await toIds('agent');
+    assert.ok(directIds.includes(String(direct)) && !directIds.includes(String(child)), JSON.stringify(directIds));
+    assert.ok(agentIds.includes(String(child)) && !agentIds.includes(String(direct)), JSON.stringify(agentIds));
+    assert.equal((await toIds(undefined)).length, directIds.length + agentIds.length, 'na bheja = dono');
+  });
+
   await t.test('a refill above the ceiling is refused', async () => {
     // Legacy had no ceiling on a direct wallet credit.
     const owner = await seedStaff(newStaffId(), { inr: '0' });

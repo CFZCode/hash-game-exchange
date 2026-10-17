@@ -214,6 +214,8 @@ const Records = () => {
   const [userId, setUserId] = useState('')
 
   const list = usePagedApi<GiftCardRecord>('admin/user/gift-cards/records', {
+    // Agent ke users ye use nahi kar sakte — sirf direct users.
+    channel: 'direct',
     limit,
     page,
     status: status === 'all' ? undefined : status,

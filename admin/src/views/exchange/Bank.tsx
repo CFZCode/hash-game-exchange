@@ -6,6 +6,7 @@ import { ArrowRightIcon, FileSpreadsheetIcon, FileTextIcon, Loader2Icon } from '
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
+import ChannelTabs, { type Channel } from '@/components/shared/ChannelTabs'
 import DataTable, { type Column } from '@/components/shared/DataTable'
 import PageHeader from '@/components/shared/PageHeader'
 import { Button } from '@/components/ui/button'
@@ -28,9 +29,9 @@ const EXPORT_COLS = ['User Name', 'CR', 'pts', 'Client(P/L)', 'Exposure', 'Avail
  * Direct children ki list (CR, pts, Client(P/L), Exposure, Available pts). Har row me
  * "All →" pending ka ULTA sign box me bhar deta hai, Submit = points settlement:
  *   Client(P/L) −100 → box +100 (dena hai)  |  Client(P/L) +10 → box −10 (lena hai)
- * Transaction Code upar ek baar.
+ * Transaction Code upar ek baar. Upar Direct Users | Agent Users tab (`channel`).
  */
-const Bank = () => {
+const BankBody = ({ channel }: { channel: Channel }) => {
   const qc = useQueryClient()
   const { state, set, query } = useListState()
   const limit = Number(query.limit ?? 20)
@@ -39,7 +40,8 @@ const Bank = () => {
   const { data, isLoading, isFetching, error } = useApi<AccountsResponse>('admin/exchange/accounts', {
     limit,
     offset: (page - 1) * limit,
-    search: query.search || undefined
+    search: query.search || undefined,
+    channel
   })
 
   const rows = data?.rows ?? []
@@ -134,11 +136,9 @@ const Bank = () => {
 
   return (
     <div>
-      <PageHeader
-        title='Bank'
-        description='Settle the Client(P/L) of your direct accounts.'
-        actions={
-          <div className='flex flex-wrap items-center gap-2'>
+      <DataTable
+        toolbar={
+          <div className='ml-auto flex flex-wrap items-center gap-2'>
             <Button variant='outline' size='icon' disabled={!rows.length} onClick={() => exportExcel('bankuserlist', EXPORT_COLS, exportRows())} aria-label='Excel'>
               <FileSpreadsheetIcon />
             </Button>
@@ -154,9 +154,6 @@ const Bank = () => {
             />
           </div>
         }
-      />
-
-      <DataTable
         columns={columns}
         rows={rows}
         rowKey={keyOf}
@@ -174,5 +171,12 @@ const Bank = () => {
     </div>
   )
 }
+
+const Bank = () => (
+  <div>
+    <PageHeader title='Bank' description='Settle the Client(P/L) of your direct accounts.' />
+    <ChannelTabs>{channel => <BankBody channel={channel} />}</ChannelTabs>
+  </div>
+)
 
 export default Bank

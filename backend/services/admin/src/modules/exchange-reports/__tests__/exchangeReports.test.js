@@ -271,6 +271,22 @@ test('exchange reports', async (t) => {
     assert.deepStrictEqual(onlyUsers.map((r) => r.username).sort(), [`rep-direct-${base}`, `rep-playerA-${base}`, `rep-playerB-${base}`]);
   });
 
+  await t.test('Direct Users | Agent Users tab (channel): direct = parent NULL, agent = tree only', async () => {
+    const names = async (channel) =>
+      (await reports.partyWinLoss({ actor: owner, type: 'all', search: `-${base}`, channel })).map((r) => r.username).sort();
+    assert.deepStrictEqual(await names('direct'), [`rep-direct-${base}`]);
+    const agentSide = await names('agent');
+    assert.ok(!agentSide.includes(`rep-direct-${base}`));
+    assert.ok(agentSide.includes(`rep-playerA-${base}`) && agentSide.includes(`rep-agentA-${base}`));
+
+    const search = async (channel) => (await reports.clients({ actor: owner, search: `-${base}`, channel })).map((r) => r.username);
+    assert.deepStrictEqual(await search('direct'), [`rep-direct-${base}`]);
+    assert.ok(!(await search('agent')).includes(`rep-direct-${base}`));
+
+    // agent (non-owner) ke liye direct tab khaali
+    assert.deepStrictEqual(await reports.partyWinLoss({ actor: agent, type: 'all', channel: 'direct' }), []);
+  });
+
   await t.test('user win loss: category sums, client = staff narrows to its players', async () => {
     const res = await reports.userWinLoss({ actor: owner, clientType: 'staff', clientId: agentA, ...range });
     assert.deepStrictEqual(res.rows.map((r) => [r.username, r.sports_pts, r.total]), [[`rep-playerA-${base}`, -10, -10]]);
@@ -281,12 +297,9 @@ test('exchange reports', async (t) => {
   });
 
   await t.test('total profit loss: grouped by sport + game type', async () => {
-    const res = await reports.totalProfitLoss({ actor: agent, type: '0', ...range });
+    const res = await reports.totalProfitLoss({ actor: agent, ...range });
     assert.deepStrictEqual(res.sports, [{ event_name: 'Cricket', game_type: 'match', opening: 50, closing: 40, profit_loss: -10 }]);
-    assert.deepStrictEqual(res.sportbook, []);
-
-    const sportbook = await reports.totalProfitLoss({ actor: agent, type: '5', ...range });
-    assert.deepStrictEqual(sportbook.sports, []);
+    assert.deepStrictEqual(Object.keys(res), ['sports'], 'no sportbook section');
   });
 
   await t.test('turnover: liability of won / lost bets and ledger win / loss', async () => {

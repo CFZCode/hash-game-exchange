@@ -12,6 +12,7 @@ import DateTime from '@/components/shared/DateTime'
 import ErrorState from '@/components/shared/ErrorState'
 import JsonView from '@/components/shared/JsonView'
 import Money from '@/components/shared/Money'
+import ChannelTabs, { type Channel } from '@/components/shared/ChannelTabs'
 import PageHeader from '@/components/shared/PageHeader'
 import StatCard from '@/components/shared/StatCard'
 import StatusBadge from '@/components/shared/StatusBadge'
@@ -53,7 +54,8 @@ const transferColumns: Column<TransferRow>[] = [
 /** Display-only sum of the amounts on this page (the wire carries decimal strings). */
 const sumAmounts = (rows: { amount: string }[] | undefined) => rows?.reduce((acc, r) => acc + Number(r.amount || 0), 0) ?? 0
 
-const TransfersTab = () => {
+/** Transfers — Direct Users | Agent Users tab (`channel`): direct = jisme ek taraf direct user ho. */
+const TransfersTab = ({ channel }: { channel: Channel }) => {
   const { state, set, query } = useListState(['accountType', 'accountId', 'from', 'to'])
 
   const list = usePagedApi<TransferRow>('admin/accounts/statement', {
@@ -62,7 +64,8 @@ const TransfersTab = () => {
     accountType: query.accountId ? query.accountType || 'user' : undefined,
     accountId: query.accountId,
     from: query.from,
-    to: query.to
+    to: query.to,
+    channel
   })
 
   const rows = list.data?.rows
@@ -312,7 +315,7 @@ const Statements = () => {
         )}
         {canTransfers && (
           <TabsContent value='transfers'>
-            <TransfersTab />
+            <ChannelTabs>{channel => <TransfersTab channel={channel} />}</ChannelTabs>
           </TabsContent>
         )}
       </Tabs>

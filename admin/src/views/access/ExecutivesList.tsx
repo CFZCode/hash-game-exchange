@@ -67,7 +67,7 @@ const PermissionPicker = ({ value, onChange }: { value: string[]; onChange: (nex
   )
 }
 
-const CreateSubLogin = ({ kind }: { kind: Kind }) => {
+export const CreateSubLogin = ({ kind }: { kind: Kind }) => {
   const [form, setForm] = useState({ username: '', password: '', confirm: '' })
   const [permissions, setPermissions] = useState<string[]>(kind === 'marketing' ? ['reports:read'] : [])
 
@@ -118,7 +118,7 @@ const CreateSubLogin = ({ kind }: { kind: Kind }) => {
  * agent tree (super masters, masters) create them under THEMSELVES, never with a permission they
  * do not hold (the platform refuses). Marketing users stay with `roles:manage`.
  */
-const GRANT: Record<Kind, string | string[]> = { executive: ['roles:manage', 'staff:write'], marketing: 'roles:manage' }
+export const GRANT: Record<Kind, string | string[]> = { executive: ['roles:manage', 'staff:write'], marketing: 'roles:manage' }
 
 const RowActions = ({ row, kind }: { row: ExecutiveRow; kind: Kind }) => {
   const base = BASE[kind]
@@ -231,7 +231,7 @@ const ActivityDialog = ({ row, open, onOpenChange }: { row: ExecutiveRow; open: 
   )
 }
 
-const SubLoginTable = ({ kind }: { kind: Kind }) => {
+export const SubLoginTable = ({ kind }: { kind: Kind }) => {
   const { state, set, query } = useListState(['status'])
   const list = usePagedApi<ExecutiveRow>(BASE[kind], { limit: query.limit, page: query.page, search: query.search, status: query.status })
 

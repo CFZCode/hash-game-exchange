@@ -25,6 +25,7 @@ import {
 } from '@/components/shared/charts'
 import ErrorState from '@/components/shared/ErrorState'
 import Money from '@/components/shared/Money'
+import ChannelTabs, { type Channel } from '@/components/shared/ChannelTabs'
 import PageHeader from '@/components/shared/PageHeader'
 import { useApi } from '@/hooks/use-api'
 import { formatMoney, formatNumber } from '@/lib/format'
@@ -194,20 +195,22 @@ const BreakdownChart = ({ title, description, rows, unit, loading, error, color 
   )
 }
 
-const ProfitLoss = () => {
+const ProfitLossView = ({ channel }: { channel: Channel }) => {
   const f = useStatsFilters({ defaultPreset: '30d' })
   const currencies = useCurrencyCodes()
 
-  const summary = useApi<Summary>(SUMMARY, f.query, { placeholderData: prev => prev, retry: false })
+  // Direct Users | Agent Users tab — har query me `channel`.
+  const q = { ...f.query, channel }
+  const summary = useApi<Summary>(SUMMARY, q, { placeholderData: prev => prev, retry: false })
 
   // The previous window only feeds the deltas, so one bucket per month is plenty.
   const previous = useApi<Summary>(
     SUMMARY,
-    { ...f.previous.apiRange, granularity: 'month', ...(f.currency ? { currency: f.currency } : {}) },
+    { ...f.previous.apiRange, granularity: 'month', ...(f.currency ? { currency: f.currency } : {}), channel },
     { retry: false }
   )
 
-  const breakdown = useApi<Breakdown>(BREAKDOWN, f.query, { placeholderData: prev => prev, retry: false })
+  const breakdown = useApi<Breakdown>(BREAKDOWN, q, { placeholderData: prev => prev, retry: false })
 
   const s = summary.data
   const p = previous.data
@@ -312,14 +315,11 @@ const ProfitLoss = () => {
 
   return (
     <div>
-      <PageHeader
-        title='Profit & loss'
-        description={
-          s?.converted || !f.currency
-            ? (s?.valuation?.note ?? 'All currencies, converted to USD at current rates.')
-            : `Figures in ${unit}, for rows in that currency only.`
-        }
-      />
+      <p className='text-muted-foreground mb-4 text-sm'>
+        {s?.converted || !f.currency
+          ? (s?.valuation?.note ?? 'All currencies, converted to USD at current rates.')
+          : `Figures in ${unit}, for rows in that currency only.`}
+      </p>
 
       <div className='flex flex-col gap-6'>
         <FilterBar filters={f} currencies={currencies} />
@@ -734,5 +734,13 @@ const ProfitLoss = () => {
     </div>
   )
 }
+
+/** Profit & loss — Direct Users | Agent Users alag tab (dono ke figures alag). */
+const ProfitLoss = () => (
+  <div>
+    <PageHeader title='Profit & loss' description='What the house made from players, minus what it gave back. Direct and agent players are shown separately.' />
+    <ChannelTabs>{channel => <ProfitLossView channel={channel} />}</ChannelTabs>
+  </div>
+)
 
 export default ProfitLoss

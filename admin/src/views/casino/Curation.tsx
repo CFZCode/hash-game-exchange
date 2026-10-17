@@ -6,7 +6,7 @@ import ErrorState from '@/components/shared/ErrorState'
 import PageHeader from '@/components/shared/PageHeader'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useSession } from '@/contexts/SessionContext'
 import { useApi, useApiMutation } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
@@ -138,7 +138,8 @@ const GIS_COLLECTIONS = [
 
 const gisSearch = async (q: string) => (await api.get<GisGame[]>('admin/casino/games/catalogue/search', { q, limit: 100 })).map(gisItem)
 
-const CollectionsTab = () => {
+/** Settings → Providers Priority (zip jaisa): home ke GIS collections ka order. */
+export const CollectionsTab = () => {
   const { can } = useSession()
   const [collection, setCollection] = useState('hot')
   const path = `admin/casino/games/collections/${collection}`
@@ -164,7 +165,8 @@ const CollectionsTab = () => {
 }
 
 /** Per-vendor or per-type pinned order in the aggregator catalogue. */
-const PriorityTab = ({ kind }: { kind: 'vendor' | 'type' }) => {
+/** Settings → Vendor Priority / Type Priority (zip jaisa): pinned games ka order. */
+export const PriorityTab = ({ kind }: { kind: 'vendor' | 'type' }) => {
   const { can } = useSession()
   const [key, setKey] = useState('')
   const options = useApi<(GisVendor | GisType)[]>(kind === 'vendor' ? 'admin/casino/games/vendors' : 'admin/casino/games/types')
@@ -214,29 +216,11 @@ const PriorityTab = ({ kind }: { kind: 'vendor' | 'type' }) => {
   )
 }
 
+/** Casino → Lobby curation: site jo lobby dikhati hai uska order. Aggregator collections / vendor / type priority ab Settings me (zip jaisa). */
 const Curation = () => (
   <div>
-    <PageHeader title='Curation & priority' description='What the lobby shows and in what order. "Lobby" orders the games the site actually renders; the aggregator tabs order the Slotegrator catalogue.' />
-    <Tabs defaultValue='lobby'>
-      <TabsList className='mb-4 flex-wrap'>
-        <TabsTrigger value='lobby'>Lobby (js-games)</TabsTrigger>
-        <TabsTrigger value='collections'>Aggregator collections</TabsTrigger>
-        <TabsTrigger value='vendor'>Vendor priority</TabsTrigger>
-        <TabsTrigger value='type'>Type priority</TabsTrigger>
-      </TabsList>
-      <TabsContent value='lobby'>
-        <LobbyTab />
-      </TabsContent>
-      <TabsContent value='collections'>
-        <CollectionsTab />
-      </TabsContent>
-      <TabsContent value='vendor'>
-        <PriorityTab kind='vendor' />
-      </TabsContent>
-      <TabsContent value='type'>
-        <PriorityTab kind='type' />
-      </TabsContent>
-    </Tabs>
+    <PageHeader title='Lobby curation' description='What the lobby shows and in what order — the games the site actually renders. Providers / Vendor / Type priority are under Settings.' />
+    <LobbyTab />
   </div>
 )
 

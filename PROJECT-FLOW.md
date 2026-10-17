@@ -25,6 +25,7 @@ Last updated: 2026-10-16
 
 - **Referral se signup = direct user.** Signup pe referrer ka code sirf `users.refree` me jaata hai aur affiliate team join hoti hai. `parent_staff_id` set nahi hota (`backend/services/user/src/modules/auth/auth.service.js` → `register`).
 - **Client user kabhi referrer nahi ban sakta.** Agent-tree player ka referral code kahin kaam nahi karta (`backend/services/user/src/modules/affiliate/referrerResolver.js`).
+- **Promotions sirf direct users ke liye.** Promotions campaigns, Bonus, Redeem codes, Gift cards, Spin wheel, VIP & club, Affiliate, Races, Rakeback, Welcome bonus, Bonus balances, Turnover Report — sab sirf `parent_staff_id IS NULL` wale users. Client user (Agent System) ko koi promotion / bonus nahi.
 
 ## 3. Admin Dashboard (`/dashboard`)
 
@@ -58,6 +59,30 @@ Reference: `admin-structure.zip` → adminpanel/src/components/users. Teen tab (
 - **Balance sheet:** direct user → deposits/withdrawals/bets (`balance-sheet`). Client user (parent wala) → sab kuch `mssports.point_ledger` me hai, wahin se (`client-balance-sheet`).
 - **Rule:** existing API kabhi mat badlo — naya endpoint banao.
 
+## 3c. Agent System page (`/agent-system`) — sidebar "Agent Management" me sabse upar
+
+Reference: `admin-structure.zip` → components/AdminManagement.tsx (Dashboard tab chhod ke; Dashboard = `/dashboard?tab=agent`). Flow apna Sports Exchange agent setup, UI zip jaisa. Tabs (`?tab=`):
+- **Agent Listing** (`agents`): `GET admin/exchange/accounts` (direct children, `parentId` = drill-down, sirf dekhna). Deposit/Withdraw = `admin/staff/transfer`, Settlement = `admin/exchange/points/settle`, Settings = MoreDialog (password / lock / credit history). Create Agent → `/exchange/users/create`.
+- **Staff Portal**: Quick ID = `admin/exchange/accounts-admin/create` (userType USER). Wallet Refill = owner `admin/accounts/refill` (note ke saath; direct user ho to owner ke Direct Users balance se), baaki `admin/staff/transfer`. Lock = `admin/accounts/status` (sportsLocked / casinoLocked / systemLocked).
+- **My Account**: owner ko dono balance + Add Balance; phir `/account` wala MyAccount.
+- **Executives / Marketing**: `admin/access/executives` / `admin/access/marketing-users`.
+- **Hierarchy**: zip Percentage Hierarchy jaisa tree, bina percentage — `GET admin/agent-hierarchy` (naya; upline + aap + downline staff, har node pe direct users ki ginti).
+- **Activity Log**: `admin/audit/activity` (audit:read).
+
+## 3d. Transactions (sidebar group, zip jaisa)
+
+- **Deposit** `/transactions/deposit`, **Withdraw** `/transactions/withdraw` — zip `DepositPage` / `WithdrawPage` jaisa tab bar (`?tab=direct|agent`):
+  - **Direct Users**: tabs Crypto | Fiat | Manual (deposit aur withdraw dono). Fiat = gateway (PSP) fiat (deposit: Payment orders screen; withdraw: gateway payouts). Manual = bank transfer / manual payout requests + Super Admin ON/OFF (`admin/manual-payments`). deposits:read / withdrawals:read.
+  - **Agent System**: zip `Deposit.tsx` / `Withdraw.tsx` jaisa table, data **point ledger** se — `GET admin/agent-ledger?direction=deposit|withdraw` (naya, users:read; `mssports.point_ledger` ki Credit / Debit / Settlement (Bank Deposite / Withdraw) / User creation entries, bet rows nahi; deposit = delta > 0 parent → child, withdraw = delta < 0 child → parent; parent = `settled_with_wallet_id` ka staff, caller ke tree me). Response `{ total, sum, rows }`.
+- **Account Statement** = `/reports/statements` (`admin/accounts/statement`).
+- Purane `/deposits/*`, `/withdrawals/*` URL ab bhi khulte hain, sidebar me nahi.
+
+## 3e. Main → Turnover Report (`/turnover-report`) aur Redeem Codes
+
+- Zip `TurnoverReport` jaisa, sirf direct users. Target = total deposit (INR) × TargetX; % = wager / target. Figures `withdrawalCapFigures` se.
+- TargetX: `turnover_settings` (default, 3x) / `turnover_targets` (user ka apna + lock). "Update All TargetX" locked users ko chhod ke sabka. API `admin/turnover-report` (naya). Withdrawal rules pe asar nahi.
+- Redeem Codes = purana `/redeem-codes`, ab sidebar Main me.
+
 ## 4. Paisa / wallet
 
 - Sabka balance `credits` table me hai: player = `uid`, staff = `staff_id`, owner = `staff_id` (OWNER).
@@ -69,7 +94,7 @@ Reference: `admin-structure.zip` → adminpanel/src/components/users. Teen tab (
 - Owner direct user ko paisa de (refill / adjust / points settle) → `staff_balances.inr` se katta hai; direct user se le → wapas `staff_balances` me. Kam ho to 422 `INSUFFICIENT_FUNDS` (party `owner_direct`). Record: transfer_type `direct`, point ledger `Bank Deposite` / `Bank Withdraw`.
 - Code: `backend/services/admin/src/modules/lords/ownerWallet.js`.
 - Direct User wallet ka ledger: table `owner_direct_ledger` (har badlav, pehle / baad ka balance), API `GET admin/exchange/owner/direct-ledger`, admin header ke balance pe click → ledger popup.
-- **Direct User Wallet** (Users → Direct User Wallet, `/admin/direct-wallet/*`): Super Admin direct users ko kisi bhi currency me credit / debit karta hai, `staff_balances` se — non-INR `exchangerate` rate se INR value. Agent ke users pe 403. App ke deposit / withdraw / bonus bhi sirf direct users ke liye.
+- **Direct User Wallet** (Main → Wallets `/wallets`, zip ke Wallet page jaisa; API `/admin/direct-wallet/*`): Super Admin direct users ko kisi bhi currency me credit / debit karta hai, `staff_balances` se — non-INR `exchangerate` rate se INR value. Agent ke users pe 403. App ke deposit / withdraw / bonus bhi sirf direct users ke liye.
 - Har parent ↔ child move pe `mssports.point_ledger` entry likhi jaati hai.
 - Sports (mssports): player ka sports paisa `public.credits.inr` me rehta hai. Staff/owner abhi bhi `mssports."Wallets"` pe hain.
 
@@ -77,9 +102,13 @@ Reference: `admin-structure.zip` → adminpanel/src/components/users. Teen tab (
 
 - **Dashboard**: upar wala ek hi link, dono tab yahin hain.
 - **Sports Exchange**: msadmin.zip ke screens (Market Analysis, Account, Bank, Reports, Settlement…). Casino ka kuch nahi. Iska alag dashboard ab nahi hai, wo main Dashboard ke Agent System tab me chala gaya.
-- **Agent Management** (alag sidebar section): Account List `/exchange/users` (D / W = Credit Deposit / Withdraw, `admin/staff/transfer`), Bank `/exchange/bank`; Create Account Account List ke button se. Assign Agent hata diya.
+- **Agent Management** (alag sidebar section): Account List `/exchange/users` (har row pe rangeen button — "Deposit / Withdraw" = `admin/staff/transfer`, "Settlement" = points settle — zip wallet jaisa −/+ popup khulta hai; aur More), Bank `/exchange/bank`; Create Account Account List ke button se. Assign Agent hata diya.
 - Sports Exchange me **Settlement** (`/exchange/settlement`: Match / Fancy / Void Bets tabs) aur **Global Settings** (`/exchange/settings`: Buffer Time / Commission / Max Odds / Auto Void / Virtual Bet Limits / Bet Limits tabs) ek-ek link hain; tab `?tab=` me.
 - Hata diye (2026-10-16): Multi Login Account, Account List For Active Users. Executives sirf Access → Executives se.
 - **Agent / master / client sirf Sports Exchange se** (Create Account, Assign Agent). Bahar ka agent system hata diya (2026-10-16): Staff & agents, Transfers, Agent users tab, Staff risk tab, Users page ka Create user. Bahar Team me sirf Executives (+ Marketing, Activity log).
 - **Users** aur **User reports** sirf direct users dikhate hain (`channel=direct`, `parent_staff_id IS NULL`).
 - Backend `admin/staff` me sirf `POST /transfer` aur `PATCH /password` bache hain.
+
+- **Settings (zip jaisa):** Payment Methods `/payment-methods` (A-Pay live status, `GET admin/user/payments/payment-systems`, config:read), Site config (`/site-config/*`), Providers Priority `/providers-priority`, Vendor Priority `/vendor-priority`, Type Priority `/type-priority` (casino curation APIs). Casino → Lobby curation `/casino/curation` sirf lobby order.
+- **Transactions → Deposit / Withdraw (Direct Users):** Deposit = Crypto | Gateway | Manual, Withdraw = Crypto | Manual; har screen me Listing pehle, Stats alag tab. Manual ke upar Super Admin ON/OFF (`admin/manual-payments`, table `manual_payment_control`) — OFF = direct user manual deposit / withdrawal request MANUAL_*_DISABLED.
+- **Direct vs Agent lists:** mixed player lists ke upar `ChannelTabs` (Direct Users | Agent Users); APIs me optional `channel=direct|agent` (direct = `parent_staff_id IS NULL`). Promotions / vault / swap / deposit-withdraw lists sirf direct (`channel=direct`, tab nahi).

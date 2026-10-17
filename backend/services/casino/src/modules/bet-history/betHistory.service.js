@@ -122,8 +122,8 @@ class BetHistoryService {
    *
    * Every casino movement the caller is allowed to see, newest first.
    */
-  async list({ page, limit, search, userId, from, to, source, staffId }) {
-    const visible = await this.#visibleUserIds({ staffId, userId });
+  async list({ page, limit, search, userId, from, to, source, staffId, channel }) {
+    const visible = await this.#visibleUserIds({ staffId, userId, channel });
     if (visible.empty) return { rows: [], total: 0 };
 
     const wanted = source ? [source] : SOURCE_KEYS;
@@ -191,7 +191,7 @@ class BetHistoryService {
     if (!model) return [];
 
     const where = {};
-    if (!visible.all) where[source.userColumn] = { [Op.in]: visible.ids };
+    Object.assign(where, this.#userWhere(visible, source.userColumn));
 
     if (from || to) {
       where[source.timeColumn] = {
@@ -351,8 +351,8 @@ class BetHistoryService {
    * Counts and net across every source, using ONE definition of win, loss and
    * push — see the class note.
    */
-  async stats({ userId, staffId, from, to }) {
-    const visible = await this.#visibleUserIds({ staffId, userId });
+  async stats({ userId, staffId, from, to, channel }) {
+    const visible = await this.#visibleUserIds({ staffId, userId, channel });
     if (visible.empty) return this.#emptyStats();
 
     const totals = this.#emptyTotals();
@@ -363,8 +363,7 @@ class BetHistoryService {
       const model = this.models[source.model];
       if (!model) continue;
 
-      const where = {};
-      if (!visible.all) where[source.userColumn] = { [Op.in]: visible.ids };
+      const where = { ...this.#userWhere(visible, source.userColumn) };
       if (from || to) {
         where[source.timeColumn] = { ...(from ? { [Op.gte]: from } : {}), ...(to ? { [Op.lte]: to } : {}) };
       }
@@ -502,8 +501,8 @@ class BetHistoryService {
    * The dashboard summary: all time, today, by outcome, and the busiest
    * players.
    */
-  async analytics({ staffId }) {
-    const visible = await this.#visibleUserIds({ staffId });
+  async analytics({ staffId, channel }) {
+    const visible = await this.#visibleUserIds({ staffId, channel });
     if (visible.empty) {
       return { ...this.#emptyStats(), today: null, topUsers: [] };
     }
@@ -512,8 +511,8 @@ class BetHistoryService {
     startOfDay.setUTCHours(0, 0, 0, 0);
 
     const [allTime, today, topUsers] = await Promise.all([
-      this.stats({ staffId }),
-      this.stats({ staffId, from: startOfDay }),
+      this.stats({ staffId, channel }),
+      this.stats({ staffId, from: startOfDay, channel }),
       this.#topUsers(visible),
     ]);
 
@@ -581,7 +580,7 @@ class BetHistoryService {
 
       const stat = statExpressions(source);
       const where = {
-        ...(visible.all ? {} : { [source.userColumn]: { [Op.in]: visible.ids } }),
+        ...this.#userWhere(visible, source.userColumn),
         ...(from && source.timeColumn ? { [source.timeColumn]: { [Op.gte]: from } } : {}),
       };
 
@@ -1064,7 +1063,40 @@ class BetHistoryService {
     if (visible.empty) throw errors.PLAYER_NOT_IN_YOUR_TREE({ userId: String(userId) });
   }
 
-  async #visibleUserIds({ staffId, userId }) {
+  /**
+   * `visible` → Sequelize where on a player column. `text`: column VARCHAR hai (`user_code`,
+   * `bets_2m.uid`). `visible.channel` (root operator + Direct / Agent tab) = users ka subquery,
+   * taaki lakhon ids ki list na banani pade. Literal sirf in do fixed strings se banta hai.
+   */
+  #userWhere(visible, column, { text = false } = {}) {
+    if (visible.all) return {};
+    if (visible.channel) {
+      const id = text ? 'id::text' : 'id';
+      const parent = visible.channel === 'direct' ? 'IS NULL' : 'IS NOT NULL';
+      return { [column]: { [Op.in]: literal(`(SELECT ${id} FROM users WHERE parent_staff_id ${parent})`) } };
+    }
+    return { [column]: { [Op.in]: text ? visible.ids.map(String) : visible.ids } };
+  }
+
+  /**
+   * Direct / Agent tab (`channel`): direct = `users.parent_staff_id IS NULL`, agent = NOT NULL.
+   * Na ho = pehle jaisa. Root ke alawa kisi ke tree me direct user hota hi nahi.
+   */
+  async #visibleUserIds({ staffId, userId, channel }) {
+    const visible = await this.#visibleUserIdsAll({ staffId, userId });
+    if (!channel || visible.empty) return visible;
+
+    if (visible.all) return { all: false, channel };
+    if (userId) {
+      const row = await this.models.Users.findByPk(Number(userId), { attributes: ['parent_staff_id'], raw: true });
+      const direct = row ? row.parent_staff_id == null : null;
+      return row && direct === (channel === 'direct') ? visible : { empty: true };
+    }
+    // Tree ke players ka parent hamesha set hai — sab agent wale.
+    return channel === 'agent' ? visible : { empty: true };
+  }
+
+  async #visibleUserIdsAll({ staffId, userId }) {
     if (!staffId) {
       // A player-scoped call: exactly one id, and it came from their token.
       return userId ? { all: false, ids: [Number(userId)] } : { empty: true };
@@ -1133,9 +1165,9 @@ class BetHistoryService {
    *
    * The LuckySports feed, from `transaction_live`.
    */
-  async luckySports({ staffId, userId, from, to, page = 1, limit = 20 }) {
+  async luckySports({ staffId, userId, from, to, page = 1, limit = 20, channel }) {
     // Same table, same shape as the raw `live` read — with player names.
-    const result = await this.rawTransactions({ table: 'live', staffId, userId, from, to, page, limit });
+    const result = await this.rawTransactions({ table: 'live', staffId, userId, from, to, page, limit, channel });
     if (!result.rows.length) return result;
 
     const names = await this.#namesFor(result.rows.map((r) => r.userId));
@@ -1153,8 +1185,8 @@ class BetHistoryService {
    *
    * Legacy served both with no authentication and no scoping — the whole table.
    */
-  async rawTransactions({ table, staffId, userId, from, to, page = 1, limit = 20 }) {
-    const visible = await this.#visibleUserIds({ staffId, userId });
+  async rawTransactions({ table, staffId, userId, from, to, page = 1, limit = 20, channel }) {
+    const visible = await this.#visibleUserIds({ staffId, userId, channel });
     if (visible.empty) return { total: 0, rows: [] };
 
     const model = table === 'slot' ? this.models.TransactionSlot : this.models.TransactionLive;
@@ -1173,7 +1205,7 @@ class BetHistoryService {
     void from;
     void to;
     const { rows, count } = await model.findAndCountAll({
-      where: visible.all ? {} : { user_code: { [Op.in]: visible.ids.map(String) } },
+      where: this.#userWhere(visible, 'user_code', { text: true }),
       order: [['id', 'DESC']],
       limit,
       offset: (page - 1) * limit,
@@ -1225,15 +1257,15 @@ class BetHistoryService {
    * string and no check that the caller owned it.
    * ─────────────────────────────────────────────────────────────────────
    */
-  async houseBets({ table = 'bets', staffId, userId, from, to, page = 1, limit = 20 }) {
-    const visible = await this.#visibleUserIds({ staffId, userId });
+  async houseBets({ table = 'bets', staffId, userId, from, to, page = 1, limit = 20, channel }) {
+    const visible = await this.#visibleUserIds({ staffId, userId, channel });
     if (visible.empty) return { total: 0, rows: [] };
 
     if (table === 'bets_2m') return this.#bets2m({ visible, page, limit });
 
     const { rows, count } = await this.models.Bets.findAndCountAll({
       where: {
-        ...(visible.all ? {} : { uid: { [Op.in]: visible.ids } }),
+        ...this.#userWhere(visible, 'uid'),
         ...this.#dateWhere('created', from, to),
       },
       order: [['id', 'DESC']],
@@ -1271,7 +1303,7 @@ class BetHistoryService {
    */
   async #bets2m({ visible, page, limit }) {
     const { rows, count } = await this.models.Bets2m.findAndCountAll({
-      where: visible.all ? {} : { uid: { [Op.in]: visible.ids.map(String) } },
+      where: this.#userWhere(visible, 'uid', { text: true }),
       order: [['sessionid', 'DESC']],
       limit,
       offset: (page - 1) * limit,

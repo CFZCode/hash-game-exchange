@@ -1148,7 +1148,7 @@ class ReportsService {
    * Every value is a bound replacement; the only text spliced into the SQL is
    * fixed column names chosen here.
    */
-  async #ipTrackerWhere(staff, { search, ip, country, source, from, to, proxyOnly } = {}) {
+  async #ipTrackerWhere(staff, { search, ip, country, source, from, to, proxyOnly, channel } = {}) {
     const staffIds = (await visibleStaffIds(this.models, staff.id, { logger: this.logger })).map(Number);
     if (!staffIds.length) return null;
 
@@ -1160,6 +1160,9 @@ class ReportsService {
         ? '(u.parent_staff_id IN (:staffIds) OR u.parent_staff_id IS NULL)'
         : 'u.parent_staff_id IN (:staffIds)',
     ];
+    // Direct Users | Agent Users tab: direct = koi parent nahi, agent = agent ke neeche.
+    if (channel === 'direct') parts.push('u.parent_staff_id IS NULL');
+    if (channel === 'agent') parts.push('u.parent_staff_id IS NOT NULL');
 
     if (search) parts.push(this.#userSearchSql(search, replacements));
 

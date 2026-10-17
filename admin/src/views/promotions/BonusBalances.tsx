@@ -177,8 +177,8 @@ const BonusBalances = () => {
     to: `${f.to}T23:59:59.999Z`
   }
 
-  const list = usePagedApi<PlayerBonus>('admin/user/bonus-balance', { limit: query.limit, page: query.page, ...filters })
-  const sums = useApi<Report>('admin/user/bonus-balance', { limit: 1, ...filters })
+  const list = usePagedApi<PlayerBonus>('admin/user/bonus-balance', { channel: 'direct', limit: query.limit, page: query.page, ...filters })
+  const sums = useApi<Report>('admin/user/bonus-balance', { channel: 'direct', limit: 1, ...filters })
 
   const sumOf = (status: string) => (sums.data?.totals ?? []).filter(t => t.status === status)
 

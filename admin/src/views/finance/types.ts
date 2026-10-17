@@ -113,12 +113,6 @@ export const CRYPTO_WITHDRAW_STATUSES = ['In Queue', 'Approved', 'Sent', 'Reject
 
 export type CryptoWithdrawSummary = { status: string; coin: string; count: number; total: string }
 
-export type WalletBalanceRow = {
-  uid: number | string
-  name: string
-  balances: Record<string, string>
-}
-
 export type ExchangeRateRow = { currency: string; usdRate: string; lastUpdated?: string | null }
 
 /** `GET admin/user/vault/stats` — platform-wide totals plus the locked balance per coin. */

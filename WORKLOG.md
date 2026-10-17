@@ -15,6 +15,142 @@ Format:
 
 ---
 
+## 2026-10-17 — Har mixed list pe "Direct Users | Agent Users" tabs; sirf-direct lists pe direct filter
+**Kya kiya:** Jahan bhi player ki list / history me direct aur agent dono ke users aa sakte hain, wahan list ke upar `components/shared/ChannelTabs.tsx` (Direct Users | Agent Users, dono ki alag listing). Backend list APIs me **optional** `channel=direct|agent` (na bhejo = purana jawab same; user ne ye exception approve kiya). Direct = `users.parent_staff_id IS NULL`, agent = NOT NULL, caller ke purane scope ke andar.
+- Tabs: IP tracker (logins + shared IPs), Profit & loss, Wager report, Notifications → Devices, Current Bets, Party Win Loss, User Win Loss, Total Profit Loss, Turn Over (client search bhi tab ke hisaab se), Account List + Bank (drill-down me tabs nahi; export / Create Account / Transaction Code ab table toolbar me), Statements → Transfers, Casino Bet history (saare andar ke tabs), In-house Bets + Bets (2m), KYC, Tips (receiver pe filter), Races → Live board + Rewards (admin ke liye naya `adminLeaderboard` service method; player wala leaderboard same).
+- Sirf direct (koi tab nahi, screen same; frontend `channel=direct` bhejta hai): Transactions → Deposit / Withdraw ke Crypto / Manual lists, Bonus balances, Vault users + interest, Swap history, Bonus module lists (records / games / events / awards / codes / redeem users), Gift-card records, Spin-wheel claims.
+- Backend files: admin service `reports` (ipTracker, pnlStats, wagerStats, validators), `notifications`, `exchange-market`, `exchange-reports` (reportScope `treeOf`), `exchange` (accountList), `lords` (transferStatement); casino `bet-history`; user service `directory/playerScope.js` (`withChannel`, `CHANNEL_SQL`) + kyc, tip, race, fiat-deposit, fiat-withdraw, crypto-withdraw, deposit-reports, player-bonuses, vault, swap, bonus, gift-cards, spin-wheel. Har jagah strict validator me sirf optional `channel`. Casino `/bet-history/analytics` pe pehle validator nahi tha — ab strict (sirf `channel`).
+**Kyun:** User: "jahan user ka data aa raha hai aur agent user ka bhi aa sakta hai wahan tab se divide karo, dono ki alag listing… jo sirf direct user ke liye hai wahan divide mat karna".
+**Notes / pending:** Tests (ek-ek file): admin reports/notifications 80/80, exchange 72/72, casino bet-history 26/26, user service 319/319, tools 9 pass; admin tsc + eslint clean. Backend restart. Browser (QA owner): har tab wale page pe dono tab dikhe aur Agent tab pe koi API error nahi; sirf-direct pages pe koi tab nahi, koi error nahi. Account List API: direct tab = direct QA user, agent tab = agent QA user. Races Live board local pe "race not running" (404) — pehle se, channel se nahi.
+Chhoda: VIP members/earnings, P2P lists, Payment orders history (`admin/user/history/*`), In-house "House counters", Affiliate. Account List / Bank me page number + search URL me hain to tab badalne pe saath rehte hain.
+
+## 2026-10-17 — Deposit / Withdraw: Fiat tab wapas (Manual ke saath)
+**Kya kiya:** Direct Users ke tabs ab — Deposit: **Crypto | Fiat | Manual**, Withdraw: **Crypto | Fiat | Manual**. Fiat = gateway (PSP) wala fiat: deposit me Payment orders screen (Gateway deposits / payouts / By user / Provider probe — pehle "Gateway" naam se), withdraw me gateway payouts list (`AllRails kind=withdrawals`, `admin/user/history/withdrawals`). Manual waisa hi (Super Admin ON/OFF + bank transfer / manual payout list).
+**Kyun:** User: withdraw me fiat kyu hataya — fiat dono me rahega aur saath me manual bhi.
+**Files / jagah:** `admin/src/views/transactions/Transactions.tsx`, `admin/src/views/finance/PaymentOrders.tsx` (`AllRails` export).
+**Notes / pending:** Sirf frontend, koi API nahi badli. Fiat aur Manual alag data dikhate hain (gateway vs bank transfer), ek list do jagah nahi. tsc + eslint clean.
+
+## 2026-10-17 — Sidebar: Site Config alag section (Settings ke barabar)
+**Kya kiya:** "Site config" Settings ke andar dropdown tha — ab apna alag **Site Config** section (Settings ke parallel): Features, Branding, Feature flags, Limits and policy, Affiliate rates, Welcome bonuses, Email (SMTP), Sports switch seedhe. Settings me ab Payment Methods + My account. Har item pe `config:read` aur pehle wale feature / promotions / ownerFlag marks waise hi.
+**Kyun:** User: site config ko settings se bahar, parallel karo.
+**Files / jagah:** `admin/src/configs/navConfig.tsx`
+**Notes / pending:** Sirf sidebar; pages / API waise hi. tsc + eslint clean.
+
+## 2026-10-17 — Deposit / Withdraw: listing pehle, Stats alag tab; Manual section + Super Admin ON/OFF
+**Kya kiya:**
+- Transactions → Deposit / Withdraw ke har screen (Crypto, Manual) me ab pehle **Listing** (table), stats cards / charts alag **Stats** tab me (`views/finance/ListStatsTabs.tsx`; Crypto withdrawals ke "queue right now" cards bhi Stats me). Period / currency filter upar hi (wo table ko bhi filter karta hai). reports:read na ho to sirf listing.
+- Direct Users ke andar tabs: Deposit = **Crypto | Gateway | Manual** (pehle Crypto | Fiat | Payment orders), Withdraw = **Crypto | Manual** (pehle Fiat). Manual = purana fiat (bank transfer + screenshot / manual payout) screen, title "Manual deposits / withdrawals".
+- Manual ke upar **Super Admin ka ON/OFF** card (`views/transactions/ManualSwitch.tsx`): switch → transaction password → `PUT admin/manual-payments`. Sirf `wallet:adjust` (Super Admin) badal sakta hai, baaki dekh sakte hain.
+- Backend: migration `111-manual-payment-control.js` (table `manual_payment_control`, default dono ON = aaj jaisa), `@ibitplay/common` `manualPayments` (`readManualPayments`, `assertManualAllowed` → MANUAL_DEPOSIT_DISABLED / MANUAL_WITHDRAW_DISABLED 403), naya admin module `manual-payments` (`GET` deposits:read|withdrawals:read, `PUT` owner + transaction password, activity log). User service: fiat-deposit `create` aur fiat-withdraw `create` me owner ki deposit_mode / withdrawal_mode policy ke baad ye check. Agent ke users pe app deposit / withdraw pehle se band (denyAgentPlayer).
+**Kyun:** User: "stats deposit/withdraw ka divide karo, andar stat daal ke, listing upar dikhao… ek section manual deposit / manual withdraw, super admin on/off kare tabhi direct user manual deposit/withdraw kar payenge… apne setup ke according, zip se reference".
+**Files / jagah:** `admin/src/views/transactions/{Transactions,ManualSwitch}.tsx`, `admin/src/views/finance/{ListStatsTabs,CryptoDeposits,CryptoWithdrawals,FiatDeposits,FiatWithdrawals}.tsx`; `backend/packages/db/migrations/111-manual-payment-control.js`, `backend/packages/common/src/{manualPayments,index}.js`, `backend/services/admin/src/modules/manual-payments/*`, `backend/services/user/src/modules/{fiat-deposit/fiatDeposit.service.js, fiat-withdraw/fiatWithdraw.service.js}`.
+**Notes / pending:** Migration dev + test DB pe chali. Tests (ek-ek file, `--test-concurrency=1`): manual-payments + withdrawal-control + fiat-deposit + fiat-withdraw 51/51, tools 9 pass. (Ek saath parallel chalane pe switch wale tests dusre DB tests ko beech me OFF kar dete hain — isliye serial.) Backend restart. Browser: Deposit pe Listing default, Stats tab me cards; Manual tab me switch OFF → "Manual deposits switched OFF" → wapas ON; Withdraw → Manual me switch dikhta hai. Player app (frontend) me OFF hone pe sirf server ka error message aayega — manual option chhupana ho to frontend me alag kaam.
+
+## 2026-10-17 — Sidebar: Casino ek hi section
+**Kya kiya:** Sidebar me "Casino" do baar aata tha (group heading + andar "Casino" dropdown) aur Providers / Vendor / Type Priority Settings me alag the. Ab ek hi **Casino** section: Game catalogue, Lobby curation, Providers, In-house games, Bet history, Wager report, Providers Priority, Vendor Priority, Type Priority — seedhe (dropdown nahi). Har item pe `flag: casino` (casino off ho to chhup jaata hai, pehle jaisa).
+**Kyun:** User: casino ke do alag section kyu, ek hi rakho.
+**Files / jagah:** `admin/src/configs/navConfig.tsx`
+**Notes / pending:** Sirf sidebar; pages / API waise hi. tsc + eslint clean.
+
+## 2026-10-17 — Settings section zip jaisa: Payment Methods, Site config, Providers / Vendor / Type Priority
+**Kya kiya:** Sidebar Settings ab admin-structure.zip ke order me: **Payment Methods** (naya), Site config (apna, children wahi), **Providers Priority**, **Vendor Priority**, **Type Priority**, My account.
+- Payment Methods (`/payment-methods`, `views/settings/PaymentMethods.tsx`): zip ka "Payment Methods — Live Status" — har currency (INR, PKR, NPR, BDT, phir baaki) ka table: Method, System name, Deposit (gateway) / Deposit (on site) chips, deposit limits, Withdrawal chip (+ "used" agar site payout rail), withdrawal limits, Notes; "Refresh from gateway" (`?fresh=1`), har 60s auto refresh. A-Pay configure na ho to "A-Pay is not configured".
+- Naya backend `GET admin/user/payments/payment-systems` (user service, payment-orders module, `config:read`, strict query `fresh`): apay gateway `getPaymentSystems` → A-Pay `/Remotes/payment-systems-info`, service `paymentSystemsOverview` (5 min cache, site rails = `APAY_DEPOSIT_SYSTEMS` / `APAY_WITHDRAWAL_SYSTEMS`, labels `APAY_SYSTEM_LABELS`). Test `__tests__/paymentSystems.test.js` (DB nahi chahiye).
+- Providers / Vendor / Type Priority (`/providers-priority`, `/vendor-priority`, `/type-priority`, `views/settings/*`): Casino → Curation ke wahi tab components (`CollectionsTab`, `PriorityTab`, ab export) — APIs same (`admin/casino/games/collections/:slug`, `priority/:vendor`, `type-priority/:type`). Casino ka "Curation & priority" ab sirf **Lobby curation** (duplicate tabs hataye).
+**Kyun:** User: "jaise zip file me setting wala section hai (vendor, site config wagera) vaise hi apne me bhi kar do… setup apna hi follow karna".
+**Files / jagah:** `admin/src/configs/navConfig.tsx`, `admin/src/views/settings/{PaymentMethods,ProvidersPriority,VendorPriority,TypePriority}.tsx`, `admin/src/app/(pages)/{payment-methods,providers-priority,vendor-priority,type-priority}/page.tsx`, `admin/src/views/casino/Curation.tsx`; `backend/services/user/src/modules/payment-orders/{gateways/index.js, paymentOrders.constants.js, paymentOrders.service.js, paymentOrders.validators.js, controllers/index.js, routes/admin.routes.js, __tests__/paymentSystems.test.js}`.
+**Notes / pending:** Tests: payment-orders 36/36, tools 9 pass (1 skip). Backend restart. Browser: paancho pages khulte hain (Payment Methods local pe "not configured" — local .env me APAY_API_KEY/PROJECT_ID nahi). Zip ke Site Config ke toggles hamare Site config → Feature flags / Sports switch me pehle se hain; zip ke "per-sport toggles" aur global match-odds-limit flag hamare yahan nahi hain (Max Odds per sport Sports Exchange → Global Settings me hai).
+
+## 2026-10-17 — Deposit / Withdraw zip jaisa + "Agent System" tab (point ledger)
+**Kya kiya:** `/transactions/deposit` aur `/transactions/withdraw` ka UI zip `DepositPage` / `WithdrawPage` jaisa (exact colours): upar tab bar **Direct Users** / **Agent System**; Direct Users me zip ka "Crypto | Fiat" switcher (deposit me "Payment orders" bhi) — andar apne purane screens. **Agent System** tab: zip `Deposit.tsx` jaisa header ("Deposit History" / "Withdraw History"), summary cards (Transactions, Total Amount, This Page, Page), filter (ID, From, To, Min ₹, Max ₹, Clear), table (ID, From, To, Type, Amount, Date & Time), Previous / Next.
+**Kyun:** User: deposit / withdraw zip jaisa, aur Agent System tab me agent wala deposit apne setup ka — point ledger se naya API.
+**Files / jagah:** naya API module `backend/services/admin/src/modules/agent-ledger/` (`GET admin/agent-ledger`), `admin/src/views/transactions/{Transactions,AgentLedger}.tsx`. Hataya: `agent-transfers` module + `AgentTransfers.tsx` (aaj hi bana tha, sirf pichhla "Agent Users" tab use karta tha; ab ledger wala tab).
+**Notes / pending:** Koi existing API nahi badli. Test agent-ledger 3/3, tsc + eslint clean, backend restart, route 401 (purana agent-transfers 404). Browser me dekhna baaki.
+
+## 2026-10-17 — Sidebar: har section aur item ka matlab wala icon (zip jaisa)
+**Kya kiya:** Har sidebar section heading ke bagal me icon (`NavItem.groupIcon`: Main, Sports Exchange, Agent Management, Users, Transactions, Finance, Promotions, Casino, Team, Content, Reports, Settings). Har item ka apna alag icon (pehle reports sab pe same FileBarChart tha) — jaise Current Bets = Radio, Settlement = Gavel, Party Win Loss = Scale, General Lock = Lock, Coins = Bitcoin. Sub-items (Casino, Push notifications, Site config ke andar) pe bhi icon (`icon?` on sub items; Sidebar me `NavIcon`). navIcons map + imports sirf use hone wale icons.
+**Kyun:** User: "sidebar me har section ke bagal me icon bhi laga do… jaise zip file me hai, meaningful".
+**Files / jagah:** `admin/src/configs/navConfig.tsx`, `admin/src/components/layout/Sidebar.tsx`
+**Notes / pending:** tsc + eslint clean; headless Chrome screenshot me headings + items ke icons dikhe (collapsed branches ke andar ke sub-item icons screenshot me khol ke nahi dekhe).
+
+## 2026-10-17 — Admin ka purana "Sports" section hataya
+**Kya kiya:** Sidebar se "Sports" group (Bets, Settlement, Catalogue & locks, Wager report) hataya, aur pages `admin/src/app/(pages)/sports/*` (bets, settlement, catalogue, results, wager-report) + views `admin/src/views/sports/*` delete kiye. Nav se unused `Goal` icon bhi hataya.
+**Kyun:** User: Sports Exchange section pehle se hai, ye purana Sports section nahi chahiye.
+**Files / jagah:** `admin/src/configs/navConfig.tsx`, `admin/src/app/(pages)/sports/` (deleted), `admin/src/views/sports/` (deleted).
+**Notes / pending:** Backend NAHI chheda (rule: existing API mat badlo). Wajah: `admin/sports/internalsettle` Sports Exchange ke Settlement page me use hota hai; sports `bet-admin` ke internal routes `lords` (net exposure) use karta hai aur gateway `legacyRoutes` me purane URL us pe mapped hain; `admin/sports/catalogue` / `results` ka backend tha hi nahi (404 deta tha). Casino wala `views/casino/WagerReport` waisa hi (casino wager report me use). Site config ka "Sports switch" (player site ka sports flag) waisa hi. tsc + eslint clean.
+
+## 2026-10-17 — Agent System me Hierarchy tab (zip Percentage Hierarchy, bina %)
+**Kya kiya:** `/agent-system?tab=hierarchy` — zip `PercentageHierarchyPage` jaisa tree (exact colours): upline → aap ("you") → downline, click se node band / khula, level ke rang ka legend (Super Admin … Agent, apne levels). Percentage nahi dikhaya — uski jagah har node ke upar uske direct users ki ginti.
+**Kyun:** User: percentage-hierarchy client management me, percentage mat dikhao, apne setup ke hisaab se.
+**Files / jagah:** naya API module `backend/services/admin/src/modules/agent-hierarchy/` (`GET admin/agent-hierarchy`, users:read ya staff:read; staff `parent_id` upar tak + `manageableStaffIds` neeche, role/level, users count), `admin/src/views/agent-system/{Hierarchy,AgentSystem}.tsx`.
+**Notes / pending:** Koi existing API nahi badli. Test 2/2, tsc + eslint clean, backend restart, route 401 (maujood). Browser me dekhna baaki.
+
+## 2026-10-17 — Turnover Report: zip ke exact colours / buttons
+**Kya kiya:** `/turnover-report` ka UI zip `TurnoverReport.tsx` ke exact hex colours me dobara likha (page #0C0D1D, card #0E1831, border #1E2D55, th/input #0B1427, hover #162140, blue #2B6EF5 / #5581F7, green #0ECC68 "Update All TargetX" / "Update TargetX", red #E01B4F lock). Zip jaisa: clickable sort headers, Previous / page / Next pagination (10 per page), "Edit Target Multiplier" dialog (User ID, Name, Email, Current Multiplier, Status, Cancel + Update TargetX).
+**Kyun:** User: theme aur button colour zip jaisa exact.
+**Files / jagah:** `admin/src/views/turnover/TurnoverReport.tsx`
+**Notes / pending:** Sirf frontend; API wahi. Ye page light theme me bhi zip jaisa dark hi dikhega. tsc + eslint clean.
+
+## 2026-10-17 — Main me Turnover Report + Redeem Codes (zip jaisa)
+**Kya kiya:** Sidebar **Main** me **Redeem Codes** (Promotions se yahan aaya, page wahi `/redeem-codes`) aur naya **Turnover Report** (`/turnover-report`) — zip `TurnoverReport` jaisa: direct users ka User ID, Name, Email, Wager, Total Deposit, Target (= deposit × TargetX, pencil se user ka TargetX), % Achieved, Progress bar, Lock; toolbar me search, "Update All TargetX", sort + direction.
+**Kyun:** User: zip ke Main jaisa turnover-report aur redeemcode Main me.
+**Files / jagah:** naya API module `backend/services/admin/src/modules/turnover-report/` (`GET /admin/turnover-report`, `GET|PUT /multiplier`, `PUT /:userId`; read reports:read, write config:write, audit `turnover.multiplier` / `turnover.user`), migration `110-turnover-targets.js` (`turnover_settings` default 3x, `turnover_targets` user ka TargetX + lock), `admin/src/views/turnover/TurnoverReport.tsx`, `admin/src/app/(pages)/turnover-report/page.tsx`, `admin/src/configs/navConfig.tsx`.
+**Notes / pending:** Deposit / wager figures wahi jo withdrawal cap use karta hai (`withdrawalCapFigures`, INR). Lock = "Update All" us user ka TargetX nahi badlta (zip jaisa), withdrawal lock nahi. Sirf report + target hai — withdrawal ke rules nahi badle. Koi existing API nahi badli. Migration dev + test DB pe lagi (saath me doosre session ki pending 106-referral-unlock-tiers bhi). Test 3/3, tsc + eslint clean, backend restart, route 401 (maujood). Browser me dekhna baaki.
+
+## 2026-10-17 — Sidebar: Turn Over ab Sports Exchange me
+**Kya kiya:** `/exchange/reports/turnover` (Turn Over) Agent Management se hata ke Sports Exchange section me (Current Bets ke baad). Page / URL / permission same.
+**Kyun:** User: "turnover wala section sports exchange me daal do".
+**Files / jagah:** `admin/src/configs/navConfig.tsx`
+**Notes / pending:** eslint clean.
+
+## 2026-10-17 — Main → Wallets ab zip ka Wallet page (Direct User Wallet) jaisa
+**Kya kiya:** `/wallets` ab admin-structure.zip ke `WalletUpdate.tsx` jaisa: card ke andar "Direct User Wallet" title + "Only direct user balances (no parent) · N users", search + refresh; table # · User (rangeen initials avatar) · UID (neela chip) · Currency (per-row select) · Balance (peela wallet chip, 4 decimal) · Actions (History neela icon, Manage Funds purple icon). Manage Funds row ke neeche: Transaction Password box (peela lock), Debit Funds (laal) / Credit Funds (hara) — "Amount in <coin>". History popup: Date & Time · Coin · Operation chip · Amount · Prev / New Balance, currency filter, Close. Data / APIs apne hi: `admin/direct-wallet/*` (sirf direct users, staff_balances se, non-INR rate se INR). Purana `/wallets` view (`views/finance/Wallets.tsx`, sab users + Adjust) hata diya; sidebar se duplicate "Direct User Wallet" hata diya; `/direct-wallet` ab `/wallets` pe redirect. Wallets nav permission `wallet:adjust` (API wahi maangti hai). Unused `WalletBalanceRow` type hataya.
+**Kyun:** User: "wallet wala section vaise hi kar do jaise zip file me hai… setup apna follow karna hai aur data zip jaisa dikhana hai".
+**Files / jagah:** `admin/src/views/players/DirectUserWallet.tsx`, `admin/src/app/(pages)/{wallets,direct-wallet}/page.tsx`, `admin/src/configs/navConfig.tsx`, `admin/src/views/finance/types.ts`; delete `admin/src/views/finance/Wallets.tsx`.
+**Notes / pending:** tsc + eslint clean. Headless Chrome, QA owner: list me sirf direct user (agent ka user nahi), Credit 25 ✓, Debit 5 ✓ (0 → 25 → 20), History me dono entries ✓; test data saaf. Backend ka `GET admin/user/wallet/balances` (purane Wallets list ka) ab admin me kahin use nahi hota — hataana ho to alag se.
+
+## 2026-10-17 — Transactions (Deposit / Withdraw / Account Statement) zip jaisa
+**Kya kiya:** Sidebar me naya group **Transactions** (zip ka): **Deposit** (`/transactions/deposit`) aur **Withdraw** (`/transactions/withdraw`), dono me tab **Direct Users** (apne purane Fiat / Crypto / Payment orders screens, chhote switch se) aur **Agent Users** (zip ka "Deposit History — Agent → User": ID, From, To, Amount, Date; filter ID / From / To / Min / Max / Clear). **Account Statement** = apna `/reports/statements` (Reports group se yahan aaya). Finance group me baaki (Exchange rates, Coins, Vault, Swap, Tips, P2P) waise hi; purane Deposits / Withdrawals sub-menu hataye (pages wahi, ab tab ke andar).
+**Kyun:** User: finance system zip jaisa — uska architecture, setup apna.
+**Files / jagah:** naya API module `backend/services/admin/src/modules/agent-transfers/` (`GET admin/agent-transfers?direction=deposit|withdraw&search&from&to&min&max`, users:read, sirf apne tree ka; deposit = staff → user, withdraw = user → staff, `staff_transfers`), `admin/src/views/transactions/{Transactions,AgentTransfers}.tsx`, `admin/src/app/(pages)/transactions/{deposit,withdraw}/page.tsx`, `admin/src/configs/navConfig.tsx`.
+**Notes / pending:** Koi existing API nahi badli (`admin/accounts/statement` me direction filter nahi tha, isliye naya endpoint). Test agent-transfers 3/3 pass, tsc + eslint clean, backend restart karke route 401 (maujood). Browser me login karke dekhna baaki.
+
+## 2026-10-17 — Sidebar: Wallets ab Main me
+**Kya kiya:** Sidebar ka "Wallets" (`/wallets`) Finance se hata ke Main section me (Dashboard, Users ke baad). Page/URL/permission same.
+**Kyun:** User: "ye wallet wala section main ke andar daalo".
+**Files / jagah:** `admin/src/configs/navConfig.tsx`
+**Notes / pending:** tsc + eslint clean; browser me sidebar: MAIN → Dashboard, Users, Wallets.
+
+## 2026-10-17 — Agent System page (zip ke AdminManagement tabs)
+**Kya kiya:** Naya page `/agent-system` (sidebar → Agent Management → Agent System). Tabs (`?tab=`), Dashboard chhod ke zip jaisa: **Agent Listing** (zip table: Login Name, Account Type, Balance, CR, Net Exposure, Current %, Betting Status, Status, Client P/L, Actions — Deposit/Withdraw, Settlement, Settings, downline drill-down; Create Agent = apna Create Account page), **Staff Portal** (Quick ID Creation, Wallet Refill, Close Sports / Casino / Lock Account), **My Account** (owner ke dono balance + Add Balance, phir apna My account), **Executives**, **Marketing**, **Activity Log** (apna audit log).
+**Kyun:** User ne zip ke client management ke sections maange, apne agent setup (Sports Exchange levels / points) ke hisaab se.
+**Files / jagah:** `admin/src/views/agent-system/{AgentSystem,AgentListing,StaffPortal}.tsx`, `admin/src/app/(pages)/agent-system/page.tsx`, `admin/src/configs/navConfig.tsx`, `admin/src/views/access/ExecutivesList.tsx` (sirf export).
+**Notes / pending:** Koi API nahi badli, koi nayi nahi bani — sab purani: `admin/exchange/accounts`, `admin/exchange/accounts-admin/create` (userType USER), `admin/staff/transfer`, `admin/accounts/refill` (owner), `admin/accounts/status`, `admin/exchange/points/settle`, `admin/access/executives|marketing-users`, `admin/audit/activity`. tsc + eslint clean; browser me login karke dekhna baaki.
+
+## 2026-10-17 — Account List: action buttons premium pill + chhote labels
+**Kya kiya:** `/exchange/users` ke action buttons ab chhote "pill" (rounded-full, halka rangeen background + ring; hover pe poora rang, white text, glow, thoda upar uthna). Labels chhote: "D / W", "Settle", "More" — poora naam tooltip (title) me.
+**Kyun:** User: "button thoda premium aur button ke andar text thoda kam karo, bas understandable".
+**Files / jagah:** `admin/src/views/exchange/AccountList.tsx`
+**Notes / pending:** tsc + eslint clean; dark + light screenshot dekhe, "Settle" click pe Settlement popup khulta hai.
+
+## 2026-10-17 — Poore admin me admin-structure.zip ke colours aur buttons
+**Kya kiya:** `globals.css` ke theme tokens zip ke `src/theme.ts` jaise: dark mode navy (background #0C0D1D, card/sidebar #0E1831, muted #121E38, border #1E2D55, text #F9F9F9 / #8384A5), primary blue #2B6EF5, success #0ECC68, danger/destructive #E01B4F, warning #FFC23F, info #5581F7; light mode me wahi blue/red aur thode gehre green/yellow/info (safed pe padhne layak). Button: rounded 10px, font-semibold; default blue hover pe halka + glow (zip jaisa); outline hover pe blue border + halka tint; destructive ab solid laal (zip ke Debit jaisa); ghost hover blue.
+**Kyun:** User: "jaise is zip me color aur button acche hai vaise hi apne me use karo" — scope poocha, user ne "Poore admin me" chuna.
+**Files / jagah:** `admin/src/app/globals.css`, `admin/src/components/ui/button.tsx`
+**Notes / pending:** Sirf colours/buttons — font (zip me Montserrat) nahi badla. tsc + eslint clean; Dashboard (dark + light), Account List aur D/W popup ke screenshot dekhe.
+
+## 2026-10-17 — General Lock: client search ki suggestion list card me kat rahi thi
+**Kya kiya:** `/exchange/reports/general-lock` ka Card `overflow-visible` kiya (Card me default `overflow-hidden` hai, isliye "Search By Client Name" ki dropdown list card ke neeche kat jaati thi). Reports (reportKit) pehle se aisa hi karte hain.
+**Kyun:** User: "searching kar rahe hai to neeche suggestion hide ho raha hai box ke andar".
+**Files / jagah:** `admin/src/views/exchange/settings/GeneralLock.tsx`
+**Notes / pending:** Headless Chrome screenshot se check: list poori dikhti hai. Pura flow (search → Load → tree → lock/unlock, reload pe lock dikhna) bhi chal raha hai.
+
+## 2026-10-17 — Account List: Action menu ki jagah rangeen button + zip wallet jaisa −/+ popup
+**Kya kiya:** `/exchange/users` me har row pe ab teen rangeen button: "Deposit / Withdraw" (hara), "Settlement" (peela), "More" (neela). D/W ya Settlement dabane pe popup (zip ke Wallet page ke Manage Funds jaisa): upar rangeen cards me parent balance, user CR (Settlement me user pts + Profit/Loss), Amount, (Settlement me Remark), Transaction Code, aur do bade button "− Withdraw" (laal) / "+ Deposit" (hara). Deposit / Withdraw = `admin/staff/transfer`, Settlement = `admin/exchange/points/settle` (APIs same). Purana Action dropdown, Credit Deposit/Withdraw popup aur SettleDialog hata diye; `CreditDialog.tsx` → `CreditHistory.tsx` (sirf More ka Credit History); MoreDialog ab sirf trigger se khulta hai. Drill-down me pehle jaisa sirf "P". (Pehle row ke neeche khulne wala panel banaya tha — user ko pasand nahi aaya, popup kar diya.)
+**Kyun:** User: "action button ki jagah do button… + - wala button jaise wallet me (zip)", phir "thoda colorful button bnao", "more wala button rahega".
+**Files / jagah:** `admin/src/views/exchange/{AccountList.tsx, FundsDialog.tsx (naya), CreditHistory.tsx, MoreDialog.tsx}`, `SettleDialog.tsx` delete.
+**Notes / pending:** tsc + eslint clean. Headless Chrome se QA owner pe live: D/W popup se Deposit 10 ✓, Withdraw 4 ✓ (CR 10 → 6), Settlement popup khula aur API ne sahi "no pending settlement" diya (P/L 0 tha), More popup ✓. Koi console error nahi. Backend change nahi.
+
 ## 2026-10-16 — Users → Financial poora reference jaisa + Risk dialog ke lock toggles
 **Kya kiya:** Financial → Withdrawal ab admin-structure.zip jaisa: Global Withdrawals ON/OFF, Withdrawal limit (ON/OFF + multiplier × deposits, Save), Wagering bonus (ON/OFF + "bonus up to"), example line, Direct users / Withdrawal locked cards, Per-user withdrawal lock table (User · Phone · INR balance · Deposited · Wagered (+bonus) · Withdrawn / max · Joined · Withdrawals · Lock switch, All/Locked, search). Har setting change transaction password confirm (sirf owner). Naye: migration 109 (`withdrawal_control` me limit columns), `PUT admin/withdrawal-control/limit`, `GET admin/withdrawal-control/users`; `GET admin/withdrawal-control` ab limit + ginti bhi deta hai (ye API aaj hi naya bana tha). Enforcement: `withdrawalCap.readAdminWithdrawalCap` (common) — admin ne save kiya ho to wahi, warna owner panel; user-service `capSettings` isi se. Cap figures SQL (deposited / withdrawn / wagered) user-service se `@ibitplay/common` withdrawalCapFigures me shift (user ki withdrawCap.js wahi exports deti hai). Risk Management dialog: Lock Controls ab reference jaise switches (Account / Sports bet / Casino / Withdrawal, `POST admin/locks` turant) + Lock Account / Unlock Account. Backend restart kiya.
 **Kyun:** User: "financial system jaisa zip me hai sab kuch, on/off settings wagera" + "direct user me balance sheet aur risk management same zip jaisa, toggle wagera".
@@ -48,6 +184,60 @@ Format:
 **Kya kiya:** `/users` (PlayersList) me tab: "User List" (default, direct users ki table upar) aur "Overview" (purane graphs). Har row me "Risk" aur "Sheet" button → `/users/:id?tab=risk` / `?tab=sheet`. Pehle 3-tab (Direct / Agent / Financial) wala naya page aur `players/summary` backend banaya tha — user ne kaha "section theek hai, bas list option do", isliye wo hata diya (backend wapas pehle jaisa).
 **Kyun:** User: direct user ki list bina neeche scroll kiye dikhe; direct user ka risk management aur balance sheet dikhe.
 **Files / jagah:** admin/src/views/players/PlayersList.tsx
+
+## 2026-10-16 — Account List: ek Action menu (Deposit / Withdraw + Settlement + More)
+**Kya kiya:** Do alag D / W columns ki jagah har row me ek "Action" dropdown: section "Deposit / Withdraw" (D, W → CreditDialog), section "Settlement" (D, W → SettleDialog), phir More. Popups menu ke bahar, state se khulte hain: CreditDialog / SettleDialog ab `open` / `onOpenChange` lete hain (trigger nahi); MoreDialog me trigger optional + controlled mode (drill-down ka "P" waise hi).
+**Kyun:** User: "dono alag alag bahut ajeeb lag raha hai — ek action button rakho, use select karne pe D and W".
+**Files / jagah:** admin/src/views/exchange/{AccountList.tsx, CreditDialog.tsx, SettleDialog.tsx, MoreDialog.tsx}
+**Notes / pending:** tsc + eslint clean, page + drill-down 200.
+
+## 2026-10-16 — User History hataya (aur khaali Exchange Reports section)
+**Kya kiya:** User History page + `views/exchange/user-reports/` (UserHistory + shared) hataye; sidebar ka Exchange Reports section (ab khaali) hataya. Backend `exchange-user-reports`: `/login-history`, `/password-history`, `/ip-detail` routes, service methods (loginHistory, passwordHistory, ipDetail, #historyTarget), helpers (fmtDate, normalizeIp, dateRange, emptyPage, notInDownline), validators, 2 tests. Module me ab sirf `/home` (Dashboard → Agent System).
+**Kyun:** User: "reports/user-history section hata do".
+**Files / jagah:** admin/src/configs/navConfig.tsx; backend exchange-user-reports/{index.js, routes/admin.routes.js, userReports.service.js, userReports.validators.js, __tests__/userReports.test.js}.
+**Notes / pending:** Tests 11 pass. Live: 3 routes + page 404, home + dashboard 200. Backend restart kiya.
+
+## 2026-10-16 — General Lock aur Turn Over Agent Management me
+**Kya kiya:** Sidebar: General Lock aur Turn Over Exchange Reports se Agent Management me (User Win Loss ke neeche). Exchange Reports me sirf User History bacha. URLs wahi.
+**Kyun:** User: "general-lock, turnover client management ke andar daal do".
+**Files / jagah:** admin/src/configs/navConfig.tsx
+**Notes / pending:** tsc + eslint clean.
+
+## 2026-10-16 — Fraud Report, User Register Detail, User Authentication hataye
+**Kya kiya:** Teeno pages + views (FraudReport, UserRegisterDetail, AuthList) + sidebar links hataye. Backend `exchange-user-reports`: routes `/fraud`, `/auth-list`, `/register-detail`, service methods (authList, fraud, registerDetail, #registerScope), validators (list, registerDetail), unused `descendantIds` import, 3 tests. Exchange Reports me ab: User History, General Lock, Turn Over.
+**Kyun:** User: "fraud, user-register-detail, user-authentication hata do exchange reports se".
+**Files / jagah:** admin/src/{configs/navConfig.tsx, views/exchange/user-reports/*}; backend exchange-user-reports/{routes/admin.routes.js, userReports.service.js, userReports.validators.js, __tests__/userReports.test.js}.
+**Notes / pending:** Tests 13 pass. Live: teeno API + pages 404, baaki 200. Backend restart kiya.
+
+## 2026-10-16 — Current Bets Sports Exchange me
+**Kya kiya:** Sidebar: Current Bets Exchange Reports se Sports Exchange section me (Market Analysis ke neeche). URL wahi (`/exchange/reports/current-bets`).
+**Kyun:** User: "current-bets sports ke andar daal do".
+**Files / jagah:** admin/src/configs/navConfig.tsx
+**Notes / pending:** tsc + eslint clean.
+
+## 2026-10-16 — Sportbook ka sab kuch hataya
+**Kya kiya:** Sportbook Report page + view + sidebar link hataye; backend `POST /exchange/reports/sportbook-report` route, service method, validator. Total Profit Loss: Type filter (All / Sports / Sportbook) aur khaali Sportbook table hataye; API se `type` param aur `sportbook: []` hataye (ab `{ sports }`). User Win Loss: SportBookpts column + `SPORTSBOOK` category / `sportsbook_pts` hataye. (marketBlocks ka `v-sportbook` sirf % badge ka naam hai — rehne diya.)
+**Kyun:** User: "sportbook jaisa koi bhi cheez yahan nahi hai, wo hata do".
+**Files / jagah:** admin/src/{views/exchange/reports/{TotalProfitLoss,UserWinLoss}.tsx, configs/navConfig.tsx}; backend exchange-reports/{routes/admin.routes.js, reports.service.js, reports.validators.js, winLossReports.js, index.js, __tests__/exchangeReports.test.js}.
+**Notes / pending:** Tests 20 pass. Live: sportbook route 404, total-profit-loss `{ sports: [] }` 200, `type` bhejne pe 422, user-win-loss totals `{ sports_pts, total }`. Backend restart kiya.
+
+## 2026-10-16 — 4 reports Agent Management me
+**Kya kiya:** Account Statement, Party Win Loss, Total Profit Loss, User Win Loss — Exchange Reports se utha ke Agent Management section me (Account List, Bank ke neeche). Exchange Reports me 8 bache. URLs wahi.
+**Kyun:** User: "account-statement, party-win-loss, total-profit-loss, user-win-loss client management me daal do" (client management = sidebar ka Agent Management).
+**Files / jagah:** admin/src/configs/navConfig.tsx
+**Notes / pending:** tsc + eslint clean.
+
+## 2026-10-16 — Exchange Reports alag sidebar section
+**Kya kiya:** Sports Exchange group se "Reports" (12 sub-links) nikal ke naya collapsible group "Exchange Reports" (Sports Exchange ke theek neeche, uske parallel) — 12 seedhe links, reports:read. Pages / URLs wahi.
+**Kyun:** User: "sports exchange me jo reports wala section hai usko bahar le aao, exchange ke parallel daal do".
+**Files / jagah:** admin/src/configs/navConfig.tsx
+**Notes / pending:** Naam "Exchange Reports" isliye ki "Reports" group (direct users ke) pehle se hai. Pages 200.
+
+## 2026-10-16 — Account List: D / W ke do section (Deposit / Withdraw + Settlement)
+**Kya kiya:** Account List me do alag column: "Deposit / Withdraw" (D / W → CreditDialog, `admin/staff/transfer`) aur "Settlement" (D / W → SettleDialog, `admin/exchange/points/settle`, pehle jaisa). SettleDialog commit `f95f9d6^` se wapas, helpers `accountMoney.ts` se. Action me ab sirf More (drill-down me P). Drill-down me paise wale column "—".
+**Kyun:** User: "D / W ko do section me divide karo — ek me settlement wala chalega, ek me simple deposit / withdraw, jaise pehle chal raha tha".
+**Files / jagah:** admin/src/views/exchange/{AccountList.tsx, SettleDialog.tsx}
+**Notes / pending:** tsc + eslint clean, page 200.
 
 ## 2026-10-16 — Account List: D / W = Credit Deposit / Withdraw; CR modal aur Assign Agent page hataye
 **Kya kiya:** Account List ke D / W ab points-settle ki jagah Credit Deposit / Credit Withdraw popup kholte hain (`admin/staff/transfer`, zip ka CreditForm). CR (naam ke bagal) pe click wala "Credit Activity" modal hataya — ab sirf number. `CreditActivityDialog.tsx` → `CreditDialog.tsx` (ek mode ka popup + CreditHistory, jo More dialog use karta hai). `SettleDialog.tsx` hataya; `fmt` / `SETTLE_INVALIDATE` / `settleApi` (Bank page) `accountMoney.ts` me. Assign Agent page hataya: route, view, sidebar link, UserPlus icon; backend `GET /exchange/accounts-admin/user-creation.csv` + `userCreationCsv.js` + validator + test.

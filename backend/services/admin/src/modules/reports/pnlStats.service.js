@@ -146,11 +146,11 @@ class PnlStatsService {
   //  Summary
   // ══════════════════════════════════════════════════════════════════════
 
-  async summary({ staff, from, to, granularity = 'day', currency }) {
+  async summary({ staff, from, to, granularity = 'day', currency, channel }) {
     const window = statsWindow({ from, to, granularity });
     const house = canManagePromotions(staff);
     const [scope, rates, buckets] = await Promise.all([
-      playerScope(this.models, staff, { logger: this.logger }),
+      playerScope(this.models, staff, { channel, logger: this.logger }),
       loadRates(this.models),
       this.#buckets(window),
     ]);
@@ -265,9 +265,9 @@ class PnlStatsService {
   //  Breakdown
   // ══════════════════════════════════════════════════════════════════════
 
-  async breakdown({ staff, from, to, granularity = 'day', currency }) {
+  async breakdown({ staff, from, to, granularity = 'day', currency, channel }) {
     const window = statsWindow({ from, to, granularity });
-    const [scope, rates] = await Promise.all([playerScope(this.models, staff, { logger: this.logger }), loadRates(this.models)]);
+    const [scope, rates] = await Promise.all([playerScope(this.models, staff, { channel, logger: this.logger }), loadRates(this.models)]);
     const valuer = createValuer(rates, currency);
     const ctx = this.#ctx(window, scope, currency);
 

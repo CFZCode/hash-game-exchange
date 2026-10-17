@@ -9,7 +9,7 @@ const { feeRateFor } = require('./swap.constants');
 const { WalletRepository } = require('../wallet/wallet.repository');
 const { ExchangeRateService } = require('../exchange-rate/exchangeRate.service');
 const { REASON, CURRENCY_COLUMN } = require('../wallet/wallet.constants');
-const { ownerWhere, assertPlayerVisible } = require('../directory/playerScope');
+const { ownerWhere, assertPlayerVisible, withChannel } = require('../directory/playerScope');
 
 /**
  * Internal currency swap.
@@ -232,8 +232,8 @@ class SwapService {
    * Scoped to the caller's tree — this listed every player's swaps to any
    * staff member with `wallet:read`, agents included.
    */
-  async listAllHistory({ staff, userId, currency, limit, offset }) {
-    const where = await ownerWhere(this, staff?.id, 'uid', userId);
+  async listAllHistory({ staff, userId, currency, channel, limit, offset }) {
+    const where = withChannel(await ownerWhere(this, staff?.id, 'uid', userId), 'uid', channel);
     // The site admin's currency filter: a swap out of OR into that coin.
     if (currency) where[Op.or] = [{ from_currency: currency }, { to_currency: currency }];
     return this.models.SwapHistory.findAndCountAll({

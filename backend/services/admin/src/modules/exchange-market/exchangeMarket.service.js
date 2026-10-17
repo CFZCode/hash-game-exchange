@@ -18,6 +18,9 @@ const REAL_RUNNERS = `e.team_name NOT ILIKE '%back' AND e.team_name NOT ILIKE '%
 // downline ke players — :staffIds aur :withDirect replacements chahiye
 const IN_SCOPE = `(u.parent_staff_id IN (:staffIds) OR (:withDirect AND u.parent_staff_id IS NULL))`;
 
+// Direct Users | Agent Users tab → SQL (na bheja = dono, purana jawab).
+const CHANNEL_SQL = { direct: 'u.parent_staff_id IS NULL', agent: 'u.parent_staff_id IS NOT NULL' };
+
 // Current Bets ke radio → SQL (zip: Matched / Unmatched / Deleted)
 const MATCH_STATUS_SQL = {
   matchbet: `b.result_status = 'pending' AND COALESCE(b.unmatched, false) = false`,
@@ -155,9 +158,9 @@ class ExchangeMarketService {
   //  Current Bets (zip: /admin/reports/current-bets)
   // ══════════════════════════════════════════════════════════════════════
 
-  async currentBets({ actor, matchStatus, betType, limit, offset }) {
+  async currentBets({ actor, matchStatus, betType, channel, limit, offset }) {
     const scope = await this.#scope(actor);
-    const where = `${IN_SCOPE} AND ${MATCH_STATUS_SQL[matchStatus]} AND ${BET_TYPE_SQL[betType]}`;
+    const where = `${IN_SCOPE} AND ${MATCH_STATUS_SQL[matchStatus]} AND ${BET_TYPE_SQL[betType]} AND ${CHANNEL_SQL[channel] ?? 'TRUE'}`;
 
     const [rows, [{ total }]] = await Promise.all([
       this.#select(

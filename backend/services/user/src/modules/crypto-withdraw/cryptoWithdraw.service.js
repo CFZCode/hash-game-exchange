@@ -16,6 +16,7 @@ const { withdrawalNotice } = require('../notifications/notices');
 const { networksFor } = require('../crypto/crypto.networks');
 const { PlayerBonusService } = require('../player-bonuses/playerBonus.service');
 const { createWithdrawRequirements } = require('../withdraw-requirements/withdrawRequirements');
+const { withChannel } = require('../directory/playerScope');
 
 /** Thrown inside the request transaction to roll back a double submit's row. */
 class ReplayedRequest extends Error {}
@@ -263,15 +264,15 @@ class CryptoWithdrawService {
    * a caller that wants a total in one currency asks it once.
    * ─────────────────────────────────────────────────────────────────────
    */
-  async listAll({ status, userId, coin, from, to, limit = 50, offset = 0 }) {
-    const where = {
+  async listAll({ status, userId, coin, from, to, channel, limit = 50, offset = 0 }) {
+    const where = withChannel({
       ...(status ? { status } : {}),
       ...(userId ? { uid: userId } : {}),
       ...(coin ? { coin } : {}),
       ...(from || to
         ? { date: { ...(from ? { [Op.gte]: from } : {}), ...(to ? { [Op.lte]: to } : {}) } }
         : {}),
-    };
+    }, 'uid', channel);
 
     const { rows, count } = await this.models.Withdrawals.findAndCountAll({
       where,

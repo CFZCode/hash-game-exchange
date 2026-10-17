@@ -105,6 +105,11 @@ const listOrders = {
 
 const providerParam = { params: z.object({ provider }) };
 
+/** Payment Methods page: `?fresh=1` = A-Pay se abhi dobara laao (cache chhod ke). */
+const paymentSystems = {
+  query: z.object({ fresh: z.enum(['0', '1', 'true', 'false']).optional() }).strict(),
+};
+
 const repairUtr = {
   body: z
     .object({
@@ -115,4 +120,4 @@ const repairUtr = {
     .strict(),
 };
 
-module.exports = { createDeposit, createWithdrawal, orderParams, listOrders, providerParam, repairUtr };
+module.exports = { createDeposit, createWithdrawal, orderParams, listOrders, providerParam, repairUtr, paymentSystems };

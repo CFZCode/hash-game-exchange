@@ -24,6 +24,12 @@ const amount = z
 
 const typeParam = { params: z.object({ type: raceType }) };
 
+/** Admin leaderboard: Direct Users | Agent Users tab. */
+const adminLeaderboard = {
+  params: z.object({ type: raceType }),
+  query: z.object({ channel: z.enum(['direct', 'agent']).optional() }).strict(),
+};
+
 const listing = {
   query: z
     .object({
@@ -43,6 +49,8 @@ const adminListing = {
       userId: id.optional(),
       raceId: id.optional(),
       claimed: z.enum(['true', 'false']).optional(),
+      // Direct Users | Agent Users — na ho to sab (purana jawab).
+      channel: z.enum(['direct', 'agent']).optional(),
       limit: z.coerce.number().int().min(1).max(200).default(50),
       offset: z.coerce.number().int().min(0).default(0),
     })
@@ -126,6 +134,7 @@ const boatParam = { params: z.object({ id }) };
 
 module.exports = {
   typeParam,
+  adminLeaderboard,
   listing,
   history,
   adminListing,

@@ -14,6 +14,9 @@ const window = {
   to: z.coerce.date().optional(),
 };
 
+/** Admin ka Direct Users / Agent Users tab. Na ho = sab (pehle jaisa). */
+const channel = z.enum(['direct', 'agent']).optional();
+
 const listing = {
   query: z
     .object({
@@ -22,6 +25,7 @@ const listing = {
       search: z.string().trim().max(120).optional(),
       userId: z.coerce.number().int().positive().optional(),
       source: z.enum(SOURCE_KEYS).optional(),
+      channel,
     })
     .strict()
     .refine((v) => !v.from || !v.to || v.to >= v.from, {
@@ -38,9 +42,12 @@ const userListing = {
 
 const stats = {
   query: z
-    .object({ ...window, userId: z.coerce.number().int().positive().optional() })
+    .object({ ...window, userId: z.coerce.number().int().positive().optional(), channel })
     .strict(),
 };
+
+/** `/analytics` — sirf Direct / Agent tab. */
+const analytics = { query: z.object({ channel }).strict() };
 
 const userParam = { params: z.object({ userId: z.coerce.number().int().positive() }) };
 
@@ -124,6 +131,7 @@ module.exports = {
   listing,
   userListing,
   stats,
+  analytics,
   userParam,
   myTimedRounds,
   liveFeed,
@@ -151,6 +159,7 @@ const rawPaging = {
   from: zod.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   to: zod.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   userId: zod.coerce.number().int().positive().optional(),
+  channel: zod.enum(['direct', 'agent']).optional(),
 };
 
 /** @legacy GET /betHistory/transactions/luckysports */

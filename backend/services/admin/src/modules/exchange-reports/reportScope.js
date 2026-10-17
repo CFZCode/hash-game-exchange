@@ -19,13 +19,17 @@ const { manageableStaffIds } = require('../staff-directory/staffDirectory.servic
 
 const notInTree = () => new AppError('This account is not in your tree', 404, 'EXCHANGE_NOT_IN_YOUR_TREE');
 
-/** Login wale ka tree. */
-async function treeOf(models, actor, logger) {
+/**
+ * Login wale ka tree. `channel` = Direct Users | Agent Users tab:
+ *   'direct' → sirf direct users (koi staff / agent ka player nahi),
+ *   'agent'  → sirf staff tree (direct users nahi),  na ho → dono (purana).
+ */
+async function treeOf(models, actor, logger, channel) {
   const ids = await manageableStaffIds(models, actor.id, { logger, level: actor.level });
   return {
     meId: Number(actor.id),
-    staffIds: ids.map(Number),
-    withDirectUsers: Boolean(actor.canIssueFunds),
+    staffIds: channel === 'direct' ? [] : ids.map(Number),
+    withDirectUsers: channel === 'agent' ? false : Boolean(actor.canIssueFunds),
   };
 }
 

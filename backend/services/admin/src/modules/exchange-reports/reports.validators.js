@@ -9,6 +9,8 @@ const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'use YYYY-MM-DD');
 const client = {
   clientType: z.enum(['user', 'staff']).optional(),
   clientId: id.optional(),
+  // Direct Users | Agent Users tab; na ho = dono
+  channel: z.enum(['direct', 'agent']).optional(),
 };
 
 const days = (q) => (new Date(q.toDate) - new Date(q.fromDate)) / 86_400_000;
@@ -24,7 +26,7 @@ function inTenDayWindow(q) {
 
 /** GET /exchange/reports/clients?search=abc */
 const clients = {
-  query: z.object({ search: z.string().trim().min(1).max(100) }).strict(),
+  query: z.object({ search: z.string().trim().min(1).max(100), channel: client.channel }).strict(),
 };
 
 /** POST /exchange/reports/statement — zip statementv2, max 7 din (maxDateRange(7)). */
@@ -57,6 +59,7 @@ const partyWinLoss = {
     .object({
       type: z.enum(['all', 'user']).default('all'),
       search: z.string().trim().max(100).optional(),
+      channel: client.channel,
     })
     .strict(),
 };
@@ -69,10 +72,10 @@ const userWinLoss = {
     .refine(inTenDayWindow, { message: RANGE_MESSAGE }),
 };
 
-/** POST /exchange/reports/total-profit-loss — type: 0 All, 2 Sports, 5 Sportbook. */
+/** POST /exchange/reports/total-profit-loss — sirf sports (sportbook hamare yahan nahi). */
 const totalProfitLoss = {
   body: z
-    .object({ ...client, fromDate: day, toDate: day, type: z.enum(['0', '2', '5']).default('0') })
+    .object({ ...client, fromDate: day, toDate: day })
     .strict()
     .refine(inTenDayWindow, { message: RANGE_MESSAGE }),
 };
@@ -91,16 +94,4 @@ const turnover = {
     .refine(inTenDayWindow, { message: RANGE_MESSAGE }),
 };
 
-/** POST /exchange/reports/sportbook-report */
-const sportbookReport = {
-  body: z
-    .object({
-      ...client,
-      vendor: z.string().trim().max(50).optional(),
-      date: z.string().trim().max(10).optional(),
-      status: z.enum(['settled', 'unsettled']),
-    })
-    .strict(),
-};
-
-module.exports = { clients, statement, statementRow, partyWinLoss, userWinLoss, totalProfitLoss, turnover, sportbookReport };
+module.exports = { clients, statement, statementRow, partyWinLoss, userWinLoss, totalProfitLoss, turnover };

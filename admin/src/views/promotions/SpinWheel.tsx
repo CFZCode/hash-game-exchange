@@ -334,7 +334,7 @@ const claimColumns: Column<SpinClaim>[] = [
 const Claims = () => {
   const { page, limit, set } = useLocalList()
   const [userId, setUserId] = useState('')
-  const list = usePagedApi<SpinClaim>('admin/user/spin-wheel/claims', { limit, page, userId: userId || undefined })
+  const list = usePagedApi<SpinClaim>('admin/user/spin-wheel/claims', { channel: 'direct', limit, page, userId: userId || undefined })
 
   return (
     <DataTable
@@ -357,7 +357,7 @@ const Claims = () => {
 const SpinWheel = () => {
   const { can } = useSession()
   const canWrite = can('config:write')
-  const claims = usePagedApi<SpinClaim>('admin/user/spin-wheel/claims', { limit: 1, page: 1 })
+  const claims = usePagedApi<SpinClaim>('admin/user/spin-wheel/claims', { channel: 'direct', limit: 1, page: 1 })
 
   return (
     <div>

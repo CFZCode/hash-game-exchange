@@ -2,7 +2,7 @@
 
 const crypto = require('node:crypto');
 
-const { money, sitePolicy, withdrawBlock, currencyRegistry } = require('@ibitplay/common');
+const { money, sitePolicy, withdrawBlock, currencyRegistry, manualPayments } = require('@ibitplay/common');
 const { Op } = require('@ibitplay/db');
 
 const errors = require('./fiatWithdraw.errors');
@@ -14,6 +14,7 @@ const { notifyPlayer } = require('../notifications/notifyPlayer');
 const { withdrawalNotice } = require('../notifications/notices');
 const { PlayerBonusService } = require('../player-bonuses/playerBonus.service');
 const { createWithdrawRequirements } = require('../withdraw-requirements/withdrawRequirements');
+const { withChannel } = require('../directory/playerScope');
 
 /** Thrown inside the request transaction to roll back a double submit's row. */
 class ReplayedRequest extends Error {}
@@ -67,6 +68,8 @@ class FiatWithdrawService {
     // Reassigned below when the payout account is a saved one (`bankAccountId`).
     let details = requested;
     await sitePolicy.assertAllowed(this.models, 'withdrawal_mode', 'manual', this.logger);
+    // Super Admin ka Manual withdrawal switch (Admin → Transactions → Withdraw → Manual).
+    await manualPayments.assertManualAllowed(this.models.Users?.sequelize, 'withdraw');
     // The operator's withdrawal block (migration 091) — WITHDRAW_BLOCKED before anything else.
     await withdrawBlock.assertWithdrawAllowed(this.models, { userId });
     // A switched-off coin is not paid out, as on the crypto rail (CURRENCY_DISABLED).
@@ -225,9 +228,9 @@ class FiatWithdrawService {
   }
 
   /** @legacy GET /getFiatWithdrawData */
-  async listAll({ status, userId, currency, limit, offset }) {
+  async listAll({ status, userId, currency, channel, limit, offset }) {
     const result = await this.models.FiatWithdrawals.findAndCountAll({
-      where: { ...(status ? { status } : {}), ...(userId ? { uid: userId } : {}), ...(currency ? { currency } : {}) },
+      where: withChannel({ ...(status ? { status } : {}), ...(userId ? { uid: userId } : {}), ...(currency ? { currency } : {}) }, 'uid', channel),
       order: [['id', 'DESC']],
       limit,
       offset,

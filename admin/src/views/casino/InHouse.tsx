@@ -12,6 +12,7 @@ import DataTable, { type Column } from '@/components/shared/DataTable'
 import DateTime from '@/components/shared/DateTime'
 import ErrorState from '@/components/shared/ErrorState'
 import Money from '@/components/shared/Money'
+import ChannelTabs, { type Channel } from '@/components/shared/ChannelTabs'
 import PageHeader from '@/components/shared/PageHeader'
 import StatCard from '@/components/shared/StatCard'
 import StatusBadge from '@/components/shared/StatusBadge'
@@ -218,9 +219,9 @@ const betColumns: Column<HouseBet>[] = [
   { key: 'id', header: 'Bet id', cell: r => <span className='font-mono text-xs'>{r.id}</span> }
 ]
 
-const BetsTab = ({ table }: { table: 'bets' | 'bets_2m' }) => {
+const BetsList = ({ table, channel }: { table: 'bets' | 'bets_2m'; channel: Channel }) => {
   const { state, set } = useListState(['userId', 'from', 'to'])
-  const list = usePageList<HouseBet>(`admin/casino/bet-history/house/${table}`, { limit: state.limit, page: state.page, userId: state.userId || undefined, from: state.from || undefined, to: state.to || undefined })
+  const list = usePageList<HouseBet>(`admin/casino/bet-history/house/${table}`, { limit: state.limit, page: state.page, userId: state.userId || undefined, from: state.from || undefined, to: state.to || undefined, channel })
 
   return (
     <DataTable
@@ -243,6 +244,9 @@ const BetsTab = ({ table }: { table: 'bets' | 'bets_2m' }) => {
     />
   )
 }
+
+/** Bets ledger: Direct Users / Agent Users alag listing. */
+const BetsTab = ({ table }: { table: 'bets' | 'bets_2m' }) => <ChannelTabs>{channel => <BetsList table={table} channel={channel} />}</ChannelTabs>
 
 const InHouse = () => (
   <div>

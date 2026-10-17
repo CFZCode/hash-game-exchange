@@ -679,4 +679,43 @@ test('casino bet history', async (t) => {
       await model.destroy({ where: { user_code: codes } });
     }
   });
+  await t.test('channel: Direct Users / Agent Users tabs split every listing', async () => {
+    // Direct = parent_staff_id NULL (site signup), agent = an agent's player.
+    const direct = await seedPlayer(null);
+    const agent = await seedPlayer(STAFF_A);
+    const service = build();
+    const ids = (r, key = 'user_id') => r.rows.map((x) => String(x[key]));
+
+    const d = await service.list({ page: 1, limit: 200, staffId: ROOT, channel: 'direct' });
+    assert.ok(ids(d).includes(String(direct)) && !ids(d).includes(String(agent)), 'direct tab: only direct');
+    const a = await service.list({ page: 1, limit: 200, staffId: ROOT, channel: 'agent' });
+    assert.ok(ids(a).includes(String(agent)) && !ids(a).includes(String(direct)), 'agent tab: only agent');
+    const all = await service.list({ page: 1, limit: 200, staffId: ROOT });
+    assert.ok(ids(all).includes(String(direct)) && ids(all).includes(String(agent)), 'no channel = both, as before');
+
+    // One player + the wrong tab = nothing; a non-root tree has no direct users.
+    assert.equal((await service.list({ page: 1, limit: 50, staffId: ROOT, userId: direct, channel: 'agent' })).total, 0);
+    assert.equal((await service.list({ page: 1, limit: 50, staffId: STAFF_A, channel: 'direct' })).total, 0);
+    assert.ok((await service.stats({ staffId: ROOT, userId: direct, channel: 'direct' })).totals.bets >= 1);
+
+    const hb = await service.houseBets({ table: 'bets', staffId: ROOT, channel: 'direct', page: 1, limit: 200 });
+    assert.ok(ids(hb, 'userId').includes(String(direct)) && !ids(hb, 'userId').includes(String(agent)));
+
+    // VARCHAR player columns (bets_2m.uid, transaction_live.user_code) take the ::text subquery.
+    await models.Bets2m.destroy({ where: { uid: [String(direct), String(agent)] } });
+    await models.Bets2m.create({ uid: String(direct), value: '2', amount: '3', sessionid: `bhch-${direct}`, status: 'won', cointype: 'usdt' });
+    await models.Bets2m.create({ uid: String(agent), value: '2', amount: '4', sessionid: `bhch-${agent}`, status: 'won', cointype: 'usdt' });
+    const b2 = await service.houseBets({ table: 'bets_2m', staffId: ROOT, channel: 'agent', page: 1, limit: 200 });
+    assert.ok(ids(b2, 'userId').includes(String(agent)) && !ids(b2, 'userId').includes(String(direct)));
+    await models.Bets2m.destroy({ where: { uid: [String(direct), String(agent)] } });
+
+    await models.TransactionLive.destroy({ where: { user_code: [String(direct), String(agent)] } });
+    await models.TransactionLive.create({ user_code: String(direct), bet_money: 5, win_money: 0, txn_id: `ch-${direct}`, type: 'bet' });
+    const live = await service.rawTransactions({ table: 'live', staffId: ROOT, channel: 'direct', page: 1, limit: 200 });
+    assert.ok(ids(live, 'userId').includes(String(direct)));
+    await models.TransactionLive.destroy({ where: { user_code: [String(direct), String(agent)] } });
+
+    await models.Bets.destroy({ where: { uid: [direct, agent] } });
+    await models.Users.destroy({ where: { id: [direct, agent] } });
+  });
 });

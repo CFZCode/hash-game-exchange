@@ -454,7 +454,8 @@ const GeneralLock = () => {
 
       <PageHeader title='General Lock' />
 
-      <Card>
+      {/* overflow-visible: client search ki suggestion list card ke bahar tak dikhe (kate nahi). */}
+      <Card className='overflow-visible'>
         <CardContent className='space-y-4'>
           <form onSubmit={handleLoad} className='flex flex-wrap items-start gap-3'>
             <div className='w-full md:w-64'>

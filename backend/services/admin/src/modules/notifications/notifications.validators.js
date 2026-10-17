@@ -35,6 +35,8 @@ const listDevices = {
   query: paging.extend({
     userId: id.optional(),
     activeOnly: z.coerce.boolean().default(true),
+    /** Direct Users | Agent Users tab. Na ho = dono. */
+    channel: z.enum(['direct', 'agent']).optional(),
   }),
 };
 

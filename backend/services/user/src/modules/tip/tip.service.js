@@ -8,7 +8,7 @@ const errors = require('./tip.errors');
 const { minimumFor, RATE_LIMIT, SEARCH_LIMIT } = require('./tip.constants');
 const { WalletService } = require('../wallet/wallet.service');
 const { REASON } = require('../wallet/wallet.constants');
-const { visibleUserIds } = require('../directory/playerScope');
+const { visibleUserIds, CHANNEL_SQL } = require('../directory/playerScope');
 const { notifyPlayer } = require('../notifications/notifyPlayer');
 const { createRewardMoney, USD_CODES } = require('../../lib/rewardMoney');
 const { createTipLimitsResolver } = require('./tipLimits');
@@ -312,7 +312,7 @@ class TipService {
 
   // ══ Staff ═══════════════════════════════════════════════════════════
 
-  async adminList({ staff, limit = 50, offset = 0, search, currency, from, to }) {
+  async adminList({ staff, limit = 50, offset = 0, search, currency, from, to, channel }) {
     const ids = await visibleUserIds(this, staff?.id);
     if (ids && ids.length === 0) {
       return { rows: [], total: 0, summary: { totalTips: 0, byCurrency: [] } };
@@ -328,6 +328,8 @@ class TipService {
       where.push("(fu.name ILIKE :search ESCAPE '\\' OR tu.name ILIKE :search ESCAPE '\\')");
       replacements.search = `%${escapeLike(search)}%`;
     }
+    // Channel tip PAANE wale (recipient) se: agent ke users tip bhej nahi sakte, sirf paa sakte hain.
+    if (CHANNEL_SQL[channel]) where.push(`tu.${CHANNEL_SQL[channel]}`);
     if (currency) {
       where.push('t.currency = :currency');
       replacements.currency = String(currency).toUpperCase();

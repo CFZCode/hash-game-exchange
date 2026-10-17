@@ -4,7 +4,7 @@ const path = require('path');
 const fs = require('fs/promises');
 const crypto = require('crypto');
 
-const { money, sitePolicy, currencyRegistry } = require('@ibitplay/common');
+const { money, sitePolicy, currencyRegistry, manualPayments } = require('@ibitplay/common');
 const { Op: SequelizeOp } = require('@ibitplay/db');
 
 const errors = require('./fiatDeposit.errors');
@@ -17,6 +17,7 @@ const { WalletService } = require('../wallet/wallet.service');
 const { REASON } = require('../wallet/wallet.constants');
 const { FirstDepositBonusService } = require('../bonus/firstDepositBonus.service');
 const { notifyPlayer } = require('../notifications/notifyPlayer');
+const { withChannel } = require('../directory/playerScope');
 
 /**
  * Manual fiat deposits — a player transfers money to the house's bank account,
@@ -81,6 +82,8 @@ class FiatDepositService {
   async create({ userId, details, screenshot }) {
     // Before anything is written: a refused submission must leave no file behind.
     await sitePolicy.assertAllowed(this.models, 'deposit_mode', 'manual', this.logger);
+    // Super Admin ka Manual deposit switch (Admin → Transactions → Deposit → Manual).
+    await manualPayments.assertManualAllowed(this.models.Users?.sequelize, 'deposit');
     // The coin registry (061): no deposit in a coin the owner or the site switched off.
     await currencyRegistry.assertCurrencyEnabled(details.currency);
     if (!screenshot) throw errors.SCREENSHOT_REQUIRED();
@@ -160,8 +163,8 @@ class FiatDepositService {
    * @legacy GET /api/deposit/user/history/:username
    * @legacy GET /api/deposit/admin/:staffId
    */
-  async listAll({ status, userId, currency, search, limit, offset }) {
-    const where = {
+  async listAll({ status, userId, currency, search, channel, limit, offset }) {
+    const where = withChannel({
       ...(status ? { status } : {}),
       ...(userId ? { user_id: userId } : {}),
       ...(currency ? { currency } : {}),
@@ -174,7 +177,7 @@ class FiatDepositService {
             ],
           }
         : {}),
-    };
+    }, 'user_id', channel);
 
     const result = await this.models.FiatDeposits.findAndCountAll({
       where,

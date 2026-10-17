@@ -24,6 +24,7 @@ import { api } from '@/lib/api/client'
 import { check } from '@/lib/validate'
 import { allConvertedLabel, useFinanceFilters } from './currencyFilter'
 import FinanceStatsPanel from './FinanceStatsPanel'
+import ListStatsTabs from './ListStatsTabs'
 import { Details, ViewDialog, stop } from './shared'
 import { FIAT_CURRENCIES, FIAT_WITHDRAW_STATUSES, type FiatWithdrawalRow } from './types'
 import { useOwnerCoinFilter } from './useCurrencyCodes'
@@ -135,45 +136,44 @@ const FiatWithdrawals = () => {
   // filters the charts AND the payout queue. The queue has no date filter, so it stays whole.
   const filters = useFinanceFilters()
   const ownerCoins = useOwnerCoinFilter()
-  const list = usePagedApi<FiatWithdrawalRow>(LIST, { limit: query.limit, page: query.page, status: query.status, userId: query.userId, currency: filters.currency || undefined })
+  const list = usePagedApi<FiatWithdrawalRow>(LIST, { channel: 'direct', limit: query.limit, page: query.page, status: query.status, userId: query.userId, currency: filters.currency || undefined })
 
   return (
     <div>
-      <PageHeader title='Fiat withdrawals' description='Bank payout requests. Funds are held when the user asks; a rejection releases them back.' />
+      <PageHeader title='Manual withdrawals' description='Manual bank payout requests. Funds are held when the user asks; a rejection releases them back.' />
       <FilterBar filters={filters} currencies={ownerCoins(FIAT_CURRENCIES)} allCurrenciesLabel={allConvertedLabel(filters.defaultCurrency)} className='mb-4' />
-      {can('reports:read') && (
-        <FinanceStatsPanel kind='withdrawals' rail='fiat' filters={filters} statusLabels={{ success: 'Paid', pending: 'In queue / approved', failed: 'Rejected' }} />
-      )}
-      <DataTable
-        columns={columns}
-        rows={list.data?.rows}
-        rowKey={r => r.withdrawalId}
-        loading={list.isLoading}
-        fetching={list.isFetching}
-        error={list.error}
-        pagination={list.data?.pagination}
-        onPageChange={page => set({ page })}
-        onLimitChange={limit => set({ limit })}
-        emptyMessage={state.status ? `Nothing ${String(state.status).toLowerCase()}.` : 'No withdrawal requests.'}
-        toolbar={
-          <>
-            <Select value={String(state.status || 'all')} onValueChange={v => v && set({ status: v === 'all' ? '' : v })}>
-              <SelectTrigger className='w-36'>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value='all'>All statuses</SelectItem>
-                {FIAT_WITHDRAW_STATUSES.map(s => (
-                  <SelectItem key={s} value={s}>
-                    {s}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Input placeholder='User id' aria-label='User id' inputMode='numeric' value={String(state.userId ?? '')} onChange={e => set({ userId: e.target.value.replace(/\D/g, '') })} className='w-28' />
-          </>
-        }
-      />
+      <ListStatsTabs stats={can('reports:read') ? <FinanceStatsPanel kind='withdrawals' rail='fiat' filters={filters} statusLabels={{ success: 'Paid', pending: 'In queue / approved', failed: 'Rejected' }} /> : null}>
+        <DataTable
+          columns={columns}
+          rows={list.data?.rows}
+          rowKey={r => r.withdrawalId}
+          loading={list.isLoading}
+          fetching={list.isFetching}
+          error={list.error}
+          pagination={list.data?.pagination}
+          onPageChange={page => set({ page })}
+          onLimitChange={limit => set({ limit })}
+          emptyMessage={state.status ? `Nothing ${String(state.status).toLowerCase()}.` : 'No withdrawal requests.'}
+          toolbar={
+            <>
+              <Select value={String(state.status || 'all')} onValueChange={v => v && set({ status: v === 'all' ? '' : v })}>
+                <SelectTrigger className='w-36'>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='all'>All statuses</SelectItem>
+                  {FIAT_WITHDRAW_STATUSES.map(s => (
+                    <SelectItem key={s} value={s}>
+                      {s}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input placeholder='User id' aria-label='User id' inputMode='numeric' value={String(state.userId ?? '')} onChange={e => set({ userId: e.target.value.replace(/\D/g, '') })} className='w-28' />
+            </>
+          }
+        />
+      </ListStatsTabs>
     </div>
   )
 }

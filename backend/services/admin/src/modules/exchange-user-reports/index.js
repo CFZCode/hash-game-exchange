@@ -1,9 +1,8 @@
 'use strict';
 
 /**
- * Exchange user reports — zip (msadmin) ke Home dashboard aur user reports:
- *   Home (dashboard cards + charts), User History (login / password), Ip Detail,
- *   User Authentication, Fraud Report, User Register Detail.
+ * Exchange user reports — ab sirf zip (msadmin) ka Home: Dashboard ka "Agent System" tab
+ * (cards + charts). Baaki zip user-reports hata diye.
  *
  * Sab sirf padhte hain. Balance `credits` table se, hierarchy `staff` / `users` se.
  */

@@ -59,6 +59,7 @@ const featureCatalogue = require('./featureCatalogue');
 const sitePolicy = require('./sitePolicy');
 /** The operator's withdrawal block (migration 091) — every payout path asks it first. */
 const withdrawBlock = require('./withdrawBlock');
+const manualPayments = require('./manualPayments');
 /** What the platform owner allows this site — see entitlements.js. */
 const entitlements = require('./entitlements');
 /** Owner-only ON/OFF options of a feature (e.g. when the spin wheel grants a spin). */
@@ -117,6 +118,7 @@ module.exports = {
   featureCatalogue,
   sitePolicy,
   withdrawBlock,
+  manualPayments,
   entitlements,
   featureOptions,
   regionPolicy,

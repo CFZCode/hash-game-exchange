@@ -5,7 +5,12 @@ const crypto = require('crypto');
 const { money, sitePolicy, operatorSettings, withdrawBlock, currencyRegistry } = require('@ibitplay/common');
 
 const errors = require('./paymentOrders.errors');
-const { FLOW, userIdFor } = require('./paymentOrders.constants');
+const { FLOW, userIdFor, APAY_DEPOSIT_SYSTEMS, APAY_WITHDRAWAL_SYSTEMS, APAY_SYSTEM_LABELS } = require('./paymentOrders.constants');
+
+/** A-Pay payment-systems list cache (Payment Methods page) — 5 min, `fresh` skips it. */
+const PAYMENT_SYSTEMS_TTL_MS = 5 * 60 * 1000;
+const PAYMENT_SYSTEMS_CURRENCY_ORDER = ['INR', 'PKR', 'NPR', 'BDT'];
+let paymentSystemsCache = null;
 const { getGateway } = require('./gateways');
 const { validatePayoutDetails } = require('./payoutDetails');
 const { createHttpClient } = require('../psp/providers/http');
@@ -393,6 +398,63 @@ class PaymentOrdersService {
     return {
       provider: providerName,
       methods: await gateway.getAvailableMethods(this.config, { http: this.http }),
+    };
+  }
+
+  /**
+   * Payment Methods page (admin-structure.zip jaisa): A-Pay ne is project ke liye kaun se
+   * payment systems chalu kiye hain, currency ke hisaab se (INR, PKR, NPR, BDT, phir baaki),
+   * limits ke saath — aur hamari site kaunsa use karti hai (`APAY_DEPOSIT_SYSTEMS` /
+   * `APAY_WITHDRAWAL_SYSTEMS`). Sirf padhna. A-Pay configure na ho to `configured: false`.
+   */
+  async paymentSystemsOverview({ fresh = false } = {}) {
+    const gateway = getGateway('apay');
+    const missing = gateway.requiredConfig.filter((key) => !this.config[key]);
+    if (missing.length) return { configured: false, projectId: null, fetchedAt: null, cacheAgeSeconds: null, currencies: [] };
+
+    const now = Date.now();
+    if (fresh || !paymentSystemsCache || now - paymentSystemsCache.at > PAYMENT_SYSTEMS_TTL_MS) {
+      const systems = await gateway.getPaymentSystems(this.config, { http: this.http });
+      paymentSystemsCache = { at: now, systems };
+    }
+    const { at, systems } = paymentSystemsCache;
+
+    const cur = (ps) => String(ps.currency || '').toUpperCase();
+    const extras = [...new Set(systems.map(cur).filter((c) => c && !PAYMENT_SYSTEMS_CURRENCY_ORDER.includes(c)))];
+    const currencies = [...PAYMENT_SYSTEMS_CURRENCY_ORDER, ...extras].map((currency) => ({
+      currency,
+      methods: systems.filter((ps) => cur(ps) === currency).map((ps) => {
+        const siteDeposit = APAY_DEPOSIT_SYSTEMS[currency] === ps.name;
+        const sitePayout = APAY_WITHDRAWAL_SYSTEMS[currency] === ps.name;
+        return {
+          name: ps.name,
+          label: APAY_SYSTEM_LABELS[ps.name] || ps.name,
+          deposit: {
+            gatewayEnabled: Boolean(ps.deposit),
+            siteOffered: Boolean(ps.deposit) && siteDeposit,
+            min: Number(ps.min_deposit) || 0,
+            max: Number(ps.max_deposit) || 0,
+          },
+          withdrawal: {
+            gatewayEnabled: Boolean(ps.withdrawal),
+            siteUsed: Boolean(ps.withdrawal) && sitePayout,
+            min: Number(ps.min_withdrawals) || 0,
+            max: Number(ps.max_withdrawals) || 0,
+          },
+          notes: [
+            siteDeposit && !ps.deposit ? 'Site uses this for deposits but the gateway has it off' : null,
+            sitePayout && !ps.withdrawal ? 'Site uses this for withdrawals but the gateway has it off' : null,
+          ].filter(Boolean),
+        };
+      }),
+    }));
+
+    return {
+      configured: true,
+      projectId: String(this.config.APAY_PROJECT_ID),
+      fetchedAt: new Date(at).toISOString(),
+      cacheAgeSeconds: Math.round((now - at) / 1000),
+      currencies,
     };
   }
 

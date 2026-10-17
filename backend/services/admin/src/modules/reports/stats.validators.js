@@ -91,6 +91,8 @@ module.exports = {
       z
         .object({
           area: z.enum(['casino', 'sports']),
+          /** Direct Users | Agent Users tab. Na ho = dono. */
+          channel: z.enum(['direct', 'agent']).optional(),
           ...window,
         })
         .strict()

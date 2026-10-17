@@ -4,6 +4,7 @@ import { useState, type FormEvent } from 'react'
 
 import { toast } from 'sonner'
 
+import ChannelTabs, { type Channel } from '@/components/shared/ChannelTabs'
 import PageHeader from '@/components/shared/PageHeader'
 import { api, errorMessage } from '@/lib/api/client'
 import { exportExcel, exportPdf } from '../exportList'
@@ -21,7 +22,7 @@ const EXPORT_COLS = ['No', 'User Name', 'Level', 'Sport pts', 'Profit/Loss', 'Pt
  * kyunki staff ka number players ka hi jod hai), phir players. "User" = sirf players.
  * Poora set ek baar aata hai — paging, search aur totals browser me.
  */
-const PartyWinLoss = () => {
+const PartyWinLossReport = ({ channel }: { channel: Channel }) => {
   const [filterType, setFilterType] = useState('all')
   const [search, setSearch] = useState('')
   const [limit, setLimit] = useState(25)
@@ -33,7 +34,7 @@ const PartyWinLoss = () => {
     setLoading(true)
 
     try {
-      setRows(await withMinimumDelay(api.get<PartyRow[]>('admin/exchange/reports/party-win-loss', { type: filterType, search: search || undefined })))
+      setRows(await withMinimumDelay(api.get<PartyRow[]>('admin/exchange/reports/party-win-loss', { type: filterType, search: search || undefined, channel })))
     } catch (err) {
       toast.error(errorMessage(err))
       setRows([])
@@ -74,7 +75,6 @@ const PartyWinLoss = () => {
 
   return (
     <div>
-      <PageHeader title='Party Win Loss' />
 
       <ReportCard>
         <form onSubmit={handleLoad} className='flex flex-wrap items-center gap-4 border-b p-4'>
@@ -101,5 +101,13 @@ const PartyWinLoss = () => {
     </div>
   )
 }
+
+/** Upar Direct Users | Agent Users tab — dono ka report alag (API ko `channel`). */
+const PartyWinLoss = () => (
+  <div>
+    <PageHeader title='Party Win Loss' />
+    <ChannelTabs>{channel => <PartyWinLossReport channel={channel} />}</ChannelTabs>
+  </div>
+)
 
 export default PartyWinLoss

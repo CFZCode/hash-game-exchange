@@ -26,7 +26,6 @@ const actorFrom = (req) => ({
  *   POST /admin/exchange/reports/user-win-loss               User Win Loss (point-category-report)
  *   POST /admin/exchange/reports/total-profit-loss           Total Profit Loss
  *   POST /admin/exchange/reports/turnover                    Turn Over
- *   POST /admin/exchange/reports/sportbook-report            SportBook Report
  */
 module.exports = function adminRoutes(deps) {
   const { auth } = deps;
@@ -51,7 +50,6 @@ module.exports = function adminRoutes(deps) {
   router.post('/user-win-loss', validate(v.userWinLoss), read('body', 'userWinLoss'));
   router.post('/total-profit-loss', validate(v.totalProfitLoss), read('body', 'totalProfitLoss'));
   router.post('/turnover', validate(v.turnover), read('body', 'turnover'));
-  router.post('/sportbook-report', validate(v.sportbookReport), read('body', 'sportbookReport'));
 
   return router;
 };

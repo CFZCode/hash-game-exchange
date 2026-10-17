@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import type { Channel } from '@/components/shared/ChannelTabs'
 import { useApi } from '@/hooks/use-api'
 import { errorMessage } from '@/lib/api/client'
 import { cn } from '@/lib/utils'
@@ -115,7 +116,8 @@ export const clientBody = (client: Client | null) => (client ? { clientType: cli
  * Zip ka ClientMultiselect: 3 akshar likhne par tree me dhoondo, naam par click = chuno,
  * wahi naam dobara = hatao. Bahar click par band, likha hua text chala jaata hai.
  */
-export function ClientSearch({ value, onChange }: { value: Client | null; onChange: (client: Client | null) => void }) {
+/** `channel` (Direct Users | Agent Users tab) ho to sirf usi taraf ke accounts suggest hote hain. */
+export function ClientSearch({ value, onChange, channel }: { value: Client | null; onChange: (client: Client | null) => void; channel?: Channel }) {
   const [open, setOpen] = useState(false)
   const [text, setText] = useState('')
   const [search, setSearch] = useState('')
@@ -146,7 +148,7 @@ export function ClientSearch({ value, onChange }: { value: Client | null; onChan
     return () => document.removeEventListener('mousedown', onDown)
   }, [open])
 
-  const { data, isFetching, error } = useApi<Client[]>(open && search.length >= 3 ? 'admin/exchange/reports/clients' : null, { search })
+  const { data, isFetching, error } = useApi<Client[]>(open && search.length >= 3 ? 'admin/exchange/reports/clients' : null, { search, channel })
 
   const pick = (client: Client) => {
     onChange(value && value.type === client.type && value.id === client.id ? null : client)

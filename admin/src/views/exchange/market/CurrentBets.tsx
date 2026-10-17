@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 
 import { ChevronLeftIcon, ChevronRightIcon, FileSpreadsheetIcon, FileTextIcon, Loader2Icon } from 'lucide-react'
 
+import ChannelTabs, { type Channel } from '@/components/shared/ChannelTabs'
 import ErrorState from '@/components/shared/ErrorState'
 import PageHeader from '@/components/shared/PageHeader'
 import { Button } from '@/components/ui/button'
@@ -52,8 +53,9 @@ function Radios({ value, onChange, options }: { value: string; onChange: (v: str
  *
  * Data sirf "Load" dabane pe aata hai. Search box loaded rows pe hi filter karta hai (API ko
  * nahi jaata). Total Soda / Total Amount = dikh rahi rows ka. Back = blue border, Lay = pink.
+ * Upar Direct Users | Agent Users tab — dono ki bets alag (API ko `channel`).
  */
-const CurrentBets = () => {
+const BetsList = ({ channel }: { channel: Channel }) => {
   const [matchStatus, setMatchStatus] = useState('matchbet')
   const [betType, setBetType] = useState('all')
   const [limit, setLimit] = useState(25)
@@ -66,6 +68,7 @@ const CurrentBets = () => {
   const { data, isFetching, error, refetch } = usePagedApi<Bet>(loaded ? `${MARKET_API}/current-bets` : null, {
     matchStatus: loaded?.matchStatus,
     betType: loaded?.betType,
+    channel,
     limit,
     page
   })
@@ -97,13 +100,6 @@ const CurrentBets = () => {
     rows.map(b => [b.sportName ?? '', b.eventName ?? '', b.username, b.marketType ?? '', b.selection ?? '', plain(b.odds), Number(b.stake).toLocaleString(), fmtDateTime(b.createdAt), b.ip, b.browser])
 
   return (
-    <div>
-      <PageHeader title='Current Bets' />
-
-      <div className='mb-3 flex border-b'>
-        <span className='border-primary text-primary -mb-px border-b-2 px-4 py-2 text-sm font-semibold'>Sports</span>
-      </div>
-
       <Card size='sm' className='gap-4 p-4'>
         <div className='flex flex-wrap items-center justify-between gap-4'>
           <Radios value={matchStatus} onChange={setMatchStatus} options={MATCH_STATUS} />
@@ -207,8 +203,19 @@ const CurrentBets = () => {
           </Button>
         </div>
       </Card>
-    </div>
   )
 }
+
+const CurrentBets = () => (
+  <div>
+    <PageHeader title='Current Bets' />
+
+    <div className='mb-3 flex border-b'>
+      <span className='border-primary text-primary -mb-px border-b-2 px-4 py-2 text-sm font-semibold'>Sports</span>
+    </div>
+
+    <ChannelTabs>{channel => <BetsList channel={channel} />}</ChannelTabs>
+  </div>
+)
 
 export default CurrentBets

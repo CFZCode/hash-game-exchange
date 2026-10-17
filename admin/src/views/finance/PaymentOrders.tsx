@@ -154,7 +154,7 @@ const railColumns: Column<RailTransactionRow>[] = [
 ]
 
 /** Every rail merged — `admin/user/history/deposits` or `/withdrawals` (limit, offset, from, to, currency, userId, status). */
-const AllRails = ({ kind }: { kind: 'deposits' | 'withdrawals' }) => {
+export const AllRails = ({ kind }: { kind: 'deposits' | 'withdrawals' }) => {
   const { state, set, query } = useListState(['status', 'userId', 'from', 'to'])
 
   // One currency at a time — the site's default coin until somebody picks another (in the URL).

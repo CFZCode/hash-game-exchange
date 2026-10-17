@@ -213,6 +213,18 @@ const apay = {
       { headers: { apikey: config.APAY_API_KEY } }
     );
   },
+
+  /** Every payment system A-Pay has switched on for this project (admin Payment Methods page). */
+  async getPaymentSystems(config, { http }) {
+    const response = await http.get(
+      `${config.APAY_BASE_URL}/Remotes/payment-systems-info?project_id=${encodeURIComponent(config.APAY_PROJECT_ID)}`,
+      { headers: { apikey: config.APAY_API_KEY } }
+    );
+    if (!response?.success || !Array.isArray(response.payment_systems)) {
+      throw new Error(response?.message || 'payment-systems-info returned no list');
+    }
+    return response.payment_systems;
+  },
 };
 
 // ══════════════════════════════════════════════════════════════════════

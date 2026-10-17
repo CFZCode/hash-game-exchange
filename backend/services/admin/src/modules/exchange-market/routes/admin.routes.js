@@ -62,8 +62,8 @@ module.exports = function adminRoutes(deps) {
     canRead,
     validate(v.currentBets),
     asyncHandler(async (req, res) => {
-      const { matchStatus, betType, limit, offset } = req.query;
-      const result = await service.currentBets({ actor: actorFrom(req), matchStatus, betType, limit, offset });
+      const { matchStatus, betType, channel, limit, offset } = req.query;
+      const result = await service.currentBets({ actor: actorFrom(req), matchStatus, betType, channel, limit, offset });
       return response.paginated(res, result.rows, { page: Math.floor(offset / limit) + 1, limit, total: result.total });
     })
   );

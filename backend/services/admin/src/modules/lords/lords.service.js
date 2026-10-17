@@ -628,7 +628,7 @@ class LordsService {
   // ══════════════════════════════════════════════════════════════════════
 
   /** @legacy GET /lords/transfer/statement */
-  async transferStatement({ actor, accountType, accountId, from, to, limit = 50, offset = 0 }) {
+  async transferStatement({ actor, accountType, accountId, from, to, channel, limit = 50, offset = 0 }) {
     const staffIds = await manageableStaffIds(this.models, actor.id, { logger: this.logger, level: actor.level });
 
     const scope = accountId
@@ -649,9 +649,16 @@ class LordsService {
           ],
         };
 
+    // Direct Users | Agent Users tab: direct = jis transfer me ek taraf direct user (koi parent nahi) hai,
+    // agent = baaki sab (staff ↔ staff, staff ↔ agent ka player). Na ho = dono (purana).
+    const directSide = `((from_type = 'user' AND from_id IN (SELECT id FROM users WHERE parent_staff_id IS NULL))
+      OR (to_type = 'user' AND to_id IN (SELECT id FROM users WHERE parent_staff_id IS NULL)))`;
+    const channelWhere = channel ? { [Op.and]: [literal(channel === 'direct' ? directSide : `NOT ${directSide}`)] } : {};
+
     const { rows, count } = await this.models.StaffTransfers.findAndCountAll({
       where: {
         ...where,
+        ...channelWhere,
         ...(from || to
           ? { created_at: { ...(from ? { [Op.gte]: from } : {}), ...(to ? { [Op.lte]: to } : {}) } }
           : {}),

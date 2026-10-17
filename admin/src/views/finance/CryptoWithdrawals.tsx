@@ -27,6 +27,7 @@ import { formatNumber, truncateId } from '@/lib/format'
 import { check } from '@/lib/validate'
 import { allConvertedLabel, useCurrencyChoices, useFinanceFilters } from './currencyFilter'
 import FinanceStatsPanel from './FinanceStatsPanel'
+import ListStatsTabs from './ListStatsTabs'
 import { Details, ViewDialog, stop } from './shared'
 import { CRYPTO_WITHDRAW_STATUSES, type CryptoWithdrawSummary, type CryptoWithdrawalRow } from './types'
 
@@ -155,6 +156,8 @@ const CryptoWithdrawals = () => {
   const choices = useCurrencyChoices()
 
   const list = usePagedApi<CryptoWithdrawalRow>(LIST, {
+    // Agent ke users ye use nahi kar sakte — sirf direct users.
+    channel: 'direct',
     limit: query.limit,
     page: query.page,
     status: query.status,
@@ -177,52 +180,55 @@ const CryptoWithdrawals = () => {
     <div>
       <PageHeader title='Crypto withdrawals' description='On-chain payout requests. Approve → send coin → mark Sent with the hash. Rejecting returns the held balance.' />
       <FilterBar filters={filters} currencies={coins} allCurrenciesLabel={allConvertedLabel(filters.defaultCurrency)} className='mb-4' />
-      {can('reports:read') && (
-        <FinanceStatsPanel kind='withdrawals' rail='crypto' filters={filters} statusLabels={{ success: 'Sent', pending: 'In queue / approved', failed: 'Rejected' }} />
-      )}
-      {summary.error ? (
-        <div className='mb-4'>
-          <ErrorState error={summary.error} title='Could not load the queue summary' />
-        </div>
-      ) : null}
-      <p className='text-muted-foreground mb-2 text-xs font-medium'>Queue right now, all dates · {filters.currency || 'all coins'}</p>
-      <div className='mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4'>
-        {CRYPTO_WITHDRAW_STATUSES.map(s => {
-          const v = byStatus(s)
-
-          return <StatCard key={s} label={s} value={formatNumber(v.count)} hint={v.hint} loading={summary.isLoading} />
-        })}
-      </div>
-      <DataTable
-        columns={columns}
-        rows={list.data?.rows}
-        rowKey={r => r.id}
-        loading={list.isLoading}
-        fetching={list.isFetching}
-        error={list.error}
-        pagination={list.data?.pagination}
-        onPageChange={page => set({ page })}
-        onLimitChange={limit => set({ limit })}
-        emptyMessage={state.status ? `Nothing ${String(state.status).toLowerCase()}.` : 'No withdrawal requests.'}
-        toolbar={
-          <>
-            <Select value={String(state.status || 'all')} onValueChange={v => v && set({ status: v === 'all' ? '' : v })}>
-              <SelectTrigger className='w-36'>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value='all'>All statuses</SelectItem>
-                {CRYPTO_WITHDRAW_STATUSES.map(s => (
-                  <SelectItem key={s} value={s}>
-                    {s}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Input placeholder='User id' aria-label='User id' inputMode='numeric' value={String(state.userId ?? '')} onChange={e => set({ userId: e.target.value.replace(/\D/g, '') })} className='w-28' />
-          </>
-        }
-      />
+      <ListStatsTabs stats={<>
+          {can('reports:read') && (
+            <FinanceStatsPanel kind='withdrawals' rail='crypto' filters={filters} statusLabels={{ success: 'Sent', pending: 'In queue / approved', failed: 'Rejected' }} />
+          )}
+          {summary.error ? (
+            <div className='mb-4'>
+              <ErrorState error={summary.error} title='Could not load the queue summary' />
+            </div>
+          ) : null}
+          <p className='text-muted-foreground mb-2 text-xs font-medium'>Queue right now, all dates · {filters.currency || 'all coins'}</p>
+          <div className='mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4'>
+            {CRYPTO_WITHDRAW_STATUSES.map(s => {
+              const v = byStatus(s)
+    
+              return <StatCard key={s} label={s} value={formatNumber(v.count)} hint={v.hint} loading={summary.isLoading} />
+            })}
+          </div>
+        </>}>
+        <DataTable
+          columns={columns}
+          rows={list.data?.rows}
+          rowKey={r => r.id}
+          loading={list.isLoading}
+          fetching={list.isFetching}
+          error={list.error}
+          pagination={list.data?.pagination}
+          onPageChange={page => set({ page })}
+          onLimitChange={limit => set({ limit })}
+          emptyMessage={state.status ? `Nothing ${String(state.status).toLowerCase()}.` : 'No withdrawal requests.'}
+          toolbar={
+            <>
+              <Select value={String(state.status || 'all')} onValueChange={v => v && set({ status: v === 'all' ? '' : v })}>
+                <SelectTrigger className='w-36'>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='all'>All statuses</SelectItem>
+                  {CRYPTO_WITHDRAW_STATUSES.map(s => (
+                    <SelectItem key={s} value={s}>
+                      {s}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input placeholder='User id' aria-label='User id' inputMode='numeric' value={String(state.userId ?? '')} onChange={e => set({ userId: e.target.value.replace(/\D/g, '') })} className='w-28' />
+            </>
+          }
+        />
+      </ListStatsTabs>
     </div>
   )
 }

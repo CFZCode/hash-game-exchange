@@ -36,6 +36,8 @@ const currentBets = {
     .object({
       matchStatus: z.enum(['matchbet', 'unsettled', 'deletebet']).default('matchbet'),
       betType: z.enum(['all', 'back', 'lay']).default('all'),
+      // Direct Users | Agent Users tab; na ho = dono
+      channel: z.enum(['direct', 'agent']).optional(),
       limit: z.coerce.number().int().min(1).max(200).default(25),
       offset: z.coerce.number().int().min(0).default(0),
     })

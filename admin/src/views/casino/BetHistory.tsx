@@ -7,6 +7,7 @@ import DateTime from '@/components/shared/DateTime'
 import ErrorState from '@/components/shared/ErrorState'
 import JsonView from '@/components/shared/JsonView'
 import Money from '@/components/shared/Money'
+import ChannelTabs, { type Channel } from '@/components/shared/ChannelTabs'
 import PageHeader from '@/components/shared/PageHeader'
 import StatCard from '@/components/shared/StatCard'
 import StatusBadge from '@/components/shared/StatusBadge'
@@ -74,7 +75,7 @@ const DateRange = ({ state, set }: { state: Record<string, string | number>; set
   <DateRangePicker aria-label='Date range' from={String(state.from ?? '')} to={String(state.to ?? '')} onChange={set} />
 )
 
-const TransactionsTab = () => {
+const TransactionsTab = ({ channel }: { channel: Channel }) => {
   const { state, set } = useListState(['userId', 'source', 'from', 'to'])
 
   const list = usePageList<CasinoTxn>('admin/casino/bet-history/transactions', {
@@ -84,7 +85,8 @@ const TransactionsTab = () => {
     userId: state.userId || undefined,
     source: state.source && state.source !== ALL ? state.source : undefined,
     from: state.from || undefined,
-    to: state.to || undefined
+    to: state.to || undefined,
+    channel
   })
 
   return (
@@ -140,11 +142,11 @@ const TotalsRow = ({ label, t }: { label: string; t: CasinoTotals }) => (
   </TableRow>
 )
 
-const StatsTab = () => {
+const StatsTab = ({ channel }: { channel: Channel }) => {
   const [userId, setUserId] = useState('')
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
-  const stats = useApi<CasinoStats>('admin/casino/bet-history/stats', { userId: userId || undefined, from: from || undefined, to: to || undefined })
+  const stats = useApi<CasinoStats>('admin/casino/bet-history/stats', { userId: userId || undefined, from: from || undefined, to: to || undefined, channel })
   const t = stats.data?.totals
   const { totals: _t, bySource, ...rest } = stats.data ?? { totals: undefined, bySource: {} }
 
@@ -203,8 +205,8 @@ const StatsTab = () => {
   )
 }
 
-const AnalyticsTab = () => {
-  const q = useApi<Record<string, unknown>>('admin/casino/bet-history/analytics')
+const AnalyticsTab = ({ channel }: { channel: Channel }) => {
+  const q = useApi<Record<string, unknown>>('admin/casino/bet-history/analytics', { channel })
 
   if (q.error) return <ErrorState error={q.error} />
   const { totals, bySource, ...rest } = (q.data ?? {}) as { totals?: CasinoTotals; bySource?: Record<string, CasinoTotals> } & Record<string, unknown>
@@ -272,9 +274,9 @@ const rawColumns: Column<RawTxn>[] = [
   { key: 'id', header: 'Id', cell: r => <span className='font-mono text-xs'>{r.id}</span> }
 ]
 
-const RawTab = ({ path }: { path: string }) => {
+const RawTab = ({ path, channel }: { path: string; channel: Channel }) => {
   const { state, set } = useListState(['userId', 'from', 'to'])
-  const list = usePageList<RawTxn>(path, { limit: state.limit, page: state.page, userId: state.userId || undefined, from: state.from || undefined, to: state.to || undefined })
+  const list = usePageList<RawTxn>(path, { limit: state.limit, page: state.page, userId: state.userId || undefined, from: state.from || undefined, to: state.to || undefined, channel })
 
   return (
     <DataTable
@@ -298,7 +300,7 @@ const RawTab = ({ path }: { path: string }) => {
   )
 }
 
-const RawTablesTab = () => {
+const RawTablesTab = ({ channel }: { channel: Channel }) => {
   const [table, setTable] = useState<'live' | 'slot'>('live')
 
   return (
@@ -312,7 +314,7 @@ const RawTablesTab = () => {
           <SelectItem value='slot'>transaction_slot</SelectItem>
         </SelectContent>
       </Select>
-      <RawTab path={`admin/casino/bet-history/transactions/raw/${table}`} />
+      <RawTab path={`admin/casino/bet-history/transactions/raw/${table}`} channel={channel} />
     </div>
   )
 }
@@ -326,6 +328,9 @@ const BetHistory = () => {
   return (
     <div>
       <PageHeader title='Casino bet history' description={`Every casino movement across in-house games, the aggregator and JS games, ${scope}.`} />
+      {/* Direct Users / Agent Users: har tab ki listing aur numbers us taraf ke players ke. */}
+      <ChannelTabs>
+        {channel => (
       <Tabs defaultValue='txns'>
         <TabsList className='mb-4 flex-wrap'>
           <TabsTrigger value='txns'>Transactions</TabsTrigger>
@@ -335,21 +340,23 @@ const BetHistory = () => {
           <TabsTrigger value='raw'>Raw provider tables</TabsTrigger>
         </TabsList>
         <TabsContent value='txns'>
-          <TransactionsTab />
+          <TransactionsTab channel={channel} />
         </TabsContent>
         <TabsContent value='stats'>
-          <StatsTab />
+          <StatsTab channel={channel} />
         </TabsContent>
         <TabsContent value='analytics'>
-          <AnalyticsTab />
+          <AnalyticsTab channel={channel} />
         </TabsContent>
         <TabsContent value='sportsbook'>
-          <RawTab path='admin/casino/bet-history/luckysports' />
+          <RawTab path='admin/casino/bet-history/luckysports' channel={channel} />
         </TabsContent>
         <TabsContent value='raw'>
-          <RawTablesTab />
+          <RawTablesTab channel={channel} />
         </TabsContent>
       </Tabs>
+        )}
+      </ChannelTabs>
     </div>
   )
 }

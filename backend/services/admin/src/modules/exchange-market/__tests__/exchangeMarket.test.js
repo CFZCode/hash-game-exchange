@@ -227,4 +227,13 @@ test('exchange market service (downline scope)', async (t) => {
     assert.strictEqual(agentAll.total, 2);
     assert.strictEqual(agentAll.rows.length, 1);
   });
+
+  await t.test('Current Bets: Direct Users | Agent Users tab (channel)', async () => {
+    const mine = (r) => r.eventId === EVENT;
+    const stakes = async (channel) =>
+      (await service.currentBets({ actor: owner, matchStatus: 'matchbet', betType: 'all', channel, limit: 200, offset: 0 })).rows.filter(mine).map((r) => Number(r.stake)).sort((x, y) => x - y);
+    assert.deepStrictEqual(await stakes('direct'), [70]);
+    assert.deepStrictEqual(await stakes('agent'), [50, 100, 999]);
+    assert.deepStrictEqual(await stakes(undefined), [50, 70, 100, 999], 'na bheja = dono');
+  });
 });

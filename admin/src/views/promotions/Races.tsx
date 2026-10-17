@@ -14,6 +14,7 @@ import ErrorState from '@/components/shared/ErrorState'
 import FormDialog from '@/components/shared/FormDialog'
 import { SwitchField, TextAreaField, TextField } from '@/components/shared/FormField'
 import Money from '@/components/shared/Money'
+import ChannelTabs, { type Channel } from '@/components/shared/ChannelTabs'
 import PageHeader from '@/components/shared/PageHeader'
 import { RewardCurrencyNotice } from '@/components/shared/RewardCurrency'
 import StatusBadge from '@/components/shared/StatusBadge'
@@ -439,9 +440,9 @@ const WinnersDialog = ({ raceId, onClose }: { raceId: number; onClose: () => voi
 }
 
 /** The open window's standings, as players see them (real ids for staff). */
-const BoardTab = () => {
+const BoardTab = ({ channel }: { channel: Channel }) => {
   const [type, setType] = useState<RaceType>('daily')
-  const q = useApi<Board>(`admin/user/race/leaderboard/${type}`, undefined, { retry: false, refetchInterval: 30_000 })
+  const q = useApi<Board>(`admin/user/race/leaderboard/${type}`, { channel }, { retry: false, refetchInterval: 30_000 })
   const currency = q.data?.payoutCurrency ?? q.data?.currency
 
   const columns: Column<BoardRow>[] = [
@@ -477,10 +478,11 @@ const BoardTab = () => {
   )
 }
 
-const RewardsTab = () => {
+const RewardsTab = ({ channel }: { channel: Channel }) => {
   const { state, set, query } = useListState(['type', 'claimed'])
 
   const list = usePagedApi<Reward>('admin/user/race/rewards', {
+    channel,
     limit: query.limit,
     page: query.page,
     type: query.type || undefined,
@@ -636,13 +638,13 @@ const Races = () => {
           <ConfigEditor key={type} type={type} />
         </TabsContent>
         <TabsContent value='board'>
-          <BoardTab />
+          <ChannelTabs>{channel => <BoardTab channel={channel} />}</ChannelTabs>
         </TabsContent>
         <TabsContent value='races'>
           <RacesTab />
         </TabsContent>
         <TabsContent value='rewards'>
-          <RewardsTab />
+          <ChannelTabs>{channel => <RewardsTab channel={channel} />}</ChannelTabs>
         </TabsContent>
         <TabsContent value='boats'>
           <BoatsTab />

@@ -7,7 +7,7 @@ const { money, entitlements } = require('@ibitplay/common');
 
 const errors = require('./spinWheel.errors');
 const { CODE_SOURCE, CODE_STATUS, DEPOSIT_SOURCES, CODE_LENGTH } = require('./spinWheel.constants');
-const { ownerWhere } = require('../directory/playerScope');
+const { ownerWhere, withChannel } = require('../directory/playerScope');
 const { createRewardMoney } = require('../../lib/rewardMoney');
 const { DEFAULT_MAX_BONUS } = require('./spinWheelBonus.service');
 
@@ -192,9 +192,9 @@ class SpinWheelService {
    * "Reward" column with nothing to put in them. The player's name is joined
    * for the same reason: a claims list keyed only by numeric id cannot be read.
    */
-  async listClaims({ staff, userId, limit = 50, offset = 0 }) {
+  async listClaims({ staff, userId, channel, limit = 50, offset = 0 }) {
     // The caller's tree only: each claim names its player and their redeem code.
-    return this.#claims({ where: await ownerWhere(this, staff?.id, 'user_id', userId), limit, offset });
+    return this.#claims({ where: withChannel(await ownerWhere(this, staff?.id, 'user_id', userId), 'user_id', channel), limit, offset });
   }
 
   async #claims({ where, limit, offset }) {

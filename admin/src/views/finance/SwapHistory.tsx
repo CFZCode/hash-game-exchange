@@ -62,7 +62,7 @@ const SwapHistory = () => {
   // another (in the URL). The validator is strict: `userId`, `currency`, `limit` and `offset` only.
   const cur = useCurrencyParam()
   const choices = useCurrencyChoices()
-  const list = usePagedApi<SwapRow>(LIST, { limit: query.limit, page: query.page, userId: query.userId, currency: cur.currency })
+  const list = usePagedApi<SwapRow>(LIST, { channel: 'direct', limit: query.limit, page: query.page, userId: query.userId, currency: cur.currency })
 
   return (
     <div>

@@ -80,7 +80,8 @@ module.exports = function adminRoutes(deps) {
   /** @legacy GET /betHistory/admin/analytics */
   router.get(
     '/analytics',
-    asyncHandler(async (req, res) => response.ok(res, await service.analytics({ staffId: req.staff.id })))
+    validate(v.analytics),
+    asyncHandler(async (req, res) => response.ok(res, await service.analytics({ channel: req.query.channel, staffId: req.staff.id })))
   );
 
   /**
