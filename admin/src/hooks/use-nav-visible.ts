@@ -23,6 +23,7 @@ export function useNavVisible() {
       (entry.account !== 'marketing' || isMarketing) &&
       (!entry.promotions || promotionsAllowed) &&
       (!entry.direct || directAllowed) &&
+      (!entry.notExecutive || !actor?.executiveId) &&
       can(entry.permission) &&
 
       // `ownerFlag` (e.g. the Sports switch) only follows the owner's plan, never the operator's own
@@ -30,7 +31,7 @@ export function useNavVisible() {
       (!entry.flag || (flags[entry.flag] !== false && flagEntitled(entry.flag))) &&
       (!entry.ownerFlag || flagEntitled(entry.ownerFlag)) &&
       featureEntitled(entry.feature),
-    [can, flags, featureEntitled, flagEntitled, isMarketing, promotionsAllowed, directAllowed]
+    [can, flags, featureEntitled, flagEntitled, isMarketing, promotionsAllowed, directAllowed, actor?.executiveId]
   )
 }
 

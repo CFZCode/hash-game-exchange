@@ -30,9 +30,11 @@ import { useSession } from '@/contexts/SessionContext'
 import OwnerAddBalance from '@/views/exchange/OwnerAddBalance'
 
 const ProfileDropdown = () => {
-  const { actor, signOut } = useSession()
+  const { actor, signOut, can } = useSession()
   const name = actor?.name ?? actor?.roleName ?? 'Staff'
-  const isOwner = actor?.level === 1 && !actor.executiveId
+
+  // Super Admin, or its executive granted wallet:adjust (the owner-wallet routes' permission).
+  const isOwner = actor?.level === 1 && can('wallet:adjust')
   const [addOpen, setAddOpen] = useState(false)
 
   const initials = name

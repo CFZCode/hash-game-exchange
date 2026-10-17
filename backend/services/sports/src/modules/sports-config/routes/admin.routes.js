@@ -2,6 +2,8 @@
 
 const { Router } = require('express');
 
+const { PERMISSIONS } = require('@ibitplay/auth');
+
 const { lazy } = require('../../../lib/mssports');
 
 /**
@@ -23,7 +25,12 @@ const { lazy } = require('../../../lib/mssports');
  *  GET|PUT /betting-config/virtual-limits                                👑 virtual league limits
  *  GET|POST|DELETE /commission-config/sports (+ POST /bulk)              👑 win commission
  */
-module.exports = function adminRoutes() {
+module.exports = function adminRoutes({ auth }) {
+  // Platform permissions first, so an executive does only what it was granted (user, 2026-10-17):
+  // locks are users:lock (the agent tree holds it), global settings sports:manage.
+  const canRead = auth.requirePermission(PERMISSIONS.USERS_READ);
+  const canLock = auth.requirePermission(PERMISSIONS.USERS_LOCK);
+  const canManage = auth.requirePermission(PERMISSIONS.SPORTS_MANAGE);
   const authMiddleware = lazy((m) => m.authMiddleware);
   const requireOwner = lazy((m) => m.requireOwner);
   const requireBackoffice = lazy((m) => m.requireBackoffice);
@@ -36,41 +43,41 @@ module.exports = function adminRoutes() {
   const router = Router();
 
   // ── /sports-lock (TENEXCH: its own router, `router.use(authMiddleware)`) ──
-  router.get('/sports-lock/get/:targetId', authMiddleware, SportsLock('getSportsLocks'));
-  router.post('/sports-lock/update', authMiddleware, SportsLock('updateSportsLock'));
+  router.get('/sports-lock/get/:targetId', canRead, authMiddleware, SportsLock('getSportsLocks'));
+  router.post('/sports-lock/update', canLock, authMiddleware, SportsLock('updateSportsLock'));
 
   // ── bet locks, betting config, commission ───────────────────────────
 
-  router.get('/betlock/market-locks/:event_id', authMiddleware, requireBackoffice, marketLocks('getMarketLockChildren'));
-  router.post('/betlock/toggle-market-lock', authMiddleware, requireBackoffice, requireTxnCode, marketLocks('toggleMarketLock'));
-  router.post('/betlock/bulk-toggle-market-lock', authMiddleware, requireBackoffice, requireTxnCode, marketLocks('bulkToggleMarketLock'));
+  router.get('/betlock/market-locks/:event_id', canRead, authMiddleware, requireBackoffice, marketLocks('getMarketLockChildren'));
+  router.post('/betlock/toggle-market-lock', canLock, authMiddleware, requireBackoffice, requireTxnCode, marketLocks('toggleMarketLock'));
+  router.post('/betlock/bulk-toggle-market-lock', canLock, authMiddleware, requireBackoffice, requireTxnCode, marketLocks('bulkToggleMarketLock'));
 
-  router.get('/betting-config/buffer/sports', authMiddleware, requireOwner, BettingConfig('getSportsBuffers'));
-  router.post('/betting-config/buffer/sports', authMiddleware, requireOwner, BettingConfig('saveSportsBuffer'));
-  router.post('/betting-config/buffer/sports/bulk', authMiddleware, requireOwner, BettingConfig('saveSportsBufferBulk'));
-  router.delete('/betting-config/buffer/sports', authMiddleware, requireOwner, BettingConfig('resetSportsBuffer'));
+  router.get('/betting-config/buffer/sports', canManage, authMiddleware, requireOwner, BettingConfig('getSportsBuffers'));
+  router.post('/betting-config/buffer/sports', canManage, authMiddleware, requireOwner, BettingConfig('saveSportsBuffer'));
+  router.post('/betting-config/buffer/sports/bulk', canManage, authMiddleware, requireOwner, BettingConfig('saveSportsBufferBulk'));
+  router.delete('/betting-config/buffer/sports', canManage, authMiddleware, requireOwner, BettingConfig('resetSportsBuffer'));
   // 'inplay' is declared BEFORE the ':event_id' style routes so Express can't match it as an id.
-  router.get('/betting-config/bet-limits/inplay', authMiddleware, requireOwner, BettingConfig('getInplayEvents'));
-  router.get('/betting-config/bet-limits/event/:event_id', authMiddleware, requireOwner, BettingConfig('getEventMarkets'));
-  router.post('/betting-config/bet-limits/event', authMiddleware, requireOwner, BettingConfig('saveEventLimit'));
-  router.delete('/betting-config/bet-limits/event/:id', authMiddleware, requireOwner, BettingConfig('deleteEventLimit'));
-  router.get('/betting-config/max-odds/sports', authMiddleware, requireOwner, BettingConfig('getSportsMaxOdds'));
-  router.post('/betting-config/max-odds/sports', authMiddleware, requireOwner, BettingConfig('saveSportsMaxOdds'));
-  router.delete('/betting-config/max-odds/sports', authMiddleware, requireOwner, BettingConfig('resetSportsMaxOdds'));
-  router.get('/betting-config/auto-void', authMiddleware, requireOwner, BettingConfig('getAutoVoid'));
-  router.put('/betting-config/auto-void', authMiddleware, requireOwner, BettingConfig('saveAutoVoid'));
-  router.get('/betting-config/auto-void/tracker', authMiddleware, requireOwner, BettingConfig('getAutoVoidTracker'));
-  router.get('/betting-config/auto-void/links', authMiddleware, requireOwner, BettingConfig('listResultLinks'));
-  router.post('/betting-config/auto-void/links', authMiddleware, requireOwner, BettingConfig('createResultLink'));
-  router.put('/betting-config/auto-void/links/:id', authMiddleware, requireOwner, BettingConfig('updateResultLink'));
-  router.delete('/betting-config/auto-void/links/:id', authMiddleware, requireOwner, BettingConfig('deleteResultLink'));
-  router.get('/betting-config/virtual-limits', authMiddleware, requireOwner, BettingConfig('getVirtualLimits'));
-  router.put('/betting-config/virtual-limits', authMiddleware, requireOwner, BettingConfig('saveVirtualLimits'));
+  router.get('/betting-config/bet-limits/inplay', canManage, authMiddleware, requireOwner, BettingConfig('getInplayEvents'));
+  router.get('/betting-config/bet-limits/event/:event_id', canManage, authMiddleware, requireOwner, BettingConfig('getEventMarkets'));
+  router.post('/betting-config/bet-limits/event', canManage, authMiddleware, requireOwner, BettingConfig('saveEventLimit'));
+  router.delete('/betting-config/bet-limits/event/:id', canManage, authMiddleware, requireOwner, BettingConfig('deleteEventLimit'));
+  router.get('/betting-config/max-odds/sports', canManage, authMiddleware, requireOwner, BettingConfig('getSportsMaxOdds'));
+  router.post('/betting-config/max-odds/sports', canManage, authMiddleware, requireOwner, BettingConfig('saveSportsMaxOdds'));
+  router.delete('/betting-config/max-odds/sports', canManage, authMiddleware, requireOwner, BettingConfig('resetSportsMaxOdds'));
+  router.get('/betting-config/auto-void', canManage, authMiddleware, requireOwner, BettingConfig('getAutoVoid'));
+  router.put('/betting-config/auto-void', canManage, authMiddleware, requireOwner, BettingConfig('saveAutoVoid'));
+  router.get('/betting-config/auto-void/tracker', canManage, authMiddleware, requireOwner, BettingConfig('getAutoVoidTracker'));
+  router.get('/betting-config/auto-void/links', canManage, authMiddleware, requireOwner, BettingConfig('listResultLinks'));
+  router.post('/betting-config/auto-void/links', canManage, authMiddleware, requireOwner, BettingConfig('createResultLink'));
+  router.put('/betting-config/auto-void/links/:id', canManage, authMiddleware, requireOwner, BettingConfig('updateResultLink'));
+  router.delete('/betting-config/auto-void/links/:id', canManage, authMiddleware, requireOwner, BettingConfig('deleteResultLink'));
+  router.get('/betting-config/virtual-limits', canManage, authMiddleware, requireOwner, BettingConfig('getVirtualLimits'));
+  router.put('/betting-config/virtual-limits', canManage, authMiddleware, requireOwner, BettingConfig('saveVirtualLimits'));
 
-  router.get('/commission-config/sports', authMiddleware, requireOwner, Commission('getSportsCommission'));
-  router.post('/commission-config/sports', authMiddleware, requireOwner, Commission('saveSportsCommission'));
-  router.post('/commission-config/sports/bulk', authMiddleware, requireOwner, Commission('saveSportsCommissionBulk'));
-  router.delete('/commission-config/sports', authMiddleware, requireOwner, Commission('resetSportsCommission'));
+  router.get('/commission-config/sports', canManage, authMiddleware, requireOwner, Commission('getSportsCommission'));
+  router.post('/commission-config/sports', canManage, authMiddleware, requireOwner, Commission('saveSportsCommission'));
+  router.post('/commission-config/sports/bulk', canManage, authMiddleware, requireOwner, Commission('saveSportsCommissionBulk'));
+  router.delete('/commission-config/sports', canManage, authMiddleware, requireOwner, Commission('resetSportsCommission'));
 
   router.authorizationReviewed =
     'mssports authorizes each route itself: authMiddleware, then requireOwner (the platform Super Admin) or requireBackoffice + the transaction password on market-lock writes. The /sports-lock routes check only that the caller is signed in (staff, here) and that only the owner touches owner locks: there is no downline check, as in TENEXCH';
