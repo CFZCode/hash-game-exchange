@@ -11,9 +11,16 @@ import Select from '../../components/shared/Select';
 import { toast } from '../../components/shared/Toast/toast';
 import { getGame, launchGame, launchCurrency } from '../../services/game';
 import { tagWords } from '../../services/catalog';
-import { getAlias, printCurrency } from '../../utils/currency';
+import { amount2usd, getAlias, printCurrency } from '../../utils/currency';
 import { addFavoriteGame, isFavoriteGame, removeFavoriteGame } from '../../services/collection';
 import { formatOnlineUsers } from '../../utils/gameArt';
+import RecommendList from '../GameCollection/RecommendList';
+import defaultAvatar from '../../assets/avatars/105522617.png';
+import { coinIcon } from '../../utils/coinArt';
+import { useIsDesktop } from '../../hooks/useMediaQuery';
+import LatestBets from '../Home/LatestBets';
+import { getGameTopWins } from '../../services/home';
+import { displayName } from '../../context/account';
 import './Game.css';
 
 /* `/game/:gameUnique` — where every game tile points, and the original's own path and param name
@@ -207,8 +214,8 @@ function PlayOverlay({ game, login, currencyName, balances, setting, launching, 
   );
 
   return (
-    <div className="game-overlay absolute inset-0 z-20 flex items-center justify-center bg-black/60">
-      <div className="game-overlay-card w-[30rem] rounded-xl bg-layer3 p-8">
+    <div className="game-overlay absolute inset-0 z-20 flex items-center justify-center bg-black/60 px-4">
+      <div className="game-overlay-card w-full max-w-[30rem] rounded-xl bg-layer3 p-8">
         {login ? (
           <>
             <div className="items-left flex flex-col justify-center gap-2">
@@ -312,6 +319,216 @@ function enterFullscreen() {
   const request = frame.requestFullscreen ?? frame.webkitRequestFullscreen;
   Promise.resolve(request?.call(frame)).catch(() => {});
 }
+
+/* The game page's Leaderboard, transcribed from hash.game's game page markup (user's paste,
+   2026-10-16): "Leaderboard" + an "All Time" period pill, Highest Wins / Luckiest Wins tabs, and the
+   top three rounds as gradient-bordered rows with a gold / silver / bronze notch, avatar, Wager,
+   Payout and the multiplier chip. Live `top-wins?game=` first, the game's static showcase when that
+   is empty (services/home.js). Amounts are shown in USD, as the original's are. The period pill is
+   drawn as the original draws it; there is one period (all time) behind it. */
+const WIN_TABS = ['Highest Wins', 'Luckiest Wins'];
+const RANK_NOTCH = ['#F3D9B5', '#9F9F9F', '#8B644D'];
+const ROW_STYLE = {
+  border: '1px solid transparent',
+  backgroundImage:
+    'linear-gradient(var(--color-layer2), var(--color-layer2)), linear-gradient(90deg, rgba(228, 234, 240, 0.3) -28.07%, rgba(228, 234, 240, 0.05) 117.02%)',
+  backgroundOrigin: 'border-box',
+  backgroundClip: 'padding-box, border-box',
+};
+
+const IconHighestWins = () => (
+  <svg width="24" height="24" viewBox="0 0 32 32" fill="none" className="size-5" aria-hidden="true">
+    <circle cx="16" cy="16" r="16" fill="#FC3C3C" />
+    <path d="M12.6903 21.2342C12.7884 21.1316 12.9624 21.2163 12.949 21.3591C12.8955 21.7962 12.7037 22.22 12.3647 22.559C11.5617 23.3619 8.57754 23.4378 8.57754 23.4378C8.57754 23.4378 8.65337 20.458 9.45629 19.6551C9.79084 19.3205 10.2191 19.1243 10.6562 19.0708C10.799 19.0529 10.8837 19.2224 10.7811 19.325L10.7767 19.3295C10.5893 19.5124 10.4867 19.8469 10.4243 20.2082C10.286 21.0201 10.9952 21.7293 11.8071 21.591C12.1684 21.5286 12.503 21.4215 12.6903 21.2342Z" fill="white" />
+    <path fillRule="evenodd" clipRule="evenodd" d="M25.3457 6.48255C25.4325 6.5113 25.499 6.58232 25.5278 6.66909C26.4769 9.58203 24.7681 15.4609 21.7132 18.4938C21.1196 19.0874 20.5185 19.562 19.9319 19.9395C20.1301 20.9902 20.1589 22.0232 19.8632 22.8745C19.0242 25.2759 16.2057 25.7067 14.9859 25.7768C14.6971 25.796 14.4176 25.5253 14.4169 25.2345L14.4398 21.245C14.0557 21.2 13.7442 21.1429 13.5273 21.0957C13.316 21.054 13.1118 20.9391 12.9468 20.774L11.2193 19.0466C11.0543 18.8815 10.9394 18.6773 10.8976 18.466C10.8504 18.2492 10.7933 17.9376 10.7478 17.5485L6.75331 17.5709C6.46247 17.5702 6.19185 17.2907 6.21105 17.0019C6.28607 15.7826 6.71742 12.9691 9.11828 12.1252C9.96963 11.8295 11.0076 11.8588 12.0638 12.0624C12.4413 11.4759 12.9164 10.8797 13.51 10.2861C16.5495 7.24665 22.5663 5.53751 25.3457 6.48255ZM20.9065 11.1176C20.1748 10.3859 18.9886 10.3859 18.257 11.1176C17.5253 11.8492 17.5253 13.0354 18.257 13.7671C18.9886 14.4987 20.1748 14.4987 20.9065 13.7671C21.6381 13.0354 21.6381 11.8492 20.9065 11.1176Z" fill="white" />
+  </svg>
+);
+
+const IconLuckiestWins = () => (
+  <svg width="24" height="24" viewBox="0 0 32 32" fill="none" className="size-5" aria-hidden="true">
+    <circle cx="16" cy="16" r="16" fill="#3A4142" />
+    <path d="M14.4209 8.38639C15.0837 7.10493 16.9163 7.10493 17.5791 8.38639L18.8127 10.7717C19.0707 11.2704 19.5491 11.618 20.1031 11.7092L22.7528 12.1453C24.1764 12.3797 24.7427 14.1226 23.7288 15.1489L21.8414 17.0593C21.4468 17.4587 21.2641 18.0211 21.3486 18.5762L21.7526 21.231C21.9696 22.6573 20.487 23.7345 19.1976 23.0874L16.7975 21.8827C16.2957 21.6309 15.7044 21.6309 15.2025 21.8827L12.8025 23.0874C11.5131 23.7345 10.0304 22.6573 10.2474 21.231L10.6514 18.5762C10.7359 18.0211 10.5532 17.4587 10.1586 17.0593L8.27124 15.1489C7.2573 14.1226 7.82363 12.3797 9.24718 12.1453L11.8969 11.7092C12.451 11.618 12.9293 11.2704 13.1873 10.7717L14.4209 8.38639Z" fill="white" />
+  </svg>
+);
+const TAB_ICONS = [IconHighestWins, IconLuckiestWins];
+
+function GameLeaderboard({ game, gameUnique }) {
+  const ref = game?.ref ?? gameUnique;
+  const read = React.useCallback(() => getGameTopWins(ref, gameUnique), [ref, gameUnique]);
+  const { data, loading } = useResource(read);
+  const [tab, setTab] = React.useState(0);
+  const usd = (row, amount) => amount2usd(amount, row.currencyName);
+  const gross = (row) => Number(row.throwAmount) * (Number(row.payout) / 100);
+  const rows = React.useMemo(() => {
+    const list = [...(data ?? [])];
+    return (tab === 0
+      ? list.sort((a, b) => usd(b, gross(b)) - usd(a, gross(a)))
+      : list.sort((a, b) => Number(b.payout) - Number(a.payout))
+    ).slice(0, 3);
+  }, [data, tab]);
+
+  return (
+    <section className="game-wins mt-4 rounded-xl">
+      <div className="mb-2 flex items-center justify-between">
+        <h2 className="ml-1 text-base font-extrabold text-primary">Leaderboard</h2>
+        <div className="flex h-8 min-w-28 items-center justify-between rounded-md border border-input bg-input_darken px-1 text-primary">
+          <span className="ml-2 text-sm">All Time</span>
+          <span className="button size-6 bg-layer5 p-0">
+            <svg viewBox="0 0 32 32" className="icon size-4 -rotate-90 text-secondary" aria-hidden="true">
+              <path d="M19.6912 5.6L9.2912 16L19.6912 26.4L22.7088 23.3824L15.3264 16L22.7088 8.6176L19.6912 5.6Z" />
+            </svg>
+          </span>
+        </div>
+      </div>
+      <div className="flex flex-col justify-between rounded-xl bg-layer4 px-3 py-2.5">
+        <div role="tablist" data-type="inner" className="scroll-x tabs-title hide-scroll h-10 w-full !p-0.5">
+          <div className="tabs-btn-group">
+            {WIN_TABS.map((title, i) => {
+              const Icon = TAB_ICONS[i];
+              return (
+                <button
+                  key={title}
+                  type="button"
+                  role="tab"
+                  className="tabs-btn btn-like"
+                  aria-selected={tab === i ? 'true' : undefined}
+                  onClick={() => setTab(i)}
+                >
+                  <div className="flex items-center justify-center gap-2">
+                    <Icon />
+                    {title}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          <div className="tabs-indicator test-indicator-tab" />
+        </div>
+        <div className="tabs-content mt-2 flex flex-col gap-1.5 bg-transparent">
+          {loading ? (
+            <div className="center h-52"><Loading /></div>
+          ) : rows.length === 0 ? (
+            <EmptyPlaceholder className="w-full" />
+          ) : (
+            rows.map((row, i) => (
+              <div
+                key={row.betId}
+                style={ROW_STYLE}
+                className="relative flex h-16 items-center overflow-hidden rounded-lg bg-layer2 transition-all duration-200 hover:bg-layer3 active:scale-[0.98]"
+              >
+                <svg width="4" height="20" viewBox="0 0 4 20" fill="none" className="h-auto flex-shrink-0 self-stretch" aria-hidden="true">
+                  <path d="M0 0C2.20914 0 4 1.79086 4 4V16C4 18.2091 2.20914 20 0 20V0Z" fill={RANK_NOTCH[i] ?? RANK_NOTCH[2]} />
+                </svg>
+                <div className="flex flex-1 items-center gap-3 px-3 py-2">
+                  <img className="size-8 flex-shrink-0 rounded-full bg-layer4 object-cover" alt="" src={defaultAvatar} />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate font-extrabold leading-4 text-secondary">{displayName(row.userName)}</div>
+                    <div className="text-sm leading-5 text-tertiary">Wager: ${usd(row, row.throwAmount).toFixed(2)}</div>
+                    <div className="text-sm leading-none text-primary">
+                      Payout: <span className="font-extrabold text-brand">+${usd(row, gross(row)).toFixed(2)}</span>
+                      <span className="ml-2 h-4 rounded bg-layer5 px-3 text-xs text-[#D5E2E5]">{Math.floor(Number(row.payout) / 100)}x</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* From `lg` up hash.game draws a different board: High win / Lucky win (/ Review) tabs over a
+   four-column table — Player, Payout (coin + amount), Wager, Mult — zebra rows in layer5-table,
+   transcribed from its desktop markup. Review is not drawn (no reviews here). */
+const DESKTOP_WIN_TABS = ['High win', 'Lucky win'];
+const TH = 'truncate px-2 py-3 align-middle font-semibold sm:px-4 w-1/4';
+
+function GameWinsTable({ game, gameUnique, settings }) {
+  const ref = game?.ref ?? gameUnique;
+  const read = React.useCallback(() => getGameTopWins(ref, gameUnique), [ref, gameUnique]);
+  const { data, loading } = useResource(read);
+  const [tab, setTab] = React.useState(0);
+  const gross = (row) => Number(row.throwAmount) * (Number(row.payout) / 100);
+  const rows = React.useMemo(() => {
+    const list = [...(data ?? [])];
+    return tab === 0
+      ? list.sort((a, b) => amount2usd(gross(b), b.currencyName) - amount2usd(gross(a), a.currencyName))
+      : list.sort((a, b) => Number(b.payout) - Number(a.payout));
+  }, [data, tab]);
+  const money = (amount, name) => printCurrency(Number(amount) || 0, name, { settings: settings ?? {}, hasAlias: true });
+
+  return (
+    <section className="game-wins mt-4 rounded-xl bg-layer4 px-4 pb-4">
+      <div role="tablist" data-type="inner" className="scroll-x tabs-title hide-scroll light-layer3-tabs my-4 h-11 w-full max-w-sm">
+        <div className="tabs-btn-group">
+          {DESKTOP_WIN_TABS.map((title, i) => (
+            <button
+              key={title}
+              type="button"
+              role="tab"
+              className="tabs-btn btn-like"
+              aria-selected={tab === i ? 'true' : undefined}
+              onClick={() => setTab(i)}
+            >
+              {title}
+            </button>
+          ))}
+        </div>
+        <div className="tabs-indicator test-indicator-tab" />
+      </div>
+      <div className="tabs-content flex flex-col gap-2 bg-transparent">
+        {loading ? (
+          <div className="center h-40"><Loading /></div>
+        ) : rows.length === 0 ? (
+          <EmptyPlaceholder className="w-full" />
+        ) : (
+          <div className="relative max-h-[40rem] w-full overflow-auto rounded-xl">
+            <table className="w-full caption-bottom text-sm">
+              <thead>
+                <tr className="font-semibold text-secondary">
+                  <th className={`${TH} text-left`}>Player</th>
+                  <th className={`${TH} text-center`}>Payout</th>
+                  <th className={`${TH} text-center`}>Wager</th>
+                  <th className={`${TH} text-center`}>Mult</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.slice(0, 10).map((row) => (
+                  <tr key={row.betId} className="text-center odd:bg-layer5-table">
+                    <td className="rounded-l-lg px-2 py-3 align-middle sm:px-4">
+                      <div className="flex items-center">
+                        <img className="mr-2 size-6 rounded-full" alt="" src={defaultAvatar} />
+                        <span className="truncate font-extrabold leading-[26px] text-secondary">{displayName(row.userName)}</span>
+                      </div>
+                    </td>
+                    <td className="px-2 py-3 align-middle sm:px-4">
+                      <div className="flex items-center justify-center gap-1">
+                        <img className="size-5 flex-none rounded-full" alt="" src={coinIcon(row.currencyName)} />
+                        <span className="font-extrabold text-brand">+{money(gross(row), row.currencyName)}</span>
+                      </div>
+                    </td>
+                    <td className="px-2 py-3 align-middle font-extrabold text-primary sm:px-4">{money(row.throwAmount, row.currencyName)}</td>
+                    <td className="rounded-r-lg px-2 py-3 align-middle font-extrabold text-primary sm:px-4">{(Number(row.payout) / 100).toFixed(4)}×</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+/* Phone: the Leaderboard; `lg` up: the table — the two boards hash.game draws at those widths. */
+function GameWins(props) {
+  const isDesktop = useIsDesktop();
+  return isDesktop ? <GameWinsTable {...props} /> : <GameLeaderboard {...props} />;
+}
+
+const SHOW_INFO_CARD = false;
 
 export default function GamePage() {
   const { gameUnique = '' } = useParams();
@@ -596,6 +813,10 @@ export default function GamePage() {
         </aside>
       </div>
 
+      {/* The info card (name, provider, tags, House Edge / RTP / Max Win / Stakes Range) is off
+          (user's request, 2026-10-16: most of its figures were "--"); the Recommended Games row
+          hash.game shows on its game page takes its place. Flip SHOW_INFO_CARD to restore it. */}
+      {SHOW_INFO_CARD ? (
       <section className="game-info">
         {loading ? (
           <div className="game-info-loading">
@@ -644,6 +865,19 @@ export default function GamePage() {
           </>
         )}
       </section>
+      ) : (
+        <>
+          {game ? <GameWins game={game} gameUnique={gameUnique} settings={session.setting} /> : null}
+          <div className="game-recommend -mx-4 mt-6 sm:mx-0">
+            <RecommendList />
+          </div>
+          {/* All bets / High Roller, the board hash.game's game page ends on. LatestBets carries
+              its own `px-4 sm:px-0` gutter, so it is pulled out of the page's the same way. */}
+          <div className="game-latest -mx-4 mt-6 sm:mx-0">
+            <LatestBets />
+          </div>
+        </>
+      )}
       <GameUnavailable open={unavailableOpen} onClose={closeUnavailable} />
     </div>
   );

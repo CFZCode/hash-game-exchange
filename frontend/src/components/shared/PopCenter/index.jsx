@@ -40,6 +40,9 @@ export default function PopCenter({
   className = '',
   type,
   dismissible = true,
+  /* A close square on the SHEET arm too (bc.game's currency sheet has one); off by default, since
+     the original's generic sheet title bar (`Kx`) draws none. */
+  closable = false,
   children,
 }) {
   useDialogScrollLock(open);
@@ -124,9 +127,19 @@ export default function PopCenter({
                guarantee, and on a phone the browser would take it for a page pan and cancel our
                pointer stream mid-gesture. Scoped here rather than to the panel because putting
                it on the panel would kill scrolling inside the sheet's own list. */
-            <div className="flex w-full flex-col" style={{ touchAction: 'none' }}>
+            <div className="relative flex w-full flex-col" style={{ touchAction: 'none' }}>
               <div className="mx-auto mb-2.5 h-1 w-11 rounded-sm bg-layer6" />
               <div className="text-center">{title}</div>
+              {closable && (
+                <button
+                  type="button"
+                  aria-label="Close"
+                  className="absolute right-4 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center"
+                  onClick={onClose}
+                >
+                  <IconClose className="icon size-5 fill-primary" />
+                </button>
+              )}
             </div>
           ) : (
             <>

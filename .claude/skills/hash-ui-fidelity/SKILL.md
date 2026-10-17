@@ -75,6 +75,12 @@ Changes the user asked for, so the pixel check WILL show them against the refere
 
 - **Signed-out home hero art is Parker567's** (bc.game's esports banner is another brand): desktop `public/brand/parker567-hero.jpg` covers the panel; phone `parker567-hero-mobile.jpg` sits bottom-right at 86% height, 4% past the right edge, left/top edges faded. The copy column keeps the original's `w-1/2 min-w-[11.25rem]`, so text matches the reference exactly; only the art region differs.
 
+- **Home Highlights card**: gradient fill + brand line-art SVG (`.hl-card`, `CardArt`), initials-on-gradient team badges, bordered odds buttons (user's request); cricket uses a colour icon (`assets/sports/sport-cricket-color.svg`); the sport/tournament line is left-aligned with `pr-16` clear of the Live badge.
+- **Game page**: under the frame, hash.game's two boards — phone: the "Leaderboard" (All Time pill, Highest / Luckiest Wins, top-3 notched rows, USD), `lg` up: the High win / Lucky win table (Review not drawn) — fed by live `top-wins?game=`, else `staticGameWins`, then the Recommended Games row, then the home's Latest round & Race tables; the info card is replaced by the Recommended Games row (`pages/GameCollection/RecommendList`); the play overlay card is `w-full max-w-[30rem]` in a `px-4` overlay.
+- **Rollover**: a turnover strip (Wagered / Required / Remaining, `GET /user/wager/progress`) above the table; the Amount column is "Turnover" — wagered / target with a progress bar; Time is date over time; money is text-only.
+- **Account menus**: Free Plays and Do Not Disturb are hidden (hidden-features skill).
+- **Header currency picker below `lg`**: a PopCenter bottom sheet titled "Select Currency" with a close cross, 80vh tall, and a full-width Deposit button under the footer — matched to bc.game's phone sheet (checked on playin05.com, a bc.game skin) — instead of the desktop popover.
+
 The sidebar is therefore shorter than the reference, so everything below the removed rows in the sidebar shifts up. Details are in `frontend/docs/architecture.md` under Sidebar. Left as they were on purpose: the Sports lobby's own Predictions tab (BetBy's), the Trading and Lottery options in the bet-history type filter, the slot theme tag "Lottery" in the casino catalogue's tag list, the footer's "Crypto trading is not gambling" licence line, and the `detrade:trading` game redirects in FreePlay and Profile.
 
 ## Next.js migration rules

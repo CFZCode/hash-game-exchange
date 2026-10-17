@@ -1,6 +1,6 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useSession } from '../../../../context/session';
 import { useGates } from '../../../../context/gates';
 import { walletCoins } from '../../../../services/gates';
@@ -8,6 +8,8 @@ import { getCurrency } from '../../../../data/currencies';
 import { printCurrency, getAlias, amount2usd } from '../../../../utils/currency';
 import { coinIcon } from '../../../../utils/coinArt';
 import { layerPosition, scrollParent } from '../../../../components/shared/Select/position';
+import PopCenter from '../../../../components/shared/PopCenter';
+import { useIsDesktop } from '../../../../hooks/useMediaQuery';
 import {
   IconSearch,
   IconClose,
@@ -352,7 +354,7 @@ function CoinGroups({ visible, showTitles, settings, onPick, onClose }) {
  * `-mx-4` against the layer's `padding: 0 .5rem` overshoots by 8px a side, and that is the
  * point: `.scroll-y` clips the overflow, so the bar bleeds to the layer's edges instead of
  * sitting inside its gutter. Do not "fix" it to `-mx-2`. */
-function Footer({ settings, setSetting }) {
+function Footer({ settings, setSetting, sheet, onDeposit }) {
   return (
     <div className="sticky bottom-0 z-20 -mx-4 mt-auto border-t border-third bg-layer4 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4">
       <div className="flex flex-none items-center justify-between">
@@ -376,8 +378,13 @@ function Footer({ settings, setSetting }) {
           <span className="ml-2">Hide Small</span>
         </div>
       </div>
-      {/* `<Show when={mobile}>` here — a full-width Deposit button under the row, which belongs
-          to the bottom-sheet arm this file does not build. */}
+      {/* `<Show when={mobile}>` — the bottom-sheet arm's full-width Deposit button under the row,
+          as bc.game draws it on a phone. */}
+      {sheet && (
+        <button type="button" className="button button-m button-second mt-3 w-full font-extrabold" onClick={onDeposit}>
+          Deposit
+        </button>
+      )}
     </div>
   );
 }
@@ -392,7 +399,8 @@ function Footer({ settings, setSetting }) {
  * mid-filter. Clearing it on close instead would be a setState in an effect — the cascading
  * render `react-hooks/set-state-in-effect` rejects, and the same reason the promotions tab
  * indicator measures onto its node. Unmounting is what the original does anyway. */
-function Panel({ onClose, onManageAssets }) {
+function Panel({ onClose, onManageAssets, sheet = false }) {
+  const navigate = useNavigate();
   const { session, balances, setSetting, updateBalance } = useSession();
   /* An agent's player picks from the agent currency only (services/gates.js `walletCoins`). */
   const { agentPlayer } = useGates();
@@ -546,7 +554,15 @@ function Panel({ onClose, onManageAssets }) {
           )}
         </div>
 
-        <Footer settings={session.setting} setSetting={setSetting} />
+        <Footer
+          settings={session.setting}
+          setSetting={setSetting}
+          sheet={sheet}
+          onDeposit={() => {
+            onClose();
+            navigate('/deposit');
+          }}
+        />
       </div>
     </>
   );
@@ -578,6 +594,11 @@ export default function CurrencySelect({ triggerRef, open, onClose, onManageAsse
   const [position, setPosition] = React.useState(null);
   const [ready, setReady] = React.useState(layerLoaded);
   const layerRef = React.useRef(null);
+  /* THE SHEET ARM (`CS`), built 2026-10-16 on the user's report: below `lg` the popover was a
+     fixed 24rem x 36rem box hanging off the pill, half of it empty. The original hands a phone a
+     `.pop` sheet instead; here that is PopCenter's sheet, with the same Panel inside it. The
+     popover's placement and outside-click effects stand down while the sheet is used. */
+  const isDesktop = useIsDesktop();
 
   React.useEffect(() => {
     if (!open || ready) return undefined;
@@ -589,7 +610,7 @@ export default function CurrencySelect({ triggerRef, open, onClose, onManageAsse
   }, [open, ready]);
 
   React.useLayoutEffect(() => {
-    if (!open) return undefined;
+    if (!open || !isDesktop) return undefined;
     const place = () => {
       const trigger = triggerRef.current;
       const layer = layerRef.current;
@@ -620,10 +641,10 @@ export default function CurrencySelect({ triggerRef, open, onClose, onManageAsse
       scroller.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', onResize);
     };
-  }, [open, onClose, triggerRef]);
+  }, [open, onClose, triggerRef, isDesktop]);
 
   React.useEffect(() => {
-    if (!open) return undefined;
+    if (!open || !isDesktop) return undefined;
     const onPointerDown = (event) => {
       if (triggerRef.current?.contains(event.target)) return;
       if (event.target.closest?.('.dropdown-layer')) return;
@@ -638,9 +659,28 @@ export default function CurrencySelect({ triggerRef, open, onClose, onManageAsse
       document.removeEventListener('pointerdown', onPointerDown, true);
       document.removeEventListener('keydown', onKey);
     };
-  }, [open, onClose, triggerRef]);
+  }, [open, onClose, triggerRef, isDesktop]);
 
   if (!open) return null;
+
+  if (!isDesktop) {
+    return (
+      <PopCenter open onClose={onClose} title="Select Currency" type="sheet" closable>
+        {/* bc.game's sheet: 80% of the screen tall whatever the list holds, the footer pinned. */}
+        <div dir="ltr" className="currency-select currency-select-sheet flex h-[calc(80vh-4rem)] flex-col overflow-y-auto overflow-x-hidden px-2">
+          <div className="scroll-container">
+            {ready ? (
+              <Panel onClose={onClose} onManageAssets={onManageAssets} sheet />
+            ) : (
+              <div className="center min-h-[50vh]">
+                <IconLoading className="size-4" />
+              </div>
+            )}
+          </div>
+        </div>
+      </PopCenter>
+    );
+  }
 
   return createPortal(
     <div
