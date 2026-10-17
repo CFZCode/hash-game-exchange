@@ -15,6 +15,12 @@ Format:
 
 ---
 
+## 2026-10-17 — Admin "Agent System" page hata diya (page + backend)
+**Kya kiya:** Pehle hide kiya tha, phir user ne poora hatane ko bola. `/agent-system` page, `views/agent-system/` (Staff Portal, Hierarchy tabs), sidebar entry aur backend module `agent-hierarchy` (`GET admin/agent-hierarchy`, sirf isi page ka tha, apni koi table nahi) delete kiye. `admin/staff/transfer`, `admin/accounts/status`, `admin/exchange/accounts-admin/create` dusre pages me use hote hain, isliye rakhe.
+**Kyun:** User: is page ki chije ab use nahi hongi.
+**Files / jagah:** `admin/src/app/(pages)/agent-system/` (deleted), `admin/src/views/agent-system/` (deleted), `backend/services/admin/src/modules/agent-hierarchy/` (deleted), `admin/src/configs/navConfig.tsx`, `PROJECT-FLOW.md` (section 3c hataya), `FEATURES.md`.
+**Notes / pending:** Wapas chahiye to git history se: is commit se pehle wala version.
+
 ## 2026-10-17 — Website pe direct user ka manual deposit form + User Win Loss Direct tab ki nayi API
 **Kya kiya:**
 - Website Deposit → Fiat (`frontend/src/pages/Deposit/ManualDeposit.jsx` naya, `FiatTab.jsx`, `services/fiatDeposit.js`, `services/gates.js`): koi gateway channel na ho aur `gates.manualDeposit()` (deposit gate + player ki deposit capability + owner deposit_mode manual allow + `/me` `capabilities.manualDeposit`) ho to manual form: notice, house bank details copy buttons ke saath (+ QR), multiple accounts pe Pay To chooser, Amount, Bank Reference / UTR, screenshot (KYC jaisa dashed box), Submit → `POST /user/deposits/fiat` multipart. Site ki maujooda classes; fixture build same. `GATES.deposit` me `orManual` (manual-only site pe bhi /deposit khule).

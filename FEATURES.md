@@ -166,7 +166,7 @@ Frontend bc.game ki copy hai, par ye cheezein hata di ya chhupa di hain (detail:
 |---|---|
 | Main | Dashboard (Direct Users / Agent System), Users (Direct / Agent / Financial), Wallets, Redeem Codes, Turnover Report |
 | Sports Exchange | Market Analysis, Current Bets, Turn Over, Settlement, Global Settings, Events |
-| Agent Management | Agent System, Account List, Bank, Account Statement, Party Win Loss, Total Profit Loss, User Win Loss, General Lock |
+| Agent Management | Account List, Bank, Account Statement, Party Win Loss, Total Profit Loss, User Win Loss, General Lock |
 | Users | Login & IP history, KYC, Bank details |
 | Transactions | Deposit, Withdraw (Crypto / Fiat / Manual), Account Statement |
 | Finance | Exchange rates, Coins, Vault, Swap history, Tips, P2P trading |
