@@ -151,6 +151,10 @@ class KycService {
     // `users:write` reaches masters; the player still has to be theirs.
     await assertPlayerVisible(this, staff?.id, userId);
 
+    // KYC is for direct users only (docs/KYC.md).
+    const player = await this.models.Users.findByPk(userId, { attributes: ['parent_staff_id'], raw: true });
+    if (player?.parent_staff_id != null) throw errors.DIRECT_USERS_ONLY({ userId });
+
     const row = await this.models.UserKyc.findOne({
       where: { user_id: String(userId) },
       order: [['id', 'DESC']],
@@ -196,8 +200,9 @@ class KycService {
    * The caller's tree only. `users:read` reaches every agent, and this listed
    * every player's name, date of birth and address site-wide.
    */
-  async listApplications({ staff, status, search, channel, limit, offset }) {
-    // `user_kyc.user_id` VARCHAR hai.
+  async listApplications({ staff, status, search, limit, offset }) {
+    // `user_kyc.user_id` VARCHAR hai. KYC is for direct users only (docs/KYC.md), so the queue is
+    // always the direct channel; an old agent-tree row stays in the table but is never listed.
     const where = withChannel({
       ...(await ownerWhere(this, staff?.id, 'user_id')),
       ...(status ? { status } : {}),
@@ -210,7 +215,7 @@ class KycService {
             ],
           }
         : {}),
-    }, 'user_id', channel, { text: true });
+    }, 'user_id', 'direct', { text: true });
 
     const result = await this.models.UserKyc.findAndCountAll({
       where,

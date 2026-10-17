@@ -3,6 +3,7 @@
 const { Router } = require('express');
 const multer = require('multer');
 const { validate, noQuery } = require('@ibitplay/common');
+const { denyAgentPlayer } = require('@ibitplay/auth');
 
 const v = require('../kyc.validators');
 const { MAX_FILE_BYTES, ALLOWED_MIME, DOCUMENT_FIELDS } = require('../kyc.constants');
@@ -33,8 +34,10 @@ module.exports = function userRoutes(deps) {
 
   router.get('/status', noQuery(), ctrl.status);
 
+  // KYC is for direct users only (docs/KYC.md): an agent's player gets 403 KYC_NOT_FOR_AGENT_USERS.
   router.post(
     '/submit',
+    denyAgentPlayer('kyc'),
     upload.fields(DOCUMENT_FIELDS.map((name) => ({ name, maxCount: 1 }))),
     validate(v.submit),
     ctrl.submit

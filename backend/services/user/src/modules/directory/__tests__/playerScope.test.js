@@ -258,14 +258,18 @@ test('staff listings are scoped to the caller’s tree', async (t) => {
     assert.ok((await vault.stats({ staff: asAdmin })).totalUsers >= 2);
   });
 
-  await t.test('KYC applications and documents: own tree only; admin sees all', async () => {
+  await t.test('KYC: agent-tree players are never in the queue (direct users only); documents stay tree-scoped', async () => {
     const kyc = new KycService(deps);
 
+    // docs/KYC.md: the queue is direct users only, so an agent's players are listed to nobody.
     const mine = await kyc.listApplications({ staff: asA, limit: 500, offset: 0 });
-    assert.deepEqual(ours(mine.rows, 'userId'), [playerA]);
+    assert.deepEqual(ours(mine.rows, 'userId'), []);
 
     const all = await kyc.listApplications({ staff: asAdmin, limit: 500, offset: 0 });
-    assert.deepEqual(ours(all.rows, 'userId'), players.slice().sort());
+    assert.deepEqual(ours(all.rows, 'userId'), []);
+
+    // Reviewing one's own agent-tree player is refused too.
+    await assert.rejects(() => kyc.review({ userId: playerA, status: 'Verified' }, asA), (err) => err.code === 'KYC_DIRECT_USERS_ONLY');
 
     // A document in the tree opens; one outside it is "not found".
     const doc = await kyc.readDocument({ kycId: kycIds[playerA], field: 'idFront', requesterId: agentA, isStaff: true });

@@ -12,7 +12,6 @@ import DataTable, { type Column } from '@/components/shared/DataTable'
 import DateTime from '@/components/shared/DateTime'
 import FormDialog from '@/components/shared/FormDialog'
 import { TextAreaField } from '@/components/shared/FormField'
-import ChannelTabs, { type Channel } from '@/components/shared/ChannelTabs'
 import PageHeader from '@/components/shared/PageHeader'
 import StatusBadge from '@/components/shared/StatusBadge'
 import { Badge } from '@/components/ui/badge'
@@ -161,8 +160,8 @@ const KycDetail = ({ app, onClose }: { app: KycApplication | null; onClose: () =
   )
 }
 
-const StatusChip = ({ status, active, channel, onClick }: { status: string; active: boolean; channel: Channel; onClick: () => void }) => {
-  const count = usePagedApi<KycApplication>(LIST, { channel, limit: 1, page: 1, status: status || undefined })
+const StatusChip = ({ status, active, onClick }: { status: string; active: boolean; onClick: () => void }) => {
+  const count = usePagedApi<KycApplication>(LIST, { limit: 1, page: 1, status: status || undefined })
 
   return (
     <Button size='sm' variant={active ? 'default' : 'outline'} onClick={onClick}>
@@ -174,12 +173,12 @@ const StatusChip = ({ status, active, channel, onClick }: { status: string; acti
   )
 }
 
-/** Ek tab (Direct Users / Agent Users) ki KYC list. */
-const KycList = ({ channel }: { channel: Channel }) => {
+/** The KYC list — direct users only (the backend never lists an agent's player). */
+const KycList = () => {
   // Defaults to the Pending queue; 'all' is the sentinel for no filter (a blank would fall back to the default).
   const { state, set, query } = useListState(['status'], { status: 'Pending' })
   const status = state.status === 'all' ? undefined : query.status
-  const list = usePagedApi<KycApplication>(LIST, { channel, limit: query.limit, page: query.page, search: query.search, status })
+  const list = usePagedApi<KycApplication>(LIST, { limit: query.limit, page: query.page, search: query.search, status })
   const [selected, setSelected] = useState<KycApplication | null>(null)
 
   return (
@@ -200,9 +199,9 @@ const KycList = ({ channel }: { channel: Channel }) => {
         onRowClick={setSelected}
         toolbar={
           <div className='flex flex-wrap gap-1'>
-            <StatusChip status='' channel={channel} active={state.status === 'all'} onClick={() => set({ status: 'all' })} />
+            <StatusChip status='' active={state.status === 'all'} onClick={() => set({ status: 'all' })} />
             {KYC_STATUSES.map(s => (
-              <StatusChip key={s} status={s} channel={channel} active={state.status === s} onClick={() => set({ status: s })} />
+              <StatusChip key={s} status={s} active={state.status === s} onClick={() => set({ status: s })} />
             ))}
           </div>
         }
@@ -212,11 +211,11 @@ const KycList = ({ channel }: { channel: Channel }) => {
   )
 }
 
-/** KYC review — Direct Users | Agent Users alag tab me (agent ke users bhi KYC bhar sakte hain). */
+/** KYC review — direct users only: an agent's player cannot submit KYC (docs/KYC.md). */
 const KycQueue = () => (
   <div>
-    <PageHeader title='KYC review' description='Identity applications. Open one to see the documents and approve or reject it.' />
-    <ChannelTabs>{channel => <KycList channel={channel} />}</ChannelTabs>
+    <PageHeader title='KYC review' description='Identity applications from direct users. Open one to see the documents and approve or reject it.' />
+    <KycList />
   </div>
 )
 
