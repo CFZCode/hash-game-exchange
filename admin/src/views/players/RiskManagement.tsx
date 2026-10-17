@@ -241,7 +241,7 @@ const BET_ROWS = 10
  */
 const LOCKS = [
   { key: 'system', field: 'isLocked', label: 'Account Locked', hint: 'Blocks all logins and activity', icon: <LockIcon /> },
-  { key: 'sports', field: 'sportsBetlocked', label: 'Sports Bet Lock', hint: 'Prevents sportsbook wagers', icon: <TrophyIcon /> },
+  { key: 'sports', field: 'sportsBetlocked', label: 'Sports Bet Lock', hint: 'Prevents sports bets', icon: <TrophyIcon /> },
   { key: 'casino', field: 'casinoLocked', label: 'Casino Lock', hint: 'Prevents casino play', icon: <DicesIcon /> },
   { key: 'withdraw', field: 'withdrawLocked', label: 'Withdrawal Lock', hint: 'Rejects all withdrawals for this user', icon: <BanknoteXIcon /> }
 ] as const

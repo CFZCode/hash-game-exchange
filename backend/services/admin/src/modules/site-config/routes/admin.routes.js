@@ -41,6 +41,13 @@ module.exports = function adminRoutes(deps) {
     asyncHandler(async (_req, res) => response.ok(res, await service.operatorSettings()))
   );
 
+  /** The owner's per-currency deposit / withdrawal limits — read-only here (owner panel → Cashier). */
+  router.get(
+    '/cashier-limits',
+    auth.requirePermission(PERMISSIONS.CONFIG_READ),
+    asyncHandler(async (_req, res) => response.ok(res, await service.cashierLimits()))
+  );
+
   /**
    * A patch, not a replacement, and `null` on a key hands it back to the
    * deployment. Permissioned and audited like every other settings write.

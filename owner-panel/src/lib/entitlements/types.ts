@@ -1,6 +1,7 @@
 import { resolveOptions } from '@/configs/entitlementCatalogue'
 import { cleanRegion, type RegionSetting } from './region'
 import { diffWithdrawalCap, type WithdrawalCap } from './withdrawalCap'
+import { diffCashierLimits, type CashierLimit, type CashierLimits } from './cashierLimits'
 import { diffBranding, type Branding, type BrandingChange } from './branding'
 
 /** Shapes shared by the routes and the screens — contract §2. */
@@ -49,6 +50,9 @@ export type EntitlementsDoc = {
    */
   withdrawalCap?: WithdrawalCap
 
+  /** Deposit / withdrawal min and max per currency (./cashierLimits). Absent = no owner limits. */
+  cashierLimits?: CashierLimits
+
   /**
    * Site name, page metadata and logo files (./branding, contract §8). Absent in an older
    * document = not branded: the site keeps its own name and the UI's own logo.
@@ -93,7 +97,7 @@ export type SiteCoin = {
 export type VariantsSeed = 'backend' | 'template' | null
 
 /** What the owner screen edits: the document with a full `variants` map. */
-export type EditableDoc = EntitlementsDoc & { variants: Record<string, string>; options: Record<string, Record<string, boolean>>; region: RegionSetting; withdrawalCap: WithdrawalCap; branding: Branding; seededFrom: VariantsSeed }
+export type EditableDoc = EntitlementsDoc & { variants: Record<string, string>; options: Record<string, Record<string, boolean>>; region: RegionSetting; withdrawalCap: WithdrawalCap; cashierLimits: CashierLimits; branding: Branding; seededFrom: VariantsSeed }
 
 export type ToggleChange = { kind: 'feature' | 'flag'; key: string; from: boolean; to: boolean }
 export type TemplateChange = { kind: 'template'; key: 'template'; from: string | null; to: string }
@@ -113,8 +117,11 @@ export type RegionChange = { kind: 'region'; key: 'region'; from: RegionSetting;
 
 /** Withdrawal requirements' deposit cap switched or re-set (audit kind `withdrawal_cap`). */
 export type WithdrawalCapChange = { kind: 'withdrawal_cap'; key: 'withdrawalCap'; from: WithdrawalCap; to: WithdrawalCap }
+
+/** One currency's cashier limits changed (audit kind `cashier_limits`); `key` is the currency code. */
+export type CashierLimitsChange = { kind: 'cashier_limits'; key: string; from: CashierLimit; to: CashierLimit }
 export type { BrandingChange }
-export type Change = ToggleChange | TemplateChange | VariantChange | CoinsChange | CoinChange | OptionChange | RegionChange | WithdrawalCapChange | BrandingChange
+export type Change = ToggleChange | TemplateChange | VariantChange | CoinsChange | CoinChange | OptionChange | RegionChange | WithdrawalCapChange | CashierLimitsChange | BrandingChange
 
 export type AuditEntry = { at: string; user: string; version: number; changes: Change[]; seededFrom?: Exclude<VariantsSeed, null> }
 
@@ -132,6 +139,7 @@ type Diffable = Pick<EntitlementsDoc, 'features' | 'flags'> & {
   options?: Record<string, Record<string, boolean>>
   region?: RegionSetting
   withdrawalCap?: WithdrawalCap
+  cashierLimits?: CashierLimits
   branding?: Branding
 }
 
@@ -185,6 +193,9 @@ export function diffDocs(before: Diffable, after: Diffable) {
   const capChange = after.withdrawalCap ? diffWithdrawalCap(before.withdrawalCap, after.withdrawalCap) : null
 
   if (capChange) changes.push(capChange)
+
+  // Cashier limits: one change per currency, compared cleaned (an older document = no limits).
+  if (after.cashierLimits) changes.push(...diffCashierLimits(before.cashierLimits, after.cashierLimits))
 
   // Branding: one change per field; an older document (no branding) equals an empty one.
   if (after.branding) changes.push(...diffBranding(before.branding, after.branding))

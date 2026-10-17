@@ -1,5 +1,6 @@
 // services/CricketService.js — mssports core, moved unchanged
 import { redisClient_default, init_redisClient } from "../config/redisClient.mjs";
+import { cleanEventRows, cleanTree, isHiddenSport } from "../constants/hiddenSports.mjs";
 import { SportsBet_default } from "../../models/user/SportsBet.mjs";
 import { recordMarkets, recordMiss } from "../helper/marketListStore.mjs";
 import { FanWin_default } from "../../models/user/FanWin.mjs";
@@ -122,7 +123,14 @@ var CricketService = {
   //     return response.data;
   //   });
   // },
+  /** One sport's events with the sports and leagues the site does not offer taken out (constants/hiddenSports.mjs). */
   fetchCricketData: async (id) => {
+    if (isHiddenSport(id)) return { success: true, data: { t1: [], t2: [] } };
+    const result = await CricketService.fetchCricketDataRaw(id);
+    if (!result?.data) return result;
+    return { ...result, data: { ...result.data, t1: cleanEventRows(result.data.t1), t2: cleanEventRows(result.data.t2) } };
+  },
+  fetchCricketDataRaw: async (id) => {
     try {
       const sid = id;
       if (!sid) {
@@ -203,7 +211,7 @@ var CricketService = {
   },
   GetallSportsdata: async () => {
     const key = `all_sports_data`;
-    return await getCachedData(key, async () => {
+    const all = await getCachedData(key, async () => {
       const response = await axios.get(`${BASE_URL}/allSportid`, {
         headers: { Accept: "*/*" },
         params: { key: API_KEY },
@@ -211,6 +219,7 @@ var CricketService = {
       });
       return response?.data?.data;
     });
+    return Array.isArray(all) ? all.filter((s) => !isHiddenSport(s?.sid ?? s?.etid ?? s?.id)) : all;
   },
   // GetMatchPrivateData: async (gmid, sid) => {
   //   // console.log("======>>>>fetch match private data for id : "+ sid+", gmid : "+gmid);
@@ -324,7 +333,9 @@ var CricketService = {
       return response.data;
     });
   },
-  fetchTreeData: async () => {
+  /** The sports tree with the sports and leagues the site does not offer taken out (constants/hiddenSports.mjs). */
+  fetchTreeData: async () => cleanTree(await CricketService.fetchTreeDataRaw()),
+  fetchTreeDataRaw: async () => {
     if (SPORTS_API_VERSION === "v2") {
       const key2 = `tree_data_v2`;
       return await getCachedData(key2, async () => {

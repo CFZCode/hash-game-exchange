@@ -336,7 +336,6 @@ const BetHistory = () => {
           <TabsTrigger value='txns'>Transactions</TabsTrigger>
           <TabsTrigger value='stats'>Stats</TabsTrigger>
           <TabsTrigger value='analytics'>Analytics</TabsTrigger>
-          <TabsTrigger value='sportsbook'>Sportsbook (LuckySports)</TabsTrigger>
           <TabsTrigger value='raw'>Raw provider tables</TabsTrigger>
         </TabsList>
         <TabsContent value='txns'>
@@ -347,9 +346,6 @@ const BetHistory = () => {
         </TabsContent>
         <TabsContent value='analytics'>
           <AnalyticsTab channel={channel} />
-        </TabsContent>
-        <TabsContent value='sportsbook'>
-          <RawTab path='admin/casino/bet-history/luckysports' channel={channel} />
         </TabsContent>
         <TabsContent value='raw'>
           <RawTablesTab channel={channel} />

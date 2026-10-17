@@ -1,7 +1,7 @@
 'use strict';
 
 const {
-  money, Mailer, entitlements, currencyRegistry, rewardCurrencyOf, defaultCurrencyOf, isDefaultCurrencyChoice, REWARD_CURRENCY_NAMES,
+  money, Mailer, entitlements, currencyRegistry, cashierLimits: cashierLimitsLib, rewardCurrencyOf, defaultCurrencyOf, isDefaultCurrencyChoice, REWARD_CURRENCY_NAMES,
 } = require('@ibitplay/common');
 
 const errors = require('./siteConfig.errors');
@@ -107,18 +107,10 @@ const OPERATOR_SETTINGS = Object.freeze({
   casino_max_bet: { env: 'CASINO_MAX_BET', kind: 'decimal', min: 0, label: 'Maximum bet' },
   casino_seed_rotate_after: { env: 'CASINO_SEED_ROTATE_AFTER', kind: 'number', min: 0, max: 1e6, label: 'Rotate the fair seed after N rounds' },
 
-  sports_min_stake: { env: 'SPORTS_MIN_STAKE', kind: 'decimal', min: 0, label: 'Minimum stake' },
-  sports_max_stake: { env: 'SPORTS_MAX_STAKE', kind: 'decimal', min: 0, label: 'Maximum stake' },
-  sports_max_selections: { env: 'SPORTS_MAX_SELECTIONS', kind: 'number', min: 1, max: 100, label: 'Selections per betslip' },
-  sports_max_payout: { env: 'SPORTS_MAX_PAYOUT', kind: 'decimal', min: 0, label: 'Maximum payout per slip' },
-  sports_odds_tolerance: { env: 'SPORTS_ODDS_TOLERANCE', kind: 'decimal', min: 0, max: 1, label: 'Odds drift allowed' },
-  sports_timezone: { env: 'SPORTS_FEED_TIMEZONE', kind: 'timezone', label: 'Sports day resets in' },
+  // The old sportsbook's stake / payout / drift settings are gone (nothing read them), and the
+  // cashier's deposit / withdrawal limits are the owner's now, per currency (`cashierLimits`,
+  // owner panel → Cashier); `cashierLimits()` below shows them read-only.
   race_timezone: { env: 'RACE_TIMEZONE', kind: 'timezone', label: 'Race week resets in' },
-
-  deposit_minimum: { env: 'DEPOSIT_MINIMUM', kind: 'decimal', min: 0, label: 'Minimum deposit' },
-  deposit_maximum: { env: 'DEPOSIT_MAXIMUM', kind: 'decimal', min: 0, label: 'Maximum deposit' },
-  withdraw_maximum: { env: 'WITHDRAW_MAXIMUM', kind: 'decimal', min: 0, label: 'Maximum withdrawal' },
-  withdrawal_auto_approve_limit: { env: 'WITHDRAWAL_AUTO_APPROVE_LIMIT', kind: 'decimal', min: 0, label: 'Auto-approve withdrawals up to' },
 
   login_max_attempts: { env: 'LOGIN_MAX_ATTEMPTS', kind: 'number', min: 1, max: 50, label: 'Failed logins before a lock' },
   login_lock_minutes: { env: 'LOGIN_LOCK_MINUTES', kind: 'number', min: 1, max: 1440, label: 'Lock lasts (minutes)' },
@@ -129,8 +121,6 @@ const OPERATOR_SETTINGS = Object.freeze({
 /** A pair whose maximum may not sit under its minimum. */
 const SETTING_PAIRS = Object.freeze([
   ['casino_min_bet', 'casino_max_bet'],
-  ['sports_min_stake', 'sports_max_stake'],
-  ['deposit_minimum', 'deposit_maximum'],
 ]);
 
 /**
@@ -912,6 +902,26 @@ class SiteConfigService {
     return Object.fromEntries(
       OPERATOR_FLAGS.map((name) => [name, row ? Boolean(row[name]) : true])
     );
+  }
+
+  /**
+   * The owner's cashier limits, read-only here (set in the owner panel → Cashier):
+   * `{ currencies: [{ code, name, depositMin, depositMax, withdrawMin, withdrawMax }] }` — one row
+   * per coin the site has switched on, null = no owner limit for that side.
+   */
+  async cashierLimits() {
+    const [doc, coins] = await Promise.all([entitlements.getEntitlements(), currencyRegistry.listCurrencies()]);
+    const limits = cashierLimitsLib.cleanCashierLimits(doc.cashierLimits);
+    const enabled = (coins ?? []).filter((c) => c && c.enabled !== false);
+    const codes = enabled.length ? enabled.map((c) => cashierLimitsLib.codeOf(c.code)) : Object.keys(limits);
+    const nameOf = new Map(enabled.map((c) => [cashierLimitsLib.codeOf(c.code), c.name ?? null]));
+    return {
+      currencies: [...new Set(codes)].map((code) => ({
+        code,
+        name: nameOf.get(code) ?? null,
+        ...cashierLimitsLib.limitsFor(limits, code),
+      })),
+    };
   }
 
   /**

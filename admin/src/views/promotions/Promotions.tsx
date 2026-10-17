@@ -801,7 +801,7 @@ const Promotions = () => {
     <div>
       <PageHeader
         title='Promotions'
-        description='The campaigns players see under Promotions, for the casino or the sportsbook. Changes apply on the site straight away; unpublish to hide one without losing it.'
+        description='The campaigns players see under Promotions, for the casino or sports. Changes apply on the site straight away; unpublish to hide one without losing it.'
         actions={
           <Can permission='config:write'>
             <PromotionDialog />

@@ -17,8 +17,8 @@ import { check } from '@/lib/validate'
 /**
  * Virtual Bet Limits — zip `pages/settings/VirtualBetLimits.jsx` (sirf owner).
  *
- * Har VIRTUAL league (cricket ka Dim "(e)", T5 XI, T10 XI, Virtual Cricket League,
- * wrestling ka WWE Virtual) ka min / max stake. Inke round har kuch minute badalte hain,
+ * Har VIRTUAL league (abhi sirf wrestling ka WWE Virtual; cricket ki virtual leagues site pe
+ * nahi hain) ka min / max stake. Inke round har kuch minute badalte hain,
  * isliye per-event Bet Limits wahan tak nahi pahunchta — yahan poori league ki ek limit.
  * 0 = set nahi, feed ki apni limit chalegi.
  */

@@ -2,7 +2,7 @@
 
 const crypto = require('crypto');
 
-const { money, sitePolicy, operatorSettings, withdrawBlock, currencyRegistry } = require('@ibitplay/common');
+const { money, sitePolicy, operatorSettings, withdrawBlock, currencyRegistry, entitlements, cashierLimits } = require('@ibitplay/common');
 
 const errors = require('./paymentOrders.errors');
 const { FLOW, userIdFor, APAY_DEPOSIT_SYSTEMS, APAY_WITHDRAWAL_SYSTEMS, APAY_SYSTEM_LABELS } = require('./paymentOrders.constants');
@@ -122,7 +122,7 @@ class PaymentOrdersService {
       throw errors.CURRENCY_NOT_SUPPORTED({ provider: providerName, currency });
     }
 
-    this.#assertWithinLimits(amount, currency, FLOW.PAY_IN);
+    await this.#assertWithinLimits(amount, currency, FLOW.PAY_IN);
 
     const reference = this.#reference('DEP');
 
@@ -216,7 +216,7 @@ class PaymentOrdersService {
       throw errors.CURRENCY_NOT_SUPPORTED({ provider: providerName, currency });
     }
 
-    this.#assertWithinLimits(amount, currency, FLOW.PAY_OUT);
+    await this.#assertWithinLimits(amount, currency, FLOW.PAY_OUT);
     // KYC (PAYORDER_KYC_REQUIRED), wagering (WITHDRAW_WAGER_REQUIRED) and the deposit cap
     // (WITHDRAW_CAP_EXCEEDED), per the owner's policy.
     const applied = await this.#requirements().assertMet(userId, {
@@ -563,13 +563,12 @@ class PaymentOrdersService {
     return `${prefix}_${Date.now()}_${crypto.randomBytes(6).toString('hex')}`;
   }
 
-  #assertWithinLimits(amount, currency, flow) {
-    // The operator's limits from the site admin; the deployed variable until they set one.
-    // There is no stored withdrawal minimum — that one is still the deployment's.
-    const min = flow === FLOW.PAY_OUT ? this.config.WITHDRAW_MINIMUM : this.settings.value('deposit_minimum', this.config.DEPOSIT_MINIMUM);
-    const max = flow === FLOW.PAY_OUT
-      ? this.settings.value('withdraw_maximum', this.config.WITHDRAW_MAXIMUM)
-      : this.settings.value('deposit_maximum', this.config.DEPOSIT_MAXIMUM);
+  async #assertWithinLimits(amount, currency, flow) {
+    // The owner's min / max for this currency (owner panel → Cashier); where the owner set none,
+    // the deployment's default. The site admin only shows them.
+    const owner = cashierLimits.limitsFor((await entitlements.getEntitlements()).cashierLimits, currency);
+    const min = flow === FLOW.PAY_OUT ? (owner.withdrawMin ?? this.config.WITHDRAW_MINIMUM) : (owner.depositMin ?? this.config.DEPOSIT_MINIMUM);
+    const max = flow === FLOW.PAY_OUT ? (owner.withdrawMax ?? this.config.WITHDRAW_MAXIMUM) : (owner.depositMax ?? this.config.DEPOSIT_MAXIMUM);
 
     if (min && money.lt(amount, String(min))) throw errors.BELOW_MINIMUM({ minimum: String(min), currency });
     if (max && money.gt(amount, String(max))) throw errors.ABOVE_MAXIMUM({ maximum: String(max), currency });

@@ -3,7 +3,7 @@
 const crypto = require('node:crypto');
 
 const { Op } = require('sequelize');
-const { money, withdrawBlock } = require('@ibitplay/common');
+const { money, withdrawBlock, entitlements, cashierLimits } = require('@ibitplay/common');
 
 const { WalletService } = require('../wallet/wallet.service');
 
@@ -219,6 +219,7 @@ class P2pService {
    * right is the offer's remaining amount, which legacy never touched at all.
    */
   async createOrder({ userId, offerId, cryptoAmount, paymentAccountId }) {
+    const limits = (await entitlements.getEntitlements());
     return this.db.transaction(async (transaction) => {
       const offer = await this.models.P2pOffer.findByPk(offerId, {
         transaction,
@@ -231,6 +232,8 @@ class P2pService {
       if (offer.status !== OFFER_STATUS.ACTIVE) throw errors.OFFER_INACTIVE({ offerId });
 
       this.#checkLimits(offer, cryptoAmount);
+      // A P2P buy is a deposit of the offer's coin: the owner's deposit min / max apply (owner panel → Cashier).
+      cashierLimits.assertWithinCashierLimits(limits, { currency: offer.coin, amount: cryptoAmount, flow: 'deposit' });
 
       if (money.lt(offer.available_amount ?? '0', cryptoAmount)) {
         throw errors.OFFER_EXHAUSTED({ offerId, available: String(offer.available_amount ?? '0') });
@@ -397,6 +400,7 @@ class P2pService {
     const qr = file ? inspect(file, errors) : null;
     // A sell order is a payout: the operator's withdrawal block refuses it (migration 091).
     await withdrawBlock.assertWithdrawAllowed(this.models, { userId });
+    const limits = (await entitlements.getEntitlements());
 
     return this.db.transaction(async (transaction) => {
       const offer = await this.models.P2pOffer.findByPk(offerId, {
@@ -408,6 +412,8 @@ class P2pService {
       if (offer.status !== OFFER_STATUS.ACTIVE) throw errors.OFFER_INACTIVE({ offerId });
 
       this.#checkLimits(offer, cryptoAmount);
+      // A P2P sell is a payout of the offer's coin: the owner's withdrawal min / max apply.
+      cashierLimits.assertWithinCashierLimits(limits, { currency: offer.coin, amount: cryptoAmount, flow: 'withdraw' });
 
       const paymentType = await this.models.P2pPaymentType.findByPk(paymentTypeId, { transaction, raw: true });
       if (!paymentType) throw errors.PAYMENT_TYPE_NOT_FOUND({ paymentTypeId });

@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { SportIcon } from '../../../components/exchange/icons';
 import Loading from '../../../components/shared/Loading';
 import { useSportsTree } from '../../../hooks/exchange';
-import { matchPath, sportIconOf } from '../../../pages/Exchange/model';
+import { matchPath, racingSports, sportIconOf } from '../../../pages/Exchange/model';
 import { treeWithoutDead, useDeadMatchesVersion } from '../../../services/exchange/deadMatches';
 
 /* The Sports group's rows: the exchange's own sports tree (`GET all/sports/tree`, one shared 60s
@@ -28,7 +28,9 @@ export default function SportsMenu({ Arrow, onCloseMobile }) {
   const data = treeWithoutDead(rawData);
   const [open, setOpen] = useState({});
   const toggle = (key) => setOpen((o) => ({ ...o, [key]: !o[key] }));
-  const sports = list(data?.sports).filter((s) => list(s.children).length > 0);
+  /* Racing (the tree's flat `racing` list) shaped as sport → country → race, after the first three. */
+  const plain = list(data?.sports).filter((s) => list(s.children).length > 0);
+  const sports = [...plain.slice(0, 3), ...racingSports(data?.racing), ...plain.slice(3)];
 
   if (data === undefined) {
     return error ? (

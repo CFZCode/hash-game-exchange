@@ -34,6 +34,7 @@ import { PlayerBonusesTab } from '@/views/promotions/BonusBalances'
 import GeoAttribution from './GeoAttribution'
 import { RiskManagementDialog, RiskManagementPanel } from './RiskManagement'
 import PlayerStatsTab from './PlayerStatsTab'
+import { BalanceSheetView } from './users/BalanceSheetDialog'
 import WithdrawBlockAction, { BetLockedBadge, WithdrawBlockedBadge, type AccountLocks } from './WithdrawBlockAction'
 import type { PlayerRow } from './types'
 
@@ -557,7 +558,7 @@ const ReportDetail = ({ id }: { id: string }) => {
           <RiskManagementPanel userId={id} />
         </TabsContent>
         <TabsContent value='sheet'>
-          <RawTab path={`admin/reports/balance-sheet/${id}`} />
+          <BalanceSheetView userId={id} name={p?.name} client={p?.channel === 'agent'} active={tab === 'sheet'} />
         </TabsContent>
         <TabsContent value='transfers'>
           <RawTab path={`admin/locks/transfers/${id}`} />

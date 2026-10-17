@@ -58,7 +58,7 @@ export const CRYPTO_COIN_FLAGS = new Set(FLAG_GROUPS.find(g => g.keys.includes(C
 
 export const FLAG_LABELS: Record<string, string> = {
   casino: 'Casino',
-  sports: 'Sportsbook (kill switch)',
+  sports: 'Sports (kill switch)',
   lotto: 'Lottery',
   vipclub: 'VIP club',
   clubmembership: 'Club membership',

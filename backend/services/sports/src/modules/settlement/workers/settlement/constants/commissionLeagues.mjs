@@ -4,13 +4,10 @@ var DEFAULT_LEAGUE_KEY = "default";
 var DEFAULT_LEAGUE_LABEL = "All other leagues";
 var COMMISSION_LEAGUES = {
   // Cricket
-  4: [
-    { key: "ecricket", label: "E-Cricket (Dim)", patterns: ["dim cricket league"], cid: 7526679, iscc: 4 },
-    { key: "t10xi", label: "T10 XI", patterns: ["t10 xi"], cid: 56100513, iscc: 1 },
-    { key: "t5xi", label: "T5 XI", patterns: ["t5 xi"], cid: 46201121, iscc: 1 },
-    { key: "vcl", label: "Virtual Cricket League", patterns: ["virtual cricket league"], cid: 8590658, iscc: 2 }
-  ],
-  // Wrestling — one virtual league, same shape as cricket's VCL.
+  // Cricket's virtual leagues (E-Cricket, T10 XI, T5 XI, Virtual Cricket League) are not offered
+  // (lib/constants/hiddenSports.mjs), so Cricket has no league rows of its own.
+  4: [],
+  // Wrestling — one virtual league.
   69: [
     { key: "wwevirtual", label: "WWE Virtual", patterns: ["wwe virtual"], cid: 8524813, iscc: 2 }
   ]

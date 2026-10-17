@@ -6,7 +6,7 @@ import { HourglassIcon, ReceiptTextIcon, RefreshCwIcon, TrendingDownIcon, Trendi
 
 import { SelectField } from '@/components/shared/FormField'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -46,20 +46,24 @@ const CATEGORY_TONE: Record<string, Tone> = { Deposit: 'success', Withdrawal: 'd
  * Direct user: deposits / withdrawals / bets se. Client user (Agent System, parent hai, `client`):
  * `mssports.point_ledger` se, INR only (Balance = all_point_after).
  */
-const BalanceSheetDialog = ({
+export const BalanceSheetView = ({
   userId,
   name,
   client = false,
-  open,
-  onOpenChange
+  active = true,
+  inDialog = false
 }: {
   userId: string | null
   name?: string | null
 
   /** Client user (parent wala) — sheet point ledger se. */
   client?: boolean
-  open: boolean
-  onOpenChange: (open: boolean) => void
+
+  /** Fetch only while shown (dialog open / tab selected). */
+  active?: boolean
+
+  /** Dialog ke andar: title DialogTitle, body scroll karta hai. Page pe: card. */
+  inDialog?: boolean
 }) => {
   const [currency, setCurrency] = useState('INR')
   const [limit, setLimit] = useState(50)
@@ -67,7 +71,7 @@ const BalanceSheetDialog = ({
   const [live, setLive] = useState(true)
 
   const q = useApi<Sheet>(
-    open && userId ? `admin/reports/${client ? 'client-balance-sheet' : 'balance-sheet'}/${userId}` : null,
+    active && userId ? `admin/reports/${client ? 'client-balance-sheet' : 'balance-sheet'}/${userId}` : null,
     client ? { limit, offset: page * limit } : { currency, limit, offset: page * limit },
     { retry: false, refetchInterval: live ? 10_000 : false, placeholderData: prev => prev }
   )
@@ -81,20 +85,22 @@ const BalanceSheetDialog = ({
   const reconciled = Number(d?.balance.unexplained ?? 0) === 0
   const pages = Math.max(1, Math.ceil((d?.total ?? 0) / limit))
 
+  const Title = inDialog ? DialogTitle : 'h2'
+  const Description = inDialog ? DialogDescription : 'p'
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className='flex max-h-[92vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-6xl'>
-        <DialogHeader className='border-b px-6 py-4 pr-14'>
+    <div className={cn('flex flex-col', inDialog ? 'min-h-0 flex-1' : 'bg-card overflow-hidden rounded-xl border')}>
+        <div className={cn('border-b px-6 py-4', inDialog && 'pr-14')}>
           <div className='flex flex-wrap items-center justify-between gap-3'>
             <div>
-              <DialogTitle className='flex items-center gap-2'>
+              <Title className='flex items-center gap-2 font-semibold'>
                 <ReceiptTextIcon className='text-primary size-4' /> Balance Sheet
-              </DialogTitle>
-              <DialogDescription>
+              </Title>
+              <Description className='text-muted-foreground text-sm'>
                 {d?.subject.name || name || 'Player'} · <span className='font-mono'>UID {userId}</span>
                 {d?.subject.agent ? ` · under ${d.subject.agent}` : ''}
                 {d?.source === 'point_ledger' ? ' · from point ledger' : ''}
-              </DialogDescription>
+              </Description>
             </div>
             <div className='flex items-center gap-3'>
               <label className='text-muted-foreground flex items-center gap-2 text-xs'>
@@ -120,9 +126,9 @@ const BalanceSheetDialog = ({
               </Button>
             </div>
           </div>
-        </DialogHeader>
+        </div>
 
-        <div className='flex flex-col gap-4 overflow-y-auto px-6 py-4'>
+        <div className={cn('flex flex-col gap-4 px-6 py-4', inDialog && 'overflow-y-auto')}>
           {q.error && <p className='text-danger text-sm'>{errorMessage(q.error)}</p>}
 
           <div className='grid gap-3 sm:grid-cols-2 lg:grid-cols-5'>
@@ -219,9 +225,28 @@ const BalanceSheetDialog = ({
             </Button>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+    </div>
   )
 }
+
+const BalanceSheetDialog = ({
+  userId,
+  name,
+  client = false,
+  open,
+  onOpenChange
+}: {
+  userId: string | null
+  name?: string | null
+  client?: boolean
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}) => (
+  <Dialog open={open} onOpenChange={onOpenChange}>
+    <DialogContent className='flex max-h-[92vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-6xl'>
+      <BalanceSheetView userId={userId} name={name} client={client} active={open} inDialog />
+    </DialogContent>
+  </Dialog>
+)
 
 export default BalanceSheetDialog

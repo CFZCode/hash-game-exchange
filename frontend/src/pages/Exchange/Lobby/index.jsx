@@ -1,10 +1,10 @@
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { SportTabs, LatestEventsStrip, InPlayList } from '../../../components/exchange';
+import { SportTabs, LatestEventsStrip, InPlayList, RaceBoard } from '../../../components/exchange';
 import Loading from '../../../components/shared/Loading';
 import { useSportsList, useLatestEvents, useSportsTree } from '../../../hooks/exchange';
 import { treeWithoutDead, useDeadMatchesVersion, withoutDeadMatches } from '../../../services/exchange/deadMatches';
 import ExchangeFrame from '../ExchangeFrame';
-import { LOBBY_SPORTS, INPLAY_TAB, matchPath, sportIconOf, splitBoard } from '../model';
+import { LOBBY_SPORTS, INPLAY_TAB, RACING_SIDS, matchPath, racingSports, sportIconOf, splitBoard } from '../model';
 
 /* In-Play first (BetBy's own order puts Live ahead of the sports), then every sport. The
    In-Play pill has no glyph: SportTabs draws sport art only, and the asset set has no "live"
@@ -25,9 +25,11 @@ const list = (v) => (Array.isArray(v) ? v : []);
 
 /* The pills after In-Play: every sport of the shared sports tree (the same read, and the same
    "has matches" rule, as the sidebar's Sports group) in the feed's order. Until the tree answers
-   — or if it fails — the three fixed boards stand in, so the row is never empty. */
+   — or if it fails — the three fixed boards stand in, so the row is never empty. Racing (the
+   tree's `racing` list) slots in after the first three, as the feed orders it. */
 function sportTabsOf(tree) {
-  const sports = list(tree?.sports).filter((s) => list(s.children).length > 0 && s.etid != null);
+  const plain = list(tree?.sports).filter((s) => list(s.children).length > 0 && s.etid != null);
+  const sports = [...plain.slice(0, 3), ...racingSports(tree?.racing), ...plain.slice(3)];
   if (sports.length === 0) return LOBBY_SPORTS.map((s) => ({ ...s, fallback: true }));
   const seen = new Set();
   const tabs = [];
@@ -97,7 +99,9 @@ export default function ExchangeLobby() {
   const cricket = useSportsList(all || tab === 'cricket' ? 4 : null);
   const soccer = useSportsList(all || tab === 'soccer' ? 1 : null);
   const tennis = useSportsList(all || tab === 'tennis' ? 2 : null);
-  const otherSid = current && !FIXED_BY_SID.has(current.sid) ? current.sid : null;
+  /* Racing boards come from the tree itself (its races, not a sport list), so they poll nothing. */
+  const racing = current && RACING_SIDS.has(current.sid) ? racingSports(tree?.racing).find((s) => s.etid === current.sid) : null;
+  const otherSid = current && !FIXED_BY_SID.has(current.sid) && !RACING_SIDS.has(current.sid) ? current.sid : null;
   const other = useSportsList(otherSid);
   const boards = { cricket, soccer, tennis };
 
@@ -145,6 +149,12 @@ export default function ExchangeLobby() {
           {...listProps}
         />
       );
+  } else if (racing || (current && RACING_SIDS.has(current.sid))) {
+    body = racing?.children.length ? (
+      <RaceBoard sport={racing} icon={current.icon} linkFor={(r) => matchPath(r.etid, r.gmid)} />
+    ) : (
+      <Notice>No {current.label.toLowerCase()} right now.</Notice>
+    );
   } else if (holding) {
     body = (
       <Notice>

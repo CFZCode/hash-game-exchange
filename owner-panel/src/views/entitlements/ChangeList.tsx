@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import type { Change, CoinChange, CoinDefinition, ToggleChange } from '@/lib/entitlements/types'
 import { regionLabel } from '@/lib/entitlements/region'
 import { withdrawalCapLabel } from '@/lib/entitlements/withdrawalCap'
+import { cashierLimitLabel } from '@/lib/entitlements/cashierLimits'
 import { BRANDING_LABELS } from '@/lib/entitlements/branding'
 
 /** An image change shows its content hash, shortened; text shows quoted. */
@@ -93,6 +94,14 @@ const ChangeList = ({ changes, labelOf }: { changes: Change[]; labelOf: (c: Togg
           <span className='font-medium'>Withdrawal requirements: deposit cap</span>
           <span className='text-muted-foreground font-mono text-xs'>
             {withdrawalCapLabel(c.from)} → {withdrawalCapLabel(c.to)}
+          </span>
+        </li>
+      ) : c.kind === 'cashier_limits' ? (
+        <li key={`cashier:${c.key}`} className='flex flex-wrap items-center gap-2 text-sm'>
+          <span className='text-muted-foreground w-14 text-xs uppercase'>cashier</span>
+          <span className='font-medium'>{c.key} limits</span>
+          <span className='text-muted-foreground font-mono text-xs'>
+            {cashierLimitLabel(c.from)} → {cashierLimitLabel(c.to)}
           </span>
         </li>
       ) : c.kind === 'branding' ? (

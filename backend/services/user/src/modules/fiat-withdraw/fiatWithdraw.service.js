@@ -2,7 +2,7 @@
 
 const crypto = require('node:crypto');
 
-const { money, sitePolicy, withdrawBlock, currencyRegistry, manualPayments } = require('@ibitplay/common');
+const { money, sitePolicy, withdrawBlock, currencyRegistry, manualPayments, entitlements, cashierLimits } = require('@ibitplay/common');
 const { Op } = require('@ibitplay/db');
 
 const errors = require('./fiatWithdraw.errors');
@@ -77,6 +77,8 @@ class FiatWithdrawService {
     if (money.lt(details.amount, this.minimum)) {
       throw errors.BELOW_MINIMUM({ minimum: this.minimum, amount: details.amount });
     }
+    // The owner's withdrawal min / max for this currency (owner panel → Cashier).
+    cashierLimits.assertWithinCashierLimits((await entitlements.getEntitlements()), { currency: details.currency, amount: details.amount, flow: 'withdraw' });
 
     /* THE COOLDOWN IS CHECKED BEFORE KYC, and the order is the point rather than an accident.
        An unverified account inside its window fails both tests, and the two refusals are not

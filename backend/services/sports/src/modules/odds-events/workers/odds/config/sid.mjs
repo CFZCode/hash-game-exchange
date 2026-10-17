@@ -33,14 +33,14 @@ var sidArray = [
   // Mixed Martial Arts
   { eid: 58, active: true },
   // American Football
-  { eid: 11, active: true },
-  // E Games
+  { eid: 11, active: false },
+  // E Games — not offered (lib/constants/hiddenSports.mjs)
   { eid: 19, active: true },
   // Ice Hockey
   { eid: 9, active: true },
   // Futsal
-  { eid: 40, active: true },
-  // Politics
+  { eid: 40, active: false },
+  // Politics — not offered (lib/constants/hiddenSports.mjs)
   { eid: 67, active: true },
   // Boat Racing
   { eid: 52, active: true },
