@@ -22,7 +22,7 @@ const {
 } = require('./reports.constants');
 const { isPrivateIp, deviceFromUA } = require('./ipTracker');
 const { playerScope } = require('./audienceStats.helpers');
-const { COIN_IDS, DEPOSIT_SUCCESS } = require('../dashboard/dashboard.constants');
+const { COIN_IDS, DEPOSIT_SUCCESS, DIRECT_WALLET_LEDGER } = require('../dashboard/dashboard.constants');
 const { WITHDRAWAL_DONE: STATS_WITHDRAWAL_DONE } = require('./audienceStats.constants');
 const { visibleStaffIds } = require('../staff-directory/staffDirectory.service');
 // transfer, refill, issuance, adjust — money handed over; never 'gt'/'casino'.
@@ -1283,20 +1283,28 @@ class ReportsService {
     let credited = 0n;
     let debited = 0n;
 
+    const moved = [];
     for (const event of events) {
-      const minor = money.toMinor(event.amount);
+      // A row that records the wallet after it (mssports) moved exactly post − running.
+      const minor = event.post != null ? money.toMinorQuantised(String(event.post)) - running : money.toMinor(event.amount);
+      const hasPost = event.post != null;
+      delete event.seq;
+      delete event.post;
+      // A lost bet settles at 0 and a hedged bet takes nothing: nothing moved, nothing to list.
+      if (hasPost && minor === 0n) continue;
       running += minor;
       event.amount = money.toDecimalString(minor);
+      event.type = minor >= 0n ? 'CREDIT' : 'DEBIT';
       event.balance = money.toDecimalString(running);
       if (minor >= 0n) credited += minor;
       else debited += minor;
-      delete event.seq;
+      moved.push(event);
     }
 
     /**
-     * Stakes on unsettled bets have left the wallet and have no settlement row
-     * yet, so the wallet legitimately sits below the ledger by exactly this.
-     * Sports betting is INR-only.
+     * Stakes on unsettled bets — shown for reference. They are already in the
+     * ledger (the exchange's "Bet placed" row), so `unexplained` does not add
+     * them back. Sports betting is INR-only.
      */
     let openExposure = '0.00000000';
     if (column === 'inr') {
@@ -1312,7 +1320,7 @@ class ReportsService {
 
     // Newest first for display, page after the running balance is computed —
     // a balance that depends on the page is not a balance.
-    const ordered = events.slice().reverse();
+    const ordered = moved.reverse();
 
     return {
       subject: {
@@ -1329,15 +1337,14 @@ class ReportsService {
         /**
          * What the ledger cannot account for.
          *
-         * `live + openExposure - ledger`. Non-zero means money moved through a
-         * path this sheet does not read — historical GT settlements, or a
-         * direct wallet write. Surfacing it is the point: legacy showed a
-         * running balance that silently disagreed with the wallet and gave the
-         * reader no way to tell.
+         * `live - ledger`. Non-zero means money moved through a path this sheet
+         * does not read — historical GT settlements, or a direct wallet write.
+         * Surfacing it is the point: legacy showed a running balance that
+         * silently disagreed with the wallet and gave the reader no way to tell.
+         * An open bet's stake is NOT added back: the exchange's "Bet placed"
+         * row already takes it (openExposure is shown for reference only).
          */
-        unexplained: money.toDecimalString(
-          money.toMinor(live) + money.toMinor(openExposure) - running
-        ),
+        unexplained: money.toDecimalString(money.toMinor(live) - running),
         credited: money.toDecimalString(credited),
         debited: money.toDecimalString(debited),
       },
@@ -1443,8 +1450,9 @@ class ReportsService {
   /** Every source that moves a wallet, normalised to a signed amount. */
   async #collectEvents(userId, currency, column) {
     const events = [];
-    const push = (ts, category, type, description, amount, seq) =>
-      events.push({ ts: ts ?? new Date(), category, type, description, amount: String(amount ?? '0'), seq });
+    // `post` = the wallet balance right after the row, when the source records it (mssports does).
+    const push = (ts, category, type, description, amount, seq, post) =>
+      events.push({ ts: ts ?? new Date(), category, type, description, amount: String(amount ?? '0'), seq, post });
 
     const uid = String(userId);
 
@@ -1554,6 +1562,53 @@ class ReportsService {
         net,
         Number(row.id) || 0
       );
+    }
+
+    /**
+     * 6b. Sports Exchange (mssports). It moves `credits.inr` itself and writes its OWN ledgers, never a
+     *     platform row: `debit_ledger` bet_placed (the market's exposure taken, `balance` after) and
+     *     `credits_ledger` settlement / refund / settlement_void (`closing` after). Their `amount` is
+     *     NOT the wallet move — the exchange nets back and lay on one market (a hedged bet debits
+     *     nothing, a settlement can credit with amount 0) — so each row carries `post`, the wallet
+     *     after it, and balanceSheet() takes the move as post − running. INR only.
+     */
+    if (column === 'inr') {
+      const { sequelize } = this.models.Users;
+      const [stakes, settles] = await Promise.all([
+        sequelize.query(
+          `SELECT id, amount, balance AS post, description, created_at FROM mssports.debit_ledger
+            WHERE user_id = :uid AND reason = 'bet_placed' AND upper(currency) = 'INR'`,
+          { replacements: { uid }, type: QueryTypes.SELECT }
+        ),
+        sequelize.query(
+          `SELECT id, reason, amount, closing AS post, description, created_at FROM mssports.credits_ledger
+            WHERE user_id = :uid AND reason IN ('settlement', 'refund', 'settlement_void') AND upper(currency) = 'INR'`,
+          { replacements: { uid }, type: QueryTypes.SELECT }
+        ),
+      ]);
+      const label = { settlement: 'Settlement', refund: 'Refund', settlement_void: 'Void' };
+      for (const row of stakes) {
+        push(row.created_at, 'Sports', 'DEBIT', `Bet placed — ${row.description || ''}`.trim(), `-${money.fromStored(row.amount ?? '0')}`, Number(row.id) || 0, row.post);
+      }
+      for (const row of settles) {
+        push(row.created_at, 'Sports', 'CREDIT', `${label[row.reason]} — ${row.description || ''}`.trim(), money.fromStored(row.amount ?? '0'), Number(row.id) || 0, row.post);
+      }
+    }
+
+    // 6c. Super Admin's Direct User Wallet (ADMIN_CREDIT / ADMIN_DEBIT, refType DIRECT_WALLET; debit stored negative).
+    const directMoves = await this.models.CreditsLedger.findAll({
+      where: {
+        user_id: uid,
+        currency: { [Op.iLike]: currency },
+        reason: { [Op.in]: [DIRECT_WALLET_LEDGER.deposit, DIRECT_WALLET_LEDGER.withdrawal] },
+        [Op.and]: [sqlWhere(literal("meta->>'refType'"), DIRECT_WALLET_LEDGER.refType)],
+      },
+      raw: true,
+    });
+    for (const row of directMoves) {
+      const credit = row.reason === DIRECT_WALLET_LEDGER.deposit;
+      const abs = money.toDecimalString(money.toMinorQuantised(String(row.amount ?? '0').replace(/^-/, '')));
+      push(row.created_at, 'Deposit', credit ? 'CREDIT' : 'DEBIT', row.description || (credit ? 'Admin deposit' : 'Admin withdrawal'), credit ? abs : `-${abs}`, Number(row.id) || 0);
     }
 
     /**
