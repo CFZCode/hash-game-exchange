@@ -120,7 +120,9 @@ test('P&L against a database', async (t) => {
     const ids = [playerA, playerB];
     await run('DELETE FROM credits_ledger WHERE user_id IN (:ids)', { ids: ids.map(String) });
     await run('DELETE FROM vault_interest_history WHERE userid IN (:ids)', { ids });
-    await run('DELETE FROM "SportsBet" WHERE user_id IN (:ids)', { ids });
+    await run('DELETE FROM mssports."SportsBet" WHERE user_id IN (:ids)', { ids });
+    await run('DELETE FROM mssports.credits_ledger WHERE user_id IN (:ids)', { ids: ids.map(String) });
+    await run('DELETE FROM mssports.users WHERE user_id IN (:ids)', { ids });
     await run('DELETE FROM bets WHERE uid IN (:ids)', { ids });
     await run('DELETE FROM gis_transactions WHERE user_id IN (:ids)', { ids });
     await models.Users.destroy({ where: { id: ids } });
@@ -150,17 +152,21 @@ test('P&L against a database', async (t) => {
        VALUES (:a, :t1, 'bet', -50, :coin, 'p-slot', 0, :d4), (:a, :t2, 'win', 20, :coin, 'p-slot', 0, :d4)`,
       { a: playerA, coin: COIN, d4: day(4), t1: `pnl-${playerA}-1`, t2: `pnl-${playerA}-2` }
     );
-    // Sports, A: a 40 stake; the ledger takes it (house +40) and pays 30 back (house −30).
+    // Sports (mssports — the Sports Exchange tables), A: a settled 40 stake (house +40), settlement pays 30 back (house −30).
     await run(
-      `INSERT INTO "SportsBet" (user_id, game_type, sport_id, event_name, stake_amount, original_currency, status, created_at, updated_at)
-       VALUES (:a, 'MO', '4', 'Test v Test', 40, :coin, 'settled', :d5, :d5)`,
+      `INSERT INTO mssports.users (user_id, username, password, role_id, "createdAt", "updatedAt") VALUES (:a, :n, 'x', 4, now(), now()) ON CONFLICT (user_id) DO NOTHING`,
+      { a: playerA, n: `pa-${playerA}` }
+    );
+    await run(
+      `INSERT INTO mssports."SportsBet" (user_id, game_type, bet_type, odds, sport_id, event_name, stake_amount, original_currency, status, result_status, created_at, updated_at)
+       VALUES (:a, 'MO', 'back', 1.75, '4', 'Test v Test', 40, :coin, 'closed', 'loss', :d5, :d5)`,
       { a: playerA, coin: COIN, d5: day(5) }
     );
-    const [[bet]] = await run('SELECT id FROM "SportsBet" WHERE user_id = :a', { a: playerA });
+    const [[bet]] = await run('SELECT id FROM mssports."SportsBet" WHERE user_id = :a', { a: playerA });
     await run(
-      `INSERT INTO credits_ledger (user_id, currency, amount, reason, netamount, bet_id, created_at)
-       VALUES (:a, :coin, -40, 'BET_STAKE', -40, :bet, :d5), (:a, :coin, 30, 'BET_PAYOUT', 30, :bet, :d6)`,
-      { a: String(playerA), coin: COIN, bet: bet.id, d5: day(5), d6: day(6) }
+      `INSERT INTO mssports.credits_ledger (user_id, currency, amount, reason, netamount, bet_id, created_at)
+       VALUES (:a, :coin, 30, 'settlement', 30, :bet, :d6)`,
+      { a: String(playerA), coin: COIN, bet: bet.id, d6: day(6) }
     );
 
     // Costs: A a VIP level-up 7, a redeem code 4 that was reversed; B rakeback 3 and vault interest 1.

@@ -199,4 +199,18 @@ test('agent-tree referral codes do not work (DB)', async (t) => {
     const joined = await affiliate.joinTeam({ userId: loner.id, referralCode: directOwner.referalcode });
     assert.equal(joined.owner, directOwner.name);
   });
+
+  await t.test('a child member (any parent) cannot join a team, and earns its referrer nothing', async () => {
+    const child = await signUp('c1');
+    agentIds.add(Number(child.id));
+    await assert.rejects(
+      () => affiliate.joinTeam({ userId: child.id, referralCode: directOwner.referalcode }),
+      (err) => err.code === 'PROMOTIONS_NOT_FOR_AGENT_USERS'
+    );
+    // An old team row (from before the rule) earns nothing on the child's wagering.
+    await models.Team.create({ ownername: directOwner.name, membername: child.name, referalCode: directOwner.referalcode, campaign: '', createdAt: new Date(), updatedAt: new Date() });
+    const out = await affiliate.onWager({ userId: child.id, previousWager: '0', newWager: '1000' });
+    assert.equal(out.skipped, 'AGENT_TREE_PLAYER');
+    await assert.rejects(() => affiliate.unlockFor({ memberName: child.name }), (err) => err.code === 'PROMOTIONS_NOT_FOR_AGENT_USERS');
+  });
 });

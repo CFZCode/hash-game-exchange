@@ -9,9 +9,9 @@ const { isAgentTree } = require('./permissions');
  * ═════════════════════════════════════════════════════════════════════════
  * THE RULE
  *
- * A player whose owner (`users.parent_staff_id`) is a SUPER_MASTER, MASTER or
- * AGENT (staff levels 4–6, or an EXECUTIVE staff row under one — see
- * `effectiveStaffLevel`) is an agent's customer. Their money comes from the
+ * A player with ANY owner (`users.parent_staff_id` set — owner, admin, sub admin, super
+ * master, master or agent; every one is created through the Sports Exchange Create Account)
+ * is a child user, an agent's customer. Their money comes from the
  * agent (staff transfers / refill), not from the site, so on the player site
  * they get the same restrictions the agent tree got in the admin:
  *
@@ -33,8 +33,8 @@ const { isAgentTree } = require('./permissions');
  * With all four money capabilities gone the player site shows no wallet
  * actions at all — only the read-only balance and the transaction history.
  *
- * Direct signups (no owner) and players owned by house staff (levels 1–3) are
- * unaffected.
+ * Only direct signups (`parent_staff_id IS NULL`) are unaffected. (Until 2026-10-17 a player
+ * under house staff, levels 1–3, counted as direct; the user ruled every parented player a child.)
  *
  * `AGENT_PLAYER_RESTRICTIONS` below is the ONE place that says which
  * capabilities an agent-tree player loses. Adding one later is one entry here
@@ -118,26 +118,22 @@ function ttlCache(ttlMs, max = 10_000) {
 /**
  * The resolver: "is this player in the agent tree?".
  *
- * Two cached reads, neither per request in steady state:
+ * One cached read, not per request in steady state:
  *   player -> owner staff id     (`loadOwnerStaffId`, the service's own `users` row)
- *   staff  -> level/parentLevel  (`loadStaff`, admin-service owns `staff`)
+ *   (`loadStaff` is still required for compatibility but no longer read: any owner = child)
  *
- * A player with no owner answers without any read past the first. A staff id
- * the admin does not know (404) counts as no owner. Any other failure throws,
- * so a guarded route fails closed rather than paying a promotion it could not
+ * A failed read throws, so a guarded route fails closed rather than paying a promotion it could not
  * check.
  */
 function createAgentPlayerResolver({
   loadOwnerStaffId,
   loadStaff,
   playerTtlMs = 30_000,
-  staffTtlMs = 60_000,
 } = {}) {
   if (typeof loadOwnerStaffId !== 'function') throw new Error('createAgentPlayerResolver requires loadOwnerStaffId');
   if (typeof loadStaff !== 'function') throw new Error('createAgentPlayerResolver requires loadStaff');
 
   const owners = ttlCache(playerTtlMs);
-  const staffTree = ttlCache(staffTtlMs);
 
   async function ownerOf(userId) {
     const key = String(userId);
@@ -149,28 +145,11 @@ function createAgentPlayerResolver({
     return value;
   }
 
-  async function staffIsAgentTree(staffId) {
-    const key = String(staffId);
-    const cached = staffTree.get(key);
-    if (cached !== undefined) return cached;
-    let staff;
-    try {
-      staff = await loadStaff(staffId);
-    } catch (error) {
-      if (error?.status === 404) staff = null;
-      else throw error;
-    }
-    const value = isAgentTreeOwner(staff);
-    staffTree.set(key, value);
-    return value;
-  }
-
   return {
     async isAgentPlayer(userId) {
       if (userId === null || userId === undefined) return false;
-      const owner = await ownerOf(userId);
-      if (!owner) return false;
-      return staffIsAgentTree(owner);
+      // Koi bhi parent = child user (staff level nahi dekhte).
+      return Boolean(await ownerOf(userId));
     },
     async capabilities(userId) {
       return capabilitiesFor(await this.isAgentPlayer(userId));
@@ -179,7 +158,6 @@ function createAgentPlayerResolver({
     invalidate(userId) {
       if (userId === undefined) {
         owners.clear();
-        staffTree.clear();
       } else owners.delete(String(userId));
     },
   };

@@ -38,7 +38,9 @@ export const GATES = {
   // manual transfer needs a reference + screenshot the form does not have) — and its only
   // withdrawal is the crypto request, which the backend files as MANUAL (staff-reviewed). So a
   // policy that closes that rail closes the whole entry.
-  deposit: { capability: 'deposit', rail: ['deposit_mode', 'automatic'] },
+  // A manual-only site (deposit_mode = manual) still opens the entry when the manual transfer
+  // form can be used — see `manualDeposit` below.
+  deposit: { capability: 'deposit', rail: ['deposit_mode', 'automatic'], orManual: true },
   // P2P / card buy is a deposit rail on the backend (`deposit` capability covers "P2P buy").
   buy: { capability: 'deposit' },
   withdraw: { capability: 'withdraw', rail: ['withdrawal_mode', 'manual'] },
@@ -145,12 +147,15 @@ export function makeGates({ flags, features, capabilities, ready = true } = {}) 
      are switched off for nobody else (backend agentPlayers.js; b2b only takes `promotions`, a
      withdraw lock only `withdraw`), so both off together is that player. */
   const agentPlayer = capabilities?.vault === false && capabilities?.deposit === false;
+  /* The manual bank-transfer deposit: the owner's deposit_mode allows 'manual' AND the site admin's
+     Manual deposit switch (`/me` capabilities.manualDeposit) is on. */
+  const manualOpen = () => railOpen(policy('deposit_mode'), 'manual') && capabilities?.manualDeposit !== false;
   const blocked = (gate) => {
     const g = GATES[gate];
     if (!g) return null;
     if (g.flag && flagMap?.[g.flag] === false) return 'site';
     if (g.feature && list && !byKey.has(g.feature)) return 'site';
-    if (g.rail && !railOpen(policy(g.rail[0]), g.rail[1])) return 'site';
+    if (g.rail && !railOpen(policy(g.rail[0]), g.rail[1]) && !(g.orManual && manualOpen())) return 'site';
     if ((PROMO_GATES.has(gate) || g.notB2B) && policy('business_model') === 'b2b') return 'site';
     if (g.notAgentPlayer && agentPlayer) return 'account';
     if (g.capability && !can(g.capability)) return 'account';
@@ -169,6 +174,8 @@ export function makeGates({ flags, features, capabilities, ready = true } = {}) 
       return !gate || on(gate);
     },
     policy,
+    /** The manual (bank transfer + screenshot) deposit form may show: deposit allowed for this player and manual open. */
+    manualDeposit: () => on('deposit') && can('deposit') && manualOpen(),
     /** One site-admin flag (`home_*` sections etc.); absent / not answered = on. */
     flag: (key) => flagMap?.[key] !== false,
     /** The signed-in player belongs to an agent's tree (restricted UI: INR wallet, no KYC, no promotions). */

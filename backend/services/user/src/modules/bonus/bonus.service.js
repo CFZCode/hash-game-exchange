@@ -2,6 +2,7 @@
 
 const { Op } = require('sequelize');
 const { money } = require('@ibitplay/common');
+const { assertPlayerCapability } = require('@ibitplay/auth');
 
 const errors = require('./bonus.errors');
 const {
@@ -605,6 +606,8 @@ class BonusService {
    * ─────────────────────────────────────────────────────────────────────
    */
   async grantBonusGame({ userId, idempotencyKey, staffId = null, note = null, ...counters }) {
+    // Bonus sirf direct users ka — child user (koi parent) ko grant nahi (403 PROMOTIONS_NOT_FOR_AGENT_USERS).
+    await assertPlayerCapability(userId, 'promotions');
     const patch = this.#counterPatch(counters);
     const total = Object.values(patch).reduce(
       (sum, value) => money.add(sum, money.toMinor(value)),

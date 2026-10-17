@@ -20,16 +20,15 @@ const { promotionsBlocked } = require('@ibitplay/auth');
  *   3. `users.name`, case-folded — players share usernames as codes
  * An account with no `referalcode` of its own is never a referrer.
  *
- * AGENT-TREE PLAYERS ARE NEVER REFERRERS. A player whose owner
- * (`parent_staff_id`) is a SUPER_MASTER, MASTER or AGENT (levels 4–6, see
- * `packages/auth/src/agentPlayers.js`) is an agent's customer, not a site
- * affiliate: their code does not work anywhere. The winning match above is
+ * CHILD USERS ARE NEVER REFERRERS. A player with ANY owner (`parent_staff_id`
+ * set — see `packages/auth/src/agentPlayers.js`) is a child user, not a site
+ * affiliate (affiliate is for direct users only): their code does not work anywhere. The winning match above is
  * checked with the same cached resolver the player guards use, and when it is
  * an agent-tree player the answer is "not found" — we do not fall through to
  * a later match, because the input named that player. So signup refuses the
  * code (422 `AUTH_REFERRAL_CODE_INVALID`), the public check says
  * `{ valid: false }`, joinTeam says the code is not valid and no joining
- * bonus is paid. New agent-tree players are created without a code
+ * bonus is paid. Admin-created (parented) players are created without a code
  * (`admin/players.service.js`); codes they already hold stay in the database
  * but are inert because of this check.
  *

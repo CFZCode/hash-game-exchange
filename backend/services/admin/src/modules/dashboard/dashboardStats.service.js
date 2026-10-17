@@ -95,15 +95,12 @@ const GIS_CURRENCY_ALIASES = Object.freeze({ PKR: 'INR' });
  */
 const NOT_FAKE = `(b.result->>'fake') IS DISTINCT FROM 'true'`;
 
-/** Sports settlement reasons in `credits_ledger` — the statements module's list. */
-const SPORTS_LEDGER_REASONS = Object.freeze([
-  'BET_STAKE',
-  'BET_PAYOUT',
-  'BET_REFUND',
-  'BET_ROLLBACK',
-  'VOID_AFTER_SETTLEMENT',
-  'VOID_SINGLE_BET_AFTER_SETTLEMENT',
-]);
+/**
+ * Sports Exchange settlement reasons in `mssports.credits_ledger` (settlementv2, commission, void
+ * after settlement). `netamount` = jo player ko wapas gaya; GGR = settled stakes (SportsBet) − SUM(netamount). Bets bhi
+ * `mssports."SportsBet"` me hain — `public."SportsBet"` purana, khaali table hai.
+ */
+const SPORTS_LEDGER_REASONS = Object.freeze(['settlement', 'settlement_void', 'commission', 'commission_void']);
 
 /** A sports bet in one of these never took a stake that stayed taken. */
 const SPORTS_NOT_TURNOVER = Object.freeze(['void', 'voided', 'refund', 'refunded', 'cancelled', 'canceled', 'rejected', 'failed']);
@@ -392,7 +389,7 @@ class DashboardStatsService {
         UNION ALL
         SELECT ${this.#bucket('s.created_at')}, 'sports', 'stake', 'house',
                UPPER(COALESCE(NULLIF(s.original_currency, ''), 'INR')), SUM(s.stake_amount), COUNT(*)
-          FROM "SportsBet" s
+          FROM mssports."SportsBet" s
          WHERE s.stake_amount > 0 AND LOWER(COALESCE(s.status, '')) NOT IN (:notTurnover)
            AND LOWER(COALESCE(s.result_status, '')) NOT IN (:refundedResults)
            AND ${this.#window('s.created_at')}
@@ -400,8 +397,18 @@ class DashboardStatsService {
            ${this.#owned(ctx, 's.user_id')}
          GROUP BY 1, 5
         UNION ALL
+        -- House side of the Sports Exchange: settled (won / loss) stakes taken, minus what the ledger paid back.
+        SELECT ${this.#bucket('s.created_at')}, 'sports', 'house', 'house',
+               UPPER(COALESCE(NULLIF(s.original_currency, ''), 'INR')), SUM(s.stake_amount), 0
+          FROM mssports."SportsBet" s
+         WHERE s.stake_amount > 0 AND LOWER(COALESCE(s.result_status, '')) IN ('won', 'loss', 'lost')
+           AND ${this.#window('s.created_at')}
+           ${ctx.currency ? `AND UPPER(COALESCE(NULLIF(s.original_currency, ''), 'INR')) = :currency` : ''}
+           ${this.#owned(ctx, 's.user_id')}
+         GROUP BY 1, 5
+        UNION ALL
         SELECT ${this.#bucket('l.created_at')}, 'sports', 'house', 'house', UPPER(l.currency), -SUM(l.netamount), 0
-          FROM credits_ledger l
+          FROM mssports.credits_ledger l
          WHERE l.reason IN (:ledgerReasons)
            AND ${this.#window('l.created_at')} ${cur('l.currency')} ${this.#owned(ctx, 'l.user_id', true)}
          GROUP BY 1, 5
@@ -457,7 +464,7 @@ class DashboardStatsService {
     return this.#query(
       `SELECT COALESCE(NULLIF(s.sport_id, ''), 'other') AS sport, ${curExpr} AS currency,
               SUM(s.stake_amount)::text AS total, COUNT(*) AS n
-         FROM "SportsBet" s
+         FROM mssports."SportsBet" s
         WHERE s.stake_amount > 0 AND LOWER(COALESCE(s.status, '')) NOT IN (:notTurnover)
           AND LOWER(COALESCE(s.result_status, '')) NOT IN (:refundedResults)
           AND ${this.#window('s.created_at')}

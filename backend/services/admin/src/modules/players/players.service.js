@@ -5,7 +5,6 @@ const { Op, literal } = require('sequelize');
 const { money } = require('@ibitplay/common');
 const {
   hashPassword,
-  isAgentTree,
   hasPermission,
   canIssueFunds,
   effectiveStaffLevel,
@@ -15,10 +14,10 @@ const {
 
 const errors = require('./players.errors');
 const { PLAYER_ROLE_ID, PASSWORD_ROUNDS, CLOSED_STATUS, WALLET_SEED } = require('./players.constants');
-const { visibleStaffIds, resolveStaff } = require('../staff-directory/staffDirectory.service');
+const { visibleStaffIds } = require('../staff-directory/staffDirectory.service');
 const { assertTransactionPassword } = require('../staff-auth/transactionPassword');
 const { insufficientStaffBalance } = require('../lords/staffFloat');
-const { addPointEntry } = require('../lords/pointLedger');
+const { addPointEntry, SPENDABLE_SQL } = require('../lords/pointLedger');
 
 /**
  * Player accounts, from an operator's side.
@@ -105,16 +104,12 @@ class PlayersService {
     }
 
     /**
-     * A player owned by the agent tree (anchor staff level 4–6, or an
-     * executive row under one) gets NO referral code: agent-tree players are
-     * never referrers (`user/affiliate/referrerResolver.js` refuses their
-     * codes). Codes such players already hold stay in the database but are
-     * inert. House-owned players (levels 1–3) keep getting one.
+     * Yahan bana har player kisi staff ke neeche hai (child user), isliye referral code NAHI:
+     * affiliate sirf direct users (khud signup, koi parent nahi) ke liye hai
+     * (`user/affiliate/referrerResolver.js` aise codes refuse karta hai).
      */
-    const agentTreeAnchor = isAgentTree(await resolveStaff(this.models, anchor));
-
     return this.db.transaction(async (transaction) => {
-      const referralCode = agentTreeAnchor ? null : await this.#uniqueReferralCode(username, transaction);
+      const referralCode = null;
 
       const user = await this.models.Users.create(
         {
@@ -381,7 +376,15 @@ class PlayersService {
 
     const [affected] = await this.models.StaffCredits.update(
       { inr: literal(`inr - ${decimal}`) },
-      { where: { staff_id: actor.id, inr: { [Op.gte]: decimal } }, transaction }
+      {
+        where: {
+          staff_id: actor.id,
+          inr: { [Op.gte]: decimal },
+          // TENEXCH: settlement points opening credit me nahi ja sakte.
+          [Op.and]: [literal(SPENDABLE_SQL.replace(':amount', decimal))],
+        },
+        transaction,
+      }
     );
 
     if (!affected) throw insufficientStaffBalance({ amount: decimal });
@@ -413,6 +416,8 @@ class PlayersService {
         isDeposit: true,
         transferId: transfer.id,
         remark: 'Opening balance',
+        // TENEXCH: account ka opening credit 'User creation' / open:<walletId>.
+        opening: true,
       },
       { transaction }
     );
@@ -535,32 +540,6 @@ class PlayersService {
 
     // Ten collisions in a ten-digit space is not bad luck.
     throw errors.NOT_PERMITTED({ reason: 'could not allocate an account id' });
-  }
-
-  /**
-   * A referral code nobody else has.
-   *
-   * Retried against the database rather than trusted from one generation —
-   * these are short codes and a collision assigns a new player's referrals to
-   * somebody else.
-   */
-  async #uniqueReferralCode(username, transaction) {
-    const base = String(username).replace(/[^A-Za-z0-9]/g, '').slice(0, 6).toUpperCase() || 'PLAYER';
-
-    for (let attempt = 0; attempt < 8; attempt += 1) {
-      const code = `${base}${crypto.randomInt(1000, 999_999)}`;
-      const taken = await this.models.Users.findOne({
-        where: { referalcode: code },
-        attributes: ['id'],
-        transaction,
-        raw: true,
-      });
-      if (!taken) return code;
-    }
-
-    // Eight collisions on a random six-digit suffix means something is wrong
-    // with the generator, not with luck.
-    throw errors.NOT_PERMITTED({ reason: 'could not allocate a referral code' });
   }
 
   #referralLink(code) {

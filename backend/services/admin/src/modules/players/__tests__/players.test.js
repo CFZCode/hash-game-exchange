@@ -174,7 +174,7 @@ test('players against a database', async (t) => {
     assert.equal(await models.CreditsLedger.count({ where: { user_id: String(player.id) } }), 0);
   });
 
-  await t.test('an AGENT-TREE player is created WITHOUT a referral code; a house player gets one', async () => {
+  await t.test('every admin-created player (any parent) is created WITHOUT a referral code — affiliate is direct-only', async () => {
     const player = await service.create({ actor: asAgent, username: `p${newId()}`, password: 'correct-horse-battery' });
     created.push(Number(player.id));
     assert.equal(player.referralCode, null);
@@ -189,7 +189,7 @@ test('players against a database', async (t) => {
     let housePlayer;
     try {
       housePlayer = await service.create({ actor: { id: house, permissions: ['*'] }, username: `p${newId()}`, password: 'correct-horse-battery' });
-      assert.ok(housePlayer.referralCode, 'a house-owned player still gets a code');
+      assert.equal(housePlayer.referralCode, null, 'a house-owned player is a child user too — no code');
     } finally {
       if (housePlayer) {
         await models.Credits.destroy({ where: { uid: housePlayer.id } });

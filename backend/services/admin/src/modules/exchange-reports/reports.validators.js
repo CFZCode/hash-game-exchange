@@ -72,6 +72,14 @@ const userWinLoss = {
     .refine(inTenDayWindow, { message: RANGE_MESSAGE }),
 };
 
+/** POST /exchange/reports/direct-user-win-loss — User Win Loss ka Direct Users tab (channel hamesha direct). */
+const directUserWinLoss = {
+  body: z
+    .object({ clientType: client.clientType, clientId: client.clientId, fromDate: day, toDate: day })
+    .strict()
+    .refine(inTenDayWindow, { message: RANGE_MESSAGE }),
+};
+
 /** POST /exchange/reports/total-profit-loss — sirf sports (sportbook hamare yahan nahi). */
 const totalProfitLoss = {
   body: z
@@ -94,4 +102,4 @@ const turnover = {
     .refine(inTenDayWindow, { message: RANGE_MESSAGE }),
 };
 
-module.exports = { clients, statement, statementRow, partyWinLoss, userWinLoss, totalProfitLoss, turnover };
+module.exports = { clients, statement, statementRow, partyWinLoss, userWinLoss, directUserWinLoss, totalProfitLoss, turnover };

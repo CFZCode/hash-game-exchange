@@ -4,6 +4,13 @@ const { canManagePromotions } = require('@ibitplay/auth');
 const { INHOUSE_PAYOUT, V2_STAKE, V2_PAYOUT } = require('../statements/casinoRounds');
 
 const { DashboardStatsService, SPORTS_LEDGER_REASONS, SPORTS_NOT_TURNOVER } = require('../dashboard/dashboardStats.service');
+
+/**
+ * Sports Exchange ka house side (mssports), dashboard jaisa: stake bet lagte waqt `credits.inr` se katta
+ * hai aur sirf `mssports."SportsBet"` me hai (ledger me nahi). GGR = settled (won/loss) bets ka stake −
+ * Σ `mssports.credits_ledger.netamount` (settlement = jo wapas diya, settlement_void ulta, commission).
+ */
+const SETTLED_BET = (a) => `LOWER(COALESCE(${a}.result_status, '')) IN ('won', 'loss', 'lost')`;
 const dashboardConstants = require('../dashboard/dashboard.constants');
 const { gisKindSql, gisSideAmountSql, gisBetCountSql, gisPlayFilterSql } = require('../statements/statements.constants');
 const { playerScope, statsWindow, bucketSql, rangeSql, select, loadRates, createValuer, minor, decimal } = require('./audienceStats.helpers');
@@ -499,17 +506,24 @@ class PnlStatsService {
                COALESCE(NULLIF(UPPER(s.game_type), ''), NULLIF(UPPER(s.market_type), ''), 'OTHER') AS market,
                COALESCE(NULLIF(s.event_name, ''), NULLIF(s.match_title, ''), NULLIF(s.match_id, ''), 'Unknown event') AS event,
                ${SPORTS_CURRENCY('s')} AS currency, s.stake_amount AS amount, 1 AS n
-          FROM "SportsBet" s
+          FROM mssports."SportsBet" s
          WHERE s.stake_amount > 0 AND LOWER(COALESCE(s.status, '')) NOT IN (:notTurnover)
            AND LOWER(COALESCE(s.result_status, '')) NOT IN (:refundedResults)
            AND ${rangeSql('s.created_at')}${ctx.currency ? ` AND ${SPORTS_CURRENCY('s')} = :currency` : ''}${owned('s.user_id')}
+        UNION ALL
+        SELECT 'house', 'house', COALESCE(NULLIF(s.sport_id, ''), 'other'),
+               COALESCE(NULLIF(UPPER(s.game_type), ''), NULLIF(UPPER(s.market_type), ''), 'OTHER'),
+               COALESCE(NULLIF(s.event_name, ''), NULLIF(s.match_title, ''), NULLIF(s.match_id, ''), 'Unknown event'),
+               ${SPORTS_CURRENCY('s')}, s.stake_amount, 0
+          FROM mssports."SportsBet" s
+         WHERE s.stake_amount > 0 AND ${SETTLED_BET('s')} AND ${rangeSql('s.created_at')}${ctx.currency ? ` AND ${SPORTS_CURRENCY('s')} = :currency` : ''}${owned('s.user_id')}
         UNION ALL
         SELECT 'house', 'house', COALESCE(NULLIF(b.sport_id, ''), NULLIF(l.sport_id, ''), 'other'),
                COALESCE(NULLIF(UPPER(b.game_type), ''), NULLIF(UPPER(l.market_type), ''), 'OTHER'),
                COALESCE(NULLIF(b.event_name, ''), NULLIF(b.match_title, ''), NULLIF(b.match_id, ''), NULLIF(l.match_id, ''), 'Unknown event'),
                UPPER(l.currency), -l.netamount, 0
-          FROM credits_ledger l
-          LEFT JOIN "SportsBet" b ON b.id = l.bet_id
+          FROM mssports.credits_ledger l
+          LEFT JOIN mssports."SportsBet" b ON b.id = l.bet_id
          WHERE l.reason IN (:ledgerReasons)
            AND ${rangeSql('l.created_at')}${cur('l.currency')}${ledgerOwned('l.user_id')}
         UNION ALL
@@ -568,14 +582,18 @@ class PnlStatsService {
            AND ${rangeSql('v.created_at')}${cur('v.currency')}${owned('v.user_id')}
         UNION ALL
         SELECT s.user_id, 'sports', 'stake', 'house', ${SPORTS_CURRENCY('s')}, s.stake_amount, 1
-          FROM "SportsBet" s
+          FROM mssports."SportsBet" s
          WHERE s.stake_amount > 0 AND LOWER(COALESCE(s.status, '')) NOT IN (:notTurnover)
            AND LOWER(COALESCE(s.result_status, '')) NOT IN (:refundedResults)
            AND ${rangeSql('s.created_at')}${ctx.currency ? ` AND ${SPORTS_CURRENCY('s')} = :currency` : ''}${owned('s.user_id')}
         UNION ALL
+        SELECT s.user_id, 'sports', 'house', 'house', ${SPORTS_CURRENCY('s')}, s.stake_amount, 0
+          FROM mssports."SportsBet" s
+         WHERE s.stake_amount > 0 AND ${SETTLED_BET('s')} AND ${rangeSql('s.created_at')}${ctx.currency ? ` AND ${SPORTS_CURRENCY('s')} = :currency` : ''}${owned('s.user_id')}
+        UNION ALL
         SELECT CASE WHEN l.user_id ~ '^[0-9]{1,18}$' THEN l.user_id::bigint END, 'sports', 'house', 'house',
                UPPER(l.currency), -l.netamount, 0
-          FROM credits_ledger l
+          FROM mssports.credits_ledger l
          WHERE l.reason IN (:ledgerReasons) AND ${rangeSql('l.created_at')}${cur('l.currency')}${ledgerOwned('l.user_id')}
       ),
       per_player AS (

@@ -1,7 +1,7 @@
 'use strict';
 
 const { response, asyncHandler } = require('@ibitplay/common');
-const { canIssueFunds } = require('@ibitplay/auth');
+const { canIssueFunds, assertPlayerCapability } = require('@ibitplay/auth');
 
 /** Staff wallet operations. */
 function createAdminController({ service }) {
@@ -46,6 +46,10 @@ function createAdminController({ service }) {
       if (String(req.body.currency).toUpperCase() === 'INR') {
         return response.ok(res, await service.agentAdjust(req.body, { staffId: req.staff.id }));
       }
+
+      // Child user (koi parent) ka paisa sirf Sports Exchange INR (D/W) se — doosre coin me
+      // operator adjustment nahi (403 DEPOSIT_NOT_FOR_AGENT_USERS).
+      await assertPlayerCapability(req.body.userId, 'deposit');
 
       await service.checkTransactionPassword(req.staff.id, req.body.transactionPassword, {
         required: false,

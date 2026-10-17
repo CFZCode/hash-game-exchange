@@ -10,8 +10,6 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import { Textarea } from '@/components/ui/textarea'
-import { useSession } from '@/contexts/SessionContext'
 import { useApiMutation } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
 import { SETTLE_INVALIDATE } from '@/views/exchange/accountMoney'
@@ -49,8 +47,6 @@ const amountOk = (v: string) => /^\d+(\.\d{1,8})?$/.test(v.trim()) && Number(v) 
  *   Close Sports / Casino / Lock Account   `admin/accounts/status`
  */
 const StaffPortal = () => {
-  const { can } = useSession()
-  const isOwner = can('wallet:adjust')
 
   // ── Quick ID creation ──
   const [cu, setCu] = useState({ username: '', fullname: '', password: '', credit: '', txn: '' })
@@ -82,16 +78,15 @@ const StaffPortal = () => {
   }
 
   // ── Wallet refill ──
-  const [rf, setRf] = useState({ userId: '', amount: '', note: '', txn: '' })
+  const [rf, setRf] = useState({ userId: '', amount: '', txn: '' })
 
+  // Sports Exchange ka EK deposit API (TENEXCH /wallet/deposit/add): owner ho ya koi staff, apne DIRECT
+  // child player ko. Bina parent wale direct users ka paisa Main → Wallets se.
   const refill = useApiMutation({
-    fn: () =>
-      isOwner
-        ? api.post('admin/accounts/refill', { accountId: Number(rf.userId), amount: rf.amount.trim(), note: rf.note.trim() || undefined, transactionPassword: rf.txn })
-        : api.post('admin/staff/transfer', { toType: 'user', toId: Number(rf.userId), amount: rf.amount.trim(), direction: 'deposit', transactionPassword: rf.txn }),
+    fn: () => api.post('admin/staff/transfer', { toType: 'user', toId: Number(rf.userId), amount: rf.amount.trim(), direction: 'deposit', transactionPassword: rf.txn }),
     invalidate: SETTLE_INVALIDATE,
     success: `Wallet refilled — ₹${rf.amount} to UID ${rf.userId}`,
-    onSuccess: () => setRf({ userId: '', amount: '', note: '', txn: '' })
+    onSuccess: () => setRf({ userId: '', amount: '', txn: '' })
   })
 
   const doRefill = () => {
@@ -169,11 +164,6 @@ const StaffPortal = () => {
           <Field label='Amount (INR)'>
             <Input inputMode='decimal' value={rf.amount} onChange={e => setRf({ ...rf, amount: e.target.value })} />
           </Field>
-          {isOwner && (
-            <Field label='Reference — who gave the shout'>
-              <Textarea rows={2} maxLength={200} placeholder='e.g. requested by Ramesh / WhatsApp' value={rf.note} onChange={e => setRf({ ...rf, note: e.target.value })} />
-            </Field>
-          )}
           <Field label='Transaction Password'>
             <Input type='password' autoComplete='off' value={rf.txn} onChange={e => setRf({ ...rf, txn: e.target.value })} />
           </Field>

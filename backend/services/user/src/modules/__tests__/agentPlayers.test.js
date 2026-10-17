@@ -82,6 +82,13 @@ test('createAgentPlayerResolver — who is in the agent tree', async (t) => {
     [2, 'MASTER parent'],
     [3, 'AGENT parent'],
     [8, "an agent's executive row as parent"],
+    // 2026-10-17: koi bhi parent = child user (house staff ke neeche wala bhi).
+    [4, 'SUPER_ADMIN parent'],
+    [5, 'ADMIN parent'],
+    [6, 'SUB_ADMIN parent'],
+    [9, "an admin's executive row as parent"],
+    [10, 'an executive row with no parent'],
+    [11, 'a parent admin-service does not know'],
   ]) {
     await t.test(`${label} -> restricted`, async () => {
       assert.equal(await resolver.isAgentPlayer(player), true);
@@ -89,22 +96,14 @@ test('createAgentPlayerResolver — who is in the agent tree', async (t) => {
     });
   }
 
-  for (const [player, label] of [
-    [4, 'SUPER_ADMIN parent'],
-    [5, 'ADMIN parent'],
-    [6, 'SUB_ADMIN parent'],
-    [7, 'no parent (direct signup)'],
-    [9, "an admin's executive row as parent"],
-    [10, 'an executive row with no parent'],
-    [11, 'a parent admin-service does not know'],
-  ]) {
+  for (const [player, label] of [[7, 'no parent (direct signup)']]) {
     await t.test(`${label} -> allowed`, async () => {
       assert.equal(await resolver.isAgentPlayer(player), false);
       assert.deepEqual(await resolver.capabilities(player), { promotions: true, vault: true, deposit: true, swap: true, withdraw: true, tips: true });
     });
   }
 
-  await t.test('both lookups are cached', async () => {
+  await t.test('the owner lookup is cached', async () => {
     const before = { ...calls };
     for (let i = 0; i < 5; i += 1) await resolver.isAgentPlayer(3);
     assert.deepEqual(calls, before);
@@ -117,14 +116,14 @@ test('createAgentPlayerResolver — who is in the agent tree', async (t) => {
     assert.equal(calls.staff, before);
   });
 
-  await t.test('an admin-service outage fails closed (throws), and is not cached', async () => {
+  await t.test('a failed owner read fails closed (throws), and is not cached', async () => {
     let down = true;
     const flaky = createAgentPlayerResolver({
-      loadOwnerStaffId: async () => 60,
-      loadStaff: async () => {
-        if (down) throw Object.assign(new Error('admin-service is unavailable'), { status: 503 });
-        return { level: 6 };
+      loadOwnerStaffId: async () => {
+        if (down) throw Object.assign(new Error('owner lookup is unavailable'), { status: 503 });
+        return 60;
       },
+      loadStaff: async () => ({ level: 6 }),
     });
     await assert.rejects(flaky.isAgentPlayer(1), /unavailable/);
     down = false;
@@ -381,8 +380,9 @@ test('guarded player routes: agent-tree player refused, direct player served', a
       mailer: null,
     });
     const agent = await service.me(agentUser.id);
-    assert.deepEqual(agent.capabilities, { promotions: false, vault: false, deposit: false, swap: false, withdraw: false, tips: false });
+    // manualDeposit / manualWithdraw: admin ke Manual switch (manual_payment_control), default ON.
+    assert.deepEqual(agent.capabilities, { promotions: false, vault: false, deposit: false, swap: false, withdraw: false, tips: false, manualDeposit: true, manualWithdraw: true });
     const direct = await service.me(directUser.id);
-    assert.deepEqual(direct.capabilities, { promotions: true, vault: true, deposit: true, swap: true, withdraw: true, tips: true });
+    assert.deepEqual(direct.capabilities, { promotions: true, vault: true, deposit: true, swap: true, withdraw: true, tips: true, manualDeposit: true, manualWithdraw: true });
   });
 });

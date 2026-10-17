@@ -116,6 +116,55 @@ async function userWinLoss(sequelize, tree, f) {
   return { rows: Object.values(perUser).sort((a, b) => b.total - a.total), totals };
 }
 
+// ════════════════════════════════════════════════════════════════════════
+//  User Win Loss — Direct Users tab (direct users ki point entry nahi banti)
+// ════════════════════════════════════════════════════════════════════════
+
+/** Settled bet: in result_status wali bets ka P/L hota hai (void / refund / cancelled nahi). */
+const SETTLED_RESULTS = ['won', 'win', 'loss', 'lost'];
+/** mssports.credits_ledger ke settlement reasons — netamount = payout (stake samet), commission minus. */
+const LEDGER_REASONS = ['settlement', 'settlement_void', 'commission', 'commission_void'];
+
+/**
+ * Direct users ka P/L, bets se: har settled bet (window = settle time, `updated_at`) ka
+ * Σnetamount (settlement + settlement_void + commission + commission_void) − stake.
+ * Wahi row shape jo userWinLoss deta hai; `sports_pts` yahan INR hai (1 pt = 1 INR).
+ * Sirf owner (tree.withDirectUsers) ko dikhta hai; baaki ko khaali.
+ */
+async function directUserWinLoss(sequelize, tree, f) {
+  if (!tree.withDirectUsers) return { rows: [], totals: emptyTotals() };
+  const client = await findClient(sequelize, tree, f);
+  const players = await playersFor(sequelize, tree, client);
+  if (!players.length) return { rows: [], totals: emptyTotals() };
+
+  const sums = await sequelize.query(
+    `SELECT u.id, u.name AS username,
+            SUM(COALESCE((SELECT SUM(l.netamount) FROM mssports.credits_ledger l
+                           WHERE l.bet_id = b.id AND l.reason IN (:reasons)), 0) - b.stake_amount) AS total
+       FROM mssports."SportsBet" b
+       JOIN users u ON u.id = b.user_id
+      WHERE b.user_id IN (:players) AND u.parent_staff_id IS NULL
+        AND LOWER(COALESCE(b.result_status, '')) IN (:settled)
+        AND b.updated_at >= CAST(:fromDate AS date) AND b.updated_at < CAST(:toDate AS date) + 1
+      GROUP BY u.id, u.name`,
+    {
+      replacements: { players, reasons: LEDGER_REASONS, settled: SETTLED_RESULTS, fromDate: f.fromDate, toDate: f.toDate },
+      type: QueryTypes.SELECT,
+    }
+  );
+
+  const totals = emptyTotals();
+  const rows = sums
+    .map((s) => {
+      const amount = round2(s.total);
+      totals.sports_pts = round2(totals.sports_pts + amount);
+      totals.total = round2(totals.total + amount);
+      return { user_id: String(s.id), username: s.username, sports_pts: amount, total: amount };
+    })
+    .sort((a, b) => b.total - a.total);
+  return { rows, totals };
+}
+
 function emptyTotals() {
   return { sports_pts: 0, total: 0 };
 }
@@ -214,4 +263,4 @@ async function turnover(sequelize, tree, f) {
   };
 }
 
-module.exports = { partyWinLoss, userWinLoss, totalProfitLoss, turnover };
+module.exports = { partyWinLoss, userWinLoss, directUserWinLoss, totalProfitLoss, turnover };

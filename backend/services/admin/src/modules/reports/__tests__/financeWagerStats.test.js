@@ -138,7 +138,9 @@ test('finance and wager stats against a database', async (t) => {
   const cleanup = async () => {
     const ids = [playerA, playerB];
     await run(`DELETE FROM credits_ledger WHERE user_id IN (:ids)`, { ids: ids.map(String) });
-    await run(`DELETE FROM "SportsBet" WHERE user_id IN (:ids)`, { ids });
+    await run(`DELETE FROM mssports."SportsBet" WHERE user_id IN (:ids)`, { ids });
+    await run(`DELETE FROM mssports.credits_ledger WHERE user_id IN (:ids)`, { ids: ids.map(String) });
+    await run(`DELETE FROM mssports.users WHERE user_id IN (:ids)`, { ids });
     await run(`DELETE FROM gis_transactions WHERE user_id IN (:ids)`, { ids });
     await run(`DELETE FROM withdrawals WHERE uid IN (:ids)`, { ids });
     await run(`DELETE FROM fiat_withdrawals WHERE uid IN (:ids)`, { ids });
@@ -217,33 +219,38 @@ test('finance and wager stats against a database', async (t) => {
       );
     }
 
-    // Sports: A's settled won bet of 100 paid 180; an open bet of 40. B's bet must not count.
+    // Sports (mssports — the Sports Exchange tables): A's settled won bet of 100 paid 180; an open bet of 40. B's bet must not count.
+    // mssports."SportsBet".user_id → mssports.users (the sports service mirror row).
+    await run(
+      `INSERT INTO mssports.users (user_id, username, password, role_id, "createdAt", "updatedAt") VALUES (:a, :na, 'x', 4, now(), now()), (:b, :nb, 'x', 4, now(), now()) ON CONFLICT (user_id) DO NOTHING`,
+      { a: playerA, b: playerB, na: `${tag}-a`, nb: `${tag}-b` }
+    );
     const [[won]] = await run(
-      `INSERT INTO "SportsBet" (user_id, stake_amount, original_amount, original_currency, result_status, status, game_type, event_name, created_at)
-       VALUES (:a, 100, 100, 'INR', 'won', 'closed', 'MO', 'A v B', :d1) RETURNING id`,
+      `INSERT INTO mssports."SportsBet" (user_id, bet_type, odds, stake_amount, original_amount, original_currency, result_status, status, game_type, event_name, created_at)
+       VALUES (:a, 'back', 1.8, 100, 100, 'INR', 'won', 'closed', 'MO', 'A v B', :d1) RETURNING id`,
       { a: playerA, d1: at(1) }
     );
     await run(
-      `INSERT INTO "SportsBet" (user_id, stake_amount, original_amount, original_currency, result_status, status, game_type, event_name, created_at)
-       VALUES (:a, 40, 40, 'INR', 'pending', 'open', 'MO', 'A v B', :d2),
-              (:b, 9000, 9000, 'INR', 'loss', 'closed', 'MO', 'A v B', :d1)`,
+      `INSERT INTO mssports."SportsBet" (user_id, bet_type, odds, stake_amount, original_amount, original_currency, result_status, status, game_type, event_name, created_at)
+       VALUES (:a, 'back', 2, 40, 40, 'INR', 'pending', 'open', 'MO', 'A v B', :d2),
+              (:b, 'back', 2, 9000, 9000, 'INR', 'loss', 'closed', 'MO', 'A v B', :d1)`,
       { a: playerA, b: playerB, d1: at(1), d2: at(2) }
     );
     await run(
-      `INSERT INTO credits_ledger (user_id, amount, reason, currency, bet_id, created_at)
-       VALUES (:a, 180, 'test', 'INR', :bet, :d2)`,
+      `INSERT INTO mssports.credits_ledger (user_id, amount, reason, currency, bet_id, created_at)
+       VALUES (:a, 180, 'settlement', 'INR', :bet, :d2)`,
       { a: String(playerA), bet: won.id, d2: at(2) }
     );
     // A refunded bet (settlement: closed + result_status 'refund') and its refund
     // credit — neither turnover nor a payout. A stray BET_REFUND on the won bet too.
     const [[refunded]] = await run(
-      `INSERT INTO "SportsBet" (user_id, stake_amount, original_amount, original_currency, result_status, status, game_type, event_name, created_at)
-       VALUES (:a, 70, 70, 'INR', 'refund', 'closed', 'MO', 'A v B', :d1) RETURNING id`,
+      `INSERT INTO mssports."SportsBet" (user_id, bet_type, odds, stake_amount, original_amount, original_currency, result_status, status, game_type, event_name, created_at)
+       VALUES (:a, 'back', 2, 70, 70, 'INR', 'refund', 'closed', 'MO', 'A v B', :d1) RETURNING id`,
       { a: playerA, d1: at(1) }
     );
     await run(
-      `INSERT INTO credits_ledger (user_id, amount, reason, currency, bet_id, created_at)
-       VALUES (:a, 70, 'BET_PAYOUT', 'INR', :refunded, :d2), (:a, 25, 'BET_REFUND', 'INR', :bet, :d2)`,
+      `INSERT INTO mssports.credits_ledger (user_id, amount, reason, currency, bet_id, created_at)
+       VALUES (:a, 70, 'settlement', 'INR', :refunded, :d2), (:a, 25, 'refund', 'INR', :bet, :d2)`,
       { a: String(playerA), refunded: refunded.id, bet: won.id, d2: at(2) }
     );
   });

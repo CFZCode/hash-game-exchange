@@ -312,10 +312,16 @@ test('admin staff', async (t) => {
     assert.equal(await staffBalance(boss), '0.00000000');
   });
 
-  await t.test('only the platform owner moves money to a player here — paid from the owner wallet', async () => {
+  await t.test('the owner funds its DIRECT child player from the owner wallet; a grandchild player is not in its tree', async () => {
     const owner = await seedStaff(newStaffId(), { inr: '500', level: 1 });
     const agent = await seedStaff(newStaffId(), { parentId: owner });
-    const player = await seedPlayer(newUid(), agent, '0');
+    // TENEXCH: direct children only — the owner too. A grandchild's player is not in its tree.
+    const deep = await seedPlayer(newUid(), agent, '0');
+    await assert.rejects(
+      () => service.transfer({ transactionPassword: TXN, actor: ownerActor(owner), toType: 'user', toId: deep, amount: '75', direction: 'deposit' }),
+      (err) => err.code === 'STAFF_PLAYER_NOT_IN_YOUR_TREE'
+    );
+    const player = await seedPlayer(newUid(), owner, '0');
 
     await service.transfer({ transactionPassword: TXN,
       actor: ownerActor(owner), toType: 'user', toId: player, amount: '75', direction: 'deposit',
@@ -328,8 +334,7 @@ test('admin staff', async (t) => {
 
   await t.test('a transfer to or from a player writes the player\'s ledger + history, so the wallet reconciles', async () => {
     const owner = await seedStaff(newStaffId(), { inr: '500', level: 1 });
-    const agent = await seedStaff(newStaffId(), { parentId: owner });
-    const player = await seedPlayer(newUid(), agent, '0');
+    const player = await seedPlayer(newUid(), owner, '0');
 
     await service.transfer({ transactionPassword: TXN,
       actor: ownerActor(owner), toType: 'user', toId: player, amount: '75', direction: 'deposit',
@@ -364,17 +369,17 @@ test('admin staff', async (t) => {
     assert.equal(await staffBalance(boss), '1000.00000000');
   });
 
-  await t.test('an Admin holding wallet:adjust is NOT the wide path: no player, no grandchild', async () => {
+  await t.test('an Admin holding wallet:adjust is NOT the wide path: its own player yes, no grandchild', async () => {
     const admin = await seedStaff(newStaffId(), { inr: '1000', level: 2 });
     const sub = await seedStaff(newStaffId(), { parentId: admin, inr: '0' });
     const grandchild = await seedStaff(newStaffId(), { parentId: sub, inr: '0' });
     const player = await seedPlayer(newUid(), admin, '0');
     const actor = actorFor(admin, { canAdjustWallets: true });
 
-    await assert.rejects(
-      () => service.transfer({ transactionPassword: TXN, actor, toType: 'user', toId: player, amount: '50', direction: 'deposit' }),
-      (err) => err.code === 'STAFF_NOT_PERMITTED'
-    );
+    // TENEXCH: its DIRECT child player is a target of the same API, out of its own float.
+    await service.transfer({ transactionPassword: TXN, actor, toType: 'user', toId: player, amount: '50', direction: 'deposit' });
+    assert.equal(await playerBalance(player), '50.00000000');
+    await service.transfer({ transactionPassword: TXN, actor, toType: 'user', toId: player, amount: '50', direction: 'withdraw' });
     await assert.rejects(
       () => service.transfer({ transactionPassword: TXN, actor, toType: 'staff', toId: grandchild, amount: '50', direction: 'deposit' }),
       (err) => err.code === 'STAFF_NOT_IN_YOUR_TREE' && err.status === 404

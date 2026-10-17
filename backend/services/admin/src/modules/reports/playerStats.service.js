@@ -287,7 +287,23 @@ class PlayerStatsService {
            FROM bets b
           WHERE b.uid = :uidNum AND ${rangeSql('b.created')} AND ${INHOUSE_UNLEDGERED('b')}
             AND b.result IS NOT NULL AND b.amount + b.profit > 0${cur('b.coin')}
-          GROUP BY 1, 4`,
+          GROUP BY 1, 4
+         UNION ALL
+         /* Sports Exchange (mssports): settled stakes from the bets (wager report rule, SPORTS_TURNOVER),
+            what settlement paid back (stake + profit), and a void-after-settlement taking it back. */
+         SELECT ${bucketSql('created_at')}, 'sports', 'SPORTS_EXCHANGE', ${SPORTS_TURNOVER.currency}, 'BET_STAKE',
+                ROUND(-SUM(${SPORTS_TURNOVER.stake}), 8)::text, COUNT(*)::int
+           FROM mssports."SportsBet"
+          WHERE user_id = :uidNum AND ${rangeSql('created_at')} AND ${SPORTS_TURNOVER.settled}${cur(SPORTS_TURNOVER.currency)}
+          GROUP BY 1, 4
+         UNION ALL
+         SELECT ${bucketSql('sl.created_at')}, 'sports', 'SPORTS_EXCHANGE', UPPER(sl.currency),
+                CASE WHEN sl.reason = 'settlement' THEN 'BET_PAYOUT' ELSE 'BET_ROLLBACK' END,
+                ROUND(SUM(sl.amount), 8)::text, COUNT(*)::int
+           FROM mssports.credits_ledger sl
+          WHERE sl.user_id = :uid AND sl.reason IN ('settlement', 'settlement_void') AND sl.amount <> 0
+            AND ${rangeSql('sl.created_at')}${cur('sl.currency')}
+          GROUP BY 1, 4, 5`,
         { ...base, playReasons: PLAY_REASONS }
       ),
       select(
@@ -296,7 +312,7 @@ class PlayerStatsService {
         // sport. Refunded and voided stakes were never risked, so they are not "stakes".
         `SELECT COALESCE(NULLIF(TRIM(b.sport_id), ''), 'other') AS sport,
                 COUNT(*)::int AS bets, ROUND(COALESCE(SUM(b.usd_amount), 0), 8)::text AS usd
-           FROM "SportsBet" b
+           FROM mssports."SportsBet" b
           WHERE b.user_id = :uidNum AND ${rangeSql('b.created_at')}
             AND LOWER(COALESCE(b.result_status, '')) NOT IN (:refundedResults)
           GROUP BY 1 ORDER BY 3 DESC, 2 DESC LIMIT ${TOP_N}`,
@@ -568,7 +584,7 @@ class PlayerStatsService {
     parts.push(
       `SELECT ${bucketSql('created_at')} AS bucket, ${SPORTS_TURNOVER.currency} AS currency,
               COALESCE(SUM(${SPORTS_TURNOVER.stake}) FILTER (WHERE ${SPORTS_TURNOVER.settled}), 0)::text AS wagered
-         FROM "SportsBet"
+         FROM mssports."SportsBet"
         WHERE ${rangeSql('created_at')} AND ${inScope('user_id')}${currency ? ` AND ${SPORTS_TURNOVER.currency} = :currency` : ''}
         GROUP BY 1, 2`
     );
@@ -587,7 +603,7 @@ class PlayerStatsService {
                   FROM ${s.table} WHERE ${rangeSql(s.time)} AND ${inScope(s.owner)}${s.where}`
       ),
       `SELECT ${bucketSql('created_at')} AS bucket, user_id::bigint AS owner, 'sports' AS product
-         FROM "SportsBet" WHERE ${rangeSql('created_at')} AND ${inScope('user_id')}`,
+         FROM mssports."SportsBet" WHERE ${rangeSql('created_at')} AND ${inScope('user_id')}`,
     ].join('\n UNION ALL \n');
     const sql = totals
       ? `SELECT COUNT(DISTINCT owner)::int AS active,

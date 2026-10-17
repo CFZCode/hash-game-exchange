@@ -79,6 +79,7 @@ class CreateAccountService {
   constructor(deps) {
     this.models = deps.models;
     this.logger = deps.logger;
+    this.db = deps.db;
     this.staffService = new StaffService(deps);
     this.playersService = new PlayersService(deps);
   }
@@ -116,7 +117,9 @@ class CreateAccountService {
     // 3. Parent ke paas Credit Amount jitna balance hai? Nahi to 0 credit pe banao (zip).
     const wantsCredit = money.toMinor(credit) > 0n;
     const float = wantsCredit ? await readStaffFloat(this.models, staffActor.id) : null;
-    const parentShort = wantsCredit && money.toMinor(float.balance) < money.toMinor(credit);
+    // TENEXCH: settlement points (upper_point + down_point) opening credit me nahi ja sakte.
+    const spendable = wantsCredit ? await this.#spendable(staffActor.id, float.balance) : null;
+    const parentShort = wantsCredit && money.toMinor(spendable) < money.toMinor(credit);
     const opening = wantsCredit && !parentShort ? credit : '0';
 
     const account = isPlayer
@@ -128,9 +131,19 @@ class CreateAccountService {
     return {
       success: true,
       creditSkipped: parentShort,
-      message: parentShort ? MESSAGES.createdInsufficientCredit(float.balance) : MESSAGES.INSERTED,
+      message: parentShort ? MESSAGES.createdInsufficientCredit(spendable) : MESSAGES.INSERTED,
       data: account,
     };
+  }
+
+  /** Float − settlement points (`upper_point + down_point`, sirf positive ho to). */
+  async #spendable(staffId, balance) {
+    const [row] = await this.models.StaffCredits.sequelize.query('SELECT upper_point, down_point FROM credits WHERE staff_id = :staffId', {
+      replacements: { staffId },
+      type: 'SELECT',
+    });
+    const extra = money.toMinorQuantised(row?.upper_point ?? '0') + money.toMinorQuantised(row?.down_point ?? '0');
+    return extra > 0n ? money.toDecimalString(money.toMinor(balance) - extra) : balance;
   }
 
   async #createPlayer({ playerActor, username, password, phone, opening, transactionPassword }) {
@@ -145,7 +158,13 @@ class CreateAccountService {
     return { accountType: 'user', id: String(user.id), username: user.name, credit: opening };
   }
 
+  /**
+   * Staff + uska opening credit EK transaction me (TENEXCH createStaff jaisa): transfer fail ho
+   * (jaise parent ke paas grant / balance nahi) to account bhi nahi banta. Opening ki point entry
+   * 'User creation' / open:<walletId>.
+   */
   async #createStaff({ staffActor, username, password, phone, roleId, percentage, opening, transactionPassword }) {
+    return this.db.transaction(async (transaction) => {
     // Staff ko email chahiye; form me nahi hai, isliye username se banate hain (login naam se hota hai).
     const staff = await this.staffService.create({
       actor: staffActor,
@@ -155,19 +174,24 @@ class CreateAccountService {
       phone: phone || undefined,
       roleId,
       percentage,
-    });
+    }, { transaction });
 
     if (money.toMinor(opening) > 0n) {
-      await this.staffService.transfer({
-        actor: staffActor,
-        toType: 'staff',
-        toId: staff.id,
-        amount: opening,
-        direction: 'deposit',
-        transactionPassword,
-      });
+      await this.staffService.transfer(
+        {
+          actor: staffActor,
+          toType: 'staff',
+          toId: staff.id,
+          amount: opening,
+          direction: 'deposit',
+          transactionPassword,
+          opening: true,
+        },
+        { transaction }
+      );
     }
     return { accountType: 'staff', id: String(staff.id), username: staff.name ?? username, credit: opening };
+    });
   }
 }
 

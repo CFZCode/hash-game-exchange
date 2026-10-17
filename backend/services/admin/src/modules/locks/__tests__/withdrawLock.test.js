@@ -246,10 +246,10 @@ test('withdraw lock against a database', async (t) => {
     await post({ userId: player, withdraw: true });
     await settle();
 
-    // Player money moves are the DIRECT parent's (the agent); the staff
-    // transfer to a player is the platform owner's only.
+    // Player money moves are the DIRECT parent's (the agent) — through lords and through the
+    // Sports Exchange staff transfer (TENEXCH: one API for staff and player children).
     const parentActor = { id: agent, level: 6 };
-    const ownerActor = { ...actor, level: 1, canIssueFunds: true };
+    const transferActor = { id: agent, level: 6, canIssueFunds: false, canAdjustWallets: false, canCredit: true, canDebit: true };
     await assert.rejects(
       lords.adjustPlayer({
         actor: parentActor, userId: player, currency: 'INR', amount: '100', operation: 'debit', transactionPassword: TXN,
@@ -258,7 +258,7 @@ test('withdraw lock against a database', async (t) => {
     );
     await assert.rejects(
       staffService.transfer({
-        actor: ownerActor, toType: 'user', toId: player, amount: '100', direction: 'withdraw', transactionPassword: TXN,
+        actor: transferActor, toType: 'user', toId: player, amount: '100', direction: 'withdraw', transactionPassword: TXN,
       }),
       (error) => error.code === 'WITHDRAW_BLOCKED'
     );

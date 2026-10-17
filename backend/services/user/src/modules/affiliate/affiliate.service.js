@@ -78,9 +78,9 @@ class AffiliateService {
     const team = await this.models.Team.findOne({ where: { membername: member.name }, raw: true });
     if (!team) return { onTeam: false };
 
-    /* The referrer earns nothing when they are an agent-tree player (owner at
-       staff level 4–6): no tier unlock, no commission. */
-    if (await this.#ownerHasNoPromotions(team.ownername)) {
+    /* Affiliate sirf direct users ka: referrer YA member child user (koi parent) ho to
+       kuch nahi — no tier unlock, no commission. */
+    if ((await this.#ownerHasNoPromotions(team.ownername)) || (await promotionsBlocked(member.id))) {
       this.logger?.info({ owner: team.ownername, member: member.name }, 'Affiliate earnings skipped: agent-tree referrer');
       return { onTeam: true, unlock: { unlocked: false }, commissionRecorded: false, skipped: 'AGENT_TREE_PLAYER' };
     }
@@ -666,6 +666,8 @@ class AffiliateService {
    */
   async joinTeam({ userId, referralCode, campaign = '' }) {
     const member = await this.#user(userId);
+    // Affiliate sirf direct users ka — child user (koi parent) kisi team me nahi ja sakta.
+    await assertPlayerCapability(member.id, 'promotions');
 
     const owner = await this.#resolveReferrerOwner(referralCode);
     if (!owner) throw errors.INVALID_REFERRAL_CODE({ referralCode });
@@ -726,6 +728,9 @@ class AffiliateService {
       raw: true,
     });
     if (!owner) throw errors.USER_NOT_FOUND({ name: team.ownername });
+    // Referrer aur member dono direct users hone chahiye (child user ka affiliate nahi).
+    await assertPlayerCapability(owner.id, 'promotions');
+    await assertPlayerCapability(member.id, 'promotions');
 
     const wagerRow = await this.models.Userwager.findOne({ where: { uid: member.id }, raw: true });
     const wager = this.#wagerAmount(wagerRow);
@@ -983,6 +988,10 @@ class AffiliateService {
   async recordReward({ ownerName, memberName, referralCode, amount, coin }) {
     const defaultCoin = await this.rewardMoney.currency();
     const ownerId = await this.#ownerIdFor({ ownername: ownerName, referalCode: referralCode });
+    // Affiliate sirf direct users ka: owner ya member child user ho to reward nahi.
+    if (ownerId) await assertPlayerCapability(ownerId, 'promotions');
+    const memberRow = memberName ? await this.models.Users.findOne({ where: { name: memberName }, attributes: ['id'], raw: true }) : null;
+    if (memberRow) await assertPlayerCapability(memberRow.id, 'promotions');
     const row = await this.models.Rewards.create({
       // Claimable by the owner through the same path as commission.
       owner_id: ownerId,

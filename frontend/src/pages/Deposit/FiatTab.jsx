@@ -9,6 +9,9 @@ import { coinIcon } from '../../utils/coinArt';
 import { useIsDialog } from '../../context/dialogRoute';
 import SevenDayBanner from './SevenDayBanner';
 import HowToDeposit from './HowToDeposit';
+import ManualDeposit from './ManualDeposit';
+import { useGates } from '../../context/gates';
+import { USE_FIXTURES } from '../../services/client';
 import { channelIcon } from '../../utils/channelArt';
 import {
   IconArrow,
@@ -383,6 +386,11 @@ function NoChannels({ onDepositCrypto, isMaintain = false }) {
 export default function FiatTab({ onDepositCrypto }) {
   const { session, balances } = useSession();
   const dialog = useIsDialog();
+  /* Live builds have no channel grid; a direct player gets the manual bank-transfer form instead of
+     the out-of-channels state while the owner and the site admin allow manual deposits. The fixture
+     build never reaches this (it keeps the captured channels and NoChannels). */
+  const gates = useGates();
+  const manual = !USE_FIXTURES && gates.manualDeposit();
 
   /* `G1(currencyName, isFiat, !isFiat)` the other way round — the fiat half of the wallet.
      Seeded from the account's own currency when that is a fiat, which it is not in this
@@ -541,7 +549,9 @@ export default function FiatTab({ onDepositCrypto }) {
         </div>
       </div>
 
-      {!channel ? (
+      {!channel && manual ? (
+        <ManualDeposit currency={currency} />
+      ) : !channel ? (
         <NoChannels onDepositCrypto={onDepositCrypto} />
       ) : (
         <>

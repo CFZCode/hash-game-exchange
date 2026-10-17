@@ -7,7 +7,7 @@ process.env.TXN_PASSWORD_MODE = 'separate';
 const test = require('node:test');
 const assert = require('node:assert');
 
-const { STAFF_LEVELS } = require('@ibitplay/auth');
+const { STAFF_LEVELS, configureAgentPlayers, resetAgentPlayers } = require('@ibitplay/auth');
 
 const { createAdminController } = require('../controllers/admin.controller');
 const { WalletService } = require('../wallet.service');
@@ -67,6 +67,21 @@ test('wallet adjust routing', async (t) => {
     await call(ctrl.adjust, { body, staff: { id: 9, level: STAFF_LEVELS.EXECUTIVE, parentLevel: STAFF_LEVELS.AGENT } });
     assert.ok(service.calls.some((c) => c[0] === 'agentAdjust'));
     assert.ok(!service.calls.some((c) => c[0] === 'adminAdjust'));
+  });
+
+  await t.test('the Super Admin cannot adjust a non-INR coin for a CHILD user (any parent) — Sports Exchange INR only', async () => {
+    configureAgentPlayers({ isAgentPlayer: async (id) => Number(id) === 42 });
+    try {
+      const service = fakeService();
+      const ctrl = createAdminController({ service });
+      await assert.rejects(
+        () => call(ctrl.adjust, { body: { ...body, currency: 'USDT' }, staff: { id: 3, level: STAFF_LEVELS.SUPER_ADMIN } }),
+        (err) => err.code === 'DEPOSIT_NOT_FOR_AGENT_USERS' && err.status === 403
+      );
+      assert.ok(!service.calls.some((c) => c[0] === 'adminAdjust'));
+    } finally {
+      resetAgentPlayers();
+    }
   });
 
   await t.test('the Super Admin adjusts a non-INR coin (operator adjustment), after the transaction-password check', async () => {

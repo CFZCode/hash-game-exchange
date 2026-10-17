@@ -117,7 +117,9 @@ test('dashboard stats against a database', async (t) => {
   const cleanup = async () => {
     await models.FiatDeposits.destroy({ where: { user_id: [String(playerA), String(playerB)] } });
     await models.FiatWithdrawals.destroy({ where: { uid: [playerA, playerB] } });
-    await sequelize.query('DELETE FROM "SportsBet" WHERE user_id IN (:ids)', { replacements: { ids: [playerA, playerB] } });
+    await sequelize.query('DELETE FROM mssports."SportsBet" WHERE user_id IN (:ids)', { replacements: { ids: [playerA, playerB] } });
+    await sequelize.query('DELETE FROM mssports.users WHERE user_id IN (:ids)', { replacements: { ids: [playerA, playerB] } }).catch(() => {});
+    await sequelize.query('DELETE FROM mssports.credits_ledger WHERE user_id IN (:ids)', { replacements: { ids: [String(playerA), String(playerB)] } });
     await sequelize.query('DELETE FROM bets WHERE uid IN (:ids)', { replacements: { ids: [playerA, playerB] } });
     await sequelize.query('DELETE FROM gis_transactions WHERE user_id IN (:ids)', { replacements: { ids: [playerA, playerB] } });
     await sequelize.query('DELETE FROM game_transactions WHERE user_id IN (:ids)', { replacements: { ids: [playerA, playerB] } });
@@ -155,12 +157,23 @@ test('dashboard stats against a database', async (t) => {
     await models.FiatWithdrawals.create({ uid: playerA, amount: '11', currency: COIN, status: 'In Queue', date: day('04'), account_holder_name: 'Test' });
     await models.FiatWithdrawals.create({ uid: playerA, amount: '13', currency: COIN, status: 'Rejected', date: day('04'), account_holder_name: 'Test' });
 
+    // mssports."SportsBet".user_id → mssports.users (sports service ka mirror row).
     await sequelize.query(
-      `INSERT INTO "SportsBet" (user_id, game_type, sport_id, stake_amount, original_currency, status, result_status, created_at, updated_at)
-       VALUES (:a, 'MO', '4', 40, :coin, 'open', NULL, :at, :at), (:a, 'MO', '4', 999, :coin, 'void', NULL, :at, :at),
+      `INSERT INTO mssports.users (user_id, username, password, role_id, "createdAt", "updatedAt") VALUES (:a, :n, 'x', 4, now(), now()) ON CONFLICT (user_id) DO NOTHING`,
+      { replacements: { a: playerA, n: `sa-${playerA}` } }
+    );
+    await sequelize.query(
+      `INSERT INTO mssports."SportsBet" (user_id, game_type, bet_type, odds, sport_id, stake_amount, original_currency, status, result_status, created_at, updated_at)
+       VALUES (:a, 'MO', 'back', 2, '4', 40, :coin, 'open', NULL, :at, :at), (:a, 'MO', 'back', 2, '4', 999, :coin, 'void', NULL, :at, :at),
               -- How settlement writes a refund: closed, with the refund in result_status.
-              (:a, 'FAN', '4', 555, :coin, 'closed', 'refund', :at, :at)`,
+              (:a, 'FAN', 'back', 2, '4', 555, :coin, 'closed', 'refund', :at, :at)`,
       { replacements: { a: playerA, coin: COIN, at: day('05') } }
+    );
+    // Sports Exchange settlement (mssports.credits_ledger): player ne 12 jeete, 3 commission diya → GGR −9.
+    await sequelize.query(
+      `INSERT INTO mssports.credits_ledger (user_id, amount, reason, netamount, currency, created_at)
+       VALUES (:a, 12, 'settlement', 12, :coin, :at), (:a, 3, 'commission', -3, :coin, :at), (:b, 50, 'settlement', 50, :coin, :at)`,
+      { replacements: { a: String(playerA), b: String(playerB), coin: COIN, at: day('05') } }
     );
     await sequelize.query(
       `INSERT INTO bets (uid, gid, game, coin, amount, profit, created, result)
@@ -198,6 +211,7 @@ test('dashboard stats against a database', async (t) => {
     assert.equal(r.totals.withdrawalCount, 3);
     assert.equal(r.totals.registrations, 1);
     assert.equal(r.totals.sportsStaked, '40.00000000', 'void and refunded sports bets are not turnover');
+    assert.equal(r.totals.sportsGgr, '-9.00000000', 'mssports settlement + commission, client ka 50 nahi');
     assert.equal(r.totals.casinoWagered, '10.00000000', 'the client’s 20 is not counted');
     // Stake 10, one win paying stake + profit = 15.
     assert.equal(r.totals.casinoGgr, '-5.00000000');
