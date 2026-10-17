@@ -4,8 +4,7 @@ const crypto = require('node:crypto');
 const { imageUpload } = require('@ibitplay/common');
 
 const errors = require('./avatars.errors');
-
-const { MAX_AVATAR_BYTES } = errors;
+const { MAX_AVATAR_BYTES } = require('./avatars.constants');
 
 /** Every column except the bytes — a list must not drag the images through the query. */
 const META = ['id', 'content_type', 'byte_size', 'version', 'min_level', 'sort', 'enabled', 'updated_at'];
