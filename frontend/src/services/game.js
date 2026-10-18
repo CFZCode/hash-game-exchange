@@ -68,7 +68,7 @@ export const isHouseGame = (ref) => HOUSE_SLUGS.has(ref) || HOUSE_SLUGS.has(slug
 
 /* ── THE LAUNCH ─────────────────────────────────────────────────────────────────────────────
  *
- * In-house games go to `POST /casino/js-games/v1/launch`, catalogue games to
+ * BC Originals go to `POST /casino/original-games/launch` (the Original Games Aggregator), catalogue games to
  * `POST /casino/games/launch` (JSGames V2 or Slotegrator, by the game's row). Both answer `{gameLaunchUrl, sessionToken}` and the URL goes
  * into the frame UNCHANGED (it carries the provider's session). How hash.game does the same job,
  * and why this is the shape it is, is in `docs/casino.md` under "Opening a game".
@@ -76,17 +76,17 @@ export const isHouseGame = (ref) => HOUSE_SLUGS.has(ref) || HOUSE_SLUGS.has(slug
  * THE TWO BODIES ARE NOT THE SAME, and both validators are `.strict()`, so a key the other route
  * takes is a 422 here:
  *   lobby {gameUuid, currencyCode, language, device}  no return URL, no demo flag
- *   v1  {gameUid, currencyCode, language, homeUrl}    `homeUrl` is where the provider's own
- *                                                     lobby/home button sends the player
- * `gameUid` is the platform's id: the catalogue row's `uuid` (which IS `js_games.game_uid`, the
- * provider's own id — checked row for row) or the in-house `game_uid` (`crash`, `classic_dice`).
+ *   originals {gameCode, currencyCode, language, device}  `gameCode` is the in-house `game_uid`
+ *                                                     (`crash`, `classic_dice`) and must match
+ *                                                     the aggregator's `GET /v1/games` code
+ * `gameUuid` is the catalogue row's `uuid` (which IS `js_games.game_uid`, the provider's own id).
  *
  * THE CURRENCY IS THE PLAYER'S SELECTED WALLET, not a constant. `session.setting.currencyName`
  * is a wallet row's name (`INRFIAT`, `USDT`), so the `FIAT` suffix comes off and the code must be
  * one the route settles. v2's validator takes INR/USDT/USD, but the live operator refuses
  * everything but INR — a SmartBet launch with the same keys on 2026-10-12 answered 201 for INR and
  * `502 JSGAMES_UPSTREAM_REJECTED` (provider HTTP 400) for USDT — so offering USDT would only turn
- * a Play press into an error. v1 settles INR, BDT, USDT and IDR (`V1_CURRENCIES`). A wallet the
+ * a Play press into an error. The originals settle INR and USDT only. A wallet the
  * route cannot take is reported to the page (`launchCurrency` → null) and the overlay says so in
  * the original's own words, rather than silently launching in a currency the player did not pick.
  *
@@ -95,7 +95,8 @@ export const isHouseGame = (ref) => HOUSE_SLUGS.has(ref) || HOUSE_SLUGS.has(slug
  * `ApiError` and the caller decides what the player sees. */
 const LAUNCH_CURRENCIES = {
   aggregator: ['INR'],
-  'in-house': ['INR', 'BDT', 'USDT', 'IDR'],
+  /* The Original Games Aggregator settles INR and USDT only (agreed at onboarding). */
+  'in-house': ['INR', 'USDT'],
 };
 
 const routeOf = (game) => (game?.launch === 'aggregator' ? 'aggregator' : 'in-house');
@@ -112,7 +113,7 @@ export const launchCurrencies = (game) => LAUNCH_CURRENCIES[routeOf(game)];
 const deviceOf = () =>
   typeof window !== 'undefined' && window.matchMedia?.('(max-width: 767px)').matches ? 'mobile' : 'desktop';
 
-export function launchGame(game, { currencyName, language = 'en', homeUrl } = {}) {
+export function launchGame(game, { currencyName, language = 'en' } = {}) {
   if (USE_FIXTURES || !getAccessToken() || !game) return null;
   const currencyCode = launchCurrency(game, currencyName);
   if (!currencyCode) return null;
@@ -121,9 +122,9 @@ export function launchGame(game, { currencyName, language = 'en', homeUrl } = {}
   const json =
     game.launch === 'aggregator'
       ? { gameUuid: game.ref, currencyCode, language: lang, device: deviceOf() }
-      : { gameUid: game.ref, currencyCode, language: lang, ...(homeUrl ? { homeUrl } : {}) };
+      : { gameCode: game.ref, currencyCode, language: lang, device: deviceOf() };
   return Promise.resolve(
-    request(game.launch === 'aggregator' ? AGGREGATOR_LAUNCH : PLATFORM.casino.inHouseLaunch, {
+    request(game.launch === 'aggregator' ? AGGREGATOR_LAUNCH : PLATFORM.casino.originalsLaunch, {
       live: true,
       method: 'POST',
       json,

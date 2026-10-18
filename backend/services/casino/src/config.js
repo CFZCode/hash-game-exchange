@@ -97,6 +97,18 @@ const config = loadEnv(
      */
     SEAMLESS_LOBBY_URL: coercers.optionalStr(),
 
+    // ── Original Games Aggregator (BC Originals) — modules/original-games ──
+    // All three secrets come from onboarding. `OG_ENV` follows the CREDENTIAL:
+    // a sandbox key opens `demo` sessions only, production opens `real`.
+    OG_BASE_URL: coercers.optionalStr(),
+    OG_API_KEY: coercers.optionalStr(),
+    OG_API_SECRET: coercers.optionalStr(),
+    OG_WEBHOOK_SECRET: coercers.optionalStr(),
+    OG_ENV: coercers.str('sandbox'),
+    OG_TIMEOUT_MS: coercers.int(10_000),
+    OG_RETURN_URL: coercers.optionalStr(),
+    OG_DEPOSIT_URL: coercers.optionalStr(),
+
     // ── Slotegrator / GIS ─────────────────────────────────────────────
     // The merchant id and key were hard-coded at the top of
     // `legacy/gis/controller.js` and are in the repository history. Rotate them

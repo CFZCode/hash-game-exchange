@@ -685,6 +685,9 @@ export const PLATFORM = {
        and friends), none of which is configured, so today it cannot succeed; `services/game.js`
        says what the page does with that. Distinct from `launch` above, which is the Casino Hub's. */
     inHouseLaunch: '/api/v1/casino/js-games/v1/launch',
+    /* The BC Originals on the Original Games Aggregator — `POST {gameCode, currencyCode (INR|USDT),
+       language, device}` → `{gameLaunchUrl, sessionId, mode}` (casino-service modules/original-games). */
+    originalsLaunch: '/api/v1/casino/original-games/launch',
 
     /* Favourites — `GET`, `PUT :gameRef`, `DELETE :gameRef`, all added to the platform for this
        page (`docs/backend-gaps.md`, Part 4b.7). They sit under `/casino/games/` rather than the

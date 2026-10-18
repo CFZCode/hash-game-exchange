@@ -108,6 +108,7 @@ const WITHDRAWN_SQL = `
  *   transactionscasino       x-casino: BET rows still 'OK' (a cancel flips the bet to CANCELLED),
  *                            in the wallet column actually moved
  *   aggregator_transactions  stake. USDT
+ *   og_transactions          original games: bet amount, less an applied rollback of that bet
  *   "SportsBet"              settled (closed, won / loss) only — void and refund are not
  *                            turnover — at the money really at risk: LEAST(stake, liability),
  *                            which is the stake for a back bet and the liability for a cheap lay.
@@ -150,6 +151,11 @@ const WAGERED_SQL = `
         WHERE user_id = :uid AND upper(wallet) = :cur AND transaction_type = 'BET' AND transaction_status = 'OK')
     + (SELECT COALESCE(SUM(stake), 0) FROM aggregator_transactions
         WHERE :cur = 'USDT' AND user_id = :uid AND stake > 0)
+    + (SELECT COALESCE(SUM(CASE WHEN t.kind = 'bet' THEN t.amount
+                                WHEN t.kind = 'rollback' AND o.kind = 'bet' THEN -t.amount ELSE 0 END), 0)
+         FROM og_transactions t
+         LEFT JOIN og_transactions o ON t.kind = 'rollback' AND o.transaction_id = t.reference_transaction_id
+        WHERE t.user_id = :uid AND t.currency = :cur AND t.status = 'applied')
     + (SELECT COALESCE(SUM(LEAST(stake_amount, COALESCE(NULLIF(liability, 0), stake_amount))), 0) FROM mssports."SportsBet"
         WHERE :cur = 'INR' AND user_id = :uid AND lower(status) = 'closed'
           AND lower(COALESCE(result_status, '')) IN ('won','loss') AND stake_amount > 0)
