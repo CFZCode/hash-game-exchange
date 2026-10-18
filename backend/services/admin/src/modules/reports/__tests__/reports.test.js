@@ -299,8 +299,8 @@ test('reports against a database', async (t) => {
     const houseListed = (await service.listPlayers({ staff: house, search: String(playerA), limit: 10 })).rows.find((r) => r.id === String(playerA));
     const houseDetail = await service.playerReport({ staff: house, userId: playerA });
     const houseExport = await service.exportPlayers({ staff: house, search: String(playerA) });
-    assert.equal(houseListed.vip.name, 'Bronze 5');
-    assert.equal(houseDetail.vip.level, 6);
+    assert.equal(houseListed.vip.name, 'Bronze II');
+    assert.equal(houseDetail.vip.level, 2);
     assert.ok(houseExport.csv.includes('VIP Level') && houseExport.csv.includes('Card Type'), 'house staff keep the VIP columns');
 
     await models.Userwager.destroy({ where: { uid: playerA } });
@@ -387,10 +387,10 @@ test('reports against a database', async (t) => {
     const expected = vipLevelFor('5500');
 
     assert.equal(report.vip.level, expected.level);
-    assert.equal(report.vip.level, 6, 'wager 5,500 sits in the 5000–9999 band');
-    assert.equal(report.vip.name, 'Bronze 5');
-    assert.equal(report.vip.nextLevel, 7, 'and the NEXT level is named as such');
-    assert.equal(report.vip.nextName, 'Silver 1');
+    assert.equal(report.vip.level, 2, 'wager 5,500 sits in the 3,000–6,999 band (hash.game ladder)');
+    assert.equal(report.vip.name, 'Bronze II');
+    assert.equal(report.vip.nextLevel, 3, 'and the NEXT level is named as such');
+    assert.equal(report.vip.nextName, 'Bronze III');
   });
 
   await t.test('a wager string with thousands separators is parsed, not truncated', async () => {
@@ -398,12 +398,12 @@ test('reports against a database', async (t) => {
     await models.Userwager.create({ uid: playerA, wager: '1,234,567' });
 
     const report = await service.playerReport({ staff: house, userId: playerA });
-    assert.equal(report.wager, '1234567');
-    // 1,234,567 is Jade 1, whose band begins at 1,200,000. Asserted through
+    assert.equal(report.wager, '1234567.00000000');
+    // 1,234,567 is Gold II, whose band begins at 1,000,000. Asserted through
     // the ladder as well as by name, so a future band change fails here loudly
     // rather than quietly reporting the wrong rank to an operator.
     assert.equal(report.vip.level, vipLevelFor('1234567').level);
-    assert.equal(report.vip.name, 'Jade 1');
+    assert.equal(report.vip.name, 'Gold II');
 
     await models.Userwager.destroy({ where: { uid: playerA } });
   });
