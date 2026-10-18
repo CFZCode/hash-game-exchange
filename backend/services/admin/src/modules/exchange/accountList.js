@@ -91,16 +91,18 @@ function toRow(r) {
 // Direct Users | Agent Users tab: direct = sirf direct users, agent = staff + unke players. Na ho = dono.
 const CHANNEL_SQL = { direct: 'AND a.is_direct_user', agent: 'AND NOT a.is_direct_user' };
 
-async function listChildren(sequelize, { parentId, withDirectUsers, search, channel, limit, offset }) {
+async function listChildren(sequelize, { parentId, withDirectUsers, search, channel, accountType, limit, offset }) {
   const replacements = {
     parentId,
     withDirectUsers: Boolean(withDirectUsers),
     executiveLevel: STAFF_LEVELS.EXECUTIVE,
     search: search ? `%${search}%` : null,
+    accountType: accountType ?? null,
     limit,
     offset,
   };
-  const where = `WHERE (CAST(:search AS text) IS NULL OR a.username ILIKE :search) ${CHANNEL_SQL[channel] ?? ''}`;
+  const where = `WHERE (CAST(:search AS text) IS NULL OR a.username ILIKE :search)
+    AND (CAST(:accountType AS text) IS NULL OR a.account_type = :accountType) ${CHANNEL_SQL[channel] ?? ''}`;
 
   const [rows, [{ total }]] = await Promise.all([
     sequelize.query(

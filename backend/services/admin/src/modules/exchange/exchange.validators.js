@@ -36,6 +36,8 @@ const accounts = {
       search: z.string().trim().max(100).optional(),
       // Direct Users | Agent Users tab; na ho = dono
       channel: z.enum(['direct', 'agent']).optional(),
+      // Staff | User filter; na ho = dono
+      accountType: z.enum(['staff', 'user']).optional(),
     })
     .strict(),
 };

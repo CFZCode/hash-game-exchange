@@ -10,6 +10,7 @@ import type { Channel } from '@/components/shared/ChannelTabs'
 import DataTable, { type Column } from '@/components/shared/DataTable'
 import PageHeader from '@/components/shared/PageHeader'
 import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { useApi, useListState } from '@/hooks/use-api'
 import { RiskManagementDialog } from '@/views/players/RiskManagement'
@@ -38,7 +39,7 @@ const lockSwitch = (on: boolean) => <Switch checked={on} disabled aria-label={on
  */
 const AccountListBody = ({ channel }: { channel?: Channel }) => {
   const title = 'Account List'
-  const { state, set, query } = useListState(['parentId'])
+  const { state, set, query } = useListState(['parentId', 'accountType'])
   const limit = Number(query.limit ?? 20)
   const page = Number(query.page ?? 1)
   const parentId = query.parentId || undefined
@@ -53,7 +54,8 @@ const AccountListBody = ({ channel }: { channel?: Channel }) => {
     offset: (page - 1) * limit,
     search: query.search || undefined,
     parentId,
-    channel
+    channel,
+    accountType: query.accountType || undefined
   })
 
   const rows = data?.rows ?? []
@@ -185,6 +187,16 @@ const AccountListBody = ({ channel }: { channel?: Channel }) => {
       <DataTable
         toolbar={
           <div className='ml-auto flex flex-wrap gap-2'>
+            <Select value={String(state.accountType || 'all')} onValueChange={v => v && set({ accountType: v === 'all' ? '' : v, page: 1 })}>
+              <SelectTrigger className='w-32' aria-label='Account type'>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value='all'>All</SelectItem>
+                <SelectItem value='staff'>Staff</SelectItem>
+                <SelectItem value='user'>User</SelectItem>
+              </SelectContent>
+            </Select>
             {parentId && (
               <Button variant='outline' onClick={() => set({ parentId: '', page: 1 })}>
                 Back to my list
