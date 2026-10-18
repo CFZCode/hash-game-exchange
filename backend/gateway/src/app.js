@@ -1,7 +1,7 @@
 'use strict';
 
 const express = require('express');
-const { createApp, createLogger, NotFoundError } = require('@ibitplay/common');
+const { createApp, createLogger, NotFoundError, PROVIDER_CALLBACK_PREFIXES } = require('@ibitplay/common');
 
 const config = require('./config');
 const { createProxy } = require('./proxy');
@@ -134,6 +134,8 @@ function buildApp() {
     // The proxy pipes request bodies straight through. Parsing here would
     // consume the stream and force every upload through the gateway's heap.
     parseBody: false,
+    // Provider wallet callbacks: signed, and metered per route in casino-service.
+    rateLimitSkipPrefixes: PROVIDER_CALLBACK_PREFIXES,
   });
 
   app.locals.logger = logger;

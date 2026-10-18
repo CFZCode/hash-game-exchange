@@ -8,6 +8,7 @@ const {
   loadModules,
   mountModules,
   internalAuth,
+  PROVIDER_CALLBACK_PREFIXES,
 } = require('@ibitplay/common');
 
 /** Assemble the casino-service HTTP app. Every route comes from a module under src/modules. */
@@ -42,7 +43,9 @@ function buildApp(container) {
     })
   );
 
-  const app = createApp({ serviceName: config.SERVICE_NAME, config, logger, routes });
+  // Provider wallet callbacks skip the per-IP global bucket (one provider, every player's bets);
+  // each callback route has its own limiter and checks the provider's signature.
+  const app = createApp({ serviceName: config.SERVICE_NAME, config, logger, routes, rateLimitSkipPrefixes: PROVIDER_CALLBACK_PREFIXES });
   app.locals.modules = modules;
   return app;
 }

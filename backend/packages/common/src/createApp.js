@@ -21,6 +21,31 @@ const { collectServiceKeys, INTERNAL_KEY_HEADER } = require('./middleware/intern
  * callback after that answered INTERNAL_ERROR (found on live, 19 Oct 2026). Only the global
  * throttle is skipped, only for a real key; the routes stay guarded by `internalAuth`.
  */
+/**
+ * Game-provider wallet callbacks: one provider sends EVERY player's bet / win / rollback from its
+ * own few addresses, so a 300-a-minute per-IP bucket throttled a whole casino at once (found on
+ * live, 19 Oct 2026: `gateway:global` 429s on original-games callbacks). Each is authenticated by
+ * the provider's signature and metered by its own route limiter (6000/min) instead.
+ */
+const PROVIDER_CALLBACK_PREFIXES = Object.freeze([
+  '/api/v1/casino/original-games/wallet/',
+  '/api/v1/casino/gis/callback/',
+  '/api/v1/casino/seamless/',
+  '/api/v1/casino/aggregators/',
+  '/api/v1/casino/js-games/v1/bet-callback',
+  '/api/v1/casino/js-games/v2/bet-callback',
+  '/api/v1/casino/x-casino/',
+]);
+
+function skipGlobal(internal, prefixes) {
+  const list = [...(prefixes ?? [])];
+  if (!internal && !list.length) return null;
+  return (req) => {
+    const path = String(req.originalUrl ?? req.path ?? '').split('?')[0];
+    return (req.method === 'POST' && list.some((p) => path.startsWith(p))) || Boolean(internal?.(req));
+  };
+}
+
 function internalCaller(config) {
   const keys = [config.INTERNAL_API_KEY, ...collectServiceKeys(config).keys.values()].filter(Boolean);
   if (!keys.length) return null;
@@ -61,6 +86,8 @@ function createApp({
   // Skip body parsing for the gateway, which streams raw bodies to upstreams.
   parseBody = true,
   enableRateLimit = true,
+  // Paths the per-IP global bucket never counts (game-provider wallet callbacks — see below).
+  rateLimitSkipPrefixes = [],
 } = {}) {
   // ── 0. Refuse to start on an unsafe production configuration ─────────
   // Before anything is built, so a misconfigured deployment fails at boot
@@ -218,7 +245,7 @@ function createApp({
         max: config.RATE_LIMIT_MAX,
         enabled: config.RATE_LIMIT_ENABLED !== false,
         logger,
-        skipIf: internalCaller(config),
+        skipIf: skipGlobal(internalCaller(config), rateLimitSkipPrefixes),
       })
     );
     if (config.RATE_LIMIT_ENABLED === false) {
@@ -238,4 +265,5 @@ function createApp({
   return app;
 }
 
-module.exports = { createApp };
+module.exports = {
+  PROVIDER_CALLBACK_PREFIXES, createApp };
