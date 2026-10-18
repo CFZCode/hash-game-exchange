@@ -487,3 +487,24 @@
   font-size: 0.875rem;
   color: var(--color-secondary);
 }
+
+/* ── an aggregator original (index.jsx, `isOriginal`) ─────────────────────────────────────────
+   No live-players panel. From `lg` up the frame is cut at the game's own panel (`--og-frame-h`)
+   and the iframe runs taller than it, so the aggregator's footer bar sits below the cut. */
+.game-page.is-original .game-side {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .game-page.is-original .game-frame {
+    height: var(--og-frame-h, 720px);
+    min-height: 0;
+    aspect-ratio: auto;
+    overflow: hidden;
+  }
+
+  .game-page.is-original .game-frame-iframe {
+    bottom: auto;
+    height: calc(var(--og-frame-h, 720px) + 12rem);
+  }
+}

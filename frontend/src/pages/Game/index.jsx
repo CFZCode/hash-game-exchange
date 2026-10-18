@@ -309,6 +309,9 @@ function PlayOverlay({ game, login, currencyName, balances, setting, launching, 
   );
 }
 
+/* Where each original's own panel ends inside the aggregator's page (see `isOriginal`). */
+const ORIGINAL_FRAME_PX = { bow: 680, diamonds: 670, keno: 680, limbo: 655, mines: 735, plinko: 685 };
+
 /* `q` in the original's Logs chunk: Full Screen requests fullscreen on the `.game-iframe` itself,
    and with no game running says so in a toast rather than doing nothing. */
 function enterFullscreen() {
@@ -615,6 +618,13 @@ export default function GamePage() {
      Fixture rows carry no `launch`, so the provider stands in for it there. */
   const isSlots = Boolean(game) && (game.launch ? game.launch === 'aggregator' : game.provider !== 'BC Originals');
 
+  /* An aggregator original fills the column (no live-players panel) and its frame is cut at the
+     end of the game's own panel, so the aggregator's footer bar (name, Provably Fair, sound /
+     home buttons) under it is not shown. Heights measured at 1920 wide, 2026-10-19.
+     shortcut: per-game px heights; re-measure if the aggregator changes a game's layout. */
+  const isOriginal = game?.launch === 'in-house';
+  const originalHeight = ORIGINAL_FRAME_PX[game?.uid ?? gameUnique] ?? 720;
+
   /* Below `lg` the original's frame is a 16:9 card and Play is "Zoom & Play" — the frame goes
      `fixed inset-0 z-[9999]` with a close bar (`ic` in Layout-DI8MpYIQ.js). Closing ends the
      game, as its `onClose` does. */
@@ -699,7 +709,10 @@ export default function GamePage() {
   };
 
   return (
-    <div className={`game-page px-4 sm:px-0${isSlots ? ' is-slots' : ''}`}>
+    <div
+      className={`game-page px-4 sm:px-0${isSlots ? ' is-slots' : ''}${isOriginal ? ' is-original' : ''}`}
+      style={isOriginal ? { '--og-frame-h': `${originalHeight}px` } : undefined}
+    >
       <div className="game-page-row">
         <section className="game-stage">
           <div className={`game-frame${frameUrl ? ' is-playing' : ''}`}>
