@@ -484,6 +484,48 @@ class SiteConfigService {
     return this.welcomeBonusSettings();
   }
 
+  // ══════════════════════════════════════════════════════════════════════
+  //  Wager contribution (migration 135) — hash.game's per-game bonus contribution
+  // ══════════════════════════════════════════════════════════════════════
+
+  async wagerContribution() {
+    try {
+      const rows = await this.models.Siteconfig.sequelize.query(
+        `SELECT category, provider, game_ref, percent FROM wager_contribution
+          ORDER BY (category IS NULL), category, (provider IS NULL), provider, game_ref`,
+        { type: this.models.Siteconfig.sequelize.QueryTypes.SELECT }
+      );
+      return {
+        rules: rows.map((r) => ({ category: r.category, provider: r.provider, gameRef: r.game_ref, percent: String(Number(r.percent)) })),
+        stored: true,
+      };
+    } catch (error) {
+      if (!/wager_contribution/.test(String(error?.message))) throw error;
+      return { rules: [], stored: false };
+    }
+  }
+
+  async updateWagerContribution({ rules, staffId = null }) {
+    const sequelize = this.models.Siteconfig.sequelize;
+    const clean = (v) => (v == null || v === '' ? null : String(v).trim().toLowerCase());
+    await sequelize.transaction(async (transaction) => {
+      await sequelize.query('DELETE FROM wager_contribution', { transaction });
+      const seen = new Set();
+      for (const r of rules) {
+        const row = { category: clean(r.category), provider: clean(r.provider), gameRef: clean(r.gameRef), percent: r.percent };
+        const key = `${row.category}|${row.provider}|${row.gameRef}`;
+        if (seen.has(key)) continue; // a duplicate rule: the first one stands
+        seen.add(key);
+        await sequelize.query(
+          'INSERT INTO wager_contribution (category, provider, game_ref, percent) VALUES (:category, :provider, :gameRef, :percent)',
+          { replacements: row, transaction }
+        );
+      }
+    });
+    this.logger?.info({ staffId, rules: rules.length }, 'Wager contribution rules replaced');
+    return this.wagerContribution();
+  }
+
   /** Tiers as exact decimal strings, lowest minimum first; junk rows dropped. */
   #tiers(value) {
     const list = Array.isArray(value) ? value : [];

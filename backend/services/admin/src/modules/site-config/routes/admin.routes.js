@@ -198,6 +198,29 @@ module.exports = function adminRoutes(deps) {
     )
   );
 
+  /**
+   * hash.game's wager contribution (migration 135): how much of a bet counts toward unlocking a
+   * locked bonus — by game, provider or category. GET lists, PUT replaces the whole list.
+   */
+  router.get(
+    '/wager-contribution',
+    houseOnly,
+    auth.requirePermission(PERMISSIONS.CONFIG_READ),
+    asyncHandler(async (_req, res) => response.ok(res, await service.wagerContribution()))
+  );
+
+  router.put(
+    '/wager-contribution',
+    houseOnly,
+    auth.requirePermission(PERMISSIONS.CONFIG_WRITE),
+    validate(v.updateWagerContribution),
+    withActivity({
+      action: 'site-config.wager-contribution.update',
+      describe: (req) => ({ targetType: 'SITE_CONFIG', targetId: 'wager-contribution', details: { rules: req.body.rules?.length } }),
+    }),
+    asyncHandler(async (req, res) => response.ok(res, await service.updateWagerContribution({ ...req.body, staffId: req.staff?.id ?? null })))
+  );
+
   /** @legacy GET /sportsCheck */
   router.get(
     '/sports',

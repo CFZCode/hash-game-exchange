@@ -31,6 +31,7 @@ import { api } from '@/lib/api/client'
 import { formatNumber } from '@/lib/format'
 import { check, type FieldErrors } from '@/lib/validate'
 import WelcomeBonuses from '@/views/site-config/WelcomeBonuses'
+import WagerContribution from '@/views/site-config/WagerContribution'
 import RewardStats from './RewardStats'
 import { BONUS_TYPES, GAME_COUNTERS, type BonusAward, type BonusDashboard, type BonusEvent, type BonusGameRow, type BonusRecord, type BonusType, type BonusUserInspect, type GameCounter } from './types'
 import { useLocalList } from './useLocalList'
@@ -593,6 +594,7 @@ const BonusAdmin = () => {
           <TabsTrigger value='dashboard'>Dashboard</TabsTrigger>
           <Can permission='config:read'>
             <TabsTrigger value='welcome'>Welcome bonuses</TabsTrigger>
+            <TabsTrigger value='contribution'>Wager contribution</TabsTrigger>
           </Can>
           <TabsTrigger value='stats'>
             <ChartColumnIcon /> Stats
@@ -606,6 +608,7 @@ const BonusAdmin = () => {
         {/* Pehle alag page tha (Site Config → Welcome bonuses); ab yahin tab me. */}
         <Can permission='config:read'>
           <TabsContent value='welcome'><WelcomeBonuses embedded /></TabsContent>
+          <TabsContent value='contribution'><WagerContribution /></TabsContent>
         </Can>
         {/* Charts alag tab me — lists pehle dikhen. */}
         <TabsContent value='stats'><RewardStats section='bonus' filters={f} rewardNote={false} /></TabsContent>

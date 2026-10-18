@@ -348,7 +348,32 @@ const updateUserSettings = {
     .refine((v) => Object.keys(v).length > 0, { message: 'give at least one setting to change' }),
 };
 
+/**
+ * Wager contribution rules (migration 135). Each rule names exactly ONE of category / provider /
+ * gameRef, with a percent 0–100. The whole list replaces what is stored.
+ */
+const updateWagerContribution = {
+  body: z
+    .object({
+      rules: z
+        .array(
+          z
+            .object({
+              category: z.enum(['originals', 'slots', 'live', 'sports']).nullable().optional(),
+              provider: z.string().trim().min(1).max(120).nullable().optional(),
+              gameRef: z.string().trim().min(1).max(190).nullable().optional(),
+              percent: rate.refine((p) => Number.parseFloat(p) <= 100, 'a percent cannot exceed 100'),
+            })
+            .strict()
+            .refine((r) => [r.category, r.provider, r.gameRef].filter(Boolean).length === 1, 'name exactly one of category, provider or game')
+        )
+        .max(2000),
+    })
+    .strict(),
+};
+
 module.exports = {
+  updateWagerContribution,
   WALLET_CURRENCIES,
   updateAffiliateSettings,
   updateWelcomeBonusSettings,
