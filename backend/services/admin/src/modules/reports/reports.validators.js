@@ -4,6 +4,9 @@ const { z } = require('@ibitplay/common');
 
 const { CURRENCY_COLUMNS, CURRENCY_SYNONYMS, MAX_PAGE_SIZE } = require('./reports.constants');
 
+// shortcut: the merged All-currencies sheet stops paging past this many rows per coin; page per coin server-side if a player outgrows it.
+const BALANCE_SHEET_MAX_ROWS = 10000;
+
 /**
  * A player id.
  *
@@ -157,7 +160,9 @@ module.exports = {
     query: z
       .object({
         currency,
-        limit: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(50),
+        // The sheet is built whole in memory (the running balance needs every row), so a long page
+        // costs only its JSON. The admin's All-currencies view reads each coin from the top this far.
+        limit: z.coerce.number().int().min(1).max(BALANCE_SHEET_MAX_ROWS).default(50),
         offset: z.coerce.number().int().min(0).default(0),
       })
       .strict(),

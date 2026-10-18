@@ -327,6 +327,36 @@ test('reports against a database', async (t) => {
     assert.equal(sheet.currency, 'INR');
   });
 
+  await t.test('casino bet rows are Casino / Original Games with their amount, not empty Sports lines', async () => {
+    const ledger = (reason, amount, refType, extra = {}) => ({
+      user_id: String(playerA), currency: 'INR', amount, netamount: 0, reason, source_service: 'casino-service', meta: { refType }, ...extra,
+    });
+    await models.CreditsLedger.bulkCreate([
+      ledger('BET_STAKE', '-1000', 'OG', { description: 'original-games bet x' }),
+      ledger('BET_PAYOUT', '1000', 'OG'),
+      ledger('BET_STAKE', '-20', 'JSGAMES'),
+      // GIS rounds are read from gis_transactions; the ledger copy must not double them.
+      ledger('BET_STAKE', '-5', 'GIS'),
+      // A sports settlement keeps its netamount and its category.
+      { user_id: String(playerA), currency: 'INR', amount: '0', netamount: '30', reason: 'BET_PAYOUT', source_service: 'sports-service' },
+    ]);
+    try {
+      const sheet = await service.balanceSheet({ staff: asA, userId: playerA, limit: 500 });
+      const by = (c) => sheet.rows.filter((r) => r.category === c).map((r) => r.amount).sort();
+      assert.deepEqual(by('Original Games'), ['-1000.00000000', '1000.00000000']);
+      assert.deepEqual(by('Casino'), ['-20.00000000']);
+      assert.deepEqual(by('Sports'), ['30.00000000']);
+      assert.equal(sheet.balance.debited, '-1020.00000000');
+      assert.equal(sheet.balance.credited, '1030.00000000');
+    } finally {
+      await models.CreditsLedger.destroy({ where: { user_id: String(playerA) } });
+    }
+  });
+
+  await t.test('the balance sheet page reaches past 200 rows', () => {
+    assert.equal(v.balanceSheet.query.parse({ limit: '1000' }).limit, 1000);
+  });
+
   await t.test('`USD` resolves to the wallet that exists', async () => {
     /**
      * Legacy's `ALLOWED_CURRENCIES` contained 'USD' and there is no

@@ -1589,6 +1589,19 @@ class ReportsService {
       raw: true,
     });
     for (const row of settlements) {
+      /**
+       * casino-service writes these reasons too (originals, js-games, aggregators, in-house) with
+       * the signed move in `amount` and `netamount` 0 — reading netamount listed every round as an
+       * empty "Sports" line. GIS rounds are read from gis_transactions in section 7.
+       */
+      if (row.source_service === 'casino-service') {
+        const meta = typeof row.meta === 'string' ? safeJson(row.meta) : row.meta;
+        if (meta?.refType === 'GIS') continue;
+        const signed = money.toDecimalString(money.toMinorQuantised(String(row.amount ?? '0')));
+        if (money.toMinor(signed) === 0n) continue;
+        push(row.created_at, meta?.refType === 'OG' ? 'Original Games' : 'Casino', money.toMinor(signed) >= 0n ? 'CREDIT' : 'DEBIT', row.description || row.reason, signed, Number(row.id) || 0);
+        continue;
+      }
       const net = row.netamount != null ? row.netamount : row.amount;
       push(
         row.created_at,

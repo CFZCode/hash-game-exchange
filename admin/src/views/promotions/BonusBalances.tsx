@@ -42,6 +42,13 @@ export type PlayerBonus = {
   remaining: string
   progress: number
   status: 'active' | 'completed' | 'expired' | 'forfeited'
+
+  /** 'gradual' (hash.game): unlocks bet by bet, the unlocked part is claimable cash, never blocks a withdrawal. */
+  unlockMode?: 'rollover' | 'gradual'
+  unlocked?: string
+  claimed?: string
+  claimable?: string
+  locked?: string
   ref: string | null
   grantedAt: string
   expiresAt: string | null
@@ -110,7 +117,23 @@ const columnsFor = (invalidate: unknown[][], withPlayer: boolean): Column<Player
     : []),
   { key: 'source', header: 'Source', cell: r => <Badge variant='outline'>{SOURCES[r.source] ?? r.source}</Badge> },
   { key: 'amount', header: 'Bonus', align: 'right', cell: r => <Money value={r.amount} currency={r.currency} /> },
-  { key: 'x', header: 'Wager', cell: r => <span className='font-mono text-sm tabular-nums'>{r.wagerMultiplier}x</span> },
+  {
+    key: 'x',
+    header: 'Wager',
+    cell: r =>
+      r.unlockMode === 'gradual' ? (
+        <span className='flex flex-col font-mono text-xs tabular-nums'>
+          <span>
+            Unlocked <Money value={r.unlocked ?? '0'} currency={r.currency} />
+          </span>
+          <span className='text-muted-foreground'>
+            Claimed <Money value={r.claimed ?? '0'} currency={r.currency} />
+          </span>
+        </span>
+      ) : (
+        <span className='font-mono text-sm tabular-nums'>{r.wagerMultiplier}x</span>
+      )
+  },
   { key: 'progress', header: 'Progress', cell: r => <Progress b={r} /> },
   {
     key: 'status',
@@ -132,11 +155,15 @@ export const PlayerBonusesTab = ({ userId }: { userId: string }) => {
   const path = `admin/user/bonus-balance/users/${userId}`
   const q = useApi<PlayerBonus[]>(path)
   const active = (q.data ?? []).filter(b => b.status === 'active')
+  const gradual = (q.data ?? []).some(b => b.unlockMode === 'gradual')
+  const rollover = (q.data ?? []).some(b => b.unlockMode !== 'gradual')
 
   return (
     <div className='flex flex-col gap-4'>
       <p className='text-muted-foreground text-sm'>
-        Bonuses sit in a locked bonus balance and become cash only when their wagering is met. Bonus funds are never withdrawable; a withdrawal while one is active forfeits it.
+        {gradual && 'Gradual bonuses unlock bet by bet: the unlocked part is claimable as cash any time and they never block a withdrawal. '}
+        {(rollover || !gradual) &&
+          `${gradual ? 'Rollover bonuses' : 'Bonuses'} sit in a locked bonus balance and become cash only when their wagering is met; until then they are not withdrawable and a withdrawal while one is active forfeits it.`}
         {active.length > 0 && ` ${active.length} active.`}
       </p>
       <DataTable

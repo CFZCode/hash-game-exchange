@@ -44,15 +44,15 @@ const LIMITS = [25, 50, 100, 200]
 /** The currency select's default: every coin, converted into the owner's default coin. */
 const ALL = 'ALL'
 
-/** The route's page ceiling (reports.constants MAX_PAGE_SIZE): the merged view reads at most this per coin. */
-const MAX_ROWS = 200
+/** The route's page ceiling (reports.validators BALANCE_SHEET_MAX_ROWS): the merged view reads at most this per coin. */
+const MAX_ROWS = 10_000
 
 const fmt = (value: string | number | null | undefined, cur: string) =>
   `${cur === 'INR' ? inrSign() : ''}${(Number(value) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 const fmtDate = (iso: string) => (iso ? new Date(iso).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : '—')
 
-const CATEGORY_TONE: Record<string, Tone> = { Deposit: 'success', Withdrawal: 'danger', Agent: 'info', Sports: 'warning', Casino: 'primary' }
+const CATEGORY_TONE: Record<string, Tone> = { Deposit: 'success', Withdrawal: 'danger', Agent: 'info', Sports: 'warning', Casino: 'primary', 'Original Games': 'primary' }
 
 /**
  * Balance Sheet — reference admin ka BalanceSheetDialog: user ka har paisa-move, running balance ke saath.
