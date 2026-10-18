@@ -210,4 +210,22 @@ test('the wager listing carries the money', async (t) => {
     assert.equal(rows[0].percentage, '100.00');
     assert.equal(rows[0].met, true, 'and it agrees with getProgress');
   });
+
+  await t.test('every deposit rail raises the rollover, not only manual fiat (and 2.5x stays 2.5x)', async () => {
+    // A ₹1,000 UPI / gateway pay-in (pay_in_transactions, status 1) — before, only fiat_deposits counted.
+    await connection.sequelize.query(
+      `INSERT INTO pay_in_transactions (user_id, transaction_id, out_trade_no, currency, amount, status)
+       VALUES (:uid, :tx, :tx, 'INR', 1000, 1)`,
+      { replacements: { uid: player, tx: `wt-${player}` } }
+    );
+    try {
+      await models.Users.update({ wager_multiplier: '2.5' }, { where: { id: player } });
+      const progress = await service.getProgress(player);
+      assert.equal(progress.totalDeposited, '12.00000000', '₹1,000 at 0.012');
+      assert.equal(progress.target, '30.00000000', '$12 × 2.5 — not × 3');
+    } finally {
+      await connection.sequelize.query('DELETE FROM pay_in_transactions WHERE user_id = :uid', { replacements: { uid: player } });
+      await models.Users.update({ wager_multiplier: '3' }, { where: { id: player } });
+    }
+  });
 });

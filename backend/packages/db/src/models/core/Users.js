@@ -175,7 +175,7 @@ module.exports = (sequelize) => {
       field: "bonus_type",
     },
     wager_multiplier: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.DECIMAL(6, 2), // migration 138 (was INTEGER: 2.5 was stored as 3)
       allowNull: true,
       defaultValue: "3",
       field: "wager_multiplier",

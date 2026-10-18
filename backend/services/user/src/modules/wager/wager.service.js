@@ -1,6 +1,6 @@
 'use strict';
 
-const { money } = require('@ibitplay/common');
+const { money, withdrawalCapFigures } = require('@ibitplay/common');
 const { Op, fn, col } = require('@ibitplay/db');
 
 const errors = require('./wager.errors');
@@ -290,28 +290,24 @@ class WagerService {
   }
 
   /**
-   * Approved deposits per player, grouped in the database.
-   *
-   * Same filter as `#totalApprovedDeposits`, which is the single-player form.
+   * Every credited deposit per player, in USD — EVERY rail, not only `fiat_deposits`: crypto,
+   * UPI / PSP, payment gateways, staff transfers and the owner's direct credits too
+   * (`withdrawalCapFigures` DEPOSITED_SQL, the definition the withdrawal cap already uses).
+   * Before this only manual fiat deposits counted, so a crypto or UPI depositor had no rollover.
+   * Each currency is converted at today's rate; one with no rate counts nothing (logged).
    */
   async #depositTotalsFor(ids) {
     if (!ids.length) return new Map();
-
-    const rows = await this.models.FiatDeposits.findAll({
-      attributes: ['user_id', 'currency', [fn('COALESCE', fn('SUM', col('amount')), 0), 'total']],
-      where: { user_id: ids, status: 'approved' },
-      group: ['user_id', 'currency'],
-      raw: true,
-    });
-
-    // `toMinorQuantised`, not `toMinor`: a SUM over a bare `numeric` column
-    // carries whatever precision the widest row had, and `toMinor` refuses more
-    // than eight places — one over-precise deposit would 400 the whole listing.
+    const figures = withdrawalCapFigures.createCapFigures({ db: this.db });
     const totals = new Map();
-    for (const r of rows) {
-      const usd = await this.#usd(money.toDecimalString(money.toMinorQuantised(r.total ?? '0')), r.currency);
-      const key = String(r.user_id);
-      totals.set(key, money.toDecimalString(money.add(totals.get(key) ?? '0', usd)));
+    for (const id of ids) {
+      let total = '0';
+      for (const currency of await figures.currencies(id)) {
+        const { deposited } = await figures.figures(id, currency, { wagered: false });
+        if (!money.gt(deposited, '0')) continue;
+        total = money.toDecimalString(money.add(total, await this.#usd(deposited, currency)));
+      }
+      totals.set(String(id), money.toDecimalString(money.toMinorQuantised(total)));
     }
     return totals;
   }
@@ -361,7 +357,7 @@ class WagerService {
       const skipped = await this.models.Users.count({ where: { lock_targetx: true }, transaction });
 
       await this.models.WagerMultiplierCommon.create(
-        { multiplier: Math.round(Number.parseFloat(multiplier)) },
+        { multiplier: String(multiplier) },
         { transaction }
       );
 

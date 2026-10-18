@@ -93,6 +93,16 @@ class TurnoverReportService {
         'UPDATE turnover_targets SET multiplier = :m, updated_by = :by, updated_at = now() WHERE locked = FALSE',
         { replacements: { m: multiplier, by: actor.id }, transaction }
       );
+      /* The SAME figure is the withdrawal rollover (user-service wager.service: users.wager_multiplier,
+         else wager_multiplier_common) — one TargetX, not a report that disagrees with what blocks a
+         withdrawal. Direct users whose TargetX is not locked here or there. */
+      await this.sequelize.query(
+        `UPDATE users SET wager_multiplier = :m
+          WHERE parent_staff_id IS NULL AND COALESCE(lock_targetx, FALSE) = FALSE
+            AND id NOT IN (SELECT user_id FROM turnover_targets WHERE locked = TRUE)`,
+        { replacements: { m: multiplier }, transaction }
+      );
+      await this.sequelize.query('INSERT INTO wager_multiplier_common (multiplier) VALUES (:m)', { replacements: { m: multiplier }, transaction });
     });
     return { defaultMultiplier: multiplier };
   }
@@ -118,6 +128,10 @@ class TurnoverReportService {
     const [row] = await this.sequelize.query('SELECT multiplier, locked FROM turnover_targets WHERE user_id = :id', {
       replacements: { id: userId },
       type: QueryTypes.SELECT,
+    });
+    // Mirrored onto the withdrawal rollover (users.wager_multiplier / lock_targetx) — one TargetX.
+    await this.sequelize.query('UPDATE users SET wager_multiplier = :m, lock_targetx = :locked WHERE id = :id', {
+      replacements: { id: userId, m: row.multiplier, locked: Boolean(row.locked) },
     });
     return { id: String(userId), multiplier: Number(row.multiplier), locked: row.locked };
   }
