@@ -136,3 +136,13 @@ Proven on live 2026-10-18 (players `lcp1…` and `lcp2…`).
 3. As admin: `POST admin/user/withdrawals/fiat/status` with `{ withdrawalId, status: 'Paid' }`. Expect 403 `TXN_PASSWORD_REQUIRED`.
 4. Send the same request with `transactionPassword`. Expect 200 `Paid`.
 5. Check the player's `/user/history`: withdrawals show Paid. Check the admin balance sheet for the INR currency: a Withdrawal −amount row.
+
+## Scenario: hash.game formulas (VIP, referral, commission, locked bonus, rollover)
+
+Run the `wager-bonus-test` skill (`.claude/skills/wager-bonus-test/SKILL.md`). It does three things:
+
+- runs the local suite first;
+- checks every admin setting through the admin proxy;
+- runs the player flows on live inside the betting budget.
+
+Its admin calls follow this skill's rules: read first, transaction password, restore in the same run.
