@@ -57,7 +57,7 @@ const EmailSettings = () => {
 
   return (
     <div>
-      <PageHeader title='Email (SMTP sender)' description='The address the platform sends from and where operator alerts go. The SMTP host itself is backend configuration (owner panel → environment).' />
+      <PageHeader title='Email (SMTP sender)' description='The address the platform sends from and where operator alerts go. The SMTP host itself is backend configuration.' />
       {q.error && <ErrorState error={q.error} />}
       <div className='grid gap-6 lg:grid-cols-2'>
         <Card className='shadow-none'>

@@ -140,7 +140,7 @@ class PushService {
       imagesFetchable: Boolean(origin) && !isLocalOrigin(origin) && origin.startsWith('https://'),
       allSegment: settings.allSegment,
       whereToSet: {
-        variant: 'Owner panel → Features & plan → Push notifications → ON, variant "OneSignal"',
+        variant: 'Push notifications are not switched on for this site',
         appId: 'Site admin → Site config → Features → Push notifications → OneSignal App ID',
         apiKey: 'Site admin → Site config → Features → Push notifications → App API key (os_v2_…)',
       },

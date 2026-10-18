@@ -76,7 +76,7 @@ const Branding = () => {
           <Card className='shadow-none'>
             <CardHeader>
               <CardTitle className='flex items-center gap-2 text-base'>
-                Name and metadata {b.branded ? <Badge variant='secondary'>Set by the platform</Badge> : <Badge variant='outline'>Not branded</Badge>}
+                Name and metadata {b.branded ? <Badge variant='secondary'>Branded</Badge> : <Badge variant='outline'>Not branded</Badge>}
               </CardTitle>
               <CardDescription>Version {b.version}</CardDescription>
             </CardHeader>

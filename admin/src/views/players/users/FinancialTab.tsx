@@ -79,7 +79,7 @@ const OnOff = ({ on, tone }: { on: boolean; tone: Tone }) => (
 /** Owner panel se aane wali setting ka badge — admin yahan badal nahi sakta. */
 const OwnerBadge = () => (
   <span className='text-muted-foreground bg-muted inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium whitespace-nowrap'>
-    <LockIcon className='size-3' /> Set in the owner panel
+    <LockIcon className='size-3' /> Read-only
   </span>
 )
 

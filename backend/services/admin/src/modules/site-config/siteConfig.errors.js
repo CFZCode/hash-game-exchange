@@ -30,7 +30,7 @@ module.exports = Object.freeze({
    */
   REWARD_CURRENCY_FIXED: {
     status: 409,
-    message: "Rewards are paid in the site's reward currency, which the platform owner sets",
+    message: "Rewards are paid in the site's reward currency, which cannot be changed here",
   },
 
   NO_ALERT_INBOX: {

@@ -11,7 +11,7 @@
  */
 export const siteConfig = {
   key: process.env.NEXT_PUBLIC_SITE_KEY ?? 'admins',
-  name: process.env.NEXT_PUBLIC_SITE_NAME ?? 'CFZ Site Admin',
+  name: process.env.NEXT_PUBLIC_SITE_NAME ?? 'Site Admin',
   tagline: process.env.NEXT_PUBLIC_SITE_TAGLINE ?? 'Operator panel',
   environment: process.env.NEXT_PUBLIC_ENV_LABEL ?? 'localhost'
 } as const

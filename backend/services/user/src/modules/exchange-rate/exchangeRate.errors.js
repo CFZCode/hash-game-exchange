@@ -18,7 +18,7 @@ module.exports = defineErrors('EXCHANGE_RATE', {
   /** A custom coin's rate is the platform owner's (owner panel → Coins), not the site's. */
   OWNER_MANAGED: {
     status: 409,
-    message: 'This rate is set by the platform owner and cannot be changed here',
+    message: 'This rate cannot be changed here',
   },
   RATE_IN_USE: {
     status: 409,

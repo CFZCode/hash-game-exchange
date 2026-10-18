@@ -50,7 +50,7 @@ export function RewardCurrencyNotice({ className }: { className?: string }) {
       <AlertDescription>
         All rewards — VIP, bonuses, rakeback, affiliate, spin wheel — are calculated and paid in this currency, and every reward amount on
         this screen is in it.{' '}
-        {managedBy === 'owner' ? 'Set by the platform owner.' : 'Set on Site config → Features (Reward currency).'}
+        {managedBy === 'owner' ? null : 'Set on Site config → Features (Reward currency).'}
       </AlertDescription>
     </Alert>
   )

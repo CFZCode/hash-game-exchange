@@ -76,7 +76,7 @@ const CreateCode = () => {
         </Button>
       }
       title='Issue a redeem code'
-      description='A fixed-amount code for one user. It pays out when they redeem it, in the site’s reward currency (set by the platform owner). Nothing moves now.'
+      description='A fixed-amount code for one user. It pays out when they redeem it, in the site’s reward currency. Nothing moves now.'
       submitLabel='Issue'
       onSubmit={() => create.mutateAsync()}
       validate={() => ({

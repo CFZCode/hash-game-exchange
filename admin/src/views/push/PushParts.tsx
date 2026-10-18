@@ -55,7 +55,7 @@ export const PushStatusCard = () => {
       </CardHeader>
       <CardContent className='grid gap-3 sm:grid-cols-2 lg:grid-cols-4'>
         <Row ok={s.entitled && s.enabled} label={s.entitled ? (s.enabled ? 'Feature on (OneSignal)' : `Feature off (variant: ${s.variant})`) : 'Not in your plan'}>
-          {!s.enabled || !s.entitled ? s.whereToSet.variant : 'Set by the platform owner'}
+          {!s.enabled || !s.entitled ? s.whereToSet.variant : null}
         </Row>
         <Row ok={s.appIdSet} label={s.appIdSet ? 'App ID set' : 'App ID missing'}>
           {s.appIdSet ? <span className='font-mono'>{s.appId}</span> : s.whereToSet.appId}
