@@ -30,7 +30,7 @@ const { money } = require('@ibitplay/common');
  * than zero (an in-house round's payout is stake + profit). Refunds and
  * rollbacks are neither. A Slotegrator game whose catalogue type says "sport"
  * (the partner sportsbook) is reported under `sports`, everything else under
- * `casino`.
+ * `casino`. Original Games aggregator rounds (`og_transactions`) count as casino too.
  */
 const SQL = `
   WITH movements AS (
@@ -76,6 +76,16 @@ const SQL = `
       LEFT JOIN js_games jg2 ON jg2.game_uid = v.game_uid
      WHERE v.user_id = :userId AND v.amount <> 0
        AND LOWER(v.transaction_type) IN ('bet', 'loss', 'win')
+
+    UNION ALL
+    -- Original Games aggregator (migration 130): an applied bet not rolled back, and a win > 0
+    SELECT CASE WHEN o.kind = 'bet' THEN 'stake' ELSE 'win' END, 'casino', UPPER(o.currency), o.amount,
+           'og:' || COALESCE(o.game_code, ''), COALESCE(og.name, o.game_code), 'BC Originals', o.created_at
+      FROM og_transactions o
+      LEFT JOIN og_games og ON og.code = o.game_code
+     WHERE o.user_id = :userId AND o.status = 'applied' AND o.kind IN ('bet', 'win') AND o.amount > 0
+       AND NOT EXISTS (SELECT 1 FROM og_transactions r
+                        WHERE r.kind = 'rollback' AND r.status = 'applied' AND r.reference_transaction_id = o.transaction_id)
   )
   SELECT json_build_object(
     'totals', (
