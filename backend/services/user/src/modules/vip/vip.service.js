@@ -7,6 +7,7 @@ const { promotionsBlocked } = require('@ibitplay/auth');
 const { WalletService } = require('../wallet/wallet.service');
 const { REASON } = require('../wallet/wallet.constants');
 const { createRewardMoney } = require('../../lib/rewardMoney');
+const { createRewardFormula, closedWindow } = require('../../lib/rewardFormula');
 const { addToUserbonus } = require('../../lib/userbonusTotals');
 const { notifyPlayer } = require('../notifications/notifyPlayer');
 
@@ -52,6 +53,7 @@ class VipService {
        guarded UPDATE. */
     this.wallet = new WalletService(deps);
     this.rewardMoney = deps.rewardMoney ?? createRewardMoney(deps);
+    this.rewardFormula = deps.rewardFormula ?? createRewardFormula(deps);
   }
 
   /**
@@ -454,6 +456,8 @@ class VipService {
 
     const rows = [];
     const now = Date.now();
+    const formula = await this.rewardFormula();
+    if (formula.mode === 'hash') return this.#awardHashPeriodic({ userId, vip, formula });
 
     for (const type of PERIODS) {
       const amount = periodicAmount(vip.card, type);
@@ -504,6 +508,95 @@ class VipService {
      * landed; both `bonus.service.js` call sites discard the value entirely.
      */
     return { awarded: rows.length, rows };
+  }
+
+  /**
+   * hash.game's Daily / Weekly / Monthly bonus (migration 137), for the period that has just
+   * CLOSED (UTC): Daily = wagered × house edge × 4%; Weekly (Fri–Thu) = … × 4% + net loss × 1%;
+   * Monthly (15th–14th) = … × 3.5% + net loss × 1.5%. Bronze I and up. One row per closed
+   * window (a row created at or after the window's end means it is done). Amounts in USD, like
+   * every `bonus_history.bonus_amount`; claimed in the reward currency.
+   */
+  async #awardHashPeriodic({ userId, vip, formula }) {
+    const rows = [];
+    if (!(Number(vip.level) >= 1)) return { awarded: 0, rows };
+    const rates = {
+      daily: { wager: formula.daily ?? '4', loss: '0' },
+      weekly: { wager: formula.weeklyWager ?? '4', loss: formula.weeklyLoss ?? '1' },
+      monthly: { wager: formula.monthlyWager ?? '3.5', loss: formula.monthlyLoss ?? '1.5' },
+    };
+    for (const type of PERIODS) {
+      try {
+        const { start, end } = closedWindow(type);
+        const done = await this.models.BonusClaim.findOne({
+          where: { userid: userId, bonus_type: type, created_at: { [Op.gte]: end } },
+          attributes: ['id'],
+          raw: true,
+        });
+        if (done) continue;
+        const { edgeUsd, netLossUsd } = await this.#windowFigures(userId, start, end);
+        const amount = money.toDecimalString(
+          money.add(
+            money.toDecimalString(money.percentOf(edgeUsd, rates[type].wager)),
+            money.toDecimalString(money.percentOf(netLossUsd, rates[type].loss))
+          )
+        );
+        if (!money.gt(amount, '0')) continue;
+        await this.models.BonusClaim.sequelize.transaction(async (transaction) => {
+          const again = await this.models.BonusClaim.findOne({
+            where: { userid: userId, bonus_type: type, created_at: { [Op.gte]: end } },
+            transaction,
+            lock: transaction.LOCK.UPDATE,
+          });
+          if (again) return;
+          await this.models.BonusClaim.create(
+            {
+              userid: userId,
+              bonus_type: type,
+              bonus_amount: amount,
+              wager_change: edgeUsd,
+              claim_deadline: new Date(Date.now() + CLAIM_WINDOW_MS[type]),
+              is_claimed: false,
+              is_unclaimable: false,
+            },
+            { transaction }
+          );
+          rows.push({ type, amount, from: start.toISOString(), to: end.toISOString() });
+        });
+      } catch (error) {
+        this.logger?.warn({ err: error, userId: String(userId), type }, 'Periodic VIP award (hash formula) failed');
+      }
+    }
+    return { awarded: rows.length, rows };
+  }
+
+  /**
+   * Σ usd × house edge of the counted (unreversed part of) stakes in `[start, end)`, and the net
+   * loss there: −Σ of bet movements on the ledger (stakes negative, payouts / refunds positive),
+   * in USD at today's rates. A net win is 0 loss.
+   */
+  async #windowFigures(userId, start, end) {
+    const sequelize = this.models.BonusClaim.sequelize;
+    const [edge] = await sequelize.query(
+      `SELECT COALESCE(SUM(
+                usd_amount * (1 - COALESCE(reversed_amount, 0) / NULLIF(amount, 0))
+                * COALESCE(house_edge, CASE category WHEN 'originals' THEN 0.01 WHEN 'live' THEN 0.02 WHEN 'sports' THEN 0.02 ELSE 0.04 END)
+              ), 0)::text AS edge
+         FROM wager_activity
+        WHERE user_id = :userId AND created_at >= :start AND created_at < :end AND reversed_at IS NULL`,
+      { replacements: { userId: String(userId), start, end }, type: 'SELECT' }
+    );
+    const [loss] = await sequelize.query(
+      `SELECT COALESCE(-SUM(l.amount * COALESCE(e.usd_rate, CASE WHEN upper(l.currency) IN ('USD', 'USDT') THEN 1 END, 0)), 0)::text AS loss
+         FROM public.credits_ledger l
+         LEFT JOIN exchangerate e ON upper(e.currency) = upper(l.currency)
+        WHERE l.user_id = :userId AND l.created_at >= :start AND l.created_at < :end
+          AND l.reason IN ('BET_STAKE', 'BET_PAYOUT', 'BET_REFUND', 'BET_ROLLBACK')`,
+      { replacements: { userId: String(userId), start, end }, type: 'SELECT' }
+    );
+    const edgeUsd = money.toDecimalString(money.toMinorQuantised(edge?.edge ?? '0'));
+    const lossRaw = money.toDecimalString(money.toMinorQuantised(loss?.loss ?? '0'));
+    return { edgeUsd, netLossUsd: money.gt(lossRaw, '0') ? lossRaw : '0.00000000' };
   }
 
   /**

@@ -32,6 +32,7 @@ import { formatNumber } from '@/lib/format'
 import { check, type FieldErrors } from '@/lib/validate'
 import WelcomeBonuses from '@/views/site-config/WelcomeBonuses'
 import WagerContribution from '@/views/site-config/WagerContribution'
+import RewardFormula from '@/views/site-config/RewardFormula'
 import RewardStats from './RewardStats'
 import { BONUS_TYPES, GAME_COUNTERS, type BonusAward, type BonusDashboard, type BonusEvent, type BonusGameRow, type BonusRecord, type BonusType, type BonusUserInspect, type GameCounter } from './types'
 import { useLocalList } from './useLocalList'
@@ -595,6 +596,7 @@ const BonusAdmin = () => {
           <Can permission='config:read'>
             <TabsTrigger value='welcome'>Welcome bonuses</TabsTrigger>
             <TabsTrigger value='contribution'>Wager contribution</TabsTrigger>
+            <TabsTrigger value='formula'>Rakeback formula</TabsTrigger>
           </Can>
           <TabsTrigger value='stats'>
             <ChartColumnIcon /> Stats
@@ -609,6 +611,7 @@ const BonusAdmin = () => {
         <Can permission='config:read'>
           <TabsContent value='welcome'><WelcomeBonuses embedded /></TabsContent>
           <TabsContent value='contribution'><WagerContribution /></TabsContent>
+          <TabsContent value='formula'><RewardFormula /></TabsContent>
         </Can>
         {/* Charts alag tab me — lists pehle dikhen. */}
         <TabsContent value='stats'><RewardStats section='bonus' filters={f} rewardNote={false} /></TabsContent>

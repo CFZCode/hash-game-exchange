@@ -37,6 +37,12 @@ module.exports = function internalRoutes(deps) {
     asyncHandler(async (_req, res) => response.ok(res, await service.welcomeBonusSettings()))
   );
 
+  /** hash.game's rakeback + recurring bonus formula (migration 137), for user-service. */
+  router.get(
+    '/reward-formula',
+    asyncHandler(async (_req, res) => response.ok(res, await service.rewardFormula()))
+  );
+
   /**
    * Tip limits (USD), for user-service's tip send. It caches them for a few
    * seconds and falls back to the shipped defaults (limits ON) if this fails.

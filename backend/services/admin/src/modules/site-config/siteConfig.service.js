@@ -485,6 +485,43 @@ class SiteConfigService {
   }
 
   // ══════════════════════════════════════════════════════════════════════
+  //  VIP reward formula (migration 137) — hash.game's rakeback + daily/weekly/monthly
+  // ══════════════════════════════════════════════════════════════════════
+
+  async rewardFormula() {
+    const defaults = { mode: 'hash', instant: '10', daily: '4', weeklyWager: '4', weeklyLoss: '1', monthlyWager: '3.5', monthlyLoss: '1.5' };
+    try {
+      const [row] = await this.models.Siteconfig.sequelize.query('SELECT vip_reward_formula FROM siteconfig ORDER BY id ASC LIMIT 1', {
+        type: this.models.Siteconfig.sequelize.QueryTypes.SELECT,
+      });
+      const v = typeof row?.vip_reward_formula === 'string' ? JSON.parse(row.vip_reward_formula) : row?.vip_reward_formula;
+      const out = { ...defaults };
+      if (v?.mode === 'fixed') out.mode = 'fixed';
+      for (const k of Object.keys(defaults)) if (k !== 'mode' && /^\d+(\.\d+)?$/.test(String(v?.[k] ?? ''))) out[k] = String(v[k]);
+      return out;
+    } catch (error) {
+      if (!isUndefinedColumn(error)) throw error;
+      return { ...defaults, mode: 'fixed' };
+    }
+  }
+
+  async updateRewardFormula({ staffId = null, ...patch }) {
+    const row = await this.#configRow(['id']);
+    if (!row) throw errors.NOT_CONFIGURED();
+    const next = { ...(await this.rewardFormula()), ...patch };
+    try {
+      await this.models.Siteconfig.sequelize.query('UPDATE siteconfig SET vip_reward_formula = CAST(:v AS jsonb), updatedat = now() WHERE id = :id', {
+        replacements: { id: row.id, v: JSON.stringify(next) },
+      });
+    } catch (error) {
+      if (isUndefinedColumn(error)) throw errors.MIGRATION_PENDING({ migration: '137-vip-reward-formula' });
+      throw error;
+    }
+    this.logger?.info({ staffId, ...patch }, 'VIP reward formula changed');
+    return this.rewardFormula();
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
   //  Wager contribution (migration 135) — hash.game's per-game bonus contribution
   // ══════════════════════════════════════════════════════════════════════
 

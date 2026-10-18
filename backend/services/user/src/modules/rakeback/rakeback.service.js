@@ -1,7 +1,8 @@
 'use strict';
 
 const { Op } = require('sequelize');
-const { money } = require('@ibitplay/common');
+const { money, wagerCategory } = require('@ibitplay/common');
+const { createRewardFormula } = require('../../lib/rewardFormula');
 const { promotionsBlocked } = require('@ibitplay/auth');
 
 const { WalletService } = require('../wallet/wallet.service');
@@ -72,6 +73,7 @@ class RakebackService {
     this.clients = clients;
     this.wallet = deps.wallet ?? new WalletService(deps);
     this.rewardMoney = deps.rewardMoney ?? createRewardMoney(deps);
+    this.rewardFormula = deps.rewardFormula ?? createRewardFormula(deps);
   }
 
   /*
@@ -146,7 +148,7 @@ class RakebackService {
    * VIP rate is read from `users.rakeback` (preferred — casino converts the
    * stake to USD, this service owns the loyalty rate).
    */
-  async accrue({ userId, amount, stakeUsd, source, ref }) {
+  async accrue({ userId, amount, stakeUsd, source, ref, kind = null }) {
     /* Rakeback is a promotion: nothing accrues on a B2B site (for anybody) or for an agent-tree
        player (packages/auth/src/agentPlayers.js `promotionsBlocked`, fails closed). A no-op, not
        an error — the stake itself still counts, and a retry must not see a failure. */
@@ -156,8 +158,15 @@ class RakebackService {
 
     let value;
 
+    const formula = amount == null && kind ? await this.rewardFormula() : null;
     if (amount != null) {
       value = money.toDecimalString(money.toMinor(amount));
+    } else if (formula?.mode === 'hash') {
+      /* hash.game "Instant": Wagered × house edge × 10% — the bet's own house edge (1 − RTP,
+         capped at 4%; originals 1%, slots 4%), not a flat per-card rate. */
+      const edge = String(kind.house_edge ?? wagerCategory.DEFAULT_HOUSE_EDGE[kind.category] ?? wagerCategory.DEFAULT_HOUSE_EDGE.slots);
+      value = money.toDecimalString(money.percentOf(money.toDecimalString(money.multiply(stakeUsd, edge)), formula.instant ?? '10'));
+      if (!money.gt(value, '0')) return { accrued: null, amount: '0.00000000', currency: 'USD', duplicate: false, skipped: 'ZERO' };
     } else {
       const user = await this.models.Users.findByPk(userId, {
         attributes: ['id', 'rakeback'],

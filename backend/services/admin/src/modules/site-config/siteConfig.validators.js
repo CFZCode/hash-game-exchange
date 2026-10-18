@@ -372,7 +372,24 @@ const updateWagerContribution = {
     .strict(),
 };
 
+/** hash.game reward formula (migration 137): mode + six percents. */
+const updateRewardFormula = {
+  body: z
+    .object({
+      mode: z.enum(['hash', 'fixed']).optional(),
+      instant: percent.optional(),
+      daily: percent.optional(),
+      weeklyWager: percent.optional(),
+      weeklyLoss: percent.optional(),
+      monthlyWager: percent.optional(),
+      monthlyLoss: percent.optional(),
+    })
+    .strict()
+    .refine((v) => Object.values(v).some((x) => x !== undefined), { message: 'give at least one setting to change' }),
+};
+
 module.exports = {
+  updateRewardFormula,
   updateWagerContribution,
   WALLET_CURRENCIES,
   updateAffiliateSettings,

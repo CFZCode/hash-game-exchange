@@ -198,6 +198,26 @@ module.exports = function adminRoutes(deps) {
     )
   );
 
+  /** hash.game's rakeback + daily / weekly / monthly formula (migration 137). */
+  router.get(
+    '/reward-formula',
+    houseOnly,
+    auth.requirePermission(PERMISSIONS.CONFIG_READ),
+    asyncHandler(async (_req, res) => response.ok(res, await service.rewardFormula()))
+  );
+
+  router.put(
+    '/reward-formula',
+    houseOnly,
+    auth.requirePermission(PERMISSIONS.CONFIG_WRITE),
+    validate(v.updateRewardFormula),
+    withActivity({
+      action: 'site-config.reward-formula.update',
+      describe: (req) => ({ targetType: 'SITE_CONFIG', targetId: 'reward-formula', details: req.body }),
+    }),
+    asyncHandler(async (req, res) => response.ok(res, await service.updateRewardFormula({ ...req.body, staffId: req.staff?.id ?? null })))
+  );
+
   /**
    * hash.game's wager contribution (migration 135): how much of a bet counts toward unlocking a
    * locked bonus — by game, provider or category. GET lists, PUT replaces the whole list.
