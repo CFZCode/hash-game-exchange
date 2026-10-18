@@ -18,10 +18,16 @@ import ManualSwitch from './ManualSwitch'
 
 type Part = { key: string; label: string; view: () => ReactNode }
 
-/** Zip ka tab button (DepositPage / SelfDeposit ke tab bar jaisa). */
+/** Top tab (Direct Users / Agent System): underline style. */
 const tabClass = (active: boolean) =>
-  `flex items-center gap-1.5 whitespace-nowrap border-b-2 px-5 py-3 text-[0.8rem] transition-colors ${
-    active ? 'border-primary bg-primary/10 font-bold text-primary' : 'border-transparent text-muted-foreground hover:bg-accent hover:text-foreground'
+  `flex items-center gap-2 whitespace-nowrap border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
+    active ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'
+  }`
+
+/** Rail switch (Crypto / Fiat / Manual): segmented pill. */
+const pillClass = (active: boolean) =>
+  `whitespace-nowrap rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
+    active ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
   }`
 
 /** Direct Users → zip ka "Crypto | Fiat" switcher; andar apne purane screens (unke actions ke saath). */
@@ -30,15 +36,13 @@ const DirectUsers = ({ parts }: { parts: Part[] }) => {
   const active = parts.find(p => p.key === key) ?? parts[0]
 
   return (
-    <div className='p-4'>
-      <div className='mb-6 overflow-x-auto rounded-lg border border-border bg-card'>
-        <div className='flex'>
-          {parts.map(p => (
-            <button key={p.key} type='button' className={tabClass(p.key === active.key)} onClick={() => setKey(p.key)}>
-              {p.label}
-            </button>
-          ))}
-        </div>
+    <div className='p-4 sm:p-6'>
+      <div role='tablist' aria-label='Rail' className='bg-muted mb-6 inline-flex max-w-full overflow-x-auto rounded-lg p-1'>
+        {parts.map(p => (
+          <button key={p.key} type='button' role='tab' aria-selected={p.key === active.key} className={pillClass(p.key === active.key)} onClick={() => setKey(p.key)}>
+            {p.label}
+          </button>
+        ))}
       </div>
       <div key={active.key}>{active.view()}</div>
     </div>
@@ -112,12 +116,14 @@ const Transactions = ({ direction }: { direction: 'deposit' | 'withdraw' }) => {
 
   return (
     <div className='overflow-hidden rounded-xl border border-border'>
-      <div className='overflow-x-auto border-b border-border bg-card'>
-        <div className='flex'>
+      <div className='overflow-x-auto border-b border-border bg-card px-2'>
+        <div role='tablist' className='flex'>
           {tabs.map(t => (
             <button
               key={t.id}
               type='button'
+              role='tab'
+              aria-selected={t.id === active.id}
               className={tabClass(t.id === active.id)}
               onClick={() => router.replace(t.id === tabs[0].id ? pathname : `${pathname}?tab=${t.id}`, { scroll: false })}
             >

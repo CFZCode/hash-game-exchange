@@ -3,7 +3,7 @@
 import { useRef, useState, type ReactNode } from 'react'
 
 import { useQuery } from '@tanstack/react-query'
-import { ImageIcon, WalletIcon } from 'lucide-react'
+import { CheckIcon, CopyIcon, ImageIcon, WalletIcon } from 'lucide-react'
 import { toast } from 'sonner'
 
 import FormDialog from '@/components/shared/FormDialog'
@@ -73,9 +73,10 @@ export const ViewDialog = ({ trigger, title, description, children, wide }: { tr
 )
 
 /** An image served by a gateway route (the proxy adds the staff token). Loaded only once the dialog opens. */
-export const ImageDialog = ({ path, title, label = 'View' }: { path: string; title: string; label?: string }) => {
+export const ImageDialog = ({ path, title, label = 'View', thumbnail }: { path: string; title: string; label?: string; thumbnail?: boolean }) => {
   const [open, setOpen] = useState(false)
   const [failed, setFailed] = useState(false)
+  const [thumbFailed, setThumbFailed] = useState(false)
 
   return (
     <Dialog
@@ -86,9 +87,24 @@ export const ImageDialog = ({ path, title, label = 'View' }: { path: string; tit
       }}
     >
       <DialogTrigger nativeButton={false} render={<span />}>
-        <Button variant='outline' size='sm'>
-          <ImageIcon /> {label}
-        </Button>
+        {thumbnail ? (
+          <button
+            type='button'
+            aria-label={label}
+            title={label}
+            className='bg-muted text-muted-foreground hover:ring-primary/60 flex size-10 items-center justify-center overflow-hidden rounded-md border transition hover:ring-2'
+          >
+            {thumbFailed ? (
+              <ImageIcon className='size-4' />
+            ) : (
+              <img src={api.url(path)} alt='' loading='lazy' className='size-full object-cover' onError={() => setThumbFailed(true)} />
+            )}
+          </button>
+        ) : (
+          <Button variant='outline' size='sm'>
+            <ImageIcon /> {label}
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className='sm:max-w-3xl'>
         <DialogHeader>
@@ -106,6 +122,34 @@ export const ImageDialog = ({ path, title, label = 'View' }: { path: string; tit
   )
 }
 
+
+/** Copies `value` to the clipboard (a bank reference, a tx hash). */
+export const CopyButton = ({ value, label = 'Copy' }: { value: string; label?: string }) => {
+  const [done, setDone] = useState(false)
+
+  return (
+    <Button
+      type='button'
+      variant='ghost'
+      size='icon-xs'
+      aria-label={label}
+      title={label}
+      className='text-muted-foreground hover:text-foreground shrink-0'
+      onClick={e => {
+        e.stopPropagation()
+        navigator.clipboard?.writeText(value).then(
+          () => {
+            setDone(true)
+            setTimeout(() => setDone(false), 1500)
+          },
+          () => toast.error('Could not copy')
+        )
+      }}
+    >
+      {done ? <CheckIcon className='text-success' /> : <CopyIcon />}
+    </Button>
+  )
+}
 
 /** A fresh per-submit idempotency key (UUID where the browser has one). */
 const newIdempotencyKey = () =>
