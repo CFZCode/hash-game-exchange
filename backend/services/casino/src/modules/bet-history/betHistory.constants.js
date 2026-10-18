@@ -9,6 +9,7 @@ const { LIVE_PROVIDERS, LIVE_TYPES } = require('../games/games.constants');
  * `gis_transactions` is Slotegrator.
  * `js_game_transactions` is jsGames v1.
  * `game_transactions` is jsGames v2.
+ * `og_transactions` is the Original Games aggregator.
  *
  * Each has its own column names for the same four ideas — who, how much, when,
  * and what happened. Legacy expressed the reconciliation as a hand-written
@@ -104,6 +105,26 @@ const SOURCES = Object.freeze({
     finishedColumn: null,
     statusColumn: null,
   },
+  /** The Original Games aggregator (migration 130): a bet row and a win row per round, unsigned. */
+  og: {
+    model: 'OgTransactions',
+    table: 'og_transactions',
+    label: 'original-games',
+    userColumn: 'user_id',
+    amountColumn: 'amount',
+    profitColumn: 'amount',
+    timeColumn: 'created_at',
+    currencyColumn: 'currency',
+    idColumn: 'transaction_id',
+    rowIdColumn: 'id',
+    roundColumn: 'round_id',
+    kindColumn: 'kind',
+    gameColumn: 'game_code',
+    catalog: 'og',
+    sessionColumn: 'session_id',
+    finishedColumn: null,
+    statusColumn: null,
+  },
 });
 
 /**
@@ -118,6 +139,7 @@ const CATALOGS = Object.freeze({
   // Slotegrator: the lobby's own catalogue (`gisgamesnew`) first, the legacy `gis_games` after.
   gis: { model: 'Gisgamesnew', fallbackModel: 'GisGames', keyColumn: 'uuid', nameColumn: 'name', vendorColumn: 'provider', typeColumn: 'type' },
   jsgames: { model: 'JsGames', keyColumn: 'game_uid', nameColumn: 'game_name', vendorColumn: 'vendor', typeColumn: 'game_type' },
+  og: { model: 'OgGames', keyColumn: 'code', nameColumn: 'name', vendorColumn: 'code' },
 });
 
 /**
@@ -140,7 +162,7 @@ const IN_HOUSE_VENDOR = 'in-house';
 function categoryOf({ sourceKey, vendor, type }) {
   const v = String(vendor ?? '').trim().toLowerCase();
   const t = String(type ?? '').trim().toLowerCase();
-  if (sourceKey === 'inhouse' || v === IN_HOUSE_VENDOR) return 'original';
+  if (sourceKey === 'inhouse' || sourceKey === 'og' || v === IN_HOUSE_VENDOR) return 'original';
   if (LIVE_PROVIDERS.includes(v) || LIVE_TYPES.includes(t) || /\blive\b/.test(t)) return 'live';
   return 'slots';
 }
