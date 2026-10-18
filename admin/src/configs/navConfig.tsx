@@ -307,6 +307,9 @@ export const navItems: NavItem[] = [
       { icon: 'BookUser', label: 'Account List', href: '/exchange/users', activePath: '/exchange/users', permission: ['users:read', 'staff:read'] } as MenuItem,
       { icon: 'Landmark', label: 'Bank', href: '/exchange/bank', permission: WALLET_ANY },
 
+      // Every staff login (Super Admin down to Agent) makes its own executives (user, 2026-10-17).
+      { icon: 'KeyRound', label: 'Executives', href: '/access/executives', notExecutive: true },
+
       // Agent ke reports.
       { icon: 'ReceiptText', label: 'Account Statement', href: '/exchange/reports/account-statement', permission: 'reports:read' },
       { icon: 'Scale', label: 'Party Win Loss', href: '/exchange/reports/party-win-loss', permission: 'reports:read' },
@@ -430,8 +433,6 @@ export const navItems: NavItem[] = [
     groupIcon: 'Contact',
     collapsible: true,
     items: [
-      // Every staff login (Super Admin down to Agent) makes its own executives (user, 2026-10-17).
-      { icon: 'KeyRound', label: 'Executives', href: '/access/executives', notExecutive: true },
       { icon: 'Target', label: 'Marketing', href: '/marketing', account: 'marketing' },
       { icon: 'ScrollText', label: 'Activity log', href: '/audit', permission: 'audit:read' }
     ]
