@@ -38,7 +38,7 @@ export function GatesProvider({ children }) {
 }
 
 function LiveGates({ children }) {
-  const { session } = useSession();
+  const { session, setSetting } = useSession();
   const signedIn = Boolean(session.login);
   const userId = signedIn ? session.userId : 0;
 
@@ -107,6 +107,16 @@ function LiveGates({ children }) {
     () => makeGates({ flags: pub?.flags, features: pub?.features, capabilities, ready }),
     [pub, capabilities, ready],
   );
+
+  /* An agent's player runs on INR alone (user, 2026-10-18): "View in currency" off and the header
+     coin INR, whatever an older session left in the stored setting. */
+  const agentInr = ready && value.agentPlayer;
+  const { enableLocaleCurrency, currencyName } = session.setting ?? {};
+  React.useEffect(() => {
+    if (!agentInr) return;
+    if (enableLocaleCurrency) setSetting('enableLocaleCurrency', false);
+    if (currencyName !== 'INRFIAT') setSetting('currencyName', 'INRFIAT');
+  }, [agentInr, enableLocaleCurrency, currencyName, setSetting]);
 
   const { pathname } = useLocation();
   const navigate = useNavigate();

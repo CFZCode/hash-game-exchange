@@ -2,6 +2,7 @@ import React from 'react';
 import Switch from '../../components/shared/Switch';
 import LanguageCurrencyModal from '../../components/modals/LanguageCurrencyModal';
 import { languageName } from '../../components/modals/LanguageCurrencyModal/languages';
+import { useGates } from '../../context/gates';
 import { useSession } from '../../context/session';
 import { useSettings } from '../../context/settings';
 import { useResource } from '../../hooks/useResource';
@@ -208,6 +209,8 @@ export default function SettingsPreferences() {
   const localeCurrency = getAlias(session.setting.localeCurrencyName).replace(/FIAT$/, '');
   /* Off: the owner's default currency rather than "None" (hooks/useSiteCurrency). */
   const siteCurrency = useSiteCurrency();
+  // Agent's player: INR only, no "View in currency" row.
+  const { agentPlayer } = useGates();
 
   return (
     /* `w-full py-4 text-base sm:py-0` — the page's own vertical rhythm on a phone, where the
@@ -216,7 +219,7 @@ export default function SettingsPreferences() {
        the controls set their own `text-sm`. */
     <div className="w-full py-4 text-base sm:py-0">
       <Card title="Account Preferences">
-        <Row label="View in currency">
+        {!agentPlayer && <Row label="View in currency">
           {/* The trigger is the ROW'S trailing div rather than the button — `S.$$click` lands on
               the `ml-auto` container, so the pencil is inside the hit area too. `open-fiat` is the
               event; this build routes it to the same modal the header and sidebar open, on its
@@ -243,7 +246,7 @@ export default function SettingsPreferences() {
             </button>
             <IconEdit className="ml-1.5 size-5 cursor-pointer fill-secondary" />
           </div>
-        </Row>
+        </Row>}
 
         <Row label="Change Language">
           <div className="flex items-center" onClick={() => setModal('language')}>

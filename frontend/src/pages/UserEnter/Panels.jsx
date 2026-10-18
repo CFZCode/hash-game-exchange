@@ -408,7 +408,7 @@ const RowLabel = ({ children }) => (
  * carries that value as `warning`. */
 const SecurityStatus = () => <IconAttention className="size-5 fill-warning" />;
 
-function SettingsCards({ onRefer, onLanguage, onCurrency, confirm, affiliateOn = true }) {
+function SettingsCards({ onRefer, onLanguage, onCurrency, confirm, affiliateOn = true, currencyOn = true }) {
   const { session } = useSession();
 
   /* `O.langs[R.lang]?.[0] ?? "English"` — the store's `setting.lang`, the field the picker writes. */
@@ -498,7 +498,7 @@ function SettingsCards({ onRefer, onLanguage, onCurrency, confirm, affiliateOn =
 
         {/* `f.$$click = () => !r && J.emit("open-fiat")`, where `r` is `isFiat` — a fiat-only
             white label, false on this deploy, so both the handler and the chevron render. */}
-        <div
+        {currencyOn && <div
           className="btn-like mt-1 flex h-11 w-full items-center px-3"
           onClick={onCurrency}
         >
@@ -508,7 +508,7 @@ function SettingsCards({ onRefer, onLanguage, onCurrency, confirm, affiliateOn =
             <p className="mr-3 text-secondary">{currency}</p>
             <Chevron />
           </div>
-        </div>
+        </div>}
 
         {/* The one row with no `btn-like` and no handler — the control is the whole of it. */}
         <div className="mt-1 flex h-11 w-full items-center px-3">
@@ -693,7 +693,7 @@ function SupportBlock({ onSignOut }) {
 export default function UserEnterPanels(props) {
   /* VIP and the referral programme are promotions: gone when the site or the account has them
      off (an agent's player). services/gates.js; all on with fixtures. */
-  const { on } = useGates();
+  const { on, agentPlayer } = useGates();
   return (
     <>
       <ProfileHeader />
@@ -705,7 +705,8 @@ export default function UserEnterPanels(props) {
       <div className="bg-layer2 pt-4">
         {on('vip') && <VipCard />}
         <BalanceCard />
-        <SettingsCards {...props} affiliateOn={on('affiliate')} />
+        {/* Agent's player: INR only, no Currency row. */}
+        <SettingsCards {...props} affiliateOn={on('affiliate')} currencyOn={!agentPlayer} />
         {on('affiliate') && <ReferBanner />}
         <SupportBlock {...props} />
       </div>

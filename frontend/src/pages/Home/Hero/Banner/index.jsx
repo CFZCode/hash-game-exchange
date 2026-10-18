@@ -441,6 +441,8 @@ const bannerAllowed = (gates, banner) => {
   /* Not answered yet: the strip is showing its skeleton anyway (see `feedLoading`), and keeping
      the slides counted keeps the early `!count` return from collapsing the box meanwhile. */
   if (!gates.ready) return true;
+  // An agent's player gets no banner at all: every slide is promotion art (user, 2026-10-18).
+  if (gates.agentPlayer) return false;
   const link = String(banner?.linkUrl ?? '');
   if (PROMO_LINK.test(link) && !gates.on('promotions')) return false;
   return gates.routeOn(link);

@@ -4,6 +4,7 @@ import RouteDialog from '../../shared/RouteDialog';
 import { toast, toastError } from '../../shared/Toast/toast';
 import Loading from '../../shared/Loading';
 import { useSession } from '../../../context/session';
+import { useGates } from '../../../context/gates';
 import { changePassword, requestEmailOtp, changeEmail } from '../../../services/auth';
 import { beginTwoFactorSetup, completeTwoFactorSetup } from '../../../services/twoFactor';
 import { IconCaution, IconSet, IconTwoFactor, IconEmail, IconPhoneNumber } from '../../../pages/Settings/icons';
@@ -309,6 +310,8 @@ function ChangePassword() {
  */
 function TwoFactorBind() {
   const navigate = useNavigate();
+  // No KYC for an agent's player: the toast must not send them there.
+  const kycOn = useGates().on('kyc');
   const { setAccountField } = useSession();
 
   const [setup, setSetup] = React.useState(null);
@@ -344,7 +347,8 @@ function TwoFactorBind() {
          — the en-US value is "Your 2FA has been successfully enabled. To ensure you can recover
          your account if you lose access, please complete <2>Advanced KYC</2>.", and slot 2 is
          `<span class="cursor-pointer text-brand underline">` routing to /settings/verification. */
-      toast.success(
+      if (!kycOn) toast.success('Your 2FA has been successfully enabled.');
+      else toast.success(
         <span>
           Your 2FA has been successfully enabled. To ensure you can recover your account if you lose
           access, please complete{' '}

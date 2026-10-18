@@ -11,6 +11,7 @@ import {
   readAllNotices,
 } from '../../services/notification';
 import { useNoticeStore } from './store';
+import { useGates } from '../../context/gates';
 
 /* The drawer's contents — TWO components on the original, stitched here the way it stitches them:
  *
@@ -157,7 +158,10 @@ export default function NotificationPanel({ className = '', onAnimationEnd, titl
     store.markAllRead();
   };
 
-  const active = TABS[state.currentType] ?? TABS[0];
+  // Agent's player (or promotions off): no Promotions tab — Transactions opens instead.
+  const promoOn = useGates().on('promotions');
+  const current = !promoOn && !state.currentType ? 1 : state.currentType;
+  const active = TABS[current] ?? TABS[0];
 
   return (
     /* `_e`'s shell. THE HEIGHT LOOKS WRONG AND IS NOT: the shell is `calc(100% - 3.75rem)` — a
@@ -230,12 +234,12 @@ export default function NotificationPanel({ className = '', onAnimationEnd, titl
             className="scroll-x tabs-title hide-scroll sticky top-4 z-10 mt-4 rounded-xl"
           >
             <div className="tabs-btn-group">
-              {TABS.map((tab, index) => (
+              {TABS.map((tab, index) => (promoOn || tab.key !== 'promotion') && (
                 <button
                   key={tab.key}
                   type="button"
                   role="tab"
-                  aria-selected={state.currentType === index || undefined}
+                  aria-selected={current === index || undefined}
                   className="tabs-btn btn-like"
                   onClick={() => store.setTab(index)}
                 >

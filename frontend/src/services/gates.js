@@ -101,6 +101,9 @@ export const ROUTES = [
   ['/blog', 'blog'],
   ['/sports', 'sports'],
   ['/notification', 'notifications'],
+  // Payout accounts and the withdrawal address whitelist: withdraw rail only (not an agent's player).
+  ['/settings/payment', 'withdraw'],
+  ['/settings/whitelist', 'withdraw'],
   ['/settings/verify', 'kyc'],
   ['/settings/verification', 'kyc'],
   // The sidebar's BC Originals entry and the casino page's Originals tag page.
@@ -194,8 +197,8 @@ const isAgentCoin = (coin) => coin?.currencyName === 'INRFIAT' || coin?.currency
  *  addaplay; everyone else, and a wallet with no INR row, gets the list unchanged. */
 export function walletCoins(balances, agentPlayer) {
   if (!agentPlayer) return balances;
-  const inr = balances.filter(isAgentCoin);
-  return inr.length ? inr : balances;
+  // Never another coin for an agent's player, even when the INR row is missing.
+  return balances.filter(isAgentCoin);
 }
 
 /* The last public read, shared with the services that must not even ASK for a switched-off

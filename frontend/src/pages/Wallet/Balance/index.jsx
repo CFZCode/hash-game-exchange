@@ -59,18 +59,22 @@ function SummaryCell({ title, amount, first }) {
  * the other two on every row, so the first cell is the sum of the next two. That is worth knowing
  * before anyone "fixes" a fixture where they disagree.
  */
+const noBonus = () => Promise.resolve(null);
+
 function Summary({ balances }) {
   // Summed in USD (amount2usd), then printed in the owner's DEFAULT coin (user's request): the
   // wallet columns are the deposit money; bonus money is held apart (`/user/bonus-balance`).
   const cur = useSelectedCurrency({ site: true });
-  const { data: bonus } = useResource(getBonusBalance);
+  // Agent's player: no bonus at all — no read, no Bonus cell (user, 2026-10-18).
+  const bonusOn = useGates().on('bonus');
+  const { data: bonus } = useResource(bonusOn ? getBonusBalance : noBonus);
   const depositUsd = balances.reduce((sum, coin) => sum + amount2usd(coin.generalAmount, coin.currencyName), 0);
   const bonusUsd = (bonus?.balances ?? []).reduce((sum, b) => sum + amount2usd(b.amount, walletCode(b.currency)), 0);
   const cells = [
     { title: 'Total Balance', usd: depositUsd + bonusUsd },
     { title: 'Deposit Balance', usd: depositUsd },
     { title: 'Bonus Balance', usd: bonusUsd },
-  ].map(({ title, usd }) => ({ title, amount: cur.show(usd, 'USDFIAT') }));
+  ].filter((cell) => bonusOn || cell.title !== 'Bonus Balance').map(({ title, usd }) => ({ title, amount: cur.show(usd, 'USDFIAT') }));
 
   return (
     <div className="mb-5 flex items-center rounded-xl bg-layer5 p-5">

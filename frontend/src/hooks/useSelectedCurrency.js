@@ -1,4 +1,5 @@
 import React from 'react';
+import { useGates } from '../context/gates';
 import { useSession } from '../context/session';
 import { getUsdPrice } from '../data/usdPrice';
 import { convertCurrency, getAlias, printCurrency, walletCode } from '../utils/currency';
@@ -28,10 +29,14 @@ export function useSelectedCurrency({ site = false } = {}) {
   const siteCode = useSiteCurrency();
   const setting = session?.setting ?? {};
   const signedIn = Boolean(session?.login);
+  // An agent's player sees INR alone (user, 2026-10-18): no "View in currency", no owner coin.
+  const { ready, agentPlayer } = useGates();
   // `site`: bonus / promotion / VIP / wager figures always read in the owner's default coin
   // (owner panel `default_currency`), whatever the player picked in the header.
   const code = String(
-    site
+    ready && agentPlayer
+      ? 'INRFIAT'
+      : site
       ? walletCode(siteCode || 'USDT')
       : (setting.enableLocaleCurrency && setting.localeCurrencyName) || (signedIn && setting.currencyName) || 'USDT'
   ).toUpperCase();

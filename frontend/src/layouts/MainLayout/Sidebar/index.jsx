@@ -827,7 +827,8 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
                     </div>
                   </div>
                 </div>
-                <div className="Sidebar-Unit_bg nav-link-same flex-1 overflow-hidden rounded-lg lg:mt-1 lg:w-full">
+                {/* Agent's player: INR only, no display-currency picker. */}
+                {!gates.agentPlayer && <div className="Sidebar-Unit_bg nav-link-same flex-1 overflow-hidden rounded-lg lg:mt-1 lg:w-full">
                   <div
                     className="nav-link-item flex h-11 flex-1 items-center px-3 lg:h-10 lg:p-0 cursor-pointer"
                     onClick={() => openLangModal('currency')}
@@ -854,7 +855,7 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
                       <ArrowSvg className="rotate-180" />
                     </div>
                   </div>
-                </div>
+                </div>}
               </div>
 
               {/* ============================================================ */}

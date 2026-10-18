@@ -354,16 +354,18 @@ function CoinGroups({ visible, showTitles, settings, onPick, onClose }) {
  * `-mx-4` against the layer's `padding: 0 .5rem` overshoots by 8px a side, and that is the
  * point: `.scroll-y` clips the overflow, so the bar bleeds to the layer's edges instead of
  * sitting inside its gutter. Do not "fix" it to `-mx-2`. */
-function Footer({ settings, setSetting, sheet, onDeposit }) {
+function Footer({ settings, setSetting, sheet, onDeposit, viewIn = true }) {
   return (
     <div className="sticky bottom-0 z-20 -mx-4 mt-auto border-t border-third bg-layer4 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4">
       <div className="flex flex-none items-center justify-between">
         {/* `Be.emit("open-fiat")` then close — the display-currency dialog, which is what turns
             `enableLocaleCurrency` on and is not built. Left as a cursor and no handler rather
             than wired to a route: there is no route, it is an imperative popup. */}
-        <div className="flex cursor-pointer items-center text-secondary">
-          <IconSettings className="icon mr-1" /> View in currency
-        </div>
+        {viewIn && (
+          <div className="flex cursor-pointer items-center text-secondary">
+            <IconSettings className="icon mr-1" /> View in currency
+          </div>
+        )}
         <div className="ml-auto flex items-center text-secondary">
           <button
             type="button"
@@ -508,7 +510,8 @@ function Panel({ onClose, onManageAssets, sheet = false }) {
               layer that opened it. `button-m` is what `ot` writes for every desktop button, and
               `aspect-square` is what makes this one a 40px square beside a 40px field.
               `light-darkness` is dead in the dark theme; kept, like the row's `scroll-target`. */}
-          <button
+          {/* Agent's player: INR only, no other coin to add. */}
+          {!agentPlayer && <button
             type="button"
             className="button button-m fix-light-hover light-darkness center ml-2 aspect-square rounded-lg bg-layer4"
             aria-label="Manage assets"
@@ -518,7 +521,7 @@ function Panel({ onClose, onManageAssets, sheet = false }) {
             }}
           >
             <IconAddCurrency className="icon" />
-          </button>
+          </button>}
         </div>
 
         <div className="my-1 flex-auto">
@@ -538,7 +541,7 @@ function Panel({ onClose, onManageAssets, sheet = false }) {
               wallet whose every row Hide Small has swallowed) you get the site's bare Empty. */}
           {visible.length === 0 && !search && <Empty>Stay tuned-something&apos;s coming!</Empty>}
 
-          {visible.length === 0 && !!search && (
+          {visible.length === 0 && !!search && !agentPlayer && (
             /* The middle third of this block is a Swap Coin button pointing at `/wallet/swap`,
                a route this build does not have — it would fall through to the catch-all and
                silently show the home page, so it is left out and said so here rather than wired
@@ -558,6 +561,7 @@ function Panel({ onClose, onManageAssets, sheet = false }) {
           settings={session.setting}
           setSetting={setSetting}
           sheet={sheet && gateOn('deposit')}
+          viewIn={!agentPlayer}
           onDeposit={() => {
             onClose();
             navigate('/deposit');
