@@ -4,9 +4,10 @@ import { useState } from 'react'
 
 import Link from 'next/link'
 
-import { PencilIcon, PlusIcon, Trash2Icon } from 'lucide-react'
+import { ChartColumnIcon, PencilIcon, PlusIcon, Trash2Icon } from 'lucide-react'
 
 import Can from '@/components/shared/Can'
+import { FilterBar } from '@/components/shared/charts'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import ErrorState from '@/components/shared/ErrorState'
 import DataTable, { type Column } from '@/components/shared/DataTable'
@@ -26,6 +27,7 @@ import { check } from '@/lib/validate'
 import RewardStats from '@/views/promotions/RewardStats'
 
 import { useFinanceFilters } from './currencyFilter'
+import { useCurrencyCodes } from './useCurrencyCodes'
 import type { VaultDepositRow, VaultInterestRow, VaultLockPeriod, VaultStats } from './types'
 
 const BASE = 'admin/user/vault'
@@ -226,6 +228,7 @@ const Vault = () => {
   // The page's currency — the site's default coin until somebody picks another (in the URL, set
   // from the filter bar in the stats block). It drives the charts, the cards and both tables.
   const f = useFinanceFilters({ defaultPreset: '30d' })
+  const currencies = useCurrencyCodes()
   const rows = f.currency ? allRows.filter(r => r.coin === f.currency) : allRows
 
   return (
@@ -244,29 +247,37 @@ const Vault = () => {
           <ErrorState error={stats.error} title='Could not load vault stats' />
         </div>
       ) : null}
-      <div className='mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4'>
-        <StatCard label='Users in vault' value={formatNumber(users)} loading={stats.isLoading} hint={`${allRows.length} coin${allRows.length === 1 ? '' : 's'} · all coins`} />
-        {rows.slice(0, 2).map(r => (
-          <StatCard key={r.coin} label={`${r.coin} locked`} value={<Money value={r.totalBalance} currency={r.coin} />} loading={stats.isLoading} />
-        ))}
-        {!stats.isLoading && rows.length === 0 && <StatCard label={f.currency ? `${f.currency} locked` : 'Locked balance'} value='—' hint='No open deposits' />}
-        <StatCard label='Interest paid today' value={formatNumber(Number(data?.todayInterest ?? 0) || 0)} loading={stats.isLoading} hint='All coins, credited today' />
-      </div>
-      <RewardStats section='vault' filters={f} />
+      {/* Lists pehle, cards + charts alag "Stats" tab me (Deposit / Withdraw screens jaisa). */}
       <Tabs defaultValue='deposits'>
         <TabsList className='mb-4'>
           <TabsTrigger value='deposits'>Deposits</TabsTrigger>
           <TabsTrigger value='interest'>Interest history</TabsTrigger>
           <TabsTrigger value='periods'>Lock periods</TabsTrigger>
+          <TabsTrigger value='stats'>
+            <ChartColumnIcon /> Stats
+          </TabsTrigger>
         </TabsList>
         <TabsContent value='deposits'>
+          <FilterBar filters={f} currencies={currencies} className='mb-4' />
           <Deposits coin={f.currency} />
         </TabsContent>
         <TabsContent value='interest'>
+          <FilterBar filters={f} currencies={currencies} className='mb-4' />
           <Interest coin={f.currency} />
         </TabsContent>
         <TabsContent value='periods'>
           <Periods />
+        </TabsContent>
+        <TabsContent value='stats'>
+          <div className='mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4'>
+            <StatCard label='Users in vault' value={formatNumber(users)} loading={stats.isLoading} hint={`${allRows.length} coin${allRows.length === 1 ? '' : 's'} · all coins`} />
+            {rows.slice(0, 2).map(r => (
+              <StatCard key={r.coin} label={`${r.coin} locked`} value={<Money value={r.totalBalance} currency={r.coin} />} loading={stats.isLoading} />
+            ))}
+            {!stats.isLoading && rows.length === 0 && <StatCard label={f.currency ? `${f.currency} locked` : 'Locked balance'} value='—' hint='No open deposits' />}
+            <StatCard label='Interest paid today' value={formatNumber(Number(data?.todayInterest ?? 0) || 0)} loading={stats.isLoading} hint='All coins, credited today' />
+          </div>
+          <RewardStats section='vault' filters={f} />
         </TabsContent>
       </Tabs>
     </div>
