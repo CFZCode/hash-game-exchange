@@ -73,6 +73,8 @@ function createProxy({ target, name, timeoutMs = 35_000, logger }) {
         agent: agents[upstream.protocol],
       },
       (upstreamRes) => {
+        // A late reply after the 504 was already sent: writing again throws and crashed the gateway.
+        if (res.headersSent) return upstreamRes.resume();
         const responseHeaders = { ...upstreamRes.headers };
         for (const header of Object.keys(responseHeaders)) {
           if (HOP_BY_HOP.has(header.toLowerCase())) delete responseHeaders[header];
