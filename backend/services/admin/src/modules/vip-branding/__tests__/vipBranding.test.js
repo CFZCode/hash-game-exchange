@@ -9,7 +9,8 @@ const v = require('../vipBranding.validators');
 const platform = VIP_LADDERS.platform;
 
 test('the seed names cover every platform level, reference names first', () => {
-  assert.strictEqual(NAMES.length, platform.levels.length + 1);
+  // Seeded for the old 41-level ladder; migration 133 drops the rows past L33. Every level has one.
+  assert.ok(NAMES.length >= platform.levels.length + 1);
   assert.deepStrictEqual(NAMES.slice(0, 3), ['Beginner', 'Bronze I', 'Bronze II']);
   assert.strictEqual(NAMES[33], 'Eternal X');
 });
@@ -22,12 +23,12 @@ test('rebrand renames and badges without touching bands, cards or thresholds', (
   assert.strictEqual(two.card, platform.levels.find((b) => b.level === 2).card);
   assert.strictEqual(two.minXp, platform.levels.find((b) => b.level === 2).minXp);
   assert.match(two.badgeUrl, /\/badges\/bronze\/image\?v=abc$/);
-  const standing = ladder.levelFor('1000');
+  const standing = ladder.levelFor('3000');
   assert.strictEqual(standing.name, 'Bronze II');
   assert.ok(standing.badgeUrl);
   // A level with no override keeps its built-in name; no badges, no URL.
   assert.strictEqual(ladder.levels.find((b) => b.level === 3).name, platform.levels.find((b) => b.level === 3).name);
-  assert.strictEqual(ladder.levels.find((b) => b.card === 'wood').badgeUrl, null);
+  assert.strictEqual(ladder.levels.find((b) => b.card === 'silver').badgeUrl, null);
 });
 
 test('no overrides returns the same ladder', () => {

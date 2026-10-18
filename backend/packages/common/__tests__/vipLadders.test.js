@@ -19,16 +19,18 @@ test('vip ladders', async (t) => {
     }
   });
 
-  await t.test('the platform ladder is the default and unchanged', () => {
+  await t.test('the platform ladder is the default — hash.game\'s 33 levels', () => {
     assert.equal(vipLadderFor(undefined), PLATFORM_LADDER);
     assert.equal(vipLadderFor('stake'), PLATFORM_LADDER);
     assert.equal(vipLadderFor('none'), PLATFORM_LADDER);
-    assert.equal(PLATFORM_LADDER.levels.length, 41);
+    assert.equal(PLATFORM_LADDER.levels.length, 33);
     assert.deepEqual(PLATFORM_LADDER.levels, VIP_LEVELS);
-    // The documented example: 120,000 wagered is level 12, Gold 1.
-    assert.deepEqual([vipLevelFor('120000').level, vipLevelFor('120000').name], [12, 'Gold 1']);
-    assert.equal(vipLevelFor('499').level, 0);
-    assert.equal(vipLevelFor('500').name, 'Wood');
+    // hash.game: Bronze I at 1,000, Bronze IV at 15,000, Silver III at 120,000, Eternal X at 10 bn.
+    assert.deepEqual([vipLevelFor('999').level, vipLevelFor('999').name], [0, 'Beginner']);
+    assert.deepEqual([vipLevelFor('1000').level, vipLevelFor('1000').name], [1, 'Bronze I']);
+    assert.equal(vipLevelFor('15000').name, 'Bronze IV');
+    assert.deepEqual([vipLevelFor('120000').level, vipLevelFor('120000').name], [7, 'Silver III']);
+    assert.equal(vipLevelFor('10000000000').name, 'Eternal X');
   });
 
   await t.test("club_ladder is the reference's 75 bands, named VIP 01 … VIP 75", () => {
@@ -49,7 +51,7 @@ test('vip ladders', async (t) => {
     const a = VIP_LADDERS.addaplay;
     // Below the first band: level 0, distance to the first band, not its floor.
     assert.deepEqual([a.levelFor('0').level, a.levelFor('0').name, a.levelFor('0').wagerToNextLevel], [0, 'VIP 00', '1']);
-    assert.equal(PLATFORM_LADDER.levelFor('300').wagerToNextLevel, '200');
+    assert.equal(PLATFORM_LADDER.levelFor('300').wagerToNextLevel, '700');
     // Above the top: stays at the top, open-ended.
     const whale = a.levelFor('999999999999999');
     assert.deepEqual([whale.level, whale.nextLevel, whale.progressPct], [75, null, '100.00']);
@@ -61,7 +63,7 @@ test('vip ladders', async (t) => {
   });
 
   await t.test('each ladder carries its own bonus gates', () => {
-    assert.deepEqual(PLATFORM_LADDER.bonusGates, { daily: 2, weekly: 2, monthly: 7 });
+    assert.deepEqual(PLATFORM_LADDER.bonusGates, { daily: 1, weekly: 1, monthly: 1 });
     assert.deepEqual(VIP_LADDERS.addaplay.bonusGates, { daily: 20, weekly: 25, monthly: 30 });
     // 1,000 wagered clears the platform daily gate; on addaplay it takes 29,000.
     assert.ok(PLATFORM_LADDER.levelFor('1000').level >= PLATFORM_LADDER.bonusGates.daily);
@@ -102,4 +104,13 @@ test('a fractional wager between two integer bands lands in the lower band', () 
     assert.equal(Number(r.wagerToNextLevel), 0.5);
     assert.ok(Number(r.progressPct) < 100);
   }
+});
+
+test('admin thresholds move the bands; a set that does not climb is ignored', () => {
+  const { rebrand } = require('../src/vipLadders');
+  const moved = rebrand(PLATFORM_LADDER, { names: new Map([[1, 'Bronze One']]), badges: new Map(), thresholds: new Map([[1, '800']]) });
+  assert.deepEqual([moved.levelFor('800').level, moved.levelFor('800').name], [1, 'Bronze One']);
+  assert.equal(moved.levels[0].maxXp, 2999);
+  const broken = rebrand(PLATFORM_LADDER, { names: new Map(), badges: new Map(), thresholds: new Map([[2, '500']]) });
+  assert.equal(broken.levelFor('1000').level, 1, 'a threshold below the level beneath it changes nothing');
 });

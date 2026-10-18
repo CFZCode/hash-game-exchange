@@ -41,16 +41,28 @@ class VipBrandingService {
     return { ladder: ladder.key, levels, badges: cards.map((card) => ({ card, url: badgeOf.get(card) ?? null })) };
   }
 
-  async rename({ staff, level, name }) {
+  async rename({ staff, level, name, minXp }) {
     const ladder = await resolveVipLadder(this.models, { logger: this.logger });
     if (level !== 0 && !ladder.levels.some((b) => b.level === level)) throw errors.UNKNOWN_LEVEL({ level });
+    if (minXp != null) {
+      // Level 0 has no threshold, and a threshold must sit between its neighbours' or the ladder breaks.
+      const index = ladder.levels.findIndex((b) => b.level === level);
+      const below = ladder.levels[index - 1];
+      const above = ladder.levels[index + 1];
+      if (level === 0 || (below && Number(minXp) <= Number(below.minXp)) || (above && Number(minXp) >= Number(above.minXp))) {
+        throw errors.BAD_THRESHOLD({ level, minXp, below: below?.minXp ?? null, above: above?.minXp ?? null });
+      }
+    }
+    const setXp = minXp !== undefined;
     await this.sequelize.query(
-      `INSERT INTO vip_level_names (level, name, updated_by, updated_at) VALUES (:level, :name, :by, NOW())
-       ON CONFLICT (level) DO UPDATE SET name = EXCLUDED.name, updated_by = EXCLUDED.updated_by, updated_at = NOW()`,
-      { replacements: { level, name, by: staff?.id ?? null } }
+      `INSERT INTO vip_level_names (level, name, ${setXp ? 'min_xp, ' : ''}updated_by, updated_at)
+       VALUES (:level, :name, ${setXp ? ':minXp, ' : ''}:by, NOW())
+       ON CONFLICT (level) DO UPDATE SET name = EXCLUDED.name, ${setXp ? 'min_xp = EXCLUDED.min_xp, ' : ''}
+         updated_by = EXCLUDED.updated_by, updated_at = NOW()`,
+      { replacements: { level, name, minXp: minXp ?? null, by: staff?.id ?? null } }
     );
     clearVipBranding();
-    return { level, name };
+    return { level, name, ...(setXp ? { minXp } : {}) };
   }
 
   async setBadge({ staff, card, file }) {

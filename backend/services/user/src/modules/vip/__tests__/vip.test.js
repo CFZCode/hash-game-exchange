@@ -113,7 +113,7 @@ test('vip', async (t) => {
       newWager: '1500',
     });
 
-    assert.equal(result.vip.level, 2);
+    assert.equal(result.vip.level, 1); // Bronze I
     assert.equal(result.vip.card, 'bronze');
     assert.equal(result.rate, '0.002');
 
@@ -125,24 +125,24 @@ test('vip', async (t) => {
     const uid = newUid();
     await seed(uid);
 
-    await vip.onWager({ userId: uid, previousWager: '0', newWager: '500' });
+    await vip.onWager({ userId: uid, previousWager: '0', newWager: '1000' });
 
-    assert.equal(await usdt(uid), '0.50000000'); // wood levelUp, in USDT
+    assert.equal(await usdt(uid), '1.00000000'); // Bronze I levelUp, in USDT (no rank-up out of Beginner)
     assert.equal(await bjb(uid), '0.00000000', 'nothing is credited to the retired BJB coin');
-    const again = await vip.onWager({ userId: uid, previousWager: '500', newWager: '600' });
+    const again = await vip.onWager({ userId: uid, previousWager: '1000', newWager: '1200' });
     assert.equal(again.granted.length, 0, 'same level does not pay again');
-    assert.equal(await usdt(uid), '0.50000000');
+    assert.equal(await usdt(uid), '1.00000000');
   });
 
   await t.test('crossing into a new card also credits a rank-up bonus', async () => {
     const uid = newUid();
     await seed(uid);
 
-    // Jump straight past Wood into Bronze 1.
+    // Bronze IV → Silver I.
     const result = await vip.onWager({
       userId: uid,
-      previousWager: '0',
-      newWager: '1000',
+      previousWager: '15000',
+      newWager: '30000',
     });
 
     const kinds = result.granted.map((g) => g.kind);
@@ -156,7 +156,7 @@ test('vip', async (t) => {
     const uid = newUid();
     await seed(uid);
 
-    const result = await vip.onWager({ userId: uid, previousWager: '0', newWager: '1000' });
+    const result = await vip.onWager({ userId: uid, previousWager: '0', newWager: '30000' });
     assert.ok(result.granted.length >= 2);
     assert.equal(REWARD_CURRENCY, 'USDT');
 
@@ -168,7 +168,7 @@ test('vip', async (t) => {
   await t.test('awardPeriodic creates claimable daily/weekly rows for Bronze+', async () => {
     const uid = newUid();
     await seed(uid, { wager: '1500' });
-    assert.equal(vipLevelFor('1500').level, 2);
+    assert.equal(vipLevelFor('1500').level, 1);
 
     const first = await vip.awardPeriodic({ userId: uid });
     assert.ok(first.awarded >= 2, `expected daily+weekly, got ${first.awarded}`);
@@ -178,7 +178,8 @@ test('vip', async (t) => {
     assert.equal(overview.types.daily.claimable, true);
     assert.equal(overview.types.weekly.claimable, true);
     assert.ok(overview.types.daily.award?.amount);
-    assert.equal(overview.types.monthly.eligible, false);
+    // hash.game: Bronze I opens all three (the monthly gate is level 1 too).
+    assert.equal(overview.types.monthly.eligible, true);
 
     const claimed = await bonus.claim({ userId: uid, type: 'daily' });
     assert.ok(money.gt(claimed.amount, '0'));

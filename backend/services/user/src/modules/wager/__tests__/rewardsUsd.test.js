@@ -137,7 +137,7 @@ test('rewards in USD, paid in the reward currency', async (t) => {
   });
 
   for (const code of ['USDT', 'INR']) {
-    await t.test(`₹1,500 ($18) pays nothing; ₹50,000 ($600) pays Wood's level-up — reward currency ${code}`, async () => {
+    await t.test(`₹1,500 ($18) pays nothing; ₹1,00,000 ($1,200) pays Bronze I's level-up — reward currency ${code}`, async () => {
       const { uid } = await seed();
       const rewardMoney = rewardMoneyIn(code);
       const vip = new VipService({ ...base, rewardMoney });
@@ -151,17 +151,17 @@ test('rewards in USD, paid in the reward currency', async (t) => {
       await service.record({ userId: uid, amount: '1500', currency: 'INR', source: 'qa-sim', ref: ref() });
       // $18 is below the first band: the INR-counted ladder paid 6.5 USDT here.
       assert.equal(await balance(uid, code), '0.00000000');
-      await service.record({ userId: uid, amount: '48500', currency: 'INR', source: 'qa-sim', ref: ref() });
+      await service.record({ userId: uid, amount: '98500', currency: 'INR', source: 'qa-sim', ref: ref() });
 
       // What the ladder owes for $18 of wager, in USD.
       const ladder = await resolveVipLadder(models, { logger });
-      const reached = ladder.levelFor(money.toDecimalString(money.multiply('50000', inrRate))).level;
+      const reached = ladder.levelFor(money.toDecimalString(money.multiply('100000', inrRate))).level;
       let owedUsd = '0.00000000';
       for (let level = 1; level <= reached; level += 1) owedUsd = money.toDecimalString(money.add(owedUsd, vipRewards.levelUpAmount(level)));
       const expected = code === 'USDT' ? owedUsd : money.toDecimalString(money.divide(owedUsd, inrRate));
 
       assert.equal(await balance(uid, code), expected);
-      assert.ok(money.gt(owedUsd, '0'), '$600 crosses at least one band');
+      assert.ok(money.gt(owedUsd, '0'), '$1,200 crosses Bronze I');
       {
         const record = await models.Userbonus.findOne({ where: { userid: uid }, raw: true });
         assert.equal(money.toDecimalString(money.toMinorQuantised(record.vipbonus)), expected, 'vipbonus mirrored');

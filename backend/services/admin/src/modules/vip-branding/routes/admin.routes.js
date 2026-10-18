@@ -27,7 +27,7 @@ module.exports = function adminRoutes(deps) {
     canWrite,
     validate(v.rename),
     withActivity({ action: 'vip.rename', describe: (req) => ({ targetType: 'VIP_LEVEL', targetId: String(req.params.level), details: req.body }) }),
-    asyncHandler(async (req, res) => response.ok(res, await service.rename({ staff: req.staff, level: req.params.level, name: req.body.name })))
+    asyncHandler(async (req, res) => response.ok(res, await service.rename({ staff: req.staff, level: req.params.level, name: req.body.name, minXp: req.body.minXp })))
   );
 
   router.put(

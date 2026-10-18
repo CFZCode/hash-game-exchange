@@ -42,7 +42,7 @@ const CARD_TONE: Record<string, string> = {
   diamond: 'bg-violet-500/15 text-violet-800 dark:text-violet-300'
 }
 
-// ── VIP ladder (read-only; no staff route exists) ─────────────────────
+// ── VIP ladder (names + thresholds editable through admin/vip-branding) ─────────
 
 // ── VIP branding: per-level names and per-card badges (admin/vip-branding, migration 120) ──
 
@@ -62,13 +62,15 @@ const proxied = (url: string | null) => {
   return m ? `/api/gw/api/v1/${m[1]}` : null
 }
 
-const RenameLevel = ({ level, name, defaultName }: { level: number; name: string; defaultName: string }) => {
+const RenameLevel = ({ level, name, defaultName, minXp }: { level: number; name: string; defaultName: string; minXp: string | null }) => {
   const [value, setValue] = useState(name)
+  const [xp, setXp] = useState(minXp ?? '')
 
   const save = useApiMutation({
-    fn: () => api.put(`${BRANDING}/levels/${level}`, { name: value.trim() }),
+    // Level 0 (Beginner) has no threshold; every other level sends its USD floor (migration 133).
+    fn: () => api.put(`${BRANDING}/levels/${level}`, { name: value.trim(), ...(level > 0 && xp.trim() ? { minXp: xp.trim() } : {}) }),
     invalidate: BRANDING_INVALIDATE,
-    success: () => `L${level} renamed`
+    success: () => `L${level} saved`
   })
 
   return (
@@ -78,13 +80,19 @@ const RenameLevel = ({ level, name, defaultName }: { level: number; name: string
           <PencilIcon />
         </Button>
       }
-      title={`Rename L${level}`}
-      description={`What players see for this level. The wager threshold and rewards don't change. Built-in name: ${defaultName}.`}
-      submitLabel='Save name'
+      title={`Edit L${level}`}
+      description={`What players see for this level and the USD wager that reaches it. A threshold must sit between the levels around it. Built-in name: ${defaultName}.`}
+      submitLabel='Save'
       onSubmit={() => save.mutateAsync()}
-      validate={() => ({ [`vip-name-${level}`]: value.trim() ? (value.trim().length > 40 ? 'At most 40 characters' : undefined) : 'Enter a name' })}
+      validate={() => ({
+        [`vip-name-${level}`]: value.trim() ? (value.trim().length > 40 ? 'At most 40 characters' : undefined) : 'Enter a name',
+        [`vip-xp-${level}`]: level > 0 && xp.trim() && !/^\d{1,14}(\.\d{1,2})?$/.test(xp.trim()) ? 'A USD amount, e.g. 1000' : undefined
+      })}
     >
       <TextField id={`vip-name-${level}`} label='Level name' required maxLength={40} value={value} onChange={e => setValue(e.target.value)} />
+      {level > 0 && (
+        <TextField id={`vip-xp-${level}`} label='Wager to reach this level (USD)' inputMode='decimal' value={xp} onChange={e => setXp(e.target.value)} />
+      )}
     </FormDialog>
   )
 }
@@ -158,7 +166,7 @@ const VipLadder = () => {
             <span className='font-medium'>{b?.name ?? r.name}</span>
             {b && (
               <Can permission='config:write'>
-                <RenameLevel level={r.level} name={b.name} defaultName={b.defaultName} />
+                <RenameLevel level={r.level} name={b.name} defaultName={b.defaultName} minXp={r.level > 0 ? String(r.minXp) : null} />
               </Can>
             )}
           </span>
@@ -174,7 +182,7 @@ const VipLadder = () => {
     <div className='grid gap-4'>
       <RewardCurrencyNotice />
       <p className='text-muted-foreground text-sm'>
-        The ladder the site shows users, read from the public <code>user/vip/levels</code> route. Thresholds are wagering totals kept in USD (every bet — casino and sports, in any currency — is converted to USD when it is recorded) and shown here in the site’s default coin at today’s rate; level-up and rank-up rewards are designed in USD and paid in the reward currency at the day’s rate. The platform has no staff route to change them; the daily / weekly / monthly bonus thresholds (VIP {gates?.daily ?? 20} / {gates?.weekly ?? 25} / {gates?.monthly ?? 30}) live on the <Link href='/bonus' className='underline'>Bonus</Link> screen.
+        The ladder the site shows users, read from the public <code>user/vip/levels</code> route. Thresholds are wagering totals kept in USD (every bet — casino and sports, in any currency — is converted to USD when it is recorded) and shown here in the site’s default coin at today’s rate; level-up and rank-up rewards are designed in USD and paid in the reward currency at the day’s rate. Names and thresholds are edited with the pencil on each row (hash.game's ladder is the default); the daily / weekly / monthly bonus thresholds (VIP {gates?.daily ?? 20} / {gates?.weekly ?? 25} / {gates?.monthly ?? 30}) live on the <Link href='/bonus' className='underline'>Bonus</Link> screen.
       </p>
       <div className='grid grid-cols-2 gap-4 lg:grid-cols-4'>
         <StatCard label='Levels' value={formatNumber(levels.length)} hint={q.data?.label} loading={q.isLoading} />

@@ -144,12 +144,12 @@ test('wager pipeline end to end', async (t) => {
 
   // ── climb ───────────────────────────────────────────────────────────
 
-  /* Mixed INR / USDT stakes walking Unranked → Wood → Bronze 1 → Bronze 4 → Silver 1. */
+  /* Mixed INR / USDT stakes walking Beginner → Bronze I → Bronze II → Silver I (hash.game ladder). */
   const climb = [
-    { amount: '50000', currency: 'INR' }, //  $600  → Wood
-    { amount: '500', currency: 'USDT' }, //   $1,100 → Bronze 1 (rank-up)
-    { amount: '250000', currency: 'INR' }, // $4,100 → Bronze 4
-    { amount: '6000', currency: 'USDT' }, //  $10,100 → Silver 1 (rank-up)
+    { amount: '50000', currency: 'INR' }, //  $600    → Beginner
+    { amount: '500', currency: 'USDT' }, //   $1,100  → Bronze I (no rank-up out of Beginner)
+    { amount: '250000', currency: 'INR' }, // $4,100  → Bronze II
+    { amount: '26000', currency: 'USDT' }, // $30,100 → Silver I (rank-up)
   ];
 
   for (const code of ['USDT', 'INR']) {
@@ -183,22 +183,22 @@ test('wager pipeline end to end', async (t) => {
         totalUsd = next;
       }
 
-      assert.equal(totalUsd, '10100.00000000');
+      assert.equal(totalUsd, '30100.00000000');
       assert.equal(await wagerOf(player.uid), totalUsd);
-      assert.equal(ladder.levelFor(totalUsd).level, 7, 'Silver 1');
-      assert.equal(expectedVipUsd, '37.50000000', 'level-ups 1..7 (7.5) + Bronze (5) + Silver (25) rank-ups');
+      assert.equal(ladder.levelFor(totalUsd).level, 5, 'Silver I');
+      assert.equal(expectedVipUsd, '31.00000000', 'level-ups 1..4 (4 × 1) + Silver I (2) + the Silver rank-up (25)');
       assert.equal(await balance(player.uid, code), sumIn(awards, code), `VIP paid in ${code}`);
       const other = code === 'USDT' ? 'INR' : 'USDT';
       assert.equal(await balance(player.uid, other), '0.00000000', `nothing paid in ${other}`);
       assert.equal(
         await models.CreditsLedger.count({ where: { user_id: String(player.uid), reason: 'BONUS' } }),
-        9,
-        '7 level-ups + 2 rank-ups, one ledger row each'
+        6,
+        '5 level-ups + 1 rank-up, one ledger row each'
       );
 
       assert.equal(await rakeOf(player.uid), expectedRake, 'rakeback accrued on the USD stake at the card rate');
 
-      assert.equal(commissions.reduce((acc, c) => m(money.add(acc, c)), '0.00000000'), '505.00000000', '5% of $10,100');
+      assert.equal(commissions.reduce((acc, c) => m(money.add(acc, c)), '0.00000000'), '1505.00000000', '5% of $30,100');
       assert.equal(await commissionOf(owner.uid), sumIn(commissions, code), `5% of each USD delta, in ${code}`);
       const coins = await models.Rewards.findAll({ where: { owner_id: owner.uid, type: 'commission' }, attributes: ['coin'], raw: true });
       assert.ok(coins.every((r) => r.coin === code));
@@ -206,7 +206,7 @@ test('wager pipeline end to end', async (t) => {
       // ── reverse the Silver stake ──
       const balanceBefore = await balance(player.uid, code);
       const commissionBefore = await commissionOf(owner.uid);
-      const silverUsd = '6000.00000000';
+      const silverUsd = '26000.00000000';
       const silverRake = m(money.multiply(silverUsd, vipRewards.rakebackRateForCard('silver')));
       const out = await service.reverse({ userId: player.uid, source: 'qa-pipe', ref: refs[3] });
       assert.equal(out.reversed, true);
@@ -226,10 +226,10 @@ test('wager pipeline end to end', async (t) => {
       assert.equal(await wagerOf(player.uid), '4100.00000000', 'no double reversal');
 
       // ── re-climb: the bands already paid do not pay again ──
-      await service.record({ userId: player.uid, amount: '6000', currency: 'USDT', source: 'qa-pipe', ref: ref() });
-      assert.equal(await wagerOf(player.uid), '10100.00000000');
+      await service.record({ userId: player.uid, amount: '26000', currency: 'USDT', source: 'qa-pipe', ref: ref() });
+      assert.equal(await wagerOf(player.uid), '30100.00000000');
       assert.equal(await balance(player.uid, code), balanceBefore, 'level-ups paid once ever');
-      assert.equal(await models.CreditsLedger.count({ where: { user_id: String(player.uid), reason: 'BONUS' } }), 9);
+      assert.equal(await models.CreditsLedger.count({ where: { user_id: String(player.uid), reason: 'BONUS' } }), 6);
     });
   }
 
@@ -239,8 +239,8 @@ test('wager pipeline end to end', async (t) => {
     const player = await seed();
     const { service } = pipelineIn('USDT');
     const key = ref();
-    const first = await service.record({ userId: player.uid, amount: '700', currency: 'USDT', source: 'qa-pipe', ref: key });
-    const second = await service.record({ userId: player.uid, amount: '700', currency: 'USDT', source: 'qa-pipe', ref: key });
+    const first = await service.record({ userId: player.uid, amount: '900', currency: 'USDT', source: 'qa-pipe', ref: key });
+    const second = await service.record({ userId: player.uid, amount: '900', currency: 'USDT', source: 'qa-pipe', ref: key });
     assert.equal(first.counted, true);
     assert.equal(second.duplicate, true);
 
@@ -250,21 +250,22 @@ test('wager pipeline end to end', async (t) => {
     );
     assert.equal(burst.filter((r) => r.counted).length, 1);
     assert.equal(burst.filter((r) => r.duplicate).length, 4);
-    assert.equal(await wagerOf(player.uid), '800.00000000');
-    assert.equal(await balance(player.uid, 'USDT'), '0.50000000', 'Wood level-up once');
-    assert.equal(await models.RakebackAccrual.count({ where: { user_id: player.uid } }), 2);
+    assert.equal(await wagerOf(player.uid), '1000.00000000');
+    assert.equal(await balance(player.uid, 'USDT'), '1.00000000', 'Bronze I level-up once');
+    // The first $900 is a Beginner stake (no rakeback); the burst reaches Bronze I and accrues once.
+    assert.equal(await models.RakebackAccrual.count({ where: { user_id: player.uid } }), 1);
   });
 
   await t.test("concurrent records for a NEW player (no userwager row yet) all count", async () => {
     const player = await seed();
     const { service } = pipelineIn('USDT');
     const results = await Promise.all(
-      Array.from({ length: 6 }, () => service.record({ userId: player.uid, amount: '100', currency: 'USDT', source: 'qa-pipe', ref: ref() }))
+      Array.from({ length: 6 }, () => service.record({ userId: player.uid, amount: '200', currency: 'USDT', source: 'qa-pipe', ref: ref() }))
     );
     assert.deepEqual(results.map((r) => r.counted), [true, true, true, true, true, true], JSON.stringify(results));
-    assert.equal(await wagerOf(player.uid), '600.00000000');
+    assert.equal(await wagerOf(player.uid), '1200.00000000');
     assert.equal(await models.WagerActivity.count({ where: { user_id: player.uid } }), 6);
-    assert.equal(await balance(player.uid, 'USDT'), '0.50000000', 'Wood level-up exactly once');
+    assert.equal(await balance(player.uid, 'USDT'), '1.00000000', 'Bronze I level-up exactly once');
   });
 
   await t.test('concurrent records for an existing player cross a band once and sum exactly', async () => {
@@ -274,10 +275,10 @@ test('wager pipeline end to end', async (t) => {
     await Promise.all(
       Array.from({ length: 10 }, () => service.record({ userId: player.uid, amount: '10000', currency: 'INR', source: 'qa-pipe', ref: ref() }))
     );
-    // $1 + 10 × $120 = $1,201 → Bronze 1: Wood 0.5 + Bronze 1 level-up 1 + Bronze rank-up 5.
+    // $1 + 10 × $120 = $1,201 → Bronze I: its level-up (1) once; no rank-up out of Beginner.
     assert.equal(await wagerOf(player.uid), '1201.00000000');
-    assert.equal(await balance(player.uid, 'INR'), sumIn(['0.50000000', '1.00000000', '5.00000000'], 'INR'));
-    assert.equal(await models.CreditsLedger.count({ where: { user_id: String(player.uid), reason: 'BONUS' } }), 3);
+    assert.equal(await balance(player.uid, 'INR'), sumIn(['1.00000000'], 'INR'));
+    assert.equal(await models.CreditsLedger.count({ where: { user_id: String(player.uid), reason: 'BONUS' } }), 1);
   });
 
   await t.test('concurrent reversals of one stake reverse it once', async () => {

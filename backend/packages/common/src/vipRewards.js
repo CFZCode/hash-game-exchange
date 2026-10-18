@@ -120,6 +120,16 @@ const CARD_REWARDS = Object.freeze({
     rankUp: '1000',
     levelUp: '60',
   },
+  /* hash.game's top tier (Eternal I–X). Its amounts are not public ("Maximum Level Up, Weekly &
+     Monthly Bonus"), so it starts one step above Diamond. */
+  eternal: {
+    rakebackRate: '0.007',
+    daily: '100',
+    weekly: '400',
+    monthly: '1500',
+    rankUp: '1500',
+    levelUp: '100',
+  },
 });
 
 /** Fallback when a player's rate has not been synced yet. Matches bronze. */

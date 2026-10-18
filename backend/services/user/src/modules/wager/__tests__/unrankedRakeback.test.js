@@ -84,10 +84,10 @@ test('unranked stakes accrue no rakeback', async (t) => {
     assert.equal(await models.RakebackAccrual.count({ where: { user_id: uid } }), 0);
   });
 
-  await t.test('the stake that reaches Wood accrues at the Wood rate', async () => {
-    await service.record({ userId: uid, amount: '300', currency: 'USDT', source: 'unr-test', ref: `unr-${uid}-2` });
-    const wood = vipRewards.rakebackRateForCard('wood');
-    assert.equal(await rakeOf(), money.toDecimalString(money.multiply('300', wood)), '300 × Wood rate');
+  await t.test('the stake that reaches Bronze I accrues at the Bronze rate', async () => {
+    await service.record({ userId: uid, amount: '700', currency: 'USDT', source: 'unr-test', ref: `unr-${uid}-2` });
+    const bronze = vipRewards.rakebackRateForCard('bronze');
+    assert.equal(await rakeOf(), money.toDecimalString(money.multiply('700', bronze)), '700 × Bronze rate');
   });
 
   await t.test('a reversal of the Unranked stake still works with no accrual behind it', async () => {

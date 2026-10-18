@@ -183,24 +183,28 @@ function clearVipBranding() {
 }
 
 async function vipBranding(sequelize, { logger } = {}) {
-  if (!sequelize?.query) return { names: new Map(), badges: new Map() };
+  if (!sequelize?.query) return { names: new Map(), badges: new Map(), thresholds: new Map() };
   if (branding.value && Date.now() - branding.at < BRANDING_TTL_MS) return branding.value;
   try {
     const [names, badges] = await Promise.all([
-      sequelize.query('SELECT level, name FROM vip_level_names', { type: 'SELECT' }),
+      sequelize.query('SELECT level, name, min_xp FROM vip_level_names', { type: 'SELECT' }).catch(() =>
+        // Before migration 133 there is no min_xp: names only.
+        sequelize.query('SELECT level, name FROM vip_level_names', { type: 'SELECT' })
+      ),
       sequelize.query('SELECT card, version FROM vip_badges', { type: 'SELECT' }),
     ]);
     branding = {
       at: Date.now(),
       value: {
         names: new Map(names.map((r) => [Number(r.level), String(r.name)])),
+        thresholds: new Map(names.filter((r) => r.min_xp != null).map((r) => [Number(r.level), String(Number(r.min_xp))])),
         badges: new Map(badges.map((r) => [String(r.card), String(r.version)])),
       },
     };
   } catch (error) {
     // Tables not migrated yet (or unreadable): the built-in names, no badges.
     logger?.warn({ err: error.message }, 'vip: branding unreadable, using the built-in names');
-    branding = { at: Date.now(), value: { names: new Map(), badges: new Map() } };
+    branding = { at: Date.now(), value: { names: new Map(), badges: new Map(), thresholds: new Map() } };
   }
   return branding.value;
 }
@@ -209,14 +213,25 @@ const badgeUrlOf = (card, badges) =>
   badges.has(card) ? `/api/v1/admin/vip-branding/badges/${encodeURIComponent(card)}/image?v=${badges.get(card)}` : null;
 
 /** The ladder with admin names and badge URLs laid over it; the same ladder when there are none. */
-function rebrand(ladder, { names, badges }) {
-  if (!names.size && !badges.size) return ladder;
+function rebrand(ladder, { names, badges, thresholds = new Map() }) {
+  if (!names.size && !badges.size && !thresholds.size) return ladder;
+  const floors = ladder.levels.map((b) => thresholds.get(b.level) ?? String(b.minXp));
+  /* Thresholds the admin set must still climb; a set that does not (a half-finished edit) is
+     ignored whole rather than ranking players on a broken ladder. */
+  const climbs = floors.every((xp, i) => i === 0 || Number(xp) > Number(floors[i - 1]));
   return makeLadder({
     key: ladder.key,
     label: ladder.label,
     bonusGates: ladder.bonusGates,
     unranked: { ...ladder.unranked, name: names.get(0) ?? ladder.unranked.name, badgeUrl: badgeUrlOf(ladder.unranked.card, badges) },
-    bands: ladder.levels.map((b) => ({ ...b, name: names.get(b.level) ?? b.name, badgeUrl: badgeUrlOf(b.card, badges) })),
+    bands: ladder.levels.map((b, i) => ({
+      ...b,
+      name: names.get(b.level) ?? b.name,
+      badgeUrl: badgeUrlOf(b.card, badges),
+      ...(climbs && thresholds.size
+        ? { minXp: Number(floors[i]), maxXp: i + 1 < floors.length ? Number(floors[i + 1]) - 1 : b.maxXp }
+        : {}),
+    })),
   });
 }
 
