@@ -4,7 +4,7 @@ import { useState } from 'react'
 
 import Link from 'next/link'
 
-import { CoinsIcon, PencilIcon, PlusIcon, SearchIcon, Trash2Icon } from 'lucide-react'
+import { ChartColumnIcon, CoinsIcon, PencilIcon, PlusIcon, SearchIcon, Trash2Icon } from 'lucide-react'
 
 import { useStatsFilters } from '@/components/shared/charts'
 import Can from '@/components/shared/Can'
@@ -583,7 +583,6 @@ const BonusAdmin = () => {
         }
       />
       <RewardCurrencyNotice className='mb-4' />
-      <RewardStats section='bonus' filters={f} rewardNote={false} />
       <Tabs defaultValue='records'>
         <TabsList className='mb-4 h-auto max-w-full flex-wrap'>
           <TabsTrigger value='records'>User bonuses</TabsTrigger>
@@ -591,12 +590,17 @@ const BonusAdmin = () => {
           <TabsTrigger value='events'>Events</TabsTrigger>
           <TabsTrigger value='awards'>Awards</TabsTrigger>
           <TabsTrigger value='dashboard'>Dashboard</TabsTrigger>
+          <TabsTrigger value='stats'>
+            <ChartColumnIcon /> Stats
+          </TabsTrigger>
         </TabsList>
         <TabsContent value='records'><Records userId={userId} /></TabsContent>
         <TabsContent value='games'><Games userId={userId} /></TabsContent>
         <TabsContent value='events'><Events userId={userId} /></TabsContent>
         <TabsContent value='awards'><Awards userId={userId} /></TabsContent>
         <TabsContent value='dashboard'><Dashboard userId={userId} /></TabsContent>
+        {/* Charts alag tab me — lists pehle dikhen. */}
+        <TabsContent value='stats'><RewardStats section='bonus' filters={f} rewardNote={false} /></TabsContent>
       </Tabs>
     </div>
   )
