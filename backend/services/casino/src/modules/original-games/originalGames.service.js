@@ -18,21 +18,19 @@ const {
 } = require('./originalGames.constants');
 
 /**
- * Original Games Aggregator — a seamless wallet (integration guide §5). Player money stays here;
- * the aggregator calls `balance` / `bet` / `win` / `rollback` and our answer is authoritative.
+ * Original Games Aggregator — seamless wallet (integration guide §5).
+ * The player's money stays with us; the aggregator calls balance / bet / win / rollback.
  *
- * The rules the guide makes mandatory, and where each is kept:
- *   - every callback is HMAC-checked, ≤60 s old and carries an unseen nonce        #verify
- *   - `transaction_id` is the dedupe key; a repeat returns the ORIGINAL answer     #applyMoney
- *     (balance after the first application, same `operator_tx_id`)
- *   - INSUFFICIENT_FUNDS debits nothing (they void the round and send no rollback)
- *   - a rollback of an unknown id is a 200 no-op and refuses that bet if it arrives later
- *   - a second rollback of the same original is a 200 with the current balance
- *   - a rollback reverses OUR recorded amount, never the request's
+ * Rules (from the guide):
+ *   - every callback: valid HMAC signature, at most 60 s old, nonce never seen before
+ *   - `transaction_id` is the dedupe key: a repeat gets the FIRST answer back (same balance, same operator_tx_id)
+ *   - INSUFFICIENT_FUNDS debits nothing
+ *   - rollback of an unknown id → 200, and that bet is refused if it turns up later
+ *   - a second rollback of the same bet → 200 with the current balance
+ *   - a rollback reverses the amount WE recorded, never the amount in the request
  *
- * Like GIS, the `og_transactions` row is written before the wallet moves, inside one DB
- * transaction, so the unique index — not a read — decides a race. The wallet call is keyed on
- * the same id, so a commit that fails after the wallet moved is repaired by the retry.
+ * The `og_transactions` row is written before the wallet moves, in one DB transaction, so the
+ * unique index decides a race between two copies of the same callback.
  */
 class OriginalGamesService {
   constructor({ db, models, config, logger, wallet, provider, games }) {
@@ -45,11 +43,9 @@ class OriginalGamesService {
     this.games = games;
   }
 
-  // ══════════════════════════════════════════════════════════════════════
-  //  Launch
-  // ══════════════════════════════════════════════════════════════════════
+  // ── Launch ───────────────────────────────────────────────────────────
 
-  /** The mode follows the credential (guide §4, §11.1): sandbox keys open demo sessions only. */
+  /** Sandbox keys open demo sessions only (guide §4). */
   get mode() {
     return this.config.OG_ENV === 'production' ? 'real' : 'demo';
   }
@@ -70,8 +66,8 @@ class OriginalGamesService {
     try {
       response = await this.provider.request('POST', '/v1/sessions/launch', {
         idempotencyKey: crypto.randomUUID(),
-        body: this.#compact({
-          player: this.#compact({ id: String(userId), nickname: user?.name ? String(user.name).slice(0, 64) : undefined, language }),
+        body: withoutEmpty({
+          player: withoutEmpty({ id: String(userId), nickname: user?.name ? String(user.name).slice(0, 64) : undefined, language }),
           game_code: gameCode,
           currency: code,
           mode: this.mode,
@@ -84,8 +80,7 @@ class OriginalGamesService {
     } catch (error) {
       if (!error?.status) throw E.UPSTREAM_FAILED({ cause: error?.message });
       if (error.status === 503) throw E.MAINTENANCE({ code: error.code });
-      // A 4xx (GAME_DISABLED, MODE_NOT_AVAILABLE, CURRENCY_*) is configuration: it is surfaced
-      // with its code and never retried.
+      // Any other 4xx (GAME_DISABLED, CURRENCY_* …) is a setup problem: show its code, don't retry.
       throw E.UPSTREAM_REJECTED({ status: error.status, code: error.code });
     }
     if (!response?.launch_url || !response?.session_id) throw E.UPSTREAM_REJECTED({ code: 'NO_LAUNCH_URL' });
@@ -99,14 +94,11 @@ class OriginalGamesService {
     return { gameLaunchUrl: response.launch_url, sessionId: response.session_id, mode: this.mode };
   }
 
-  // ══════════════════════════════════════════════════════════════════════
-  //  Switch and catalogue
-  // ══════════════════════════════════════════════════════════════════════
+  // ── On/off switch and game list ──────────────────────────────────────
 
   /**
-   * Originals on? Both switches must say so: the owner's plan (owner panel → "Originals
-   * (in-house)") and the site admin's `siteconfig.originals` (Admin → Site config → global).
-   * Off closes the list, the launch and every NEW bet; wins and rollbacks of open rounds settle.
+   * Originals are on only when BOTH are on: the owner's plan ("Originals (in-house)") and the site
+   * admin's `siteconfig.originals`. Off = no list, no launch, no new bets; open rounds still settle.
    */
   async originalsOn() {
     if (!(await entitlements.isFlagEntitled('originals'))) return false;
@@ -114,7 +106,7 @@ class OriginalGamesService {
     return row?.originals !== false;
   }
 
-  /** The lobby's list — `og_games` in the aggregator's order; empty while Originals are off. */
+  /** The lobby's list from `og_games`; empty while Originals are off. */
   async listGames() {
     if (!(await this.originalsOn())) return [];
     const rows = await this.#query('SELECT code, name, data FROM og_games ORDER BY position, code');
@@ -125,10 +117,7 @@ class OriginalGamesService {
     }));
   }
 
-  /**
-   * Refresh `og_games` from `GET /v1/games` (scripts/sync-original-games.js). Replaces the table
-   * in one transaction, so a game the aggregator stopped offering leaves the lobby.
-   */
+  /** Replace `og_games` with the aggregator's `GET /v1/games` (scripts/sync-original-games.js). */
   async syncGames() {
     if (!this.provider?.configured) throw E.NOT_CONFIGURED();
     let response;
@@ -145,6 +134,7 @@ class OriginalGamesService {
     if (!games.length) throw E.UPSTREAM_REJECTED({ code: 'EMPTY_CATALOGUE' });
 
     await this.db.transaction(async (transaction) => {
+      // A game the aggregator no longer offers leaves the lobby.
       await this.#query('DELETE FROM og_games WHERE NOT (code = ANY(ARRAY[:codes]::text[]))', { codes: games.map((g) => g.code) }, transaction);
       for (const [position, game] of games.entries()) {
         await this.#query(
@@ -158,9 +148,7 @@ class OriginalGamesService {
     return { synced: games.length, codes: games.map((g) => g.code) };
   }
 
-  // ══════════════════════════════════════════════════════════════════════
-  //  Wallet callbacks — always resolve to `{ status, body }`
-  // ══════════════════════════════════════════════════════════════════════
+  // ── Wallet callbacks: always return { status, body }, never throw ──────
 
   async callback(action, { body, rawBody, headers, method, path, query }) {
     try {
@@ -169,9 +157,8 @@ class OriginalGamesService {
 
       const currency = String(body?.currency ?? '');
       if (!EXPONENT[currency]) return this.#error(ERROR_CODE.CURRENCY_MISMATCH, { currency });
-      // The validation run (guide §9) probes its own test player, never one we launched: point it at a real test user.
-      const sentId = String(body?.player_id ?? '');
-      const playerId = sentId === VALIDATION_PLAYER_ID && this.config.OG_VALIDATION_USER_ID ? String(this.config.OG_VALIDATION_USER_ID) : sentId;
+
+      const playerId = this.#playerId(body);
       if (!/^\d{1,18}$/.test(playerId)) return this.#error(ERROR_CODE.PLAYER_NOT_FOUND, { currency });
       const userId = Number(playerId);
 
@@ -183,22 +170,22 @@ class OriginalGamesService {
       if (session && session.currency !== currency) return this.#error(ERROR_CODE.CURRENCY_MISMATCH, { currency });
 
       const ctx = { body, userId, currency, balance };
-      switch (action) {
-        case ACTION.BALANCE:
-          return this.#ok(balance, currency);
-        case ACTION.BET:
-          return await this.#bet(ctx);
-        case ACTION.WIN:
-          return await this.#win(ctx);
-        case ACTION.ROLLBACK:
-          return await this.#rollback(ctx);
-        default:
-          return this.#error(ERROR_CODE.INTERNAL, { currency });
-      }
+      if (action === ACTION.BALANCE) return this.#ok(balance, currency);
+      if (action === ACTION.BET) return await this.#bet(ctx);
+      if (action === ACTION.WIN) return await this.#win(ctx);
+      if (action === ACTION.ROLLBACK) return await this.#rollback(ctx);
+      return this.#error(ERROR_CODE.INTERNAL, { currency });
     } catch (error) {
       this.logger?.error({ err: error, action, txId: body?.transaction_id }, 'Original games callback failed');
       return this.#error(ERROR_CODE.INTERNAL, { currency: body?.currency });
     }
+  }
+
+  /** Their validation run (guide §9) sends a test player we never launched; it plays as OG_VALIDATION_USER_ID. */
+  #playerId(body) {
+    const sent = String(body?.player_id ?? '');
+    const testUser = this.config.OG_VALIDATION_USER_ID;
+    return sent === VALIDATION_PLAYER_ID && testUser ? String(testUser) : sent;
   }
 
   async #bet({ body, userId, currency, balance }) {
@@ -209,24 +196,21 @@ class OriginalGamesService {
     const seen = await this.#tx(txId);
     if (seen) return this.#replay(seen, currency);
 
-    // Rolled back before it reached us (guide §5.4 rule 1): refused, nothing moves.
-    const [voided] = await this.#query(
-      `SELECT 1 FROM og_transactions WHERE kind = 'rollback' AND reference_transaction_id = :txId LIMIT 1`,
-      { txId }
-    );
-    if (voided) {
+    // Rolled back before it reached us (guide §5.4 rule 1): refuse it, nothing moves.
+    if (await this.#rollbackOf(txId)) {
       this.logger?.warn({ txId, userId }, 'Original games bet arrived after its rollback — refused');
       return this.#error(ERROR_CODE.INTERNAL, { currency, balance });
     }
 
     const user = await this.models.Users.findByPk(userId, { attributes: ['casino_locked', 'system_locked'], raw: true });
     if (user?.casino_locked || user?.system_locked) return this.#error(ERROR_CODE.PLAYER_BLOCKED, { currency, balance });
-    // Originals switched off: no new stake (the aggregator voids the round); open rounds still settle.
+    // Originals switched off: no new bets (open rounds still settle).
     if (!(await this.originalsOn())) return this.#error(ERROR_CODE.MAINTENANCE, { currency, balance });
 
     const outcome = await this.#applyMoney({ kind: 'bet', body, userId, currency, amount, balance, txId, isCredit: false });
     if (outcome.insufficient) return this.#error(ERROR_CODE.INSUFFICIENT_FUNDS, { currency, balance });
 
+    // VIP / rakeback / affiliate wager counting.
     if (outcome.fresh && !money.isZero(amount) && this.games?.recordActivity) {
       await this.games.recordActivity({ userId, gameRef: null, wagered: amount, currency, source: WAGER_SOURCE, ref: txId });
     }
@@ -250,31 +234,24 @@ class OriginalGamesService {
     const refId = String(body.reference_transaction_id ?? '');
     if (!txId || !refId) return this.#error(ERROR_CODE.INTERNAL, { currency });
 
-    // A repeat of this rollback, or any earlier rollback of the same original: 200, current balance.
+    // Same rollback again, or the bet was already rolled back: 200 with the current balance.
     if (await this.#tx(txId)) return this.#ok(balance, currency);
-    const [already] = await this.#query(
-      `SELECT 1 FROM og_transactions WHERE kind = 'rollback' AND reference_transaction_id = :refId LIMIT 1`,
-      { refId }
-    );
-    if (already) return this.#ok(balance, currency);
+    if (await this.#rollbackOf(refId)) return this.#ok(balance, currency);
 
     const original = await this.#tx(refId);
     if (!original || original.kind === 'rollback' || String(original.user_id) !== String(userId)) {
-      // Never applied here: recorded as a no-op so the late bet is refused (rule 1).
-      await this.#insert({ kind: 'rollback', status: 'noop', body, userId, currency, amount: '0', txId, refId, balanceAfter: balance })
-        .catch((error) => { if (error?.name !== 'SequelizeUniqueConstraintError') throw error; });
+      // We never applied it: save a no-op so the bet is refused if it arrives later.
+      await this.#insertOnce({ kind: 'rollback', status: 'noop', body, userId, currency, amount: '0', txId, refId, balanceAfter: balance });
       return this.#ok(balance, currency);
     }
 
     const amount = money.fromStored(original.amount);
-    const isCredit = original.kind === 'bet'; // undoing a bet pays back; undoing a win takes back
+    const isCredit = original.kind === 'bet'; // undo a bet = pay back; undo a win = take back
     const outcome = await this.#applyMoney({ kind: 'rollback', body, userId, currency, amount, balance, txId, refId, isCredit });
 
     if (outcome.insufficient) {
-      // The player already spent the win. Not something a retry fixes, so it is acknowledged and
-      // left for an operator — recorded `unfunded`, logged loudly.
-      await this.#insert({ kind: 'rollback', status: 'unfunded', body, userId, currency, amount, txId, refId, balanceAfter: balance })
-        .catch((error) => { if (error?.name !== 'SequelizeUniqueConstraintError') throw error; });
+      // The player already spent the win. A retry won't fix it: acknowledge, record `unfunded`, alert an operator.
+      await this.#insertOnce({ kind: 'rollback', status: 'unfunded', body, userId, currency, amount, txId, refId, balanceAfter: balance });
       this.logger?.error({ userId, refId, amount, currency }, 'Original games rollback could not be funded — NEEDS MANUAL RECONCILIATION');
       return this.#ok(balance, currency);
     }
@@ -288,8 +265,9 @@ class OriginalGamesService {
   }
 
   /**
-   * One movement: row first, then the wallet, in one DB transaction. Returns
-   * `{ response, fresh }`, `{ insufficient: true }`, or the original answer on a race.
+   * Move money once: save the row, then debit/credit the wallet, in one DB transaction.
+   * Returns `{ fresh, response }`, `{ insufficient: true }`, or `{ duplicate, response }` when
+   * another copy of the same callback won the race.
    */
   async #applyMoney({ kind, body, userId, currency, amount, balance, txId, refId = null, isCredit }) {
     const reason = { bet: 'BET_STAKE', win: 'BET_PAYOUT', rollback: 'BET_ROLLBACK' }[kind];
@@ -312,9 +290,9 @@ class OriginalGamesService {
       });
 
       if (!money.isZero(amount)) await this.#writePoints({ userId, currency, amount, isCredit, txId, kind, body, balanceAfter: after });
-      return { fresh: true, response: this.#ok(after, currency, { operator_tx_id: this.#operatorTxId(id) }) };
+      return { fresh: true, response: this.#ok(after, currency, { operator_tx_id: operatorTxId(id) }) };
     } catch (error) {
-      if (error?.name === 'SequelizeUniqueConstraintError') {
+      if (isDuplicate(error)) {
         const seen = await this.#tx(txId);
         return { duplicate: true, response: seen ? this.#replay(seen, currency) : this.#ok(balance, currency) };
       }
@@ -323,11 +301,13 @@ class OriginalGamesService {
     }
   }
 
-  /** A repeat of an applied transaction: the ORIGINAL balance and `operator_tx_id`. */
+  /** A repeat of a saved transaction: its ORIGINAL balance and `operator_tx_id`. */
   #replay(row, currency) {
     if (row.kind === 'rollback') return this.#ok(row.balance_after ?? '0', currency);
-    return this.#ok(row.balance_after ?? '0', currency, { operator_tx_id: this.#operatorTxId(row.id) });
+    return this.#ok(row.balance_after ?? '0', currency, { operator_tx_id: operatorTxId(row.id) });
   }
+
+  // ── og_transactions ──────────────────────────────────────────────────
 
   async #insert({ kind, status, body, userId, currency, amount, txId, refId = null, balanceAfter }, transaction) {
     const [row] = await this.#query(
@@ -354,9 +334,30 @@ class OriginalGamesService {
     return row.id;
   }
 
-  // ── Callback plumbing ────────────────────────────────────────────────
+  /** Insert, but a row already saved by a parallel copy of the same callback is fine. */
+  async #insertOnce(row) {
+    await this.#insert(row).catch((error) => {
+      if (!isDuplicate(error)) throw error;
+    });
+  }
 
-  /** null when genuine, fresh and unseen; otherwise the refusal to send. */
+  async #tx(txId) {
+    const [row] = await this.#query('SELECT * FROM og_transactions WHERE transaction_id = :txId', { txId });
+    return row ?? null;
+  }
+
+  /** Has a rollback for this bet/win already been saved? */
+  async #rollbackOf(txId) {
+    const [row] = await this.#query(
+      `SELECT 1 FROM og_transactions WHERE kind = 'rollback' AND reference_transaction_id = :txId LIMIT 1`,
+      { txId }
+    );
+    return Boolean(row);
+  }
+
+  // ── Signature check ──────────────────────────────────────────────────
+
+  /** null = genuine, fresh and unseen; otherwise the refusal to send back. */
   async #verify({ rawBody, headers, method, path, query }) {
     if (!this.provider?.configured) {
       this.logger?.error('Original games credentials are not configured — refusing callbacks');
@@ -365,52 +366,35 @@ class OriginalGamesService {
     const timestamp = String(headers['x-timestamp'] ?? '');
     const nonce = String(headers['x-nonce'] ?? '');
     const sent = String(headers['x-signature'] ?? '');
-    const expected = sign(this.provider.webhookSecret, {
-      method,
-      path,
-      query,
-      timestamp,
-      nonce,
-      body: rawBody ?? Buffer.alloc(0),
-    });
-    const unauthorised = (why) => {
+    const expected = sign(this.provider.webhookSecret, { method, path, query, timestamp, nonce, body: rawBody ?? Buffer.alloc(0) });
+    const reject = (why) => {
       this.logger?.warn({ why, path }, 'REJECTED original games callback');
       return { status: 401, body: { status: 'ERROR', error_code: why } };
     };
 
-    if (!sent || !this.#safeEqual(sent, expected)) return unauthorised('INVALID_SIGNATURE');
+    if (!sent || !sameText(sent, expected)) return reject('INVALID_SIGNATURE');
     const seconds = Number(timestamp);
-    if (!Number.isFinite(seconds) || Math.abs(Date.now() / 1000 - seconds) > MAX_SKEW_SECONDS) {
-      return unauthorised('REQUEST_EXPIRED');
-    }
-    if (nonce.length < 16) return unauthorised('REPLAY_DETECTED');
-    const fresh = await this.#query(
-      'INSERT INTO og_nonces (nonce) VALUES (:nonce) ON CONFLICT (nonce) DO NOTHING RETURNING nonce',
-      { nonce }
-    );
-    if (!fresh.length) return unauthorised('REPLAY_DETECTED');
+    if (!Number.isFinite(seconds) || Math.abs(Date.now() / 1000 - seconds) > MAX_SKEW_SECONDS) return reject('REQUEST_EXPIRED');
+    if (nonce.length < 16) return reject('REPLAY_DETECTED');
+
+    const fresh = await this.#query('INSERT INTO og_nonces (nonce) VALUES (:nonce) ON CONFLICT (nonce) DO NOTHING RETURNING nonce', { nonce });
+    if (!fresh.length) return reject('REPLAY_DETECTED');
     // shortcut: pruned on ~1% of callbacks; move to a timer if og_nonces ever shows up in slow logs.
     if (Math.random() < 0.01) {
-      await this.#query(`DELETE FROM og_nonces WHERE seen_at < NOW() - make_interval(secs => :ttl)`, {
-        ttl: NONCE_TTL_SECONDS * 5,
-      }).catch(() => {});
+      await this.#query(`DELETE FROM og_nonces WHERE seen_at < NOW() - make_interval(secs => :ttl)`, { ttl: NONCE_TTL_SECONDS * 5 }).catch(() => {});
     }
     return null;
   }
 
-  #safeEqual(a, b) {
-    const bufA = crypto.createHash('sha256').update(String(a)).digest();
-    const bufB = crypto.createHash('sha256').update(String(b)).digest();
-    return crypto.timingSafeEqual(bufA, bufB);
-  }
+  // ── Amounts: they send/receive integer minor units (paise, micro-USDT); our wallet keeps decimals ──
 
-  /** Integer minor units → wallet decimal string; null when not a non-negative JSON integer. */
+  /** Their minor units → our decimal string; null unless a non-negative integer. */
   #amount(value, currency) {
     if (!Number.isSafeInteger(value) || value < 0) return null;
     return money.toDecimalString(BigInt(value) * 10n ** BigInt(8 - EXPONENT[currency]));
   }
 
-  /** Wallet decimal → integer minor units, rounded DOWN so we never report more than is held. */
+  /** Our decimal → their minor units, rounded DOWN (never report more than the player has), never below 0. */
   #minor(balance, currency) {
     const scaled = money.toMinorQuantised(String(balance ?? '0')) / 10n ** BigInt(8 - EXPONENT[currency]);
     return Number(scaled < 0n ? 0n : scaled);
@@ -420,6 +404,7 @@ class OriginalGamesService {
     return { status: 200, body: { status: 'OK', balance: this.#minor(balance, currency), currency, ...extra } };
   }
 
+  /** A business refusal: still HTTP 200, with `status: "ERROR"` (guide §5.2). */
   #error(code, { currency, balance } = {}) {
     const body = { status: 'ERROR', error_code: code };
     if (balance != null && EXPONENT[currency]) body.balance = this.#minor(balance, currency);
@@ -427,23 +412,15 @@ class OriginalGamesService {
     return { status: 200, body };
   }
 
-  #operatorTxId(id) {
-    return `og-${id}`;
-  }
-
-  async #tx(txId) {
-    const [row] = await this.#query('SELECT * FROM og_transactions WHERE transaction_id = :txId', { txId });
-    return row ?? null;
-  }
+  // ── Player data ──────────────────────────────────────────────────────
 
   async #session(sessionId) {
     if (!sessionId) return null;
-    const [row] = await this.#query('SELECT user_id, currency FROM og_sessions WHERE session_id = :sessionId', {
-      sessionId: String(sessionId),
-    });
+    const [row] = await this.#query('SELECT user_id, currency FROM og_sessions WHERE session_id = :sessionId', { sessionId: String(sessionId) });
     return row ?? null;
   }
 
+  /** The player's wallet balance; null = no such player. */
   async #balanceOf(userId, currency) {
     try {
       const result = await this.wallet.balance(userId, currency);
@@ -455,7 +432,7 @@ class OriginalGamesService {
     }
   }
 
-  /** Point ledger, as GIS / JS games: agent child → `point_ledger` (INR), direct player → `point_ledger_direct`. */
+  /** Point ledger, like JS / GIS games: agent player → `point_ledger` (INR only), direct player → `point_ledger_direct`. */
   async #writePoints({ userId, currency, amount, isCredit, txId, kind, body, balanceAfter }) {
     const sequelize = this.db.sequelize;
     const entry = {
@@ -477,10 +454,22 @@ class OriginalGamesService {
   #query(sql, replacements, transaction) {
     return this.db.sequelize.query(sql, { replacements, type: QueryTypes.SELECT, transaction });
   }
+}
 
-  #compact(object) {
-    return Object.fromEntries(Object.entries(object).filter(([, value]) => value !== undefined && value !== null && value !== ''));
-  }
+const isDuplicate = (error) => error?.name === 'SequelizeUniqueConstraintError';
+
+const operatorTxId = (id) => `og-${id}`;
+
+/** Constant-time compare (hashing first makes both sides the same length). */
+function sameText(a, b) {
+  const hashA = crypto.createHash('sha256').update(String(a)).digest();
+  const hashB = crypto.createHash('sha256').update(String(b)).digest();
+  return crypto.timingSafeEqual(hashA, hashB);
+}
+
+/** Drop undefined / null / '' fields, so the launch body only carries what we have. */
+function withoutEmpty(object) {
+  return Object.fromEntries(Object.entries(object).filter(([, value]) => value !== undefined && value !== null && value !== ''));
 }
 
 module.exports = { OriginalGamesService };
