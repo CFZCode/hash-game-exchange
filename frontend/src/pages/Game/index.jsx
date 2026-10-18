@@ -600,11 +600,7 @@ export default function GamePage() {
           homeUrl: `${window.location.origin}/game/${gameUnique}`,
         }),
       );
-      /* shortcut: the Original Games Aggregator answers `frame-ancestors 'none'` until it registers
-         parker567.com as a lobby origin (guide §11.4), so an original opens as a page of its own
-         (the guide's "redirect") — drop this branch once the origin is registered. */
-      if (url && game.launch !== 'aggregator') window.location.assign(url);
-      else if (url) setLaunched({ for: target, url, currency: launchCurrency(game, session.setting?.currencyName) });
+      if (url) setLaunched({ for: target, url, currency: launchCurrency(game, session.setting?.currencyName) });
       else setFailedFor(target);
     } catch (error) {
       console.warn('[game] launch refused', error?.code ?? error?.status ?? error);
