@@ -27,10 +27,11 @@ import { walletCode } from '../../utils/currency';
  * check run under node looks like a mismatch when the browser is right. Verified in Chrome:
  * IDR 0, INR 2, USD 2, and 'en' and 'en-US' agree on all three.
  */
-const fiat = (value, code) =>
-  new Intl.NumberFormat('en-US', { style: 'currency', currency: code.replace('FIAT', '') }).format(
-    Number(value)
-  );
+const fiat = (value, code) => {
+  const iso = code.replace('FIAT', '');
+  // Rupees in lakh / crore grouping (₹2,84,669.32), as hash.game prints them.
+  return new Intl.NumberFormat(iso === 'INR' ? 'en-IN' : 'en-US', { style: 'currency', currency: iso }).format(Number(value));
+};
 
 export const printCurrency = (value, currency = 'USDFIAT') =>
   currency.endsWith('FIAT')

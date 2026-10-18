@@ -172,6 +172,9 @@ class ExchangeRateService {
 
   async #requireRate(currency) {
     const row = await this.#findRate(currency);
+    /* USD and USDT ARE the unit (1:1). A site whose rate table lacks a USDT row used to throw
+       here for every non-USD stake, so no INR / BTC bet counted toward VIP, commission or bonus. */
+    if (!row && ['USD', 'USDT'].includes(String(currency ?? '').toUpperCase())) return '1.00000000';
     if (!row) throw errors.RATE_NOT_FOUND({ currency });
 
     const rate = money.toDecimalString(money.toMinor(row.usd_rate ?? '0'));

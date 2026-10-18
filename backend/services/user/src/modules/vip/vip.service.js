@@ -143,7 +143,12 @@ class VipService {
     let rate = null;
     if (code === 'USD' || code === 'USDT') rate = '1';
     try {
-      const fx = await this.models.Exchangerate?.findOne?.({ where: { currency: code }, attributes: ['usd_rate'], raw: true });
+      // Case-insensitive: a row stored as `inr` / `Inr` is still the INR rate.
+      const fx = await this.models.Exchangerate?.findOne?.({
+        where: this.db.sequelize.where(this.db.sequelize.fn('upper', this.db.sequelize.col('currency')), String(code).toUpperCase()),
+        attributes: ['usd_rate'],
+        raw: true,
+      });
       if (fx?.usd_rate && Number(fx.usd_rate) > 0) rate = String(fx.usd_rate);
     } catch {
       /* fall through */

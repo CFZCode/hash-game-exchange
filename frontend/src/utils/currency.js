@@ -139,11 +139,17 @@ export const walletCode = (code) => {
    Exported for the fiat deposit tab's quick-amount chips, which call `Ct.toFiatStr` directly
    rather than going through `printCurrency` — `dC` in index-C1xohM7W.js branches on the
    currency type and picks `toFiatStr` or `toCryptoStr` itself. */
-export const toFiatStr = (value, target, lang = 'en-US') =>
-  new Intl.NumberFormat(lang, {
+/* Rupees group in lakhs and crores (₹2,84,669.32), as hash.game prints them — whatever the
+   page language, since the grouping belongs to the currency. Other fiats keep `lang`. */
+const LOCALE_OF = { INR: 'en-IN' };
+
+export const toFiatStr = (value, target, lang = 'en-US') => {
+  const code = target.replace(/FIAT$/, '');
+  return new Intl.NumberFormat(LOCALE_OF[code] ?? lang, {
     style: 'currency',
-    currency: target.replace(/FIAT$/, ''),
+    currency: code,
   }).format(Number(value));
+};
 
 /* `convertCurrency(t, e, n = "USD")`, verbatim:
  *
