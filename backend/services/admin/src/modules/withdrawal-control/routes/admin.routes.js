@@ -35,7 +35,8 @@ module.exports = function adminRoutes(deps) {
   const router = Router();
   const withActivity = createActivityRecorder({ client: clients.admin, logger, serviceName: config.SERVICE_NAME });
   const actorOf = (req) => ({ id: req.staff.id, canIssueFunds: canIssueFunds(req.staff) });
-  const canRead = auth.requirePermission(PERMISSIONS.REPORTS_READ);
+  // Direct users only: owner (wallet:adjust), never an agent login.
+  const canRead = auth.requirePermission(PERMISSIONS.WALLET_ADJUST);
 
   router.get('/', canRead, asyncHandler(async (_req, res) => response.ok(res, await service.read())));
 

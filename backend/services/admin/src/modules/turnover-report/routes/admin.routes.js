@@ -29,8 +29,8 @@ const v = {
 };
 
 /**
- *   GET /admin/turnover-report               direct users: wager, deposit, target, %     reports:read
- *   GET /admin/turnover-report/multiplier    default TargetX                               reports:read
+ *   GET /admin/turnover-report               direct users: wager, deposit, target, %     wallet:adjust (owner)
+ *   GET /admin/turnover-report/multiplier    default TargetX                               wallet:adjust (owner)
  *   PUT /admin/turnover-report/multiplier    "Update All TargetX"                         config:write
  *   PUT /admin/turnover-report/:userId       user ka TargetX / lock                        config:write
  */
@@ -43,7 +43,7 @@ module.exports = function adminRoutes(deps) {
 
   router.get(
     '/',
-    auth.requirePermission(PERMISSIONS.REPORTS_READ),
+    auth.requirePermission(PERMISSIONS.WALLET_ADJUST),
     validate(v.list),
     asyncHandler(async (req, res) => {
       const result = await service.list(req.query);
@@ -54,7 +54,7 @@ module.exports = function adminRoutes(deps) {
 
   router.get(
     '/multiplier',
-    auth.requirePermission(PERMISSIONS.REPORTS_READ),
+    auth.requirePermission(PERMISSIONS.WALLET_ADJUST),
     asyncHandler(async (_req, res) => response.ok(res, await service.settings()))
   );
 
