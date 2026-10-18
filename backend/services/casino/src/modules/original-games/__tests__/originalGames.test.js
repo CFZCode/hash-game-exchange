@@ -159,7 +159,7 @@ test('original games aggregator', async (t) => {
     assert.strictEqual(first.body.balance, 5000);
     assert.deepStrictEqual(again.body, first.body);
     assert.strictEqual(balances.get(`${uid}:INR`), '50.00000000');
-    assert.deepStrictEqual(wagers.at(-1), { userId: uid, gameRef: null, wagered: '50.00000000', currency: 'INR', source: 'original-games', ref: bet.transaction_id, category: 'originals', provider: 'BC Originals' });
+    assert.deepStrictEqual(wagers.at(-1), { userId: uid, gameRef: null, wagered: '50.00000000', currency: 'INR', source: 'original-games', ref: bet.transaction_id, category: 'originals', provider: 'BC Originals', catalogueRef: 'crash' });
   });
 
   await t.test('wallet.insufficient_funds — refused, nothing debited', async () => {

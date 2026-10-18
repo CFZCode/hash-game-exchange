@@ -598,7 +598,12 @@ class PlayerBonusService {
       this.rewardMoney.currency(),
     ]);
     const totals = new Map();
-    for (const b of active) totals.set(b.currency, money.toDecimalString(money.add(totals.get(b.currency) ?? '0', D(b.amount))));
+    // What is still held: a gradual bonus's claimed part is already cash (found on live: the
+    // balance stayed 10.80 after claiming 9.69, so Total Balance counted it twice).
+    for (const b of active) {
+      const held = money.toDecimalString(money.subtract(D(b.amount), D(b.claimed_amount ?? '0')));
+      totals.set(b.currency, money.toDecimalString(money.add(totals.get(b.currency) ?? '0', held)));
+    }
     return {
       wageringLock: lock,
       currency,

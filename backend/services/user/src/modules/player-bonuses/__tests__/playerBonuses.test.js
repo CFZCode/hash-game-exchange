@@ -436,6 +436,8 @@ test('bonus balance with a wagering lock', async (t) => {
     const claimed = await bonuses.claimUnlocked(uid);
     assert.equal(claimed.claimed[0].amount, '0.40000000');
     assert.equal(await balance(uid, 'USDT'), '2000.40000000');
+    const after = await bonuses.summary(uid);
+    assert.equal(after.balances[0].amount, '17.60000000', 'the claimed 0.40 is cash now, not bonus balance');
     await assert.rejects(() => bonuses.claimUnlocked(uid), (e) => e.code === 'PLAYER_BONUS_NOTHING_TO_CLAIM');
 
     // A sports bet under odds 1.5 unlocks nothing; at 2.0 it counts 50% (house edge 2%).

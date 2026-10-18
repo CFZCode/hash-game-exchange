@@ -221,6 +221,8 @@ class OriginalGamesService {
         ref: txId,
         category: 'originals',
         provider: 'BC Originals',
+        // The game code — the bonus wager contribution is per game (crash 50%, mines 80% …).
+        catalogueRef: body.game_code ?? null,
       });
     }
     return outcome.response;
