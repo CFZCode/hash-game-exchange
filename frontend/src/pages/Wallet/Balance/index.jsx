@@ -5,7 +5,7 @@ import { useGates } from '../../../context/gates';
 import { walletCoins } from '../../../services/gates';
 import { amount2usd, walletCode } from '../../../utils/currency';
 import { useResource } from '../../../hooks/useResource';
-import { getBonusBalance } from '../../../services/bonus';
+import { getBonusBalance, claimUnlockedBonus } from '../../../services/bonus';
 import { useSelectedCurrency } from '../../../hooks/useSelectedCurrency';
 import SelectCurrencyContent from './CurrencyList';
 import LocalAmountItem from '../../../components/shared/LocalAmountItem';
@@ -67,7 +67,9 @@ function Summary({ balances }) {
   const cur = useSelectedCurrency({ site: true });
   // Agent's player: no bonus at all — no read, no Bonus cell (user, 2026-10-18).
   const bonusOn = useGates().on('bonus');
-  const { data: bonus } = useResource(bonusOn ? getBonusBalance : noBonus);
+  const [reloads, setReloads] = React.useState(0);
+  const readBonus = React.useCallback(() => (bonusOn ? getBonusBalance() : noBonus()), [bonusOn, reloads]); // eslint-disable-line react-hooks/exhaustive-deps
+  const { data: bonus } = useResource(readBonus);
   const depositUsd = balances.reduce((sum, coin) => sum + amount2usd(coin.generalAmount, coin.currencyName), 0);
   const bonusUsd = (bonus?.balances ?? []).reduce((sum, b) => sum + amount2usd(b.amount, walletCode(b.currency)), 0);
   const cells = [
@@ -76,13 +78,40 @@ function Summary({ balances }) {
     { title: 'Bonus Balance', usd: bonusUsd },
   ].filter((cell) => bonusOn || cell.title !== 'Bonus Balance').map(({ title, usd }) => ({ title, amount: cur.show(usd, 'USDFIAT') }));
 
+  /* hash.game's locked deposit bonus: what is still locked, what has unlocked, and a Claim button. */
+  const gradual = (bonus?.active ?? []).filter((b) => b.unlockMode === 'gradual');
+  const lockedUsd = gradual.reduce((sum, b) => sum + amount2usd(b.locked, walletCode(b.currency)), 0);
+  const claimableUsd = gradual.reduce((sum, b) => sum + amount2usd(b.claimable, walletCode(b.currency)), 0);
+  const [claiming, setClaiming] = React.useState(false);
+  const claim = () => {
+    setClaiming(true);
+    Promise.resolve(claimUnlockedBonus())
+      .catch((error) => console.warn('[bonus] claim refused', error?.code ?? error))
+      .finally(() => {
+        setClaiming(false);
+        setReloads((n) => n + 1);
+      });
+  };
+
   return (
-    <div className="mb-5 flex items-center rounded-xl bg-layer5 p-5">
-      <img className="mr-4 h-6 w-6" alt="coin" src={coinImg} />
-      {cells.map((cell, index) => (
-        <SummaryCell key={cell.title} title={cell.title} amount={cell.amount} first={index === 0} />
-      ))}
-    </div>
+    <>
+      <div className="mb-5 flex items-center rounded-xl bg-layer5 p-5">
+        <img className="mr-4 h-6 w-6" alt="coin" src={coinImg} />
+        {cells.map((cell, index) => (
+          <SummaryCell key={cell.title} title={cell.title} amount={cell.amount} first={index === 0} />
+        ))}
+      </div>
+      {gradual.length > 0 && (
+        <div className="mb-5 flex flex-wrap items-center gap-4 rounded-xl bg-layer5 p-5">
+          <SummaryCell title="Locked Bonus" amount={cur.show(lockedUsd, 'USDFIAT')} first />
+          <SummaryCell title="Unlocked" amount={cur.show(claimableUsd, 'USDFIAT')} />
+          <button type="button" className="button button-brand button-m ml-auto px-6" disabled={claiming || claimableUsd <= 0} onClick={claim}>
+            Claim
+          </button>
+          <p className="w-full text-xs text-secondary">Every bet unlocks part of your bonus (wager × house edge × 1%). Claim it any time — no expiry.</p>
+        </div>
+      )}
+    </>
   );
 }
 

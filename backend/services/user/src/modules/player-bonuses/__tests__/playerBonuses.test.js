@@ -379,4 +379,86 @@ test('bonus balance with a wagering lock', async (t) => {
     assert.equal(await balance(uid2, 'USDT'), '60.00000000');
     assert.equal((await rowOf(uid2))[0].end_reason, 'NO_WAGERING');
   });
+
+  // ══════════════════════════════════════════════════════════════════════
+  //  hash.game: monthly deposit bonus, gradual unlock (migration 136)
+  // ══════════════════════════════════════════════════════════════════════
+
+  const HASH_PROGRAM = {
+    mode: 'monthly',
+    unlockMode: 'gradual',
+    unlockRate: '0.01',
+    schedule: [
+      { percent: '180', minDeposit: '5', maxBonus: '0' },
+      { percent: '240', minDeposit: '10', maxBonus: '0' },
+      { percent: '300', minDeposit: '20', maxBonus: '0' },
+      { percent: '360', minDeposit: '30', maxBonus: '0' },
+    ],
+  };
+
+  await t.test('monthly deposit bonus: the Nth deposit of the month gets its row, locked, at most four', async () => {
+    lock = true;
+    const uid = await seed();
+    const h = hook({ program: HASH_PROGRAM });
+    const first = await h.onDepositCredited(await deposit(uid, '10', 'USDT', 'm1'));
+    assert.equal(first.paid, true);
+    assert.equal(first.locked, true);
+    assert.equal(first.amount, '18.00000000', '180% of 10');
+    assert.equal(await balance(uid, 'USDT'), '10.00000000', 'only the deposit is cash');
+
+    const below = await h.onDepositCredited(await deposit(uid, '5', 'USDT', 'm2'));
+    assert.equal(below.reason, 'BELOW_MINIMUM', 'the 2nd row needs 10');
+    const second = await h.onDepositCredited(await deposit(uid, '10', 'USDT', 'm3'));
+    assert.equal(second.amount, '24.00000000', '240% of 10');
+    await h.onDepositCredited(await deposit(uid, '20', 'USDT', 'm4'));
+    await h.onDepositCredited(await deposit(uid, '30', 'USDT', 'm5'));
+    const fifth = await h.onDepositCredited(await deposit(uid, '100', 'USDT', 'm6'));
+    assert.equal(fifth.reason, 'MONTHLY_LIMIT_REACHED');
+    const rows = await rowOf(uid);
+    assert.deepEqual(rows.map((r) => r.unlock_mode), ['gradual', 'gradual', 'gradual', 'gradual']);
+    assert.ok(rows.every((r) => r.expires_at === null), 'no expiration');
+  });
+
+  await t.test('gradual unlock: wager × contribution × house edge × 1%, claimable any time, never twice', async () => {
+    lock = true;
+    const uid = await seed();
+    await hook({ program: HASH_PROGRAM }).onDepositCredited(await deposit(uid, '10', 'USDT', 'g1'));
+    await models.Credits.update({ usdt: '2000' }, { where: { uid } });
+
+    // $1,000 of slots (house edge 4%, contribution 100%): 1000 × 1 × 0.04 × 0.01 = 0.40 unlocked.
+    await wager.record({ userId: uid, amount: '1000', currency: 'USDT', source: 'gis', ref: `g-${uid}-1` });
+    let [row] = await rowOf(uid);
+    assert.equal(money.fromStored(row.wagered), '0.40000000');
+    const summary = await bonuses.summary(uid);
+    assert.equal(summary.active[0].claimable, '0.40000000');
+    assert.equal(summary.active[0].locked, '17.60000000');
+
+    const claimed = await bonuses.claimUnlocked(uid);
+    assert.equal(claimed.claimed[0].amount, '0.40000000');
+    assert.equal(await balance(uid, 'USDT'), '2000.40000000');
+    await assert.rejects(() => bonuses.claimUnlocked(uid), (e) => e.code === 'PLAYER_BONUS_NOTHING_TO_CLAIM');
+
+    // A sports bet under odds 1.5 unlocks nothing; at 2.0 it counts 50% (house edge 2%).
+    await wager.record({ userId: uid, amount: '1000', currency: 'USDT', source: 'sports', ref: `g-${uid}-2`, category: 'sports', odds: '1.4' });
+    [row] = await rowOf(uid);
+    assert.equal(money.fromStored(row.wagered), '0.40000000');
+    await wager.record({ userId: uid, amount: '1000', currency: 'USDT', source: 'sports', ref: `g-${uid}-3`, category: 'sports', odds: '2' });
+    [row] = await rowOf(uid);
+    assert.equal(money.fromStored(row.wagered), '0.50000000', '+ 1000 × 0.5 × 0.02 × 0.01 = 0.10');
+
+    // A gradual bonus never blocks a withdrawal.
+    assert.deepEqual(await bonuses.beforeWithdrawal(uid), { forfeited: [] });
+  });
+
+  await t.test('gradual unlock: fully unlocked pays the unclaimed rest and completes', async () => {
+    lock = true;
+    const uid = await seed();
+    await bonuses.grant({ userId: uid, source: 'monthly_deposit', grantKey: `pb-g:${uid}`, amount: '1', currency: 'USDT', unlockMode: 'gradual', unlockRate: '0.01' });
+    await wager.record({ userId: uid, amount: '1000', currency: 'USDT', source: 'gis', ref: `gf-${uid}-1` });
+    await bonuses.claimUnlocked(uid); // 0.40
+    await wager.record({ userId: uid, amount: '5000', currency: 'USDT', source: 'gis', ref: `gf-${uid}-2` }); // +2.00 → capped at 1
+    const [row] = await rowOf(uid);
+    assert.equal(row.status, 'completed');
+    assert.equal(await balance(uid, 'USDT'), '1.00000000', '0.40 claimed + the 0.60 rest');
+  });
 });

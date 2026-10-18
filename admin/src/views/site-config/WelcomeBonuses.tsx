@@ -20,7 +20,18 @@ import { check } from '@/lib/validate'
 type RegisterBonus = { enabled: boolean; amount: string; currency: string }
 type Tier = { minDeposit: string; percent: string; maxBonus: string }
 type FirstDepositBonus = { enabled: boolean; tiers: Tier[]; wagerMultiplier: number | null; expiryDays?: number }
-type Welcome = { registerBonus: RegisterBonus; firstDepositBonus: FirstDepositBonus; configured: boolean }
+
+/** hash.game's deposit bonus program (migration 136). `unlockRate` is a percent. */
+type DepositProgram = { mode: 'first' | 'monthly'; unlockMode: 'rollover' | 'gradual'; unlockRate: string; schedule: Tier[] }
+type Welcome = { registerBonus: RegisterBonus; firstDepositBonus: FirstDepositBonus; depositProgram?: DepositProgram; configured: boolean }
+
+/** hash.game "Monthly Deposit Bonus": 1st–4th deposit of the month. */
+const HASH_SCHEDULE: Tier[] = [
+  { percent: '180', minDeposit: '5', maxBonus: '0' },
+  { percent: '240', minDeposit: '10', maxBonus: '0' },
+  { percent: '300', minDeposit: '20', maxBonus: '0' },
+  { percent: '360', minDeposit: '30', maxBonus: '0' }
+]
 
 const PATH = 'admin/site-config/welcome-bonuses'
 
@@ -77,6 +88,17 @@ const WelcomeForm = ({ saved }: { saved?: Welcome }) => {
 
   const [expiry, setExpiry] = useState(String(base.firstDepositBonus.expiryDays ?? 30))
 
+  const program = base.depositProgram
+  const [monthly, setMonthly] = useState(program?.mode === 'monthly')
+  const [gradual, setGradual] = useState(program?.unlockMode === 'gradual')
+  const [unlockRate, setUnlockRate] = useState(trim(program?.unlockRate ?? '1'))
+
+  const [schedule, setSchedule] = useState<Tier[]>(
+    (program?.schedule?.length ? program.schedule : HASH_SCHEDULE).map(t => ({ percent: trim(t.percent), minDeposit: trim(t.minDeposit), maxBonus: trim(t.maxBonus) }))
+  )
+
+  const setRow = (i: number, patch: Partial<Tier>) => setSchedule(rows => rows.map((t, j) => (j === i ? { ...t, ...patch } : t)))
+
   const setTier = (i: number, patch: Partial<Tier>) =>
     setTiers(ts => ts.map((t, j) => (j === i ? { ...t, ...patch } : t)))
 
@@ -110,7 +132,13 @@ const WelcomeForm = ({ saved }: { saved?: Welcome }) => {
       seen.add(min)
     })
 
-    if (fdOn && filled.length === 0) errors.tiers = 'Add at least one tier, or switch the first deposit bonus off'
+    if (fdOn && !monthly && filled.length === 0) errors.tiers = 'Add at least one tier, or switch the first deposit bonus off'
+    errors.unlockRate = check.number(unlockRate, 'Unlock rate %', { min: 0, max: 100, decimals: 8 })
+    schedule.forEach((t, i) => {
+      errors[`sched-${i}-percent`] = check.number(t.percent, `Deposit ${i + 1}: bonus %`, { min: 0, max: 1000, decimals: 8 })
+      errors[`sched-${i}-minDeposit`] = rate(t.minDeposit, `Deposit ${i + 1}: minimum`)
+      errors[`sched-${i}-maxBonus`] = rate(t.maxBonus, `Deposit ${i + 1}: max bonus`)
+    })
 
     return errors
   }
@@ -128,6 +156,12 @@ const WelcomeForm = ({ saved }: { saved?: Welcome }) => {
           })),
           wagerMultiplier: wager.trim() === '' ? null : Number(wager),
           expiryDays: Math.max(0, Math.floor(Number(expiry) || 0))
+        },
+        depositProgram: {
+          mode: monthly ? 'monthly' : 'first',
+          unlockMode: gradual ? 'gradual' : 'rollover',
+          unlockRate: unlockRate.trim() || '1',
+          schedule: schedule.map(t => ({ percent: t.percent.trim() || '0', minDeposit: t.minDeposit.trim() || '0', maxBonus: t.maxBonus.trim() || '0' }))
         }
       }),
     invalidate: [
@@ -305,6 +339,59 @@ const WelcomeForm = ({ saved }: { saved?: Welcome }) => {
               value={expiry}
               onChange={e => setExpiry(e.target.value.replace(/\D/g, ''))}
             />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className='shadow-none'>
+        <CardHeader>
+          <CardTitle className='text-base'>hash.game deposit bonus{monthly ? ' — 4 deposits a month' : ''}</CardTitle>
+          <CardDescription>
+            hash.game: “Get 4 deposit bonuses every month. Each bonus is locked and unlocks as you wager. All 4 chances reset on the 1st
+            of each month at 00:00 UTC.” With the monthly program on, the Nth credited deposit of the month gets row N below (instead of
+            the first-deposit tiers). Gradual unlock: every bet unlocks wager × game contribution × house edge × unlock rate, and the
+            player claims it any time (no expiry; it never blocks a withdrawal). The on/off switch is “Give a first deposit bonus” above.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className='grid gap-4'>
+          <div className='grid max-w-xl gap-4'>
+            <SwitchField id='dpMonthly' label='Monthly deposit bonus (4 a month)' hint='Off: only the first deposit, by the tiers above.' checked={monthly} onChange={setMonthly} disabled={!writable} />
+            <SwitchField id='dpGradual' label='Gradual unlock (hash.game)' hint='Off: the wagering multiplier above, paid all at once.' checked={gradual} onChange={setGradual} disabled={!writable} />
+            <TextField id='unlockRate' label='Unlock rate %' hint='hash.game Deposit Rakeback: wagered × house edge × 1%' inputMode='decimal' value={unlockRate} onChange={e => setUnlockRate(e.target.value)} />
+          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Deposit</TableHead>
+                <TableHead>Bonus %</TableHead>
+                <TableHead>Minimum ({cur})</TableHead>
+                <TableHead>Max bonus ({cur}, 0 = none)</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {schedule.map((t, i) => (
+                <TableRow key={i}>
+                  <TableCell className='font-medium'>{['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th'][i]}</TableCell>
+                  {(['percent', 'minDeposit', 'maxBonus'] as const).map(k => (
+                    <TableCell key={k}>
+                      <Input aria-label={`Deposit ${i + 1} ${k}`} inputMode='decimal' value={t[k]} onChange={e => setRow(i, { [k]: e.target.value })} />
+                      {f.errors[`sched-${i}-${k}`] && <p className='text-destructive mt-1 text-xs'>{f.errors[`sched-${i}-${k}`]}</p>}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          <div className='flex gap-2'>
+            <Button type='button' variant='outline' disabled={!writable || schedule.length >= 10} onClick={() => setSchedule(rows => [...rows, { percent: '', minDeposit: '', maxBonus: '0' }])}>
+              Add deposit
+            </Button>
+            <Button type='button' variant='ghost' disabled={!writable || schedule.length <= 1} onClick={() => setSchedule(rows => rows.slice(0, -1))}>
+              Remove last
+            </Button>
+            <Button type='button' variant='ghost' disabled={!writable} onClick={() => setSchedule(HASH_SCHEDULE)}>
+              hash.game defaults
+            </Button>
           </div>
         </CardContent>
       </Card>

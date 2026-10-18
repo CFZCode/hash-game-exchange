@@ -28,6 +28,10 @@ module.exports = (sequelize) => {
       wager_multiplier: { type: DataTypes.DECIMAL(10, 2), allowNull: false, defaultValue: 0, field: 'wager_multiplier' },
       required_wager: { type: DataTypes.DECIMAL(30, 8), allowNull: false, defaultValue: 0, field: 'required_wager' },
       wagered: { type: DataTypes.DECIMAL(30, 8), allowNull: false, defaultValue: 0, field: 'wagered' },
+      /** Migration 136: 'rollover' or 'gradual' (hash.game — `wagered` is then the amount unlocked). */
+      unlock_mode: { type: DataTypes.TEXT, allowNull: false, defaultValue: 'rollover', field: 'unlock_mode' },
+      unlock_rate: { type: DataTypes.DECIMAL(10, 6), allowNull: true, field: 'unlock_rate' },
+      claimed_amount: { type: DataTypes.DECIMAL(30, 8), allowNull: false, defaultValue: 0, field: 'claimed_amount' },
       /** active | completed | expired | forfeited */
       status: { type: DataTypes.STRING(20), allowNull: false, defaultValue: 'active', field: 'status' },
       expires_at: { type: DataTypes.DATE, allowNull: true, field: 'expires_at' },

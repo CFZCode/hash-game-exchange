@@ -16,6 +16,8 @@ module.exports = function userRoutes(deps) {
   const router = Router();
 
   router.get('/', noQuery(), asyncHandler(async (req, res) => response.ok(res, await service.summary(req.user.id))));
+  /** hash.game: claim what the locked bonus has unlocked so far — any time, no expiry. */
+  router.post('/claim', noQuery(), asyncHandler(async (req, res) => response.ok(res, await service.claimUnlocked(req.user.id))));
 
   return router;
 };

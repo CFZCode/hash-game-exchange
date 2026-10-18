@@ -1,7 +1,7 @@
 'use strict';
 
 const { Op } = require('sequelize');
-const { money, entitlements } = require('@ibitplay/common');
+const { money, entitlements, wagerCategory } = require('@ibitplay/common');
 const { promotionsBlocked } = require('@ibitplay/auth');
 
 const { WalletService } = require('../wallet/wallet.service');
@@ -12,8 +12,9 @@ const { ownerWhere, assertPlayerVisible, withChannel } = require('../directory/p
 const errors = require('./playerBonus.errors');
 const { settleItem } = require('../wager/stakeShare');
 const {
-  STATUS, refTypeOf, labelOf, releaseKey, END_REASON, DEFAULT_EXPIRY_DAYS,
+  STATUS, refTypeOf, labelOf, releaseKey, END_REASON, DEFAULT_EXPIRY_DAYS, UNLOCK_MODE, DEFAULT_UNLOCK_RATE,
 } = require('./playerBonus.constants');
+const { contributionFor } = require('./wagerContribution');
 
 /** A stored decimal (any scale) as a canonical 8-place string. */
 const D = (value) => money.fromStored(String(value ?? '0'));
@@ -113,19 +114,23 @@ class PlayerBonusService {
     const run = (fn) => (transaction ? fn(transaction) : this.db.transaction(fn));
     const {
       userId, source, grantKey, ref = null, currency, wagerMultiplier, expiryDays, description = null,
+      unlockMode = UNLOCK_MODE.ROLLOVER, unlockRate = null,
     } = input;
+    const gradual = unlockMode === UNLOCK_MODE.GRADUAL;
     const amount = D(input.amount);
     const code = String(currency).toUpperCase();
     if (!money.gt(amount, '0')) return { paid: false, reason: 'ZERO_BONUS' };
 
     if (await promotionsBlocked(userId)) return { paid: false, reason: 'AGENT_TREE_PLAYER' };
 
-    const multiplier = Number(wagerMultiplier) > 0 ? Number(wagerMultiplier) : 0;
-    const requiredWager = money.toDecimalString(money.multiply(amount, String(multiplier)));
+    const multiplier = gradual ? 0 : Number(wagerMultiplier) > 0 ? Number(wagerMultiplier) : 0;
+    /* Gradual (hash.game): the "requirement" is the bonus itself — `wagered` counts what has
+       UNLOCKED, `wager × contribution × house edge × unlock rate` per bet. */
+    const requiredWager = gradual ? amount : money.toDecimalString(money.multiply(amount, String(multiplier)));
     const lock = await this.lockOn();
     const now = new Date();
 
-    if (!lock || multiplier === 0) {
+    if (!lock || (!gradual && multiplier === 0)) {
       return run(async (t) => {
         if (await this.#alreadyGranted(grantKey, t)) return { paid: false, reason: 'ALREADY_PAID' };
         const movement = await this.wallet.credit(
@@ -156,7 +161,8 @@ class PlayerBonusService {
       });
     }
 
-    const days = Number.isFinite(Number(expiryDays)) ? Number(expiryDays) : DEFAULT_EXPIRY_DAYS;
+    // hash.game: a gradual bonus has "no expiration".
+    const days = gradual ? 0 : Number.isFinite(Number(expiryDays)) ? Number(expiryDays) : DEFAULT_EXPIRY_DAYS;
     const expiresAt = days > 0 ? new Date(now.getTime() + days * 86_400_000) : null;
 
     return run(async (t) => {
@@ -167,12 +173,15 @@ class PlayerBonusService {
           wager_multiplier: String(multiplier), required_wager: requiredWager, wagered: ZERO,
           status: STATUS.ACTIVE, expires_at: expiresAt, granted_at: now, completed_at: null, ended_at: null,
           end_reason: null, release_ledger_id: null, description,
+          unlock_mode: gradual ? UNLOCK_MODE.GRADUAL : UNLOCK_MODE.ROLLOVER,
+          unlock_rate: gradual ? String(unlockRate ?? DEFAULT_UNLOCK_RATE) : null,
         },
         t
       );
       if (!id) return { paid: false, reason: 'ALREADY_PAID' };
       return {
         paid: true, locked: true, bonusId: id, amount, currency: code, requiredWager,
+        unlockMode: gradual ? UNLOCK_MODE.GRADUAL : UNLOCK_MODE.ROLLOVER,
         expiresAt: expiresAt ? expiresAt.toISOString() : null,
       };
     });
@@ -211,7 +220,7 @@ class PlayerBonusService {
    *
    * @returns {{ applied: [{ bonusId, amount }], released: [bonusId] }}
    */
-  async onStake({ userId, amount, currency, source, ref }) {
+  async onStake({ userId, amount, currency, source, ref, kind = {} }) {
     const stakeCode = String(currency ?? '').toUpperCase();
     let remaining = D(amount);
     const key = String(ref);
@@ -246,15 +255,20 @@ class PlayerBonusService {
           continue;
         }
 
-        const inBonus = await this.#convert(remaining, stakeCode, b.currency);
-        if (inBonus == null || !money.gt(inBonus, '0')) {
+        const converted = await this.#convert(remaining, stakeCode, b.currency);
+        if (converted == null || !money.gt(converted, '0')) {
           this.logger?.warn({ userId: String(userId), from: stakeCode, to: b.currency }, 'Bonus wagering: no rate — stake not counted for this bonus');
           continue;
         }
+        /* Gradual (hash.game): what this stake can unlock is `stake × contribution × house edge ×
+           unlock rate`; the rollover rule counts the stake itself. `inBonus` is that figure, in
+           the bonus currency, and the share of the stake it used is worked out from it below. */
+        const inBonus = b.unlock_mode === UNLOCK_MODE.GRADUAL ? await this.#unlockable(converted, b, kind) : converted;
+        if (!money.gt(inBonus, '0')) continue;
         const take = money.toDecimalString(money.min(inBonus, need));
         // What is left of the stake, in the stake's own unit.
         if (money.gte(take, inBonus)) remaining = ZERO;
-        else if (stakeCode === String(b.currency).toUpperCase()) remaining = money.toDecimalString(money.subtract(remaining, take));
+        else if (stakeCode === String(b.currency).toUpperCase() && b.unlock_mode !== UNLOCK_MODE.GRADUAL) remaining = money.toDecimalString(money.subtract(remaining, take));
         else {
           const share = money.toDecimalString(money.divide(money.toDecimalString(money.subtract(inBonus, take)), inBonus));
           remaining = money.toDecimalString(money.multiply(remaining, share));
@@ -353,6 +367,53 @@ class PlayerBonusService {
   }
 
   /** Active bonuses of a player, oldest first, locked. */
+  /** What `stake` (already in the bonus currency) unlocks on a gradual bonus. */
+  async #unlockable(stake, b, kind) {
+    const contribution = await contributionFor(this.db.sequelize, kind, { logger: this.logger });
+    const houseEdge = String(kind?.house_edge ?? wagerCategory.DEFAULT_HOUSE_EDGE[kind?.category] ?? wagerCategory.DEFAULT_HOUSE_EDGE.slots);
+    const rate = String(b.unlock_rate ?? DEFAULT_UNLOCK_RATE);
+    const value = money.multiply(money.toDecimalString(money.multiply(money.toDecimalString(money.multiply(stake, contribution)), houseEdge)), rate);
+    return money.toDecimalString(value);
+  }
+
+  /**
+   * hash.game: "Claim your unlocked rewards from the Bonus page anytime." Moves what has unlocked
+   * on every active gradual bonus (unlocked − already claimed) to cash. Each claim is its own
+   * ledger key (`player-bonus:<id>:claim:<claimed after>`), so a retry pays nothing twice.
+   */
+  async claimUnlocked(userId) {
+    const paid = [];
+    await this.db.transaction(async (transaction) => {
+      const active = await this.#lockActive(userId, transaction);
+      for (const b of active) {
+        if (b.unlock_mode !== UNLOCK_MODE.GRADUAL) continue;
+        const unlocked = D(b.wagered);
+        const claimed = D(b.claimed_amount ?? '0');
+        const due = money.toDecimalString(money.subtract(unlocked, claimed));
+        if (!money.gt(due, '0')) continue;
+        const after = money.toDecimalString(money.add(claimed, due));
+        const movement = await this.wallet.credit(
+          {
+            userId,
+            currency: b.currency,
+            amount: due,
+            reason: REASON.BONUS,
+            idempotencyKey: `${releaseKey(b.id)}:claim:${after}`,
+            refType: refTypeOf(b.source),
+            refId: String(b.id),
+            description: `${labelOf(b.source)}: unlocked part claimed`,
+          },
+          { sourceService: 'user-service', transaction }
+        );
+        await this.models.PlayerBonus.update({ claimed_amount: after }, { where: { id: b.id }, transaction });
+        paid.push({ bonusId: String(b.id), amount: due, currency: b.currency, ledgerId: movement.ledgerId ?? null });
+      }
+    });
+    if (!paid.length) throw errors.NOTHING_TO_CLAIM({ userId: String(userId) });
+    this.logger?.info({ userId: String(userId), paid }, 'Unlocked bonus claimed');
+    return { claimed: paid };
+  }
+
   async #lockActive(userId, transaction) {
     return this.models.PlayerBonus.findAll({
       where: { user_id: userId, status: STATUS.ACTIVE },
@@ -365,7 +426,16 @@ class PlayerBonusService {
 
   /** Requirement met: the amount goes to cash, the row is completed — inside `transaction`. */
   async #release(b, transaction) {
-    const amount = D(b.amount);
+    // A gradual bonus may have been claimed in parts already; the rest goes now.
+    const amount = money.toDecimalString(money.subtract(D(b.amount), D(b.claimed_amount ?? '0')));
+    if (!money.gt(amount, '0')) {
+      const now = new Date();
+      await this.models.PlayerBonus.update(
+        { status: STATUS.COMPLETED, completed_at: now, ended_at: now, end_reason: END_REASON.WAGERING_MET },
+        { where: { id: b.id, status: STATUS.ACTIVE }, transaction }
+      );
+      return { ...b, status: STATUS.COMPLETED };
+    }
     const movement = await this.wallet.credit(
       {
         userId: b.user_id,
@@ -383,7 +453,7 @@ class PlayerBonusService {
     await this.models.PlayerBonus.update(
       {
         status: STATUS.COMPLETED, completed_at: now, ended_at: now, end_reason: END_REASON.WAGERING_MET,
-        release_ledger_id: movement.ledgerId ?? null,
+        release_ledger_id: movement.ledgerId ?? null, claimed_amount: D(b.amount),
       },
       { where: { id: b.id, status: STATUS.ACTIVE }, transaction }
     );
@@ -424,9 +494,13 @@ class PlayerBonusService {
   async beforeWithdrawal(userId, { forfeitBonus = false, transaction } = {}) {
     await this.expireDue({ userId });
     const check = async (t) => {
-      const active = t
-        ? await this.#lockActive(userId, t)
-        : await this.models.PlayerBonus.findAll({ where: { user_id: userId, status: STATUS.ACTIVE }, raw: true });
+      /* A gradual bonus never blocks a withdrawal (hash.game: "All rewards are real cash and can
+         be withdrawn immediately") — its locked part just stays locked. Only rollover bonuses do. */
+      const active = (
+        t
+          ? await this.#lockActive(userId, t)
+          : await this.models.PlayerBonus.findAll({ where: { user_id: userId, status: STATUS.ACTIVE }, raw: true })
+      ).filter((b) => b.unlock_mode !== UNLOCK_MODE.GRADUAL);
       if (!active.length) return { forfeited: [] };
       if (!forfeitBonus) {
         throw errors.FORFEIT_REQUIRED({
@@ -454,7 +528,7 @@ class PlayerBonusService {
    */
   async forfeitForWithdrawal(userId) {
     return this.db.transaction(async (transaction) => {
-      const active = await this.#lockActive(userId, transaction);
+      const active = (await this.#lockActive(userId, transaction)).filter((b) => b.unlock_mode !== UNLOCK_MODE.GRADUAL);
       for (const b of active) await this.#end(b.id, STATUS.FORFEITED, END_REASON.WITHDRAWAL, null, transaction);
       if (active.length) this.logger?.info({ userId: String(userId), bonuses: active.map((b) => String(b.id)) }, 'Active bonuses forfeited by a withdrawal');
       return { forfeited: active.map((b) => String(b.id)) };
@@ -474,6 +548,7 @@ class PlayerBonusService {
       raw: true,
     });
     return active
+      .filter((b) => b.unlock_mode !== UNLOCK_MODE.GRADUAL)
       .map((b) => ({
         id: String(b.id),
         source: b.source,
@@ -598,6 +673,16 @@ class PlayerBonusService {
       remaining: remainingOf(b),
       progress,
       status: b.status,
+      // Gradual (hash.game): unlocked so far, already claimed, claimable now.
+      unlockMode: b.unlock_mode ?? UNLOCK_MODE.ROLLOVER,
+      ...(b.unlock_mode === UNLOCK_MODE.GRADUAL
+        ? {
+            unlocked: wagered,
+            claimed: D(b.claimed_amount ?? '0'),
+            claimable: money.toDecimalString(money.max('0', money.toDecimalString(money.subtract(wagered, D(b.claimed_amount ?? '0'))))),
+            locked: money.toDecimalString(money.subtract(D(b.amount), wagered)),
+          }
+        : {}),
       ref: b.ref ?? null,
       grantedAt: iso(b.granted_at),
       expiresAt: iso(b.expires_at),

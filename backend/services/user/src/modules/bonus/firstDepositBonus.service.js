@@ -15,6 +15,8 @@ const { SOURCE: BONUS_SOURCE } = require('../player-bonuses/playerBonus.constant
 
 const REF_TYPE = 'FIRST_DEPOSIT_BONUS';
 const keyFor = (userId) => `first-deposit-bonus:${userId}`;
+/** One monthly deposit bonus per (player, UTC month, deposit number). */
+const monthlyKeyFor = (userId, { month, n }) => `monthly-deposit-bonus:${userId}:${month}:${n}`;
 
 /**
  * ── REWARD CURRENCY (supersedes the USD wording below) ──────────────────
@@ -107,7 +109,24 @@ class FirstDepositBonusService {
       tiers: normaliseTiers(raw?.tiers),
       wagerMultiplier: raw?.wagerMultiplier ?? null,
       expiryDays: raw?.expiryDays ?? null,
+      program: raw?.program ?? { mode: 'first', unlockMode: 'rollover', unlockRate: '0.01', schedule: [] },
     };
+  }
+
+  /** UTC month bounds and its `YYYY-MM` label — hash.game resets "on the 1st of each month at 00:00 UTC". */
+  #month(now = new Date()) {
+    const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    return { start, label: start.toISOString().slice(0, 7) };
+  }
+
+  /** How many monthly deposit bonuses this player has had this month. */
+  async #monthlyUsed(userId) {
+    const { start } = this.#month();
+    return (
+      (await this.models.PlayerBonus?.count({
+        where: { user_id: userId, source: BONUS_SOURCE.MONTHLY_DEPOSIT, granted_at: { [Op.gte]: start } },
+      })) ?? 0
+    );
   }
 
   /**
@@ -133,7 +152,28 @@ class FirstDepositBonusService {
       expiryDays: terms.expiryDays,
       wageringLock: await this.playerBonuses.lockOn(),
       claimed: null,
+      // hash.game's program (migration 136): 'monthly' = the Nth deposit of the month gets schedule[N-1].
+      program: {
+        mode: terms.program.mode,
+        unlockMode: terms.program.unlockMode,
+        unlockRatePercent: String(Number(terms.program.unlockRate) * 100),
+        schedule: terms.program.schedule.map((t) => ({ percent: Number(t.percent), minDeposit: twoPlaces(t.minDeposit), maxBonus: twoPlaces(t.maxBonus) })),
+        usedThisMonth: null,
+      },
     };
+    if (terms.program.mode === 'monthly') {
+      base.enabled = terms.enabled && terms.program.schedule.length > 0;
+      if (!userId) return base;
+      base.program.usedThisMonth = await this.#monthlyUsed(userId);
+      let agent = true;
+      try {
+        agent = await promotionsBlocked(userId);
+      } catch {
+        agent = true;
+      }
+      base.eligible = base.enabled && !agent && base.program.usedThisMonth < terms.program.schedule.length;
+      return base;
+    }
     if (!userId) return base;
 
     const granted = await this.models.PlayerBonus?.findOne({
@@ -208,7 +248,7 @@ class FirstDepositBonusService {
      * When the spin code wins on the first deposit, the first-deposit bonus is simply not paid
      * (it is only ever for the first deposit, so it is gone).
      */
-    let terms = { enabled: false, tiers: [], wagerMultiplier: null, expiryDays: null };
+    let terms = { enabled: false, tiers: [], wagerMultiplier: null, expiryDays: null, program: { mode: 'first', schedule: [] } };
     let first;
     try {
       terms = await this.#terms();
@@ -235,13 +275,14 @@ class FirstDepositBonusService {
         result = await this.#pay(deposit, first.quote, terms);
         if (result.paid) {
           this.logger?.info({ userId: String(deposit.userId), ...result, source: deposit.source }, 'First deposit bonus paid');
+          const monthly = Boolean(first.quote.monthly);
           void notifyPlayer(deposit.userId, {
             kind: 'first_deposit_bonus',
-            key: 'bonus:first-deposit',
-            title: 'First deposit bonus',
+            key: monthly ? `bonus:deposit:${first.quote.monthly.month}:${first.quote.monthly.n}` : 'bonus:first-deposit',
+            title: monthly ? `Deposit bonus ${first.quote.monthly.n}` : 'First deposit bonus',
             body: result.locked
-              ? '{amount} first deposit bonus has been added to your bonus balance. Wager it to unlock it as cash.'
-              : '{amount} first deposit bonus has been added to your wallet.',
+              ? '{amount} deposit bonus is locked in your bonus balance. Every bet unlocks part of it — claim it any time.'
+              : '{amount} deposit bonus has been added to your wallet.',
             link: result.locked ? '/wallet' : '/bonus',
             meta: { amount: result.amount, currency: result.currency },
           });
@@ -289,7 +330,9 @@ class FirstDepositBonusService {
    * Every check, and the amount, without paying: `{ quote }` when the bonus would be paid,
    * otherwise `{ paid: false, reason }`.
    */
-  async #quote({ userId, currency, amount, ledgerId, source, refId } = {}, terms) {
+  async #quote(deposit = {}, terms) {
+    if (terms.program?.mode === 'monthly') return this.#monthlyQuote(deposit, terms);
+    const { userId, currency, amount, ledgerId, source, refId } = deposit;
     if (!terms.enabled || !terms.tiers.length) return { paid: false, reason: 'DISABLED' };
     if (!userId || !ledgerId || !currency || !money.gt(amount ?? '0', '0')) {
       return { paid: false, reason: 'NO_DEPOSIT' };
@@ -338,24 +381,65 @@ class FirstDepositBonusService {
   }
 
   /**
+   * hash.game "Monthly Deposit Bonus": "Get 4 deposit bonuses every month … All 4 chances reset on
+   * the 1st of each month at 00:00 UTC." The Nth credited deposit of the month (that reaches its
+   * row's minimum) gets `schedule[N-1]`: deposit × percent, capped by maxBonus when set.
+   */
+  async #monthlyQuote({ userId, currency, amount, ledgerId } = {}, terms) {
+    const schedule = terms.program.schedule;
+    if (!terms.enabled || !schedule.length) return { paid: false, reason: 'DISABLED' };
+    if (!userId || !ledgerId || !currency || !money.gt(amount ?? '0', '0')) return { paid: false, reason: 'NO_DEPOSIT' };
+    if (await promotionsBlocked(userId)) return { paid: false, reason: 'AGENT_TREE_PLAYER' };
+
+    const used = await this.#monthlyUsed(userId);
+    if (used >= schedule.length) return { paid: false, reason: 'MONTHLY_LIMIT_REACHED', used };
+    const tier = schedule[used];
+
+    const code = String(currency).toUpperCase();
+    const deposited = money.toDecimalString(money.toMinor(amount));
+    const quote = await this.rewardMoney.toReward(deposited, code);
+    if (quote === null) return { paid: false, reason: 'NO_EXCHANGE_RATE' };
+    const value = quote.amount;
+    const usd = await this.rewardMoney.toUsd(deposited, code);
+    if (!money.gte(value, tier.minDeposit)) {
+      return { paid: false, reason: 'BELOW_MINIMUM', depositUsd: usd, depositValue: value, minDeposit: tier.minDeposit };
+    }
+
+    let bonus = money.percentOf(value, tier.percent);
+    if (money.gt(tier.maxBonus, '0')) bonus = money.min(bonus, tier.maxBonus);
+    const bonusAmount = money.toDecimalString(bonus);
+    if (!money.gt(bonusAmount, '0')) return { paid: false, reason: 'ZERO_BONUS' };
+
+    const { label } = this.#month();
+    return {
+      quote: { bonusAmount, rewardCurrency: quote.currency, value, usd, tier, code, deposited, monthly: { n: used + 1, month: label } },
+    };
+  }
+
+  /**
    * Grant the bonus: to the locked bonus balance (wagering lock on, a multiplier set) or straight
    * to cash (`../player-bonuses` decides, and records it either way).
    */
   async #pay({ userId, source, refId }, quote, terms) {
-    const { bonusAmount, rewardCurrency, value, usd, tier, code, deposited } = quote;
+    const { bonusAmount, rewardCurrency, value, usd, tier, code, deposited, monthly } = quote;
     const pct = Number(tier.percent);
-    const rollover = terms.wagerMultiplier ? `, wager ${terms.wagerMultiplier}x` : '';
+    const gradual = terms.program?.unlockMode === 'gradual';
+    const rollover = gradual
+      ? `, unlocks as you wager (${Number(terms.program.unlockRate) * 100}% of wager × house edge)`
+      : terms.wagerMultiplier ? `, wager ${terms.wagerMultiplier}x` : '';
     const grant = await this.playerBonuses.grant({
       userId,
-      source: BONUS_SOURCE.FIRST_DEPOSIT,
-      grantKey: keyFor(userId),
+      source: monthly ? BONUS_SOURCE.MONTHLY_DEPOSIT : BONUS_SOURCE.FIRST_DEPOSIT,
+      grantKey: monthly ? monthlyKeyFor(userId, monthly) : keyFor(userId),
       ref: `${source}:${refId}`,
       amount: bonusAmount,
       currency: rewardCurrency,
       wagerMultiplier: terms.wagerMultiplier,
       expiryDays: terms.expiryDays,
+      unlockMode: gradual ? 'gradual' : 'rollover',
+      unlockRate: terms.program?.unlockRate,
       description:
-        `First deposit bonus: ${pct}% of ${twoPlaces(value)} ${rewardCurrency}` +
+        `${monthly ? `Deposit bonus ${monthly.n} (${monthly.month})` : 'First deposit bonus'}: ${pct}% of ${twoPlaces(value)} ${rewardCurrency}` +
         (code === rewardCurrency ? '' : ` (${twoPlaces(deposited)} ${code})`) +
         rollover,
     });
@@ -421,4 +505,4 @@ function twoPlaces(value) {
   return `${whole}.${fraction.slice(0, 2).padEnd(2, '0')}`;
 }
 
-module.exports = { FirstDepositBonusService, REF_TYPE, keyFor };
+module.exports = { FirstDepositBonusService, REF_TYPE, keyFor, monthlyKeyFor };

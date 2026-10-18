@@ -126,11 +126,24 @@ const updateWelcomeBonusSettings = {
         })
         .strict()
         .optional(),
+      // hash.game's deposit bonus program (migration 136).
+      depositProgram: z
+        .object({
+          mode: z.enum(['first', 'monthly']).optional(),
+          unlockMode: z.enum(['rollover', 'gradual']).optional(),
+          unlockRate: percent.optional(),
+          schedule: z
+            .array(z.object({ percent: rate.refine((v) => Number.parseFloat(v) <= 1000, 'at most 1000%'), minDeposit: rate, maxBonus: rate }).strict())
+            .max(10, 'at most 10 deposits a month')
+            .optional(),
+        })
+        .strict()
+        .optional(),
     })
     .strict()
     .refine(
       (v) =>
-        [v.registerBonus, v.firstDepositBonus].some(
+        [v.registerBonus, v.firstDepositBonus, v.depositProgram].some(
           (group) => group && Object.values(group).some((field) => field !== undefined)
         ),
       { message: 'give at least one setting to change' }

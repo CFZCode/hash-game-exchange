@@ -17,6 +17,7 @@ const withdraw = defineErrors('BONUS', {
 const admin = defineErrors('PLAYER_BONUS', {
   NOT_FOUND: { status: 404, message: 'Bonus not found' },
   NOT_ACTIVE: { status: 409, message: 'This bonus is no longer active' },
+  NOTHING_TO_CLAIM: { status: 409, message: 'Nothing has unlocked yet — keep playing to unlock your bonus' },
 });
 
 module.exports = { ...withdraw, ...admin };

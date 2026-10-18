@@ -248,4 +248,9 @@ const rechargeBonusConfigFixture = () =>
 export const getBonusBalance = () =>
   USE_FIXTURES ? null : Promise.resolve(request('/api/v1/user/bonus-balance', { live: true, fixture: null })).catch(() => null);
 
+/* hash.game: "Claim your unlocked rewards from the Bonus page anytime" — `POST /user/bonus-balance/claim`
+   moves what the locked deposit bonuses have unlocked to cash. */
+export const claimUnlockedBonus = () =>
+  request('/api/v1/user/bonus-balance/claim', { live: true, method: 'POST', fixture: null });
+
 export default getDepositBonuses;

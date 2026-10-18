@@ -16,7 +16,13 @@ const { money } = require('@ibitplay/common');
 const DEFAULT_TTL_MS = 5_000;
 const INTERNAL_PATH = '/internal/admin/site-config/welcome-bonuses';
 
-const DISABLED = Object.freeze({ enabled: false, tiers: Object.freeze([]), wagerMultiplier: null, expiryDays: null });
+const DISABLED = Object.freeze({
+  enabled: false,
+  tiers: Object.freeze([]),
+  wagerMultiplier: null,
+  expiryDays: null,
+  program: Object.freeze({ mode: 'first', unlockMode: 'rollover', unlockRate: '0.01', schedule: Object.freeze([]) }),
+});
 
 const DECIMAL = /^\d+(\.\d{1,8})?$/;
 const decimal = (value) => (DECIMAL.test(String(value ?? '').trim()) ? String(value).trim() : '0');
@@ -27,6 +33,23 @@ function normaliseTiers(list) {
     .map((t) => ({ minDeposit: decimal(t?.minDeposit), percent: decimal(t?.percent), maxBonus: decimal(t?.maxBonus) }))
     .filter((t) => money.gt(t.percent, '0'))
     .sort((a, b) => money.compare(a.minDeposit, b.minDeposit));
+}
+
+/**
+ * hash.game's deposit bonus program (migration 136): `mode` 'first' | 'monthly', `unlockMode`
+ * 'rollover' | 'gradual', `unlockRate` a FRACTION here (admin sends a percent), `schedule` in
+ * deposit order (row N = the Nth deposit of the month).
+ */
+function normaliseProgram(p) {
+  const pct = DECIMAL.test(String(p?.unlockRate ?? '').trim()) ? Number(p.unlockRate) : 1;
+  return {
+    mode: p?.mode === 'monthly' ? 'monthly' : 'first',
+    unlockMode: p?.unlockMode === 'gradual' ? 'gradual' : 'rollover',
+    unlockRate: String(pct / 100),
+    schedule: (Array.isArray(p?.schedule) ? p.schedule : [])
+      .map((t) => ({ minDeposit: decimal(t?.minDeposit), percent: decimal(t?.percent), maxBonus: decimal(t?.maxBonus) }))
+      .filter((t) => money.gt(t.percent, '0')),
+  };
 }
 
 function createWelcomeBonusResolver({ clients, logger, ttlMs = DEFAULT_TTL_MS } = {}) {
@@ -49,6 +72,7 @@ function createWelcomeBonusResolver({ clients, logger, ttlMs = DEFAULT_TTL_MS } 
           wagerMultiplier: fd.wagerMultiplier == null || !Number.isFinite(multiplier) ? null : multiplier,
           // Days an unwagered bonus lives in the bonus balance (migration 076); null = the default.
           expiryDays: Number.isInteger(Number(fd.expiryDays)) && fd.expiryDays != null ? Number(fd.expiryDays) : null,
+          program: normaliseProgram(body?.depositProgram),
         };
         cached = { value, expires: Date.now() + ttlMs };
         return value;
@@ -75,4 +99,4 @@ function createWelcomeBonusResolver({ clients, logger, ttlMs = DEFAULT_TTL_MS } 
   };
 }
 
-module.exports = { createWelcomeBonusResolver, normaliseTiers, INTERNAL_PATH, DISABLED };
+module.exports = { createWelcomeBonusResolver, normaliseTiers, normaliseProgram, INTERNAL_PATH, DISABLED };

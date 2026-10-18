@@ -384,11 +384,44 @@ class SiteConfigService {
    * paid in the reward currency. Tier amounts are denominated in it too
    * (`currency` = `payoutCurrency` = the reward currency).
    */
+  /** hash.game's deposit bonus program (migration 136); the old behaviour before it ran. */
+  async #storedDepositProgram() {
+    const fallback = { mode: 'first', unlockMode: 'rollover', unlockRate: '1', schedule: [] };
+    try {
+      const [row] = await this.models.Siteconfig.sequelize.query('SELECT deposit_bonus_program FROM siteconfig ORDER BY id ASC LIMIT 1', {
+        type: this.models.Siteconfig.sequelize.QueryTypes.SELECT,
+      });
+      const v = typeof row?.deposit_bonus_program === 'string' ? JSON.parse(row.deposit_bonus_program) : row?.deposit_bonus_program;
+      if (!v) return fallback;
+      return {
+        mode: v.mode === 'monthly' ? 'monthly' : 'first',
+        unlockMode: v.unlockMode === 'gradual' ? 'gradual' : 'rollover',
+        unlockRate: /^\d+(\.\d+)?$/.test(String(v.unlockRate ?? '')) ? String(v.unlockRate) : '1',
+        // In deposit order (1st, 2nd, …), NOT sorted: the Nth deposit of the month gets row N.
+        schedule: (Array.isArray(v.schedule) ? v.schedule : []).map((t) => ({
+          percent: this.#amount(t?.percent),
+          minDeposit: this.#amount(t?.minDeposit),
+          maxBonus: this.#amount(t?.maxBonus),
+        })),
+      };
+    } catch (error) {
+      if (!isUndefinedColumn(error)) throw error;
+      return fallback;
+    }
+  }
+
   async welcomeBonusSettings() {
     const row = await this.#configRow(['id', ...Object.values(WELCOME_FIELDS)]);
     const multiplier = row?.first_deposit_bonus_wager_multiplier;
-    const rewardCurrency = await this.rewardCurrency();
+    const [rewardCurrency, depositProgram] = await Promise.all([this.rewardCurrency(), this.#storedDepositProgram()]);
     return {
+      /**
+       * hash.game "Monthly Deposit Bonus" (migration 136): `mode` 'monthly' pays the Nth deposit of
+       * the calendar month (UTC) `schedule[N-1]`; 'first' keeps the first-deposit tiers below.
+       * `unlockMode` 'gradual' = locked, unlocking `wager × contribution × house edge × unlockRate%`
+       * per bet, claimable any time. On/off is `firstDepositBonus.enabled` either way.
+       */
+      depositProgram,
       rewardCurrency,
       registerBonus: {
         enabled: Boolean(row?.register_bonus_enabled),
@@ -411,9 +444,22 @@ class SiteConfigService {
   }
 
   /** A patch: any field left out keeps its stored value. `tiers` replaces the list. */
-  async updateWelcomeBonusSettings({ registerBonus, firstDepositBonus, staffId = null }) {
+  async updateWelcomeBonusSettings({ registerBonus, firstDepositBonus, depositProgram, staffId = null }) {
     const row = await this.#configRow(['id']);
     if (!row) throw errors.NOT_CONFIGURED();
+
+    if (depositProgram !== undefined) {
+      const next = { ...(await this.#storedDepositProgram()), ...depositProgram };
+      try {
+        await this.models.Siteconfig.sequelize.query(
+          'UPDATE siteconfig SET deposit_bonus_program = CAST(:v AS jsonb), updatedat = now() WHERE id = :id',
+          { replacements: { id: row.id, v: JSON.stringify(next) } }
+        );
+      } catch (error) {
+        if (isUndefinedColumn(error)) throw errors.MIGRATION_PENDING({ migration: '136-gradual-bonus-unlock' });
+        throw error;
+      }
+    }
 
     const patch = { updatedat: new Date() };
     const put = (column, value) => {
