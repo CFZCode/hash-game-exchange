@@ -3,7 +3,7 @@
 /* The referrer lookup (which needs `where(fn(...), value)`) now lives in
    `referrerResolver.js`, shared with signup and the public code check. */
 const { Op, fn, col, QueryTypes } = require('sequelize');
-const { money, creditableCurrency } = require('@ibitplay/common');
+const { money, creditableCurrency, resolveVipLadder } = require('@ibitplay/common');
 const { promotionsBlocked, assertPlayerCapability } = require('@ibitplay/auth');
 
 const errors = require('./affiliate.errors');
@@ -353,6 +353,11 @@ class AffiliateService {
       // `https://addaplay.com/referal/...` in the controller, so the link was
       // wrong on every environment that was not that one.
       referralLink: referralLinkFor(this.config, user.referalcode),
+      // hash.game's My Rewards "Locked Rewards" box. Best-effort: the code and link never wait on it.
+      lockedRewards: await this.lockedRewards({ ownerName: user.name }).catch((error) => {
+        this.logger?.warn({ err: error, userId }, 'Locked referral rewards unreadable');
+        return null;
+      }),
     };
   }
 
@@ -735,17 +740,19 @@ class AffiliateService {
     const wagerRow = await this.models.Userwager.findOne({ where: { uid: member.id }, raw: true });
     const wager = this.#wagerAmount(wagerRow);
 
-    const tier = this.#tierFor(wager);
-    if (!tier) return { unlocked: false, reason: 'The member has not reached the first tier', wager };
+    const tiers = await this.unlockTiers();
+    if (!tiers.some((t) => money.gte(wager, t.wager))) {
+      return { unlocked: false, reason: 'The member has not reached the first tier', wager };
+    }
 
     return this.db.transaction(async (transaction) => {
       /**
-       * Only unlock a tier ABOVE the highest already granted for this member.
+       * Every tier ABOVE the highest already granted for this member, up to the one the wager
+       * has reached — each its own row. hash.game pays a friend's $1,000 in ten steps; paying
+       * only the highest step reached skipped the ones a fast climber jumped over.
        *
-       * Without this, running the job twice grants the same tier twice —
-       * and legacy's check (`wager_amount >= $2`) compared against the
-       * caller-supplied figure rather than the tier, so a caller could step it
-       * by one and unlock repeatedly.
+       * The highest grant is read under a row lock, so two runs cannot both pay a step, and a
+       * caller cannot step the figure: the wager comes from `userwager`, not from the request.
        */
       const highest = await this.models.UnlockedRewards.findOne({
         where: { membername: memberName },
@@ -754,51 +761,108 @@ class AffiliateService {
         transaction,
         raw: true,
       });
-
-      if (highest && money.gte(String(highest.wager_amount ?? '0'), tier.wager)) {
-        return { unlocked: false, reason: 'This tier has already been unlocked', tier: tier.wager, wager };
+      const floor = String(highest?.wager_amount ?? '0');
+      const due = tiers.filter((t) => money.gt(t.wager, floor) && money.gte(wager, t.wager));
+      if (!due.length) {
+        return { unlocked: false, reason: 'This tier has already been unlocked', tier: floor, wager };
       }
 
-      // `UNLOCK_TIERS` rewards are USD; priced in the site's reward currency.
-      const quote = await this.rewardMoney.fromUsd(tier.reward);
-      const rewardCoin = quote.currency;
+      const granted = [];
+      for (const tier of due) {
+        // Tier rewards are USD; priced in the site's reward currency.
+        const quote = await this.rewardMoney.fromUsd(tier.reward);
+        const created = await this.models.UnlockedRewards.create(
+          {
+            uid: owner.id,
+            ownername: owner.name,
+            membername: memberName,
+            amount: quote.amount,
+            cointype: quote.currency,
+            // NOT NULL on this table. Taken from the TEAM row, not the owner's
+            // current code: a referrer who regenerates their code must not
+            // orphan the rewards already earned under the old one.
+            referalCode: team.referalCode ?? owner.referalcode,
+            // OUR figure, so a later run compares against something real.
+            wager_amount: tier.wager,
+            claimed: false,
+          },
+          { transaction }
+        );
+        granted.push({ rewardId: created.id, level: tier.level, tier: tier.wager, amount: quote.amount, amountUsd: tier.reward, currency: quote.currency });
+      }
 
-      const created = await this.models.UnlockedRewards.create(
-        {
-          uid: owner.id,
-          ownername: owner.name,
-          membername: memberName,
-          amount: quote.amount,
-          cointype: rewardCoin,
-          // NOT NULL on this table. Taken from the TEAM row, not the owner's
-          // current code: a referrer who regenerates their code must not
-          // orphan the rewards already earned under the old one.
-          referalCode: team.referalCode ?? owner.referalcode,
-          // OUR figure, so a later run compares against something real.
-          wager_amount: tier.wager,
-          claimed: false,
-        },
-        { transaction }
+      this.logger?.info({ owner: owner.name, member: memberName, steps: granted.length, staffId }, 'Affiliate reward unlocked');
+      const top = granted[granted.length - 1];
+      transaction.afterCommit(() =>
+        notifyPlayer(owner.id, {
+          kind: 'affiliate_reward',
+          key: `affiliate:tier:${memberName}:${top.tier}`,
+          title: 'Affiliate reward unlocked',
+          body: `{amount} is ready to claim — ${memberName} reached ${top.level || 'a new level'}.`,
+          link: '/affiliate',
+          meta: { amount: granted.reduce((acc, g) => money.toDecimalString(money.add(acc, g.amount)), '0'), currency: top.currency },
+        })
       );
-
-      this.logger?.info(
-        { owner: owner.name, member: memberName, tier: tier.wager, reward: tier.reward, staffId },
-        'Affiliate reward unlocked'
-      );
-      transaction.afterCommit(() => notifyPlayer(owner.id, { kind: 'affiliate_reward', key: `affiliate:tier:${memberName}:${tier.wager}`, title: 'Affiliate reward unlocked', body: `{amount} is ready to claim — ${memberName} reached a new wager tier.`, link: '/affiliate', meta: { amount: quote.amount, currency: rewardCoin } }));
 
       return {
         unlocked: true,
-        rewardId: created.id,
+        rewardId: top.rewardId,
         owner: owner.name,
         member: memberName,
-        tier: tier.wager,
-        amount: quote.amount,
-        amountUsd: tier.reward,
-        currency: rewardCoin,
+        tier: top.tier,
+        amount: top.amount,
+        amountUsd: top.amountUsd,
+        currency: top.currency,
+        granted,
         wager,
       };
     });
+  }
+
+  /**
+   * The referral unlock table that PAYS: the site admin's (`siteconfig.referral_unlock_tiers`,
+   * read through affiliate settings), else `UNLOCK_TIERS`. A row named after a VIP level
+   * ("Bronze I") takes that level's threshold from the live ladder, so the admin's VIP XP edits
+   * move it too — hash.game: "Your friend's VIP level will unlock your awards". USD both sides.
+   */
+  async unlockTiers() {
+    const settings = await this.settings.read();
+    const table = settings.unlockTiers ?? UNLOCK_TIERS;
+    let ladder = null;
+    try {
+      ladder = await resolveVipLadder(this.models, { logger: this.logger });
+    } catch {
+      ladder = null;
+    }
+    const floorOf = new Map((ladder?.levels ?? []).map((b) => [String(b.name).toLowerCase(), String(b.minXp)]));
+    return table
+      .map((t) => ({ ...t, wager: floorOf.get(String(t.level).toLowerCase()) ?? t.wager }))
+      .sort((a, b) => Number(a.wager) - Number(b.wager));
+  }
+
+  /**
+   * hash.game's "Locked Rewards": what this referrer's friends have not unlocked yet — per friend,
+   * the table's total less the steps already granted — in USD and in the reward currency.
+   */
+  async lockedRewards({ ownerName }) {
+    const tiers = await this.unlockTiers();
+    const perFriend = tiers.reduce((acc, t) => money.toDecimalString(money.add(acc, t.reward)), '0');
+    const members = await this.models.Team.findAll({ where: { ownername: ownerName }, attributes: ['membername'], raw: true });
+    if (!members.length) return { friends: 0, perFriendUsd: perFriend, lockedUsd: '0.00000000', locked: '0.00000000', currency: (await this.rewardMoney.fromUsd('0')).currency };
+    const highest = await this.models.UnlockedRewards.findAll({
+      where: { ownername: ownerName },
+      attributes: ['membername', [fn('MAX', col('wager_amount')), 'top']],
+      group: ['membername'],
+      raw: true,
+    });
+    const topOf = new Map(highest.map((r) => [r.membername, String(r.top ?? '0')]));
+    let locked = '0';
+    for (const { membername } of members) {
+      const floor = topOf.get(membername) ?? '0';
+      for (const t of tiers) if (money.gt(t.wager, floor)) locked = money.toDecimalString(money.add(locked, t.reward));
+    }
+    const quote = await this.rewardMoney.fromUsd(locked);
+    return { friends: members.length, perFriendUsd: perFriend, lockedUsd: money.toDecimalString(money.toMinor(locked)), locked: quote.amount, currency: quote.currency };
   }
 
   // ══════════════════════════════════════════════════════════════════════
@@ -1094,14 +1158,6 @@ class AffiliateService {
     if (!ownername) return null;
     const byName = await this.models.Users.findOne({ where: { name: ownername }, attributes: ['id'], raw: true });
     return byName?.id ?? null;
-  }
-
-  /** The highest tier this wager has reached, or null. */
-  #tierFor(wager) {
-    for (let i = UNLOCK_TIERS.length - 1; i >= 0; i -= 1) {
-      if (money.gte(wager, UNLOCK_TIERS[i].wager)) return UNLOCK_TIERS[i];
-    }
-    return null;
   }
 
   /**

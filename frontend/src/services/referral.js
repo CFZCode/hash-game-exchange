@@ -152,8 +152,10 @@ export const getAffiliateDashboard = ({ reloads } = {}) => {
 
   if (!team || typeof team.then !== 'function') return DASHBOARD_INFO;
 
-  return Promise.all([team.catch(emptyIfAgentBlocked(null)), readRewards(), readUnclaimed(), readTodayRewards()]).then(
-    ([members, earned, open, today]) => {
+  const summary = Promise.resolve(request(PLATFORM.user.affiliate.summary, { live: true, fixture: null })).catch(() => null);
+
+  return Promise.all([team.catch(emptyIfAgentBlocked(null)), readRewards(), readUnclaimed(), readTodayRewards(), summary]).then(
+    ([members, earned, open, today, info]) => {
       const { tier, commission } = splitUnclaimed(open);
       /* Commission ever credited (claimed or not) is `rewards.totalAmount`; what is still open is
          the unclaimed list's `commission` rows; so what was already paid out is the difference.
@@ -172,8 +174,9 @@ export const getAffiliateDashboard = ({ reloads } = {}) => {
           commissionUsd: String(commissionEarned),
           rewardUsd: String(tier + tierPaid),
           todayCommissionUsd: String(num(today?.totalAmount)),
-          /* `ratio`/`maxRatio`, `todayWagerUsd` and `remainingRewardUsd` (locked rewards) have no
-             source on the platform and keep the declared zeros. */
+          /* hash.game's "Locked Rewards": friends' referral steps not unlocked yet (USD), from
+             `GET /user/affiliate` → `lockedRewards`. `ratio`/`maxRatio`/`todayWagerUsd` keep zeros. */
+          remainingRewardUsd: String(num(info?.lockedRewards?.lockedUsd)),
         },
         /* Rewards Activities: one Commission Rewards line per credited commission, newest first. */
         topCommissions: (earned?.rows ?? []).map((row) => ({ commissionUsd: String(num(row.amount)) })),

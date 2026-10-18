@@ -23,7 +23,19 @@ const DEFAULTS = Object.freeze({
   affiliateBonusRequiresDeposit: true,
   registerBonusCurrency: REWARD_CURRENCY,
   affiliateBonusCurrency: REWARD_CURRENCY,
+  // The admin's referral unlock table (`[{ level, wager, reward }]`, USD); null = use UNLOCK_TIERS.
+  unlockTiers: null,
 });
+
+/** `[{ level, totalWager, unlockAmount }]` from admin-service → `[{ level, wager, reward }]`, lowest first. */
+function toUnlockTiers(rows) {
+  if (!Array.isArray(rows)) return null;
+  const tiers = rows
+    .map((r) => ({ level: String(r?.level ?? '').trim(), wager: String(r?.totalWager ?? ''), reward: String(r?.unlockAmount ?? '') }))
+    .filter((t) => /^\d+(\.\d+)?$/.test(t.wager) && /^\d+(\.\d+)?$/.test(t.reward) && Number(t.wager) > 0)
+    .sort((a, b) => Number(a.wager) - Number(b.wager));
+  return tiers.length ? tiers : null;
+}
 
 function createAffiliateSettingsResolver({ clients, logger, ttlMs = DEFAULT_TTL_MS } = {}) {
   let cached = { value: { ...DEFAULTS }, expires: 0 };
@@ -45,6 +57,7 @@ function createAffiliateSettingsResolver({ clients, logger, ttlMs = DEFAULT_TTL_
           affiliateBonusRequiresDeposit: body?.affiliateBonusRequiresDeposit !== false,
           registerBonusCurrency: String(body?.registerBonusCurrency ?? DEFAULTS.registerBonusCurrency).toUpperCase(),
           affiliateBonusCurrency: String(body?.affiliateBonusCurrency ?? DEFAULTS.affiliateBonusCurrency).toUpperCase(),
+          unlockTiers: toUnlockTiers(body?.referralUnlocks),
         };
         cached = { value, expires: Date.now() + ttlMs };
         return value;
@@ -83,6 +96,7 @@ function affiliateSettings(deps) {
 }
 
 module.exports = {
+  toUnlockTiers,
   createAffiliateSettingsResolver,
   affiliateSettings,
   DEFAULTS,

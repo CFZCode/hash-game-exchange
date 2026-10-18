@@ -126,9 +126,11 @@ test('affiliate', async (t) => {
     const second = await service.unlockFor({ memberName: member.name });
 
     assert.equal(first.unlocked, true);
-    assert.equal(first.tier, '5000');
+    // 6,000 passes Bronze I (1,000) and Bronze II (3,000): both steps, once each.
+    assert.equal(first.tier, '3000');
+    assert.equal(first.granted.length, 2);
     assert.equal(second.unlocked, false);
-    assert.equal(await connection.models.UnlockedRewards.count({ where: { uid: owner.uid } }), 1);
+    assert.equal(await connection.models.UnlockedRewards.count({ where: { uid: owner.uid } }), 2);
   });
 
   await t.test('reaching a HIGHER tier unlocks again', async () => {
@@ -141,8 +143,10 @@ test('affiliate', async (t) => {
 
     const second = await service.unlockFor({ memberName: member.name });
     assert.equal(second.unlocked, true);
-    assert.equal(second.tier, '17000');
+    // 1,500 → 20,000 passes Bronze II (3,000) and Bronze IV (15,000).
+    assert.equal(second.tier, '15000');
     assert.equal(second.amount, '5.00000000');
+    assert.deepEqual(second.granted.map((g) => g.amountUsd), ['2.50', '5.00']);
   });
 
   await t.test('a wager with thousands separators still finds the right tier', async () => {
@@ -151,7 +155,21 @@ test('affiliate', async (t) => {
     await service.joinTeam({ userId: member.uid, referralCode: owner.code });
 
     const result = await service.unlockFor({ memberName: member.name });
-    assert.equal(result.tier, '49000');
+    assert.equal(result.tier, '30000');
+  });
+
+  await t.test('a friend who jumps levels pays every step, and the rest stays locked (hash.game $1,000)', async () => {
+    const owner = await seed(newUid());
+    const member = await seed(newUid(), { wager: '30000' });
+    await service.joinTeam({ userId: member.uid, referralCode: owner.code });
+
+    const result = await service.unlockFor({ memberName: member.name });
+    // Bronze I 0.50 + Bronze II 2.50 + Bronze IV 5 + Silver I 12 = 20 of the 1,000.
+    assert.deepEqual(result.granted.map((g) => g.level), ['Bronze I', 'Bronze II', 'Bronze IV', 'Silver I']);
+    const locked = await service.lockedRewards({ ownerName: owner.name });
+    assert.equal(locked.friends, 1);
+    assert.equal(locked.perFriendUsd, '1000.00000000');
+    assert.equal(locked.lockedUsd, '980.00000000');
   });
 
   // ══════════════════════════════════════════════════════════════════════

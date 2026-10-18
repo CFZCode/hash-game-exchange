@@ -61,8 +61,10 @@ const TIP_LIMIT_DEFAULTS = Object.freeze({ maxPerTipUsd: '500', maxPerDayUsd: '2
  * Referral unlock tiers (migration 106) — the "Friend's Level / Total Wager /
  * Unlock Amount" table on the player site's `/referral/rules`.
  *
- * DISPLAY TERMS. What the site promises a referrer; user-service's tier unlock
- * (`UNLOCK_TIERS` in affiliate.constants.js) still pays on its own constants.
+ * PAYING TERMS (19 Oct 2026). user-service's tier unlock reads this table through
+ * `/internal/admin/site-config/affiliate` (`referralUnlocks`); `UNLOCK_TIERS` in
+ * affiliate.constants.js is only the fallback when the table is unreadable. Amounts are USD
+ * (hash.game's $1,000 per friend), priced into the reward currency when paid.
  *
  * The defaults are the migration's column default (the bc.game capture the
  * page shipped with) and are what a site without the column yet reads, so the
@@ -255,8 +257,10 @@ class SiteConfigService {
 
     // No config row is a real state on a fresh install, and legacy reported
     // zeros for it rather than erroring. Kept, so the screen renders.
-    const rewardCurrency = await this.rewardCurrency();
+    const [rewardCurrency, unlocks] = await Promise.all([this.rewardCurrency(), this.#storedReferralUnlocks()]);
     return {
+      // The referral unlock table PAYS now (user-service tier unlock), not only displays.
+      referralUnlocks: unlocks.tiers,
       affiliateBonus: this.#amount(row?.affiliatebonus),
       commissionPercent: this.#amount(row?.comissionpercent),
       registerBonus: this.#amount(row?.registerbonus),
