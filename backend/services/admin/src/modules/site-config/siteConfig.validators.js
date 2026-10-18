@@ -42,6 +42,9 @@ const rate = z
   .trim()
   .regex(/^\d+(\.\d{1,8})?$/, 'must be a non-negative decimal with at most 8 decimal places');
 
+/** A percent, 0–100 (hash.game's commission rate and game rates). */
+const percent = rate.refine((v) => Number.parseFloat(v) <= 100, 'a percent cannot exceed 100');
+
 const updateAffiliateSettings = {
   body: z
     .object({
@@ -56,6 +59,12 @@ const updateAffiliateSettings = {
       affiliateBonusCurrency: rewardCurrency.optional(),
       // The joining bonus waits for the referee's first deposit (migration 072).
       affiliateBonusRequiresDeposit: z.boolean().optional(),
+      // hash.game's commission (migration 134): wager × 1% × commissionRate% × game rate%.
+      commissionRate: percent.optional(),
+      gameRates: z
+        .object({ originals: percent.optional(), slots: percent.optional(), live: percent.optional(), sports: percent.optional() })
+        .strict()
+        .optional(),
     })
     .strict()
     // An update naming nothing would answer "updated successfully" having
@@ -68,7 +77,9 @@ const updateAffiliateSettings = {
         v.registerBonus !== undefined ||
         v.registerBonusCurrency !== undefined ||
         v.affiliateBonusCurrency !== undefined ||
-        v.affiliateBonusRequiresDeposit !== undefined,
+        v.affiliateBonusRequiresDeposit !== undefined ||
+        v.commissionRate !== undefined ||
+        v.gameRates !== undefined,
       { message: 'give at least one setting to change' }
     ),
 };

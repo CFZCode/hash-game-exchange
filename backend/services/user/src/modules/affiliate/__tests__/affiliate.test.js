@@ -428,7 +428,7 @@ test('affiliate', async (t) => {
     assert.equal(result.unlock.unlocked, true);
   });
 
-  await t.test('on-wager records commission from site-config percent', async () => {
+  await t.test("on-wager records hash.game's commission: wager × 1% × rate × game rate", async () => {
     const owner = await seed(newUid());
     const member = await seed(newUid());
     await service.joinTeam({ userId: member.uid, referralCode: owner.code });
@@ -442,7 +442,7 @@ test('affiliate', async (t) => {
         admin: {
           get: async (path) => {
             assert.match(path, /site-config\/affiliate/);
-            return { commissionPercent: '10.00000000', affiliateBonus: '0', registerBonus: '0' };
+            return { commissionRate: '25', gameRates: { originals: '28', slots: '60', live: '60', sports: '100' }, affiliateBonus: '0', registerBonus: '0' };
           },
         },
       },
@@ -455,14 +455,21 @@ test('affiliate', async (t) => {
     });
 
     assert.equal(result.commissionRecorded, true);
-    assert.equal(result.commission, '10.00000000');
+    // $100 of slots: 100 × 1% × 25% × 60% = 0.15.
+    assert.equal(result.commission, '0.15000000');
+
+    // The same $100 on an original: × 28% → 0.07; on sports: × 100% → 0.25.
+    const original = await rated.onWager({ userId: member.uid, previousWager: '200', newWager: '300', kind: { category: 'originals' } });
+    assert.equal(original.commission, '0.07000000');
+    const sports = await rated.onWager({ userId: member.uid, previousWager: '300', newWager: '400', kind: { category: 'sports' } });
+    assert.equal(sports.commission, '0.25000000');
 
     const rows = await connection.models.Rewards.findAll({
       where: { ownername: owner.name, membername: member.name },
       raw: true,
     });
-    assert.equal(rows.length, 1);
-    assert.equal(String(rows[0].referalmount), '100.00000000');
+    assert.equal(rows.length, 3);
+    assert.ok(rows.every((r) => String(r.referalmount) === '100.00000000'));
   });
 
   await t.test('a team listing does not include member email addresses', async () => {

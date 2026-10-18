@@ -226,12 +226,12 @@ test('rewards in USD, paid in the reward currency', async (t) => {
 
   const affiliateIn = (code) => {
     const service = new AffiliateService({ ...base, rewardMoney: rewardMoneyIn(code) });
-    service.settings = { read: async () => ({ commissionPercent: '5' }) };
+    service.settings = { read: async () => ({ commissionRate: '25', gameRates: { originals: '28', slots: '60', live: '60', sports: '100' } }) };
     return service;
   };
 
   for (const code of ['USDT', 'INR']) {
-    await t.test(`₹1,000 of referee wager pays 5% of $12 in ${code}, claimable once`, async () => {
+    await t.test(`₹1,000 of referee wager pays hash.game's slots commission (0.15% of $12) in ${code}, claimable once`, async () => {
       const owner = await seed();
       const member = await seed();
       const affiliate = affiliateIn(code);
@@ -245,7 +245,7 @@ test('rewards in USD, paid in the reward currency', async (t) => {
       });
       await pipeline.record({ userId: member.uid, amount: '1000', currency: 'INR', source: 'qa-sim', ref: ref() });
 
-      const usd = money.toDecimalString(money.percentOf(money.multiply('1000', inrRate), '5')); // $0.60
+      const usd = money.toDecimalString(money.percentOf(money.multiply('1000', inrRate), '0.15')); // $0.018 = ₹1.50
       const expected = code === 'USDT' ? usd : money.toDecimalString(money.divide(usd, inrRate));
 
       const unclaimed = await affiliate.unclaimedRewards({ userId: owner.uid });

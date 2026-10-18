@@ -27,7 +27,8 @@ let nextUid = 980_000_000 + Math.floor(process.pid % 100_000) * 1000;
 const newUid = () => (nextUid += 1);
 let seq = 0;
 const ref = () => `wp-${process.pid}-${Date.now()}-${(seq += 1)}`;
-const COMMISSION_PERCENT = '5';
+// hash.game: wager × 1% × 25% × 60% (a `qa-pipe` stake counts as slots) = 0.15% of the stake.
+const COMMISSION_PERCENT = '0.15';
 
 test('wager pipeline end to end', async (t) => {
   const logger = createLogger({ name: 'wager-pipeline-test', level: 'silent' });
@@ -129,7 +130,7 @@ test('wager pipeline end to end', async (t) => {
     const rewardMoney = createRewardMoney({ ...base, rewardCurrencies: { rewardCurrency: async () => code } });
     const deps = { ...base, rewardMoney, bonusWageringLock: async () => true };
     const affiliate = new AffiliateService(deps);
-    affiliate.settings = { read: async () => ({ commissionPercent: COMMISSION_PERCENT }) };
+    affiliate.settings = { read: async () => ({ commissionRate: '25', gameRates: { originals: '28', slots: '60', live: '60', sports: '100' } }) };
     const playerBonuses = new PlayerBonusService(deps);
     const service = new WagerActivityService({
       ...deps,
@@ -198,8 +199,8 @@ test('wager pipeline end to end', async (t) => {
 
       assert.equal(await rakeOf(player.uid), expectedRake, 'rakeback accrued on the USD stake at the card rate');
 
-      assert.equal(commissions.reduce((acc, c) => m(money.add(acc, c)), '0.00000000'), '1505.00000000', '5% of $30,100');
-      assert.equal(await commissionOf(owner.uid), sumIn(commissions, code), `5% of each USD delta, in ${code}`);
+      assert.equal(commissions.reduce((acc, c) => m(money.add(acc, c)), '0.00000000'), '45.15000000', '0.15% of $30,100');
+      assert.equal(await commissionOf(owner.uid), sumIn(commissions, code), `0.15% of each USD delta, in ${code}`);
       const coins = await models.Rewards.findAll({ where: { owner_id: owner.uid, type: 'commission' }, attributes: ['coin'], raw: true });
       assert.ok(coins.every((r) => r.coin === code));
 

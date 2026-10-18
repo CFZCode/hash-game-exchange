@@ -25,7 +25,12 @@ const DEFAULTS = Object.freeze({
   affiliateBonusCurrency: REWARD_CURRENCY,
   // The admin's referral unlock table (`[{ level, wager, reward }]`, USD); null = use UNLOCK_TIERS.
   unlockTiers: null,
+  // hash.game's commission (migration 134). Zero when admin-service is unreachable: pay nobody.
+  commissionRate: '0',
+  gameRates: Object.freeze({ originals: '0', slots: '0', live: '0', sports: '0' }),
 });
+
+const percentOr = (value, fallback) => (/^\d+(\.\d+)?$/.test(String(value ?? '')) ? String(value) : fallback);
 
 /** `[{ level, totalWager, unlockAmount }]` from admin-service → `[{ level, wager, reward }]`, lowest first. */
 function toUnlockTiers(rows) {
@@ -58,6 +63,10 @@ function createAffiliateSettingsResolver({ clients, logger, ttlMs = DEFAULT_TTL_
           registerBonusCurrency: String(body?.registerBonusCurrency ?? DEFAULTS.registerBonusCurrency).toUpperCase(),
           affiliateBonusCurrency: String(body?.affiliateBonusCurrency ?? DEFAULTS.affiliateBonusCurrency).toUpperCase(),
           unlockTiers: toUnlockTiers(body?.referralUnlocks),
+          commissionRate: percentOr(body?.commissionRate, DEFAULTS.commissionRate),
+          gameRates: Object.fromEntries(
+            Object.keys(DEFAULTS.gameRates).map((k) => [k, percentOr(body?.gameRates?.[k], DEFAULTS.gameRates[k])])
+          ),
         };
         cached = { value, expires: Date.now() + ttlMs };
         return value;

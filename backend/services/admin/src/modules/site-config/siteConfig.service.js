@@ -71,6 +71,10 @@ const TIP_LIMIT_DEFAULTS = Object.freeze({ maxPerTipUsd: '500', maxPerDayUsd: '2
  * page is unchanged until an operator edits it. Kept in step with
  * `packages/db/migrations/106-referral-unlock-tiers.js` by hand.
  */
+/** hash.game's commission rates (migration 134): `wager × 1% × rate × game rate`, percents. */
+const COMMISSION_RATE_DEFAULT = '25';
+const GAME_RATE_DEFAULTS = Object.freeze({ originals: '28', slots: '60', live: '60', sports: '100' });
+
 const REFERRAL_UNLOCK_COLUMN = 'referral_unlock_tiers';
 const REFERRAL_UNLOCK_MAX = 50;
 const REFERRAL_UNLOCK_DEFAULTS = Object.freeze([
@@ -257,8 +261,15 @@ class SiteConfigService {
 
     // No config row is a real state on a fresh install, and legacy reported
     // zeros for it rather than erroring. Kept, so the screen renders.
-    const [rewardCurrency, unlocks] = await Promise.all([this.rewardCurrency(), this.#storedReferralUnlocks()]);
+    const [rewardCurrency, unlocks, rates] = await Promise.all([
+      this.rewardCurrency(),
+      this.#storedReferralUnlocks(),
+      this.#storedCommissionRates(),
+    ]);
     return {
+      // hash.game's formula (migration 134): commission = wager × 1% × commissionRate% × gameRates[category]%.
+      commissionRate: rates.commissionRate,
+      gameRates: rates.gameRates,
       // The referral unlock table PAYS now (user-service tier unlock), not only displays.
       referralUnlocks: unlocks.tiers,
       affiliateBonus: this.#amount(row?.affiliatebonus),
@@ -288,9 +299,49 @@ class SiteConfigService {
    * settings" cannot touch a second row that should not exist. Legacy's
    * statement had no WHERE clause at all.
    */
-  async updateAffiliateSettings({ staffId = null, ...input }) {
+  /** The commission rate + game rates (migration 134); the defaults before it ran. */
+  async #storedCommissionRates() {
+    try {
+      const [row] = await this.models.Siteconfig.sequelize.query(
+        'SELECT affiliate_commission_rate, affiliate_game_rates FROM siteconfig ORDER BY id ASC LIMIT 1',
+        { type: this.models.Siteconfig.sequelize.QueryTypes.SELECT }
+      );
+      const stored = typeof row?.affiliate_game_rates === 'string' ? JSON.parse(row.affiliate_game_rates) : row?.affiliate_game_rates;
+      const gameRates = {};
+      for (const [key, fallback] of Object.entries(GAME_RATE_DEFAULTS)) {
+        const v = stored?.[key];
+        gameRates[key] = v != null && /^\d+(\.\d+)?$/.test(String(v)) ? String(Number(v)) : fallback;
+      }
+      const rate = row?.affiliate_commission_rate;
+      return { commissionRate: rate != null ? String(Number(rate)) : COMMISSION_RATE_DEFAULT, gameRates };
+    } catch (error) {
+      if (!isUndefinedColumn(error)) throw error;
+      return { commissionRate: COMMISSION_RATE_DEFAULT, gameRates: { ...GAME_RATE_DEFAULTS } };
+    }
+  }
+
+  async updateAffiliateSettings({ staffId = null, commissionRate, gameRates, ...input }) {
     const row = await this.#configRow(['id']);
     if (!row) throw errors.NOT_CONFIGURED();
+
+    if (commissionRate !== undefined || gameRates !== undefined) {
+      const current = await this.#storedCommissionRates();
+      try {
+        await this.models.Siteconfig.sequelize.query(
+          `UPDATE siteconfig SET affiliate_commission_rate = :rate, affiliate_game_rates = CAST(:games AS jsonb), updatedat = now() WHERE id = :id`,
+          {
+            replacements: {
+              id: row.id,
+              rate: commissionRate ?? current.commissionRate,
+              games: JSON.stringify({ ...current.gameRates, ...(gameRates ?? {}) }),
+            },
+          }
+        );
+      } catch (error) {
+        if (isUndefinedColumn(error)) throw errors.MIGRATION_PENDING({ migration: '134-affiliate-game-rates' });
+        throw error;
+      }
+    }
 
     const patch = { updatedat: new Date() };
     for (const [name, column] of Object.entries(AFFILIATE_FIELDS)) {

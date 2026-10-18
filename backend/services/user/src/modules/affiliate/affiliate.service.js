@@ -3,7 +3,7 @@
 /* The referrer lookup (which needs `where(fn(...), value)`) now lives in
    `referrerResolver.js`, shared with signup and the public code check. */
 const { Op, fn, col, QueryTypes } = require('sequelize');
-const { money, creditableCurrency, resolveVipLadder } = require('@ibitplay/common');
+const { money, creditableCurrency, resolveVipLadder, wagerCategory } = require('@ibitplay/common');
 const { promotionsBlocked, assertPlayerCapability } = require('@ibitplay/auth');
 
 const errors = require('./affiliate.errors');
@@ -73,7 +73,7 @@ class AffiliateService {
    * stored on the commission row so a refund / rollback / void of that stake can find
    * it (`onReverse`, migration 090). Absent for callers that do not have one.
    */
-  async onWager({ userId, previousWager, newWager, source = null, ref = null }) {
+  async onWager({ userId, previousWager, newWager, source = null, ref = null, kind = null }) {
     const member = await this.#user(userId);
     const team = await this.models.Team.findOne({ where: { membername: member.name }, raw: true });
     if (!team) return { onTeam: false };
@@ -102,19 +102,23 @@ class AffiliateService {
       return { onTeam: true, unlock, commissionRecorded: false };
     }
 
-    const { commissionPercent } = await this.settings.read();
-    if (!money.gt(commissionPercent, '0')) {
+    const { commissionRate, gameRates } = await this.settings.read();
+    const category = wagerCategory.resolveCategory({ category: kind?.category, source });
+    const gameRate = gameRates?.[category] ?? '0';
+    if (!money.gt(commissionRate, '0') || !money.gt(gameRate, '0')) {
       return { onTeam: true, unlock, commissionRecorded: false };
     }
 
     /**
-     * `delta` is USD: `userwager` is counted in USD by the wager-activity
-     * pipeline (stakes are converted there, ONCE), so it is not converted
-     * again here. The USD commission is then priced in the site's reward
-     * currency — previously the raw INR delta was paid as USDT
-     * (₹1,000 → 50 USDT at 5%).
+     * hash.game (Referral → Rate & Rules): commission = wager × 1% × Commission Rate × game rate
+     * — Originals 28%, 3rd-party slots and live casino 60%, sports 100%, rate 25% by default.
+     * ₹1,000 on an original pays ₹0.70. It replaced a flat 5% of every wager, 20×–71× that.
+     *
+     * `delta` is USD: `userwager` is counted in USD by the wager-activity pipeline (stakes are
+     * converted there, ONCE), so it is not converted again here. The USD commission is then
+     * priced in the site's reward currency.
      */
-    const commissionUsd = money.toDecimalString(money.percentOf(delta, commissionPercent));
+    const commissionUsd = money.toDecimalString(commissionFor(delta, commissionRate, gameRate));
     if (!money.gt(commissionUsd, '0')) {
       return { onTeam: true, unlock, commissionRecorded: false };
     }
@@ -1319,4 +1323,10 @@ function teamTimestamp(value) {
   return d.toISOString();
 }
 
-module.exports = { AffiliateService, teamTimestamp };
+/** `wager × 1% × rate% × gameRate%` in minor units — every percent as a decimal string. */
+function commissionFor(wagerUsd, ratePercent, gameRatePercent) {
+  return money.percentOf(money.toDecimalString(money.percentOf(money.toDecimalString(money.percentOf(wagerUsd, '1')), ratePercent)), gameRatePercent);
+}
+
+module.exports = {
+  commissionFor, AffiliateService, teamTimestamp };

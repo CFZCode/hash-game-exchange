@@ -103,7 +103,8 @@ test('wager reversal reaches commission, partial refunds and the side-effect rac
     const rewardMoney = createRewardMoney({ ...base, rewardCurrencies: { rewardCurrency: async () => 'USDT' } });
     const deps = { ...base, rewardMoney, bonusWageringLock: async () => true };
     const affiliate = new AffiliateService(deps);
-    affiliate.settings = { read: async () => ({ commissionPercent: '5' }) };
+    // An effective 5% (1% × 100% × 500%) keeps the reversal arithmetic below readable; the formula is tested in affiliate.test.js.
+    affiliate.settings = { read: async () => ({ commissionRate: '100', gameRates: { originals: '500', slots: '500', live: '500', sports: '500' } }) };
     const playerBonuses = new PlayerBonusService(deps);
     const service = new WagerActivityService({
       ...deps,

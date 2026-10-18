@@ -18,16 +18,34 @@ import { useApi, useApiMutation } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
 import { check } from '@/lib/validate'
 
+type GameRates = { originals: string; slots: string; live: string; sports: string }
+
 type Affiliate = {
   affiliateBonus: string
-  commissionPercent: string
   registerBonus: string
 
   /** The referrer's joining bonus waits for the referee's first deposit (anti sign-up farming). */
   affiliateBonusRequiresDeposit: boolean
+
+  /** hash.game: commission = wager × 1% × commissionRate% × gameRates[category]% (migration 134). */
+  commissionRate: string
+  gameRates: GameRates
 }
 
-const BLANK: Affiliate = { affiliateBonus: '', commissionPercent: '', registerBonus: '', affiliateBonusRequiresDeposit: true }
+const GAMES: { key: keyof GameRates; label: string }[] = [
+  { key: 'originals', label: 'Originals' },
+  { key: 'slots', label: '3rd party slots' },
+  { key: 'live', label: 'Live casino' },
+  { key: 'sports', label: 'Sports' }
+]
+
+const BLANK: Affiliate = {
+  affiliateBonus: '',
+  registerBonus: '',
+  affiliateBonusRequiresDeposit: true,
+  commissionRate: '',
+  gameRates: { originals: '', slots: '', live: '', sports: '' }
+}
 
 /**
  * The editable form, keyed by the loaded settings: a fresh load remounts it
@@ -41,9 +59,15 @@ const AffiliateForm = ({ initial }: { initial: Affiliate | undefined }) => {
   const f = useFormErrors()
 
   const patchOf = () => {
-    const patch: Partial<Record<keyof Affiliate, string | boolean>> = {}
+    const patch: Record<string, unknown> = {}
 
-    for (const k of Object.keys(BLANK) as (keyof Affiliate)[]) if (initial && form[k] !== initial[k]) patch[k] = typeof form[k] === 'string' ? (form[k] as string).trim() : form[k]
+    for (const k of ['affiliateBonus', 'registerBonus', 'affiliateBonusRequiresDeposit', 'commissionRate'] as const)
+      if (initial && form[k] !== initial[k]) patch[k] = typeof form[k] === 'string' ? (form[k] as string).trim() : form[k]
+
+    const games: Partial<GameRates> = {}
+
+    for (const { key } of GAMES) if (initial && form.gameRates[key] !== initial.gameRates?.[key]) games[key] = form.gameRates[key].trim()
+    if (Object.keys(games).length) patch.gameRates = games
 
     return patch
   }
@@ -65,7 +89,8 @@ const AffiliateForm = ({ initial }: { initial: Affiliate | undefined }) => {
         const ok = f.passes({
           registerBonus: rate(form.registerBonus, 'Register bonus'),
           affiliateBonus: rate(form.affiliateBonus, 'Affiliate bonus'),
-          commissionPercent: rate(form.commissionPercent, 'Commission %', 100)
+          commissionRate: rate(form.commissionRate, 'Commission rate', 100),
+          ...Object.fromEntries(GAMES.map(g => [`rate-${g.key}`, rate(form.gameRates[g.key], `${g.label} rate`, 100)]))
         })
 
         if (!ok) return
@@ -90,7 +115,30 @@ const AffiliateForm = ({ initial }: { initial: Affiliate | undefined }) => {
         onChange={checked => setForm({ ...form, affiliateBonusRequiresDeposit: checked })}
         disabled={!can('config:write')}
       />
-      <TextField id='commissionPercent' inputMode='decimal' label='Commission %' hint='Share of referred users’ activity, 0–100' value={form.commissionPercent} onChange={e => setForm({ ...form, commissionPercent: e.target.value })} />
+      <TextField
+        id='commissionRate'
+        inputMode='decimal'
+        label='Commission rate %'
+        hint='hash.game formula: wager × 1% × this rate × the game rate below. Default 25'
+        value={form.commissionRate}
+        onChange={e => setForm({ ...form, commissionRate: e.target.value })}
+      />
+      <div className='grid grid-cols-2 gap-3'>
+        {GAMES.map(g => (
+          <TextField
+            key={g.key}
+            id={`rate-${g.key}`}
+            inputMode='decimal'
+            label={`${g.label} game rate %`}
+            value={form.gameRates[g.key]}
+            onChange={e => setForm({ ...form, gameRates: { ...form.gameRates, [g.key]: e.target.value } })}
+          />
+        ))}
+      </div>
+      <p className='text-muted-foreground text-xs'>
+        Example: ₹1,000 wagered on an original pays the referrer 1,000 × 1% × {form.commissionRate || 0}% × {form.gameRates.originals || 0}% ={' '}
+        ₹{((1000 * 0.01 * Number(form.commissionRate || 0) * Number(form.gameRates.originals || 0)) / 10000).toFixed(2)}.
+      </p>
       </FormErrorsProvider>
       <Button type='submit' disabled={save.isPending || !can('config:write')} className='justify-self-start'>
         {save.isPending && <Loader2Icon className='animate-spin' />}
@@ -323,7 +371,7 @@ const AffiliateSettings = ({ embedded = false }: { embedded?: boolean }) => {
       <Card className='max-w-xl shadow-none'>
         <CardHeader>
           <CardTitle className='text-base'>Rates</CardTitle>
-          <CardDescription>Exact decimal strings. Commission is a percentage, capped at 100.</CardDescription>
+          <CardDescription>Exact decimal strings. Commission follows hash.game: wager × 1% × commission rate × game rate (Originals 28, Slots 60, Live 60, Sports 100).</CardDescription>
         </CardHeader>
         <CardContent>
           <AffiliateForm key={q.data ? JSON.stringify(q.data) : 'loading'} initial={q.data} />
