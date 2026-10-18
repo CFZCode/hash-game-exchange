@@ -415,6 +415,7 @@ export function depositBonusConfig(currencyName) {
       ? convertCurrency(config.maxDeposit, config.currency, currencyName)
       : Number.MAX_SAFE_INTEGER,
     ratio: ratioOf(config),
+    monthly: payload.monthly ?? null,
     maxBonusAmount: convertCurrency(
       config.maxBonus ?? Number.MAX_SAFE_INTEGER,
       config.currency,

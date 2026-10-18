@@ -137,9 +137,11 @@ export default function ManualDeposit({ currency, crypto = false }) {
         <div className="mb-4 flex rounded-xl bg-brand/10 p-2 text-secondary">
           <IconInform className="icon -mt-0.5 mr-1.5 size-6 flex-none fill-brand" />
           <div>
-            First deposit bonus: <span className="font-extrabold text-brand">+{Math.round(bonus.ratio * 100)}%</span> on a
+            {bonus.monthly ? `Deposit bonus ${bonus.monthly.n}/${bonus.monthly.total} · ` : 'First deposit bonus: '}
+            <span className="font-extrabold text-brand">+{Math.round(bonus.ratio * 100)}%</span> on a
             deposit of {fiat(bonus.minDeposit)} or more
             {bonus.maxBonusAmount < Number.MAX_SAFE_INTEGER / 2 && <>, up to {site.show(bonus.maxBonusAmount, walletCode, { precision: 2 })}</>}.
+            {bonus.monthly?.gradual && <> Locked — unlocks as you wager, claim any time.</>}
           </div>
         </div>
       )}

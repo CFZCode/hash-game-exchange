@@ -73,16 +73,23 @@ export function toDepositOffer(terms) {
 /** The first-deposit terms as the recharge config `pages/Deposit/deposit.js` reads (`xg`'s shape),
     or null when there is nothing this account can get. The lowest tier is what a chip offers. */
 export function toRechargeConfig(terms) {
-  const tiers = liveTiers(terms);
+  const program = terms?.program;
+  /* hash.game's Monthly Deposit Bonus: the NEXT deposit of the UTC month gets schedule[used], and
+     `eligible` is already false once all of them are used, so "used up" renders as no offer. */
+  const monthly = program?.mode === 'monthly';
+  const used = Number(program?.usedThisMonth) || 0;
+  const tiers = monthly ? (terms.enabled && program.schedule?.[used] ? [program.schedule[used]] : []) : liveTiers(terms);
   if (!tiers.length || !terms.eligible) return null;
   const [low] = tiers;
   return {
-    depositBonusType: 'FIRST_DEPOSIT',
+    depositBonusType: monthly ? 'MONTHLY' : 'FIRST_DEPOSIT',
+    /* Read by the manual deposit form's "Deposit bonus N/4" line; null in first-deposit mode. */
+    monthly: monthly ? { n: used + 1, total: program.schedule.length, gradual: program.unlockMode === 'gradual' } : null,
     selected: false,
     supportCurrencyRule: [{ type: 'all', list: [] }],
     currentUseConfigs: [
       {
-        seq: 1,
+        seq: monthly ? used + 1 : 1,
         selectedBonusType: null,
         currency: String(terms.currency ?? 'USDT'),
         minDeposit: Number(low.minDeposit),
