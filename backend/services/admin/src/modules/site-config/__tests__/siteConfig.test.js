@@ -432,6 +432,14 @@ test('site-config', async (t) => {
     assert.equal((await service.affiliateSettings()).registerBonusEnabled, true);
   });
 
+  await t.test('the public view carries the commission rate and game rates (migration 134)', async () => {
+    await seedConfig({});
+    await service.updateAffiliateSettings({ commissionRate: '30', gameRates: { originals: '35' } });
+    const pub = await service.publicSettings();
+    assert.equal(pub.commissionRate, '30');
+    assert.deepEqual(pub.gameRates, { originals: '35', slots: '60', live: '60', sports: '100' });
+  });
+
   await t.test('welcome bonus validation', async () => {
     const parseWelcome = (body) => v.updateWelcomeBonusSettings.body.safeParse(body);
     const tier = { minDeposit: '10', percent: '100', maxBonus: '100' };

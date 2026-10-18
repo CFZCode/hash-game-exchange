@@ -7,10 +7,10 @@ import NumberInput from '../../components/shared/NumberInput';
 import { coinIcon } from '../../utils/coinArt';
 import { vipTier, vipTierByName, tierColor } from '../../data/vipConfig';
 import useResource from '../../hooks/useResource';
-import { getReferralUnlocks } from '../../services/referral';
+import { getReferralUnlocks, getCommissionRates, CAPTURE_RATES } from '../../services/referral';
 import { fill, walletCode } from './format';
 import { useSelectedCurrency } from '../../hooks/useSelectedCurrency';
-import { RULES, HOW_TO_STEPS, GAME_RATES } from './referral';
+import { RULES, HOW_TO_STEPS } from './referral';
 import {
   IconTierBronze,
   IconTierSilver,
@@ -30,6 +30,8 @@ import goldCoin from '../../assets/referral/coin_gold.png';
  * than complete-and-empty. The rate boxes are literals in the markup, the Unlock Amount table is
  * a HARDCODED ARRAY in the chunk (`s = [{icon, Level, wager, amount}, …]`, ten rows), and the
  * calculator is arithmetic over three inputs. Nothing here was gated and nothing is inferred.
+ * HERE the rate boxes and the calculator's defaults are the site admin's (`getCommissionRates`),
+ * with the capture's literals as the fallback — like the table below.
  *
  * The level names and their colours are NOT in that array — it carries a bare `Level` number, and
  * `u1` looks the rest up through the VIP ladder: `vipLevelRow(n).tier` for the name and
@@ -172,9 +174,15 @@ export default function RateRules() {
   const [inlineOpen, setInlineOpen] = React.useState(() => search.get('rule') === 'open');
   const [dialogOpen, setDialogOpen] = React.useState(false);
 
+  /* The site admin's rates off `site-config/public`, the capture's until the read lands. The two
+     inputs are `null` until touched so the default follows the read rather than its first render. */
+  const { data: rates = CAPTURE_RATES } = useResource(getCommissionRates);
+  const pctOf = (key) => `${rates.games.find((g) => g.key === key).pct}%`;
   const [wager, setWager] = React.useState(1000);
-  const [rate, setRate] = React.useState(25);
-  const [game, setGame] = React.useState(GAME_RATES[0]);
+  const [rateInput, setRate] = React.useState(null);
+  const rate = rateInput ?? rates.commissionRate;
+  const [gameKey, setGameKey] = React.useState(null);
+  const game = rates.games.find((g) => g.key === gameKey) ?? rates.games[0];
 
   /* `r()` in the chunk returns a FRESH OBJECT with `wager: 0` and `commissionRate: 0` every time
      it is called, so `!!r().wager` is always false and neither error message can ever render.
@@ -196,18 +204,18 @@ export default function RateRules() {
             <div className="flex flex-col gap-3 lg:flex-row">
               <div className="flex-1">
                 <p className="mb-2 text-secondary">The Original Games</p>
-                <RateBox rate="28%" />
+                <RateBox rate={pctOf('originals')} />
               </div>
               <div className="flex-1">
                 <p className="mb-2 text-secondary">3rd Party Slots, Live Casino</p>
-                <RateBox rate="60%" muted />
+                <RateBox rate={pctOf('slots') === pctOf('live') ? pctOf('slots') : `${pctOf('slots')} / ${pctOf('live')}`} muted />
               </div>
             </div>
             {/* `data` is a dead class, and the block is NOT inside the `lg:flex-row` pair above —
                 All Sports gets the full width at every size. */}
             <div className="data">
               <p className="text-base font-extrabold">All Sports</p>
-              <RateBox rate="100%" muted />
+              <RateBox rate={pctOf('sports')} muted />
             </div>
           </div>
 
@@ -277,8 +285,8 @@ export default function RateRules() {
               <Select
                 className="w-full !bg-input_bright"
                 value={game}
-                options={GAME_RATES}
-                onChange={setGame}
+                options={rates.games}
+                onChange={(option) => setGameKey(option.key)}
               >
                 {(option) => option.label}
               </Select>

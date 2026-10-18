@@ -917,10 +917,11 @@ class SiteConfigService {
 
     // What the site may promise a new player. Only the terms when it is on.
     const tiers = this.#tiers(row?.first_deposit_bonus_tiers);
-    const [rewardCurrency, defaultCurrency, referralUnlocks] = await Promise.all([
+    const [rewardCurrency, defaultCurrency, referralUnlocks, rates] = await Promise.all([
       this.rewardCurrency(),
       this.#publicDefaultCurrency(),
       this.#storedReferralUnlocks(),
+      this.#storedCommissionRates(),
     ]);
     const firstDepositBonus = row?.first_deposit_bonus_enabled && tiers.length
       ? { enabled: true, currency: rewardCurrency, payoutCurrency: rewardCurrency, tiers }
@@ -939,6 +940,10 @@ class SiteConfigService {
       // total wager that reaches it, and what the referrer unlocks there —
       // amounts in the reward currency. Display terms only.
       referralUnlocks: { currency: rewardCurrency, tiers: referralUnlocks.tiers },
+      // The /referral/rules rate boxes and calculator (migration 134): percent
+      // strings, the defaults until it runs. Display terms only.
+      commissionRate: rates.commissionRate,
+      gameRates: rates.gameRates,
       rewardCurrency,
       registerBonusCurrency: rewardCurrency,
       affiliateBonusCurrency: rewardCurrency,

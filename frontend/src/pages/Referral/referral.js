@@ -396,12 +396,13 @@ export const LEVEL_UNLOCKS = [
 /* `c` — the calculator's Game dropdown. FOUR OPTIONS AND ONLY THREE RATES: 3rd Party Slots and
    Live Casino are separate entries both at 0.6, which is also how the rate boxes above group them
    ("3rd Party Slots, Live Casino" under one 60% box). The percentage is printed in the label as
-   well as applied, both out of the chunk. */
+   well as applied, both out of the chunk. `key`/`name` let `toCommissionRates` rebuild the label
+   from the site admin's `gameRates` (keys as on `site-config/public`). */
 export const GAME_RATES = [
-  { label: 'Original Games (28%)', rate: 0.28 },
-  { label: 'Live Casino (60%)', rate: 0.6 },
-  { label: '3rd Party Slots (60%)', rate: 0.6 },
-  { label: 'Sport Games (100%)', rate: 1 },
+  { key: 'originals', name: 'Original Games', label: 'Original Games (28%)', pct: 28, rate: 0.28 },
+  { key: 'live', name: 'Live Casino', label: 'Live Casino (60%)', pct: 60, rate: 0.6 },
+  { key: 'slots', name: '3rd Party Slots', label: '3rd Party Slots (60%)', pct: 60, rate: 0.6 },
+  { key: 'sports', name: 'Sport Games', label: 'Sport Games (100%)', pct: 100, rate: 1 },
 ];
 
 /* `me` — the four rule paragraphs, verbatim `t("…")`. `__ENV_HOST__` expands to "BC.GAME"

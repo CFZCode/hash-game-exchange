@@ -9,6 +9,7 @@ import {
   LIVE,
   DASHBOARD_INFO,
   LEVEL_UNLOCKS,
+  GAME_RATES,
 } from '../pages/Referral/referral';
 import { SIGNED_IN } from '../context/account';
 import { printCurrency } from '../utils/currency';
@@ -467,6 +468,31 @@ export const getReferralUnlocks = () => {
   return typeof read?.then === 'function'
     ? read.then(toUnlockRows, () => [])
     : toUnlockRows(read);
+};
+
+/* The Rate & Rules tab's rate boxes and calculator — the same `site-config/public` read.
+ * `commissionRate` and `gameRates` (migration 134, percent strings) are the site admin's; absent
+ * (fixtures on, a backend without them) or a failed read answers the capture's 25 and 28/60/100. */
+export const CAPTURE_RATES = { commissionRate: 25, games: GAME_RATES };
+
+export const toCommissionRates = (config) => {
+  const live = config?.gameRates;
+  if (!live || config?.commissionRate == null) return CAPTURE_RATES;
+  return {
+    commissionRate: Number(config.commissionRate),
+    games: GAME_RATES.map((game) => {
+      if (live[game.key] == null) return game;
+      const pct = Number(live[game.key]);
+      return { ...game, label: `${game.name} (${pct}%)`, pct, rate: pct / 100 };
+    }),
+  };
+};
+
+export const getCommissionRates = () => {
+  const read = request(PLATFORM.site.config, { live: true, fixture: UNLOCKS_FIXTURE });
+  return typeof read?.then === 'function'
+    ? read.then(toCommissionRates, () => CAPTURE_RATES)
+    : toCommissionRates(read);
 };
 
 export default getReferral;
