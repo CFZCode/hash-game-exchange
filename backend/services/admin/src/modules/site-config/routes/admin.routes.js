@@ -205,7 +205,27 @@ module.exports = function adminRoutes(deps) {
     asyncHandler(async (_req, res) => response.ok(res, await service.sportsEnabled()))
   );
 
-  // The sports kill switch is the owner's (owner panel → Site flags → Sports); no write here.
+  /**
+   * The Super Admin's sports switch (Sports Exchange → Sports switch). Works under the owner's
+   * flag: off here hides sports and refuses bets even when the owner has them on.
+   */
+  router.put(
+    '/sports',
+    auth.requirePermission(PERMISSIONS.CONFIG_WRITE),
+    validate(v.setSportsEnabled),
+    withActivity({
+      action: 'site-config.sports.toggle',
+      describe: (req) => ({
+        targetType: 'SITE_CONFIG', targetId: 'sports', details: { enabled: req.body.enabled },
+      }),
+    }),
+    asyncHandler(async (req, res) =>
+      response.ok(
+        res,
+        await service.setSportsEnabled({ enabled: req.body.enabled, staffId: req.staff?.id ?? null })
+      )
+    )
+  );
 
   // ── Reward payout currencies ────────────────────────────────────────
 

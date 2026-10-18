@@ -338,7 +338,9 @@ export const navItems: NavItem[] = [
 
       // Zip me owner only (sports config): Buffer Time, Commission, Max Odds, Auto Void, Virtual / Bet Limits — tabs me.
       { icon: 'SlidersHorizontal', label: 'Global Settings', href: '/exchange/settings', permission: 'sports:manage', direct: true },
-      { icon: 'CalendarDays', label: 'Events', href: '/exchange/events', permission: 'sports:read' }
+      { icon: 'CalendarDays', label: 'Events', href: '/exchange/events', permission: 'sports:read' },
+      // Super Admin's on/off; hidden when the owner has sports off (owner panel → Site flags).
+      { icon: 'Power', label: 'Sports switch', href: '/exchange/sports-switch', permission: 'config:write', ownerFlag: 'sports', direct: true }
     ]
   },
   {

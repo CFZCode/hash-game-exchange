@@ -552,11 +552,35 @@ class SiteConfigService {
    * a few times a year.
    */
   async sportsEnabled() {
-    // The owner's kill switch only (owner panel → Site flags → Sports). The old site-admin
-    // switch (`siteconfig.sports`) is no longer read, so a value left there cannot keep sports
-    // off once the owner has them on. sports-service reads `sportsEnabled` from here.
+    const row = await this.#configRow(['id', 'sports']);
+    // Absent config reads as ON: a missing row is an unconfigured deployment, not an operator
+    // switching sports off.
+    const enabled = row ? Boolean(row.sports) : true;
+    // Effective = the owner's flag (owner panel → Site flags → Sports) AND the Super Admin's
+    // switch (Sports Exchange → Sports switch). sports-service reads `sportsEnabled` from here.
     const entitled = await entitlements.isFlagEntitled('sports');
-    return { sportsEnabled: entitled, enabled: entitled, entitled, configured: true };
+    return { sportsEnabled: enabled && entitled, enabled, entitled, configured: Boolean(row) };
+  }
+
+  /** The Super Admin's sports switch. Pushes the new flags so every open site hides/shows sports. */
+  async setSportsEnabled({ enabled, staffId = null }) {
+    if (enabled) await this.#assertFlagsEntitled(['sports']);
+    const row = await this.#configRow(['id']);
+    if (!row) throw errors.NOT_CONFIGURED();
+
+    await this.models.Siteconfig.update(
+      { sports: enabled, updatedat: new Date() },
+      { where: { id: row.id } }
+    );
+
+    this.logger?.warn(
+      { staffId, enabled, configId: row.id },
+      enabled ? 'Sports betting switched ON platform-wide' : 'Sports betting switched OFF platform-wide'
+    );
+
+    await this.pushPublic();
+
+    return this.sportsEnabled();
   }
 
   /**
@@ -683,6 +707,7 @@ class SiteConfigService {
   async publicSettings() {
     const row = await this.#configRow([
       'id',
+      'sports',
       ...PUBLIC_FLAGS,
       ...PUBLIC_AMOUNTS,
       ...Object.values(AFFILIATE_CURRENCY_FIELDS),
@@ -698,9 +723,9 @@ class SiteConfigService {
     const flags = Object.fromEntries(
       PUBLIC_FLAGS.map((name) => [name, plan[name] !== false && (row ? Boolean(row[name]) : true)])
     );
-    // The owner's kill switch (owner panel → Site flags → Sports), read-only here so a
-    // browser can hide sports. Same rule as `sportsEnabled()`.
-    flags.sports = plan.sports !== false;
+    // Read-only here so a browser can hide sports. Same rule as `sportsEnabled()`: owner flag
+    // AND the Super Admin's switch.
+    flags.sports = plan.sports !== false && (row ? Boolean(row.sports) : true);
 
     const amounts = Object.fromEntries(
       PUBLIC_AMOUNTS.map((name) => [name, this.#amount(row?.[name])])
