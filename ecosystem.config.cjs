@@ -26,8 +26,7 @@ module.exports = {
     svc('sports-worker', 'services/sports/src/worker.js'),
     svc('user-worker', 'services/user/src/worker.js'),
     svc('gateway', 'gateway/src/index.js'),
-    // Frontend not live yet: `cd frontend && npm run build`, then uncomment.
-    // next('frontend', 'frontend', 5190, '127.0.0.1'),
+    next('frontend', 'frontend', 5190, '127.0.0.1'),
     next('admin', 'admin', 3080, '127.0.0.1'),
     next('owner-panel', 'owner-panel', 3085, '127.0.0.1'),
   ],
