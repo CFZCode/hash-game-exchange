@@ -333,6 +333,8 @@ function createRateLimiter({
   // hundreds of logins come from one address and would trip every bucket.
   // Never disable it in an environment reachable from the internet.
   enabled = true,
+  // Extra requests this bucket never counts (createApp: authenticated service-to-service calls).
+  skipIf = null,
 } = {}) {
   if (!enabled) {
     const passthrough = (_req, _res, next) => next();
@@ -362,7 +364,8 @@ function createRateLimiter({
     // on its own. Every socket EVENT has its own limit (`limit` on each
     // handler in @ibitplay/socket), which is where that traffic is metered.
     skip: (req) =>
-      req.path === '/health' || req.path === '/health/live' || req.path === '/health/ready' || req.path.startsWith('/socket.io'),
+      req.path === '/health' || req.path === '/health/live' || req.path === '/health/ready' || req.path.startsWith('/socket.io') ||
+      Boolean(skipIf?.(req)),
 
     handler: (req, res) => {
       const retryAfter = Math.ceil(windowMs / 1000);

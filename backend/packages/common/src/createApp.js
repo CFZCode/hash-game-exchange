@@ -1,5 +1,7 @@
 'use strict';
 
+const nodeCrypto = require('crypto');
+
 const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
@@ -10,6 +12,28 @@ const { requestContext, REQUEST_ID_HEADER } = require('./middleware/requestConte
 const { errorHandler, stackExposure } = require('./middleware/errorHandler');
 const { notFound } = require('./middleware/notFound');
 const { createRateLimiter } = require('./middleware/rateLimit');
+const { collectServiceKeys, INTERNAL_KEY_HEADER } = require('./middleware/internalAuth');
+
+/**
+ * A service-to-service call to an `/internal/` route carrying a VALID internal key. The global
+ * bucket is keyed by IP, and every wallet move a game makes reaches user-service from
+ * casino-service's one address — so 300 a minute across ALL players' bets tripped it and every
+ * callback after that answered INTERNAL_ERROR (found on live, 19 Oct 2026). Only the global
+ * throttle is skipped, only for a real key; the routes stay guarded by `internalAuth`.
+ */
+function internalCaller(config) {
+  const keys = [config.INTERNAL_API_KEY, ...collectServiceKeys(config).keys.values()].filter(Boolean);
+  if (!keys.length) return null;
+  const digest = (v) => nodeCrypto.createHash('sha256').update(String(v ?? '')).digest();
+  const wanted = keys.map(digest);
+  return (req) => {
+    if (!String(req.path ?? '').startsWith('/internal/')) return false;
+    const sent = req.headers?.[INTERNAL_KEY_HEADER];
+    if (!sent) return false;
+    const got = digest(sent);
+    return wanted.some((w) => nodeCrypto.timingSafeEqual(w, got));
+  };
+}
 const { ForbiddenError } = require('./errors');
 const { assertProductionPosture } = require('./productionGuards');
 
@@ -194,6 +218,7 @@ function createApp({
         max: config.RATE_LIMIT_MAX,
         enabled: config.RATE_LIMIT_ENABLED !== false,
         logger,
+        skipIf: internalCaller(config),
       })
     );
     if (config.RATE_LIMIT_ENABLED === false) {

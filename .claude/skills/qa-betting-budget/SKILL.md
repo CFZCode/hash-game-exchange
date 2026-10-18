@@ -42,3 +42,9 @@ Callbacks you sign and send to our own backend (a test harness that simulates a 
 ## Owner overrides (logged)
 
 - **2026-10-18 — live sports ledger test.** The owner lifted the limits for one test: deposit as much USDT as the test needs to a dedicated test player (`lcp2ctrpqb`) and place multiple sports bets (at the slip minimum or above, across several sports/matches) to check that the ledger, exposure, VIP wager and turnover are calculated correctly. This override covers that test only. It does not change the limits above for any other run.
+- **2026-10-19 — live full scenario (run c99s, players fsc99sp01…p10).**
+  - **What the owner allowed:** the admin may credit test players a self-used balance of up to 10,000 USDT each, so wager / VIP / referral / commission / bonus tests can reach real levels.
+  - **Sports:** INR only.
+  - **Originals:** INR and USDT, played as signed sandbox callbacks to our own backend.
+  - **Third-party slots / casino:** not tested until the aggregator whitelists the real API.
+  - **Scope:** this run and these players only.
