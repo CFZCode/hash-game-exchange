@@ -4,7 +4,7 @@ import { useState } from 'react'
 
 import Link from 'next/link'
 
-import { PencilIcon, PercentIcon, Trash2Icon, UploadIcon } from 'lucide-react'
+import { ChartColumnIcon, PencilIcon, PercentIcon, Trash2Icon, UploadIcon } from 'lucide-react'
 
 import { useStatsFilters } from '@/components/shared/charts'
 import Can from '@/components/shared/Can'
@@ -483,14 +483,18 @@ const VipClub = () => {
   return (
   <div>
     <PageHeader title='VIP & club' description='The VIP ladder users climb by wagering, and the clubs (owner → agents → members) that share in club turnover.' />
-    <RewardStats section='vip' filters={f} rewardNote={false} />
     <Tabs defaultValue='clubs'>
       <TabsList className='mb-4'>
         <TabsTrigger value='clubs'>Clubs</TabsTrigger>
         <TabsTrigger value='vip'>VIP ladder</TabsTrigger>
+        <TabsTrigger value='stats'>
+          <ChartColumnIcon /> Stats
+        </TabsTrigger>
       </TabsList>
       <TabsContent value='clubs'><Clubs /></TabsContent>
       <TabsContent value='vip'><VipLadder /></TabsContent>
+      {/* Charts alag tab me — lists pehle dikhen. */}
+      <TabsContent value='stats'><RewardStats section='vip' filters={f} rewardNote={false} /></TabsContent>
     </Tabs>
   </div>
   )
