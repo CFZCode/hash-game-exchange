@@ -309,6 +309,7 @@ export const navItems: NavItem[] = [
 
       // Every staff login (Super Admin down to Agent) makes its own executives (user, 2026-10-17).
       { icon: 'KeyRound', label: 'Executives', href: '/access/executives', notExecutive: true },
+      { icon: 'ScrollText', label: 'Activity log', href: '/audit', permission: 'audit:read' },
 
       // Agent ke reports.
       { icon: 'ReceiptText', label: 'Account Statement', href: '/exchange/reports/account-statement', permission: 'reports:read' },
@@ -433,8 +434,7 @@ export const navItems: NavItem[] = [
     groupIcon: 'Contact',
     collapsible: true,
     items: [
-      { icon: 'Target', label: 'Marketing', href: '/marketing', account: 'marketing' },
-      { icon: 'ScrollText', label: 'Activity log', href: '/audit', permission: 'audit:read' }
+      { icon: 'Target', label: 'Marketing', href: '/marketing', account: 'marketing' }
     ]
   },
   {
