@@ -72,6 +72,8 @@ const withdrawalCap = require('./withdrawalCap');
 const cashierLimits = require('./cashierLimits');
 /** Deposit cap figures (deposited / withdrawn / wagered) — user-service cap + admin Users → Financial. */
 const withdrawalCapFigures = require('./withdrawalCapFigures');
+/** Bet kinds hash.game prices differently (originals / slots / live / sports) — wagerCategory.js. */
+const wagerCategory = require('./wagerCategory');
 /** Direct user's ledger: label a balance update (the trigger of migration 117 writes the row). */
 const directLedger = require('./directLedger');
 /** Daily withdrawal limit per currency: the owner's `withdrawalDailyLimit` block (withdrawalDailyLimit.js). */
@@ -132,6 +134,7 @@ module.exports = {
   regionPolicy,
   withdrawalCap,
   withdrawalCapFigures,
+  wagerCategory,
   directLedger,
   directLedgerContext: directLedger.directLedgerContext,
   withdrawalDailyLimit,

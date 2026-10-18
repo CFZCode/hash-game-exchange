@@ -1,7 +1,7 @@
 'use strict';
 
 const { literal, QueryTypes } = require('sequelize');
-const { money } = require('@ibitplay/common');
+const { money, wagerCategory } = require('@ibitplay/common');
 
 const { ExchangeRateService } = require('../exchange-rate/exchangeRate.service');
 const { VipService } = require('../vip/vip.service');
@@ -106,7 +106,7 @@ class WagerActivityService {
    *
    * @returns {{ counted, duplicate, usdAmount, previousWager, newWager, reason? }}
    */
-  async record({ userId, amount, currency, source, ref, rakeback = true }) {
+  async record({ userId, amount, currency, source, ref, rakeback = true, category, provider, gameRef, odds, houseEdge }) {
     const code = String(currency ?? '').toUpperCase();
     const stake = money.toDecimalString(money.toMinor(String(amount ?? '0')));
     if (!money.gt(stake, '0')) return { counted: false, duplicate: false, reason: 'NOT_POSITIVE' };
@@ -118,13 +118,25 @@ class WagerActivityService {
     }
     if (!money.gt(usd, '0')) return { counted: false, duplicate: false, reason: 'NOT_POSITIVE' };
 
+    const kind = describeStake({ category, source, provider, gameRef, odds, houseEdge });
+    const rateUsed = money.toDecimalString(money.divide(usd, stake));
+
     let previous;
     let next;
     try {
       ({ previous, next } = await this.db.transaction(async (transaction) => {
         // First, inside the transaction: a duplicate unwinds everything below.
         await this.models.WagerActivity.create(
-          { user_id: userId, source, ref: String(ref), currency: code, amount: stake, usd_amount: usd },
+          {
+            user_id: userId,
+            source,
+            ref: String(ref),
+            currency: code,
+            amount: stake,
+            usd_amount: usd,
+            ...kind,
+            rate_used: rateUsed,
+          },
           { transaction }
         );
 
@@ -162,7 +174,7 @@ class WagerActivityService {
       throw error;
     }
 
-    await this.#sideEffects({ userId, previous, next, usd, source, ref, rakeback, stake, code });
+    await this.#sideEffects({ userId, previous, next, usd, source, ref, rakeback, stake, code, kind });
 
     return { counted: true, duplicate: false, usdAmount: usd, previousWager: previous, newWager: next };
   }
@@ -369,7 +381,7 @@ class WagerActivityService {
     return new Date(accrual.created_at).getTime() <= new Date(lastClaim.created_at).getTime();
   }
 
-  async #sideEffects({ userId, previous, next, usd, source, ref, rakeback, stake, code }) {
+  async #sideEffects({ userId, previous, next, usd, source, ref, rakeback, stake, code, kind = {} }) {
     const key = String(ref);
     /* Fully reversed between the count and here: nothing below may be written for it.
        (Paid VIP credits are never clawed back, so do not pay any for a stake that is gone.) */
@@ -380,7 +392,7 @@ class WagerActivityService {
 
     // Wagering toward the player's active bonuses (the bonus balance's lock), oldest first.
     try {
-      await this.#bonuses().onStake({ userId, amount: stake, currency: code, source, ref: key });
+      await this.#bonuses().onStake({ userId, amount: stake, currency: code, source, ref: key, usd, kind });
     } catch (error) {
       this.logger?.warn({ err: error, userId: String(userId), source, ref }, 'Bonus wagering progress failed — stake still counted');
     }
@@ -393,7 +405,7 @@ class WagerActivityService {
     }
 
     try {
-      await this.affiliate.onWager({ userId, previousWager: previous, newWager: next, source, ref: key });
+      await this.affiliate.onWager({ userId, previousWager: previous, newWager: next, source, ref: key, usd, kind });
     } catch (error) {
       this.logger?.warn({ err: error, userId: String(userId) }, 'Affiliate on-wager failed — stake still counted');
     }
@@ -404,7 +416,7 @@ class WagerActivityService {
     const unrankedRate = syncedRate != null && !money.gt(String(syncedRate), '0');
     if (rakeback && !unrankedRate) {
       try {
-        await this.rakeback.accrue({ userId, stakeUsd: usd, source, ref: key });
+        await this.rakeback.accrue({ userId, stakeUsd: usd, source, ref: key, kind });
       } catch (error) {
         this.logger?.warn({ err: error, userId: String(userId), source, ref }, 'Rakeback accrual failed — stake still counted');
       }
@@ -501,9 +513,25 @@ function stakeFigures(row) {
 }
 
 /** `userwager.wager` is TEXT and legacy rows carry thousands separators. */
+/**
+ * The `wager_activity` columns that say what kind of bet this was (migration 132). A missing
+ * category comes from the settlement path (`inhouse` → originals, `sports` → sports) or is slots;
+ * a missing house edge is the category's default (`wagerCategory.DEFAULT_HOUSE_EDGE`).
+ */
+function describeStake({ category, source, provider, gameRef, odds, houseEdge }) {
+  const resolved = wagerCategory.resolveCategory({ category, source });
+  return {
+    category: resolved,
+    provider: provider || null,
+    game_ref: gameRef || null,
+    odds: odds || null,
+    house_edge: houseEdge ?? wagerCategory.DEFAULT_HOUSE_EDGE[resolved],
+  };
+}
+
 function cleanWager(value) {
   const cleaned = value == null ? '0' : String(value).replace(/,/g, '').trim();
   return /^\d+(\.\d+)?$/.test(cleaned) ? money.toDecimalString(money.toMinorQuantised(cleaned)) : '0.00000000';
 }
 
-module.exports = { WagerActivityService, USD_CURRENCIES, cleanWager };
+module.exports = { describeStake, WagerActivityService, USD_CURRENCIES, cleanWager };

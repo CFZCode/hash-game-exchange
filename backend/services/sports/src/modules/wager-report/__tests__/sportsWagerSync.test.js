@@ -26,13 +26,13 @@ const fakeUser = (counted = true) => {
 test('records each settled bet once, in its own currency, and reverses voided ones', async () => {
   const user = fakeUser();
   const sync = new SportsWagerSync({
-    db: fakeDb([{ id: 16, user_id: '9184273284', amount: '2000.00', currency: 'INR' }], [{ user_id: '3600404865', ref: '14' }]),
+    db: fakeDb([{ id: 16, user_id: '9184273284', amount: '2000.00', currency: 'INR', odds: '1.85' }], [{ user_id: '3600404865', ref: '14' }]),
     clients: { user },
   });
 
   assert.deepEqual(await sync.run(), { counted: 1, reversed: 1 });
   assert.deepEqual(user.calls, [
-    { path: '/internal/user/wager/record', body: { userId: 9184273284, amount: '2000.00', currency: 'INR', source: SOURCE, ref: '16' } },
+    { path: '/internal/user/wager/record', body: { userId: 9184273284, amount: '2000.00', currency: 'INR', source: SOURCE, ref: '16', category: 'sports', odds: '1.8500' } },
     { path: '/internal/user/wager/reverse', body: { userId: 3600404865, source: SOURCE, ref: '14' } },
   ]);
 });

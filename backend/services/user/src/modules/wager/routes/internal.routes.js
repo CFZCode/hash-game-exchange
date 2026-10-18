@@ -2,7 +2,7 @@
 
 const { Router } = require('express');
 const { z } = require('zod');
-const { validate, response, asyncHandler } = require('@ibitplay/common');
+const { validate, response, asyncHandler, wagerCategory } = require('@ibitplay/common');
 
 const { WagerActivityService } = require('../wagerActivity.service');
 
@@ -22,6 +22,12 @@ const record = {
       source: z.string().trim().min(1).max(40),
       ref: z.string().trim().min(1).max(190),
       rakeback: z.boolean().optional(),
+      // What kind of bet (migration 132) — optional; resolved from `source` / defaults when absent.
+      category: z.enum(wagerCategory.CATEGORIES).optional(),
+      provider: z.string().trim().max(120).optional(),
+      gameRef: z.string().trim().max(190).optional(),
+      odds: z.string().trim().regex(/^\d+(\.\d{1,4})?$/).optional(),
+      houseEdge: z.string().trim().regex(/^0(\.\d{1,6})?$/).optional(),
     })
     .strict(),
 };

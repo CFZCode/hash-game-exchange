@@ -41,6 +41,8 @@ test('recordActivity', async (t) => {
     assert.equal(posted[0].path, '/internal/user/wager/record');
     assert.deepEqual(posted[0].body, {
       userId: 7, amount: '1500.00000000', currency: 'INR', source: 'inhouse', ref: '42', rakeback: true,
+      // What kind of bet (migration 132): `inhouse` is always originals.
+      category: 'originals', gameRef: 'dice',
     });
     assert.equal(increments.length, 1, 'games_played once');
   });

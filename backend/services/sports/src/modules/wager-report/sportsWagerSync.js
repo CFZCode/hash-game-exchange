@@ -38,8 +38,11 @@ class SportsWagerSync {
 
   async #countSettled(limit) {
     const bets = await this.#query(
-      `SELECT b.id, b.user_id, COALESCE(b.original_amount, b.stake_amount) AS amount,
-              UPPER(COALESCE(b.original_currency, 'INR')) AS currency
+      `SELECT b.id, b.user_id, b.odds, COALESCE(b.original_amount, b.stake_amount) AS amount,
+              -- stake_amount is the book's INR figure: with no original_amount the bet is INR,
+              -- whatever original_currency says (a USDT label on an INR stake counted rupees as dollars).
+              CASE WHEN b.original_amount IS NULL THEN 'INR'
+                   ELSE UPPER(COALESCE(b.original_currency, 'INR')) END AS currency
          FROM mssports."SportsBet" b
         WHERE b.result_status IN ('won', 'loss')
           AND COALESCE(b.original_amount, b.stake_amount) > 0
@@ -58,6 +61,9 @@ class SportsWagerSync {
           currency: bet.currency,
           source: SOURCE,
           ref: String(bet.id),
+          category: 'sports',
+          // Decimal odds — a bonus counts a sports bet only at 1.5 or more (hash.game).
+          ...(Number(bet.odds) > 0 ? { odds: Number(bet.odds).toFixed(4) } : {}),
         });
         if (outcome?.counted) done += 1;
       } catch (error) {

@@ -27,7 +27,7 @@ const {
   withoutDisabledGames,
   isProviderDisabled,
 } = require('./providerSwitch');
-const { imageUpload, money } = require('@ibitplay/common');
+const { imageUpload, money, wagerCategory } = require('@ibitplay/common');
 
 /** A provider logo is a small mark, not a hero image. */
 const LOGO_MAX_BYTES = 1024 * 1024;
@@ -1234,7 +1234,23 @@ class GamesService {
    * with no currency cannot be converted. `rakeback: false` skips the accrual
    * for a path that has none.
    */
-  async recordActivity({ userId, gameRef, wagered, currency, source = 'casino', ref, rakeback = true, countPlay = true }) {
+  async recordActivity({
+    userId,
+    gameRef,
+    wagered,
+    currency,
+    source = 'casino',
+    ref,
+    rakeback = true,
+    countPlay = true,
+    category,
+    provider,
+    odds,
+    houseEdge,
+    // The catalogue row to describe the bet by, when it is not `gameRef` (which also
+    // writes recently-played — once per launch, not once per spin).
+    catalogueRef,
+  }) {
     try {
       if (gameRef) await this.recordPlay({ userId, gameUuid: gameRef });
     } catch (error) {
@@ -1260,6 +1276,8 @@ class GamesService {
             source,
             ref: String(ref),
             rakeback: Boolean(rakeback),
+            // What kind of bet — the hash.game formulas price by it (migration 132).
+            ...(await this.#stakeKind({ gameRef: catalogueRef ?? gameRef, source, category, provider, odds, houseEdge })),
           })) ?? outcome;
       }
     } catch (error) {
@@ -1278,6 +1296,33 @@ class GamesService {
     }
 
     return outcome;
+  }
+
+  /**
+   * `category` / `provider` / `gameRef` / `odds` / `houseEdge` for `/wager/record`, only the keys
+   * that are known. A caller that names the category keeps it; otherwise the catalogue row of
+   * `gameRef` (`gisgamesnew` uuid, then `js_games` uid) gives type + provider. Never throws: a
+   * failed lookup records the stake without them (user-service then uses the source's default).
+   */
+  async #stakeKind({ gameRef, source, category, provider, odds, houseEdge }) {
+    let type = null;
+    let vendor = provider ?? null;
+    if (gameRef && (!category || !vendor)) {
+      try {
+        const gis = await this.models.Gisgamesnew?.findOne({ where: { uuid: String(gameRef) }, attributes: ['type', 'provider'], raw: true });
+        const js = gis ? null : await this.models.JsGames?.findOne({ where: { game_uid: String(gameRef) }, attributes: ['game_type', 'vendor'], raw: true });
+        type = gis?.type ?? js?.game_type ?? null;
+        vendor = vendor ?? gis?.provider ?? js?.vendor ?? null;
+      } catch (error) {
+        this.logger?.warn({ err: error, gameRef }, 'stake kind lookup failed');
+      }
+    }
+    const kind = { category: wagerCategory.resolveCategory({ category, source, type }) };
+    if (vendor) kind.provider = String(vendor).slice(0, 120);
+    if (gameRef) kind.gameRef = String(gameRef).slice(0, 190);
+    if (odds != null && /^\d+(\.\d+)?$/.test(String(odds))) kind.odds = Number(odds).toFixed(4).replace(/\.?0+$/, '');
+    if (houseEdge != null) kind.houseEdge = String(houseEdge);
+    return kind;
   }
 
   /**

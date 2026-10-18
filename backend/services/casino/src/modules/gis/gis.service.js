@@ -217,6 +217,7 @@ class GisService {
       await this.games.recordActivity({
         userId,
         gameRef: null,
+        catalogueRef: body.game_uuid ?? null,
         wagered: amount,
         currency: settlement,
         source: 'gis',

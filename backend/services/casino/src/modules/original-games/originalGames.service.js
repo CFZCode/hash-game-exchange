@@ -212,7 +212,16 @@ class OriginalGamesService {
 
     // VIP / rakeback / affiliate wager counting.
     if (outcome.fresh && !money.isZero(amount) && this.games?.recordActivity) {
-      await this.games.recordActivity({ userId, gameRef: null, wagered: amount, currency, source: WAGER_SOURCE, ref: txId });
+      await this.games.recordActivity({
+        userId,
+        gameRef: null,
+        wagered: amount,
+        currency,
+        source: WAGER_SOURCE,
+        ref: txId,
+        category: 'originals',
+        provider: 'BC Originals',
+      });
     }
     return outcome.response;
   }

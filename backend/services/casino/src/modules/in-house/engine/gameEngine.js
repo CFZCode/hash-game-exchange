@@ -219,6 +219,8 @@ class GameEngine {
         currency,
         source: 'inhouse',
         ref: opened.betId,
+        category: 'originals',
+        provider: 'BC Originals',
         // A round is counted in `games_played` when it SETTLES (see `settle`),
         // so a refunded or invalid round is not a game played.
         countPlay: false,
