@@ -4,6 +4,7 @@ const { defineErrors } = require('@ibitplay/common');
 
 /** Launch-side errors. The wallet callbacks never throw — they answer in the aggregator's envelope. */
 module.exports = defineErrors('ORIGINAL_GAMES', {
+  DISABLED: { status: 403, message: 'Originals are switched off on this site' },
   NOT_CONFIGURED: { status: 503, message: 'The original games aggregator is not configured' },
   UNSUPPORTED_CURRENCY: { status: 422, message: 'Original games play in INR or USDT only' },
   CASINO_LOCKED: { status: 403, message: 'Casino play is locked on this account' },

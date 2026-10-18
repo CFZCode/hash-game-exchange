@@ -2,7 +2,7 @@
 
 const crypto = require('crypto');
 const { QueryTypes } = require('sequelize');
-const { money } = require('@ibitplay/common');
+const { money, entitlements } = require('@ibitplay/common');
 
 const E = require('./originalGames.errors');
 const { sign } = require('./provider/client');
@@ -55,6 +55,7 @@ class OriginalGamesService {
 
   async launch({ userId, gameCode, currency, device, language }) {
     if (!this.provider?.configured) throw E.NOT_CONFIGURED();
+    if (!(await this.originalsOn())) throw E.DISABLED();
     const code = String(currency).toUpperCase();
     if (!EXPONENT[code]) throw E.UNSUPPORTED_CURRENCY({ currency });
 
@@ -95,6 +96,65 @@ class OriginalGamesService {
     );
 
     return { gameLaunchUrl: response.launch_url, sessionId: response.session_id, mode: this.mode };
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
+  //  Switch and catalogue
+  // ══════════════════════════════════════════════════════════════════════
+
+  /**
+   * Originals on? Both switches must say so: the owner's plan (owner panel → "Originals
+   * (in-house)") and the site admin's `siteconfig.originals` (Admin → Site config → global).
+   * Off closes the list, the launch and every NEW bet; wins and rollbacks of open rounds settle.
+   */
+  async originalsOn() {
+    if (!(await entitlements.isFlagEntitled('originals'))) return false;
+    const [row] = await this.#query('SELECT originals FROM siteconfig LIMIT 1').catch(() => []);
+    return row?.originals !== false;
+  }
+
+  /** The lobby's list — `og_games` in the aggregator's order; empty while Originals are off. */
+  async listGames() {
+    if (!(await this.originalsOn())) return [];
+    const rows = await this.#query('SELECT code, name, data FROM og_games ORDER BY position, code');
+    return rows.map((row) => ({
+      game_code: row.code,
+      name: row.name,
+      image: row.data?.image_url ?? row.data?.image ?? row.data?.thumbnail ?? null,
+    }));
+  }
+
+  /**
+   * Refresh `og_games` from `GET /v1/games` (scripts/sync-original-games.js). Replaces the table
+   * in one transaction, so a game the aggregator stopped offering leaves the lobby.
+   */
+  async syncGames() {
+    if (!this.provider?.configured) throw E.NOT_CONFIGURED();
+    let response;
+    try {
+      response = await this.provider.request('GET', '/v1/games');
+    } catch (error) {
+      throw error?.status ? E.UPSTREAM_REJECTED({ status: error.status, code: error.code }) : E.UPSTREAM_FAILED({ cause: error?.message });
+    }
+    // shortcut: one page only — the guide does not say /v1/games paginates; add a cursor loop if `next_cursor` appears.
+    const list = Array.isArray(response) ? response : response?.games ?? response?.data ?? response?.items ?? [];
+    const games = list
+      .map((game) => ({ code: String(game?.game_code ?? game?.code ?? ''), name: String(game?.name ?? game?.title ?? ''), data: game }))
+      .filter((game) => game.code);
+    if (!games.length) throw E.UPSTREAM_REJECTED({ code: 'EMPTY_CATALOGUE' });
+
+    await this.db.transaction(async (transaction) => {
+      await this.#query('DELETE FROM og_games WHERE NOT (code = ANY(ARRAY[:codes]::text[]))', { codes: games.map((g) => g.code) }, transaction);
+      for (const [position, game] of games.entries()) {
+        await this.#query(
+          `INSERT INTO og_games (code, name, position, data, synced_at) VALUES (:code, :name, :position, CAST(:data AS jsonb), NOW())
+           ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, position = EXCLUDED.position, data = EXCLUDED.data, synced_at = NOW()`,
+          { code: game.code, name: game.name || game.code, position, data: JSON.stringify(game.data) },
+          transaction
+        );
+      }
+    });
+    return { synced: games.length, codes: games.map((g) => g.code) };
   }
 
   // ══════════════════════════════════════════════════════════════════════
@@ -158,6 +218,8 @@ class OriginalGamesService {
 
     const user = await this.models.Users.findByPk(userId, { attributes: ['casino_locked', 'system_locked'], raw: true });
     if (user?.casino_locked || user?.system_locked) return this.#error(ERROR_CODE.PLAYER_BLOCKED, { currency, balance });
+    // Originals switched off: no new stake (the aggregator voids the round); open rounds still settle.
+    if (!(await this.originalsOn())) return this.#error(ERROR_CODE.MAINTENANCE, { currency, balance });
 
     const outcome = await this.#applyMoney({ kind: 'bet', body, userId, currency, amount, balance, txId, isCredit: false });
     if (outcome.insufficient) return this.#error(ERROR_CODE.INSUFFICIENT_FUNDS, { currency, balance });

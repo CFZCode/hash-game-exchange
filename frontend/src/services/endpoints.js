@@ -688,6 +688,8 @@ export const PLATFORM = {
     /* The BC Originals on the Original Games Aggregator — `POST {gameCode, currencyCode (INR|USDT),
        language, device}` → `{gameLaunchUrl, sessionId, mode}` (casino-service modules/original-games). */
     originalsLaunch: '/api/v1/casino/original-games/launch',
+    /* `GET` → `[{game_code, name, image}]`, the aggregator's catalogue; [] while Originals are off. */
+    originalsGames: '/api/v1/casino/original-games/games',
 
     /* Favourites — `GET`, `PUT :gameRef`, `DELETE :gameRef`, all added to the platform for this
        page (`docs/backend-gaps.md`, Part 4b.7). They sit under `/casino/games/` rather than the

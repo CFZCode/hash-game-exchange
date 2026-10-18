@@ -1,7 +1,7 @@
 'use strict';
 
 const { Router } = require('express');
-const { asyncHandler, createRateLimiter } = require('@ibitplay/common');
+const { asyncHandler, createRateLimiter, response } = require('@ibitplay/common');
 
 const { buildOriginalGamesService } = require('../originalGames.factory');
 const { ACTION } = require('../originalGames.constants');
@@ -35,6 +35,9 @@ module.exports = function publicRoutes(deps) {
       });
       res.status(status).json(body);
     });
+
+  /** The lobby's Originals list (`og_games`); `[]` while the owner or the site admin has them off. */
+  router.get('/games', asyncHandler(async (_req, res) => response.ok(res, await service.listGames())));
 
   for (const action of Object.values(ACTION)) router.post(`/wallet/${action}`, limiter, handle(() => action));
   // `callback_style: unified` — everything on one path, the action in `type`.

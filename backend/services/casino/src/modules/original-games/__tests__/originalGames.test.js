@@ -77,6 +77,9 @@ test('original games aggregator', async (t) => {
     webhookSecret: WEBHOOK_SECRET,
     fetchImpl: async (url, init) => {
       upstream = { url, init };
+      if (String(url).endsWith('/v1/games')) {
+        return { ok: true, status: 200, json: async () => ({ games: [{ game_code: 'crash', name: 'Crash' }, { game_code: 'mines', name: 'Mines', image_url: 'https://x/m.png' }] }) };
+      }
       return { ok: true, status: 201, json: async () => ({ session_id: crypto.randomUUID(), launch_url: 'https://games.test/crash?token=lt_x' }) };
     },
   });
@@ -193,6 +196,30 @@ test('original games aggregator', async (t) => {
     balances.set(`${uid}:INR`, '0');
     const res = await call('rollback', { player_id: String(uid), currency: 'INR', transaction_id: newTx(), reference_transaction_id: winId });
     assert.deepStrictEqual(res.body, { status: 'OK', balance: 0, currency: 'INR' });
+  });
+
+  await t.test('catalogue sync, and the admin switch closes list, launch and new bets', async () => {
+    const out = await service.syncGames();
+    assert.deepStrictEqual(out.codes, ['crash', 'mines']);
+    assert.deepStrictEqual(await service.listGames(), [
+      { game_code: 'crash', name: 'Crash', image: null },
+      { game_code: 'mines', name: 'Mines', image: 'https://x/m.png' },
+    ]);
+
+    const uid = await player('100');
+    const [[before]] = await connection.sequelize.query('SELECT originals FROM siteconfig LIMIT 1');
+    if (before) await connection.sequelize.query('UPDATE siteconfig SET originals = false');
+    else await connection.sequelize.query('INSERT INTO siteconfig (originals, registerbonus, createdat, updatedat) VALUES (false, 0, NOW(), NOW())');
+    try {
+      assert.deepStrictEqual(await service.listGames(), []);
+      await assert.rejects(service.launch({ userId: uid, gameCode: 'crash', currency: 'INR' }), { status: 403 });
+      const bet = await call('bet', { player_id: String(uid), currency: 'INR', transaction_id: newTx(), amount: 100 });
+      assert.strictEqual(bet.body.error_code, 'MAINTENANCE');
+      assert.strictEqual(balances.get(`${uid}:INR`), '100');
+    } finally {
+      if (before) await connection.sequelize.query('UPDATE siteconfig SET originals = :v', { replacements: { v: before.originals } });
+      else await connection.sequelize.query('DELETE FROM siteconfig');
+    }
   });
 
   await t.test('launch is signed, demo on a sandbox key, and the session pins its currency', async () => {

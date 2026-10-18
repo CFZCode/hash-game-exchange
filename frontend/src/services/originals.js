@@ -116,12 +116,14 @@ export function getOriginals() {
   return publicGates().then((gates) => (gates.on('originals') ? readLive() : []));
 }
 
+/* Live: the Original Games Aggregator's catalogue (`og_games`, filled by the backend's
+   scripts/sync-original-games.js) — every game the aggregator offers, in its order, not cut to
+   SHOWN_ORIGINALS. `uid` is the aggregator's `game_code`, which the launch sends as-is. The
+   backend answers [] while the owner or the site admin has Originals off. */
 function readLive() {
-  return Promise.resolve(
-    /* The SmartBet backend keeps the imported provider catalogue in the same `js_games` table
-       (paged 20 at a time), so ask for the house's own rows only, all of them on one page. */
-    request(PLATFORM.casino.inHouseGames, { live: true, fixture: [], params: { vendor: 'in-house', per_page: 100 } }),
-  ).then(toOriginals);
+  return Promise.resolve(request(PLATFORM.casino.originalsGames, { live: true, fixture: [] })).then((rows) =>
+    (rows ?? []).map((row) => toGame({ game_uid: row.game_code, game_name: row.name })),
+  );
 }
 
 export default getOriginals;
