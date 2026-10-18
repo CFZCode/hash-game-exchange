@@ -135,6 +135,22 @@ test('original games aggregator', async (t) => {
     assert.strictEqual((await call('balance', { player_id: '1', currency: 'BTC' })).body.error_code, 'CURRENCY_MISMATCH');
   });
 
+  await t.test('the validation player answers as OG_VALIDATION_USER_ID, and only when it is set', async () => {
+    const uid = await player('5');
+    const body = { player_id: '__aggregator_validation__', currency: 'INR' };
+    assert.strictEqual((await call('balance', body)).body.error_code, 'PLAYER_NOT_FOUND');
+    service.config.OG_VALIDATION_USER_ID = String(uid);
+    try {
+      assert.deepStrictEqual((await call('balance', body)).body, { status: 'OK', balance: 500, currency: 'INR' });
+      const bet = { ...body, transaction_id: newTx(), amount: 1 };
+      const first = await call('bet', bet);
+      assert.deepStrictEqual(await call('bet', bet), first);
+      assert.strictEqual(balances.get(`${uid}:INR`), '4.99000000');
+    } finally {
+      delete service.config.OG_VALIDATION_USER_ID;
+    }
+  });
+
   await t.test('wallet.bet_dedupe — a repeat returns the original answer and debits once', async () => {
     const uid = await player('100');
     const bet = { player_id: String(uid), currency: 'INR', transaction_id: newTx(), round_id: 'r1', game_code: 'crash', amount: 5000 };

@@ -14,6 +14,7 @@ const {
   MAX_SKEW_SECONDS,
   NONCE_TTL_SECONDS,
   WAGER_SOURCE,
+  VALIDATION_PLAYER_ID,
 } = require('./originalGames.constants');
 
 /**
@@ -168,7 +169,9 @@ class OriginalGamesService {
 
       const currency = String(body?.currency ?? '');
       if (!EXPONENT[currency]) return this.#error(ERROR_CODE.CURRENCY_MISMATCH, { currency });
-      const playerId = String(body?.player_id ?? '');
+      // The validation run (guide §9) probes its own test player, never one we launched: point it at a real test user.
+      const sentId = String(body?.player_id ?? '');
+      const playerId = sentId === VALIDATION_PLAYER_ID && this.config.OG_VALIDATION_USER_ID ? String(this.config.OG_VALIDATION_USER_ID) : sentId;
       if (!/^\d{1,18}$/.test(playerId)) return this.#error(ERROR_CODE.PLAYER_NOT_FOUND, { currency });
       const userId = Number(playerId);
 

@@ -9,6 +9,9 @@ const EXPONENT = Object.freeze({ INR: 2, USDT: 6 });
 const SUPPORTED_CURRENCIES = Object.freeze(Object.keys(EXPONENT));
 
 /** Wallet callback actions; the unified `/transaction` endpoint names them in `type`. */
+/** The player id the aggregator's validation run (guide §9) sends in every probe. */
+const VALIDATION_PLAYER_ID = '__aggregator_validation__';
+
 const ACTION = Object.freeze({ BALANCE: 'balance', BET: 'bet', WIN: 'win', ROLLBACK: 'rollback' });
 
 /** The `error_code`s we may answer (guide §5.6). Anything else reads as INTERNAL_ERROR. */
@@ -40,4 +43,5 @@ module.exports = {
   NONCE_TTL_SECONDS,
   DEVICES,
   WAGER_SOURCE,
+  VALIDATION_PLAYER_ID,
 };

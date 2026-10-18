@@ -108,6 +108,8 @@ const config = loadEnv(
     OG_TIMEOUT_MS: coercers.int(10_000),
     OG_RETURN_URL: coercers.optionalStr(),
     OG_DEPOSIT_URL: coercers.optionalStr(),
+    // Our test user that answers for `__aggregator_validation__` in their validation run.
+    OG_VALIDATION_USER_ID: coercers.optionalStr(),
 
     // ── Slotegrator / GIS ─────────────────────────────────────────────
     // The merchant id and key were hard-coded at the top of
