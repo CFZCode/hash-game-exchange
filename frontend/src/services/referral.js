@@ -195,16 +195,40 @@ export const getAffiliateDashboard = ({ reloads } = {}) => {
  * the amounts are read as USD the way bc.game's `*Usd` fields are. */
 const REWARDS_TODAY = { params: { filter: 'today' } };
 const num = (value) => Number(value) || 0;
-const readRewards = () =>
-  Promise.resolve(request(PLATFORM.user.affiliate.rewards, { live: true, fixture: null })).catch(() => null);
+/* `team` and `rewards` are paged (default 50, at most 200 a page), so a per-friend or per-coin sum
+   over the first page misses the rest. These walk every page into one envelope; `key` is its list. */
+const PAGE_MAX = 200;
+const readAll = (path, key) => {
+  const page = (offset, acc) =>
+    Promise.resolve(request(path, { live: true, fixture: null, params: { limit: PAGE_MAX, offset } })).then((data) => {
+      const got = data?.[key] ?? [];
+      const rows = acc.concat(got);
+      if (got.length === PAGE_MAX && rows.length < num(data.total)) return page(offset + PAGE_MAX, rows);
+      return data ? { ...data, [key]: rows } : null;
+    });
+  return page(0, []).catch(() => null);
+};
+const readRewards = () => readAll(PLATFORM.user.affiliate.rewards, 'rows');
 const readTodayRewards = () =>
   Promise.resolve(
     request(PLATFORM.user.affiliate.rewards, { live: true, fixture: null, ...REWARDS_TODAY }),
   ).catch(() => null);
 const readUnclaimed = () =>
   Promise.resolve(request(PLATFORM.user.affiliate.unclaimed, { live: true, fixture: null })).catch(() => null);
-const readTeam = () =>
-  Promise.resolve(request(PLATFORM.user.affiliate.team, { live: true, fixture: null })).catch(() => null);
+const readTeam = () => readAll(PLATFORM.user.affiliate.team, 'members');
+
+/* A friend's VIP level NAME off their wager (USD, `team.members[].wager`) and the site's ladder
+   (`GET /user/vip/levels`, bands by `minXp` in USD). `member.level` is not the VIP level. */
+const readVipNamer = () =>
+  Promise.resolve(request(PLATFORM.user.vip.levels, { live: true, fixture: null }))
+    .catch(() => null)
+    .then((ladder) => {
+      const bands = [...(ladder?.levels ?? [])].sort((a, b) => num(a.minXp) - num(b.minXp));
+      return (wager) => {
+        const band = bands.filter((b) => num(wager) >= num(b.minXp)).pop();
+        return band?.name ?? ladder?.unranked?.name ?? '';
+      };
+    });
 
 function splitUnclaimed(open) {
   let tier = 0;
@@ -269,27 +293,22 @@ const EMPTY_PAGE = { list: [], page: 0, pageSize: 10, total: 0, totalPage: 0 };
 export const getFriendCommissions = () => {
   if (USE_FIXTURES) return request(ENDPOINTS.referral.friendList, { method: 'POST', fixture: EMPTY_PAGE });
   /* One row per referred player, off `team.members`, with that player's commission summed from
-     `rewards.rows`. The rate is what the platform actually paid on them (commission over the
-     wager it was paid on). The platform sends no user id and no deposit figure for a team member,
-     so those two cells print a dash rather than a number nobody sent. */
-  return Promise.all([readTeam(), readRewards()]).then(([team, earned]) => {
+     `rewards.rows`. The rate is the site's configured commission rate (as hash.game's column
+     prints it), a fraction like bc.game's `ratio`. The platform sends no user id and no deposit
+     figure for a team member, so those two cells print a dash rather than a number nobody sent. */
+  return Promise.all([readTeam(), readRewards(), getCommissionRates()]).then(([team, earned, rates]) => {
     const paid = new Map();
-    for (const row of earned?.rows ?? []) {
-      const entry = paid.get(row.member) ?? { amount: 0, referred: 0 };
-      entry.amount += num(row.amount);
-      entry.referred += num(row.referredAmount);
-      paid.set(row.member, entry);
-    }
+    for (const row of earned?.rows ?? []) paid.set(row.member, (paid.get(row.member) ?? 0) + num(row.amount));
     const list = (team?.members ?? []).map((member) => {
-      const entry = paid.get(member.name) ?? { amount: 0, referred: 0 };
+      const amount = paid.get(member.name) ?? 0;
       return {
         id: member.name,
         userName: member.name,
         userId: '-',
-        commissionRate: entry.referred > 0 ? Math.round((entry.amount / entry.referred) * 10000) / 10000 : 0,
+        commissionRate: rates.commissionRate / 100,
         day7TotalDeposits: '-',
         createDate: shortDate(member.joinedAt),
-        commissionUsd: usd2(entry.amount),
+        commissionUsd: usd2(amount),
       };
     });
     return { ...EMPTY_PAGE, list, page: 1, total: list.length, totalPage: list.length ? 1 : 0 };
@@ -375,7 +394,7 @@ export const getReferralRewards = () => {
      joined to the team member for the registration date, VIP level and code. Only UNCLAIMED tier
      rows are readable — the platform has no player route listing claimed ones — so a claimed
      reward leaves this table. */
-  return Promise.all([readUnclaimed(), readTeam()]).then(([open, team]) => {
+  return Promise.all([readUnclaimed(), readTeam(), readVipNamer()]).then(([open, team, vipName]) => {
     const members = new Map((team?.members ?? []).map((m) => [m.name, m]));
     const list = (open?.rows ?? [])
       .filter((row) => row.kind === 'tier')
@@ -385,7 +404,7 @@ export const getReferralRewards = () => {
           id: `tier-${row.id}`,
           userName: row.member ?? '',
           createDate: shortDate(member?.joinedAt),
-          userLevel: member?.level ?? '',
+          userLevel: member ? vipName(member.wager) : '',
           aliasCode: member?.campaign ?? '',
           rewardUsd: usd2(row.amount),
         };

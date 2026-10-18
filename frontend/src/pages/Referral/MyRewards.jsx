@@ -243,8 +243,8 @@ function CommissionByFriends({ codes, data, wagerRange }) {
       title: 'Commission Rate',
       dataIndex: 'commissionRate',
       /* The `%` is a literal in the template AFTER the value, and the value is the stored
-         fraction times 100 — 0.25 renders as "25%". */
-      render: (v) => <Primary>{Number(v) * 100}%</Primary>,
+         fraction times 100 — 0.25 renders as "25%" (rounded, so 0.07 is not "7.000000000000001%"). */
+      render: (v) => <Primary>{Math.round(Number(v) * 10000) / 100}%</Primary>,
     },
     { title: 'Total Deposits (Past 7D)', dataIndex: 'day7TotalDeposits', render: (v) => <Primary>{v}</Primary> },
     { title: 'Registration Date', dataIndex: 'createDate', render: (v) => <Secondary>{v}</Secondary> },

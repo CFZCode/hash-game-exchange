@@ -317,7 +317,7 @@ export default function RateRules() {
                   {step.lead}
                 </span>
                 <span className={`text-xl font-extrabold${step.tailBrand ? ' text-brand' : ''}`}>
-                  {step.tailAmountUsd ? cur.show(step.tailAmountUsd, 'USDFIAT', { precision: 0 }) : step.tail}
+                  {step.tailAmountUsd ? cur.show(step.tailAmountUsd, 'USDFIAT') : step.tail}
                 </span>
                 <br />
                 <p className="text-secondary">{step.body}</p>
