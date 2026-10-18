@@ -145,7 +145,6 @@ async function runBetBuffer(body, sb, opts = {}) {
       }
     }
     let finalStake = stake;
-    let stakeInInr = false;
     if (ownLine) {
       finalOdds = slipOdds;
     } else if (isCashout) {
@@ -154,8 +153,6 @@ async function runBetBuffer(body, sb, opts = {}) {
       if (diff > 0 && Math.abs(live - slipOdds) > 1e-3) {
         const divisor = bool(sb.cashout_percent) ? live / 100 + 1 : live;
         finalStake = round2(diff / divisor);
-        // cashout_diff is an INR exposure figure: placeBet converts this stake into the bet's coin.
-        stakeInInr = true;
         const maxStake = Number(sb.max_stake) || 0;
         if (!(finalStake > 0) || maxStake > 0 && finalStake > maxStake) {
           return reject(MESSAGES.BET.RANGE_NOT_VALID, "CASHOUT_RANGE");
@@ -171,7 +168,7 @@ async function runBetBuffer(body, sb, opts = {}) {
       if (!auto.accept) return reject(MESSAGES.BET.ODDS_CHANGE_NOT_CONFIRMED, `ODDS_MOVED:${selectedOdds}->${finalOdds}`);
       finalOdds = auto.finalOdds;
     }
-    return { accept: true, odds: finalOdds, size: finalSize, stake: finalStake, stakeInInr, bufferSeconds, ticks, liveTicks };
+    return { accept: true, odds: finalOdds, size: finalSize, stake: finalStake, bufferSeconds, ticks, liveTicks };
   } finally {
     if (canPoll) liveOdds_default.release(gmid);
   }
@@ -246,7 +243,7 @@ var placeBetBuffered = async (req, res) => {
   }
   console.log(`[betBuffer] \u2713 decided ${tag} X=${sb.selected_odds} slip=${req.body.odds} \u2192 ${decision.odds} stake=${req.body.stake_amount}\u2192${decision.stake} size=${decision.size} buffer=${decision.bufferSeconds}s ticks=${decision.liveTicks}/${decision.ticks}`);
   applyDecision(req.body, decision);
-  return placeBet(req, res, { stakeInInr: decision.stakeInInr === true });
+  return placeBet(req, res);
 };
 async function checkBetLive(body) {
   const sb = isLineMarket(body?.market_type) ? { line_market: true } : {};

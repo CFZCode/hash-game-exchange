@@ -30,8 +30,7 @@ import { checkBetLive } from "../buffer/betBuffer.mjs";
 import { StaffMarketLocks_default } from "../../../models/admin/StaffMarketLocks.mjs";
 
 import xssClean from "xss-clean";
-import { toInr, inrToCurrency } from "../../../lib/helper/toInr.mjs";
-import { betCoin, placedRate, toBetCoin, addToWallet, walletBalance } from "../../../lib/helper/betCoin.mjs";
+import { toInr } from "../../../lib/helper/toInr.mjs";
 import fetch from "node-fetch";
 init_TotalExposure();
 init_db();
@@ -424,30 +423,6 @@ var walletUpdate = async (wallet, balanceChange, transaction, context = {}) => {
     console.error(`[walletUpdate] \u274C Critical: balanceChange is NaN for user ${user_id}. Context:`, context);
     return;
   }
-  // A non-INR bet (helper/betCoin.mjs): the INR liability change is taken from / given back to its
-  // coin wallet; the debit row stays in INR and keeps the coin figures in meta. Returns the coin balance.
-  if (context.coinBets) {
-    const coin = betCoin(context.coinBets);
-    const coinAmount = await toBetCoin(context.coinBets, { release: balanceChange });
-    const coinBalance = await addToWallet(db_default, user_id, coin, -coinAmount, transaction);
-    if (balanceChange > 0) {
-      await DebitLedger_default.create({
-        user_id,
-        amount: balanceChange,
-        currency: "INR",
-        reason: "bet_placed",
-        description: `${match_title} ${selection_name}`,
-        balance: Number(wallet.inr || 0),
-        market_type: market_type || game_type,
-        match_id,
-        event_id: eventid,
-        sport_id: sid,
-        meta: { bet_id: newBet?.id, coin, coin_amount: coinAmount, coin_balance: coinBalance }
-      }, { transaction });
-    }
-    console.log(`[walletUpdate] Delta: ${balanceChange} INR = ${coinAmount} ${coin}, ${coin}: ${coinBalance}`);
-    return coinBalance;
-  }
   // OLD (Wallets.cash):
   /*
   let currentCash = Number(wallet.cash || 0);
@@ -599,20 +574,8 @@ var placeBet = async (req, res, opts) => {
       return res.status(400).json({ success: false, error: "currency is required" });
     }
     // The stake as the player sent it, in their coin; from here on stake_amount is INR.
-    // A coin market keeps the rate of its open bets (helper/betCoin.mjs), so every bet on it shares
-    // one rate and a return gives back exactly what was taken. A cashout stake comes worked out in INR.
-    const stakeCoin = String(currency).trim().toUpperCase();
-    const marketRate = stakeCoin === "INR" ? null : placedRate(await SportsBet_default.findAll({
-      where: { user_id, match_id, market_type, original_currency: stakeCoin, status: { [Op6.in]: ["open", "manual"] } },
-      attributes: ["original_amount", "stake_amount"],
-      transaction
-    }));
-    let currency_amount = Number(stake_amount);
-    if (stakeCoin !== "INR" && options.stakeInInr) {
-      currency_amount = marketRate ? Math.round(currency_amount * marketRate * 1e8) / 1e8 : await inrToCurrency(currency_amount, stakeCoin);
-    } else {
-      stake_amount = marketRate ? Math.round(currency_amount / marketRate * 100) / 100 : await toInr(stake_amount, currency);
-    }
+    const currency_amount = Number(stake_amount);
+    stake_amount = await toInr(stake_amount, currency);
     const ip_address = req.headers["x-forwarded-for"]?.split(",")[0] || req.connection.remoteAddress || req.ip;
     console.log("IP ADDRESS:", ip_address);
     const browser = req.headers["user-agent"] || null;
@@ -811,26 +774,6 @@ var placeBet = async (req, res, opts) => {
     if (!wallet) throw new Error("Wallet not found");
     const currentInr = Number(wallet.inr || 0);
     console.log("Current wallet balance:", currentInr);
-    // Money moves in the bet's coin (helper/betCoin.mjs, user 2026-10-18): one coin per market while
-    // bets are open, agent players INR only; the balance check and the deduction are in that coin.
-    const coin = String(currency).trim().toUpperCase();
-    const groupBets = await SportsBet_default.findAll({
-      where: { user_id, match_id, market_type, status: { [Op6.in]: ["open", "manual"] } },
-      attributes: ["original_currency", "original_amount", "stake_amount"],
-      transaction
-    });
-    const otherCoin = groupBets.map((b) => betCoin(b)).find((c) => c !== coin);
-    if (otherCoin) throw new Error(`You already have an open bet in ${otherCoin} on this market \u2014 bet in ${otherCoin} here`);
-    let coinBets = null;
-    let currentCoin = null;
-    if (coin !== "INR") {
-      const better = await User_default.findOne({ where: { user_id }, attributes: ["parent_staff_id"], transaction });
-      if (better?.parent_staff_id) throw new Error("Agent players can bet in INR only");
-      coinBets = [...groupBets, { original_currency: coin, stake_amount, original_amount: currency_amount }];
-      currentCoin = await walletBalance(db_default, user_id, coin, transaction);
-      console.log(`Current ${coin} balance:`, currentCoin);
-    }
-    const shortOf = async (need) => coinBets ? currentCoin < await toBetCoin(coinBets, { release: need }) : currentInr < need;
     const isBadlo = isBadloBet({ badlo }) || String(market_type || "").toLowerCase() === "badlo";
     const exposureIds = exposureIdentity({ marketType: market_type, selectionName: selection_name, badlo: isBadlo });
     const exposureGameType = exposureIds.game_type;
@@ -2017,7 +1960,7 @@ var placeBet = async (req, res, opts) => {
       if (Object.keys(oldExposures).length === 0) balanceChange = newMax;
       else if (liabInc > 0) balanceChange = liabInc;
       else if (liabInc < 0) balanceChange = liabInc;
-      if (balanceChange > 0 && await shortOf(balanceChange)) throw new Error("Bet Not Confirm Check Exposure Limit And Balance");
+      if (balanceChange > 0 && currentInr < balanceChange) throw new Error("Bet Not Confirm Check Exposure Limit And Balance");
     } else {
       const oldNegs = Object.values(oldExposures).filter((x) => x < 0);
       const newNegs = Object.values(newExposures).filter((x) => x < 0);
@@ -2033,7 +1976,7 @@ var placeBet = async (req, res, opts) => {
       if (Object.keys(oldExposures).length === 0) balanceChange = newMax;
       else if (liabInc > 0) balanceChange = liabInc;
       else if (liabInc < 0) balanceChange = liabInc;
-      if (balanceChange > 0 && await shortOf(balanceChange)) throw new Error("Bet not confirm check balance.");
+      if (balanceChange > 0 && currentInr < balanceChange) throw new Error("Bet not confirm check balance.");
     }
     console.log("FINAL BALANCE CHANGE:", balanceChange, "(+deduct, -release)");
     for (const [name, amt] of Object.entries(newExposures)) {
@@ -2137,7 +2080,7 @@ var placeBet = async (req, res, opts) => {
       },
       { transaction }
     );
-    const coinBalance = await walletUpdate(wallet, balanceChange, transaction, {
+    await walletUpdate(wallet, balanceChange, transaction, {
       user_id,
       match_title,
       selection_name,
@@ -2146,8 +2089,7 @@ var placeBet = async (req, res, opts) => {
       match_id,
       eventid,
       sid,
-      newBet,
-      coinBets
+      newBet
     });
     const betExposureValues = Object.values(newExposures);
     console.log("NEW EXPOSURES FOR THIS BET:", newExposures);
@@ -2174,18 +2116,6 @@ var placeBet = async (req, res, opts) => {
     );
     console.log(`\u2705 TotalExposure upserted for user ${user_id}: ${totalUserExposure}`);
     if (!externalTx) await transaction.commit();
-    if (coinBets) {
-      // The balances the player sees are the coin's.
-      return res.json({
-        success: true,
-        exposure: { [match_id]: { match_title, teams: newExposures } },
-        balanceDelta: coinBalance - currentCoin,
-        oldBalance: currentCoin,
-        newBalance: coinBalance,
-        currency: coin,
-        totalExposure: totalUserExposure
-      });
-    }
     const newBalance = balanceChange !== 0 ? currentInr - balanceChange : currentInr;
     console.log("Transaction completed successfully");
     console.log("Old balance:", currentInr);
@@ -2456,20 +2386,12 @@ var cancelBet = async (req, res) => {
       lock: transaction.LOCK.UPDATE
     });
     if (!wallet) throw new Error("Wallet not found");
-    let newBalance;
-    if (betCoin(bet) !== "INR") {
-      // A non-INR bet: the cancelled liability goes back to its coin at the bet's own rate (helper/betCoin.mjs).
-      newBalance = refund > 0
-        ? await addToWallet(db_default, user_id, betCoin(bet), await toBetCoin([bet], { release: refund }), transaction)
-        : await walletBalance(db_default, user_id, betCoin(bet), transaction);
-    } else {
-      if (refund > 0) {
-        wallet.inr = Number(wallet.inr || 0) + refund;
-        if (isNaN(wallet.inr)) throw new Error("Balance calculation resulted in NaN");
-        await wallet.save({ transaction });
-      }
-      newBalance = Number(wallet.inr || 0);
+    if (refund > 0) {
+      wallet.inr = Number(wallet.inr || 0) + refund;
+      if (isNaN(wallet.inr)) throw new Error("Balance calculation resulted in NaN");
+      await wallet.save({ transaction });
     }
+    const newBalance = Number(wallet.inr || 0);
     const exposureResults = await db_default.query(TOTAL_EXPOSURE_SQL, {
       replacements: { user_id },
       type: db_default.QueryTypes.SELECT,

@@ -10,7 +10,6 @@ import { CommissionConfig_default } from "../../models/admin/CommissionConfig.mj
 import { leagueKeyFromName, leagueLabel } from "../../constants/commissionLeagues.mjs";
 import { CommissionConfigService_default } from "../CommissionConfigService.mjs";
 import { resolveLeagueName } from "../SportsLeagueResolver.mjs";
-import { betCoin, payInBetCoin } from "../../../../../../lib/helper/betCoin.mjs";
 
 var COMMISSION_REASON = "commission";
 var COMMISSION_SUFFIX = "- Comm";
@@ -48,7 +47,7 @@ async function applyWinCommission(p) {
       return { applied: false, reason: `already charged (ledger ${dup.id})` };
     }
     const description = `${p.description || ""}${COMMISSION_SUFFIX}`;
-    let newCash = 0, newInr = 0, ledgerId = null, commPaid = null;
+    let newCash = 0, newInr = 0, ledgerId = null;
     await db_default.transaction(async (transaction) => {
       // OLD (Wallets.cash + Wallets.inr_balance):
       /*
@@ -69,15 +68,9 @@ async function applyWinCommission(p) {
         lock: transaction.LOCK.UPDATE
       });
       if (!wallet) throw new Error(`wallet not found for user ${p.user_id}`);
-      if (betCoin(bet) !== "INR") {
-        // A non-INR bet's winnings sit in its coin: the commission comes off there, at today's rate.
-        commPaid = await payInBetCoin(db_default, { uid: p.user_id, bets: [bet], win: -comm, transaction });
-        newCash = round2(Number(wallet.inr || 0));
-      } else {
-        newCash = round2(Number(wallet.inr || 0) - comm);
-        await wallet.update({ inr: newCash }, { transaction });
-      }
+      newCash = round2(Number(wallet.inr || 0) - comm);
       newInr = newCash;
+      await wallet.update({ inr: newCash }, { transaction });
       await User_default.increment(
         { net_loss: -comm, profit: -comm },
         { where: { user_id: p.user_id }, transaction }
@@ -106,8 +99,7 @@ async function applyWinCommission(p) {
           league_name: leagueName || null,
           rule_source: rule.source || "default",
           gtype: String(bet.gtype || "").toLowerCase() || null,
-          net_win: netWin,
-          ...commPaid || {}
+          net_win: netWin
         },
         commission: comm,
         netamount: -comm,

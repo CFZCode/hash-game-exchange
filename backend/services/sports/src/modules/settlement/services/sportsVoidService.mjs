@@ -17,8 +17,7 @@ import { newVoidGroupId, recordVoidAudit } from "./voidAuditService.mjs";
 import { COMMISSION_REASON, COMMISSION_VOID_REASON } from "./sportsCommissionService.mjs";
 
 init_db();
-import { Op as Op12, QueryTypes } from "sequelize";
-import { toBetCoin, addToWallet } from "../../../lib/helper/betCoin.mjs";
+import { Op as Op12 } from "sequelize";
 var round22 = (v) => Math.round((Number(v) || 0) * 100) / 100;
 var VOID_WINDOW_HOURS = Number(process.env.SPORTS_SETTLED_VOID_WINDOW_HOURS || 24);
 var since = () => new Date(Date.now() - VOID_WINDOW_HOURS * 60 * 60 * 1e3);
@@ -217,25 +216,10 @@ var voidSettledLedgerEntry = async (ledgerId, outerTx = null, { writeStatement =
     if (!wallet) throw new Error(`Wallet not found for user ${userId}`);
     const cashBefore = Number(wallet.inr || 0);
     const inrBefore = cashBefore;
-    const paidIn = row.meta?.coin && row.meta.coin !== "INR" ? row.meta : null;
-    if (paidIn) {
-      // A non-INR bet was paid in its coin (helper/betCoin.mjs): take the win back exactly as paid,
-      // or give a loss back at the bet's own rate.
-      let back = -Number(paidIn.coin_win || 0);
-      if (!(net > 0)) {
-        const bets = await db_default.query(
-          'SELECT original_currency, original_amount, stake_amount FROM mssports."SportsBet" WHERE id = :id',
-          { replacements: { id: row.bet_id }, type: QueryTypes.SELECT, transaction }
-        );
-        back = await toBetCoin(bets.length ? bets : [{ original_currency: paidIn.coin }], { release: -net });
-      }
-      await addToWallet(db_default, userId, paidIn.coin, back, transaction);
-    } else {
-      await wallet.update(
-        { inr: round22(cashBefore - net) },
-        { transaction }
-      );
-    }
+    await wallet.update(
+      { inr: round22(cashBefore - net) },
+      { transaction }
+    );
     const counters = { profit: -net };
     if (net > 0) counters.net_win = -net;
     else if (net < 0) counters.net_loss = -net;
@@ -348,15 +332,10 @@ var voidSettledLedgerEntry = async (ledgerId, outerTx = null, { writeStatement =
       //   { transaction }
       // );
       // NEW (credits.inr): the voided commission goes back to inr.
-      if (c.meta?.coin && c.meta.coin !== "INR") {
-        // Charged in the bet's coin: give back exactly what was taken.
-        await addToWallet(db_default, userId, c.meta.coin, -Number(c.meta.coin_amount || 0), transaction);
-      } else {
-        await wallet.update(
-          { inr: round22(Number(wallet.inr || 0) + comm) },
-          { transaction }
-        );
-      }
+      await wallet.update(
+        { inr: round22(Number(wallet.inr || 0) + comm) },
+        { transaction }
+      );
       await User_default.increment({ net_loss: comm, profit: comm }, { where: { user_id: userId }, transaction });
       if (writeStatement) {
         await CreditsLedger_default.create(
