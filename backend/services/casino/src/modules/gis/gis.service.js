@@ -3,6 +3,7 @@
 const crypto = require('crypto');
 const { Op } = require('sequelize');
 const { money } = require('@ibitplay/common');
+const { agentPlayerError } = require('@ibitplay/auth');
 
 const E = require('./gis.errors');
 const { addChildGamePoints, addDirectGamePoints } = require('../js-games/pointLedger');
@@ -791,8 +792,10 @@ class GisService {
 
     if (!((input.betId && input.denomination) || input.totalBetId)) throw E.FREESPIN_BET_REQUIRED();
 
-    const user = await this.models.Users.findByPk(input.playerId, { attributes: ['id'], raw: true });
+    const user = await this.models.Users.findByPk(input.playerId, { attributes: ['id', 'parent_staff_id'], raw: true });
     if (!user) throw E.USER_NOT_FOUND({ playerId: input.playerId });
+    // No free spins / vouchers for an agent's player (user, 2026-10-18).
+    if (user.parent_staff_id) throw agentPlayerError('promotions');
 
     /**
      * The provider is told FIRST, and only a confirmed campaign is stored.
@@ -1010,8 +1013,10 @@ class GisService {
   async setVoucher(input) {
     this.#requireProvider();
 
-    const user = await this.models.Users.findByPk(input.playerId, { attributes: ['id'], raw: true });
+    const user = await this.models.Users.findByPk(input.playerId, { attributes: ['id', 'parent_staff_id'], raw: true });
     if (!user) throw E.USER_NOT_FOUND({ playerId: input.playerId });
+    // No free spins / vouchers for an agent's player (user, 2026-10-18).
+    if (user.parent_staff_id) throw agentPlayerError('promotions');
 
     await this.#upstream(() =>
       this.provider.post('/freevouchers/set', {

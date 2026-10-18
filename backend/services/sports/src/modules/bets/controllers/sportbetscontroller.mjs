@@ -573,6 +573,14 @@ var placeBet = async (req, res, opts) => {
       if (!externalTx) await transaction.rollback();
       return res.status(400).json({ success: false, error: "currency is required" });
     }
+    // An agent's player bets in INR only (user, 2026-10-18).
+    if (currency.trim().toUpperCase() !== "INR") {
+      const better = await User_default.findOne({ where: { user_id }, attributes: ["parent_staff_id"], transaction });
+      if (better?.parent_staff_id) {
+        if (!externalTx) await transaction.rollback();
+        return res.status(400).json({ success: false, error: "Your account can only bet in INR" });
+      }
+    }
     // The stake as the player sent it, in their coin; from here on stake_amount is INR.
     const currency_amount = Number(stake_amount);
     stake_amount = await toInr(stake_amount, currency);

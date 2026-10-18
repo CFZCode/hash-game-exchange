@@ -35,6 +35,11 @@ module.exports = defineErrors('WALLET', {
     status: 404,
     message: 'Player not found',
   },
+  /** An agent's player plays in INR only (user, 2026-10-18). */
+  AGENT_PLAYER_INR_ONLY: {
+    status: 422,
+    message: 'Your account can only play in INR',
+  },
   UNSUPPORTED_CURRENCY: {
     status: 422,
     message: 'This currency is not supported',

@@ -4,6 +4,7 @@ const crypto = require('crypto');
 
 const { Op } = require('sequelize');
 const { money, entitlements } = require('@ibitplay/common');
+const { assertPlayerCapability } = require('@ibitplay/auth');
 
 const errors = require('./spinWheel.errors');
 const { CODE_SOURCE, CODE_STATUS, DEPOSIT_SOURCES, CODE_LENGTH } = require('./spinWheel.constants');
@@ -379,6 +380,8 @@ class SpinWheelService {
    * locked, so two simultaneous requests cannot both pass the cooldown.
    */
   async spin({ userId }) {
+    // The socket path (WHEELER) too, not only the HTTP route: no spins for an agent's player.
+    await assertPlayerCapability(userId, 'promotions');
     const config = await this.getConfig();
     if (!config?.isActive) throw errors.DISABLED();
 

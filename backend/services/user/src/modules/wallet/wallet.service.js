@@ -224,6 +224,8 @@ class WalletService {
   async getBalance(userId, currency) {
     const wallet = await this.repo.findWallet(userId);
     if (!wallet) throw errors.WALLET_NOT_FOUND({ userId });
+    // Agent's player sees INR alone, like getBalances.
+    if (CURRENCY_COLUMN[String(currency ?? '').toUpperCase()] !== 'inr' && (await isAgentPlayer(userId))) return money.fromStored('0');
 
     if (isCustomCurrency(currency)) return money.fromStored(await this.repo.customBalance(userId, currency));
     const column = resolveColumn(currency);
@@ -263,6 +265,11 @@ class WalletService {
    * JavaScript comparison that a concurrent request could invalidate.
    */
   async debit(input, context = {}) {
+    // Agent's player: no stake / spend in any coin but INR (casino, originals, every debit path).
+    // Credits stay open so refunds and rollbacks of an old bet still settle.
+    if (CURRENCY_COLUMN[String(input.currency ?? '').toUpperCase()] !== 'inr' && (await isAgentPlayer(input.userId))) {
+      throw errors.AGENT_PLAYER_INR_ONLY({ userId: input.userId, currency: input.currency });
+    }
     return this.#move({ ...input, direction: OPERATION.DEBIT }, context);
   }
 

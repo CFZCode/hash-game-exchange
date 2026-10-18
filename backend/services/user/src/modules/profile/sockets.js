@@ -2,6 +2,7 @@
 
 const { EVENTS, PLATFORM_EVENTS, AUDIENCE } = require('@ibitplay/socket');
 const { money, resolveVipLadder } = require('@ibitplay/common');
+const { isAgentPlayer } = require('@ibitplay/auth');
 const errors = require('./profile.errors');
 const { ProfileService } = require('./profile.service');
 const { IN_HOUSE_GAMES } = require('./profile.constants');
@@ -152,6 +153,8 @@ function register({ on, deps }) {
           'id', 'name', 'email', 'avatar', 'level', 'games_played', 'country',
           'referalcode', 'created', 'last_login_at',
         ]);
+        // Agent's player: INR only, no VIP / referral (user, 2026-10-18).
+        const agent = await isAgentPlayer(user.id);
 
         const [credits, wager, ladder] = await Promise.all([
           models.Credits.findOne({ where: { uid: user.id }, raw: true }),
@@ -169,7 +172,7 @@ function register({ on, deps }) {
           level: Number(user.level ?? 0),
           country: user.country ?? null,
           gamesPlayed: Number(user.games_played ?? 0),
-          referralCode: user.referalcode ?? null,
+          referralCode: agent ? null : user.referalcode ?? null,
           joined: user.created ?? null,
           lastLogin: user.last_login_at ?? null,
           wager: lifetimeWager,
@@ -178,8 +181,8 @@ function register({ on, deps }) {
            * reports resolve, so a player and a support agent never see
            * different levels.
            */
-          vip: { ...ladder.levelFor(lifetimeWager), ladder: ladder.key },
-          credit: describeBalances(credits),
+          vip: agent ? null : { ...ladder.levelFor(lifetimeWager), ladder: ladder.key },
+          credit: describeBalances(agent && credits ? { inr: credits.inr } : credits),
         });
       } catch (error) {
         if (error.code?.startsWith('PROFILE_')) return refuse(error);
