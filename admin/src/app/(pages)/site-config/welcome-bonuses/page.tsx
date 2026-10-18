@@ -1,7 +1,6 @@
-import WelcomeBonuses from '@/views/site-config/WelcomeBonuses'
+import { redirect } from 'next/navigation'
 
-export const metadata = { title: 'Welcome bonuses' }
-
+// Welcome bonuses now live on the Bonus page's Welcome bonuses tab; old links land there.
 export default function Page() {
-  return <WelcomeBonuses />
+  redirect('/bonus')
 }

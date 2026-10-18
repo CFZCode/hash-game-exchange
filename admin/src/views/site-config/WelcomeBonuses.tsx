@@ -35,17 +35,18 @@ const trim = (v: string) => (v.includes('.') ? v.replace(/\.?0+$/, '') : v)
 
 const sortTiers = (tiers: Tier[]) => [...tiers].sort((a, b) => Number(a.minDeposit) - Number(b.minDeposit))
 
-const WelcomeBonuses = () => {
+/** `embedded`: inside the Bonus page's Welcome bonuses tab — no page header (the page has the currency notice). */
+const WelcomeBonuses = ({ embedded = false }: { embedded?: boolean }) => {
   const q = useApi<Welcome>(PATH)
 
   return (
     <div>
-      <PageHeader
+      {!embedded && <PageHeader
         title='Welcome bonuses'
         description='Decide whether a new player gets a sign-up bonus and a bonus on their first deposit. Every amount here is in the site’s reward currency, and both bonuses are paid in it. Agent-tree players never get either.'
-      />
+      />}
       {q.error && <ErrorState error={q.error} />}
-      <RewardCurrencyNotice className='mb-4 max-w-3xl' />
+      {!embedded && <RewardCurrencyNotice className='mb-4 max-w-3xl' />}
       {/* Keyed on the saved values, so a save or refetch resets the form to what is stored. */}
       <WelcomeForm key={q.data ? JSON.stringify(q.data) : 'loading'} saved={q.data} />
     </div>

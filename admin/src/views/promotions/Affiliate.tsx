@@ -2,9 +2,7 @@
 
 import { useState } from 'react'
 
-import Link from 'next/link'
-
-import { PlusIcon, Settings2Icon, UnlockIcon } from 'lucide-react'
+import { PlusIcon, UnlockIcon } from 'lucide-react'
 
 import { useStatsFilters } from '@/components/shared/charts'
 import Can from '@/components/shared/Can'
@@ -27,6 +25,7 @@ import { useApi, useApiMutation, useListState, usePagedApi } from '@/hooks/use-a
 import { api } from '@/lib/api/client'
 import { formatNumber } from '@/lib/format'
 import { check } from '@/lib/validate'
+import AffiliateSettings from '@/views/site-config/AffiliateSettings'
 import RewardStats from './RewardStats'
 import type { AffiliateMember, AffiliateReward, AffiliateStats, AffiliateTeam, AffiliateTeamMember, AffiliateTop } from './types'
 import { useLocalList } from './useLocalList'
@@ -225,12 +224,7 @@ const Affiliate = () => {
     <div>
       <PageHeader
         title='Affiliate programme'
-        description='Referral teams, who is bringing in users, and the reward ledger. Rates (register bonus, commission %) are site config.'
-        actions={
-          <Button variant='outline' nativeButton={false} render={<Link href='/site-config/affiliate' />}>
-            <Settings2Icon /> Affiliate rates
-          </Button>
-        }
+        description='Referral teams, who is bringing in users, and the reward ledger. Rates (register bonus, commission %) are on the Rates tab.'
       />
       {stats.error && <div className='mb-4'><ErrorState error={stats.error} /></div>}
       <div className='mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4'>
@@ -246,11 +240,18 @@ const Affiliate = () => {
           <TabsTrigger value='members'>Members</TabsTrigger>
           <TabsTrigger value='top'>Top referrers</TabsTrigger>
           <TabsTrigger value='rewards'>Rewards</TabsTrigger>
+          <Can permission='config:read'>
+            <TabsTrigger value='rates'>Rates</TabsTrigger>
+          </Can>
         </TabsList>
         <TabsContent value='teams'><Teams /></TabsContent>
         <TabsContent value='members'><Members /></TabsContent>
         <TabsContent value='top'><Top /></TabsContent>
         <TabsContent value='rewards'><Rewards /></TabsContent>
+        {/* Pehle alag page tha (Site Config → Affiliate rates); ab yahin tab me. */}
+        <Can permission='config:read'>
+          <TabsContent value='rates'><AffiliateSettings embedded /></TabsContent>
+        </Can>
       </Tabs>
     </div>
   )

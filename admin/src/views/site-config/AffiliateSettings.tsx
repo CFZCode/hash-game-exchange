@@ -310,13 +310,14 @@ const ReferralUnlocksForm = ({ saved }: { saved: ReferralUnlocks | undefined }) 
   )
 }
 
-const AffiliateSettings = () => {
+/** `embedded`: inside the Affiliate page's Rates tab — no page header. */
+const AffiliateSettings = ({ embedded = false }: { embedded?: boolean }) => {
   const q = useApi<Affiliate>('admin/site-config/affiliate')
   const unlocks = useApi<ReferralUnlocks>(UNLOCKS_PATH)
 
   return (
     <div>
-      <PageHeader title='Affiliate rates' description='What the site promises a new user and a referrer. Public by intent — the sign-up page shows these.' />
+      {!embedded && <PageHeader title='Affiliate rates' description='What the site promises a new user and a referrer. Public by intent — the sign-up page shows these.' />}
       {q.error && <ErrorState error={q.error} />}
       <RewardCurrencyNotice className='mb-4 max-w-xl' />
       <Card className='max-w-xl shadow-none'>
