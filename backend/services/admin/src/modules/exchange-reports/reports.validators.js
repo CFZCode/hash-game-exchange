@@ -87,7 +87,7 @@ const directBetHistory = {
       clientId: id,
       fromDate: day,
       toDate: day,
-      category: z.enum(['ALL', 'SPORTS', 'CASINO']).default('ALL'),
+      category: z.enum(['ALL', 'SPORTS', 'CASINO', 'ORIGINAL_GAME']).default('ALL'),
       currency: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{2,10}$/, 'A currency code like INR').optional(),
       page: z.coerce.number().int().min(1).default(1),
       limit: z.coerce.number().int().min(1).max(200).default(50),

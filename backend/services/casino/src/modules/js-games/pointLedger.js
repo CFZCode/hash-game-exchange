@@ -16,6 +16,8 @@ const { QueryTypes } = require('sequelize');
 
 const CATEGORY = 'CASINO';
 const EVENT = 'BET_SETTLEMENT';
+/** `point_ledger.category` → its `credits` bucket. Identifiers come from here, never from input. */
+const PTS_COLUMN = { CASINO: 'thirdparty_pts', ORIGINAL_GAME: 'original_game_pts' };
 
 /** Child user ki chain (player wallet, phir staff wallets upar tak); direct user = null. */
 async function childChain(sequelize, userId, transaction) {
@@ -47,11 +49,13 @@ async function childChain(sequelize, userId, transaction) {
 
 /**
  * @param {import('sequelize').Sequelize} sequelize
- * @param {{ userId: number, delta: string, entryRef: string, gameType?: string, remark?: string }} p
- *   delta = decimal string (win − bet), INR
+ * @param {{ userId: number, delta: string, entryRef: string, gameType?: string, remark?: string, category?: string }} p
+ *   delta = decimal string (win − bet), INR; category picks the bucket (PTS_COLUMN)
  * @returns {Promise<null | { duplicate: true } | { wallets: number }>}
  */
-async function addChildGamePoints(sequelize, { userId, delta, entryRef, gameType, remark }) {
+async function addChildGamePoints(sequelize, { userId, delta, entryRef, gameType, remark, category = CATEGORY }) {
+  const bucket = PTS_COLUMN[category];
+  if (!bucket) throw new Error(`Unknown point category ${category}`);
   return sequelize.transaction(async (transaction) => {
     const walletIds = await childChain(sequelize, userId, transaction);
     if (!walletIds) return null;
@@ -65,7 +69,7 @@ async function addChildGamePoints(sequelize, { userId, delta, entryRef, gameType
 
     const wallets = await sequelize.query(
       `UPDATE public.credits c
-          SET all_point = c.all_point + :delta, thirdparty_pts = c.thirdparty_pts + :delta
+          SET all_point = c.all_point + :delta, ${bucket} = c.${bucket} + :delta
          FROM (SELECT c2.id, COALESCE(u.name, s.name) AS username
                  FROM public.credits c2
                  LEFT JOIN public.users u ON u.id = c2.uid
@@ -88,7 +92,7 @@ async function addChildGamePoints(sequelize, { userId, delta, entryRef, gameType
           replacements: {
             entryRef,
             event: EVENT,
-            category: CATEGORY,
+            category,
             gameType: gameType ? String(gameType).slice(0, 50) : null,
             username: w.username,
             walletId: w.wallet_id,
@@ -116,7 +120,7 @@ async function addChildGamePoints(sequelize, { userId, delta, entryRef, gameType
  *           entryRef: string, gameType?: string, remark?: string }} p   delta = signed decimal
  * @returns {Promise<null | { written: boolean }>} null = child user (ye uska ledger nahi)
  */
-async function addDirectGamePoints(sequelize, { userId, currency, delta, balanceAfter, entryRef, gameType, remark }) {
+async function addDirectGamePoints(sequelize, { userId, currency, delta, balanceAfter, entryRef, gameType, remark, category = CATEGORY }) {
   const [user] = await sequelize.query('SELECT name, parent_staff_id FROM public.users WHERE id = :userId', {
     replacements: { userId },
     type: QueryTypes.SELECT,
@@ -134,7 +138,7 @@ async function addDirectGamePoints(sequelize, { userId, currency, delta, balance
       replacements: {
         entryRef,
         event: EVENT,
-        category: CATEGORY,
+        category,
         userId,
         username: user.name ?? null,
         currency: String(currency || 'INR').toUpperCase().slice(0, 10),

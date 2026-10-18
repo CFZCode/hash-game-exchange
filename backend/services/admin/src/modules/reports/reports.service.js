@@ -1383,6 +1383,7 @@ class ReportsService {
    *   Credit / Debit / User creation → "Agent" (parent ne diya / liya)
    *   Bank Deposite / Bank Withdraw   → "Deposit" / "Withdrawal" (D/W settlement)
    *   casino (category CASINO, JS games)  → "Casino"
+   *   original games (category ORIGINAL_GAME) → "Original Games"
    *   bet wali entries (BET_SETTLEMENT, COMMISSION, REVERSAL) → "Sports"
    *
    * `points`: wallet ke point buckets — total (all_point), sports (sports_pts), casino
@@ -1441,6 +1442,7 @@ class ReportsService {
 
     const categoryOf = (r) => {
       if (r.category === 'CASINO') return 'Casino';
+      if (r.category === 'ORIGINAL_GAME') return 'Original Games';
       if (r.bet_id != null || ['BET_SETTLEMENT', 'COMMISSION', 'REVERSAL'].includes(r.event_type)) return 'Sports';
       if (r.event_type === 'Bank Deposite') return 'Deposit';
       if (r.event_type === 'Bank Withdraw') return 'Withdrawal';

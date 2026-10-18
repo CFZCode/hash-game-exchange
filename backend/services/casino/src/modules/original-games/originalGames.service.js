@@ -455,7 +455,7 @@ class OriginalGamesService {
     }
   }
 
-  /** Point ledger, as GIS / JS games: agent child → `point_ledger` (INR), every player → direct. */
+  /** Point ledger, as GIS / JS games: agent child → `point_ledger` (INR), direct player → `point_ledger_direct`. */
   async #writePoints({ userId, currency, amount, isCredit, txId, kind, body, balanceAfter }) {
     const sequelize = this.db.sequelize;
     const entry = {
@@ -464,6 +464,7 @@ class OriginalGamesService {
       entryRef: `og:${txId}`,
       gameType: body.game_code ?? null,
       remark: `Original games ${kind} ${txId}`,
+      category: 'ORIGINAL_GAME', // credits.original_game_pts, not the JS / GIS thirdparty_pts
     };
     try {
       if (currency === 'INR') await addChildGamePoints(sequelize, entry);

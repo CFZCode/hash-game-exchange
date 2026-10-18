@@ -45,7 +45,7 @@ test('js games point ledger against a database', async (t) => {
   const agentId = 975_000 + n;
   const childId = 836_000_000 + n;
   const directId = 837_000_000 + n;
-  const refs = [`jsgames:test:${n}:a`, `jsgames:test:${n}:b`];
+  const refs = [`jsgames:test:${n}:a`, `jsgames:test:${n}:b`, `jsgames:test:${n}:c`];
 
   const cleanup = async () => {
     await q('DELETE FROM mssports.point_ledger WHERE entry_ref IN (:refs)', { refs });
@@ -69,7 +69,7 @@ test('js games point ledger against a database', async (t) => {
     await connection.close();
   });
 
-  const points = async (where, id) => (await q(`SELECT all_point, thirdparty_pts FROM credits WHERE ${where} = :id`, { id }))[0][0];
+  const points = async (where, id) => (await q(`SELECT all_point, thirdparty_pts, original_game_pts FROM credits WHERE ${where} = :id`, { id }))[0][0];
 
   await t.test('child user: player + agent wallets, one row each', async () => {
     const out = await addChildGamePoints(sequelize, { userId: childId, delta: '-25.50', entryRef: refs[0], gameType: 'slot', remark: 'test' });
@@ -86,6 +86,17 @@ test('js games point ledger against a database', async (t) => {
     const out = await addChildGamePoints(sequelize, { userId: childId, delta: '-25.50', entryRef: refs[0] });
     assert.deepEqual(out, { duplicate: true });
     assert.equal(Number((await points('uid', childId)).all_point), -25.5);
+  });
+
+  await t.test('ORIGINAL_GAME → original_game_pts bucket, its own category', async () => {
+    await addChildGamePoints(sequelize, { userId: childId, delta: '10', entryRef: refs[2], category: 'ORIGINAL_GAME' });
+    const p = await points('uid', childId);
+    assert.equal(Number(p.all_point), -15.5);
+    assert.equal(Number(p.original_game_pts), 10);
+    assert.equal(Number(p.thirdparty_pts), -25.5);
+    const [rows] = await q('SELECT category FROM mssports.point_ledger WHERE entry_ref = :r', { r: refs[2] });
+    assert.ok(rows.length === 2 && rows.every((r) => r.category === 'ORIGINAL_GAME'));
+    await assert.rejects(addChildGamePoints(sequelize, { userId: childId, delta: '1', entryRef: 'x', category: 'BOGUS' }));
   });
 
   await t.test('direct user → no point ledger', async () => {
