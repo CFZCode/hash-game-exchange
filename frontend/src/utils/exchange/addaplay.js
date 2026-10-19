@@ -326,7 +326,8 @@ export function normaliseBet(raw) {
     sportId: pick(raw.sportId, raw.sport_id) ?? null,
     gameType: pick(raw.gameType, raw.game_type) ?? '',
     marketType: pick(raw.marketType, raw.market_type) ?? '',
-    fancyName: pick(raw.fancyName, raw.fancy_name) ?? '',
+    // The bet route stores the literal "NULL" when a market has no fancy name.
+    fancyName: [pick(raw.fancyName, raw.fancy_name) ?? ''].map(String).find((v) => v.toUpperCase() !== 'NULL') ?? '',
     selection: pick(raw.selection, raw.selectionName, raw.selection_name, raw.nat, raw.team) ?? '',
     side: String(pick(raw.side, raw.betType, raw.bet_type) ?? '').toLowerCase(),
     odds: num(pick(raw.odds, raw.user_rate, raw.rate)),

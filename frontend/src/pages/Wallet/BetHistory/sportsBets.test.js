@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { normaliseBet } from '../../../utils/exchange/addaplay';
-import { betLiability, betPnl, betStatus, formatBetDate, toSportsBet } from './sportsBets';
+import { betLiability, betPnl, betStatus, formatBetDate, marketLabel, toSportsBet } from './sportsBets';
 
 /* Rows shaped like the live feed (`GET /cricket/sports-bets/user`), through the exchange's own
    normaliser — exactly what the pane gets. */
@@ -168,5 +168,13 @@ describe('direct or agent, and the 31-day cap', () => {
     expect(w.clamped).toBe(true);
     expect((w.to - w.from) / 86_400_000).toBe(30);
     expect(clampStatementWindow(to - 86_400_000, to).clamped).toBe(false);
+  });
+});
+
+describe('marketLabel', () => {
+  it('names the over/under line and title-cases the rest', () => {
+    expect(marketLabel('OVER_UNDER_15')).toBe('Over/Under 1.5');
+    expect(marketLabel('MATCH_ODDS')).toBe('Match Odds');
+    expect(marketLabel('NULL')).toBe('');
   });
 });

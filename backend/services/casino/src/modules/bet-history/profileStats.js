@@ -78,8 +78,13 @@ const SQL = `
        AND LOWER(v.transaction_type) IN ('bet', 'loss', 'win')
 
     UNION ALL
-    -- Original Games aggregator (migration 130): an applied bet not rolled back, and a win > 0
-    SELECT CASE WHEN o.kind = 'bet' THEN 'stake' ELSE 'win' END, 'casino', UPPER(o.currency), o.amount,
+    -- Original Games aggregator (migration 130): an applied bet not rolled back, and a win > 0.
+    -- A win leg that pays back no more than its stake is a 'payout': money back, not a won round.
+    SELECT CASE WHEN o.kind = 'bet' THEN 'stake'
+                WHEN o.amount > COALESCE((SELECT b.amount FROM og_transactions b
+                                           WHERE b.transaction_id = o.reference_transaction_id), 0) THEN 'win'
+                ELSE 'payout' END,
+           'casino', UPPER(o.currency), o.amount,
            'og:' || COALESCE(o.game_code, ''), COALESCE(og.name, o.game_code), 'BC Originals', o.created_at
       FROM og_transactions o
       LEFT JOIN og_games og ON og.code = o.game_code
@@ -92,7 +97,7 @@ const SQL = `
       SELECT COALESCE(json_agg(t), '[]'::json) FROM (
         SELECT section, currency,
                COALESCE(SUM(amount) FILTER (WHERE kind = 'stake'), 0)::text AS wagered,
-               COALESCE(SUM(amount) FILTER (WHERE kind = 'win'), 0)::text AS won,
+               COALESCE(SUM(amount) FILTER (WHERE kind IN ('win', 'payout')), 0)::text AS won,
                COUNT(*) FILTER (WHERE kind = 'stake') AS bets,
                COUNT(*) FILTER (WHERE kind = 'win') AS wins,
                MIN(at) FILTER (WHERE kind = 'stake') AS first_at,

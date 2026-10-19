@@ -42,15 +42,17 @@ test('original-games rounds count in the profile stats', async (t) => {
     await row('w1', 'win', '1500', `${UID}-b1`);
     await row('b2', 'bet', '1000');
     await row('w2', 'win', '0', `${UID}-b2`);
+    await row('b4', 'bet', '1000');
+    await row('w4', 'win', '500', `${UID}-b4`);
     await row('b3', 'bet', '500');
     await row('r3', 'rollback', '500', `${UID}-b3`);
 
     const s = await casinoProfileStats(connection, UID);
     const usdt = s.byCurrency.find((r) => r.currency === 'USDT');
-    assert.strictEqual(usdt.wagered, '2000.00000000', 'two bets; the rolled-back one does not count');
-    assert.strictEqual(usdt.bets, 2);
-    assert.strictEqual(usdt.wins, 1, 'a zero win is not a win');
-    assert.strictEqual(usdt.won, '1500.00000000');
+    assert.strictEqual(usdt.wagered, '3000.00000000', 'three bets; the rolled-back one does not count');
+    assert.strictEqual(usdt.bets, 3);
+    assert.strictEqual(usdt.wins, 1, 'a zero win, or 500 back on 1000, is not a win');
+    assert.strictEqual(usdt.won, '2000.00000000', 'every payout still counts as paid back');
   } finally {
     await cleanup();
     await connection.close();

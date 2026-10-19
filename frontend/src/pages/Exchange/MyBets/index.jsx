@@ -7,6 +7,7 @@ import Pagination from '../../../components/shared/Pagination';
 import { usePolling, useExchangeCurrency } from '../../../hooks/exchange';
 import { getSportsBets } from '../../../services/exchange';
 import { ExchangeAccountPage } from '../ExchangeFrame';
+import { marketLabel } from '../../Wallet/BetHistory/sportsBets';
 
 /* `status` is mssports' own vocabulary (CricketService.getSportsBetsByUserId): `matchbet` = open
    and matched, `all` = every bet. THERE IS NO SETTLED FILTER — Settled reads `all` and drops the
@@ -38,7 +39,7 @@ function useMoney() {
 function BetRow({ bet, tab }) {
   const { fmt, money } = useMoney();
   const side = bet.side;
-  const market = bet.fancyName || bet.marketType;
+  const market = bet.fancyName || marketLabel(bet.marketType);
   // A fancy line's rate (Yes 54 @ 100). Odd/even markets carry a placeholder size (1000000), not a rate.
   const oddEven = String(bet.raw?.gtype || bet.marketType || '').toLowerCase() === 'oddeven';
   const rate = oddEven ? null : bet.raw?.size ?? bet.raw?.user_rate_size;
