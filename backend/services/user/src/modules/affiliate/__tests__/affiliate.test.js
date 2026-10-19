@@ -413,6 +413,23 @@ test('affiliate', async (t) => {
     }
   });
 
+  await t.test('myTeam gives each member their id and the last 7 days of deposits in USD', async () => {
+    const owner = await seed(newUid());
+    const member = await seed(newUid());
+    await service.joinTeam({ userId: member.uid, referralCode: owner.code });
+    const q = (sql) => connection.sequelize.query(sql, { replacements: { uid: member.uid } });
+    await q(`INSERT INTO fiat_deposits (user_id, amount, currency, status, created_at, handled_at)
+             VALUES (:uid, 25, 'USDT', 'approved', now(), now()), (:uid, 40, 'USDT', 'approved', now() - interval '9 days', now() - interval '9 days'),
+                    (:uid, 70, 'USDT', 'pending', now(), NULL)`);
+    try {
+      const [row] = (await service.myTeam({ userId: owner.uid })).members;
+      assert.equal(row.id, String(member.uid));
+      assert.equal(row.deposits7dUsd, '25.00000000', 'only approved, only the last 7 days');
+    } finally {
+      await q('DELETE FROM fiat_deposits WHERE user_id = :uid');
+    }
+  });
+
   await t.test('on-wager unlocks tiers for players on a team', async () => {
     const owner = await seed(newUid());
     const member = await seed(newUid(), { wager: '1500' });

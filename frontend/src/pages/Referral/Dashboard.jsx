@@ -219,7 +219,8 @@ function Stats({ dashboard, copy }) {
         <div className="center flex-1 flex-col gap-2 border-r border-third">
           <img className="mb-2 h-auto w-10" alt="trophy" src={trophy} />
           <p className="text-xs text-secondary">{copy.totalReward}</p>
-          <p className="text-xl font-extrabold">{money(dashboard.rewardUsd)}</p>
+          {/* Total Reward is everything earned: referral rewards plus commission, as hash.game adds them. */}
+          <p className="text-xl font-extrabold">{money(String(Number(dashboard.rewardUsd || 0) + Number(dashboard.commissionUsd || 0)))}</p>
         </div>
         <div className="center flex-1 flex-col gap-2">
           <img className="mb-2 h-auto w-10" alt="user avatar" src={usehead} />
@@ -267,7 +268,8 @@ function Activities({ dashboard, topCommissions, copy }) {
                 <span>{copy.referralRewards}</span>
               </div>
               <p className="font-extrabold text-brand">
-                +{money(dashboard.availableRewardUsd)}
+                {/* Earned, not still-claimable: after a claim the activity line would read "+0". */}
+                +{money(dashboard.rewardUsd)}
               </p>
             </div>
             {topCommissions.map((row, i) => (

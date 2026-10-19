@@ -401,6 +401,7 @@ class AffiliateService {
       });
       for (const w of wagers) wagerByUid.set(Number(w.uid), this.#wagerAmount(w));
     }
+    const deposits7d = await this.#deposits7dUsd(memberIds);
 
     let totalWager = '0';
     const members = rows.map((r) => {
@@ -410,6 +411,8 @@ class AffiliateService {
       const campaignLabel = String(r.campaign ?? '').trim();
       return {
         name: r.membername,
+        id: member?.id != null ? String(member.id) : null,
+        deposits7dUsd: member ? deposits7d.get(String(member.id)) ?? '0.00000000' : null,
         joinedAt: teamTimestamp(r.createdAt),
         campaign: campaignLabel || user.referalcode || 'Default',
         wager: money.toDecimalString(money.toMinor(wager)),
@@ -1293,6 +1296,31 @@ class AffiliateService {
         'Affiliate team row backfilled from refree'
       );
     }
+  }
+
+  /**
+   * Commission by Friends' "Total Deposits (Past 7D)", in USD per member.
+   * shortcut: approved manual deposits + admin direct-wallet credits only (the two rails live uses);
+   * add the other rails from withdrawalCapFigures' DEPOSITED_SQL if a gateway goes live.
+   */
+  async #deposits7dUsd(ids) {
+    const totals = new Map();
+    if (!ids.length) return totals;
+    const rows = await this.db.sequelize.query(
+      `SELECT uid, cur, SUM(amt)::text AS amt FROM (
+         SELECT user_id::text AS uid, upper(currency) AS cur, amount AS amt FROM fiat_deposits
+          WHERE user_id IN (:ids) AND lower(status) = 'approved' AND COALESCE(handled_at, created_at) >= now() - interval '7 days'
+         UNION ALL
+         SELECT user_id::text, COALESCE(upper(currency), 'INR'), COALESCE(currency_amount, amount) FROM owner_direct_ledger
+          WHERE user_id::text IN (:idTexts) AND entry_type = 'user_deposit' AND created_at >= now() - interval '7 days'
+       ) d GROUP BY uid, cur`,
+      { replacements: { ids, idTexts: ids.map(String) }, type: QueryTypes.SELECT }
+    );
+    for (const row of rows) {
+      const usd = (await this.rewardMoney.toUsd(row.amt, row.cur)) ?? '0';
+      totals.set(row.uid, money.toDecimalString(money.add(totals.get(row.uid) ?? '0', usd)));
+    }
+    return totals;
   }
 
   async #usersByName(names) {

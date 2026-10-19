@@ -294,8 +294,8 @@ export const getFriendCommissions = () => {
   if (USE_FIXTURES) return request(ENDPOINTS.referral.friendList, { method: 'POST', fixture: EMPTY_PAGE });
   /* One row per referred player, off `team.members`, with that player's commission summed from
      `rewards.rows`. The rate is the site's configured commission rate (as hash.game's column
-     prints it), a fraction like bc.game's `ratio`. The platform sends no user id and no deposit
-     figure for a team member, so those two cells print a dash rather than a number nobody sent. */
+     prints it), a fraction like bc.game's `ratio`. `team` sends each member's id and approved
+     deposits of the last 7 days in USD; an older backend sends neither, and those cells print a dash. */
   return Promise.all([readTeam(), readRewards(), getCommissionRates()]).then(([team, earned, rates]) => {
     const paid = new Map();
     for (const row of earned?.rows ?? []) paid.set(row.member, (paid.get(row.member) ?? 0) + num(row.amount));
@@ -304,9 +304,10 @@ export const getFriendCommissions = () => {
       return {
         id: member.name,
         userName: member.name,
-        userId: '-',
+        userId: member.id ?? '-',
         commissionRate: rates.commissionRate / 100,
-        day7TotalDeposits: '-',
+        // USD; null from an older backend that does not send it.
+        day7TotalDeposits: member.deposits7dUsd ?? null,
         createDate: shortDate(member.joinedAt),
         commissionUsd: usd2(amount),
       };
