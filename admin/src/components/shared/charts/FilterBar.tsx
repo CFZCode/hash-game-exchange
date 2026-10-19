@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react'
 
-import { CalendarDays, RotateCcw } from 'lucide-react'
+import { CalendarDays, Clock3, Coins, RotateCcw } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { DateRangePicker } from '@/components/ui/date-picker'
@@ -53,10 +53,13 @@ const FilterBar = ({ filters, currencies, allCurrenciesLabel, allowAll = true, s
     : []
 
   return (
-    <div role='group' aria-label='Report filters' className={cn('bg-card flex flex-wrap items-center gap-2 rounded-xl border p-2', className)}>
+    <div role='group' aria-label='Report filters' className={cn('bg-card flex flex-wrap items-center gap-2 rounded-xl border p-2.5 shadow-xs', className)}>
       <Select value={filters.preset} onValueChange={v => v && filters.set(v === 'custom' ? { preset: 'custom', from: filters.from, to: filters.to } : { preset: v as Preset })}>
-        <SelectTrigger className='w-40' aria-label='Period'>
-          <SelectValue />
+        <SelectTrigger className='w-full font-medium sm:w-44' aria-label='Period'>
+          <span className='flex min-w-0 items-center gap-2'>
+            <Clock3 className='text-muted-foreground size-4' aria-hidden />
+            <SelectValue />
+          </span>
         </SelectTrigger>
         <SelectContent>
           {PRESETS.map(p => (
@@ -77,18 +80,18 @@ const FilterBar = ({ filters, currencies, allCurrenciesLabel, allowAll = true, s
           onChange={r => r.from && r.to && filters.set({ preset: 'custom', from: r.from, to: r.to })}
         />
       ) : (
-        <span className='bg-muted text-muted-foreground inline-flex h-9 items-center gap-1.5 rounded-md px-3 text-xs tabular-nums'>
-          <CalendarDays className='size-3.5' aria-hidden />
+        <span className='border-input bg-muted/40 text-foreground/80 inline-flex h-9 items-center gap-2 rounded-md border px-3 text-xs font-medium tabular-nums'>
+          <CalendarDays className='text-muted-foreground size-4' aria-hidden />
           {filters.from === filters.to ? shortDay(filters.from) : `${shortDay(filters.from)} – ${shortDay(filters.to)}`}
-          <span className='opacity-70'>· UTC</span>
+          <span className='bg-background text-muted-foreground rounded px-1.5 py-0.5 text-[10px] font-semibold tracking-wide'>UTC</span>
         </span>
       )}
 
       {showGranularity && (
         <ToggleGroup
-          variant='outline'
           size='sm'
           spacing={0}
+          className='bg-muted h-9 gap-0.5 rounded-md p-0.5'
           aria-label='Group by'
           value={[filters.granularity]}
           onValueChange={(v: unknown[]) => {
@@ -101,7 +104,7 @@ const FilterBar = ({ filters, currencies, allCurrenciesLabel, allowAll = true, s
             <ToggleGroupItem
               key={g}
               value={g}
-              className='px-3'
+              className='aria-pressed:bg-background aria-pressed:text-foreground h-8 rounded-[5px] px-3.5 aria-pressed:shadow-xs'
               disabled={g === 'day' && filters.days > MAX_DAY_SPAN}
               title={g === 'day' && filters.days > MAX_DAY_SPAN ? `Daily buckets are limited to ${MAX_DAY_SPAN} days` : undefined}
             >
@@ -113,8 +116,11 @@ const FilterBar = ({ filters, currencies, allCurrenciesLabel, allowAll = true, s
 
       {currencyOptions.length > 0 && (
         <Select value={filters.currency || 'ALL'} onValueChange={v => v && filters.set({ currency: v === 'ALL' ? '' : v })}>
-          <SelectTrigger className='w-56' aria-label='Currency'>
-            <SelectValue />
+          <SelectTrigger className='w-full font-medium sm:w-56' aria-label='Currency'>
+            <span className='flex min-w-0 items-center gap-2'>
+              <Coins className='text-muted-foreground size-4' aria-hidden />
+              <SelectValue />
+            </span>
           </SelectTrigger>
           <SelectContent>
             {(allowAll || !filters.currency) && <SelectItem value='ALL'>{allLabel}</SelectItem>}
@@ -135,9 +141,9 @@ const FilterBar = ({ filters, currencies, allCurrenciesLabel, allowAll = true, s
 
       <Button
         type='button'
-        variant='ghost'
+        variant='outline'
         size='sm'
-        className='text-muted-foreground ml-auto gap-1.5'
+        className='ml-auto h-9 gap-1.5'
         disabled={!filters.dirty}
         onClick={filters.reset}
         title='Back to the default period, grouping and currency'
