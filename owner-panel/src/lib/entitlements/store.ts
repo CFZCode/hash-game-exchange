@@ -2,7 +2,7 @@ import 'server-only'
 
 import { createHmac, createPrivateKey, sign as edSign, type KeyObject } from 'node:crypto'
 
-import { FEATURE_CATALOGUE, FEATURE_KEYS, FEATURE_OPTIONS, FLAG_GROUPS, FLAG_KEYS, isPolicy, isVariantOf, resolveOptions } from '@/configs/entitlementCatalogue'
+import { FEATURE_CATALOGUE, FEATURE_KEYS, FEATURE_OPTIONS, featureByKey, FLAG_GROUPS, FLAG_KEYS, isPolicy, isVariantOf, resolveOptions } from '@/configs/entitlementCatalogue'
 import { serverConfig } from '@/configs/site'
 import { pinToUi, SITE_UI } from '@/configs/siteUi'
 import { DEFAULT_TEMPLATE, resolveTemplateKey, templateByKey, TEMPLATE_KEYS } from '@/configs/templateCatalogue'
@@ -344,7 +344,13 @@ export function saveEntitlements(
     for (const key of ['default_currency', 'reward_currency']) {
       const coin = String(pinned.variants[key] ?? '').toLowerCase()
 
-      if (coin && coinSwitchedOff(coin, flags, FIAT_COIN_FLAGS)) throw new HttpError(422, 'VALIDATION_ERROR', `${key}: ${coin.toUpperCase()} is switched off under Site flags — allow the coin or pick another`)
+      if (coin && coinSwitchedOff(coin, flags, FIAT_COIN_FLAGS)) {
+        const label = featureByKey(key)?.label ?? key
+        const COIN = coin.toUpperCase()
+        const why = flags[coin] === false ? `${COIN} is switched off under Site flags` : 'Crypto wallets (master) is switched off under Site flags'
+
+        throw new HttpError(422, 'VALIDATION_ERROR', `Not saved: ${label} is ${COIN}, but ${why}. Turn ${COIN} back on, or first change ${label} to a coin that is on, then save.`)
+      }
     }
 
     const next = {
