@@ -1,6 +1,7 @@
 import { fetchSharedJson, USE_FIXTURES } from './client';
 import { SOCKET_BASE } from './realtime';
 import { useResource } from '../hooks/useResource';
+import { toast } from '../components/shared/Toast/toast';
 
 /* Google sign-in (backend modules/auth/google.js). The button shows only while the backend has
  * its keys (`GET /user/auth/google/status`). The start URL is the API ORIGIN itself, never the
@@ -17,7 +18,12 @@ export function useGoogleLogin() {
   return data === true;
 }
 
-export const startGoogleLogin = () => window.location.assign(GOOGLE_START_URL);
+/* The hero draws the button whether or not the keys are set (user's request), so the press checks
+   first and says so instead of landing on the API's NOT_CONFIGURED page. */
+export const startGoogleLogin = () =>
+  Promise.resolve(getGoogleLogin())
+    .catch(() => false)
+    .then((on) => (on ? window.location.assign(GOOGLE_START_URL) : toast.error(GOOGLE_ERRORS.AUTH_GOOGLE_NOT_CONFIGURED)));
 
 /* Platform error codes the callback can come back with → what the player reads. */
 export const GOOGLE_ERRORS = {

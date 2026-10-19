@@ -9,7 +9,7 @@ const DEFAULT_HERO_ART = '/brand/parker567-hero.jpg';
 /* Figma "Frame 146" (372×215 @2x): the phone banner, two players on the right. */
 const DEFAULT_HERO_ART_MOBILE = '/brand/parker567-hero-mobile.jpg';
 import googleIcon from '../../../assets/google.png';
-import { startGoogleLogin, useGoogleLogin } from '../../../services/googleAuth';
+import { startGoogleLogin } from '../../../services/googleAuth';
 import telegramIcon from '../../../assets/telegram.png';
 import './Hero.css';
 
@@ -23,7 +23,6 @@ const HeroCopy = () => {
   /* A B2B site has no sign-up (context/gates.js): the headline stays, the Sign Up button and the
      "Or Register With" row are not rendered. */
   const canSignUp = useCanSignUp();
-  const googleOn = useGoogleLogin();
 
   return (
     <div className="center relative z-[1] flex h-full w-1/2 min-w-[11.25rem] flex-col whitespace-nowrap">
@@ -42,10 +41,8 @@ const HeroCopy = () => {
         Sign Up
       </button>
 
-      {/* "Or Register With" — Google only (user's request, 2026-10-16), and only while the
-          backend has its Google keys (services/googleAuth.js); Telegram stays hidden
-          (SOCIAL_SIGN_IN). */}
-      {googleOn && (
+      {/* "Or Register With" — Google only, always drawn (user's request, 2026-10-19); the press
+          checks the backend's keys (services/googleAuth.js). Telegram stays hidden (SOCIAL_SIGN_IN). */}
       <>
       <p className="mt-3 p-0 font-semibold leading-[150%] text-secondary">Or Register With</p>
 
@@ -75,7 +72,6 @@ const HeroCopy = () => {
         </div>
       </div>
       </>
-      )}
         </>
       )}
     </div>
