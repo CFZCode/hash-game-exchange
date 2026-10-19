@@ -14,6 +14,7 @@ import { onLiveState } from '../services/realtime';
 import { useGates } from './gates';
 import { GatesContext } from './gates';
 import { useSession } from './session';
+import { useSettings } from './settings';
 import Loading from '../components/shared/Loading';
 
 /* Signed in, /me not answered yet: capability gates read as CLOSED rather than open for a
@@ -117,6 +118,13 @@ function LiveGates({ children }) {
     if (enableLocaleCurrency) setSetting('enableLocaleCurrency', false);
     if (currencyName !== 'INRFIAT') setSetting('currencyName', 'INRFIAT');
   }, [agentInr, enableLocaleCurrency, currencyName, setSetting]);
+
+  /* Light theme switched off by the owner: back to dark, whatever an older visit saved. */
+  const { theme, setTheme } = useSettings();
+  const darkOnly = pub !== null && !value.themeSwitch();
+  React.useEffect(() => {
+    if (darkOnly && theme !== 'dark') setTheme('dark');
+  }, [darkOnly, theme, setTheme]);
 
   const { pathname } = useLocation();
   const navigate = useNavigate();
