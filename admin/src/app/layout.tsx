@@ -28,7 +28,7 @@ export const metadata: Metadata = {
   title: { default: siteConfig.name, template: `%s · ${siteConfig.name}` },
   description: `${siteConfig.name} operator panel`,
   robots: { index: false, follow: false },
-  icons: { icon: '/brand-mark.png' }
+  icons: { icon: { url: '/brand-mark.webp', type: 'image/webp' }, apple: '/brand-mark.png' }
 }
 
 const RootLayout = ({ children }: Readonly<{ children: ReactNode }>) => {

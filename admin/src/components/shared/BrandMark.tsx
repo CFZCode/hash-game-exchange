@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils'
  */
 type PublicBranding = { markUrl?: string | null }
 
-export const DEFAULT_MARK = '/brand-mark.png'
+export const DEFAULT_MARK = '/brand-mark.webp'
 
 // The asset route answers on the platform; the browser reaches it through the `/api/gw` proxy.
 const proxied = (url: string | null | undefined) => {

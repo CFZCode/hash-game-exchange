@@ -48,7 +48,7 @@ const LOGOS = {
 
 /* The square marks that go with a logo above (favicon, loader), by the same name. */
 const MARKS = {
-  parker567: 'parker567-mark.png',
+  parker567: 'parker567-mark.webp',
 };
 
 /* This front end is Parker567's. In live mode an unbranded backend (the owner has not uploaded a
