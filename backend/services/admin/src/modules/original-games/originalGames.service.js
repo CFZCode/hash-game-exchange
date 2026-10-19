@@ -17,6 +17,9 @@ const { reportingCurrency } = require('../reports/reportingCurrency');
 /** Minor units per major for the provider's limits — the same table as casino-service originalGames.constants. */
 const EXPONENT = { INR: 2, USDT: 6 };
 
+/** Only games the provider offers today (og_games): old in-house rows (crash, dice) stay out. */
+const OFFERED = (column) => `${column} IN (SELECT code FROM og_games)`;
+
 /** A row of og_transactions that a rollback has undone. */
 const ROLLED_BACK = `EXISTS (SELECT 1 FROM og_transactions r
                               WHERE r.kind = 'rollback' AND r.status = 'applied' AND r.reference_transaction_id = t.transaction_id)`;
@@ -54,7 +57,7 @@ class OriginalGamesAdminService {
     ]);
     const replacements = { ...S.replacementsFor(window, null), ...(currency ? { currency } : {}) };
     const rows = `(SELECT t.*, ${ROLLED_BACK} AS rb FROM og_transactions t
-                    WHERE t.kind IN ('bet', 'win') AND t.status = 'applied' AND ${S.windowSql('t.created_at')}
+                    WHERE t.kind IN ('bet', 'win') AND t.status = 'applied' AND ${OFFERED('t.game_code')} AND ${S.windowSql('t.created_at')}
                       ${channelSql('t.user_id', channel)}${currency ? ' AND t.currency = :currency' : ''}) o`;
 
     const [series, games, currencies, [players]] = await Promise.all([
@@ -119,7 +122,7 @@ class OriginalGamesAdminService {
   // ── Bet history ──────────────────────────────────────────────────────
 
   async bets({ channel, from, to, game, currency, status, search, page, limit }) {
-    const where = [`b.kind = 'bet'`, `b.status = 'applied'`];
+    const where = [`b.kind = 'bet'`, `b.status = 'applied'`, OFFERED('b.game_code')];
     const replacements = { limit, offset: (page - 1) * limit };
     if (from) {
       where.push('b.created_at >= CAST(:from AS timestamptz)');
