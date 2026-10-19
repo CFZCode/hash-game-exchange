@@ -117,7 +117,7 @@ export default function WalletLayout() {
           <div className="h-18 overflow-hidden bg-layer2 py-4">
             {/* `pan="x"` is the original's touch-scroll wrapper; `hide-scroll` is already in
                 index.css. `light-layer2-tabs` is a light-theme-only rule and is inert here. */}
-            <div className="page-menu light-layer2-tabs hide-scroll flex size-full flex-none flex-nowrap whitespace-nowrap rounded-xl bg-layer4 p-1">
+            <div className="page-menu light-layer2-tabs hide-scroll flex size-full overflow-x-auto flex-none flex-nowrap whitespace-nowrap rounded-xl bg-layer4 p-1">
               {rows.map((row) => (
                 <RailLink
                   key={row.key}
