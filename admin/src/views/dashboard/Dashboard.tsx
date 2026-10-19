@@ -3,7 +3,7 @@
 import { useMemo, type ReactNode } from 'react'
 
 import Link from 'next/link'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { parseAsString, useQueryState } from 'nuqs'
 
 import { ArrowDownToLineIcon, ArrowUpFromLineIcon, DicesIcon, ScaleIcon, SparklesIcon, TrophyIcon, UserPlusIcon } from 'lucide-react'
 
@@ -642,10 +642,6 @@ type Tab = 'direct' | 'agent'
  */
 const Dashboard = () => {
   const { actor, can } = useSession()
-  const router = useRouter()
-  const pathname = usePathname()
-  const params = useSearchParams()
-
   const tabs = (
     [
       { value: 'direct', label: 'Direct Users', allowed: actor?.direct === true && can('reports:read') },
@@ -653,17 +649,12 @@ const Dashboard = () => {
     ] as const
   ).filter(t => t.allowed)
 
-  const asked = params.get('tab')
+  // Through nuqs like the Direct tab's filters (useStatsFilters): a next/router replace raced their URL writes and left Agent stuck.
+  const [asked, setAsked] = useQueryState('tab', parseAsString.withOptions({ history: 'replace', scroll: false }))
   const tab: Tab = tabs.find(t => t.value === asked)?.value ?? tabs[0]?.value ?? 'direct'
   const has = (value: Tab) => tabs.some(t => t.value === value)
 
-  const select = (value: Tab) => {
-    const next = new URLSearchParams(params.toString())
-
-    // Always an explicit ?tab= — replacing to the bare path (param deleted) left the Agent tab stuck.
-    next.set('tab', value)
-    router.replace(`${pathname}?${next.toString()}`, { scroll: false })
-  }
+  const select = (value: Tab) => void setAsked(value)
 
   return (
     <div>
