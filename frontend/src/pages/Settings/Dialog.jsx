@@ -7,7 +7,6 @@ import AccountInfo from './AccountInfo';
 import Security from './Security';
 import Preferences from './Preferences';
 import Verification from './Verification';
-import Payment from './Payment';
 import Whitelist from './Whitelist';
 import './Settings.css';
 
@@ -34,7 +33,6 @@ const PANES = {
   security: Security,
   preferences: Preferences,
   verification: Verification,
-  payment: Payment,
   whitelist: Whitelist,
   /* The router's own spelling of the last child; the rail links to the lowercase one. Both are
      accepted here for the same reason React Router accepts both. */
