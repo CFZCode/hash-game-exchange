@@ -10,10 +10,18 @@ import { api, errorMessage } from '@/lib/api/client'
 import { exportExcel, exportPdf } from '../exportList'
 import { ActionButtons, EntriesBar, fmt, Pager, Pick, ReportCard, ReportTable, usePaged, withMinimumDelay, type ReportColumn } from './reportKit'
 
-type PartyRow = { key: string; username: string; level: string; sport_pts: number; profit_loss: number; ptype: string }
+type PartyRow = {
+  key: string
+  username: string
+  level: string
+  sport_pts: number
+  casino_pts: number
+  original_pts: number
+  profit_loss: number
+  ptype: string
+}
 
-// Zip ke Casino pts / Third Party pts columns yahan nahi (casino exchange nahi hai).
-const EXPORT_COLS = ['No', 'User Name', 'Level', 'Sport pts', 'Profit/Loss', 'Ptype']
+const EXPORT_COLS = ['No', 'User Name', 'Level', 'Sport pts', 'Casino pts', 'Original pts', 'Profit/Loss', 'Ptype']
 
 /**
  * Party Win Loss — zip ka `reports/ProfitLoss.jsx` (`GET /admin/profitloss/all`).
@@ -58,17 +66,25 @@ const PartyWinLossReport = ({ channel }: { channel: Channel }) => {
 
   // Footer totals aur export poore filtered set par, sirf page par nahi.
   const totals = filtered.reduce(
-    (acc, r) => ({ sport: acc.sport + (Number(r.sport_pts) || 0), pl: acc.pl + (Number(r.profit_loss) || 0) }),
-    { sport: 0, pl: 0 }
+    (acc, r) => ({
+      sport: acc.sport + (Number(r.sport_pts) || 0),
+      casino: acc.casino + (Number(r.casino_pts) || 0),
+      original: acc.original + (Number(r.original_pts) || 0),
+      pl: acc.pl + (Number(r.profit_loss) || 0)
+    }),
+    { sport: 0, casino: 0, original: 0, pl: 0 }
   )
 
-  const exportRows = () => filtered.map((r, i) => [i + 1, r.username || '-', r.level || '-', fmt(r.sport_pts), fmt(r.profit_loss), r.ptype || 'Point'])
+  const exportRows = () =>
+    filtered.map((r, i) => [i + 1, r.username || '-', r.level || '-', fmt(r.sport_pts), fmt(r.casino_pts), fmt(r.original_pts), fmt(r.profit_loss), r.ptype || 'Point'])
 
   const columns: ReportColumn<PartyRow>[] = [
     { key: 'no', header: 'No', cell: (_, i) => start + i + 1 },
     { key: 'username', header: 'User Name', cell: r => r.username || '-' },
     { key: 'level', header: 'Level', cell: r => r.level || '-' },
     { key: 'sport', header: 'Sport pts', align: 'right', cell: r => fmt(r.sport_pts) },
+    { key: 'casino', header: 'Casino pts', align: 'right', cell: r => fmt(r.casino_pts) },
+    { key: 'original', header: 'Original pts', align: 'right', cell: r => fmt(r.original_pts) },
     { key: 'pl', header: 'Profit/Loss', align: 'right', cell: r => fmt(r.profit_loss) },
     { key: 'ptype', header: 'Ptype', cell: r => r.ptype || 'Point' }
   ]
@@ -94,7 +110,7 @@ const PartyWinLossReport = ({ channel }: { channel: Channel }) => {
           rows={pageRows}
           rowKey={r => r.key}
           emptyMessage={search ? 'There are no records matching your request' : 'There are no records to show'}
-          footer={['', '', '', fmt(totals.sport), fmt(totals.pl), '']}
+          footer={['', '', '', fmt(totals.sport), fmt(totals.casino), fmt(totals.original), fmt(totals.pl), '']}
         />
         <Pager page={page} totalPages={totalPages} onPage={setPage} />
       </ReportCard>

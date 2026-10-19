@@ -258,12 +258,23 @@ test('exchange reports', async (t) => {
   });
 
   await t.test('party win loss: staff rows at 0, players with their sport pts', async () => {
+    // Casino aur Original games ki entries bhi — P/L = sports + casino + original.
+    const extraRefs = [`test:casino:${base}`, `test:og:${base}`];
+    await run(
+      `INSERT INTO mssports.point_ledger (entry_ref, event_type, category, wallet_id, username, delta, created_at)
+       VALUES (:r1, 'BET_SETTLEMENT', 'CASINO', :w, 'x', 25, NOW()), (:r2, 'BET_SETTLEMENT', 'ORIGINAL_GAME', :w, 'x', -4.5, NOW())`,
+      { r1: extraRefs[0], r2: extraRefs[1], w: wPlayerA }
+    );
     const rows = await reports.partyWinLoss({ actor: agent, type: 'all' });
+    await run('DELETE FROM mssports.point_ledger WHERE entry_ref IN (:extraRefs)', { extraRefs });
     const names = rows.map((r) => r.username);
     assert.ok(names.includes(`rep-agentA-${base}`));
     assert.ok(!names.includes(`rep-playerB-${base}`), 'other agent ka player nahi');
     const pA = rows.find((r) => r.username === `rep-playerA-${base}`);
     assert.strictEqual(pA.sport_pts, -10);
+    assert.strictEqual(pA.casino_pts, 25);
+    assert.strictEqual(pA.original_pts, -4.5);
+    assert.strictEqual(pA.profit_loss, 10.5);
     assert.strictEqual(pA.level, 'User');
     assert.strictEqual(rows.find((r) => r.username === `rep-agentA-${base}`).profit_loss, 0);
 

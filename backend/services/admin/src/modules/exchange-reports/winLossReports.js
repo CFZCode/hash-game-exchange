@@ -27,7 +27,8 @@ const dateSql = (t = '') => `${t}created_at >= CAST(:fromDate AS date) AND ${t}c
 // ════════════════════════════════════════════════════════════════════════
 
 /**
- * Hierarchy ke sab players ka game P/L (point_ledger, bet wali entries ka SUM).
+ * Hierarchy ke sab players ka game P/L (point_ledger ka SUM): sports (bet wali entries),
+ * casino (category CASINO, third-party) aur original games (ORIGINAL_GAME); P/L = teeno ka jod.
  * Upar mera + mere staff ki rows (points 0 — staff ka number players ka hi jod hai,
  * dobara ginte to total double ho jata), phir players profit ke hisaab se.
  * type = 'user' → sirf players.
@@ -45,15 +46,18 @@ async function partyWinLoss(sequelize, tree, { type, search }) {
   const userRows = players.length
     ? await sequelize.query(
       `SELECT u.id, u.name AS username,
-              COALESCE((SELECT SUM(p.delta) FROM mssports.point_ledger p
-                         WHERE p.wallet_id = c.id AND p.bet_id IS NOT NULL AND COALESCE(p.category, 'SPORTS') = 'SPORTS'), 0) AS sport
+              COALESCE(SUM(p.delta) FILTER (WHERE p.bet_id IS NOT NULL AND COALESCE(p.category, 'SPORTS') = 'SPORTS'), 0) AS sport,
+              COALESCE(SUM(p.delta) FILTER (WHERE p.category = 'CASINO'), 0) AS casino,
+              COALESCE(SUM(p.delta) FILTER (WHERE p.category = 'ORIGINAL_GAME'), 0) AS original
          FROM users u LEFT JOIN credits c ON c.uid = u.id
-        WHERE u.id IN (:players)`,
+         LEFT JOIN mssports.point_ledger p ON p.wallet_id = c.id
+        WHERE u.id IN (:players)
+        GROUP BY u.id, u.name`,
       { replacements: { players }, type: QueryTypes.SELECT }
     )
     : [];
 
-  const zero = { sport_pts: 0, profit_loss: 0, ptype: 'Point' };
+  const zero = { sport_pts: 0, casino_pts: 0, original_pts: 0, profit_loss: 0, ptype: 'Point' };
   const staff = staffRows.map((s) => ({ key: `staff-${s.id}`, username: s.username, level: s.level, ...zero }));
   const users = userRows
     .map((u) => ({
@@ -61,7 +65,9 @@ async function partyWinLoss(sequelize, tree, { type, search }) {
       username: u.username,
       level: 'User',
       sport_pts: round2(u.sport),
-      profit_loss: round2(u.sport),
+      casino_pts: round2(u.casino),
+      original_pts: round2(u.original),
+      profit_loss: round2(round2(u.sport) + round2(u.casino) + round2(u.original)),
       ptype: 'Point',
     }))
     .sort((a, b) => b.profit_loss - a.profit_loss);
