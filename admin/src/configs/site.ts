@@ -16,12 +16,12 @@ export const siteConfig = {
   environment: process.env.NEXT_PUBLIC_ENV_LABEL ?? 'localhost',
 
   /** The platform's public base URL: the browser signs in here directly (views/auth/Login.tsx). */
-  apiBaseUrl: (process.env.NEXT_PUBLIC_API_URL || 'https://api.parker567.com').replace(/\/+$/, '')
+  apiBaseUrl: (process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE || 'https://api.parker567.com').replace(/\/+$/, '')
 } as const
 
 /** Server-only. Never import from a client component. */
 export const serverConfig = {
-  apiUrl: (process.env.API_URL || 'https://api.parker567.com').replace(/\/+$/, ''),
+  apiUrl: (process.env.API_URL || process.env.NEXT_PUBLIC_API_BASE || 'https://api.parker567.com').replace(/\/+$/, ''),
   cookieName: process.env.SESSION_COOKIE_NAME ?? 'site_admin_token',
   cookieMaxAgeSeconds: Number(process.env.SESSION_MAX_AGE_SECONDS ?? 8 * 60 * 60)
 }
