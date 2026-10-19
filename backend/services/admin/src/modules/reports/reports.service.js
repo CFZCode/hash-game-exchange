@@ -1409,7 +1409,11 @@ class ReportsService {
    */
   async clientBalanceSheet({ staff, userId, limit = 50, offset = 0 }) {
     const user = await this.#assertVisible(staff, userId);
-    const creditsRow = await this.models.Credits.findOne({ where: { uid: user.id }, raw: true });
+    // Raw SQL: the generated Credits model has no id or point columns (all_point, *_pts).
+    const [creditsRow] = await this.models.Credits.sequelize.query('SELECT * FROM credits WHERE uid = :uid LIMIT 1', {
+      replacements: { uid: user.id },
+      type: QueryTypes.SELECT,
+    });
     return this.#pointLedgerSheet(user, creditsRow, { limit, offset });
   }
 

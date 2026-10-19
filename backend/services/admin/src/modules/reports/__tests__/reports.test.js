@@ -263,9 +263,17 @@ test('reports against a database', async (t) => {
     assert.equal(summary.totalUsers, list.total);
     assert.equal(seenByA.rows[0].locks, undefined, 'players API unchanged');
 
-    // Client user (parent hai) ki balance sheet point ledger se aati hai.
+    // Client user (parent hai) ki balance sheet point ledger se aati hai; points credits ke columns se.
+    await models.Credits.findOrCreate({ where: { uid: playerA }, defaults: { uid: playerA, inr: '0' } });
+    await models.Credits.sequelize.query(
+      'UPDATE credits SET sports_pts = 12, thirdparty_pts = 34, original_game_pts = -5.5 WHERE uid = :uid',
+      { replacements: { uid: playerA } }
+    );
     const sheet = await service.clientBalanceSheet({ staff: asA, userId: playerA, limit: 10, offset: 0 });
     assert.equal(sheet.source, 'point_ledger');
+    assert.equal(Number(sheet.points.sports), 12);
+    assert.equal(Number(sheet.points.casino), 34);
+    assert.equal(Number(sheet.points.original), -5.5);
     assert.ok(Array.isArray(sheet.rows));
   });
 
