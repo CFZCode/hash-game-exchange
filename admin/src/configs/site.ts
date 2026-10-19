@@ -18,7 +18,7 @@ export const siteConfig = {
 
 /** Server-only. Never import from a client component. */
 export const serverConfig = {
-  apiUrl: (process.env.API_URL ?? 'http://127.0.0.1:4700').replace(/\/+$/, ''),
+  apiUrl: (process.env.API_URL || 'https://api.parker567.com').replace(/\/+$/, ''),
   cookieName: process.env.SESSION_COOKIE_NAME ?? 'site_admin_token',
   cookieMaxAgeSeconds: Number(process.env.SESSION_MAX_AGE_SECONDS ?? 8 * 60 * 60)
 }
