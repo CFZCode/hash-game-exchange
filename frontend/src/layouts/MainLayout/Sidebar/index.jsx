@@ -4,7 +4,9 @@ import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import LanguageCurrencyModal from '../../../components/modals/LanguageCurrencyModal';
 import Refer from '../../../components/modals/Refer';
-import { FLYOUTS } from './originals';
+import { FLYOUTS, ORIGINALS } from './originals';
+import { getOriginals } from '../../../services/originals';
+import useResource from '../../../hooks/useResource';
 import { useSession } from '../../../context/session';
 import { useGates } from '../../../context/gates';
 import { useSettings } from '../../../context/settings';
@@ -297,6 +299,15 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
      because the panel is a SIBLING of the aside — see the note over `.sidebar-flyout` in
      Sidebar.css for why it cannot be a child of it. */
   const [flyout, setFlyout] = useState(null);
+  /* The Originals flyout lists what the aggregator offers (the same read as /casino/brand), not the
+     transcribed list: Arrow Bow and Diamonds were missing from it. A game with no sprite of its own
+     draws the sheet's fallback cell, as `dice` does. */
+  const { data: originalGames } = useResource(getOriginals);
+  const liveOriginals = originalGames?.map((game) => ({
+    href: `/game/${game.slug}`,
+    icon: ORIGINALS.find((row) => row.href === `/game/${game.slug}`)?.icon ?? game.slug,
+    label: game.name,
+  }));
 
   /* The language and currency rows open the same dialog the HEADER's globe button opens, just
      on a different tab — which is the original's behaviour and the reason the modal already
@@ -956,7 +967,7 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
     {/* Sibling of the aside, not a child — `.sidebar-container` clips. The CSS sibling
         selector that shifts it to 72px when the sidebar folds depends on this order. */}
     {flyout && FLYOUTS[flyout] && (
-      <Flyout games={FLYOUTS[flyout]} onClose={() => setFlyout(null)} />
+      <Flyout games={flyout === 'originals' && liveOriginals?.length ? liveOriginals : FLYOUTS[flyout]} onClose={() => setFlyout(null)} />
     )}
 
     {/* Outside the <aside> for tidiness rather than necessity — PopCenter portals to <body>, so

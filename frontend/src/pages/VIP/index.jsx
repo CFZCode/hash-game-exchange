@@ -201,7 +201,7 @@ export default function VIP() {
     );
   }
 
-  const { hero, video, transfer, rewards, perks, more, access, engage, faq } = data;
+  const { hero, transfer, rewards, perks, more, access, engage, faq } = data;
 
   return (
     <div className="flex flex-col gap-y-4 px-4 text-primary sm:gap-y-6 sm:px-0 sm:pt-sh">
@@ -269,14 +269,7 @@ export default function VIP() {
 
       {/* ------------------------------------------------------------- film + VIP transfer */}
       <div className="-mt-4 mb-8 flex w-full flex-col items-center justify-center sm:mt-8">
-        {/* `noMargin` at this call site, which is what drops the `my-9 sm:my-14 sm:ml-[50%]`
-            self-centring the component applies everywhere else — the flex column already
-            centres it. The poster is local; the film is the CDN's, see vip.js. */}
-        <div className="group relative flex h-60 w-full justify-center overflow-hidden rounded-md sm:h-96 sm:w-2/3">
-          <video className="-mt-3 h-[105%] w-full rounded-md" controls poster={artFor(video.poster)}>
-            <source src={video.src} type={video.type} />
-          </video>
-        </div>
+        {/* The VIP film is off (user's request, 2026-10-19); `video` stays in vip.js. */}
         {!login && (
           <>
             <GoldHeading
