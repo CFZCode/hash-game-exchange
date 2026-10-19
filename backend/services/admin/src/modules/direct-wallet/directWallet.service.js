@@ -77,6 +77,15 @@ class DirectWalletService {
     return { inrMinor, rateMinor };
   }
 
+  /** `amountMinor` <code> = kitne INR + rate, abhi ke `exchangerate` se (owner ka Direct balance top-up). */
+  async inrValue(code, amountMinor, { transaction } = {}) {
+    const rates = await this.#rates({ transaction });
+    if (!rates.has(code) || !rates.has('INR')) throw unknownCurrency(code);
+    const result = DirectWalletService.toInr(amountMinor, rates.get(code), rates.get('INR'));
+    if (result.inrMinor <= 0n) throw tooSmall();
+    return result;
+  }
+
   /** Dropdown ke liye currencies + 1 unit = kitne INR. INR pehle. */
   async currencies({ actor }) {
     if (!actor.canIssueFunds) throw onlyOwner();

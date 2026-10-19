@@ -13,6 +13,7 @@ const {
 } = require('../lords/ownerWallet');
 const { TRANSFER_TYPE } = require('../lords/lords.constants');
 const { listChildren } = require('./accountList');
+const { DirectWalletService } = require('../direct-wallet/directWallet.service');
 const { settlePoints } = require('./pointsSettle');
 
 /**
@@ -111,14 +112,21 @@ class ExchangeService {
    * Owner apne Direct User balance (`staff_balances`) me paisa daalta hai.
    * Direct users ko dena / lena isi balance se hota hai. Rules wahi: sirf owner, password zaroori.
    */
-  async ownerAddDirectBalance({ actor, amount, note, transactionPassword }) {
+  async ownerAddDirectBalance({ actor, amount, currency = 'INR', note, transactionPassword }) {
     if (!actor.canIssueFunds) throw onlyOwner();
 
     await assertTransactionPassword(this.models, actor.id, transactionPassword, { required: true });
 
-    const result = await this.db.transaction((transaction) =>
-      addOwnerDirectBalance(this.models, { ownerId: actor.id, amount, note }, { transaction })
-    );
+    // Owner apni default coin (e.g. USDT) me daalta hai; wallet INR me hai, to abhi ke rate se INR me save.
+    const code = String(currency).toUpperCase();
+    const result = await this.db.transaction(async (transaction) => {
+      if (code === 'INR') return addOwnerDirectBalance(this.models, { ownerId: actor.id, amount, note }, { transaction });
+      const amountMinor = money.toMinor(amount);
+      const wallet = new DirectWalletService({ models: this.models, db: this.db });
+      const { inrMinor, rateMinor } = await wallet.inrValue(code, amountMinor, { transaction });
+      const conversion = { currency: code, currencyAmount: money.toDecimalString(amountMinor), rate: money.toDecimalString(rateMinor) };
+      return addOwnerDirectBalance(this.models, { ownerId: actor.id, amount: money.toDecimalString(inrMinor), note, conversion }, { transaction });
+    });
 
     this.logger?.warn({ actorStaffId: actor.id, amount: result.amount }, 'Owner added Direct User balance');
     return result;

@@ -27,6 +27,11 @@ const ownerAddBalance = {
     .strict(),
 };
 
+/** POST /exchange/owner/add-direct-balance — `currency` = jis coin me amount hai (default INR). */
+const ownerAddDirectBalance = {
+  body: ownerAddBalance.body.extend({ currency: z.string().trim().regex(/^[A-Za-z]{2,10}$/).optional() }),
+};
+
 /** GET /exchange/accounts — direct children; parentId = drill-down. */
 const accounts = {
   query: z
@@ -71,4 +76,4 @@ const directLedger = {
     .refine((q) => !q.from || !q.to || q.from <= q.to, { message: 'from must be before to', path: ['from'] }),
 };
 
-module.exports = { ownerAddBalance, accounts, settle, creditHistory, directLedger };
+module.exports = { ownerAddBalance, ownerAddDirectBalance, accounts, settle, creditHistory, directLedger };

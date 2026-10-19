@@ -68,10 +68,10 @@ module.exports = function adminRoutes(deps) {
   router.post(
     '/owner/add-direct-balance',
     auth.requirePermission(PERMISSIONS.WALLET_ADJUST),
-    validate(v.ownerAddBalance),
+    validate(v.ownerAddDirectBalance),
     withActivity({
       action: 'exchange.owner.add-direct-balance',
-      describe: (req) => ({ targetType: 'STAFF', targetId: req.staff.id, details: { amount: req.body.amount, note: req.body.note } }),
+      describe: (req) => ({ targetType: 'STAFF', targetId: req.staff.id, details: { amount: req.body.amount, currency: req.body.currency, note: req.body.note } }),
     }),
     asyncHandler(async (req, res) =>
       response.created(res, await service.ownerAddDirectBalance({ ...req.body, actor: actorFrom(req) }))

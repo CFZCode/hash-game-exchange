@@ -171,11 +171,12 @@ async function listOwnerDirectLedger(models, ownerId, { limit = 25, offset = 0, 
  * Owner apne Direct User balance me paisa daalta hai.
  * `staff_transfers` me 'owner_direct_topup' row (from 'system').
  */
-async function addOwnerDirectBalance(models, { ownerId, amount, note }, { transaction }) {
+async function addOwnerDirectBalance(models, { ownerId, amount, note, conversion }, { transaction }) {
   const decimal = toDecimal(amount);
+  // conversion = { currency, currencyAmount, rate } jab owner ne INR ke alawa coin me daala.
   await creditOwnerDirectBalance(models, ownerId, decimal, {
     transaction,
-    entry: { type: LEDGER_TYPE.ADD, note: note ?? 'Super Admin added Direct User balance' },
+    entry: { type: LEDGER_TYPE.ADD, note: note ?? 'Super Admin added Direct User balance', ...conversion },
   });
 
   const row = await models.StaffTransfers.create(
