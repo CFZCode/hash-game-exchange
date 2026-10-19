@@ -309,8 +309,9 @@ function PlayOverlay({ game, login, currencyName, balances, setting, launching, 
   );
 }
 
-/* Where each original's own panel ends inside the aggregator's page (see `isOriginal`). */
-const ORIGINAL_FRAME_PX = { bow: 680, diamonds: 670, keno: 680, limbo: 655, mines: 735, plinko: 685 };
+/* Where each original's own panel ends inside the aggregator's page at its tallest setting
+   (Plinko 16 rows, Mines 8x8), measured 1100–1920 wide, 2026-10-19 (see `isOriginal`). */
+const ORIGINAL_FRAME_PX = { bow: 690, diamonds: 680, keno: 690, limbo: 665, mines: 745, plinko: 720 };
 
 /* `q` in the original's Logs chunk: Full Screen requests fullscreen on the `.game-iframe` itself,
    and with no game running says so in a toast rather than doing nothing. */
