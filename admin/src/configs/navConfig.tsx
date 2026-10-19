@@ -339,6 +339,7 @@ export const navItems: NavItem[] = [
       // Zip me owner only (sports config): Buffer Time, Commission, Max Odds, Auto Void, Virtual / Bet Limits — tabs me.
       { icon: 'SlidersHorizontal', label: 'Global Settings', href: '/exchange/settings', permission: 'sports:manage', direct: true },
       { icon: 'CalendarDays', label: 'Events', href: '/exchange/events', permission: 'sports:read' },
+
       // Super Admin's on/off; hidden when the owner has sports off (owner panel → Site flags).
       { icon: 'Power', label: 'Sports switch', href: '/exchange/sports-switch', permission: 'config:write', ownerFlag: 'sports', direct: true }
     ]
@@ -426,6 +427,9 @@ export const navItems: NavItem[] = [
 
       // Like bet history: `GET admin/reports/wager-stats` is reports:read and tree-scoped. Not for agent logins (user, 2026-10-17).
       { icon: 'FileSpreadsheet', label: 'Wager report', href: '/casino/wager-report', permission: 'reports:read', flag: 'casino', promotions: true },
+
+      // The aggregator's originals: dashboard, bets, games. Super Admin + its executives with originals:read (backend checks both).
+      { icon: 'Dices', label: 'Original Games', href: '/casino/original-games', permission: 'originals:read', direct: true },
       { icon: 'Trophy', label: 'Providers Priority', href: '/providers-priority', permission: 'casino:read', flag: 'casino' },
       { icon: 'ArrowBigUp', label: 'Vendor Priority', href: '/vendor-priority', permission: 'casino:read', flag: 'casino' },
       { icon: 'Gamepad2', label: 'Type Priority', href: '/type-priority', permission: 'casino:read', flag: 'casino' },

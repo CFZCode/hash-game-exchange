@@ -32,7 +32,7 @@ export const PERMISSION_GROUPS: { label: string; permissions: string[] }[] = [
   { label: 'Reports (statements, win/loss, turnover, current bets)', permissions: ['reports:read', 'audit:read'] },
   { label: 'Sports exchange: view / settings & locks / settlement / void', permissions: ['sports:read', 'sports:manage', 'sports:settle', 'sports:void-settled'] },
   { label: 'Payments (direct users)', permissions: ['deposits:read', 'deposits:approve', 'withdrawals:read', 'withdrawals:approve'] },
-  { label: 'Casino', permissions: ['casino:read', 'casino:manage', 'casino:settle'] },
+  { label: 'Casino', permissions: ['casino:read', 'casino:manage', 'casino:settle', 'originals:read'] },
   { label: 'Admin', permissions: ['roles:manage', 'config:read', 'config:write', 'redeem:write', 'users:delete', 'users:impersonate'] }
 ]
 

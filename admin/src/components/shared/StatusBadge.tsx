@@ -26,7 +26,8 @@ const SUCCESS = [
   'published',
   'enabled',
   'paid',
-  'credited'
+  'credited',
+  'live'
 ]
 
 const WARNING = ['pending', 'processing', 'open', 'submitted', 'review', 'awaiting', 'partial']

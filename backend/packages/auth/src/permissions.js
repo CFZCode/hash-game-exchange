@@ -54,6 +54,8 @@ const PERMISSIONS = {
   CASINO_READ: 'casino:read',
   CASINO_MANAGE: 'casino:manage',
   CASINO_SETTLE: 'casino:settle',
+  /** Admin → Casino → Original Games (dashboard, bets, games). Super Admin + its executives only. */
+  ORIGINALS_READ: 'originals:read',
 
   // sports-service
   SPORTS_READ: 'sports:read',
