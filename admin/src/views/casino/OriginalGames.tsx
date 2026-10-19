@@ -2,7 +2,6 @@
 
 import { useMemo } from 'react'
 
-import { CheckCircle2Icon, XCircleIcon } from 'lucide-react'
 
 import {
   BarChart,
@@ -410,20 +409,6 @@ const BetsTab = ({ channel }: { channel: Channel }) => {
 
 // ── Games (what the provider offers, and its status) ─────────────────────
 
-const Switch = ({ label, on, hint }: { label: string; on: boolean; hint: string }) => (
-  <Card className='shadow-none'>
-    <CardContent className='flex items-center gap-3 py-4'>
-      {on ? <CheckCircle2Icon className='text-success size-6' /> : <XCircleIcon className='text-danger size-6' />}
-      <div>
-        <div className='text-sm font-medium'>
-          {label}: <span className={on ? 'text-success' : 'text-danger'}>{on ? 'ON' : 'OFF'}</span>
-        </div>
-        <div className='text-muted-foreground text-xs'>{hint}</div>
-      </div>
-    </CardContent>
-  </Card>
-)
-
 const GameCard = ({ game }: { game: Game }) => (
   <Card className='shadow-none'>
     <CardHeader className='pb-2'>
@@ -477,19 +462,11 @@ const GamesTab = () => {
   const q = useApi<Games>(`${BASE}/games`)
 
   if (q.error) return <ErrorState error={q.error} />
-  const sw = q.data?.switches
   const games = q.data?.games ?? []
   const live = games.filter(g => g.enabled && g.status === 'live').length
 
   return (
     <div className='grid gap-4'>
-      {sw && (
-        <div className='grid grid-cols-1 gap-4 md:grid-cols-3'>
-          <Switch label='Plan' on={sw.owner} hint='Set by the platform' />
-          <Switch label='Site switch' on={sw.site} hint='Site config → Originals' />
-          <Switch label='On the site now' on={sw.live} hint='Both switches must be ON' />
-        </div>
-      )}
       <div className='text-muted-foreground text-sm'>
         {formatNumber(games.length)} games from the provider · {formatNumber(live)} live. Play counts are for all players, all time.
       </div>
