@@ -224,17 +224,6 @@ function setFavicon(url) {
 }
 
 /* The pre-boot loader (#start-up, app/boot-style.ts) draws the square mark in live mode. */
-function setLoaderMark(url) {
-  if (!url) return;
-  let style = document.getElementById('brand-loader');
-  if (!style) {
-    style = document.createElement('style');
-    style.id = 'brand-loader';
-    document.head.appendChild(style);
-  }
-  style.textContent = `#start-up,body.dark #start-up{background-image:url("${url}");background-repeat:no-repeat;background-position:center}`;
-}
-
 /** Puts the current branding on the document. Leaves the layout's own values where nothing is set. */
 export function applySiteBranding() {
   if (typeof document === 'undefined') return;
@@ -253,7 +242,6 @@ export function applySiteBranding() {
   }
   /* The mark has a build-time fallback, so it goes on even before (or without) the backend's. */
   setFavicon(siteMark());
-  setLoaderMark(siteMark());
   if (!runtime) return;
 
   setMeta('name', 'keywords', runtime.keywords.length ? runtime.keywords.join(', ') : null);

@@ -40,9 +40,9 @@ export function cleanBranding(data) {
 }
 
 /**
- * Runs in <head> before first paint (live mode only, app/layout): the cached mark as the loader
+ * Runs in <head> before first paint (live mode only, app/layout): 
  * image and the favicon, and the cached title — so a returning visitor never sees the
  * original's for a moment. The server-rendered metadata already carries them when the backend
  * answered; this covers the case it did not.
  */
-export const BRANDING_BOOT_SCRIPT = `try{var b=JSON.parse(localStorage.getItem('${BRANDING_STORAGE_KEY}')||'null'),r=/^\\/api\\/v1\\/admin\\/branding\\/asset\\/[0-9a-f]{64}\\.(png|webp|svg)$/,a=${JSON.stringify(API_BASE)};if(b){if(typeof b.markUrl==='string'&&r.test(b.markUrl)&&!document.getElementById('brand-loader')){var u=a+b.markUrl,s=document.createElement('style');s.id='brand-loader';s.textContent='#start-up,body.dark #start-up{background-image:url("'+u+'");background-repeat:no-repeat;background-position:center}';document.head.appendChild(s)}var t=b.title||b.siteName;if(typeof t==='string'&&t&&!/[<>]/.test(t))document.title=t}}catch(e){}`;
+export const BRANDING_BOOT_SCRIPT = `try{var b=JSON.parse(localStorage.getItem('${BRANDING_STORAGE_KEY}')||'null');if(b){var t=b.title||b.siteName;if(typeof t==='string'&&t&&!/[<>]/.test(t))document.title=t}}catch(e){}`;

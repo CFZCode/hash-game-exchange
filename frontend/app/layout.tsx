@@ -104,22 +104,13 @@ export async function generateViewport(): Promise<Viewport> {
 /* `app-root dark` is the original's body class, and `#start-up` is the pre-boot loader, torn down
    by the client shell once the app has painted. The body's class is changed at runtime by the
    theme (context/settings.js), hence suppressHydrationWarning. */
-export default async function RootLayout({ children }: { children: ReactNode }) {
-  /* Live mode: the owner's square mark as the pre-boot loader's picture (same 11rem box). */
-  const mark = assetUrl((await serverBranding())?.markUrl ?? null) ?? FALLBACK_MARK;
+export default function RootLayout({ children }: { children: ReactNode }) {
+  /* The pre-boot loader keeps its own art (public/init-*.png, user's request); the mark is only the favicon. */
   return (
     <html lang="en" dir="ltr" suppressHydrationWarning>
       <head>
         <style dangerouslySetInnerHTML={{ __html: BOOT_CSS }} />
         {LIVE && <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />}
-        {mark && (
-          <style
-            id="brand-loader"
-            dangerouslySetInnerHTML={{
-              __html: `#start-up,body.dark #start-up{background-image:url("${mark}");background-repeat:no-repeat;background-position:center}`,
-            }}
-          />
-        )}
         {LIVE && <script dangerouslySetInnerHTML={{ __html: BRANDING_BOOT_SCRIPT }} />}
       </head>
       <body className="app-root dark" suppressHydrationWarning>
