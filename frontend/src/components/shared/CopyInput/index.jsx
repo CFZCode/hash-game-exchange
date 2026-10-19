@@ -69,8 +69,7 @@ export default function CopyInput({ value = '', className = '' }) {
       <button
         type="button"
         onClick={copy}
-        className="btn-like ml-auto h-full flex-none rounded-lg px-2 pb-0.5 pt-0"
-        style={{ background: '#373e3f' }}
+        className="btn-like ml-auto h-full flex-none rounded-lg bg-[#e9eaf2] px-2 pb-0.5 pt-0 dark:bg-[#373e3f]"
       >
         Copy
       </button>

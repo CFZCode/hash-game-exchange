@@ -28,7 +28,7 @@
  * false and this build is dark-only, the same reason the VIP page skips `banner_bg_w`.
  */
 .user-vip-0-bg {
-  background: linear-gradient(337.9deg, #0000000d 27.42%, #d5d6db80 98.62%), #323738;
+  background: linear-gradient(337.9deg, #0000000d 27.42%, #d5d6db80 98.62%), var(--user-vip-base);
   backdrop-filter: blur(3px);
   border: 0 none;
 }
@@ -38,7 +38,7 @@
 .user-vip-0-c3 { background: #cbcbcb; }
 
 .user-vip-1-bg {
-  background: linear-gradient(337.9deg, #0000000d 27.42%, #f2b5a180 98.62%), #323738;
+  background: linear-gradient(337.9deg, #0000000d 27.42%, #f2b5a180 98.62%), var(--user-vip-base);
   backdrop-filter: blur(3px);
   border: 0 none;
 }
@@ -48,7 +48,7 @@
 .user-vip-1-c3 { background: #c1a9a1; }
 
 .user-vip-2-bg {
-  background: linear-gradient(337.9deg, #0000000d 27.42%, #8e98bc80 98.62%), #323738;
+  background: linear-gradient(337.9deg, #0000000d 27.42%, #8e98bc80 98.62%), var(--user-vip-base);
   backdrop-filter: blur(3px);
   border: 0 none;
 }
@@ -58,7 +58,7 @@
 .user-vip-2-c3 { background: #a2b3d4; }
 
 .user-vip-3-bg {
-  background: linear-gradient(337.9deg, #0000000d 27.42%, #e5d68c80 98.62%), #323738;
+  background: linear-gradient(337.9deg, #0000000d 27.42%, #e5d68c80 98.62%), var(--user-vip-base);
   backdrop-filter: blur(3px);
   border: 0 none;
 }
@@ -69,7 +69,7 @@
 
 .user-vip-4-bg,
 .user-vip-5-bg {
-  background: linear-gradient(337.9deg, #0000000d 27.42%, #935de980 98.62%), #323738;
+  background: linear-gradient(337.9deg, #0000000d 27.42%, #935de980 98.62%), var(--user-vip-base);
   backdrop-filter: blur(3px);
   border: 0 none;
 }
@@ -101,3 +101,8 @@
 .user-vip-6-c3,
 .user-vip-7-c3,
 .user-vip-8-c3 { background: #5fc0fc; }
+
+/* The card's base: the dark fill above, and white in the light theme so the tier tint sits on a
+   light card and the primary-coloured text stays readable (it was dark text on #323738). */
+.app-root { --user-vip-base: #ffffff; }
+.app-root.dark { --user-vip-base: #323738; }
