@@ -27,6 +27,8 @@ module.exports = function adminRoutes(deps) {
   const service = new ExchangeMarketService(deps);
   const router = Router();
   const canRead = auth.requirePermission(PERMISSIONS.SPORTS_READ);
+  // Current Bets is a report: same permission as its nav entry and Turn Over, so agents can open it.
+  const canReadReports = auth.requirePermission(PERMISSIONS.REPORTS_READ);
 
   router.get(
     '/analysis',
@@ -59,7 +61,7 @@ module.exports = function adminRoutes(deps) {
 
   router.get(
     '/current-bets',
-    canRead,
+    canReadReports,
     validate(v.currentBets),
     asyncHandler(async (req, res) => {
       const { matchStatus, betType, channel, limit, offset } = req.query;
