@@ -2,7 +2,6 @@ import type { NextRequest } from 'next/server'
 
 import { serverConfig } from '@/configs/site'
 import { coinProblem } from '@/lib/entitlements/coins'
-import { nudgeBackend } from '@/lib/entitlements/nudge'
 import { readForEdit, saveEntitlements } from '@/lib/entitlements/store'
 import type { CoinDefinition } from '@/lib/entitlements/types'
 import type { RegionSetting } from '@/lib/entitlements/region'
@@ -113,8 +112,8 @@ export const PUT = handler(async (req: NextRequest) => {
     serverConfig.ownerUsername
   )
 
-  // A real change goes live now: the backend re-pulls and pushes it to open sites (contract §3).
-  const live = result.changes.length ? await nudgeBackend() : undefined
+  // A saved change is already live: the backend stored, applied and pushed it to open sites (contract §3).
+  const live = result.changes.length ? { live: true, version: result.doc.version } : undefined
 
   return ok({ ...result, live })
 })

@@ -1,8 +1,6 @@
 import 'server-only'
 
 import { createHmac, createPrivateKey, sign as edSign, type KeyObject } from 'node:crypto'
-import { appendFile, mkdir, readFile, rename, writeFile } from 'node:fs/promises'
-import path from 'node:path'
 
 import { FEATURE_CATALOGUE, FEATURE_KEYS, FEATURE_OPTIONS, FLAG_GROUPS, FLAG_KEYS, isPolicy, isVariantOf, resolveOptions } from '@/configs/entitlementCatalogue'
 import { serverConfig } from '@/configs/site'
@@ -10,6 +8,7 @@ import { pinToUi, SITE_UI } from '@/configs/siteUi'
 import { DEFAULT_TEMPLATE, resolveTemplateKey, templateByKey, TEMPLATE_KEYS } from '@/configs/templateCatalogue'
 import { HttpError } from '@/lib/owner/guard'
 import { brandingProblem, BRANDING_SLOTS, cleanBranding, type Branding } from './branding'
+import { ownerJson } from './backend'
 import { assetExists } from './brandingAssets'
 import { coinSwitchedOff } from './coinGate'
 import { cleanCoin, coinProblem, diffCoins, droppedCoins } from './coins'
@@ -19,11 +18,12 @@ import { cleanWithdrawalDailyLimit, withdrawalDailyLimitProblem, type Withdrawal
 import { diffDocs, type AuditEntry, type Change, type CoinDefinition, type EditableDoc, type EntitlementsDoc, type VariantsSeed } from './types'
 
 /**
- * The entitlements document and its audit trail live only in owner-panel/data/
- * (contract §2). Nothing here touches the site database, admin or frontend.
+ * The entitlements document and its audit trail live in the site database (owner_entitlements,
+ * owner_audit), read and written through the backend's owner API (./backend) — never a local
+ * file, so every owner panel pointed at the same SITE_GATEWAY_URL shows the same data. This
+ * panel validates, normalises and SIGNS; the backend verifies the signature and the version
+ * order, stores, applies and pushes the change to open sites (contract §2, §3).
  */
-const docPath = () => path.join(serverConfig.dataDir, 'entitlements.json')
-const auditPath = () => path.join(serverConfig.dataDir, 'audit.jsonl')
 
 /** The full catalogue, every key present; a key the file lacks reads as entitled. */
 function complete(map: Record<string, unknown> | undefined, keys: string[]) {
@@ -106,23 +106,12 @@ export function knownCoins(list: unknown, strict = false): CoinDefinition[] {
   return out
 }
 
-async function writeAtomic(file: string, body: string) {
-  await mkdir(path.dirname(file), { recursive: true })
-  const tmp = `${file}.${process.pid}.${Date.now()}.tmp`
-
-  await writeFile(tmp, body, { mode: 0o600 })
-  await rename(tmp, file)
-}
-
 export async function readEntitlements(): Promise<EntitlementsDoc> {
-  const raw = await readFile(docPath(), 'utf8').catch(error => {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null
-    throw error
-  })
+  const { doc: stored } = await ownerJson<{ version: number; doc: Partial<EntitlementsDoc> | null }>('/entitlements')
 
-  if (raw === null) {
-    // First run: everything entitled — today's behaviour.
-    const doc: EntitlementsDoc = {
+  if (!stored) {
+    // Nothing stored yet: everything entitled — today's behaviour. Written by the first save.
+    return {
       site: serverConfig.siteKey,
       version: 1,
       updatedAt: new Date().toISOString(),
@@ -132,13 +121,7 @@ export async function readEntitlements(): Promise<EntitlementsDoc> {
 
       // No `variants`: the backend keeps the site's current ones until the owner's first save.
     }
-
-    await writeAtomic(docPath(), JSON.stringify(doc, null, 2) + '\n')
-
-    return doc
   }
-
-  const stored = JSON.parse(raw) as Partial<EntitlementsDoc>
 
   return {
     site: stored.site ?? serverConfig.siteKey,
@@ -401,8 +384,16 @@ export function saveEntitlements(
 
     const entry: AuditEntry = { at: doc.updatedAt, user, version: doc.version, changes, ...(seededFrom ? { seededFrom } : {}) }
 
-    await writeAtomic(docPath(), JSON.stringify(doc, null, 2) + '\n')
-    await appendFile(auditPath(), JSON.stringify(entry) + '\n', { mode: 0o600 })
+    // `issuedAt` is inside the signed data, so a captured request goes stale instead of being
+    // replayable later (the backend refuses one older than OWNER_MAX_AGE_SECONDS).
+    const data = { ...doc, issuedAt: new Date().toISOString() }
+    const signatureEd25519 = signDocEd25519(data)
+
+    await ownerJson('/entitlements', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ data, signature: signDoc(data), ...(signatureEd25519 ? { signatureEd25519 } : {}), audit: entry, updatedBy: user })
+    })
 
     return { doc, changes }
   }
@@ -415,20 +406,7 @@ export function saveEntitlements(
 }
 
 export async function readAudit(limit = 500): Promise<AuditEntry[]> {
-  const raw = await readFile(auditPath(), 'utf8').catch(() => '')
-  const rows: AuditEntry[] = []
-
-  for (const line of raw.split('\n')) {
-    if (!line.trim()) continue
-
-    try {
-      rows.push(JSON.parse(line) as AuditEntry)
-    } catch {
-      // A torn line (crash mid-append) is skipped, not fatal.
-    }
-  }
-
-  return rows.reverse().slice(0, limit)
+  return (await ownerJson<{ entries: AuditEntry[] }>(`/audit?limit=${limit}`)).entries
 }
 
 /** Contract §3: hex HMAC-SHA256 of JSON.stringify(data) with OWNER_SHARED_SECRET. */
