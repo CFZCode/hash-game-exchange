@@ -282,7 +282,7 @@ const ClubDetail = ({ club, onClose }: { club: Club; onClose: () => void }) => {
         </div>
       )
     },
-    { key: 'role', header: 'Role', cell: r => <StatusBadge value={r.role} /> },
+    { key: 'role', header: 'Role', cell: r => <StatusBadge value={r.role === 'owner' ? 'leader' : r.role} /> },
     { key: 'agent', header: 'Agent code', cell: r => <span className='font-mono text-xs'>{r.agentCode ?? '—'}</span> },
     { key: 'parent', header: 'Under agent', cell: r => (r.agentId ? <span className='font-mono text-xs'>#{r.agentId}</span> : '—') },
     { key: 'joined', header: 'Joined', cell: r => <DateTime value={r.joinedAt} /> }
@@ -291,7 +291,7 @@ const ClubDetail = ({ club, onClose }: { club: Club; onClose: () => void }) => {
   const earningColumns: Column<ClubEarning>[] = [
     { key: 'at', header: 'When', cell: r => <DateTime value={r.createdAt} /> },
     { key: 'who', header: 'Beneficiary', cell: r => <span className='font-mono text-xs'>#{String(r.beneficiaryId)}</span> },
-    { key: 'role', header: 'Role', cell: r => <StatusBadge value={r.role} /> },
+    { key: 'role', header: 'Role', cell: r => <StatusBadge value={r.role === 'owner' ? 'leader' : r.role} /> },
     { key: 'wager', header: 'Wager', align: 'right', cell: r => <Money value={r.wager} /> },
     { key: 'pct', header: '%', align: 'right', cell: r => `${r.percentage}%` },
     { key: 'amount', header: 'Earned', align: 'right', cell: r => <Money value={r.amount} currency={r.currency} /> },
@@ -326,14 +326,14 @@ const ClubDetail = ({ club, onClose }: { club: Club; onClose: () => void }) => {
             <FormDialog
               trigger={<Button variant='outline' size='sm'><PercentIcon /> Earnings split</Button>}
               title='Earnings split'
-              description='What the platform pays the owner, agents and members on every wager the club generates. Percentages like "12.5"; leave blank to keep.'
+              description='What the platform pays the leader, agents and members on every wager the club generates. Percentages like "12.5"; leave blank to keep.'
               onSubmit={() => setConfig.mutateAsync()}
               validate={() => {
                 const pct = (v: string, label: string) => check.number(v, label, { min: 0, max: 100, decimals: 2, optional: true })
                 const any = Object.values(cfg).some(v => v.trim())
 
                 return {
-                  'ec-o': any ? pct(cfg.ownerPercentage, 'Owner %') : 'Change at least one value',
+                  'ec-o': any ? pct(cfg.ownerPercentage, 'Leader %') : 'Change at least one value',
                   'ec-a': pct(cfg.agentPercentage, 'Agent %'),
                   'ec-m': pct(cfg.memberPercentage, 'Member %'),
                   'ec-ap': check.number(cfg.activePlayerThreshold, 'Min active users', { integer: true, min: 0, max: 1000000, optional: true }),
@@ -343,7 +343,7 @@ const ClubDetail = ({ club, onClose }: { club: Club; onClose: () => void }) => {
               onOpenChange={o => o && setCfg({ ownerPercentage: '', agentPercentage: '', memberPercentage: '', activePlayerThreshold: '', wagerThreshold: '' })}
             >
               <div className='grid grid-cols-3 gap-3'>
-                <TextField id='ec-o' label='Owner %' placeholder={c.earnings.owner} value={cfg.ownerPercentage} onChange={e => setCfg({ ...cfg, ownerPercentage: e.target.value })} />
+                <TextField id='ec-o' label='Leader %' placeholder={c.earnings.owner} value={cfg.ownerPercentage} onChange={e => setCfg({ ...cfg, ownerPercentage: e.target.value })} />
                 <TextField id='ec-a' label='Agent %' placeholder={c.earnings.agent} value={cfg.agentPercentage} onChange={e => setCfg({ ...cfg, agentPercentage: e.target.value })} />
                 <TextField id='ec-m' label='Member %' placeholder={c.earnings.member} value={cfg.memberPercentage} onChange={e => setCfg({ ...cfg, memberPercentage: e.target.value })} />
               </div>
@@ -355,7 +355,7 @@ const ClubDetail = ({ club, onClose }: { club: Club; onClose: () => void }) => {
             <ConfirmDialog
               trigger={<Button variant='destructive' size='sm'><Trash2Icon /> Delete</Button>}
               title={`Delete ${c.name}?`}
-              description='Every membership goes with it. The owner and members keep their user accounts.'
+              description='Every membership goes with it. The leader and members keep their user accounts.'
               confirmLabel='Delete club'
               destructive
               onConfirm={() => remove.mutateAsync()}
@@ -364,9 +364,9 @@ const ClubDetail = ({ club, onClose }: { club: Club; onClose: () => void }) => {
           <Button variant='ghost' size='sm' onClick={onClose}>Close</Button>
         </CardTitle>
         <CardDescription className='flex flex-wrap gap-x-4'>
-          <span>owner <Link href={`/users/${c.ownerId}`} className='underline'>#{String(c.ownerId)}</Link></span>
+          <span>leader <Link href={`/users/${c.ownerId}`} className='underline'>#{String(c.ownerId)}</Link></span>
           <span>{formatNumber(c.members ?? club.members)} members{c.maxMembers ? ` of ${formatNumber(c.maxMembers)}` : ''}</span>
-          <span>split owner {c.earnings.owner}% · agent {c.earnings.agent}% · member {c.earnings.member}%</span>
+          <span>split leader {c.earnings.owner}% · agent {c.earnings.agent}% · member {c.earnings.member}%</span>
           {c.parentClubId && <span>parent club #{c.parentClubId}</span>}
           {c.description && <span className='basis-full'>{c.description}</span>}
         </CardDescription>
@@ -395,7 +395,7 @@ const ClubDetail = ({ club, onClose }: { club: Club; onClose: () => void }) => {
                   <SelectTrigger className='w-36'><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value='all'>All roles</SelectItem>
-                    <SelectItem value='owner'>Owner</SelectItem>
+                    <SelectItem value='owner'>Leader</SelectItem>
                     <SelectItem value='agent'>Agent</SelectItem>
                     <SelectItem value='member'>Member</SelectItem>
                   </SelectContent>
@@ -447,9 +447,9 @@ const Clubs = () => {
         </div>
       )
     },
-    { key: 'owner', header: 'Owner', cell: r => <Link href={`/users/${r.ownerId}`} className='font-mono text-xs hover:underline' onClick={e => e.stopPropagation()}>#{String(r.ownerId)}</Link> },
+    { key: 'owner', header: 'Leader', cell: r => <Link href={`/users/${r.ownerId}`} className='font-mono text-xs hover:underline' onClick={e => e.stopPropagation()}>#{String(r.ownerId)}</Link> },
     { key: 'members', header: 'Members', align: 'right', cell: r => `${formatNumber(r.members)}${r.maxMembers ? ` / ${formatNumber(r.maxMembers)}` : ''}` },
-    { key: 'split', header: 'Split (O / A / M)', cell: r => <span className='tabular-nums'>{r.earnings.owner}% / {r.earnings.agent}% / {r.earnings.member}%</span> },
+    { key: 'split', header: 'Split (L / A / M)', cell: r => <span className='tabular-nums'>{r.earnings.owner}% / {r.earnings.agent}% / {r.earnings.member}%</span> },
     { key: 'status', header: 'Status', cell: r => <StatusBadge value={r.isActive ? 'active' : 'inactive'} /> }
   ]
 
@@ -490,7 +490,7 @@ const VipClub = () => {
 
   return (
   <div>
-    <PageHeader title='VIP & club' description='The VIP ladder users climb by wagering, and the clubs (owner → agents → members) that share in club turnover.' />
+    <PageHeader title='VIP & club' description='The VIP ladder users climb by wagering, and the clubs (leader → agents → members) that share in club turnover.' />
     <Tabs defaultValue='clubs'>
       <TabsList className='mb-4'>
         <TabsTrigger value='clubs'>Clubs</TabsTrigger>

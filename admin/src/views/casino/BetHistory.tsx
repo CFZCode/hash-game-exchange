@@ -25,6 +25,9 @@ import { usePageList } from './usePageList'
 
 const ALL = '__all__'
 
+// The API keys the house engine's rounds 'in-house'; on screen they are the Originals.
+const sourceName = (key: string) => (key === 'in-house' ? 'Originals' : key)
+
 const SOURCES = [
   { value: 'inhouse', label: 'Originals' },
   { value: 'gis', label: 'Slotegrator' },
@@ -203,7 +206,7 @@ const StatsTab = ({ channel }: { channel: Channel }) => {
             </TableHeader>
             <TableBody>
               {Object.entries(bySource ?? {}).map(([k, v]) => (
-                <TotalsRow key={k} label={k} t={v} currency={currency} />
+                <TotalsRow key={k} label={sourceName(k)} t={v} currency={currency} />
               ))}
               {t && <TotalsRow label='Total' t={t} currency={currency} />}
             </TableBody>
@@ -253,7 +256,7 @@ const AnalyticsTab = ({ channel }: { channel: Channel }) => {
             </TableHeader>
             <TableBody>
               {Object.entries(bySource).map(([k, v]) => (
-                <TotalsRow key={k} label={k} t={v} />
+                <TotalsRow key={k} label={sourceName(k)} t={v} />
               ))}
             </TableBody>
           </Table>

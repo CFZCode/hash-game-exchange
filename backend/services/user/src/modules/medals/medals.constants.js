@@ -73,7 +73,7 @@ const MEDALS = Object.freeze([
     type: 8,
     title: 'Invincible Lucky Dog',
     rule: { metric: 'maxMultiplier', target: 99000, unit: 'x', source: SOURCE.REMOTE,
-      description: 'Win a 99,000x+ payout on one round with a non-zero stake (in-house games).' },
+      description: 'Win a 99,000x+ payout on one round with a non-zero stake (Originals).' },
   },
   /* Type 9 is not listed: every list on the reference drops it (its title is 18's). */
   { type: 10, title: 'Roll King', rule: null, unavailableReason: NO_RULE.retired },
