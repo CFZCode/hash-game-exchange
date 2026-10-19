@@ -93,7 +93,8 @@ const pct = (v: number | null | undefined) => (v === null || v === undefined ? '
 
 // ── Dashboard ──────────────────────────────────────────────────────────
 
-const DashboardTab = ({ channel }: { channel: Channel }) => {
+/** `turnover` shows the turnover pieces (by game, by coin); otherwise the dashboard (KPIs, trend charts). One stats fetch serves both. */
+const DashboardTab = ({ channel, turnover = false }: { channel: Channel; turnover?: boolean }) => {
   const filters = useStatsFilters()
   const query = { channel, ...filters.query }
   const stats = useApi<Stats>(`${BASE}/stats`, query)
@@ -137,6 +138,16 @@ const DashboardTab = ({ channel }: { channel: Channel }) => {
     <div>
       <FilterBar filters={filters} currencies={CURRENCIES} className='mb-4' />
 
+      {s && s.unconverted.length > 0 && (
+        <Alert className='mb-4'>
+          <AlertDescription>
+            Not in the {currency} totals (no exchange rate): {s.unconverted.map(u => u.currency ?? 'unknown').join(', ')}. Pick that currency to see it.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {!turnover && (
+        <>
       <div className='mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4'>
         <KpiCard
           label='Wagered'
@@ -180,17 +191,9 @@ const DashboardTab = ({ channel }: { channel: Channel }) => {
         />
       </div>
 
-      {s && s.unconverted.length > 0 && (
-        <Alert className='mb-4'>
-          <AlertDescription>
-            Not in the {currency} totals (no exchange rate): {s.unconverted.map(u => u.currency ?? 'unknown').join(', ')}. Pick that currency to see it.
-          </AlertDescription>
-        </Alert>
-      )}
 
-      <div className='mb-4 grid grid-cols-1 gap-4 xl:grid-cols-3'>
         <ChartCard
-          className='xl:col-span-2'
+          className='mb-4'
           title='Wagered vs won vs GGR'
           description={`Per ${filters.granularity}, ${currency}${s?.converted ? ' (converted at current rates)' : ''}`}
           table={seriesTable({ buckets: filters.buckets, granularity: filters.granularity, series: charts.money, format: 'money', currency })}
@@ -208,31 +211,6 @@ const DashboardTab = ({ channel }: { channel: Channel }) => {
             emptyMessage='No bets in this period.'
           />
         </ChartCard>
-        <ChartCard
-          title='Wagered by game'
-          description={`Share of turnover, ${currency}`}
-          table={categoryTable({
-            categories: charts.games.map(g => g.name),
-            categoryHeader: 'Game',
-            series: [
-              { name: 'Bets', data: charts.games.map(g => g.bets) },
-              { name: `Wagered (${currency})`, data: charts.games.map(g => Number(g.wagered)) }
-            ]
-          })}
-        >
-          <DonutChart
-            ariaLabel={`Original games turnover by game, ${currency}`}
-            labels={charts.games.map(g => g.name)}
-            values={charts.games.map(g => Number(g.wagered))}
-            totalLabel='Wagered'
-            format='money'
-            currency={currency}
-            loading={loading}
-            error={stats.error}
-            emptyMessage='Nothing wagered in this period.'
-          />
-        </ChartCard>
-      </div>
 
       <div className='mb-4 grid grid-cols-1 gap-4 xl:grid-cols-3'>
         <ChartCard
@@ -263,6 +241,37 @@ const DashboardTab = ({ channel }: { channel: Channel }) => {
             loading={loading}
             error={stats.error}
             emptyMessage='Nothing to compare.'
+          />
+        </ChartCard>
+      </div>
+        </>
+      )}
+
+      {turnover && (
+        <>
+      <div className='mb-4'>
+        <ChartCard
+          title='Wagered by game'
+          description={`Share of turnover, ${currency}`}
+          table={categoryTable({
+            categories: charts.games.map(g => g.name),
+            categoryHeader: 'Game',
+            series: [
+              { name: 'Bets', data: charts.games.map(g => g.bets) },
+              { name: `Wagered (${currency})`, data: charts.games.map(g => Number(g.wagered)) }
+            ]
+          })}
+        >
+          <DonutChart
+            ariaLabel={`Original games turnover by game, ${currency}`}
+            labels={charts.games.map(g => g.name)}
+            values={charts.games.map(g => Number(g.wagered))}
+            totalLabel='Wagered'
+            format='money'
+            currency={currency}
+            loading={loading}
+            error={stats.error}
+            emptyMessage='Nothing wagered in this period.'
           />
         </ChartCard>
       </div>
@@ -299,6 +308,8 @@ const DashboardTab = ({ channel }: { channel: Channel }) => {
 
       <h2 className='mb-2 text-sm font-medium'>Games by turnover</h2>
       <DataTable columns={gameColumns} rows={s?.byGame} rowKey={r => r.code} loading={loading} error={stats.error} emptyMessage='No bets in this period.' />
+        </>
+      )}
     </div>
   )
 }
@@ -503,7 +514,8 @@ const GamesTab = ({ channel }: { channel: Channel }) => {
 }
 
 const SECTIONS = {
-  dashboard: { title: 'Original Games · Dashboard', description: 'Turnover, payouts and GGR (wagered − won) of the Original Games Aggregator. Refunded (rolled back) bets are kept out of the figures.', Tab: DashboardTab },
+  dashboard: { title: 'Original Games · Dashboard', description: 'Payouts and GGR (wagered − won) of the Original Games Aggregator. Refunded (rolled back) bets are kept out of the figures.', Tab: DashboardTab },
+  turnover: { title: 'Original Games · Turnover', description: 'What was wagered: by game, and by coin as it really turned over. Refunded (rolled back) bets are kept out.', Tab: ({ channel }: { channel: Channel }) => <DashboardTab channel={channel} turnover /> },
   bets: { title: 'Original Games · Bet history', description: 'Every Original Games round: bet, payout, result and balance after.', Tab: BetsTab },
   games: { title: 'Original Games · Games', description: 'The games the provider offers, their limits and status.', Tab: GamesTab }
 }
