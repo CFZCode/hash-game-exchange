@@ -201,6 +201,7 @@ class ReportsService {
         'id', 'name', 'avatar', 'level', 'games_played', 'referalcode', 'parent_staff_id', 'status',
         // Users page: email, phone, country aur locks (Status / Financial).
         'email', 'phone', 'country', 'system_locked', 'is_locked', 'casino_locked', 'sports_betlocked', 'withdraw_locked',
+        'originals_locked',
       ],
       order: [['id', 'DESC']],
       limit,
@@ -248,6 +249,7 @@ class ReportsService {
           casino: Boolean(user.casino_locked),
           sports: Boolean(user.sports_betlocked),
           withdraw: Boolean(user.withdraw_locked),
+          originals: Boolean(user.originals_locked),
         },
       })),
     };
@@ -345,7 +347,7 @@ class ReportsService {
       house ? resolveVipLadder(this.models, { logger: this.logger }) : null,
       this.#betCountsFor([user.id]),
       this.models.Users.findByPk(user.id, {
-        attributes: ['system_locked', 'casino_locked', 'sports_betlocked', 'withdraw_locked'],
+        attributes: ['system_locked', 'casino_locked', 'sports_betlocked', 'withdraw_locked', 'originals_locked'],
         raw: true,
       }),
       this.#agentTreeParents([user.parent_staff_id]),
@@ -369,6 +371,7 @@ class ReportsService {
         casino: Boolean(lockRow?.casino_locked),
         sports: Boolean(lockRow?.sports_betlocked),
         withdraw: Boolean(lockRow?.withdraw_locked),
+        originals: Boolean(lockRow?.originals_locked),
       },
     };
   }
@@ -485,7 +488,7 @@ class ReportsService {
           'id', 'name', 'email', 'country', 'phone', 'created', 'updated_at',
           'level', 'games_played', 'two_fa_status', 'parent_staff_id',
           'system_locked', 'lock_targetx', 'sports_betlocked', 'casino_locked',
-          'withdraw_locked', 'status', 'bet_status',
+          'withdraw_locked', 'originals_locked', 'status', 'bet_status',
           // migration 058-login-geo (+ signup_region, 084)
           'last_country_code', 'last_country', 'last_city', 'last_isp',
           'signup_ip', 'signup_country_code', 'signup_country', 'signup_region', 'signup_city', 'signup_isp',
@@ -659,6 +662,7 @@ class ReportsService {
         sportsBetlocked: Boolean(full.sports_betlocked),
         casinoLocked: Boolean(full.casino_locked),
         withdrawLocked: Boolean(full.withdraw_locked),
+        originalsLocked: Boolean(full.originals_locked),
         status: full.status ?? null,
         betStatus: full.bet_status ?? null,
       },

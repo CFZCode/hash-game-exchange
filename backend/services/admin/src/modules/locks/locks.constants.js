@@ -54,6 +54,11 @@ const LOCK_FIELDS = Object.freeze({
    * Not the timed `withdraw_locked_until` cooldown after a password change.
    */
   withdraw: 'withdraw_locked',
+  /**
+   * Original Games (casino-service `modules/original-games`) may not be played
+   * (migration 141). No alias. `casino` no longer covers them.
+   */
+  originals: 'originals_locked',
 });
 
 /**

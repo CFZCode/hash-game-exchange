@@ -93,6 +93,9 @@ const EXTENSIONS = {
     // set through `POST /admin/locks` and cascaded by `lock_sources`. Not the
     // timed `withdraw_locked_until` cooldown above.
     withdraw_locked: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false, field: 'withdraw_locked' },
+    // ── migration 141-originals-lock ───────────────────────────────────
+    // Blocks Original Games only; `casino_locked` covers provider casino.
+    originals_locked: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false, field: 'originals_locked' },
   },
 
   // ── migration 062-agent-money ────────────────────────────────────────
@@ -490,6 +493,8 @@ const EXTENSIONS = {
     lock_sources: { type: DataTypes.JSONB, allowNull: false, defaultValue: {}, field: 'lock_sources' },
     // ── migration 091-withdraw-lock ────────────────────────────────────
     withdraw_locked: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false, field: 'withdraw_locked' },
+    // ── migration 141-originals-lock ───────────────────────────────────
+    originals_locked: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false, field: 'originals_locked' },
   },
 };
 

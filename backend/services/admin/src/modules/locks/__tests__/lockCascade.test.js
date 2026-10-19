@@ -169,4 +169,21 @@ test('lock cascade keeps direct locks', async (t) => {
     assert.equal(row.casino_locked, true, 'direct casino lock kept');
     assert.equal(row.sports_betlocked, false, 'inherited sports lock lifted');
   });
+
+  await t.test('the Original Games lock cascades and keeps a direct lock like the others', async () => {
+    await reset();
+    await locks.updateLocks({ actor, userId: aPlayer, locks: { originals: true } });
+    await locks.updateLocks({ actor, staffId: a, locks: { originals: true } });
+    const originals = async (id) => (await models.Users.findByPk(id, { raw: true })).originals_locked;
+    assert.equal((await models.Staff.findByPk(b, { raw: true })).originals_locked, true);
+    assert.equal(await originals(bPlayer), true);
+
+    await locks.updateLocks({ actor, staffId: a, locks: { originals: false } });
+    assert.equal(await originals(aPlayer), true, 'direct originals lock kept');
+    assert.equal(await originals(aPlayer2), false);
+    assert.equal(await originals(bPlayer), false);
+    const row = await models.Users.findByPk(aPlayer, { raw: true });
+    assert.equal(row.casino_locked, false, 'the casino lock is a separate column');
+    assert.deepEqual(row.lock_sources.originals_locked, { own: true, by: [] });
+  });
 });

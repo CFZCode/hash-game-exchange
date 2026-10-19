@@ -57,10 +57,11 @@ class OriginalGamesService {
     if (!EXPONENT[code]) throw E.UNSUPPORTED_CURRENCY({ currency });
 
     const user = await this.models.Users.findByPk(userId, {
-      attributes: ['id', 'name', 'casino_locked', 'system_locked'],
+      attributes: ['id', 'name', 'originals_locked', 'system_locked'],
       raw: true,
     });
-    if (user?.casino_locked || user?.system_locked) throw E.CASINO_LOCKED({ userId });
+    // Its own lock (migration 141): `casino_locked` covers provider casino only.
+    if (user?.originals_locked || user?.system_locked) throw E.ORIGINALS_LOCKED({ userId });
 
     let response;
     try {
@@ -203,8 +204,8 @@ class OriginalGamesService {
       return this.#error(ERROR_CODE.INTERNAL, { currency, balance });
     }
 
-    const user = await this.models.Users.findByPk(userId, { attributes: ['casino_locked', 'system_locked'], raw: true });
-    if (user?.casino_locked || user?.system_locked) return this.#error(ERROR_CODE.PLAYER_BLOCKED, { currency, balance });
+    const user = await this.models.Users.findByPk(userId, { attributes: ['originals_locked', 'system_locked'], raw: true });
+    if (user?.originals_locked || user?.system_locked) return this.#error(ERROR_CODE.PLAYER_BLOCKED, { currency, balance });
     // Originals switched off: no new bets (open rounds still settle).
     if (!(await this.originalsOn())) return this.#error(ERROR_CODE.MAINTENANCE, { currency, balance });
 

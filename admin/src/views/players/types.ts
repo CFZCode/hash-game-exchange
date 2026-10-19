@@ -155,6 +155,7 @@ export type PlayerRisk = {
     sportsBetlocked: boolean
     casinoLocked: boolean
     withdrawLocked?: boolean
+    originalsLocked?: boolean
     status?: string | null
     betStatus?: string | null
   }

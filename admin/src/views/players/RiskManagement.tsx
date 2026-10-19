@@ -4,7 +4,7 @@ import { useState, type ReactNode } from 'react'
 
 import Link from 'next/link'
 
-import { BanknoteXIcon, DicesIcon, LockIcon, LockOpenIcon, RefreshCwIcon, ShieldAlertIcon, TrophyIcon } from 'lucide-react'
+import { BanknoteXIcon, DicesIcon, GamepadIcon, LockIcon, LockOpenIcon, RefreshCwIcon, ShieldAlertIcon, TrophyIcon } from 'lucide-react'
 
 import DataTable, { type Column } from '@/components/shared/DataTable'
 import DateTime from '@/components/shared/DateTime'
@@ -243,7 +243,8 @@ const BET_ROWS = 10
 const LOCKS = [
   { key: 'system', field: 'isLocked', label: 'Account Locked', hint: 'Blocks all logins and activity', icon: <LockIcon /> },
   { key: 'sports', field: 'sportsBetlocked', label: 'Sports Bet Lock', hint: 'Prevents sports bets', icon: <TrophyIcon /> },
-  { key: 'casino', field: 'casinoLocked', label: 'Casino Lock', hint: 'Prevents casino play', icon: <DicesIcon /> },
+  { key: 'casino', field: 'casinoLocked', label: 'Casino Lock', hint: 'Prevents provider casino play', icon: <DicesIcon /> },
+  { key: 'originals', field: 'originalsLocked', label: 'Original Games Lock', hint: 'Prevents Original Games play', icon: <GamepadIcon /> },
   { key: 'withdraw', field: 'withdrawLocked', label: 'Withdrawal Lock', hint: 'Rejects all withdrawals for this user', icon: <BanknoteXIcon /> }
 ] as const
 

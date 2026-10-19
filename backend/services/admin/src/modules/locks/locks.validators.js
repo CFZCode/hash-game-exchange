@@ -23,6 +23,8 @@ const lockBody = z
     sports: z.boolean().optional(),
     /** The withdrawal block (migration 091). */
     withdraw: z.boolean().optional(),
+    /** The Original Games lock (migration 141). */
+    originals: z.boolean().optional(),
 
     // Legacy names.
     all_system_blocked: z.boolean().optional(),
@@ -36,6 +38,7 @@ const lockBody = z
       ...(body.casino !== undefined ? { casino: body.casino } : {}),
       ...(body.sports !== undefined ? { sports: body.sports } : {}),
       ...(body.withdraw !== undefined ? { withdraw: body.withdraw } : {}),
+      ...(body.originals !== undefined ? { originals: body.originals } : {}),
     };
 
     for (const [legacyName, current] of Object.entries(LEGACY_FIELD_ALIASES)) {

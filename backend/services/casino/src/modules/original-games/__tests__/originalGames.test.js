@@ -274,4 +274,20 @@ test('original games aggregator', async (t) => {
     const res = await call('balance', { player_id: String(uid), currency: 'USDT', session_id: out.sessionId });
     assert.strictEqual(res.body.error_code, 'CURRENCY_MISMATCH');
   });
+
+  await t.test('the Original Games lock refuses launch and bets; the casino lock alone does not', async () => {
+    const locked = await player('100');
+    await models.Users.update({ originals_locked: true }, { where: { id: locked } });
+    await assert.rejects(service.launch({ userId: locked, gameCode: 'crash', currency: 'INR' }), { status: 403, code: 'ORIGINAL_GAMES_ORIGINALS_LOCKED' });
+    const refused = await call('bet', { player_id: String(locked), currency: 'INR', transaction_id: newTx(), amount: 100 });
+    assert.strictEqual(refused.body.error_code, 'PLAYER_BLOCKED');
+    assert.strictEqual(balances.get(`${locked}:INR`), '100');
+
+    const casinoOnly = await player('100');
+    await models.Users.update({ casino_locked: true }, { where: { id: casinoOnly } });
+    assert.ok((await service.launch({ userId: casinoOnly, gameCode: 'crash', currency: 'INR' })).sessionId);
+    const placed = await call('bet', { player_id: String(casinoOnly), currency: 'INR', transaction_id: newTx(), amount: 100 });
+    assert.strictEqual(placed.body.status, 'OK');
+    assert.strictEqual(balances.get(`${casinoOnly}:INR`), '99.00000000');
+  });
 });

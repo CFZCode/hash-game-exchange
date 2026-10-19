@@ -26,7 +26,8 @@ const { wagerValuer } = require('./reportingCurrency');
  *
  *   closed      users.status = 'closed' (the close route; anonymised)
  *   locked      system_locked or is_locked — sign-in and everything else refused
- *   restricted  a product lock (casino_locked, sports_betlocked, withdraw_locked)
+ *   restricted  a product lock (casino_locked, sports_betlocked, withdraw_locked,
+ *               originals_locked)
  *               or bet_status other than 'active'
  *   active      none of the above
  *   <other>     any other users.status value, as written
@@ -45,6 +46,7 @@ const EFFECTIVE_STATUS = (u) => `CASE
     WHEN LOWER(COALESCE(${u}.status, 'active')) = 'closed' THEN 'closed'
     WHEN ${u}.system_locked IS TRUE OR ${u}.is_locked IS TRUE THEN 'locked'
     WHEN ${u}.casino_locked IS TRUE OR ${u}.sports_betlocked IS TRUE OR ${u}.withdraw_locked IS TRUE
+      OR ${u}.originals_locked IS TRUE
       OR LOWER(COALESCE(NULLIF(${u}.bet_status, ''), 'active')) <> 'active' THEN 'restricted'
     WHEN LOWER(COALESCE(NULLIF(${u}.status, ''), 'active')) = 'active' THEN 'active'
     ELSE LOWER(${u}.status) END`;
@@ -107,6 +109,7 @@ class UserStatusStatsService {
                 COUNT(*) FILTER (WHERE u.casino_locked IS TRUE)::int AS casino_locked,
                 COUNT(*) FILTER (WHERE u.sports_betlocked IS TRUE)::int AS sports_locked,
                 COUNT(*) FILTER (WHERE u.withdraw_locked IS TRUE)::int AS withdraw_locked,
+                COUNT(*) FILTER (WHERE u.originals_locked IS TRUE)::int AS originals_locked,
                 COUNT(*) FILTER (WHERE LOWER(COALESCE(NULLIF(u.bet_status, ''), 'active')) <> 'active')::int AS bet_suspended,
                 COUNT(*) FILTER (WHERE u.muted IS TRUE)::int AS muted,
                 COUNT(*) FILTER (WHERE u.withdraw_locked_until > now())::int AS withdraw_hold,
@@ -235,6 +238,7 @@ class UserStatusStatsService {
           { key: 'casino', label: 'Casino lock', value: Number(t.casino_locked ?? 0) },
           { key: 'sports', label: 'Sports lock', value: Number(t.sports_locked ?? 0) },
           { key: 'withdraw', label: 'Withdrawals blocked', value: Number(t.withdraw_locked ?? 0) },
+          { key: 'originals', label: 'Original Games lock', value: Number(t.originals_locked ?? 0) },
           { key: 'betSuspended', label: 'Betting suspended', value: Number(t.bet_suspended ?? 0) },
           { key: 'withdrawHold', label: 'Withdrawal hold', value: Number(t.withdraw_hold ?? 0) },
           { key: 'muted', label: 'Chat muted', value: Number(t.muted ?? 0) },
@@ -340,7 +344,7 @@ class UserStatusStatsService {
       select(
         this.models,
         `SELECT u.id, u.name, u.created, u.status, u.bet_status, u.system_locked, u.is_locked, u.casino_locked,
-                u.sports_betlocked, u.withdraw_locked, u.muted, u.two_fa_status, u.withdraw_locked_until, u.country, u.parent_staff_id,
+                u.sports_betlocked, u.withdraw_locked, u.originals_locked, u.muted, u.two_fa_status, u.withdraw_locked_until, u.country, u.parent_staff_id,
                 NULLIF(TRIM(u.email), '') IS NOT NULL AS has_email,
                 NULLIF(TRIM(u.phone), '') IS NOT NULL AS has_phone,
                 u.last_login_at,
@@ -445,6 +449,7 @@ class UserStatusStatsService {
           casino: Boolean(account.casino_locked),
           sports: Boolean(account.sports_betlocked),
           withdraw: Boolean(account.withdraw_locked),
+          originals: Boolean(account.originals_locked),
           muted: Boolean(account.muted),
           withdrawHoldUntil:
             account.withdraw_locked_until && new Date(account.withdraw_locked_until) > new Date() ? iso(account.withdraw_locked_until) : null,

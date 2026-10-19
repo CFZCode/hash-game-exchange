@@ -45,7 +45,7 @@ class StaffService {
     const row = await this.models.Staff.findByPk(staffId, {
       attributes: [
         'id', 'name', 'email', 'phone', 'country', 'parent_id', 'role_id', 'status', 'percentage',
-        'system_locked', 'casino_locked', 'sports_betlocked', 'withdraw_locked',
+        'system_locked', 'casino_locked', 'sports_betlocked', 'withdraw_locked', 'originals_locked',
       ],
       raw: true,
     });
@@ -61,6 +61,7 @@ class StaffService {
         casino: Boolean(row.casino_locked),
         sports: Boolean(row.sports_betlocked),
         withdraw: Boolean(row.withdraw_locked),
+        originals: Boolean(row.originals_locked),
       },
     };
   }

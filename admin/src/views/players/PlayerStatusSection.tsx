@@ -32,7 +32,7 @@ type PlayerStatus = {
     rawStatus: string | null
     betStatus: string | null
     channel: 'direct' | 'agent'
-    locks: { system: boolean; casino: boolean; sports: boolean; withdraw?: boolean; muted: boolean; withdrawHoldUntil: string | null }
+    locks: { system: boolean; casino: boolean; sports: boolean; withdraw?: boolean; originals?: boolean; muted: boolean; withdrawHoldUntil: string | null }
     twoFa: boolean
     hasEmail: boolean
     hasPhone: boolean
@@ -125,6 +125,7 @@ const PlayerStatusSection = ({ userId, filters: f }: { userId: string; filters: 
             <Flag on={a.locks.system} label='System lock' />
             <Flag on={a.locks.casino} label='Casino lock' />
             <Flag on={a.locks.sports} label='Sports lock' />
+            {a.locks.originals !== undefined && <Flag on={a.locks.originals} label='Original Games lock' />}
             {a.locks.withdraw !== undefined && <Flag on={a.locks.withdraw} label='Withdrawal block' />}
             {a.betStatus && a.betStatus.toLowerCase() !== 'active' && <Flag on label={`Betting ${a.betStatus}`} />}
             {a.locks.muted && <Flag on label='Chat muted' />}
