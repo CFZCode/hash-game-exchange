@@ -447,14 +447,10 @@ class DashboardStatsService {
         SELECT game_key, currency, MAX(name) AS name, MAX(provider) AS provider, SUM(amount) AS total, SUM(bets) AS n,
                ROW_NUMBER() OVER (PARTITION BY currency ORDER BY SUM(amount) DESC) AS rank
           FROM (
-            SELECT 'inhouse:' || b.game AS game_key, UPPER(b.coin) AS currency, b.game AS name, NULL::text AS provider, b.amount, 1 AS bets
-              FROM bets b
-             WHERE b.amount > 0 AND (b.result IS NULL OR b.result::text <> '"refunded"') AND ${NOT_FAKE}
-               AND ${this.#window('b.created')} ${cur('b.coin')} ${this.#owned(ctx, 'b.uid')}
-            UNION ALL
+            -- Third-party casino only: the Originals (in-house bets, og_transactions) have their own section.
             -- Stakes less the refunds / rollbacks that returned them, as in the series.
-            SELECT 'gis:' || COALESCE(g.game_uuid, ''), ${gisCurrency}, COALESCE(gg.name, g.game_uuid), gg.provider,
-                   ${gisSideAmountSql('g')}, ${gisBetCountSql('g')}
+            SELECT 'gis:' || COALESCE(g.game_uuid, '') AS game_key, ${gisCurrency} AS currency, COALESCE(gg.name, g.game_uuid) AS name, gg.provider AS provider,
+                   ${gisSideAmountSql('g')} AS amount, ${gisBetCountSql('g')} AS bets
               FROM gis_transactions g
               LEFT JOIN gis_games gg ON gg.uuid = g.game_uuid
              WHERE ${gisPlayFilterSql('g')} AND ${gisKindSql('g')} = 'stake' AND LOWER(COALESCE(gg.type, '')) NOT LIKE '%sport%'
@@ -472,12 +468,6 @@ class DashboardStatsService {
               LEFT JOIN js_games jg2 ON jg2.game_uid = v.game_uid
              WHERE ${V2_STAKE('v')} <> 0
                AND ${this.#window('v.created_at')} ${cur('v.currency')} ${this.#owned(ctx, 'v.user_id')}
-            UNION ALL
-            SELECT 'og:' || COALESCE(o.game_code, ''), UPPER(o.currency), COALESCE(og.name, o.game_code), 'Original Games', o.amount, 1
-              FROM og_transactions o
-              LEFT JOIN og_games og ON og.code = o.game_code
-             WHERE ${OG_PLAYED('o')} AND o.kind = 'bet'
-               AND ${this.#window('o.created_at')} ${cur('o.currency')} ${this.#owned(ctx, 'o.user_id')}
           ) stakes
          GROUP BY game_key, currency
       ) ranked
