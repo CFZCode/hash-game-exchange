@@ -31,7 +31,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { DateRangePicker } from '@/components/ui/date-picker'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useApi, useListState } from '@/hooks/use-api'
 import { formatNumber } from '@/lib/format'
 import { usePageList } from './usePageList'
@@ -503,34 +502,22 @@ const GamesTab = ({ channel }: { channel: Channel }) => {
   )
 }
 
-/** Admin → Casino → Original Games. Super Admin and its executives with `originals:read`. */
-const OriginalGames = () => (
-  <div>
-    <PageHeader
-      title='Original Games'
-      description='The Original Games Aggregator: turnover, payouts and GGR (wagered − won), every round, and the games the provider offers. Refunded (rolled back) bets are kept out of the figures.'
-    />
-    <ChannelTabs>
-      {channel => (
-        <Tabs defaultValue='dashboard'>
-          <TabsList className='mb-4'>
-            <TabsTrigger value='dashboard'>Dashboard</TabsTrigger>
-            <TabsTrigger value='bets'>Bet history</TabsTrigger>
-            <TabsTrigger value='games'>Games</TabsTrigger>
-          </TabsList>
-          <TabsContent value='dashboard'>
-            <DashboardTab channel={channel} />
-          </TabsContent>
-          <TabsContent value='bets'>
-            <BetsTab channel={channel} />
-          </TabsContent>
-          <TabsContent value='games'>
-            <GamesTab channel={channel} />
-          </TabsContent>
-        </Tabs>
-      )}
-    </ChannelTabs>
-  </div>
-)
+const SECTIONS = {
+  dashboard: { title: 'Original Games · Dashboard', description: 'Turnover, payouts and GGR (wagered − won) of the Original Games Aggregator. Refunded (rolled back) bets are kept out of the figures.', Tab: DashboardTab },
+  bets: { title: 'Original Games · Bet history', description: 'Every Original Games round: bet, payout, result and balance after.', Tab: BetsTab },
+  games: { title: 'Original Games · Games', description: 'The games the provider offers, their limits and status.', Tab: GamesTab }
+}
+
+/** Admin → Original Games → Dashboard / Bet history / Games. Super Admin and its executives with `originals:read`. */
+const OriginalGames = ({ section = 'dashboard' }: { section?: keyof typeof SECTIONS }) => {
+  const { title, description, Tab } = SECTIONS[section]
+
+  return (
+    <div>
+      <PageHeader title={title} description={description} />
+      <ChannelTabs>{channel => <Tab channel={channel} />}</ChannelTabs>
+    </div>
+  )
+}
 
 export default OriginalGames

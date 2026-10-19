@@ -439,7 +439,9 @@ export const navItems: NavItem[] = [
     collapsible: true,
     items: [
       // The aggregator's originals: dashboard, bets, games. Super Admin + its executives with originals:read (backend checks both).
-      { icon: 'Dices', label: 'Original Games', href: '/casino/original-games', permission: 'originals:read', direct: true }
+      { icon: 'LayoutDashboard', label: 'Dashboard', href: '/casino/original-games', permission: 'originals:read', direct: true },
+      { icon: 'History', label: 'Bet history', href: '/casino/original-games/bets', permission: 'originals:read', direct: true },
+      { icon: 'Dices', label: 'Games', href: '/casino/original-games/games', permission: 'originals:read', direct: true }
     ]
   },
   {
