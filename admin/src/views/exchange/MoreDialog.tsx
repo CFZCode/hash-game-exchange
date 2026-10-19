@@ -58,6 +58,8 @@ const ProfileTab = ({ row }: { row: AccountRow }) => (
         ['Client P/L:', fmt(row.settlementPoints)],
         ['Exposure:', fmt(row.exposure)],
         ['Sports pts:', fmt(row.sportsPts)],
+        ['Casino pts:', fmt(row.casinoPts)],
+        ['Original pts:', fmt(row.originalPts)],
         ['Created Date :', row.createdAt ? new Date(row.createdAt).toLocaleString() : '']
       ])}
     </div>
