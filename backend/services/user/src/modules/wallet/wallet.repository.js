@@ -479,6 +479,47 @@ class WalletRepository {
   }
 
   /**
+   * The staff Ledger tab: `wallet_history` plus the moves that never write it — a swap's two
+   * `credits_ledger` legs (`meta.swap`) and the Sports Exchange's own ledgers (mssports bet placed /
+   * settlement / refund / void, INR) — newest first, one page. Same row shape as `listHistory`.
+   */
+  async listStaffHistory({ userId, currency, limit, offset }) {
+    const { sequelize } = this;
+    const cur = String(currency ?? '').toUpperCase();
+    const replacements = { uid: String(userId), limit, offset, ...(currency ? { cur } : {}) };
+    const sports = !currency || cur === 'INR';
+    const parts = [
+      `SELECT h.id::text AS id, h.transaction_time, h.coin, h.operation, h.amount::text AS amount,
+              h.previous_balance::text AS previous_balance, h.new_balance::text AS new_balance, h.description
+         FROM wallet_history h WHERE h.uid::text = :uid${currency ? ' AND UPPER(h.coin) = :cur' : ''}`,
+      `SELECT 'swap-' || l.id, l.created_at, UPPER(l.currency), CASE WHEN l.amount < 0 THEN 'debit' ELSE 'credit' END,
+              ABS(l.amount)::text, l.meta->>'previousBalance', l.balance::text, l.description
+         FROM credits_ledger l
+        WHERE l.user_id = :uid AND l.meta->>'swap' = 'true'${currency ? ' AND UPPER(l.currency) = :cur' : ''}`,
+      ...(sports
+        ? [
+            `SELECT 'sports-bet-' || d.id, d.created_at, 'INR', 'debit', ABS(d.amount)::text, NULL, d.balance::text,
+                    TRIM('Sports bet placed — ' || COALESCE(d.description, ''))
+               FROM mssports.debit_ledger d
+              WHERE d.user_id = :uid AND d.reason = 'bet_placed' AND UPPER(COALESCE(d.currency, 'INR')) = 'INR'`,
+            `SELECT 'sports-' || c.id, c.created_at, 'INR', 'credit', ABS(c.amount)::text, NULL, c.closing::text,
+                    TRIM('Sports ' || REPLACE(c.reason, '_', ' ') || ' — ' || COALESCE(c.description, ''))
+               FROM mssports.credits_ledger c
+              WHERE c.user_id = :uid AND c.reason IN ('settlement', 'refund', 'settlement_void') AND UPPER(COALESCE(c.currency, 'INR')) = 'INR'`,
+          ]
+        : []),
+    ].join('\n UNION ALL \n');
+    const [rows, [{ count }]] = await Promise.all([
+      sequelize.query(`SELECT * FROM (${parts}) x ORDER BY transaction_time DESC NULLS LAST, id DESC LIMIT :limit OFFSET :offset`, {
+        replacements,
+        type: sequelize.QueryTypes.SELECT,
+      }),
+      sequelize.query(`SELECT COUNT(*)::int AS count FROM (${parts}) x`, { replacements, type: sequelize.QueryTypes.SELECT }),
+    ]);
+    return { rows, count };
+  }
+
+  /**
    * Sum the ledger for one currency — used to reconcile a wallet against its
    * own history. A mismatch means something wrote a balance without a ledger
    * row, which is the failure this whole module exists to make impossible.

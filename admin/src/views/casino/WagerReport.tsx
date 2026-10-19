@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 
 import Can from '@/components/shared/Can'
 import {
@@ -21,6 +21,7 @@ import Money from '@/components/shared/Money'
 import ChannelTabs, { type Channel } from '@/components/shared/ChannelTabs'
 import PageHeader from '@/components/shared/PageHeader'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useApi } from '@/hooks/use-api'
 import { formatNumber } from '@/lib/format'
 import { useCurrencyCodes } from '@/views/finance/useCurrencyCodes'
@@ -58,6 +59,15 @@ type WagerStats = {
 const STATS = 'admin/reports/wager-stats'
 const DONUT_SLICES = 6
 
+/** Casino only: every game, third-party providers, or the site's own Original Games. */
+const CATEGORIES = [
+  { value: 'all', label: 'All' },
+  { value: 'casino', label: 'Casino (third-party)' },
+  { value: 'originals', label: 'Original Games' }
+] as const
+
+type Category = (typeof CATEGORIES)[number]['value']
+
 const pct = (v: number | null | undefined) => (v === null || v === undefined ? '—' : `${(v * 100).toFixed(1)}%`)
 
 /**
@@ -67,7 +77,8 @@ const pct = (v: number | null | undefined) => (v === null || v === undefined ? '
 const WagerReportView = ({ area, channel }: Props & { channel: Channel }) => {
   const filters = useStatsFilters()
   const currencies = useCurrencyCodes()
-  const query = { area, channel, ...filters.query }
+  const [category, setCategory] = useState<Category>('all')
+  const query = { area, channel, ...(area === 'casino' && category !== 'all' ? { category } : {}), ...filters.query }
   const stats = useApi<WagerStats>(STATS, query)
   const prev = useApi<WagerStats>(STATS, { ...query, ...filters.previous.apiRange })
 
@@ -124,6 +135,18 @@ const WagerReportView = ({ area, channel }: Props & { channel: Channel }) => {
   return (
     <div>
       <FilterBar filters={filters} currencies={currencies} className='mb-4' />
+
+      {area === 'casino' && (
+        <Tabs value={category} onValueChange={v => setCategory(v as Category)} className='mb-4'>
+          <TabsList aria-label='Game category'>
+            {CATEGORIES.map(c => (
+              <TabsTrigger key={c.value} value={c.value}>
+                {c.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+      )}
 
       <Can
         permission='reports:read'
@@ -292,7 +315,7 @@ const WagerReport = ({ area }: Props) => (
       title={`${area === 'casino' ? 'Casino' : 'Sports'} wager report`}
       description={
         area === 'casino'
-          ? 'Stakes, payouts and gross gaming revenue (GGR = wagered − won) across every casino provider, for the players in your tree. Refunds are kept out of both sides.'
+          ? 'Stakes, payouts and gross gaming revenue (GGR = wagered − won) across every casino provider and the Original Games, for the players in your tree. Refunds are kept out of both sides.'
           : 'Stakes of settled bets (when they were placed) against settlement payouts (when they were paid), for the players in your tree. GGR = wagered − won.'
       }
     />

@@ -467,6 +467,34 @@ test('wallet money guarantees', async (t) => {
     assert.equal(after.USDT, '0.00000000', 'live coins are listed at zero as before');
   });
 
+  await t.test('the staff Ledger tab lists swap legs and Sports Exchange bets beside the wallet history', async () => {
+    const uid = newUid();
+    await seedWallet(uid, '100');
+    await service.debit({ userId: uid, currency: CURRENCY, amount: '10', reason: REASON.BET_STAKE, idempotencyKey: `t-staff-history-${uid}` });
+    const { CreditsLedger, WalletHistory } = connection.models;
+    const leg = (currency, amount, reason) => ({
+      user_id: String(uid), currency, amount, reason, description: 'Swap USDT -> INR', balance: 0, closing: 0,
+      netamount: 0, profit: 0, loss: 0, commission: 0, source_service: 'user-service', meta: { swap: true },
+    });
+    await CreditsLedger.bulkCreate([leg('USDT', '-30', REASON.TRANSFER_OUT), leg('INR', '2475', REASON.TRANSFER_IN)]);
+    const q = (sql) => connection.sequelize.query(sql, { replacements: { uid: String(uid) } });
+    await q(`INSERT INTO mssports.debit_ledger (user_id, currency, amount, reason, description, balance, created_at)
+             VALUES (:uid, 'INR', 100, 'bet_placed', 'AFG v ZIM', 2375, now())`);
+    try {
+      const all = await service.listStaffHistory({ userId: uid, limit: 50, offset: 0 });
+      assert.equal(all.count, 4, 'the debit, both swap legs and the sports bet');
+      const by = (prefix) => all.rows.filter((r) => String(r.id).startsWith(prefix)).map((r) => [r.coin, r.operation, money.toDecimalString(money.toMinorQuantised(r.amount))]);
+      assert.deepEqual(by('swap-').sort(), [['INR', 'credit', '2475.00000000'], ['USDT', 'debit', '30.00000000']]);
+      assert.deepEqual(by('sports-bet-'), [['INR', 'debit', '100.00000000']]);
+      const usdt = await service.listStaffHistory({ userId: uid, currency: 'USDT', limit: 50, offset: 0 });
+      assert.equal(usdt.count, 1, 'a USDT page has the USDT leg only — sports bets are INR');
+    } finally {
+      await q('DELETE FROM mssports.debit_ledger WHERE user_id = :uid');
+      await CreditsLedger.destroy({ where: { user_id: String(uid) } });
+      await WalletHistory.destroy({ where: { uid } });
+    }
+  });
+
   await t.test('validators: BJB is known for reads and debits, never offered', async () => {
     assert.equal(SUPPORTED_CURRENCIES.includes('BJB'), false);
     assert.equal(KNOWN_CURRENCIES.includes('BJB'), true);

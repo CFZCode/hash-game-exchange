@@ -253,6 +253,11 @@ class WalletService {
     return this.repo.listHistory(params);
   }
 
+  /** The staff Ledger tab: wallet history plus swaps and sports bets (repo.listStaffHistory). */
+  async listStaffHistory(params) {
+    return this.repo.listStaffHistory(params);
+  }
+
   /** The PLAYER's ledger: a row a staff member wrote reads as a plain label, never the staff note. */
   async listLedger(params) {
     const result = await this.repo.listLedger(params);

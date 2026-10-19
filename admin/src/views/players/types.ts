@@ -11,8 +11,14 @@ export type PlayerRow = {
   channel: 'direct' | 'agent'
   agentId: number | null
   balance: string
+
+  /** Real deposits, every rail and coin, valued in INR. */
   totalDeposited: string
   totalWithdrawn: string
+
+  /** Super Admin Direct User Wallet credit / debit (INR) — never a deposit / withdrawal. */
+  adminCredited?: string
+  adminDebited?: string
   wager: string
 
   /** House-only: null for agent-tree accounts. */
@@ -155,6 +161,9 @@ export type PlayerRisk = {
   financials: {
     totalDeposit: string
     totalWithdrawal: string
+
+    /** Direct User Wallet credit (INR) — not a deposit. */
+    adminCredited?: string
     net: string
     reward: {
       currency: string

@@ -124,7 +124,7 @@ const statementColumns: Column<StatementRow>[] = [
 ]
 
 const StatementTab = () => {
-  const [form, setForm] = useState({ subject: 'user', id: '', from: daysAgo(30), to: daysAgo(0), category: 'all' })
+  const [form, setForm] = useState({ subject: 'user', id: '', from: daysAgo(30), to: daysAgo(0), category: 'all', currency: 'INR' })
   const [applied, setApplied] = useState<typeof form | null>(null)
   const [page, setPage] = useState(1)
   const [limit, setLimit] = useState(100)
@@ -132,7 +132,9 @@ const StatementTab = () => {
   const [betPage, setBetPage] = useState(1)
 
   const base = applied ? (applied.subject === 'user' ? `admin/statements/user/${applied.id}` : `admin/statements/${applied.id}`) : null
-  const range = applied ? { from: applied.from || undefined, to: applied.to || undefined } : {}
+
+  // A user's statement is per wallet (currency); a staff statement is INR points.
+  const range = applied ? { from: applied.from || undefined, to: applied.to || undefined, ...(applied.subject === 'user' ? { currency: applied.currency } : {}) } : {}
   const stmt = useApi<Statement>(base ? `${base}/statement` : null, { ...range, category: applied?.category, page, limit })
   const bets = usePagedApi<Record<string, unknown>>(base ? `${base}/bets` : null, { ...range, kind: betKind, page: betPage, limit: 50 })
   const s = stmt.data
@@ -218,6 +220,28 @@ const StatementTab = () => {
                 )}
                 <Badge variant='secondary'>{s.subject.role}</Badge>
                 {s.subject.parentName && <span className='text-muted-foreground text-sm font-normal'>under {s.subject.parentName}</span>}
+                {applied?.subject === 'user' && (s.wallets?.length ?? 0) > 0 && (
+                  <Select
+                    value={s.currency ?? applied.currency}
+                    onValueChange={v => {
+                      if (!v) return
+                      setForm({ ...form, currency: v })
+                      setApplied({ ...applied, currency: v })
+                      setPage(1)
+                    }}
+                  >
+                    <SelectTrigger className='w-28' aria-label='Wallet'>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {s.wallets?.map(w => (
+                        <SelectItem key={w.currency} value={w.currency}>
+                          {w.currency}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
                 <span className='text-muted-foreground ml-auto text-sm font-normal'>
                   {s.period.from ?? 'start'} → {s.period.to ?? 'now'} · {s.category}
                 </span>
@@ -225,12 +249,19 @@ const StatementTab = () => {
             </CardHeader>
           </Card>
           <div className='grid grid-cols-2 gap-4 lg:grid-cols-4'>
-            <StatCard label='Opening' value={<Money value={s.balance.opening} />} />
-            <StatCard label='Closing' value={<Money value={s.balance.closing} />} hint={<>live <Money value={s.balance.live} /></>} />
+            <StatCard label='Opening' value={<Money value={s.balance.opening} currency={s.currency} />} hint='balance before the period' />
+            <StatCard label='Closing' value={<Money value={s.balance.closing} currency={s.currency} />} hint={<>live <Money value={s.balance.live} /></>} />
             <StatCard label='Total in' value={<Money value={s.balance.totalIn} />} hint={<span title='Credits the upline (agent or staff) transferred to this account in the period. Gateway and bank deposits are in the rows, not in this figure.'>credits from upline <Money value={s.balance.depositIn} /></span>} />
             <StatCard label='Total out' value={<Money value={s.balance.totalOut} />} hint={<>withdrawals <Money value={s.balance.withdrawOut} /></>} />
             <StatCard label='Movement' value={<Money value={s.balance.movement} signed />} hint={<>unexplained <Money value={s.balance.unexplained} /></>} />
             <StatCard label='Open exposure' value={<Money value={s.balance.openExposure} />} />
+            {s.balance.adminCredit !== undefined && (
+              <StatCard
+                label='Admin credit'
+                value={<Money value={s.balance.adminCredit} currency={s.currency} />}
+                hint={<>not a deposit · bonuses, swaps net <Money value={s.balance.otherNet} signed /></>}
+              />
+            )}
             <StatCard label='Sports P&L' value={<Money value={s.gaming.total.headlineSports} signed />} hint={`${formatNumber(s.gaming.counts.settledBets)} settled · ${formatNumber(s.gaming.counts.openBets)} open`} />
             <StatCard label='Casino P&L' value={<Money value={s.gaming.total.headlineCasino} signed />} hint={`${formatNumber(s.gaming.counts.casinoBets)} bets · ${formatNumber(s.gaming.counts.casinoWins)} wins`} />
           </div>

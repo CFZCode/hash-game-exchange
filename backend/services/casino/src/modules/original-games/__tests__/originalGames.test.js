@@ -42,8 +42,18 @@ test('original games aggregator', async (t) => {
     t.skip(`No test database reachable (${error.message})`);
     return;
   }
-  t.after(() => connection.close());
   const { models } = connection;
+  // Every player this suite makes is removed after it, rounds and all: left behind they are direct
+  // users with Original Games play, and the admin reports' fixtures then count them.
+  const made = [];
+  t.after(async () => {
+    if (made.length) {
+      await connection.sequelize.query('DELETE FROM og_transactions WHERE user_id IN (:ids)', { replacements: { ids: made } });
+      await connection.sequelize.query('DELETE FROM og_sessions WHERE user_id IN (:ids)', { replacements: { ids: made } });
+      await models.Users.destroy({ where: { id: made } });
+    }
+    await connection.close();
+  });
 
   /** user-service stand-in: overdraft refused, idempotent per (reason, ref). */
   const balances = new Map();
@@ -98,6 +108,7 @@ test('original games aggregator', async (t) => {
 
   const player = async (inr = '100', usdt = '0') => {
     const uid = newUid();
+    made.push(uid);
     await models.Users.destroy({ where: { id: uid } });
     await models.Users.create({ id: uid, name: `og-${uid}`, password: 'x', status: 'active' });
     balances.set(`${uid}:INR`, inr);

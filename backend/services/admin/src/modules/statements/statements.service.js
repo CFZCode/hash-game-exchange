@@ -16,6 +16,7 @@ const {
 } = require('./ledger');
 const {
   KIND,
+  KIND_CATEGORY,
   SPORTS_LEDGER_REASONS,
   OPEN_BET_STATUSES,
   CASINO_INR_CURRENCIES,
@@ -24,6 +25,8 @@ const {
   gisMagnitude,
 } = require('./statements.constants');
 const { casinoRoundsSql, dayRange } = require('./casinoRounds');
+const { realDepositsSql } = require('../reports/depositRails');
+const { CURRENCY_COLUMNS, CURRENCY_SYNONYMS } = require('../reports/reports.constants');
 const { descendantIds, visibleStaffIds } = require('../staff-directory/staffDirectory.service');
 const { PLAYER_FUNDING_TYPES, TRANSFER_TYPE } = require('../lords/lords.constants');
 
@@ -51,6 +54,23 @@ const FLOAT_TYPES = Object.freeze([TRANSFER_TYPE.TRANSFER, TRANSFER_TYPE.REFILL,
 
 /** `credits_ledger.reason` of a house (levels 1–3) wallet adjustment. */
 const HOUSE_ADJUST_REASONS = Object.freeze(['ADMIN_CREDIT', 'ADMIN_DEBIT']);
+
+/** casino-service ledger refTypes whose rounds the statement reads from the provider table (7 / 7b). */
+const ROUND_TABLE_REFS = Object.freeze(['GIS', 'INHOUSE', 'SEAMLESS']);
+
+/** Wallet-ledger bonuses and tips (the balance sheet's 6d), by the side they move. */
+const OTHER_CREDIT_REASONS = Object.freeze(['BONUS', 'TIP_RECEIVED']);
+const OTHER_DEBIT_REASONS = Object.freeze(['BONUS_REVERSAL', 'TIP_SENT']);
+
+/** `depositRails.js` rail → statement label. */
+const DEPOSIT_RAIL_LABELS = Object.freeze({
+  bank: 'Bank / manual deposit',
+  apay: 'Gateway deposit',
+  waypay: 'WayPay deposit',
+  ccpayment: 'Crypto deposit',
+  cricpay: 'CricPay deposit',
+  upi: 'UPI deposit',
+});
 
 /**
  * When a casino round HAPPENED.
@@ -257,23 +277,43 @@ class StatementsService {
    * and a win returns to it — so the running balance reconciles against
    * `credits.inr`.
    */
-  async userStatement({ staff, userId, from, to, page = 1, limit = 100, category = 'all' }) {
+  async userStatement({ staff, userId, from, to, page = 1, limit = 100, category = 'all', currency = 'INR' }) {
     const user = await this.#assertUserVisible(staff, userId);
+    const asked = String(currency).toUpperCase();
+    const wallet = CURRENCY_SYNONYMS[asked] ?? asked;
+    const column = CURRENCY_COLUMNS[wallet];
+    if (!column) throw errors.UNSUPPORTED_CURRENCY({ currency: asked });
 
-    const events = await this.#collectUserEvents(user.id);
+    const events = await this.#collectUserEvents(user.id, wallet);
 
     const credits = await this.models.Credits.findOne({ where: { uid: user.id }, raw: true });
-    const live = money.fromStored(credits?.inr ?? '0');
+    const live = money.fromStored(credits?.[column] ?? '0');
+    // Every wallet the player holds (and the one asked for), so the screen can switch between them.
+    const wallets = Object.entries(CURRENCY_COLUMNS)
+      .filter(([code, col]) => code === wallet || money.toMinorQuantised(String(credits?.[col] ?? '0')) !== 0n)
+      .map(([code, col]) => ({ currency: code, balance: money.fromStored(credits?.[col] ?? '0') }));
 
-    const ledger = buildLedger(events, live, { from, to, page, limit, category });
+    // Opening = what the events put in the wallet before the range (a new account opens at 0).
+    const ledger = buildLedger(events, live, { from, to, page, limit, category, anchor: 'events' });
 
     let depositIn = 0n;
     let withdrawOut = 0n;
     let bankIn = 0n;
     let bankOut = 0n;
+    let adminCredit = 0n;
+    let adminDebit = 0n;
+    let otherNet = 0n;
 
     for (const event of ledger.inside) {
       const minor = money.toMinor(event.amount);
+      if (KIND_CATEGORY[event.kind] === 'other') {
+        otherNet += minor;
+        if (event.kind === KIND.ADMIN) {
+          if (minor >= 0n) adminCredit += minor;
+          else adminDebit += -minor;
+        }
+        continue;
+      }
       if (event.kind === KIND.DEPOSIT_UPLINE) depositIn += minor;
       else if (event.kind === KIND.WITHDRAW_UPLINE) withdrawOut += -minor;
       else if (event.kind === KIND.BANK_DEPOSIT || event.kind === KIND.GATEWAY_DEPOSIT) bankIn += minor;
@@ -316,10 +356,13 @@ class StatementsService {
       closing: ledger.closing,
       totalIn,
       totalOut,
-      play: periodPlay(ledger.inside),
+      // Admin credits, bonuses and swaps move the wallet but are neither in/out nor play.
+      play: money.toDecimalString(money.toMinor(periodPlay(ledger.inside)) + otherNet),
     });
 
     return {
+      currency: wallet,
+      wallets,
       subject: {
         type: 'USER',
         id: String(user.id),
@@ -343,6 +386,11 @@ class StatementsService {
         withdrawOut: money.toDecimalString(withdrawOut),
         bankIn: money.toDecimalString(bankIn),
         bankOut: money.toDecimalString(bankOut),
+        /** Direct User Wallet / house adjustments — never a deposit or withdrawal. */
+        adminCredit: money.toDecimalString(adminCredit),
+        adminDebit: money.toDecimalString(adminDebit),
+        /** Admin credits, bonuses, tips and swaps in the period, net. */
+        otherNet: money.toDecimalString(otherNet),
         givenAgents: '0.00000000',
         givenPlayers: '0.00000000',
         givenDownline: '0.00000000',
@@ -511,9 +559,15 @@ class StatementsService {
   //  Gathering
   // ══════════════════════════════════════════════════════════════════════
 
-  /** Every INR balance-affecting event for one player, oldest first. */
-  async #collectUserEvents(userId) {
+  /** Every balance-affecting event for one player's `currency` wallet, oldest first. */
+  async #collectUserEvents(userId, currency = 'INR') {
     const uid = String(userId);
+    const inr = currency === 'INR';
+    const like = { [Op.iLike]: currency };
+    const { sequelize } = this.models.CreditsLedger;
+    const QueryTypes = sequelize.constructor.QueryTypes;
+    // The casino provider names this platform's INR wallet 'PKR' and its USDT wallet 'USD'.
+    const casinoCurrencies = inr ? CASINO_INR_CURRENCIES : currency === 'USDT' ? ['USDT', 'USD'] : [currency];
     const events = [];
     const push = (ts, kind, label, party, amount, note, seq) =>
       events.push({ ts: ts ?? new Date(), kind, label, party, note: note ?? null, legacy: null, amount: String(amount), seq: seq ?? 0 });
@@ -526,7 +580,8 @@ class StatementsService {
      * would double-count against the per-bet rows below — legacy's filter, and
      * the reason for it, both preserved.
      */
-    const transfers = await this.models.StaffTransfers.findAll({
+    // `staff_transfers` has no currency column: agent money is INR.
+    const transfers = !inr ? [] : await this.models.StaffTransfers.findAll({
       where: {
         transfer_type: PLAYER_FUNDING_TYPES,
         [Op.or]: [
@@ -558,7 +613,9 @@ class StatementsService {
     }
 
     /**
-     * 1b. House balance adjustments (levels 1–3, `/admin/user/wallet/adjust`).
+     * 1b. House balance adjustments (levels 1–3, `/admin/user/wallet/adjust`) and the Super
+     *     Admin's Direct User Wallet credit / debit — "Admin credit", never a deposit (owner,
+     *     19 Oct 2026), so its own kind outside Total in / out.
      *
      * They move the wallet through the spine with reason ADMIN_CREDIT/DEBIT
      * and were on no statement at all — the money appeared in `credits.inr`
@@ -567,7 +624,7 @@ class StatementsService {
      * nothing is counted twice.
      */
     const adjustments = await this.models.CreditsLedger.findAll({
-      where: { user_id: uid, currency: { [Op.iLike]: 'INR' }, reason: { [Op.in]: HOUSE_ADJUST_REASONS } },
+      where: { user_id: uid, currency: like, reason: { [Op.in]: HOUSE_ADJUST_REASONS } },
       order: [['created_at', 'ASC'], ['id', 'ASC']],
       raw: true,
     });
@@ -576,10 +633,11 @@ class StatementsService {
     );
     for (const row of adjustments) {
       const credit = money.toMinorQuantised(row.amount ?? '0') >= 0n;
+      const direct = row.meta?.refType === 'DIRECT_WALLET';
       push(
         row.created_at,
-        credit ? KIND.DEPOSIT_UPLINE : KIND.WITHDRAW_UPLINE,
-        credit ? 'Balance adjustment (credit)' : 'Balance adjustment (debit)',
+        KIND.ADMIN,
+        direct ? (credit ? 'Admin credit' : 'Admin debit') : credit ? 'Balance adjustment (credit)' : 'Balance adjustment (debit)',
         adjusters.get(String(row.meta?.refId)) ?? 'House',
         row.amount,
         row.description,
@@ -587,25 +645,16 @@ class StatementsService {
       );
     }
 
-    // 2. Bank deposits.
-    for (const row of await this.models.FiatDeposits.findAll({
-      where: {
-        user_id: uid,
-        currency: { [Op.iLike]: 'INR' },
-        status: { [Op.in]: ['approved', 'success', 'done', 'completed', 'Approved', 'Success'] },
-      },
-      raw: true,
-    })) {
-      push(row.created_at, KIND.BANK_DEPOSIT, 'Bank deposit', 'Bank', row.amount, row.transaction_id, Number(row.id) || 0);
-    }
-
-    // 3. Gateway deposits.
-    for (const row of await this.models.Apaydeposits.findAll({
-      where: { user_id: uid, currency: { [Op.iLike]: 'INR' }, status: 'Success' },
-      raw: true,
-    })) {
-      push(row.created_at, KIND.GATEWAY_DEPOSIT, 'Gateway deposit', 'Gateway', row.amount, row.order_id, Number(row.id) || 0);
-    }
+    // 2–3. Real deposits, every rail (reports/depositRails.js — the Dashboard's definition).
+    const real = realDepositsSql({ who: (column) => ` AND ${column}::text = :uid`, currency: true });
+    const deposits = await sequelize.query(`SELECT * FROM (${real.sql}) d ORDER BY d.at`, {
+      replacements: { ...real.replacements, uid, currency },
+      type: QueryTypes.SELECT,
+    });
+    deposits.forEach((row, i) => {
+      const bank = row.rail === 'bank';
+      push(row.at, bank ? KIND.BANK_DEPOSIT : KIND.GATEWAY_DEPOSIT, DEPOSIT_RAIL_LABELS[row.rail] ?? 'Deposit', bank ? 'Bank' : 'Gateway', row.amt, null, i);
+    });
 
     /**
      * 4. Bank withdrawals.
@@ -617,7 +666,7 @@ class StatementsService {
     for (const row of await this.models.FiatWithdrawals.findAll({
       where: {
         uid,
-        currency: { [Op.iLike]: 'INR' },
+        currency: like,
         status: { [Op.notIn]: ['rejected', 'failed', 'Rejected', 'Failed'] },
       },
       raw: true,
@@ -629,7 +678,7 @@ class StatementsService {
     for (const row of await this.models.Apaywithdrawals.findAll({
       where: {
         user_id: uid,
-        currency: { [Op.iLike]: 'INR' },
+        currency: like,
         status: { [Op.in]: ['Success', 'Pending'] },
         [Op.or]: [{ refunded: false }, { refunded: null }],
       },
@@ -644,10 +693,39 @@ class StatementsService {
      * FILTERED BY REASON — see the module header. Legacy read every ledger row
      * and called it sports.
      */
+    const ogNames = new Map(
+      (await sequelize.query(
+        `SELECT t.transaction_id AS id, COALESCE(g.name, t.game_code) AS name FROM og_transactions t
+           LEFT JOIN og_games g ON g.code = t.game_code WHERE t.user_id = :uidNum`,
+        { replacements: { uidNum: Number(userId) }, type: QueryTypes.SELECT }
+      ).catch(() => [])).map((r) => [String(r.id), r.name])
+    );
     for (const row of await this.models.CreditsLedger.findAll({
-      where: { user_id: uid, currency: { [Op.iLike]: 'INR' }, reason: { [Op.in]: SPORTS_LEDGER_REASONS } },
+      where: { user_id: uid, currency: like, reason: { [Op.in]: SPORTS_LEDGER_REASONS } },
       raw: true,
     })) {
+      /**
+       * casino-service writes these reasons too (Original Games, jsGames, seamless, aggregators,
+       * in-house) with the signed move in `amount` — the balance sheet's rule. GIS, in-house and
+       * seamless rounds are read from their own tables in 7 / 7b, so their ledger copies are skipped.
+       */
+      if (row.source_service === 'casino-service') {
+        const refType = String(row.meta?.refType ?? '').toUpperCase();
+        if (ROUND_TABLE_REFS.includes(refType)) continue;
+        const signed = money.toMinorQuantised(String(row.amount ?? '0'));
+        if (signed === 0n) continue;
+        const og = refType === 'OG';
+        push(
+          row.created_at,
+          KIND.CASINO,
+          og ? 'Original Games' : `Casino ${String(row.reason).toLowerCase().replace('bet_', '')}`,
+          (og && ogNames.get(String(row.meta?.refId ?? ''))) || row.description || '—',
+          money.toDecimalString(signed),
+          row.description || row.reason,
+          Number(row.id) || 0
+        );
+        continue;
+      }
       const net = row.netamount != null ? row.netamount : row.amount;
       push(
         row.created_at,
@@ -660,9 +738,64 @@ class StatementsService {
       );
     }
 
-    // 7. Casino. The provider labels this platform's INR wallet 'PKR'.
+    /**
+     * 6b. Sports Exchange (mssports), INR: it moves `credits.inr` itself and writes its own ledgers.
+     *     shortcut: the stake is `debit_ledger.amount` and the payout `credits_ledger.amount`, exact
+     *     for single bets; a hedged market moves less than that (the balance sheet uses `post`).
+     */
+    if (inr) {
+      const [stakes, settles] = await Promise.all([
+        sequelize.query(
+          `SELECT id, amount, description, created_at FROM mssports.debit_ledger
+            WHERE user_id = :uid AND reason = 'bet_placed' AND UPPER(COALESCE(currency, 'INR')) = 'INR'`,
+          { replacements: { uid }, type: QueryTypes.SELECT }
+        ),
+        sequelize.query(
+          `SELECT id, reason, amount, description, created_at FROM mssports.credits_ledger
+            WHERE user_id = :uid AND reason IN ('settlement', 'refund', 'settlement_void') AND amount <> 0
+              AND UPPER(COALESCE(currency, 'INR')) = 'INR'`,
+          { replacements: { uid }, type: QueryTypes.SELECT }
+        ),
+      ]);
+      const label = { settlement: 'Sports settlement', refund: 'Sports refund', settlement_void: 'Sports void' };
+      for (const row of stakes) {
+        const abs = money.toMinorQuantised(String(row.amount ?? '0').replace(/^-/, ''));
+        push(row.created_at, KIND.SPORTS, 'Sports bet placed', 'Sports', money.toDecimalString(-abs), row.description, Number(row.id) || 0);
+      }
+      for (const row of settles) {
+        push(row.created_at, KIND.SPORTS, label[row.reason], 'Sports', money.toDecimalString(money.toMinorQuantised(String(row.amount))), row.description, Number(row.id) || 0);
+      }
+    }
+
+    // 6c. Swaps (both legs, `meta.swap`), bonuses and tips — the wallet ledger, sign from the reason.
+    for (const row of await this.models.CreditsLedger.findAll({
+      where: {
+        user_id: uid,
+        currency: like,
+        [Op.or]: [
+          { reason: { [Op.in]: [...OTHER_CREDIT_REASONS, ...OTHER_DEBIT_REASONS] } },
+          { reason: { [Op.in]: ['TRANSFER_IN', 'TRANSFER_OUT'] }, [Op.and]: [whereFn(literal("meta->>'swap'"), 'true')] },
+        ],
+      },
+      raw: true,
+    })) {
+      const swap = row.reason === 'TRANSFER_IN' || row.reason === 'TRANSFER_OUT';
+      const credit = swap ? row.reason === 'TRANSFER_IN' : OTHER_CREDIT_REASONS.includes(row.reason);
+      const abs = money.toMinorQuantised(String(row.amount ?? '0').replace(/^-/, ''));
+      push(
+        row.created_at,
+        swap ? KIND.SWAP : KIND.BONUS,
+        swap ? 'Swap' : row.reason.startsWith('TIP') ? 'Tip' : row.reason === 'BONUS_REVERSAL' ? 'Bonus reversed' : 'Bonus',
+        swap ? 'Wallet' : 'House',
+        money.toDecimalString(credit ? abs : -abs),
+        row.description || row.reason,
+        Number(row.id) || 0
+      );
+    }
+
+    // 7. Casino (Slotegrator), in the provider's name for this wallet.
     const casino = await this.models.GisTransactions.findAll({
-      where: { user_id: userId, currency: { [Op.in]: CASINO_INR_CURRENCIES } },
+      where: { user_id: userId, currency: { [Op.in]: casinoCurrencies } },
       order: [['id', 'ASC']],
       raw: true,
     });
@@ -684,18 +817,16 @@ class StatementsService {
     }
 
     /**
-     * 7b. In-house rounds, jsGames v2 and seamless (`casinoRounds.js`), INR.
+     * 7b. In-house rounds, jsGames v2 and seamless (`casinoRounds.js`), in this wallet's currency.
      *
      * One event per round / callback, for what the wallet actually moved: a
      * settled in-house round nets payout − stake, an open one has taken its
-     * stake and paid nothing yet, a refunded one never happened. Without these
-     * a player who only played the house games had a statement whose running
-     * balance could not reach `credits.inr`.
+     * stake and paid nothing yet, a refunded one never happened. Their ledger
+     * copies are skipped in 6 (ROUND_TABLE_REFS), so a round is counted once.
      */
-    const { sequelize } = this.models.CreditsLedger;
     const rounds = await sequelize.query(
-      `SELECT * FROM (${casinoRoundsSql()}) r WHERE r.currency IN (:inr) AND r.net <> 0 ORDER BY r.ts, r.id`,
-      { replacements: { ids: [Number(userId)], inr: CASINO_INR_CURRENCIES }, type: sequelize.constructor.QueryTypes.SELECT }
+      `SELECT * FROM (${casinoRoundsSql()}) r WHERE r.currency IN (:curs) AND r.net <> 0 ORDER BY r.ts, r.id`,
+      { replacements: { ids: [Number(userId)], curs: casinoCurrencies }, type: QueryTypes.SELECT }
     );
     for (const row of rounds) {
       const label = row.source === 'inhouse'

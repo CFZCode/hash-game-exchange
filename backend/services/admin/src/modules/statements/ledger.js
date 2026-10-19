@@ -69,7 +69,7 @@ function place(ts, from, to) {
  * @param {Array<{ts: Date|string, kind: string, amount: string}>} events Oldest first.
  * @param {string} live The wallet balance right now, as a decimal string.
  */
-function buildLedger(events, live, { from, to, page = 1, limit = 100, category = 'all' }) {
+function buildLedger(events, live, { from, to, page = 1, limit = 100, category = 'all', anchor = 'wallet' }) {
   let lifetimeNet = 0n;
   let afterEndNet = 0n;
   let periodNet = 0n;
@@ -91,7 +91,9 @@ function buildLedger(events, live, { from, to, page = 1, limit = 100, category =
   }
 
   const liveMinor = money.toMinorQuantised(live);
-  const closing = liveMinor - afterEndNet;
+  // `anchor: 'events'` (a player's statement): opening = every event before the range, so a new
+  // account opens at 0 and drift stays in `unexplained` instead of "brought forward".
+  const closing = anchor === 'events' ? lifetimeNet - afterEndNet : liveMinor - afterEndNet;
   const opening = closing - periodNet;
 
   let running = opening;

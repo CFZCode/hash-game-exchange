@@ -24,6 +24,11 @@ const KIND = Object.freeze({
   // Play
   SPORTS: 'SPORTS',
   CASINO: 'CASINO',
+
+  // Neither a deposit nor play (owner, 19 Oct 2026: an admin credit is never a deposit)
+  ADMIN: 'ADMIN',
+  BONUS: 'BONUS',
+  SWAP: 'SWAP',
 });
 
 /** Which `?category=` filter each kind answers to. */
@@ -40,9 +45,12 @@ const KIND_CATEGORY = Object.freeze({
   [KIND.GATEWAY_WITHDRAW]: 'money',
   [KIND.SPORTS]: 'sports',
   [KIND.CASINO]: 'casino',
+  [KIND.ADMIN]: 'other',
+  [KIND.BONUS]: 'other',
+  [KIND.SWAP]: 'other',
 });
 
-const CATEGORIES = Object.freeze(['all', 'money', 'sports', 'casino']);
+const CATEGORIES = Object.freeze(['all', 'money', 'sports', 'casino', 'other']);
 
 /**
  * `credits_ledger.reason` values that are sports settlement.

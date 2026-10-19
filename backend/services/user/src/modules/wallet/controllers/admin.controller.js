@@ -93,7 +93,7 @@ function createAdminController({ service }) {
     history: asyncHandler(async (req, res) => {
       await service.assertPlayerVisible(req.staff.id, req.params.userId);
       const { limit, offset, currency } = req.query;
-      const result = await service.listHistory({
+      const result = await service.listStaffHistory({
         userId: req.params.userId, currency, limit, offset,
       });
       return res.json({ history: result.rows, count: result.count });

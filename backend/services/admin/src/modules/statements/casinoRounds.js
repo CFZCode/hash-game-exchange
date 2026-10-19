@@ -48,6 +48,15 @@ const INHOUSE_STATUS = (a) =>
 const INHOUSE_PLAYED = (a) =>
   `(${a}.result IS NULL OR ${a}.result::text <> '"refunded"') AND (${a}.result->>'fake') IS DISTINCT FROM 'true'`;
 
+/**
+ * Original Games (`og_transactions`): a `bet` and a `win` leg per round, both unsigned. A leg a
+ * rollback undid is a refund — neither turnover nor payout (admin original-games service's rule).
+ */
+const OG_ROLLED_BACK = (a) =>
+  `EXISTS (SELECT 1 FROM og_transactions ogr
+            WHERE ogr.kind = 'rollback' AND ogr.status = 'applied' AND ogr.reference_transaction_id = ${a}.transaction_id)`;
+const OG_PLAYED = (a) => `${a}.kind IN ('bet', 'win') AND ${a}.status = 'applied' AND NOT ${OG_ROLLED_BACK(a)}`;
+
 const SEAMLESS_STAKE = (a) =>
   `(CASE WHEN LOWER(${a}.action) IN ('withdraw', 'pushbet', 'transfer') AND ${a}.amount < 0 THEN -${a}.amount
          WHEN LOWER(${a}.action) IN ('rollback', 'cancel') AND ${a}.amount > 0 THEN -${a}.amount
@@ -128,6 +137,8 @@ module.exports = {
   INHOUSE_PLAYED,
   INHOUSE_STATUS,
   INHOUSE_UNLEDGERED,
+  OG_ROLLED_BACK,
+  OG_PLAYED,
   V2_STAKE,
   V2_PAYOUT,
 };

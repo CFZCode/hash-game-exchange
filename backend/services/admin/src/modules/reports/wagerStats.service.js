@@ -4,7 +4,7 @@ const { reportingCurrency } = require('./reportingCurrency');
 
 const S = require('./stats.shared');
 const { gisKindSql, gisSideAmountSql, gisPlayFilterSql } = require('../statements/statements.constants');
-const { V2_STAKE, V2_PAYOUT } = require('../statements/casinoRounds');
+const { V2_STAKE, V2_PAYOUT, OG_ROLLED_BACK } = require('../statements/casinoRounds');
 
 /**
  * Casino and sports turnover, payouts and GGR over time — the wager reports.
@@ -26,6 +26,13 @@ const { V2_STAKE, V2_PAYOUT } = require('../statements/casinoRounds');
  *                                     `#tradingPnlFor` and the dashboard's
  *   jsGames   `js_game_transactions`  `bet`/`loss`/`settle` stake, `win`/`settle` pay
  *   jsGames 2 `game_transactions`     the same vocabulary
+ *   originals `og_transactions`       the Original Games aggregator: a `bet` and a
+ *                                     `win` leg per round, unsigned; a rolled-back
+ *                                     leg is a refund (admin original-games rule)
+ *
+ * Each source has a `category`: `originals` (the site's own games — in-house
+ * `bets` and the Original Games aggregator, casino-service's "original" type)
+ * or `casino` (third-party providers). `category` on the query keeps one.
  *
  * Refunds and rollbacks are neither turnover nor payout — a refunded bet was
  * never risked — and are reported on their own line. For GIS, where the bet row
@@ -61,6 +68,7 @@ const CASINO_SOURCES = Object.freeze([
   {
     key: 'inhouse',
     label: 'In-house',
+    category: 'originals',
     table: 'bets',
     owner: 'uid',
     time: 'created',
@@ -80,6 +88,7 @@ const CASINO_SOURCES = Object.freeze([
   {
     key: 'gis',
     label: 'Slotegrator',
+    category: 'casino',
     table: 'gis_transactions',
     owner: 'user_id',
     time: 'created_at',
@@ -106,6 +115,7 @@ const CASINO_SOURCES = Object.freeze([
     const isRefund = `${kind} IN ('refund', 'rollback')`;
     return {
       ...s,
+      category: 'casino',
       owner: 'user_id',
       currency: 'currency',
       currencySql: plainCurrencySql('currency'),
@@ -130,7 +140,29 @@ const CASINO_SOURCES = Object.freeze([
         : {}),
     };
   }),
+  {
+    key: 'og',
+    label: 'Original Games',
+    category: 'originals',
+    table: 'og_transactions',
+    owner: 'user_id',
+    time: 'created_at',
+    currency: 'currency',
+    currencySql: plainCurrencySql('currency'),
+    game: 'game_code',
+    // No alias of its own: the rollback probe names the table.
+    where: ` AND kind IN ('bet', 'win') AND status = 'applied'`,
+    bets: `COUNT(*) FILTER (WHERE kind = 'bet' AND NOT ${OG_ROLLED_BACK('og_transactions')})`,
+    paidWins: `COUNT(*) FILTER (WHERE kind = 'win' AND amount > 0 AND NOT ${OG_ROLLED_BACK('og_transactions')})`,
+    wagered: `COALESCE(SUM(amount) FILTER (WHERE kind = 'bet' AND NOT ${OG_ROLLED_BACK('og_transactions')}), 0)`,
+    won: `COALESCE(SUM(amount) FILTER (WHERE kind = 'win' AND NOT ${OG_ROLLED_BACK('og_transactions')}), 0)`,
+    refunded: `COALESCE(SUM(amount) FILTER (WHERE kind = 'bet' AND ${OG_ROLLED_BACK('og_transactions')}), 0)`,
+    refunds: `COUNT(*) FILTER (WHERE kind = 'bet' AND ${OG_ROLLED_BACK('og_transactions')})`,
+  },
 ]);
+
+/** The casino sources of one category (`casino` | `originals`), or all of them. */
+const casinoSources = (category) => (category ? CASINO_SOURCES.filter((s) => s.category === category) : CASINO_SOURCES);
 
 /** How many games per source the per-game breakdown considers. */
 const MAX_GAMES_PER_SOURCE = 500;
@@ -150,7 +182,7 @@ class WagerStatsService {
     this.config = config;
   }
 
-  async stats({ staff, area, currency, channel, ...query }) {
+  async stats({ staff, area, currency, channel, category, ...query }) {
     const window = S.resolveWindow(query);
 
     const [scope, buckets, rates] = await Promise.all([
@@ -166,7 +198,7 @@ class WagerStatsService {
     const data = empty
       ? { series: [], items: [], uniqueUsers: 0 }
       : area === 'casino'
-        ? await this.#casino(this.#owned(scope, channel), currency, replacements)
+        ? await this.#casino(this.#owned(scope, channel), currency, replacements, casinoSources(category))
         : await this.#sports(this.#owned(scope, channel), currency, replacements);
 
     return this.#fold({ area, window, buckets, rates, currency, convertTo, ...data });
@@ -183,7 +215,7 @@ class WagerStatsService {
     return (column) => S.scopeSql(column, scope) + (tab ? ` AND ${column} IN (SELECT u.id FROM users u WHERE TRUE${tab})` : '');
   }
 
-  async #casino(owned, currency, replacements) {
+  async #casino(owned, currency, replacements, sources) {
     const filters = (s) =>
       `${S.windowSql(s.time)}${owned(s.owner)}${s.where}${currency ? ` AND ${s.currencySql} = :currency` : ''}`;
     const currencyExpr = (s) => s.currencySql;
@@ -192,7 +224,7 @@ class WagerStatsService {
        (${s.wagered})::text AS wagered, (${s.won})::text AS won, (${s.refunded})::text AS refunded`;
 
     const perSource = await Promise.all(
-      CASINO_SOURCES.map(async (s) => {
+      sources.map(async (s) => {
         const [series, games] = await Promise.all([
           S.select(
             this.models,
@@ -215,7 +247,7 @@ class WagerStatsService {
       })
     );
 
-    const owners = CASINO_SOURCES.map(
+    const owners = sources.map(
       (s) => `SELECT ${s.owner}::text AS owner FROM ${s.table} WHERE ${filters(s)}`
     );
     const [unique] = await S.select(
@@ -235,6 +267,7 @@ class WagerStatsService {
         return {
           ...g,
           vendor: meta.vendor || (g.source.key === 'inhouse' ? 'In-house' : g.source.label),
+          category: g.source.category,
           name: meta.name || g.game || 'Unknown game',
         };
       }),
@@ -248,18 +281,21 @@ class WagerStatsService {
     const ids = (key) => [...new Set(games.filter((g) => g.source.key === key && g.game).map((g) => g.game))];
     const gis = ids('gis');
     const js = [...new Set([...ids('jsgames'), ...ids('jsgamesv2')])];
+    const og = ids('og');
 
-    const [gisRows, jsRows] = await Promise.all([
+    const [gisRows, jsRows, ogRows] = await Promise.all([
       gis.length
         ? S.select(this.models, 'SELECT uuid AS id, name, provider AS vendor FROM gis_games WHERE uuid IN (:ids)', { ids: gis })
         : [],
       js.length
         ? S.select(this.models, 'SELECT game_uid AS id, game_name AS name, vendor FROM js_games WHERE game_uid IN (:ids)', { ids: js })
         : [],
+      og.length ? S.select(this.models, `SELECT code AS id, name, 'Original Games' AS vendor FROM og_games WHERE code IN (:ids)`, { ids: og }) : [],
     ]);
 
     const map = new Map();
     for (const r of gisRows) map.set(`gis:${r.id}`, r);
+    for (const r of ogRows) map.set(`og:${r.id}`, r);
     for (const r of jsRows) {
       map.set(`jsgames:${r.id}`, r);
       map.set(`jsgamesv2:${r.id}`, r);
@@ -470,4 +506,4 @@ class WagerStatsService {
 /** The sports turnover rule, for other reports that must agree with this one (player-stats). */
 const SPORTS_TURNOVER = Object.freeze({ settled: SETTLED, currency: SPORTS_CURRENCY, stake: SPORTS_STAKE });
 
-module.exports = { WagerStatsService, CASINO_SOURCES, SPORTS_TURNOVER };
+module.exports = { WagerStatsService, CASINO_SOURCES, casinoSources, SPORTS_TURNOVER };

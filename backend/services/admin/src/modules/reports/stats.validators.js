@@ -91,6 +91,8 @@ module.exports = {
       z
         .object({
           area: z.enum(['casino', 'sports']),
+          /** Casino only: third-party `casino` or `originals`. Na ho = dono. */
+          category: z.enum(['casino', 'originals']).optional(),
           /** Direct Users | Agent Users tab. Na ho = dono. */
           channel: z.enum(['direct', 'agent']).optional(),
           ...window,

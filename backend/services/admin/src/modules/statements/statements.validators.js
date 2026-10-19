@@ -65,6 +65,11 @@ const statementFields = {
   limit: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(100),
 };
 
+/** A player's statement: which wallet (INR when absent). */
+const walletField = {
+  currency: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{2,10}$/, 'Not a currency code').optional(),
+};
+
 /** The bet list: which game, and a page. */
 const betFields = {
   kind: z.enum(['sports', 'casino']).default('sports'),
@@ -90,7 +95,7 @@ module.exports = {
   agentStatement: { params: z.object({ staffId }).strict(), query: withRange(statementFields) },
 
   /** @legacy GET /api/admin/agent-report/user/:userId/statement */
-  userStatement: { params: z.object({ userId }).strict(), query: withRange(statementFields) },
+  userStatement: { params: z.object({ userId }).strict(), query: withRange({ ...statementFields, ...walletField }) },
 
   /** @legacy GET /api/admin/agent-report/:staffId/bets */
   agentBets: { params: z.object({ staffId }).strict(), query: withRange(betFields) },
@@ -105,5 +110,5 @@ module.exports = {
   agentPdf: { params: z.object({ staffId }).strict(), query: withRange(pdfFields) },
 
   /** @legacy GET /api/admin/agent-report/user/:userId/pdf */
-  userPdf: { params: z.object({ userId }).strict(), query: withRange(pdfFields) },
+  userPdf: { params: z.object({ userId }).strict(), query: withRange({ ...pdfFields, ...walletField }) },
 };

@@ -465,7 +465,7 @@ export const RiskManagementPanel = ({ userId, inDialog = false }: { userId: stri
           </div>
         </div>
         <p className='text-muted-foreground mt-3 text-xs'>
-          Every completed deposit and withdrawal, all coins, valued in {reward.currency} at today&apos;s rates. Bank + gateway INR alone: <Money value={d.financials.totalDeposit} currency='INR' /> in, <Money value={d.financials.totalWithdrawal} currency='INR' /> out.
+          Every completed deposit and withdrawal, all coins, valued in {reward.currency} at today&apos;s rates. Admin credits (Direct User Wallet, not deposits): <Money value={d.financials.adminCredited ?? '0'} currency='INR' />.
           {reward.unconverted.length ? ` No rate for ${reward.unconverted.join(', ')}, left out.` : ''}
         </p>
       </Section>

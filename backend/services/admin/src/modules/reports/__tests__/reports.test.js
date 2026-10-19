@@ -361,6 +361,22 @@ test('reports against a database', async (t) => {
     }
   });
 
+  await t.test('a swap is on the sheet, one leg per currency, with its sign', async () => {
+    const leg = (currency, amount, reason) => ({
+      user_id: String(playerA), currency, amount, netamount: 0, reason, source_service: 'user-service',
+      description: 'Swap USDT -> INR', meta: { swap: true },
+    });
+    await models.CreditsLedger.bulkCreate([leg('USDT', '-30', 'TRANSFER_OUT'), leg('INR', '2475', 'TRANSFER_IN')]);
+    try {
+      const usdt = await service.balanceSheet({ staff: asA, userId: playerA, currency: 'USDT' });
+      const inr = await service.balanceSheet({ staff: asA, userId: playerA, currency: 'INR', limit: 500 });
+      assert.deepEqual(usdt.rows.filter((r) => r.category === 'Swap').map((r) => [r.type, r.amount]), [['DEBIT', '-30.00000000']]);
+      assert.deepEqual(inr.rows.filter((r) => r.category === 'Swap').map((r) => [r.type, r.amount]), [['CREDIT', '2475.00000000']]);
+    } finally {
+      await models.CreditsLedger.destroy({ where: { user_id: String(playerA) } });
+    }
+  });
+
   await t.test('the balance sheet page reaches past 200 rows', () => {
     assert.equal(v.balanceSheet.query.parse({ limit: '1000' }).limit, 1000);
   });

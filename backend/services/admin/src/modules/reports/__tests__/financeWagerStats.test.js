@@ -383,6 +383,33 @@ test('finance and wager stats against a database', async (t) => {
     assert.equal(r.breakdown.rows[0].wagered, '100.00000000');
   });
 
+  await t.test('casino: Original Games rounds are in the totals and have their own category; a rolled-back bet is a refund', async () => {
+    const og = (id, kind, amount, extra = '') =>
+      run(
+        `INSERT INTO og_transactions (transaction_id, kind, status, user_id, round_id, game_code, currency, amount, reference_transaction_id, created_at)
+         VALUES (:id, :kind, 'applied', :uid, :round, 'limbo', 'INR', :amount, :ref, :created)`,
+        { id: `${tag}-${id}`, kind, uid: playerA, round: `${tag}-${extra || id}`, amount, ref: kind === 'rollback' ? `${tag}-${extra}` : null, created: at(1) }
+      );
+    await og('b1', 'bet', 60);
+    await og('w1', 'win', 20, 'b1');
+    await og('b2', 'bet', 10);
+    await og('r2', 'rollback', 10, 'b2');
+    try {
+      const all = await wager.stats({ staff: asA, area: 'casino', ...q({ currency: 'INR' }) });
+      assert.equal(all.totals.wagered, '160.00000000', 'GIS 100 + Original Games 60');
+      assert.equal(all.totals.won, '50.00000000');
+      const originals = await wager.stats({ staff: asA, area: 'casino', category: 'originals', ...q({ currency: 'INR' }) });
+      assert.equal(originals.totals.wagered, '60.00000000');
+      assert.equal(originals.totals.ggr, '40.00000000');
+      assert.equal(originals.totals.bets, 1);
+      assert.equal(originals.totals.refunded, '10.00000000');
+      const thirdParty = await wager.stats({ staff: asA, area: 'casino', category: 'casino', ...q({ currency: 'INR' }) });
+      assert.equal(thirdParty.totals.wagered, '100.00000000');
+    } finally {
+      await run(`DELETE FROM og_transactions WHERE transaction_id LIKE :like`, { like: `${tag}-%` });
+    }
+  });
+
   await t.test("casino: GIS 'PKR' rows are this platform's INR, as on the dashboard", async () => {
     await run(
       `INSERT INTO gis_transactions (user_id, transaction_id, action, amount, currency, balance_after, created_at, game_uuid)

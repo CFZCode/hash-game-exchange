@@ -3,12 +3,13 @@
 const { reportingCurrency } = require('../reports/reportingCurrency');
 
 const { money } = require('@ibitplay/common');
-const { INHOUSE_PAYOUT, V2_STAKE, V2_PAYOUT } = require('../statements/casinoRounds');
+const { INHOUSE_PAYOUT, V2_STAKE, V2_PAYOUT, OG_PLAYED } = require('../statements/casinoRounds');
 
 const { visibleStaffIds } = require('../staff-directory/staffDirectory.service');
 const {
-  COIN_IDS, DEPOSIT_SUCCESS, WITHDRAWAL_DONE, DIRECT_WALLET_LEDGER, VALUATION_NOTE, SPORT_NAMES, SPORTS_REFUNDED_RESULTS,
+  COIN_IDS, WITHDRAWAL_DONE, VALUATION_NOTE, SPORT_NAMES, SPORTS_REFUNDED_RESULTS,
 } = require('./dashboard.constants');
+const { realDepositsSql } = require('../reports/depositRails');
 const { gisKindSql, gisSideAmountSql, gisBetCountSql, gisPlayFilterSql } = require('../statements/statements.constants');
 
 /**
@@ -22,9 +23,10 @@ const { gisKindSql, gisSideAmountSql, gisBetCountSql, gisPlayFilterSql } = requi
  *
  * ── WHAT EACH FIGURE READS ───────────────────────────────────────────────
  *
- *   deposits     the same four tables and success statuses as the headline
- *                totals (`#depositTotals`): ccdeposit, fiat_deposits,
- *                apaydeposits, pay_in_transactions
+ *   deposits     real deposits, every rail (`reports/depositRails.js`, the
+ *                definition User reports and the Users page share). The Super
+ *                Admin's Direct User Wallet credit / debit is neither a deposit
+ *                nor a withdrawal (owner, 19 Oct 2026).
  *   withdrawals  withdrawals + fiat_withdrawals, withdrawn statuses (bank
  *                Approved or Paid, crypto Sent — WITHDRAWAL_DONE)
  *   casino       the four casino sources as `bet-history/profileStats.js`
@@ -35,8 +37,11 @@ const { gisKindSql, gisSideAmountSql, gisBetCountSql, gisPlayFilterSql } = requi
  *                win back takes it off wins, so GGR is the reports'
  *                `#tradingPnlFor` figure), jsGames v1 and v2. A Slotegrator
  *                game whose catalogue type says "sport" is the partner
- *                sportsbook, so it is counted under SPORTS.
- *                GGR = stakes − wins.
+ *                sportsbook, so it is counted under SPORTS. Plus the Original
+ *                Games aggregator (`og_transactions`, rolled-back legs out).
+ *                GGR = stakes − wins. `casino*` is every casino game;
+ *                `originals*` is the site's own games inside it (in-house
+ *                `bets` + Original Games), so third-party = casino − originals.
  *   sports       turnover: `SportsBet.stake_amount` by placement time, voided
  *                and refunded bets excluded (by `status` AND `result_status`) (+ the partner sportsbook's
  *                stakes). GGR: the house side of the sports settlement ledger
@@ -114,16 +119,13 @@ const TOP_PER_CURRENCY = 50;
 
 /** Every series a bucket carries. Money keys are decimal strings, the rest counts. */
 const MONEY_KEYS = Object.freeze([
-  'deposits', 'withdrawals', 'casinoWagered', 'casinoWon', 'casinoGgr', 'sportsStaked', 'sportsGgr',
+  'deposits', 'withdrawals', 'casinoWagered', 'casinoWon', 'casinoGgr', 'originalsWagered', 'originalsWon', 'originalsGgr',
+  'sportsStaked', 'sportsGgr',
 ]);
-const COUNT_KEYS = Object.freeze(['depositCount', 'withdrawalCount', 'registrations', 'casinoBets', 'sportsBets']);
+const COUNT_KEYS = Object.freeze(['depositCount', 'withdrawalCount', 'registrations', 'casinoBets', 'originalsBets', 'sportsBets']);
 
-/** One deposit/withdrawal source: its table, date column (all timestamptz since 083), owner, amount, currency. */
+/** One withdrawal source: its table, date column (all timestamptz since 083), owner, amount, currency. Deposits: `realDepositsSql`. */
 const MONEY_SOURCES = Object.freeze([
-  { side: 'deposit', table: 'ccdeposit', date: 'created_at', owner: 'userid', ownerIsText: true, amount: 'price', coinId: 'coinid', statuses: DEPOSIT_SUCCESS.ccdeposit },
-  { side: 'deposit', table: 'fiat_deposits', date: 'created_at', owner: 'user_id', amount: 'amount', currency: 'currency', statuses: DEPOSIT_SUCCESS.fiat_deposits },
-  { side: 'deposit', table: 'apaydeposits', date: 'created_at', owner: 'user_id', amount: 'amount', currency: 'currency', statuses: DEPOSIT_SUCCESS.apaydeposits },
-  { side: 'deposit', table: 'pay_in_transactions', date: 'created_at', owner: 'user_id', amount: 'amount', currency: 'currency', statuses: DEPOSIT_SUCCESS.pay_in_transactions, statusIsNumber: true },
   { side: 'withdrawal', table: 'withdrawals', date: 'date', owner: 'uid', amount: 'amount', currency: 'coin', statuses: WITHDRAWAL_DONE.withdrawals },
   { side: 'withdrawal', table: 'fiat_withdrawals', date: 'date', owner: 'uid', amount: 'amount', currency: 'currency', statuses: WITHDRAWAL_DONE.fiat_withdrawals },
 ]);
@@ -202,13 +204,15 @@ class DashboardStatsService {
       const cur = this.#currencyOf(r.currency);
       const n = Number(r.n) || 0;
       if (r.section === 'casino') {
-        if (r.kind === 'stake') {
-          add(row, 'casinoWagered', r.total, cur);
-          add(row, 'casinoGgr', r.total, cur);
-          row.casinoBets += n;
-        } else {
-          add(row, 'casinoWon', r.total, cur);
-          add(row, 'casinoGgr', r.total, cur, -1n);
+        for (const p of r.source === 'originals' ? ['casino', 'originals'] : ['casino']) {
+          if (r.kind === 'stake') {
+            add(row, `${p}Wagered`, r.total, cur);
+            add(row, `${p}Ggr`, r.total, cur);
+            row[`${p}Bets`] += n;
+          } else {
+            add(row, `${p}Won`, r.total, cur);
+            add(row, `${p}Ggr`, r.total, cur, -1n);
+          }
         }
       } else if (r.kind === 'stake') {
         add(row, 'sportsStaked', r.total, cur);
@@ -293,18 +297,9 @@ class DashboardStatsService {
     MONEY_SOURCES.forEach((s, i) => {
       const statusKey = `st${i}`;
       replacements[statusKey] = s.statuses;
-      const status = s.statusIsNumber ? `status IN (:${statusKey})` : `LOWER(status) IN (:${statusKey})`;
-      const currencyExpr = s.coinId ? `'#' || ${s.coinId}::text` : `UPPER(${s.currency})`;
-      let currencyFilter = '';
-      if (ctx.currency) {
-        if (s.coinId) {
-          const ids = Object.entries(COIN_IDS).filter(([, sym]) => sym === ctx.currency).map(([id]) => Number(id));
-          replacements[`coin${i}`] = ids.length ? ids : [-1];
-          currencyFilter = `AND ${s.coinId} IN (:coin${i})`;
-        } else {
-          currencyFilter = `AND UPPER(${s.currency}) = :currency`;
-        }
-      }
+      const status = `LOWER(status) IN (:${statusKey})`;
+      const currencyExpr = `UPPER(${s.currency})`;
+      const currencyFilter = ctx.currency ? `AND UPPER(${s.currency}) = :currency` : '';
       parts.push(`
         SELECT ${this.#bucket(s.date)} AS bucket, '${s.side}' AS side, ${currencyExpr} AS currency,
                COALESCE(SUM(${s.amount}), 0)::text AS total, COUNT(*) AS n
@@ -313,18 +308,16 @@ class DashboardStatsService {
          GROUP BY 1, 3`);
     });
 
-    // Direct User Wallet credits / debits — `credits_ledger`, debit stored negative.
-    replacements.dwRef = DIRECT_WALLET_LEDGER.refType;
-    for (const side of ['deposit', 'withdrawal']) {
-      replacements[`dw_${side}`] = DIRECT_WALLET_LEDGER[side];
-      parts.push(`
-        SELECT ${this.#bucket('created_at')} AS bucket, '${side}' AS side, UPPER(currency) AS currency,
-               COALESCE(SUM(ABS(amount)), 0)::text AS total, COUNT(*) AS n
-          FROM credits_ledger
-         WHERE reason = :dw_${side} AND meta->>'refType' = :dwRef AND ${this.#window('created_at')}
-               ${ctx.currency ? 'AND UPPER(currency) = :currency' : ''} ${this.#owned(ctx, 'user_id', true)}
-         GROUP BY 1, 3`);
-    }
+    const real = realDepositsSql({
+      range: (column) => ` AND ${this.#window(column)}`,
+      who: (column, text) => ` ${this.#owned(ctx, column, text)}`,
+      currency: Boolean(ctx.currency),
+    });
+    Object.assign(replacements, real.replacements);
+    parts.push(`
+      SELECT ${this.#bucket('at')} AS bucket, 'deposit' AS side, cur AS currency, COALESCE(SUM(amt), 0)::text AS total, COUNT(*) AS n
+        FROM (${real.sql}) d
+       GROUP BY 1, 3`);
 
     return this.#query(parts.join(' UNION ALL '), replacements);
   }
@@ -358,7 +351,7 @@ class DashboardStatsService {
 
     const sql = `
       SELECT bucket, section, kind, source, currency, SUM(total)::text AS total, SUM(n) AS n FROM (
-        SELECT ${this.#bucket('b.created')} AS bucket, 'casino' AS section, 'stake' AS kind, 'house' AS source,
+        SELECT ${this.#bucket('b.created')} AS bucket, 'casino' AS section, 'stake' AS kind, 'originals' AS source,
                UPPER(b.coin) AS currency, SUM(b.amount) AS total, COUNT(*) AS n
           FROM bets b
          WHERE b.amount > 0 AND (b.result IS NULL OR b.result::text <> '"refunded"') AND ${NOT_FAKE}
@@ -367,7 +360,7 @@ class DashboardStatsService {
         UNION ALL
         -- What was PAID on every settled round (pushes and partial returns
         -- included); the count stays the number of winning rounds.
-        SELECT ${this.#bucket('b.created')}, 'casino', 'win', 'house', UPPER(b.coin), SUM(${INHOUSE_PAYOUT('b')}),
+        SELECT ${this.#bucket('b.created')}, 'casino', 'win', 'originals', UPPER(b.coin), SUM(${INHOUSE_PAYOUT('b')}),
                COUNT(*) FILTER (WHERE b.profit > 0)
           FROM bets b
          WHERE b.result IS NOT NULL AND b.result::text <> '"refunded"' AND b.amount + b.profit > 0 AND ${NOT_FAKE}
@@ -402,6 +395,15 @@ class DashboardStatsService {
                                      ('win', ${V2_PAYOUT('v')}, CASE WHEN ${V2_PAYOUT('v')} > 0 THEN 1 ELSE 0 END)) AS k(kind, amount, n)
          WHERE k.amount <> 0
            AND ${this.#window('v.created_at')} ${cur('v.currency')} ${this.#owned(ctx, 'v.user_id')}
+         GROUP BY 1, 3, 5
+        UNION ALL
+        -- Original Games: the bet leg is the stake, the win leg the payout.
+        SELECT ${this.#bucket('o.created_at')}, 'casino', CASE WHEN o.kind = 'bet' THEN 'stake' ELSE 'win' END,
+               'originals', UPPER(o.currency), SUM(o.amount),
+               COUNT(*) FILTER (WHERE o.kind = 'bet' OR o.amount > 0)
+          FROM og_transactions o
+         WHERE ${OG_PLAYED('o')}
+           AND ${this.#window('o.created_at')} ${cur('o.currency')} ${this.#owned(ctx, 'o.user_id')}
          GROUP BY 1, 3, 5
         UNION ALL
         SELECT ${this.#bucket('s.created_at')}, 'sports', 'stake', 'house',
@@ -468,6 +470,12 @@ class DashboardStatsService {
               LEFT JOIN js_games jg2 ON jg2.game_uid = v.game_uid
              WHERE ${V2_STAKE('v')} <> 0
                AND ${this.#window('v.created_at')} ${cur('v.currency')} ${this.#owned(ctx, 'v.user_id')}
+            UNION ALL
+            SELECT 'og:' || COALESCE(o.game_code, ''), UPPER(o.currency), COALESCE(og.name, o.game_code), 'Original Games', o.amount, 1
+              FROM og_transactions o
+              LEFT JOIN og_games og ON og.code = o.game_code
+             WHERE ${OG_PLAYED('o')} AND o.kind = 'bet'
+               AND ${this.#window('o.created_at')} ${cur('o.currency')} ${this.#owned(ctx, 'o.user_id')}
           ) stakes
          GROUP BY game_key, currency
       ) ranked

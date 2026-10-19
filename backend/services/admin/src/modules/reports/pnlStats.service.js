@@ -3,7 +3,7 @@
 const { reportingCurrency } = require('./reportingCurrency');
 
 const { canManagePromotions } = require('@ibitplay/auth');
-const { INHOUSE_PAYOUT, V2_STAKE, V2_PAYOUT } = require('../statements/casinoRounds');
+const { INHOUSE_PAYOUT, V2_STAKE, V2_PAYOUT, OG_PLAYED } = require('../statements/casinoRounds');
 
 const { DashboardStatsService, SPORTS_LEDGER_REASONS, SPORTS_NOT_TURNOVER } = require('../dashboard/dashboardStats.service');
 
@@ -39,6 +39,9 @@ const { playerScope, statsWindow, bucketSql, rangeSql, select, loadRates, create
  *                   settlement ledger (−SUM(netamount) over the statements
  *                   module's reasons, by ledger time) + the partner sportsbook's
  *                   stakes − wins.
+ *                   Plus the Original Games aggregator (`og_transactions`). The
+ *                   waterfall splits casino into third-party and Original Games
+ *                   (in-house + aggregator, the dashboard's `originals*`).
  *   Gross gaming revenue (GGR) = Casino GGR + Sports GGR.
  *   Player costs    money the house put in players' wallets that no bet paid
  *                   for — read from the wallet ledger (`credits_ledger`), the
@@ -179,14 +182,14 @@ class PnlStatsService {
 
     // ── Revenue and cash flow, per bucket, exactly as the dashboard sends them ──
     const zero = () => ({
-      casinoGgr: 0n, sportsGgr: 0n, casinoWagered: 0n, casinoWon: 0n, sportsStaked: 0n,
+      casinoGgr: 0n, originalsGgr: 0n, sportsGgr: 0n, casinoWagered: 0n, casinoWon: 0n, sportsStaked: 0n,
       deposits: 0n, withdrawals: 0n, costs: 0n, ...Object.fromEntries(COST_KEYS.map((k) => [k, 0n])),
     });
     const rows = new Map(buckets.map((b) => [b, zero()]));
     const rowOf = (b) => rows.get(b) ?? rows.set(b, zero()).get(b);
     for (const b of gaming.buckets) {
       const r = rowOf(b.bucket);
-      for (const k of ['casinoGgr', 'sportsGgr', 'casinoWagered', 'casinoWon', 'sportsStaked', 'deposits', 'withdrawals']) r[k] += minor(b[k]);
+      for (const k of ['casinoGgr', 'originalsGgr', 'sportsGgr', 'casinoWagered', 'casinoWon', 'sportsStaked', 'deposits', 'withdrawals']) r[k] += minor(b[k]);
     }
 
     // ── Player costs (house only) ──
@@ -204,6 +207,7 @@ class PnlStatsService {
 
     const T = gaming.totals;
     const casinoGgr = minor(T.casinoGgr);
+    const originalsGgr = minor(T.originalsGgr);
     const sportsGgr = minor(T.sportsGgr);
     const ggr = casinoGgr + sportsGgr;
     const costs = [...lineTotals.values()].reduce((s, t) => s + t.value, 0n);
@@ -214,7 +218,8 @@ class PnlStatsService {
       : null;
 
     const waterfall = [
-      { key: 'casinoGgr', label: 'Casino GGR', kind: 'revenue', value: decimal(casinoGgr) },
+      { key: 'thirdPartyGgr', label: 'Casino GGR (third-party)', kind: 'revenue', value: decimal(casinoGgr - originalsGgr) },
+      { key: 'originalsGgr', label: 'Original Games GGR', kind: 'revenue', value: decimal(originalsGgr) },
       { key: 'sportsGgr', label: 'Sports GGR', kind: 'revenue', value: decimal(sportsGgr) },
       { key: 'ggr', label: 'Gross gaming revenue', kind: 'total', value: decimal(ggr) },
       ...(house
@@ -234,6 +239,11 @@ class PnlStatsService {
       house,
       kpis: {
         casinoGgr: decimal(casinoGgr),
+        thirdPartyGgr: decimal(casinoGgr - originalsGgr),
+        originalsGgr: decimal(originalsGgr),
+        originalsWagered: T.originalsWagered,
+        originalsWon: T.originalsWon,
+        originalsBets: T.originalsBets,
         sportsGgr: decimal(sportsGgr),
         ggr: decimal(ggr),
         costs: house ? decimal(costs) : null,
@@ -256,6 +266,7 @@ class PnlStatsService {
         .map(([bucket, r]) => ({
           bucket,
           casinoGgr: decimal(r.casinoGgr),
+          originalsGgr: decimal(r.originalsGgr),
           sportsGgr: decimal(r.sportsGgr),
           ggr: decimal(r.casinoGgr + r.sportsGgr),
           costs: house ? decimal(r.costs) : null,
@@ -374,7 +385,7 @@ class PnlStatsService {
     const best = (map) => byGgr(map).filter((e) => e.ggr > 0n).slice(0, TOP_N).map(out);
     const worst = (map) => byGgr(map).filter((e) => e.ggr < 0n).reverse().slice(0, TOP_N).map(out);
 
-    const originals = new Map([...games].filter(([, g]) => g.source === 'inhouse'));
+    const originals = new Map([...games].filter(([, g]) => g.source === 'inhouse' || g.source === 'og'));
 
     return {
       range: this.#range(window, valuer.currency),
@@ -490,6 +501,13 @@ class PnlStatsService {
                                        ('win', ${V2_PAYOUT('v')}, 0)) AS k(kind, amount, n)
            WHERE k.amount <> 0
              AND ${rangeSql('v.created_at')}${cur('v.currency')}${owned('v.user_id')}
+          UNION ALL
+          SELECT 'og', 'Original Games', 'Originals', 'og:' || COALESCE(o.game_code, ''), COALESCE(og.name, o.game_code),
+                 UPPER(o.currency), CASE WHEN o.kind = 'bet' THEN 'stake' ELSE 'win' END, o.amount,
+                 CASE WHEN o.kind = 'bet' THEN 1 ELSE 0 END
+            FROM og_transactions o
+            LEFT JOIN og_games og ON og.code = o.game_code
+           WHERE ${OG_PLAYED('o')} AND ${rangeSql('o.created_at')}${cur('o.currency')}${owned('o.user_id')}
         ) x
        GROUP BY source, provider, category, game_key, currency`;
     return select(this.models, sql, replacements);
@@ -582,6 +600,11 @@ class PnlStatsService {
                                      ('win', ${V2_PAYOUT('v')}, 0)) AS k(kind, amount, n)
          WHERE k.amount <> 0
            AND ${rangeSql('v.created_at')}${cur('v.currency')}${owned('v.user_id')}
+        UNION ALL
+        SELECT o.user_id, 'casino', CASE WHEN o.kind = 'bet' THEN 'stake' ELSE 'win' END, 'house', UPPER(o.currency), o.amount,
+               CASE WHEN o.kind = 'bet' THEN 1 ELSE 0 END
+          FROM og_transactions o
+         WHERE ${OG_PLAYED('o')} AND ${rangeSql('o.created_at')}${cur('o.currency')}${owned('o.user_id')}
         UNION ALL
         SELECT s.user_id, 'sports', 'stake', 'house', ${SPORTS_CURRENCY('s')}, s.stake_amount, 1
           FROM mssports."SportsBet" s
@@ -678,6 +701,6 @@ class PnlStatsService {
   }
 }
 
-const SOURCE_LABEL = Object.freeze({ inhouse: 'In-house originals', gis: 'Slotegrator', jsgames: 'jsGames', jsgamesv2: 'jsGames v2' });
+const SOURCE_LABEL = Object.freeze({ inhouse: 'In-house originals', og: 'Original Games', gis: 'Slotegrator', jsgames: 'jsGames', jsgamesv2: 'jsGames v2' });
 
 module.exports = { PnlStatsService, COST_LINES, costLineOf };

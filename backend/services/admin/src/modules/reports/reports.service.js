@@ -22,13 +22,14 @@ const {
 } = require('./reports.constants');
 const { isPrivateIp, deviceFromUA } = require('./ipTracker');
 const { playerScope } = require('./audienceStats.helpers');
+const S = require('./stats.shared');
+const { realDepositsSql } = require('./depositRails');
 const { wagerValuer } = require('./reportingCurrency');
-const { COIN_IDS, DEPOSIT_SUCCESS, DIRECT_WALLET_LEDGER } = require('../dashboard/dashboard.constants');
+const { DIRECT_WALLET_LEDGER } = require('../dashboard/dashboard.constants');
 const { WITHDRAWAL_DONE: STATS_WITHDRAWAL_DONE } = require('./audienceStats.constants');
 const { visibleStaffIds } = require('../staff-directory/staffDirectory.service');
 // transfer, refill, issuance, adjust — money handed over; never 'gt'/'casino'.
 const { PLAYER_FUNDING_TYPES, TRANSFER_TYPE } = require('../lords/lords.constants');
-const { LEDGER_TYPE } = require('../lords/ownerWallet');
 
 /** staff_transfers types that fund an agent-tree player (DIRECT is counted from owner_direct_ledger). */
 const AGENT_FUNDING_TYPES = [TRANSFER_TYPE.TRANSFER, TRANSFER_TYPE.REFILL, TRANSFER_TYPE.ISSUANCE, TRANSFER_TYPE.ADJUST];
@@ -660,10 +661,12 @@ class ReportsService {
       financials: {
         totalDeposit: lifetime.deposited,
         totalWithdrawal: lifetime.withdrawn,
+        adminCredited: lifetime.adminCredited ?? '0.00000000',
+        adminDebited: lifetime.adminDebited ?? '0.00000000',
         net: money.toDecimalString(deposited - withdrawn),
         // Every deposit and withdrawal (fiat, gateway, crypto) in the site's
-        // reward currency at today's rates; the INR figures above are bank and
-        // gateway INR only. A currency with no rate is named, never counted as 0.
+        // reward currency at today's rates; the figures above are the same lifetime
+        // totals valued in INR. A currency with no rate is named, never counted as 0.
         reward,
       },
       activity: {
@@ -851,36 +854,18 @@ class ReportsService {
     const replacements = {
       uid: String(userId),
       uidNum: Number(userId),
-      okFiat: DEPOSIT_SUCCESS.fiat_deposits,
-      okApay: DEPOSIT_SUCCESS.apaydeposits,
-      okPayIn: DEPOSIT_SUCCESS.pay_in_transactions,
-      okCc: DEPOSIT_SUCCESS.ccdeposit,
       okCrypto: STATS_WITHDRAWAL_DONE.withdrawals,
       okBank: STATS_WITHDRAWAL_DONE.fiat_withdrawals,
       okGateway: STATS_WITHDRAWAL_DONE.apaywithdrawals,
     };
-    const coinCase = Object.entries(COIN_IDS)
-      .map(([id, code], i) => {
-        replacements[`coinId${i}`] = Number(id);
-        replacements[`coinCode${i}`] = code;
-        return `WHEN :coinId${i} THEN :coinCode${i}`;
-      })
-      .join(' ');
+    // Deposits: the shared real-deposit rails (no Direct User Wallet credit).
+    const real = realDepositsSql({ who: (column) => ` AND ${column}::text = :uid` });
+    Object.assign(replacements, real.replacements);
 
     const [rows, rateRows, rewardRow] = await Promise.all([
       sequelize.query(
         `SELECT side, cur, ROUND(SUM(amt), 8)::text AS amount, COUNT(*)::int AS n FROM (
-           SELECT 'deposit' AS side, UPPER(d.currency) AS cur, d.amount AS amt FROM fiat_deposits d
-            WHERE d.user_id = :uidNum AND LOWER(d.status) IN (:okFiat)
-           UNION ALL
-           SELECT 'deposit', UPPER(a.currency), a.amount FROM apaydeposits a
-            WHERE a.user_id = :uidNum AND LOWER(a.status) IN (:okApay)
-           UNION ALL
-           SELECT 'deposit', UPPER(p.currency), p.amount FROM pay_in_transactions p
-            WHERE p.user_id = :uidNum AND p.status IN (:okPayIn)
-           UNION ALL
-           SELECT 'deposit', (CASE c.coinid ${coinCase} ELSE NULL END), c.price FROM ccdeposit c
-            WHERE c.userid = :uid AND LOWER(c.status) IN (:okCc)
+           SELECT 'deposit' AS side, r.cur, r.amt FROM (${real.sql}) r
            UNION ALL
            SELECT 'withdraw', UPPER(w.coin), w.amount FROM withdrawals w
             WHERE w.uid = :uidNum AND LOWER(w.status) IN (:okCrypto)
@@ -1708,6 +1693,27 @@ class ReportsService {
     }
 
     /**
+     * 6e. Swaps (user-service swap module): one `credits_ledger` leg per currency, both reason
+     *     TRANSFER_OUT / TRANSFER_IN with `meta.swap`, amount signed (out negative). Without them a
+     *     player who swapped showed a mismatch on the coin swapped out, and the coin swapped in
+     *     credited the next sports bet's balance jump as "Bet placed".
+     */
+    const swaps = await this.models.CreditsLedger.findAll({
+      where: {
+        user_id: uid,
+        currency: { [Op.iLike]: currency },
+        reason: { [Op.in]: ['TRANSFER_IN', 'TRANSFER_OUT'] },
+        [Op.and]: [sqlWhere(literal("meta->>'swap'"), 'true')],
+      },
+      raw: true,
+    });
+    for (const row of swaps) {
+      const credit = row.reason === 'TRANSFER_IN';
+      const abs = money.toDecimalString(money.toMinorQuantised(String(row.amount ?? '0').replace(/^-/, '')));
+      push(row.created_at, 'Swap', credit ? 'CREDIT' : 'DEBIT', row.description || 'Swap', credit ? abs : `-${abs}`, Number(row.id) || 0);
+    }
+
+    /**
      * 7. Casino.
      *
      * The provider labels this platform's INR wallet 'PKR' and its USDT wallet
@@ -1825,8 +1831,11 @@ class ReportsService {
    * lifetime totals — so `undefined || 0` put a zero in every row of every
    * export the platform has ever produced. See EXPORT_TOTALS_WERE_MISSING.
    *
-   * Computed from the tables that actually record the movements: bank and
-   * gateway on each side. INR, matching the balance column beside it.
+   * DEPOSITED is every real deposit rail in every currency (`depositRails.js`, the definition the
+   * Dashboard and User reports use) plus agent funding, valued in INR at today's rates, matching
+   * the balance column beside it. WITHDRAWN: bank and gateway INR, plus agent collections.
+   * The Super Admin's Direct User Wallet credit / debit is NEITHER (owner, 19 Oct 2026): it is
+   * `adminCredited` / `adminDebited`, its own line, also in INR.
    * ─────────────────────────────────────────────────────────────────────
    */
   async #lifetimeTotalsFor(ids) {
@@ -1836,24 +1845,13 @@ class ReportsService {
     const sum = [[fn('COALESCE', fn('SUM', col('amount')), 0), 'total']];
 
     const { sequelize } = this.models.FiatDeposits;
+    const real = realDepositsSql({ who: (column) => ` AND ${column}::text IN (:ids)` });
 
-    const [bankIn, gatewayIn, bankOut, gatewayOut, directMoves, agentMoves, otherGateways] = await Promise.all([
-      this.models.FiatDeposits.findAll({
-        where: {
-          user_id: asText,
-          currency: { [Op.iLike]: 'INR' },
-          status: { [Op.in]: ['approved', 'success', 'done', 'completed', 'Approved', 'Success'] },
-        },
-        attributes: ['user_id', ...sum],
-        group: ['user_id'],
-        raw: true,
-      }),
-      this.models.Apaydeposits.findAll({
-        where: { user_id: asText, currency: { [Op.iLike]: 'INR' }, status: 'Success' },
-        attributes: ['user_id', ...sum],
-        group: ['user_id'],
-        raw: true,
-      }),
+    const [realIn, bankOut, gatewayOut, directMoves, agentMoves, otherOut, rates] = await Promise.all([
+      sequelize.query(
+        `SELECT uid::text AS user_id, cur, SUM(amt)::text AS total FROM (${real.sql}) d GROUP BY 1, 2`,
+        { replacements: { ...real.replacements, ids: asText }, type: QueryTypes.SELECT }
+      ),
       this.models.FiatWithdrawals.findAll({
         where: {
           uid: asText,
@@ -1879,19 +1877,21 @@ class ReportsService {
         raw: true,
       }),
 
-      // Super Admin ka Direct User Wallet (D / W): INR `amount` per user.
+      // Super Admin ka Direct User Wallet credit / debit (credits_ledger, debit stored negative), per currency.
       sequelize.query(
-        `SELECT user_id::text AS user_id,
-                COALESCE(SUM(amount) FILTER (WHERE entry_type = :dep), 0) AS deposited,
-                COALESCE(SUM(amount) FILTER (WHERE entry_type = :wd), 0) AS withdrawn
-           FROM owner_direct_ledger
-          WHERE user_id::text IN (:ids) AND entry_type IN (:dep, :wd)
-          GROUP BY user_id`,
-        { replacements: { ids: asText, dep: LEDGER_TYPE.USER_DEPOSIT, wd: LEDGER_TYPE.USER_WITHDRAW }, type: QueryTypes.SELECT }
+        `SELECT user_id, UPPER(currency) AS cur,
+                COALESCE(SUM(ABS(amount)) FILTER (WHERE reason = :dwIn), 0)::text AS credited,
+                COALESCE(SUM(ABS(amount)) FILTER (WHERE reason = :dwOut), 0)::text AS debited
+           FROM credits_ledger
+          WHERE user_id IN (:ids) AND reason IN (:dwIn, :dwOut) AND meta->>'refType' = :dwRef
+          GROUP BY 1, 2`,
+        {
+          replacements: { ids: asText, dwIn: DIRECT_WALLET_LEDGER.deposit, dwOut: DIRECT_WALLET_LEDGER.withdrawal, dwRef: DIRECT_WALLET_LEDGER.refType },
+          type: QueryTypes.SELECT,
+        }
       ),
 
-      // Agent → player deposit / withdraw. `direct` rows (owner → direct user) are already in
-      // owner_direct_ledger above, and points settlement is P&L, not funding.
+      // Agent → player deposit / withdraw (points settlement is P&L, not funding).
       sequelize.query(
         `SELECT CASE WHEN to_type = 'user' THEN to_id ELSE from_id END::text AS user_id,
                 COALESCE(SUM(amount) FILTER (WHERE to_type = 'user'), 0) AS deposited,
@@ -1903,49 +1903,43 @@ class ReportsService {
         { replacements: { ids: asText, types: AGENT_FUNDING_TYPES }, type: QueryTypes.SELECT }
       ),
 
-      // The other INR gateways (same statuses as packages/common withdrawalCapFigures).
+      // The WayPay payouts (same statuses as packages/common withdrawalCapFigures).
       sequelize.query(
-        `SELECT user_id, SUM(deposited) AS deposited, SUM(withdrawn) AS withdrawn FROM (
-           SELECT uid::text AS user_id, amount AS deposited, 0 AS withdrawn FROM cricpaytransactions
-            WHERE uid::text IN (:ids) AND lower(status) = 'successful'
-           UNION ALL
-           SELECT uid::text, CASE WHEN amount ~ '^[0-9]+(\\.[0-9]+)?$' THEN amount::numeric ELSE 0 END, 0 FROM upideposit
-            WHERE uid::text IN (:ids) AND lower(status) = 'success'
-           UNION ALL
-           SELECT user_id::text, amount, 0 FROM pay_in_transactions
-            WHERE user_id::text IN (:ids) AND upper(currency) = 'INR' AND status = 1
-           UNION ALL
-           SELECT user_id::text, 0, amount FROM pay_out_transactions
-            WHERE user_id::text IN (:ids) AND upper(currency) = 'INR' AND status = 1
-         ) g GROUP BY user_id`,
+        `SELECT user_id::text AS user_id, SUM(amount) AS withdrawn FROM pay_out_transactions
+          WHERE user_id::text IN (:ids) AND upper(currency) = 'INR' AND status = 1
+          GROUP BY 1`,
         { replacements: { ids: asText }, type: QueryTypes.SELECT }
       ),
+      S.loadRates(this.models),
     ]);
 
-    const totals = new Map(asText.map((id) => [id, { deposited: 0n, withdrawn: 0n }]));
-    const add = (rows, key, side) => {
-      for (const row of rows) {
-        const entry = totals.get(String(row[key]));
-        if (entry) entry[side] += money.toMinor(row.total ?? '0');
-      }
+    // Native amounts → INR at today's rate; a coin with no rate is left out (never counted as INR).
+    const inr = S.createConverter(rates, null, 'INR');
+    const toInr = (amount, cur) => inr.convert(S.minor(amount), cur) ?? 0n;
+
+    const totals = new Map(asText.map((id) => [id, { deposited: 0n, withdrawn: 0n, adminCredited: 0n, adminDebited: 0n }]));
+    const bump = (id, side, minor) => {
+      const entry = totals.get(String(id));
+      if (entry) entry[side] += minor;
     };
 
-    add(bankIn, 'user_id', 'deposited');
-    add(gatewayIn, 'user_id', 'deposited');
-    add(bankOut, 'uid', 'withdrawn');
-    add(gatewayOut, 'user_id', 'withdrawn');
-    for (const rows of [directMoves, agentMoves, otherGateways]) {
-      add(rows.map((r) => ({ user_id: r.user_id, total: r.deposited })), 'user_id', 'deposited');
-      add(rows.map((r) => ({ user_id: r.user_id, total: r.withdrawn })), 'user_id', 'withdrawn');
+    for (const r of realIn) bump(r.user_id, 'deposited', toInr(r.total, r.cur));
+    for (const r of bankOut) bump(r.uid, 'withdrawn', money.toMinor(r.total ?? '0'));
+    for (const r of gatewayOut) bump(r.user_id, 'withdrawn', money.toMinor(r.total ?? '0'));
+    for (const r of agentMoves) {
+      bump(r.user_id, 'deposited', money.toMinor(r.deposited ?? '0'));
+      bump(r.user_id, 'withdrawn', money.toMinor(r.withdrawn ?? '0'));
+    }
+    for (const r of otherOut) bump(r.user_id, 'withdrawn', money.toMinor(r.withdrawn ?? '0'));
+    for (const r of directMoves) {
+      bump(r.user_id, 'adminCredited', toInr(r.credited, r.cur));
+      bump(r.user_id, 'adminDebited', toInr(r.debited, r.cur));
     }
 
     return new Map(
       [...totals].map(([id, value]) => [
         id,
-        {
-          deposited: money.toDecimalString(value.deposited),
-          withdrawn: money.toDecimalString(value.withdrawn),
-        },
+        Object.fromEntries(Object.entries(value).map(([k, v]) => [k, money.toDecimalString(v)])),
       ])
     );
   }
@@ -2035,6 +2029,9 @@ class ReportsService {
       balance: amount(credits?.inr),
       totalDeposited: totals?.deposited ?? '0.00000000',
       totalWithdrawn: totals?.withdrawn ?? '0.00000000',
+      /** Direct User Wallet credit / debit (INR) — its own line, never inside the deposits. */
+      adminCredited: totals?.adminCredited ?? '0.00000000',
+      adminDebited: totals?.adminDebited ?? '0.00000000',
       // `userwager` is counted in USD; shown in the site's default coin (`wagerValuer`).
       wager: wagerIn ? wagerIn.of(wager ?? '0') : wager ?? '0',
       wagerCurrency: wagerIn ? wagerIn.currency : 'USD',

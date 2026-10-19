@@ -57,7 +57,7 @@ const playerColumns: Column<PlayerReportRow>[] = [
   { key: 'balance', header: 'Balance', align: 'right', cell: r => <Money value={r.balance} /> },
   {
     key: 'dep',
-    header: <span title='Lifetime bank and gateway deposits the player paid in (INR). Credits from an upline are not included.'>Gateway deposits</span>,
+    header: <span title='Lifetime real deposits the player paid in (bank, gateway, crypto, every coin), valued in INR. Admin credits are not deposits.'>Deposits</span>,
     align: 'right',
     cell: r => <Money value={r.totalDeposited} />
   },

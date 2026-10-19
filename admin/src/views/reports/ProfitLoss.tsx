@@ -4,7 +4,7 @@ import { useMemo, type ReactNode } from 'react'
 
 import Link from 'next/link'
 
-import { CoinsIcon, DicesIcon, GiftIcon, LandmarkIcon, ScaleIcon, TrendingUpIcon, TrophyIcon } from 'lucide-react'
+import { CoinsIcon, DicesIcon, GiftIcon, LandmarkIcon, ScaleIcon, SparklesIcon, TrendingUpIcon, TrophyIcon } from 'lucide-react'
 
 import {
   BarChart,
@@ -50,6 +50,7 @@ type WaterfallStep = { key: string; label: string; kind: 'revenue' | 'cost' | 't
 type SeriesRow = {
   bucket: string
   casinoGgr: Amount
+  originalsGgr: Amount
   sportsGgr: Amount
   ggr: Amount
   costs: Amount | null
@@ -65,7 +66,14 @@ type Summary = {
   valuation: { note: string } | null
   house: boolean
   kpis: {
+
+    /** Every casino game; = thirdPartyGgr + originalsGgr. */
     casinoGgr: Amount
+    thirdPartyGgr: Amount
+    originalsGgr: Amount
+    originalsWagered: Amount
+    originalsWon: Amount
+    originalsBets: number
     sportsGgr: Amount
     ggr: Amount
     costs: Amount | null
@@ -228,6 +236,8 @@ const ProfitLossView = ({ channel }: { channel: Channel }) => {
 
     return {
       casinoGgr: pick('casinoGgr'),
+      originalsGgr: pick('originalsGgr'),
+      thirdPartyGgr: fillBuckets(f.buckets, rows, r => r.bucket, r => num(r.casinoGgr) - num(r.originalsGgr)),
       sportsGgr: pick('sportsGgr'),
       ggr: pick('ggr'),
       costs: pick('costs'),
@@ -271,8 +281,9 @@ const ProfitLossView = ({ channel }: { channel: Channel }) => {
   // ── Donuts: GGR by product, player costs by type ──
   const products = (() => {
     const parts = [
-      { label: 'Casino', value: num(s?.kpis.casinoGgr) },
-      { label: 'Sports', value: num(s?.kpis.sportsGgr) }
+      { label: 'Casino (third-party)', value: num(s?.kpis.thirdPartyGgr), color: 'chart-1' as const },
+      { label: 'Original Games', value: num(s?.kpis.originalsGgr), color: 'chart-5' as const },
+      { label: 'Sports', value: num(s?.kpis.sportsGgr), color: 'chart-3' as const }
     ]
 
     return parts.filter(x => x.value > 0)
@@ -300,7 +311,8 @@ const ProfitLossView = ({ channel }: { channel: Channel }) => {
     : [{ name: 'Gross gaming revenue', data: line.ggr, color: 'chart-4' }]
 
   const stackSeries: ChartSeries[] = [
-    { name: 'Casino GGR', data: line.casinoGgr, color: 'chart-1' },
+    { name: 'Casino GGR (third-party)', data: line.thirdPartyGgr, color: 'chart-1' },
+    { name: 'Original Games GGR', data: line.originalsGgr, color: 'chart-5' },
     { name: 'Sports GGR', data: line.sportsGgr, color: 'chart-3' },
     ...(house ? [{ name: 'Player costs', data: line.negCosts, color: 'danger' as const }] : [])
   ]
@@ -345,12 +357,26 @@ const ProfitLossView = ({ channel }: { channel: Channel }) => {
             label='Casino GGR'
             value={<Money value={s?.kpis.casinoGgr} digits={2} />}
             unit={unit}
-            hint={`${money(s?.kpis.casinoWagered)} wagered − ${money(s?.kpis.casinoWon)} paid out`}
+            hint={`All casino · ${money(s?.kpis.casinoWagered)} wagered − ${money(s?.kpis.casinoWon)} paid out · third-party ${money(s?.kpis.thirdPartyGgr)}`}
             icon={<DicesIcon />}
             loading={loading}
             delta={delta('casinoGgr')}
             spark={line.casinoGgr}
             sparkColor='chart-1'
+            sparkLabels={labels}
+            sparkFormat='money'
+            sparkCurrency={unit}
+          />
+          <KpiCard
+            label='Original Games GGR'
+            value={<Money value={s?.kpis.originalsGgr} digits={2} />}
+            unit={unit}
+            hint={`${money(s?.kpis.originalsWagered)} wagered − ${money(s?.kpis.originalsWon)} paid out · ${formatNumber(s?.kpis.originalsBets)} bets`}
+            icon={<SparklesIcon />}
+            loading={loading}
+            delta={delta('originalsGgr')}
+            spark={line.originalsGgr}
+            sparkColor='chart-5'
             sparkLabels={labels}
             sparkFormat='money'
             sparkCurrency={unit}
@@ -463,8 +489,8 @@ const ProfitLossView = ({ channel }: { channel: Channel }) => {
             title='GGR by product'
             description='Share of positive GGR. A product that lost money is left out of the ring.'
             table={categoryTable({
-              categories: ['Casino', 'Sports'],
-              series: [{ name: 'GGR', data: [num(s?.kpis.casinoGgr), num(s?.kpis.sportsGgr)] }],
+              categories: ['Casino (third-party)', 'Original Games', 'Sports'],
+              series: [{ name: 'GGR', data: [num(s?.kpis.thirdPartyGgr), num(s?.kpis.originalsGgr), num(s?.kpis.sportsGgr)] }],
               format: 'money',
               currency: unit
             })}
@@ -473,7 +499,7 @@ const ProfitLossView = ({ channel }: { channel: Channel }) => {
               ariaLabel={`GGR by product, ${unit}`}
               labels={products.map(x => x.label)}
               values={products.map(x => x.value)}
-              colors={products.map(x => (x.label === 'Casino' ? 'chart-1' : 'chart-3'))}
+              colors={products.map(x => x.color)}
               totalLabel='GGR'
               format='money'
               currency={unit}
@@ -622,8 +648,8 @@ const ProfitLossView = ({ channel }: { channel: Channel }) => {
             emptyMessage='No game lost money in this period.'
           />
           <BreakdownChart
-            title='In-house originals'
-            description='Our own games (dice, limbo, plinko, …), by game.'
+            title='Original Games'
+            description='Our own games (Original Games and in-house), by game.'
             rows={b?.originals ?? []}
             unit={unit}
             loading={bLoading}
@@ -700,8 +726,8 @@ const ProfitLossView = ({ channel }: { channel: Channel }) => {
           <ul className='text-muted-foreground list-disc space-y-1.5 pl-5'>
             <li>
               <strong className='text-foreground'>GGR (gross gaming revenue)</strong> is what players staked minus what they won back: the
-              house&apos;s share of the play. Casino GGR covers our in-house originals, Slotegrator and jsGames (bot and test rounds are left out;
-              refunded rounds are not stakes). Sports GGR is the house side of the sports settlement ledger. These are the same figures as the Dashboard.
+              house&apos;s share of the play. Casino GGR covers the Original Games (and in-house originals), Slotegrator and jsGames (bot and test rounds are left out;
+              refunded and rolled-back rounds are not stakes); the waterfall shows third-party casino and Original Games on their own lines. Sports GGR is the house side of the sports settlement ledger. These are the same figures as the Dashboard.
             </li>
             <li>
               <strong className='text-foreground'>Player costs</strong> are rewards actually credited to players&apos; wallets: rakeback claimed,

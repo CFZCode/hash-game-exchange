@@ -129,6 +129,24 @@ test('the running balance is anchored on the live wallet', async (t) => {
     assert.equal(ledger.rows.length, 0);
     assert.equal(ledger.pagination.totalPages, 1);
   });
+
+  await t.test("a player's statement (anchor: events) opens at what the events held before the range", () => {
+    // A same-day account the events only partly explain: opening 0, not live − movements (2,275).
+    const events = [
+      event('2026-10-19T06:43:00Z', KIND.SWAP, '2475'),
+      event('2026-10-19T06:46:00Z', KIND.SPORTS, '-100'),
+    ];
+    const range = { from: '2026-09-19', to: '2026-10-19', page: 1, limit: 100, anchor: 'events' };
+    const ledger = buildLedger(events, '9999', range);
+    assert.equal(ledger.opening, '0.00000000');
+    assert.equal(ledger.closing, '2375.00000000');
+    assert.equal(ledger.rows[0].balance, '2375.00000000');
+    assert.equal(ledger.unexplained, '7624.00000000', 'the wallet drift is still reported');
+
+    const before = buildLedger([event('2026-09-01T06:00:00Z', KIND.BANK_DEPOSIT, '50'), ...events], '2425', range);
+    assert.equal(before.opening, '50.00000000');
+    assert.equal(before.closing, '2425.00000000');
+  });
 });
 
 test('range placement', async (t) => {

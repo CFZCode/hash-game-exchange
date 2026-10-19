@@ -5,7 +5,7 @@ import { useMemo, type ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
-import { ArrowDownToLineIcon, ArrowUpFromLineIcon, DicesIcon, ScaleIcon, TrophyIcon, UserPlusIcon } from 'lucide-react'
+import { ArrowDownToLineIcon, ArrowUpFromLineIcon, DicesIcon, ScaleIcon, SparklesIcon, TrophyIcon, UserPlusIcon } from 'lucide-react'
 
 import {
   BarChart,
@@ -51,6 +51,12 @@ type StatsBucket = {
   casinoWon: string
   casinoGgr: string
   casinoBets: number
+
+  /** The site's own games (Original Games + in-house) — part of the casino figures; third-party = casino − originals. */
+  originalsWagered: string
+  originalsWon: string
+  originalsGgr: string
+  originalsBets: number
   sportsStaked: string
   sportsGgr: string
   sportsBets: number
@@ -215,6 +221,9 @@ const METRIC_LABEL: Record<string, string> = {
   casinoWagered: 'casino stakes',
   casinoWon: 'casino wins',
   casinoGgr: 'casino GGR',
+  originalsWagered: 'Original Games stakes',
+  originalsWon: 'Original Games wins',
+  originalsGgr: 'Original Games GGR',
   sportsStaked: 'sports stakes',
   sportsGgr: 'sports GGR'
 }
@@ -256,6 +265,7 @@ const DirectUserDashboard = () => {
 
   const s = series.data
   const p = previous.data
+
   // The answer names its unit: the picked coin, or the site's default coin for "every currency".
   const unit = f.currency || s?.currency || reportCoin
   const loading = series.isLoading
@@ -272,6 +282,8 @@ const DirectUserDashboard = () => {
       registrations: pick('registrations'),
       casinoWagered: pick('casinoWagered'),
       casinoGgr: pick('casinoGgr'),
+      originalsWagered: pick('originalsWagered'),
+      originalsGgr: pick('originalsGgr'),
       sportsStaked: pick('sportsStaked'),
       sportsGgr: pick('sportsGgr')
     }
@@ -284,13 +296,17 @@ const DirectUserDashboard = () => {
     { name: 'Withdrawals', data: line.withdrawals, color: 'chart-2' }
   ]
 
+  const minus = (a: (number | null)[], b: (number | null)[]) => a.map((v, i) => n(v) - n(b[i]))
+
   const turnoverSeries: ChartSeries[] = [
-    { name: 'Casino wagered', data: line.casinoWagered, color: 'chart-1' },
+    { name: 'Casino wagered (third-party)', data: minus(line.casinoWagered, line.originalsWagered), color: 'chart-1' },
+    { name: 'Original Games wagered', data: line.originalsWagered, color: 'chart-5' },
     { name: 'Sports staked', data: line.sportsStaked, color: 'chart-3' }
   ]
 
   const ggrSeries: ChartSeries[] = [
-    { name: 'Casino GGR', data: line.casinoGgr, color: 'chart-1' },
+    { name: 'Casino GGR (third-party)', data: minus(line.casinoGgr, line.originalsGgr), color: 'chart-1' },
+    { name: 'Original Games GGR', data: line.originalsGgr, color: 'chart-5' },
     { name: 'Sports GGR', data: line.sportsGgr, color: 'chart-3' }
   ]
 
@@ -328,7 +344,7 @@ const DirectUserDashboard = () => {
 
         {series.error && <ErrorState error={series.error} />}
 
-        <div className='grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6'>
+        <div className='grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7'>
           <KpiCard
             label='Deposits'
             value={money(s?.totals.deposits)}
@@ -388,12 +404,26 @@ const DirectUserDashboard = () => {
             label='Casino GGR'
             value={<Money value={s?.totals.casinoGgr} digits={2} />}
             unit={unit}
-            hint={`${money(s?.totals.casinoWagered)} wagered · ${formatNumber(s?.totals.casinoBets)} ${s?.totals.casinoBets === 1 ? 'bet' : 'bets'}`}
+            hint={`All casino incl. Original Games · ${money(s?.totals.casinoWagered)} wagered · ${formatNumber(s?.totals.casinoBets)} ${s?.totals.casinoBets === 1 ? 'bet' : 'bets'} · third-party GGR ${money(n(s?.totals.casinoGgr) - n(s?.totals.originalsGgr))}`}
             icon={<DicesIcon />}
             loading={loading}
             delta={delta('casinoGgr')}
             spark={line.casinoGgr}
             sparkColor='chart-1'
+            sparkLabels={labels}
+            sparkFormat='money'
+            sparkCurrency={unit}
+          />
+          <KpiCard
+            label='Original Games GGR'
+            value={<Money value={s?.totals.originalsGgr} digits={2} />}
+            unit={unit}
+            hint={`${money(s?.totals.originalsWagered)} wagered · ${formatNumber(s?.totals.originalsBets)} ${s?.totals.originalsBets === 1 ? 'bet' : 'bets'}`}
+            icon={<SparklesIcon />}
+            loading={loading}
+            delta={delta('originalsGgr')}
+            spark={line.originalsGgr}
+            sparkColor='chart-5'
             sparkLabels={labels}
             sparkFormat='money'
             sparkCurrency={unit}
@@ -464,7 +494,7 @@ const DirectUserDashboard = () => {
         <div className='grid gap-4 xl:grid-cols-2'>
           <ChartCard
             title='Turnover'
-            description={`Casino stakes and sports stakes, per ${f.granularity}, in ${unit}.`}
+            description={`Third-party casino, Original Games and sports stakes, per ${f.granularity}, in ${unit}.`}
             table={seriesTable({ ...tableArgs, series: turnoverSeries })}
           >
             <TimeSeriesChart

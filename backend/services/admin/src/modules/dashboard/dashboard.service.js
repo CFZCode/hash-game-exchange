@@ -555,14 +555,13 @@ class DashboardService {
 
   // ══════════════════════════════════════════════════════════════════════
 
-  /** Every deposit source, converted, with what could not be converted. */
+  /** Every deposit source, converted, with what could not be converted. The Direct User Wallet credit is not a deposit (owner, 19 Oct 2026). */
   async #depositTotals(rates, startOfToday, range, scope) {
     const window = (since) => [
       this.#groupCcdeposit(since, scope),
       this.#groupByCurrency(this.models.FiatDeposits, DEPOSIT_SUCCESS.fiat_deposits, 'created_at', since, 'currency', this.#ownerWhere(scope, 'user_id')),
       this.#groupByCurrency(this.models.Apaydeposits, DEPOSIT_SUCCESS.apaydeposits, 'created_at', since, 'currency', this.#ownerWhere(scope, 'user_id')),
       this.#groupPayIn(since, scope),
-      this.#groupDirectWallet(DIRECT_WALLET_LEDGER.deposit, since, scope),
     ];
 
     const [lifetime, today, inRange] = await Promise.all([
@@ -582,7 +581,6 @@ class DashboardService {
     const window = (since) => [
       this.#groupByCurrency(this.models.Withdrawals, WITHDRAWAL_DONE.withdrawals, 'date', since, 'coin', this.#ownerWhere(scope, 'uid')),
       this.#groupByCurrency(this.models.FiatWithdrawals, WITHDRAWAL_DONE.fiat_withdrawals, 'date', since, 'currency', this.#ownerWhere(scope, 'uid')),
-      this.#groupDirectWallet(DIRECT_WALLET_LEDGER.withdrawal, since, scope),
     ];
 
     const [lifetime, today, inRange] = await Promise.all([
@@ -632,21 +630,6 @@ class DashboardService {
         ...this.#ownerWhere(scope, 'user_id'),
       },
       attributes: ['currency', [fn('COALESCE', fn('SUM', col('amount')), 0), 'total'], [fn('COUNT', literal('*')), 'count']],
-      group: ['currency'],
-      raw: true,
-    });
-    return rows.map((row) => ({ currency: row.currency, total: row.total, count: Number(row.count) }));
-  }
-
-  /** Direct User Wallet credits (or debits, made positive) by currency. */
-  async #groupDirectWallet(reason, since, scope) {
-    const rows = await this.models.CreditsLedger.findAll({
-      where: {
-        ...directWalletWhere(reason),
-        ...this.#windowWhere('created_at', since),
-        ...this.#ownerWhere(scope, 'user_id'),
-      },
-      attributes: ['currency', [fn('COALESCE', fn('SUM', fn('ABS', col('amount'))), 0), 'total'], [fn('COUNT', literal('*')), 'count']],
       group: ['currency'],
       raw: true,
     });

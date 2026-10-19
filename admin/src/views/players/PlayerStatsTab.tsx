@@ -3,6 +3,7 @@
 import {
   ArrowDownToLineIcon,
   ArrowUpFromLineIcon,
+  BadgePlusIcon,
   CrownIcon,
   DicesIcon,
   GiftIcon,
@@ -50,15 +51,16 @@ const CONFIG: StatsPanelConfig = {
   kpis: [
     {
       key: 'deposited',
-      label: 'Gateway deposits',
+      label: 'Deposits',
       format: 'money',
       icon: <ArrowDownToLineIcon />,
       spark: 'deposits',
       sparkColor: 'chart-1',
 
-      // Not the credits an upline handed over — those are on the Statement and the agent-users list.
-      hint: k => `${formatNumber(num(k.deposits))} paid in by the player (fiat, gateway, crypto) · excludes credits from upline`
+      // Real deposits only; the Super Admin's Direct User Wallet credit is the "Admin credit" line.
+      hint: k => `${formatNumber(num(k.deposits))} paid in by the player (bank, gateway, crypto) · admin credits not included`
     },
+    { key: 'adminCredited', label: 'Admin credit', format: 'money', icon: <BadgePlusIcon />, goodWhen: 'neutral', hint: () => 'Super Admin Direct User Wallet credits — not a deposit' },
     { key: 'withdrawn', label: 'Withdrawn', format: 'money', icon: <ArrowUpFromLineIcon />, spark: 'withdrawals', sparkColor: 'chart-2', goodWhen: 'neutral', hint: k => `${formatNumber(num(k.withdrawals))} withdrawals` },
     { key: 'netDeposit', label: 'Net deposit', format: 'money', icon: <ScaleIcon />, goodWhen: 'neutral' },
     {

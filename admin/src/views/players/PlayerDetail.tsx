@@ -634,7 +634,8 @@ const ReportDetail = ({ id }: { id: string }) => {
           loading={report.isLoading}
           hint={held.map(c => formatAmount(p?.wallets[c], c)).join(' · ') || undefined}
         />
-        <StatCard label='Gateway deposits' value={money.format(p?.totalDeposited, 'INR')} loading={report.isLoading} hint={`${formatAmount(p?.totalDeposited, 'INR')} · lifetime bank + gateway, paid in by the player · excludes credits from upline`} />
+        <StatCard label='Deposits' value={money.format(p?.totalDeposited, 'INR')} loading={report.isLoading} hint='Lifetime real deposits (bank, gateway, crypto), every coin · admin credits not included' />
+        <StatCard label='Admin credit' value={money.format(p?.adminCredited, 'INR')} loading={report.isLoading} hint='Super Admin Direct User Wallet credits — not a deposit' />
         <StatCard label='Withdrawn' value={money.format(p?.totalWithdrawn, 'INR')} loading={report.isLoading} hint={formatAmount(p?.totalWithdrawn, 'INR')} />
           </>
         )}
