@@ -30,14 +30,11 @@ import { checkBetLive } from "../buffer/betBuffer.mjs";
 import { StaffMarketLocks_default } from "../../../models/admin/StaffMarketLocks.mjs";
 
 import xssClean from "xss-clean";
-import { toInr } from "../../../lib/helper/toInr.mjs";
-import fetch from "node-fetch";
+import { toInr, inrToUsd } from "../../../lib/helper/toInr.mjs";
 init_TotalExposure();
 init_db();
 import axios5 from "axios";
 import { Op as Op6, Sequelize as Sequelize2 } from "sequelize";
-var cachedUsdRate = 0;
-var cachedAt = 0;
 var sportsDataSet = [
   { sid: 4, ename: "Cricket" },
   { sid: 1, ename: "Football" },
@@ -222,22 +219,6 @@ var getMarketNameFromGtype = ({ mname, gtype, nat, section }) => {
     marketName: nat.trim()
   };
 };
-async function inrToUsd(inrAmount = 0) {
-  const FIVE_MIN = 5 * 60 * 1e3;
-  const now = Date.now();
-  if (!cachedUsdRate || now - cachedAt > FIVE_MIN) {
-    try {
-      const r = await fetch("https://api.exchangerate.host/latest?base=INR&symbols=USD");
-      const j = await r.json();
-      cachedUsdRate = 1 / j.rates.USD;
-      cachedAt = now;
-    } catch (e) {
-      console.error("FX fetch failed, using fallback 83:", e.message);
-      cachedUsdRate = 1 / 83;
-    }
-  }
-  return +(inrAmount * cachedUsdRate).toFixed(2);
-}
 var checkUserBetLock = async (user_id, game_type, event_id = null, transaction = null, market_id = null) => {
   try {
     console.log("[BetLock] checkUserBetLock CALLED:", { user_id, game_type, event_id, market_id });
@@ -540,7 +521,6 @@ var placeBet = async (req, res, opts) => {
       team_two,
       category,
       original_currency,
-      usd_amount,
       match_start_time,
       eventid,
       fancy_name,
@@ -2057,7 +2037,8 @@ var placeBet = async (req, res, opts) => {
         stake_amount: stake,
         original_currency: currency.toUpperCase(),
         original_amount: currency_amount,
-        usd_amount: usd_amount || await inrToUsd(stake),
+        // Server-side at the admin rate; the client's figure is never trusted.
+        usd_amount: await inrToUsd(stake),
         liability: singleBetLiability,
         match_start_time: startTime,
         exposure_after_bet: Math.max(0, ...Object.values(newExposures).filter((v) => v < 0).map((v) => Math.abs(v)), 0),

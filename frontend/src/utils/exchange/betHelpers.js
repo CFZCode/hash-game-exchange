@@ -212,7 +212,6 @@ export function oddsFormat(betValue) {
 }
 
 export function prepareBetPayload(betValue, oddsNum, stakeNum, user, effectiveMarketType, effectiveBetType, effectiveTeam) {
-  const conversionRate = 0.0118;
   // Anything that is NOT match_odds or bookmaker is fancy-category
   const mtLower = String(effectiveMarketType || '').toLowerCase();
   const isMatchOrBookmaker = mtLower.includes('match_odds') || mtLower.includes('match odds') || mtLower.includes('bookmaker');
@@ -312,7 +311,6 @@ export function prepareBetPayload(betValue, oddsNum, stakeNum, user, effectiveMa
     team_two: (betValue?.market_type === 'TIED_MATCH' || (betValue?.market_type || '').toLowerCase() === 'tied match')
       ? String((betValue?.runners || [])[1] || 'No')
       : String(betValue?.team_two || ''),
-    usd_amount: Number((stakeNum * conversionRate).toFixed(2)),
     user_id: String(user?.user_id || user?.id || '0'),
     count: betValue?.count || betValue?.outcomes?.length || 2,
     bet_type: effectiveBetType,

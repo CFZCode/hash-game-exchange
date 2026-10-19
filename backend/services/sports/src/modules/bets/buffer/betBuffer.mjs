@@ -17,7 +17,6 @@ var FANCY_DEFAULT_SECONDS = Number(process.env.FANCY_BUFFER_DEFAULT_SECONDS) || 
 var MAX_AGE_MS = Number(process.env.LIVE_ODDS_MAX_AGE_MS) || 5e3;
 var FIRST_POLL_WAIT_MS = 3e3;
 var TICK_MS = 500;
-var USD_RATE = 0.0118;
 var sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 var round2 = (n) => Math.round(n * 100) / 100;
 var bool = (v) => v === true || v === "true";
@@ -187,7 +186,6 @@ function applyDecision(body, d) {
     body.stake_amount = stake;
     body.original_amount = stake;
     body.amount = stake;
-    body.usd_amount = Number((stake * USD_RATE).toFixed(2));
   }
 }
 var placeBetBuffered = async (req, res) => {

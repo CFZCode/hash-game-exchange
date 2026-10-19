@@ -40,4 +40,13 @@ var inrToCurrency = async (amount, currency) => {
   return Math.round(n * inr / coin * 1e8) / 1e8;
 };
 
-export { toInr, inrToCurrency };
+// A bet's usd_amount (VIP wager, commission, admin reports): INR at the admin's usd_rate.
+// 0.012 only when the table has no INR row, so a bet is never refused over it.
+var INR_USD_FALLBACK = 0.012;
+var inrToUsd = async (inrAmount = 0) => {
+  const n = Number(inrAmount) || 0;
+  const usd = await inrToCurrency(n, "USD").catch(() => n * INR_USD_FALLBACK);
+  return Math.round(usd * 100) / 100;
+};
+
+export { toInr, inrToCurrency, inrToUsd };
