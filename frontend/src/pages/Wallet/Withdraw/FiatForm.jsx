@@ -8,7 +8,7 @@ import { showToast } from '../../../components/shared/Toast/toast';
 import { useSession } from '../../../context/session';
 import useResource from '../../../hooks/useResource';
 import { USE_FIXTURES } from '../../../services/client';
-import { getAlias, printCurrency } from '../../../utils/currency';
+import { getAlias } from '../../../utils/currency';
 import { channelIcon } from '../../../utils/channelArt';
 import {
   FIAT_METHODS,
@@ -123,7 +123,7 @@ function SubmittedPop({ onClose }) {
 }
 
 export default function FiatForm({ currencyName }) {
-  const { balances, exposure, refreshBalances, updateBalance } = useSession();
+  const { balances, refreshBalances, updateBalance } = useSession();
   const [method, setMethod] = React.useState(FIAT_METHODS[0].method);
   /* `null` = not chosen yet: the first saved account for the method, or new details when there
      is none — derived during render, so it follows the read when it lands. */
@@ -152,9 +152,9 @@ export default function FiatForm({ currencyName }) {
 
   const row = balances.find((coin) => coin.currencyName === currencyName);
   const total = Number(row?.generalAmount ?? row?.amount ?? 0) || 0;
-  // INR held by open sports bets stays in the balance until they settle and is not withdrawable.
-  const inBets = currencyName === 'INRFIAT' ? exposure : 0;
-  const balance = Math.max(0, total - inBets);
+  // Open sports bets' stakes have already left `credits.inr` (sports-service walletUpdate), so the
+  // wallet balance is what can be withdrawn — subtracting the exposure again would count it twice.
+  const balance = Math.max(0, total);
   const min = FIAT_WITHDRAW_MINIMUM;
   const shownAmount = amount ?? min;
 
@@ -341,11 +341,6 @@ export default function FiatForm({ currencyName }) {
           precision={2}
         />
         <AvailableRow currencyName={currencyName} unlocked={balance} className="mt-5" />
-        {inBets > 0 && (
-          <div className="mt-1 text-right text-secondary">
-            In bets: {printCurrency(inBets, currencyName, { target: currencyName, hasAlias: false })}
-          </div>
-        )}
 
         {error && (
           <Notice type="error" className="mt-5 font-normal">
