@@ -25,7 +25,7 @@ import {
 } from '@/configs/navConfig'
 
 // Component Imports
-import LogoSvg from '@/assets/svg/logo'
+import BrandMark from '@/components/shared/BrandMark'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import {
   DropdownMenu,
@@ -533,6 +533,7 @@ const SidebarLayout = () => {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const { state, isMobile, setOpenMobile } = useSidebar()
+
   // Agent-tree logins (no promotions) see every section open by default (user, 2026-10-17).
   const { actor } = useSession()
   const allOpen = actor?.promotions === false
@@ -610,10 +611,10 @@ const SidebarLayout = () => {
           <SidebarMenuItem>
             <SidebarMenuButton
               size='lg'
-              className='gap-2.5 bg-transparent! hover:bg-transparent! [&>svg]:size-8'
+              className='gap-2.5 bg-transparent! hover:bg-transparent!'
               render={<Link href={homeHref} />}
             >
-              <LogoSvg />
+              <BrandMark />
               <div className='flex min-w-0 flex-col items-start gap-0.5'>
                 <span className='text-sidebar-foreground text-sm font-medium text-nowrap'>
                   {themeConfig.templateName}

@@ -9,6 +9,9 @@ import { NextResponse, type NextRequest } from 'next/server'
 const COOKIE = process.env.SESSION_COOKIE_NAME ?? 'site_admin_token'
 const PUBLIC = ['/login', '/api/auth/login', '/api/auth/logout']
 
+// Gateway reads a signed-out page needs (the login screen's site config and brand mark).
+const PUBLIC_API = ['/site-config/public', '/branding/public', '/branding/asset/']
+
 function tokenLooksValid(token: string | undefined) {
   if (!token) return false
 
@@ -26,7 +29,7 @@ export function proxy(req: NextRequest) {
   const signedIn = tokenLooksValid(req.cookies.get(COOKIE)?.value)
 
   if (pathname.startsWith('/api/gw/')) {
-    if (!signedIn && !pathname.includes('/site-config/public')) {
+    if (!signedIn && !PUBLIC_API.some(p => pathname.includes(p))) {
       return NextResponse.json({ success: false, error: { code: 'UNAUTHENTICATED', message: 'Not signed in' } }, { status: 401 })
     }
 
@@ -51,5 +54,5 @@ export function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|images|api/auth/me).*)']
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|brand-mark.png|images|api/auth/me).*)']
 }
