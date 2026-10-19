@@ -210,7 +210,7 @@ export default function SettingsPreferences() {
   /* Off: the owner's default currency rather than "None" (hooks/useSiteCurrency). */
   const siteCurrency = useSiteCurrency();
   // Agent's player: INR only, no "View in currency" row.
-  const { agentPlayer } = useGates();
+  const { agentPlayer, themeSwitch } = useGates();
 
   return (
     /* `w-full py-4 text-base sm:py-0` — the page's own vertical rhythm on a phone, where the
@@ -274,10 +274,12 @@ export default function SettingsPreferences() {
 
         {/* The Display mode row has NO trailing container in the template — the toggle is appended
             to the row itself and brings its own `ml-auto`, which is why this one is not a `Row`. */}
+        {themeSwitch() && (
         <div className="mt-3 flex h-12 w-full items-center">
           <span className="font-semibold">Display mode</span>
           <ThemeToggle />
         </div>
+        )}
       </Card>
 
       <Card title="Privacy Preferences" className="mt-3 sm:mt-4">

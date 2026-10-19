@@ -870,8 +870,9 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
               </div>
 
               {/* ============================================================ */}
-              {/* 8. DARK / LIGHT TOGGLE                                        */}
+              {/* 8. DARK / LIGHT TOGGLE — only when the owner allows the light theme */}
               {/* ============================================================ */}
+              {gates.themeSwitch() && (
               <div className="w-full overflow-hidden">
                 <div className="mt-2 h-10 w-full cursor-pointer rounded-lg p-0.5 font-semibold Sidebar-Unit_bg">
                   <div className="relative flex h-9 w-full">
@@ -916,6 +917,7 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
                 </div>
 
               </div>
+              )}
 
               {/* ============================================================ */}
               {/* 10. JOIN OUR GLOBAL COMMUNITY  (drawer only, signed out)     */}

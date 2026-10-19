@@ -42,6 +42,8 @@ const POLICY_DEFAULTS = Object.freeze({
   withdrawal_requirements: 'kyc',
   // Not a channel switch: whose game catalogue the lobby serves (casino games/catalogueSwitch.js).
   casino_aggregator: 'js_games',
+  // Not a channel switch: whether the player site offers the light theme (frontend gates.js).
+  theme_mode: 'dark_only',
 });
 
 /** For each policy, which stored variants allow each channel. */

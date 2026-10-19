@@ -410,6 +410,7 @@ const SecurityStatus = () => <IconAttention className="size-5 fill-warning" />;
 
 function SettingsCards({ onRefer, onLanguage, onCurrency, confirm, affiliateOn = true, currencyOn = true }) {
   const { session } = useSession();
+  const { themeSwitch } = useGates();
 
   /* `O.langs[R.lang]?.[0] ?? "English"` — the store's `setting.lang`, the field the picker writes. */
   const language = languageName(session.setting.lang);
@@ -510,7 +511,9 @@ function SettingsCards({ onRefer, onLanguage, onCurrency, confirm, affiliateOn =
           </div>
         </div>}
 
-        {/* The one row with no `btn-like` and no handler — the control is the whole of it. */}
+        {/* The one row with no `btn-like` and no handler — the control is the whole of it.
+            Only when the owner allows the light theme (gates `themeSwitch`). */}
+        {themeSwitch() && (
         <div className="mt-1 flex h-11 w-full items-center px-3">
           <IconTheme className="size-6 fill-secondary" />
           <RowLabel>Theme</RowLabel>
@@ -518,6 +521,7 @@ function SettingsCards({ onRefer, onLanguage, onCurrency, confirm, affiliateOn =
             <ThemeToggle />
           </div>
         </div>
+        )}
       </div>
     </div>
   );

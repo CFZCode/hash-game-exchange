@@ -7,7 +7,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 
 const COOKIE = process.env.SESSION_COOKIE_NAME ?? 'site_admin_token'
-const PUBLIC = ['/login', '/api/auth/login', '/api/auth/logout']
+const PUBLIC = ['/login', '/api/auth/session', '/api/auth/logout']
 
 // Gateway reads a signed-out page needs (the login screen's site config and brand mark).
 const PUBLIC_API = ['/site-config/public', '/branding/public', '/branding/asset/']

@@ -205,6 +205,20 @@ const CATALOGUE: FeatureEntry[] = [
     ]
   },
   {
+    // Light / dark theme: a policy (always on, owner-only). Mirrors backend featureCatalogue.js.
+    key: 'theme_mode',
+    label: 'Light / dark theme',
+    category: 'business',
+    flag: null,
+    policy: true,
+    defaultVariant: 'dark_only',
+    note: 'Dark only: the player site is always dark and shows no theme toggle. Dark and light: players can switch (sidebar, account page, Settings → Preferences).',
+    variants: [
+      { key: 'dark_only', label: 'Dark only', description: 'The site is always dark; no theme toggle anywhere. The default.' },
+      { key: 'switch', label: 'Dark and light', description: 'Players can switch between the dark and the light theme (sidebar, account page, Settings → Preferences).' }
+    ]
+  },
+  {
     key: 'vip',
     label: 'VIP club',
     category: 'engagement',

@@ -128,7 +128,7 @@ const PROMO_GATES = new Set(['bonus', 'vip', 'affiliate', 'promotions', 'contest
 
 /* The owner's policies when the site never chose one — the backend's own `POLICY_DEFAULTS`
    (packages/common/src/sitePolicy.js). */
-const POLICY_DEFAULTS = { business_model: 'hybrid', deposit_mode: 'both', withdrawal_mode: 'both' };
+const POLICY_DEFAULTS = { business_model: 'hybrid', deposit_mode: 'both', withdrawal_mode: 'both', theme_mode: 'dark_only' };
 
 /* Which policy variants leave a channel open — backend sitePolicy.js ALLOWS. */
 const railOpen = (mode, channel) => mode === 'both' || mode === channel;
@@ -185,6 +185,9 @@ export function makeGates({ flags, features, capabilities, ready = true } = {}) 
     agentPlayer,
     /** Public self-registration: off on a B2B (agent-only) site. */
     canSignUp: () => policy('business_model') !== 'b2b',
+    /** The light theme and its toggles: only when the owner's `theme_mode` is `switch`. Not answered
+     *  or failed = dark only; fixtures (the pixel reference) keep both. */
+    themeSwitch: () => (list ? policy('theme_mode') === 'switch' : USE_FIXTURES),
   };
 }
 

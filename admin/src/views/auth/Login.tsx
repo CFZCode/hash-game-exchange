@@ -86,11 +86,19 @@ const Login = () => {
       else body.username = identifier
       if (code) body.twoFactorCode = code
 
-      const { data } = await request<{ firstLogin?: boolean; mustChangePassword?: boolean; actor?: { name?: string } }>('/api/auth/login', {
-        raw: true,
-        method: 'POST',
-        body
-      })
+      // Signed in at the platform's base URL itself; the admin server only keeps the token in its
+      // httpOnly cookie (app/api/auth/session).
+      const payload = { ...body }
+
+      delete payload.mode
+      const path = mode === 'executive' ? '/api/v1/admin/auth/executive/login' : '/api/v1/admin/auth/login'
+
+      const { data } = await request<{ token: string; firstLogin?: boolean; mustChangePassword?: boolean; actor?: { name?: string } }>(
+        `${siteConfig.apiBaseUrl}${path}`,
+        { raw: true, method: 'POST', body: payload }
+      )
+
+      await request('/api/auth/session', { raw: true, method: 'POST', body: { token: data.token } })
 
       toast.success(`Signed in${data?.actor?.name ? ` as ${data.actor.name}` : ''}`)
 

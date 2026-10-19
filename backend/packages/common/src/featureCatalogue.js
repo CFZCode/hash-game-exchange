@@ -812,7 +812,25 @@ const CASINO_AGGREGATOR_POLICY = {
   ],
 };
 
-const FEATURES = Object.freeze([...POLICIES, REWARD_CURRENCY_POLICY, DEFAULT_CURRENCY_POLICY, REGION_RESTRICTION_POLICY, WITHDRAWAL_REQUIREMENTS_POLICY, CASINO_AGGREGATOR_POLICY, ...GENERATED, TIPS, P2P, PUSH_NOTIFICATIONS, ANALYTICS]);
+/**
+ * Light / dark theme — a policy like the casino aggregator: always in force, the owner alone sets
+ * it. `dark_only` (the default) keeps the player site dark with no theme toggle; `switch` brings
+ * the light theme and the toggles back (frontend services/gates.js `themeSwitch`).
+ */
+const THEME_MODE_POLICY = {
+  key: 'theme_mode',
+  label: 'Light / dark theme',
+  category: 'business',
+  kind: 'policy',
+  flag: null,
+  defaultVariant: 'dark_only',
+  variants: [
+    { key: 'dark_only', label: 'Dark only', description: 'The site is always dark; no theme toggle anywhere. The default.' },
+    { key: 'switch', label: 'Dark and light', description: 'Players can switch between the dark and the light theme (sidebar, account page, Settings → Preferences).' },
+  ],
+};
+
+const FEATURES = Object.freeze([...POLICIES, REWARD_CURRENCY_POLICY, DEFAULT_CURRENCY_POLICY, REGION_RESTRICTION_POLICY, WITHDRAWAL_REQUIREMENTS_POLICY, CASINO_AGGREGATOR_POLICY, THEME_MODE_POLICY, ...GENERATED, TIPS, P2P, PUSH_NOTIFICATIONS, ANALYTICS]);
 
 /**
  * Site templates — the bundles the OWNER picks for a site (docs/OWNER-PANEL.md
