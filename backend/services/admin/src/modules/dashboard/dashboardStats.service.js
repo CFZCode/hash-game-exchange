@@ -134,13 +134,15 @@ const MONEY_SOURCES = Object.freeze([
 const sportName = (id) => (id === 'other' ? 'Other' : SPORT_NAMES[id] ?? `Sport ${id}`);
 
 class DashboardStatsService {
-  constructor({ models, db, logger, config, directOnly = false }) {
+  constructor({ models, db, logger, config, directOnly = false, agentOnly = false }) {
     this.models = models;
     this.db = db;
     this.logger = logger;
     this.config = config;
     /** Dashboard "Direct Users" tab: only players with no parent. */
     this.directOnly = directOnly;
+    /** P&L "Agent Users" tab: only players with a parent in the caller's tree. */
+    this.agentOnly = agentOnly;
   }
 
   /**
@@ -609,6 +611,7 @@ class DashboardStatsService {
     const root = Number(this.config?.ROOT_STAFF_ID ?? 1);
     const isRoot = staffIds.includes(root);
     if (this.directOnly) return { all: false, direct: true, empty: !isRoot, staffIds: [] };
+    if (this.agentOnly) return { all: false, direct: false, empty: staffIds.length === 0, staffIds };
     if (isRoot) return { all: true, direct: false, empty: false, staffIds: [] };
     return { all: false, direct: false, empty: staffIds.length === 0, staffIds };
   }

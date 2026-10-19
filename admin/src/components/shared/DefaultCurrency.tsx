@@ -1,7 +1,7 @@
 'use client'
 
 import { useApi } from '@/hooks/use-api'
-import { isPlainInr } from '@/lib/format'
+import { isPlainInr, setDefaultCode } from '@/lib/format'
 
 /**
  * The site's DEFAULT COIN — the currency every money screen opens on before anybody picks one
@@ -21,6 +21,9 @@ export function useDefaultCurrency() {
 
   // The agent system (every session but the Super Admin's) runs on INR, whatever the owner's default.
   const code = isPlainInr() ? 'INR' : String(pub.data?.defaultCurrency || FALLBACK_DEFAULT_CURRENCY).toUpperCase()
+
+  // Amounts printed without a code are in this coin, so it picks their digit grouping (lib/format).
+  setDefaultCode(code)
 
   return { code, loading: pub.isLoading }
 }

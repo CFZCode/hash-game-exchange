@@ -14,7 +14,7 @@ import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
 import { formatIn, useReportMoney } from '@/components/shared/ReportMoney'
-import { inrSign } from '@/lib/format'
+import { inrSign, localeFor } from '@/lib/format'
 import { useApi } from '@/hooks/use-api'
 import { api, errorMessage } from '@/lib/api/client'
 import { cn } from '@/lib/utils'
@@ -48,7 +48,7 @@ const ALL = 'ALL'
 const MAX_ROWS = 10_000
 
 const fmt = (value: string | number | null | undefined, cur: string) =>
-  `${cur === 'INR' ? inrSign() : ''}${(Number(value) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  `${cur === 'INR' ? inrSign() : ''}${(Number(value) || 0).toLocaleString(localeFor(cur), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${cur === 'INR' ? '' : ` ${cur}`}`
 
 const fmtDate = (iso: string) => (iso ? new Date(iso).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : '—')
 
@@ -159,7 +159,7 @@ export const BalanceSheetView = ({
     converted ? (
       <span className='flex flex-col'>
         <span>{money.format(v, rowCur)}</span>
-        {rowCur !== money.code && <span className='text-muted-foreground text-[11px] font-normal'>{fmt(v, rowCur)}{rowCur === 'INR' ? '' : ` ${rowCur}`}</span>}
+        {rowCur !== money.code && <span className='text-muted-foreground text-[11px] font-normal'>{fmt(v, rowCur)}</span>}
       </span>
     ) : (
       fmt(v, rowCur)
@@ -250,7 +250,7 @@ export const BalanceSheetView = ({
                   ? '✓ reconciled'
                   : `⚠ mismatch ${sheets
                       .filter(sh => Number(sh.balance.unexplained ?? 0) !== 0)
-                      .map(sh => `${fmt(sh.balance.unexplained, curOf(sh))}${curOf(sh) === 'INR' ? '' : ` ${curOf(sh)}`}`)
+                      .map(sh => fmt(sh.balance.unexplained, curOf(sh)))
                       .join(', ')} — needs review`}
               </span>
             </p>

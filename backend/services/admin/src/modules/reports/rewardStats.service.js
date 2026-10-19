@@ -45,6 +45,9 @@ const {
  * are USD by design (rakeback accruals, periodic VIP bonuses in
  * `bonus_history`) are reported as USD and named `…Usd`.
  */
+/** `player_bonuses.source` as the Bonus balances legend says it (the list's own labels). */
+const BONUS_SOURCE_LABEL = Object.freeze({ first_deposit: 'First deposit', monthly_deposit: 'Monthly deposit', spin_wheel: 'Spin wheel' });
+
 class RewardStatsService {
   constructor({ models, logger, config }) {
     this.models = models;
@@ -528,7 +531,7 @@ class RewardStatsService {
 
     const sources = new Map();
     for (const row of bySource) {
-      const e = sources.get(row.source) ?? { key: row.source, label: row.source, value: 0n, count: 0 };
+      const e = sources.get(row.source) ?? { key: row.source, label: BONUS_SOURCE_LABEL[row.source] ?? row.source, value: 0n, count: 0 };
       e.value += valuer.value(row.amount, row.currency);
       e.count += row.n;
       sources.set(row.source, e);

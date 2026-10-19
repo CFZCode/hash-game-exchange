@@ -269,7 +269,7 @@ test('P&L against a database', async (t) => {
     assert.equal(b.originals.length, 1, 'the bot round is not a game played');
     assert.equal(m(b.originals[0].ggr), m('15'));
     assert.equal(b.sports.bySport[0].label, 'Cricket');
-    assert.equal(b.sports.byMarket[0].label, 'MO');
+    assert.equal(b.sports.byMarket[0].label, 'Match Odds');
     assert.equal(b.sports.topEvents[0].label, 'Test v Test');
     // A: casino 25 + sports 10 = 35 to the house; B: 20.
     assert.deepEqual(b.players.houseWon.map((p) => p.id), [String(playerA), String(playerB)]);

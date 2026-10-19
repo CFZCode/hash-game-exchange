@@ -101,7 +101,8 @@ module.exports = {
   agentBets: { params: z.object({ staffId }).strict(), query: withRange(betFields) },
 
   /** @legacy GET /api/admin/agent-report/user/:userId/bets */
-  userBets: { params: z.object({ userId }).strict(), query: withRange(betFields) },
+  // `currency`: the statement screen sends its wallet with every request, the bet list included.
+  userBets: { params: z.object({ userId }).strict(), query: withRange({ ...betFields, ...walletField }) },
 
   /**
    * @legacy GET /api/admin/agent-report/:staffId/pdf

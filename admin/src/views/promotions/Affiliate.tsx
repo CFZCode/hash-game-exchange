@@ -144,7 +144,8 @@ const Rewards = () => {
     { key: 'id', header: '#', cell: r => <span className='font-mono text-xs'>{r.id}</span> },
     { key: 'owner', header: 'Owner', cell: r => <span className='font-medium'>{r.owner}</span> },
     { key: 'member', header: 'For member', cell: r => r.member },
-    { key: 'tier', header: 'Wager tier', cell: r => (r.tier ? <Badge variant='outline'>{r.tier}</Badge> : '—') },
+    { key: 'kind', header: 'Type', cell: r => <Badge variant={r.kind === 'commission' ? 'secondary' : 'outline'}>{r.kind === 'commission' ? 'Commission' : 'Joining / tier'}</Badge> },
+    { key: 'tier', header: 'Wager tier', cell: r => (r.kind !== 'commission' && r.tier ? <Badge variant='outline'>{r.tier}</Badge> : '—') },
     { key: 'amount', header: 'Amount', align: 'right', cell: r => <Money value={r.amount} currency={r.currency} /> },
     { key: 'claimed', header: 'Claimed', cell: r => <StatusBadge value={r.claimed ? 'completed' : 'pending'} /> }
   ]

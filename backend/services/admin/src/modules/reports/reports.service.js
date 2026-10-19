@@ -21,7 +21,8 @@ const {
   GEO_TOP_N,
 } = require('./reports.constants');
 const { isPrivateIp, deviceFromUA } = require('./ipTracker');
-const { playerScope } = require('./audienceStats.helpers');
+const { playerScope, statsWindow } = require('./audienceStats.helpers');
+const { playsSql } = require('./playerStats.service');
 const S = require('./stats.shared');
 const { realDepositsSql } = require('./depositRails');
 const { wagerValuer } = require('./reportingCurrency');
@@ -284,7 +285,8 @@ class ReportsService {
   /**
    * Users page ke upar ke cards — ek channel ke saare users
    * (direct = parent nahi, agent = parent hai, all = dono). Reference admin jaisa:
-   *   activeUsers = jinhone kuch deposit kiya, lockedUsers = account lock,
+   *   activeUsers = played casino or sports in the last 30 days (User reports' "Active players",
+   *   same sources and default window), lockedUsers = account lock,
    *   withdrawLocked = withdrawal block, totalDeposits / totalWithdrawals = lifetime (list wale hi).
    */
   async playersSummary({ staff, channel = 'all' }) {
@@ -304,13 +306,15 @@ class ReportsService {
     const totals = await this.#lifetimeTotalsFor(users.map((u) => u.id));
     let deposits = 0n;
     let withdrawals = 0n;
-    let active = 0;
     for (const t of totals.values()) {
-      const dep = money.toMinor(t.deposited);
-      deposits += dep;
+      deposits += money.toMinor(t.deposited);
       withdrawals += money.toMinor(t.withdrawn);
-      if (dep > 0n) active += 1;
     }
+    const window = statsWindow({});
+    const [{ active }] = await this.models.Users.sequelize.query(
+      `SELECT COUNT(DISTINCT owner)::int AS active FROM (${playsSql((owner) => `${owner} IN (:ids)`)}) p`,
+      { replacements: { ...window.replacements, ids: users.map((u) => Number(u.id)) }, type: QueryTypes.SELECT }
+    );
 
     return {
       totalUsers: users.length,

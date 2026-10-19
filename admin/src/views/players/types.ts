@@ -92,7 +92,7 @@ export type RiskBet = {
 }
 export type RiskCasinoBet = {
   id: string
-  source: 'inhouse' | 'gis' | 'jsgames' | 'jsgamesv2'
+  source: 'inhouse' | 'og' | 'gis' | 'jsgames' | 'jsgamesv2' | 'seamless'
   createdAt: string
   game: string | null
   stakeAmount: string

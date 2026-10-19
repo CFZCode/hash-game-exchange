@@ -1,4 +1,4 @@
-import { formatMoney, formatNumber } from '@/lib/format'
+import { formatMoney, formatNumber, localeFor } from '@/lib/format'
 
 /**
  * How a chart prints its values.
@@ -21,15 +21,15 @@ export function formatValue(value: number | string | null | undefined, format: V
   return formatNumber(value)
 }
 
-/** Short value, for axis ticks (12.3K, 4.5L). */
+/** Short value, for axis ticks (12.3K; 4.5L only when the default coin is INR). */
 export function formatAxisValue(value: number | null | undefined, format: ValueFormat = 'number') {
   if (value === null || value === undefined || !Number.isFinite(value)) return ''
   if (format === 'percent') return `${Math.round(value)}%`
 
   // Below 1 the compact format rounds every tick of a small scale (0.02, 0.04…) to "0" or "0.1".
-  if (value !== 0 && Math.abs(value) < 1) return new Intl.NumberFormat('en-IN', { maximumSignificantDigits: 2 }).format(value)
+  if (value !== 0 && Math.abs(value) < 1) return new Intl.NumberFormat(localeFor(), { maximumSignificantDigits: 2 }).format(value)
 
-  return new Intl.NumberFormat('en-IN', { notation: 'compact', maximumFractionDigits: 1 }).format(value)
+  return new Intl.NumberFormat(localeFor(), { notation: 'compact', maximumFractionDigits: 1 }).format(value)
 }
 
 // ---------------------------------------------------------------------------

@@ -72,6 +72,10 @@ const DEPOSIT_RAIL_LABELS = Object.freeze({
   upi: 'UPI deposit',
 });
 
+/** The casino providers' names for one wallet: INR is 'PKR' to them and USDT 'USD'. */
+const casinoCurrenciesFor = (currency) =>
+  currency === 'INR' ? CASINO_INR_CURRENCIES : currency === 'USDT' ? ['USDT', 'USD'] : [currency];
+
 /**
  * When a casino round HAPPENED.
  *
@@ -288,9 +292,16 @@ class StatementsService {
 
     const credits = await this.models.Credits.findOne({ where: { uid: user.id }, raw: true });
     const live = money.fromStored(credits?.[column] ?? '0');
-    // Every wallet the player holds (and the one asked for), so the screen can switch between them.
+    // Every wallet the player holds or has moved money in (and the one asked for), so the screen can switch.
+    const { sequelize } = this.models.CreditsLedger;
+    const moved = new Set(
+      (await sequelize.query('SELECT DISTINCT UPPER(currency) AS code FROM credits_ledger WHERE user_id = :uid', {
+        replacements: { uid: String(user.id) },
+        type: sequelize.constructor.QueryTypes.SELECT,
+      })).map((r) => CURRENCY_SYNONYMS[r.code] ?? r.code)
+    );
     const wallets = Object.entries(CURRENCY_COLUMNS)
-      .filter(([code, col]) => code === wallet || money.toMinorQuantised(String(credits?.[col] ?? '0')) !== 0n)
+      .filter(([code, col]) => code === wallet || moved.has(code) || money.toMinorQuantised(String(credits?.[col] ?? '0')) !== 0n)
       .map(([code, col]) => ({ currency: code, balance: money.fromStored(credits?.[col] ?? '0') }));
 
     // Opening = what the events put in the wallet before the range (a new account opens at 0).
@@ -320,10 +331,19 @@ class StatementsService {
       else if (event.kind === KIND.BANK_WITHDRAW || event.kind === KIND.GATEWAY_WITHDRAW) bankOut += -minor;
     }
 
-    const gaming = await this.#gatherGaming([user.id], { from, to });
+    const gaming = await this.#gatherGaming([user.id], { from, to, currency: wallet });
+    /**
+     * The P&L cards from this wallet's own rows, so they add up with the closing balance: what
+     * the period's sports / casino rows moved. A stake still out on a bet placed in the period
+     * is not lost yet, so it is added back.
+     * shortcut: adds back the bet's stake; a lay bet's exposure is its liability — use the
+     * debit_ledger exposure per open bet if lay bets ever matter here.
+     */
+    const moves = { [KIND.SPORTS]: 0n, [KIND.CASINO]: 0n };
+    for (const event of ledger.inside) if (event.kind in moves) moves[event.kind] += money.toMinor(event.amount);
     const finalised = finaliseGaming({
-      sportsPlayerPnl: gaming.sports.playerPnl,
-      casinoPlayerPnl: gaming.casino.playerPnl,
+      sportsPlayerPnl: money.toDecimalString(moves[KIND.SPORTS] + money.toMinorQuantised(gaming.sports.openStake)),
+      casinoPlayerPnl: money.toDecimalString(moves[KIND.CASINO]),
       headlineFor: HEADLINE_FOR.PLAYER,
     });
 
@@ -436,15 +456,17 @@ class StatementsService {
    * runs to tens of thousands of rows — so they page on the server rather than
    * being capped and silently truncated. Legacy's reasoning, kept.
    */
-  async bets({ staff, staffId, userId, kind = 'sports', from, to, page = 1, limit = 50 }) {
+  async bets({ staff, staffId, userId, kind = 'sports', from, to, page = 1, limit = 50, currency }) {
     const ids = await this.#resolvePlayerIds(staff, { staffId, userId });
     const offset = (page - 1) * limit;
+    // A player's statement is per wallet; sports bets are INR only.
+    const wallet = currency ? CURRENCY_SYNONYMS[currency] ?? currency : null;
 
-    if (!ids.length) {
+    if (!ids.length || (kind !== 'casino' && wallet && wallet !== 'INR')) {
       return { kind, total: 0, rows: [], pagination: { page, limit, total: 0, totalPages: 1 } };
     }
 
-    if (kind === 'casino') return this.#casinoBets(ids, { from, to, page, limit, offset });
+    if (kind === 'casino') return this.#casinoBets(ids, { from, to, page, limit, offset, wallet });
     return this.#sportsBets(ids, { from, to, page, limit, offset });
   }
 
@@ -497,7 +519,7 @@ class StatementsService {
    * positive; an in-house round is ONE row, net of its payout); `stake`,
    * `profit` and `status` say what the round was.
    */
-  async #casinoBets(ids, { from, to, page, limit, offset }) {
+  async #casinoBets(ids, { from, to, page, limit, offset, wallet }) {
     const { sequelize } = this.models.CreditsLedger;
     const { QueryTypes } = sequelize.constructor;
     const range = dayRange(from, to);
@@ -514,14 +536,16 @@ class StatementsService {
          AND COALESCE(g.transaction_datetime, g.created_at) < :roundsTo
       UNION ALL
       SELECT r.source, r.id, r.ts, r.user_id,
-             CASE WHEN r.source = 'inhouse' THEN 'round' ELSE r.status END, r.game, NULL, r.currency,
-             r.net, r.stake, CASE WHEN r.source = 'inhouse' AND r.status <> 'open' THEN r.net END, r.status
+             CASE WHEN r.source IN ('inhouse', 'og') THEN 'round' ELSE r.status END, r.game, NULL, r.currency,
+             r.net, r.stake, CASE WHEN r.source IN ('inhouse', 'og') AND r.status <> 'open' THEN r.net END, r.status
         FROM (${casinoRoundsSql({ range: true })}) r`;
-    const replacements = { ids: ids.map(Number), inr: CASINO_INR_CURRENCIES, ...range };
+    // One wallet when asked (the statement's picker); GIS rows are INR only, as the totals read them.
+    const filtered = wallet ? `SELECT * FROM (${union}) w WHERE w.currency = :wallet` : union;
+    const replacements = { ids: ids.map(Number), inr: CASINO_INR_CURRENCIES, wallet, ...range };
 
     const [[{ total }], rows] = await Promise.all([
-      sequelize.query(`SELECT COUNT(*)::int AS total FROM (${union}) x`, { replacements, type: QueryTypes.SELECT }),
-      sequelize.query(`SELECT * FROM (${union}) x ORDER BY ts DESC, id DESC LIMIT :limit OFFSET :offset`, {
+      sequelize.query(`SELECT COUNT(*)::int AS total FROM (${filtered}) x`, { replacements, type: QueryTypes.SELECT }),
+      sequelize.query(`SELECT * FROM (${filtered}) x ORDER BY ts DESC, id DESC LIMIT :limit OFFSET :offset`, {
         replacements: { ...replacements, limit, offset },
         type: QueryTypes.SELECT,
       }),
@@ -567,10 +591,11 @@ class StatementsService {
     const { sequelize } = this.models.CreditsLedger;
     const QueryTypes = sequelize.constructor.QueryTypes;
     // The casino provider names this platform's INR wallet 'PKR' and its USDT wallet 'USD'.
-    const casinoCurrencies = inr ? CASINO_INR_CURRENCIES : currency === 'USDT' ? ['USDT', 'USD'] : [currency];
+    const casinoCurrencies = casinoCurrenciesFor(currency);
     const events = [];
-    const push = (ts, kind, label, party, amount, note, seq) =>
-      events.push({ ts: ts ?? new Date(), kind, label, party, note: note ?? null, legacy: null, amount: String(amount), seq: seq ?? 0 });
+    // `post` = the wallet right after the row, when the source records it (mssports) — see `buildLedger`.
+    const push = (ts, kind, label, party, amount, note, seq, post) =>
+      events.push({ ts: ts ?? new Date(), kind, label, party, note: note ?? null, legacy: null, amount: String(amount), seq: seq ?? 0, post: post ?? null });
 
     /**
      * 1. Agent transfers.
@@ -740,19 +765,20 @@ class StatementsService {
 
     /**
      * 6b. Sports Exchange (mssports), INR: it moves `credits.inr` itself and writes its own ledgers.
-     *     shortcut: the stake is `debit_ledger.amount` and the payout `credits_ledger.amount`, exact
-     *     for single bets; a hedged market moves less than that (the balance sheet uses `post`).
+     *     Their `amount` is not the wallet move (a fancy win's is the profit, while the wallet also
+     *     got the stake back), so each row carries `post` — the wallet after it — and the move is
+     *     post − running, the balance sheet's rule (`buildLedger`).
      */
     if (inr) {
       const [stakes, settles] = await Promise.all([
         sequelize.query(
-          `SELECT id, amount, description, created_at FROM mssports.debit_ledger
+          `SELECT id, amount, balance AS post, description, created_at FROM mssports.debit_ledger
             WHERE user_id = :uid AND reason = 'bet_placed' AND UPPER(COALESCE(currency, 'INR')) = 'INR'`,
           { replacements: { uid }, type: QueryTypes.SELECT }
         ),
         sequelize.query(
-          `SELECT id, reason, amount, description, created_at FROM mssports.credits_ledger
-            WHERE user_id = :uid AND reason IN ('settlement', 'refund', 'settlement_void') AND amount <> 0
+          `SELECT id, reason, amount, closing AS post, description, created_at FROM mssports.credits_ledger
+            WHERE user_id = :uid AND reason IN ('settlement', 'refund', 'settlement_void') AND (amount <> 0 OR closing IS NOT NULL)
               AND UPPER(COALESCE(currency, 'INR')) = 'INR'`,
           { replacements: { uid }, type: QueryTypes.SELECT }
         ),
@@ -760,10 +786,10 @@ class StatementsService {
       const label = { settlement: 'Sports settlement', refund: 'Sports refund', settlement_void: 'Sports void' };
       for (const row of stakes) {
         const abs = money.toMinorQuantised(String(row.amount ?? '0').replace(/^-/, ''));
-        push(row.created_at, KIND.SPORTS, 'Sports bet placed', 'Sports', money.toDecimalString(-abs), row.description, Number(row.id) || 0);
+        push(row.created_at, KIND.SPORTS, 'Sports bet placed', 'Sports', money.toDecimalString(-abs), row.description, Number(row.id) || 0, row.post);
       }
       for (const row of settles) {
-        push(row.created_at, KIND.SPORTS, label[row.reason], 'Sports', money.toDecimalString(money.toMinorQuantised(String(row.amount))), row.description, Number(row.id) || 0);
+        push(row.created_at, KIND.SPORTS, label[row.reason], 'Sports', money.toDecimalString(money.toMinorQuantised(String(row.amount ?? '0'))), row.description, Number(row.id) || 0, row.post);
       }
     }
 
@@ -825,7 +851,8 @@ class StatementsService {
      * copies are skipped in 6 (ROUND_TABLE_REFS), so a round is counted once.
      */
     const rounds = await sequelize.query(
-      `SELECT * FROM (${casinoRoundsSql()}) r WHERE r.currency IN (:curs) AND r.net <> 0 ORDER BY r.ts, r.id`,
+      // Original Games rounds are read leg by leg from the wallet ledger in 6, so not again here.
+      `SELECT * FROM (${casinoRoundsSql()}) r WHERE r.currency IN (:curs) AND r.net <> 0 AND r.source <> 'og' ORDER BY r.ts, r.id`,
       { replacements: { ids: [Number(userId)], curs: casinoCurrencies }, type: QueryTypes.SELECT }
     );
     for (const row of rounds) {
@@ -859,7 +886,7 @@ class StatementsService {
    *
    * Aggregated in the database rather than by reading every bet into memory.
    */
-  async #gatherGaming(playerIds, { from, to }) {
+  async #gatherGaming(playerIds, { from, to, currency = 'INR' }) {
     const empty = {
       sports: { playerPnl: '0.00000000', turnover: '0.00000000', openStake: '0.00000000' },
       casino: { playerPnl: '0.00000000', staked: '0.00000000', won: '0.00000000' },
@@ -873,10 +900,13 @@ class StatementsService {
     const ids = playerIds.map(Number);
     const asText = playerIds.map(String);
 
+    const casinoCurrencies = casinoCurrenciesFor(currency);
     const ledgerWhere = {
       user_id: asText,
-      currency: { [Op.iLike]: 'INR' },
+      currency: { [Op.iLike]: currency },
       reason: { [Op.in]: SPORTS_LEDGER_REASONS },
+      // casino-service writes these reasons for its rounds too — those are casino, not sports.
+      [Op.or]: [{ source_service: { [Op.ne]: 'casino-service' } }, { source_service: null }],
       ...this.#dateWhere('created_at', from, to),
     };
 
@@ -898,26 +928,27 @@ class StatementsService {
         order: [[fn('DATE', col('created_at')), 'ASC']],
         raw: true,
       }),
-      this.models.SportsBet.findAll({
+      // Sports Exchange bets are INR only.
+      currency !== 'INR' ? [] : this.models.SportsBet.findAll({
         where: { user_id: ids, ...this.#dateWhere('created_at', from, to) },
         attributes: ['status', [fn('COUNT', col('id')), 'n'], [fn('COALESCE', fn('SUM', col('stake_amount')), 0), 'stake']],
         group: ['status'],
         raw: true,
       }),
       this.models.GisTransactions.findAll({
-        where: { user_id: ids, currency: { [Op.in]: CASINO_INR_CURRENCIES }, ...this.#casinoDateWhere(from, to) },
+        where: { user_id: ids, currency: { [Op.in]: casinoCurrencies }, ...this.#casinoDateWhere(from, to) },
         attributes: ['action', [fn('COUNT', col('id')), 'n'], [fn('COALESCE', fn('SUM', literal(GIS_AMOUNT_SQL)), 0), 'total']],
         group: ['action'],
         raw: true,
       }),
       this.models.GisTransactions.findAll({
-        where: { user_id: ids, currency: { [Op.in]: CASINO_INR_CURRENCIES }, ...this.#casinoDateWhere(from, to) },
+        where: { user_id: ids, currency: { [Op.in]: casinoCurrencies }, ...this.#casinoDateWhere(from, to) },
         attributes: ['user_id', 'action', [fn('COUNT', col('id')), 'n'], [fn('COALESCE', fn('SUM', literal(GIS_AMOUNT_SQL)), 0), 'total']],
         group: ['user_id', 'action'],
         raw: true,
       }),
       this.models.GisTransactions.findAll({
-        where: { user_id: ids, currency: { [Op.in]: CASINO_INR_CURRENCIES }, ...this.#casinoDateWhere(from, to) },
+        where: { user_id: ids, currency: { [Op.in]: casinoCurrencies }, ...this.#casinoDateWhere(from, to) },
         attributes: [
           [fn('DATE', CASINO_TS), 'date'],
           'action',
@@ -928,18 +959,18 @@ class StatementsService {
         order: [[fn('DATE', CASINO_TS), 'ASC']],
         raw: true,
       }),
-      // In-house, jsGames v2 and seamless rounds (`casinoRounds.js`), INR only
-      // like the Slotegrator figures beside them.
+      // In-house, Original Games, jsGames v2 and seamless rounds (`casinoRounds.js`), in the
+      // same wallet as the Slotegrator figures beside them. A win is a round that paid more than its stake.
       this.models.CreditsLedger.sequelize.query(
         `SELECT r.user_id, DATE(r.ts) AS date,
                 COALESCE(SUM(r.stake), 0)::text AS staked, COALESCE(SUM(r.payout), 0)::text AS won,
                 COALESCE(SUM(r.n), 0)::int AS bets,
-                COUNT(*) FILTER (WHERE r.payout > 0)::int AS wins, COUNT(*)::int AS txns
+                COUNT(*) FILTER (WHERE r.net > 0)::int AS wins, COUNT(*)::int AS txns
            FROM (${casinoRoundsSql({ range: true })}) r
-          WHERE r.currency IN (:inr)
+          WHERE r.currency IN (:curs)
           GROUP BY 1, 2`,
         {
-          replacements: { ids, inr: CASINO_INR_CURRENCIES, ...dayRange(from, to) },
+          replacements: { ids, curs: casinoCurrencies, ...dayRange(from, to) },
           type: this.models.CreditsLedger.sequelize.constructor.QueryTypes.SELECT,
         }
       ),
@@ -955,7 +986,6 @@ class StatementsService {
     for (const row of sportsPerPlayer) {
       const net = money.toMinorQuantised(row.net ?? '0');
       sportsPnl += net;
-      settledBets += Number(row.bets) || 0;
       const entry = perPlayer.get(String(row.user_id));
       if (entry) {
         entry.sportsPnl = net;
@@ -977,6 +1007,9 @@ class StatementsService {
         openBets += n;
       }
     }
+    // Settled = the period's bets that are no longer open. The ledger rows counted above are
+    // movements (and were casino rounds too), not bets.
+    settledBets = placedBets - openBets;
 
     let casinoStaked = 0n;
     let casinoWon = 0n;

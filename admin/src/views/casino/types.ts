@@ -67,7 +67,14 @@ export type CasinoTotals = {
   refunded: string
   net: string
 }
-export type CasinoStats = { totals: CasinoTotals; bySource: Record<string, CasinoTotals>; [k: string]: unknown }
+export type CasinoStats = {
+  totals: CasinoTotals
+  bySource: Record<string, CasinoTotals>
+
+  /** The same figures per wallet — money in two coins does not add up raw. */
+  byCurrency?: { currency: string; totals: CasinoTotals; bySource: Record<string, CasinoTotals> }[]
+  [k: string]: unknown
+}
 
 export type HouseBet = { id: string; at: string | null; userId: string | null; user: string | null; amount: string; profit: string; game: string | null }
 export type RawTxn = { id: string; at: string | null; userId: string | null; user: string | null; amount: string; type: string | null; status: string | null }

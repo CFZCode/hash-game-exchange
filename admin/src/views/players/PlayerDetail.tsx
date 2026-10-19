@@ -35,7 +35,7 @@ import GeoAttribution from './GeoAttribution'
 import { RiskManagementDialog, RiskManagementPanel } from './RiskManagement'
 import PlayerStatsTab from './PlayerStatsTab'
 import { BalanceSheetView } from './users/BalanceSheetDialog'
-import useReportMoney from '@/components/shared/ReportMoney'
+import useReportMoney, { formatIn } from '@/components/shared/ReportMoney'
 import WithdrawBlockAction, { BetLockedBadge, WithdrawBlockedBadge, type AccountLocks } from './WithdrawBlockAction'
 import type { PlayerRow } from './types'
 
@@ -411,7 +411,7 @@ const BalancesTab = ({ userId }: { userId: string }) => {
             {held.map(([coin, v]) => (
               <div key={coin} className='flex items-baseline justify-between gap-3 border-b py-1'>
                 <dt className='text-muted-foreground text-sm'>{coin}</dt>
-                <dd className='font-mono tabular-nums'>{formatAmount(v)}</dd>
+                <dd className='font-mono tabular-nums'>{formatIn(Number(v), coin.toUpperCase())}</dd>
               </div>
             ))}
           </dl>
@@ -632,7 +632,7 @@ const ReportDetail = ({ id }: { id: string }) => {
           label='Balance'
           value={walletTotal ? walletTotal.text : money.format(p?.balance, 'INR')}
           loading={report.isLoading}
-          hint={held.map(c => formatAmount(p?.wallets[c], c)).join(' · ') || undefined}
+          hint={held.map(c => formatIn(Number(p?.wallets[c]), c.toUpperCase())).join(' · ') || undefined}
         />
         <StatCard label='Deposits' value={money.format(p?.totalDeposited, 'INR')} loading={report.isLoading} hint='Lifetime real deposits (bank, gateway, crypto), every coin · admin credits not included' />
         <StatCard label='Admin credit' value={money.format(p?.adminCredited, 'INR')} loading={report.isLoading} hint='Super Admin Direct User Wallet credits — not a deposit' />

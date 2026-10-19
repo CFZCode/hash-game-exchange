@@ -22,8 +22,13 @@ const Money = ({
   return (
     <span className={cn('whitespace-nowrap tabular-nums', tone, className)}>
       {signed && Number.isFinite(n) && n > 0 ? '+' : ''}
-      {formatMoney(value, undefined, { digits })}
-      {currency && <span className='text-muted-foreground ml-1 text-[0.9em] font-normal'>{currency}</span>}
+      {formatMoney(value, undefined, { digits, of: currency })}
+      {currency && (
+        <>
+          {' '}
+          <span className='text-muted-foreground text-[0.9em] font-normal'>{currency}</span>
+        </>
+      )}
     </span>
   )
 }

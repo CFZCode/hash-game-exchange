@@ -54,14 +54,16 @@ const playerColumns: Column<PlayerReportRow>[] = [
       </span>
     )
   },
-  { key: 'balance', header: 'Balance', align: 'right', cell: r => <Money value={r.balance} /> },
+
+  // `balance` is the INR wallet (credits.inr); deposits and withdrawals are valued in INR.
+  { key: 'balance', header: <span title='The INR wallet'>Balance</span>, align: 'right', cell: r => <Money value={r.balance} currency='INR' /> },
   {
     key: 'dep',
     header: <span title='Lifetime real deposits the player paid in (bank, gateway, crypto, every coin), valued in INR. Admin credits are not deposits.'>Deposits</span>,
     align: 'right',
-    cell: r => <Money value={r.totalDeposited} />
+    cell: r => <Money value={r.totalDeposited} currency='INR' />
   },
-  { key: 'wd', header: 'Withdrawn', align: 'right', cell: r => <Money value={r.totalWithdrawn} /> },
+  { key: 'wd', header: 'Withdrawn', align: 'right', cell: r => <Money value={r.totalWithdrawn} currency='INR' /> },
   { key: 'games', header: <span title='Lifetime bets, every product (stakes on the wallet ledger).'>Bets</span>, align: 'right', cell: r => formatNumber(r.gamesPlayed) }
 ]
 

@@ -176,6 +176,9 @@ export type AffiliateTop = { owner: string; rewards: number; total: string; curr
 
 export type AffiliateReward = {
   id: number
+
+  /** `tier` = a joining / wager-step reward (unlocked_rewards), `commission` = wager commission (rewards). */
+  kind?: 'tier' | 'commission'
   owner: string
   member: string
   amount: string

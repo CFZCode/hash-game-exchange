@@ -80,6 +80,25 @@ export type Exposure = { total: number; rows: Record<string, unknown>[] }
 
 export const STATEMENT_CATEGORIES = ['all', 'money', 'sports', 'casino', 'other'] as const
 export const STATEMENT_CATEGORY_LABEL: Record<(typeof STATEMENT_CATEGORIES)[number], string> = { all: 'All activity', money: 'Money', sports: 'Sports', casino: 'Casino', other: 'Admin credit, bonus, swap' }
+
+/** A statement row's `kind` (admin statements.constants KIND), as a reader says it. */
+export const STATEMENT_KIND_LABEL: Record<string, string> = {
+  DEPOSIT_UPLINE: 'Deposit from upline',
+  WITHDRAW_UPLINE: 'Withdrawn by upline',
+  DEPOSIT_AGENT: 'Deposit to agent',
+  COLLECTED_AGENT: 'Collected from agent',
+  DEPOSIT_PLAYER: 'Deposit to player',
+  COLLECTED_PLAYER: 'Collected from player',
+  BANK_DEPOSIT: 'Bank deposit',
+  GATEWAY_DEPOSIT: 'Gateway deposit',
+  BANK_WITHDRAW: 'Bank withdrawal',
+  GATEWAY_WITHDRAW: 'Gateway withdrawal',
+  SPORTS: 'Sports',
+  CASINO: 'Casino',
+  ADMIN: 'Admin credit',
+  BONUS: 'Bonus',
+  SWAP: 'Swap'
+}
 export const ACCOUNT_TYPES = ['user', 'staff'] as const
 
 export const isoDay = (d: Date) => d.toISOString().slice(0, 10)

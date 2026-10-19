@@ -93,7 +93,7 @@ const UsersTable = ({ channel, title, showStaffColumn, onOpenRisk, onOpenBalance
     <div className='flex flex-col gap-4'>
       <div className={showMoney ? 'grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5' : 'grid gap-4 sm:grid-cols-3'}>
         <StatCard label='Total Users' value={(s?.totalUsers ?? 0).toLocaleString('en-IN')} icon={<UsersIcon />} tone='primary' loading={summary.isLoading} />
-        <StatCard label='Active Users' value={(s?.activeUsers ?? 0).toLocaleString('en-IN')} icon={<TrendingUpIcon />} tone='success' loading={summary.isLoading} />
+        <StatCard label='Active Users (30 days)' value={(s?.activeUsers ?? 0).toLocaleString('en-IN')} icon={<TrendingUpIcon />} tone='success' loading={summary.isLoading} />
         {showMoney && (
           <>
             <StatCard label='Total Deposits' value={money.format(s?.totalDeposits)} icon={<WalletIcon />} tone='warning' loading={summary.isLoading} />

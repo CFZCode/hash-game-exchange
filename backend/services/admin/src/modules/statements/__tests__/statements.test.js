@@ -294,6 +294,31 @@ test('statements against a database', async (t) => {
     assert.ok(Array.isArray(casino.rows));
   });
 
+  await t.test('an Original Games round is one casino bet, in its own wallet', async () => {
+    const q = (sql, replacements) => connection.sequelize.query(sql, { replacements });
+    const leg = (tx, kind, amount) =>
+      q(`INSERT INTO og_transactions (transaction_id, kind, status, user_id, round_id, game_code, currency, amount)
+         VALUES (:tx, :kind, 'applied', :uid, :round, 'mines', 'USDT', :amount)`,
+      { tx: `${player}-${tx}`, kind, uid: player, round: `rnd-${player}`, amount });
+    await q('DELETE FROM og_transactions WHERE user_id = :uid', { uid: player });
+    try {
+      await leg('b1', 'bet', '5');
+      await leg('w1', 'win', '7.5');
+      const usdt = await service.bets({ staff: asAgent, userId: player, kind: 'casino', currency: 'USDT' });
+      const og = usdt.rows.filter((r) => r.source === 'og');
+      assert.equal(og.length, 1, 'the bet and win legs fold into one round');
+      assert.equal(og[0].stake, '5.00000000');
+      assert.equal(og[0].profit, '2.50000000');
+      assert.equal(og[0].status, 'won');
+      const inr = await service.bets({ staff: asAgent, userId: player, kind: 'casino', currency: 'INR' });
+      assert.equal(inr.rows.filter((r) => r.source === 'og').length, 0, 'not in the INR wallet');
+      const sports = await service.bets({ staff: asAgent, userId: player, kind: 'sports', currency: 'USDT' });
+      assert.equal(sports.total, 0, 'sports bets are INR only');
+    } finally {
+      await q('DELETE FROM og_transactions WHERE user_id = :uid', { uid: player });
+    }
+  });
+
   await t.test('the PDF renders the statement it was given', async () => {
     /**
      * Legacy had two renderers running their OWN queries, and their sports P&L

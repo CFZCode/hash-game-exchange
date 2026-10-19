@@ -423,6 +423,14 @@ class BetHistoryService {
 
     const totals = this.#emptyTotals();
     const bySource = {};
+    /** The same figures per wallet: money in two coins does not add up raw. */
+    const currencies = new Map();
+    const add = (into, entry) => {
+      for (const field of ['total', 'bets', 'wins', 'paidWins', 'pushes', 'losses', 'refunds']) into[field] += entry[field];
+      for (const field of ['wagered', 'payouts', 'refunded', 'net']) {
+        into[field] = money.toDecimalString(money.toMinorQuantised(into[field]) + money.toMinorQuantised(entry[field]));
+      }
+    };
 
     for (const key of SOURCE_KEYS) {
       const source = SOURCES[key];
@@ -437,39 +445,57 @@ class BetHistoryService {
       // Built from the frozen SOURCES table, never from a request — which is
       // what makes these safe to hand to `literal()`.
       const stat = statExpressions(source);
+      // The providers' names for this platform's wallets: PKR is INR, USD is USDT.
+      const currency = `CASE UPPER(${source.currencyColumn}::text) WHEN 'PKR' THEN 'INR' WHEN 'USD' THEN 'USDT'
+                          ELSE UPPER(COALESCE(${source.currencyColumn}::text, '?')) END`;
 
-      const [row] = await model.findAll({
+      const rows = await model.findAll({
         where,
-        attributes: Object.entries(stat).map(([name, sql]) => [literal(sql), name]),
+        attributes: [[literal(currency), 'currency'], ...Object.entries(stat).map(([name, sql]) => [literal(sql), name])],
+        group: [literal('1')],
         raw: true,
       });
 
-      const entry = {
-        total: Number(row?.movements ?? 0),
-        bets: Number(row?.bets ?? 0),
-        /** Legacy's `total_wins`: every win row, zero-value ones included. */
-        wins: Number(row?.winRows ?? 0),
-        paidWins: Number(row?.paidWins ?? 0),
-        pushes: Number(row?.pushes ?? 0),
-        losses: Number(row?.losses ?? 0),
-        refunds: Number(row?.refunds ?? 0),
-        wagered: String(row?.wagered ?? '0'),
-        payouts: String(row?.payouts ?? '0'),
-        refunded: String(row?.refunded ?? '0'),
-        /** The PLAYERS' side: positive means the players are up on this source. */
-        net: String(Number(row?.payouts ?? 0) - Number(row?.wagered ?? 0)),
-      };
+      const entry = this.#emptyTotals();
+      for (const row of rows) {
+        const one = this.#statEntry(row);
+        add(entry, one);
+        if (!currencies.has(row.currency)) currencies.set(row.currency, { totals: this.#emptyTotals(), bySource: {} });
+        const wallet = currencies.get(row.currency);
+        wallet.bySource[source.label] = one;
+        add(wallet.totals, one);
+      }
 
       bySource[source.label] = entry;
-      for (const field of ['total', 'bets', 'wins', 'paidWins', 'pushes', 'losses', 'refunds']) {
-        totals[field] += entry[field];
-      }
-      for (const field of ['wagered', 'payouts', 'refunded', 'net']) {
-        totals[field] = String(Number(totals[field]) + Number(entry[field]));
-      }
+      add(totals, entry);
     }
 
-    return { totals, bySource, byType: this.#byType(totals) };
+    const byCurrency = [...currencies.entries()]
+      .map(([currency, figures]) => ({ currency, ...figures }))
+      .sort((a, b) => b.totals.bets - a.totals.bets);
+    return { totals, bySource, byType: this.#byType(totals), byCurrency };
+  }
+
+  /** One grouped `statExpressions` row as the totals shape. */
+  #statEntry(row) {
+    const dec = (v) => money.toDecimalString(money.toMinorQuantised(String(v ?? '0')));
+    const wagered = dec(row?.wagered);
+    const payouts = dec(row?.payouts);
+    return {
+      total: Number(row?.movements ?? 0),
+      bets: Number(row?.bets ?? 0),
+      /** Legacy's `total_wins`: every win row, zero-value ones included. */
+      wins: Number(row?.winRows ?? 0),
+      paidWins: Number(row?.paidWins ?? 0),
+      pushes: Number(row?.pushes ?? 0),
+      losses: Number(row?.losses ?? 0),
+      refunds: Number(row?.refunds ?? 0),
+      wagered,
+      payouts,
+      refunded: dec(row?.refunded),
+      /** The PLAYERS' side: positive means the players are up on this source. */
+      net: money.toDecimalString(money.toMinorQuantised(payouts) - money.toMinorQuantised(wagered)),
+    };
   }
 
   /**

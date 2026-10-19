@@ -12,7 +12,7 @@ const present = (v) => {
   return s && !/^(null|undefined)$/i.test(s) ? s : '';
 };
 
-const NAMES = { normal: 'Fancy', fancy: 'Fancy', fan: 'Fancy', fancy1: 'Fancy 1', oddeven: 'Odd / Even' };
+const NAMES = { normal: 'Fancy', fancy: 'Fancy', fan: 'Fancy', fancy1: 'Fancy 1', oddeven: 'Odd / Even', mo: 'Match Odds', bm: 'Bookmaker' };
 
 /** Fancy lines whose rate is in `size` (the exchange's `line` scale). */
 const LINE = /^(normal|fancy|khado|meter|badlo)$/i;

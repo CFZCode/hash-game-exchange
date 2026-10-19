@@ -159,7 +159,7 @@ test('per-player admin views count in-house, v2 and seamless rounds', async (t) 
     assert.equal(st.gaming.casino.bets, 6);
     assert.equal(st.gaming.casino.staked, '60.00000000');
     assert.equal(st.gaming.casino.won, '74.60000000');
-    assert.equal(st.gaming.casino.wins, 4);
+    assert.equal(st.gaming.casino.wins, 3, 'a win paid more than the stake: the push is not one');
     const casinoRows = st.rows.filter((r) => String(r.kind).toUpperCase() === 'CASINO');
     // won, lost, open, ledgered won, v2 stake, v2 win (the push moved nothing).
     assert.equal(casinoRows.length, 6);

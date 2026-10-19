@@ -312,6 +312,36 @@ function countExpressions(source) {
 function statExpressions(source) {
   const amount = `ABS(${source.amountColumn})`;
 
+  /**
+   * Original Games: a bet leg and a win leg per round, both unsigned, so a win row says nothing
+   * about the round — a loss is a win leg of 0 and a 3 back on a 5 stake is still a loss. Each
+   * applied bet leg a rollback did not undo is one round, judged by its round's win legs: a win
+   * only when they paid more than the stake, a push when they paid it back exactly. A rolled-back
+   * bet is a refund. `t` is the alias Sequelize gives the model's table.
+   */
+  if (source.oneRowPerRound) {
+    const t = `"${source.model}"`;
+    const undone = (a) => `EXISTS (SELECT 1 FROM ${source.table} rb
+      WHERE rb.kind = 'rollback' AND rb.status = 'applied' AND rb.reference_transaction_id = ${a}.transaction_id)`;
+    const bet = `${t}.kind = 'bet' AND ${t}.status = 'applied'`;
+    const played = `${bet} AND NOT ${undone(t)}`;
+    const payout = `(SELECT SUM(w.amount) FROM ${source.table} w
+      WHERE w.kind = 'win' AND w.status = 'applied' AND w.round_id = ${t}.round_id AND w.user_id = ${t}.user_id
+        AND NOT ${undone('w')})`;
+    return {
+      movements: 'COUNT(*)',
+      bets: `COUNT(*) FILTER (WHERE ${played})`,
+      winRows: `COUNT(*) FILTER (WHERE ${played} AND ${payout} > ${t}.amount)`,
+      paidWins: `COUNT(*) FILTER (WHERE ${played} AND ${payout} > ${t}.amount)`,
+      pushes: `COUNT(*) FILTER (WHERE ${played} AND ${payout} = ${t}.amount)`,
+      losses: `COUNT(*) FILTER (WHERE ${played} AND ${payout} < ${t}.amount)`,
+      refunds: `COUNT(*) FILTER (WHERE ${bet} AND ${undone(t)})`,
+      wagered: `COALESCE(SUM(${t}.amount) FILTER (WHERE ${played}), 0)`,
+      payouts: `COALESCE(SUM(${t}.amount) FILTER (WHERE ${t}.kind = 'win' AND ${t}.status = 'applied' AND NOT ${undone(t)}), 0)`,
+      refunded: `COALESCE(SUM(${t}.amount) FILTER (WHERE ${bet} AND ${undone(t)}), 0)`,
+    };
+  }
+
   // One row IS one round: it was a bet, and `profit` says what it did.
   if (!source.kindColumn) {
     const profit = source.profitColumn;

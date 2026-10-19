@@ -126,7 +126,7 @@ const TransactionsTab = ({ channel }: { channel: Channel }) => {
   )
 }
 
-const TotalsRow = ({ label, t }: { label: string; t: CasinoTotals }) => (
+const TotalsRow = ({ label, t, currency }: { label: string; t: CasinoTotals; currency?: string }) => (
   <TableRow>
     <TableCell className='pl-4 font-medium capitalize'>{label}</TableCell>
     <TableCell className='text-right tabular-nums'>{formatNumber(t.bets)}</TableCell>
@@ -134,10 +134,10 @@ const TotalsRow = ({ label, t }: { label: string; t: CasinoTotals }) => (
     <TableCell className='text-right tabular-nums'>{formatNumber(t.losses)}</TableCell>
     <TableCell className='text-right tabular-nums'>{formatNumber(t.pushes)}</TableCell>
     <TableCell className='text-right tabular-nums'>{formatNumber(t.refunds)}</TableCell>
-    <TableCell className='text-right'><Money value={t.wagered} /></TableCell>
-    <TableCell className='text-right'><Money value={t.payouts} /></TableCell>
-    <TableCell className='text-right'><Money value={t.refunded} /></TableCell>
-    <TableCell className='pr-4 text-right'><Money value={String(-Number(t.net))} signed /></TableCell>
+    <TableCell className='text-right'><Money value={t.wagered} currency={currency} /></TableCell>
+    <TableCell className='text-right'><Money value={t.payouts} currency={currency} /></TableCell>
+    <TableCell className='text-right'><Money value={t.refunded} currency={currency} /></TableCell>
+    <TableCell className='pr-4 text-right'><Money value={String(-Number(t.net))} currency={currency} signed /></TableCell>
   </TableRow>
 )
 
@@ -145,24 +145,44 @@ const StatsTab = ({ channel }: { channel: Channel }) => {
   const [userId, setUserId] = useState('')
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
+  const [cur, setCur] = useState('')
   const stats = useApi<CasinoStats>('admin/casino/bet-history/stats', { userId: userId || undefined, from: from || undefined, to: to || undefined, channel })
-  const t = stats.data?.totals
+
+  // One wallet at a time: INR and USDT added together is no amount at all.
+  const wallets = stats.data?.byCurrency ?? []
+  const wallet = wallets.find(w => w.currency === cur) ?? wallets[0]
+  const t = wallet?.totals
+  const currency = wallet?.currency
 
   // `byType` (the rest of the payload) restates the cards above, so it is not drawn again.
-  const bySource = stats.data?.bySource ?? {}
+  const bySource = wallet?.bySource ?? {}
 
   return (
     <div className='grid gap-4'>
       <div className='flex flex-wrap items-center gap-3'>
         <Input placeholder='User id (optional)' className='w-40' value={userId} onChange={e => setUserId(e.target.value)} />
         <DateRangePicker aria-label='Date range' from={from} to={to} onChange={r => { setFrom(r.from); setTo(r.to) }} />
+        {wallets.length > 0 && (
+          <Select value={currency ?? ''} onValueChange={v => v && setCur(v)}>
+            <SelectTrigger className='w-28' aria-label='Currency'>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {wallets.map(w => (
+                <SelectItem key={w.currency} value={w.currency}>
+                  {w.currency}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
       {stats.error && <ErrorState error={stats.error} />}
       <div className='grid grid-cols-2 gap-4 lg:grid-cols-4'>
         <StatCard label='Bets' value={formatNumber(t?.bets)} loading={stats.isLoading} hint={t ? `${formatNumber(t.wins)} won · ${formatNumber(t.losses)} lost · ${formatNumber(t.pushes)} push` : undefined} />
-        <StatCard label='Wagered' value={<Money value={t?.wagered} />} loading={stats.isLoading} />
-        <StatCard label='Paid out' value={<Money value={t?.payouts} />} loading={stats.isLoading} hint={t ? `refunded ${t.refunded}` : undefined} />
-        <StatCard label='GGR (house)' value={<Money value={t ? String(-Number(t.net)) : undefined} signed />} loading={stats.isLoading} hint='Wagered minus payouts' />
+        <StatCard label='Wagered' value={<Money value={t?.wagered} currency={currency} />} loading={stats.isLoading} />
+        <StatCard label='Paid out' value={<Money value={t?.payouts} currency={currency} />} loading={stats.isLoading} hint={t ? <>refunded <Money value={t.refunded} currency={currency} digits={2} /></> : undefined} />
+        <StatCard label='GGR (house)' value={<Money value={t ? String(-Number(t.net)) : undefined} currency={currency} signed />} loading={stats.isLoading} hint='Wagered minus payouts' />
       </div>
       <Card className='gap-0 overflow-hidden py-0 shadow-none'>
         <div className='overflow-x-auto'>
@@ -183,9 +203,9 @@ const StatsTab = ({ channel }: { channel: Channel }) => {
             </TableHeader>
             <TableBody>
               {Object.entries(bySource ?? {}).map(([k, v]) => (
-                <TotalsRow key={k} label={k} t={v} />
+                <TotalsRow key={k} label={k} t={v} currency={currency} />
               ))}
-              {t && <TotalsRow label='Total' t={t} />}
+              {t && <TotalsRow label='Total' t={t} currency={currency} />}
             </TableBody>
           </Table>
         </div>

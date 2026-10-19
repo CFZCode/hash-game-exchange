@@ -14,6 +14,9 @@
  *              the payout its `win_amount` (both kept in `additional_data`); a
  *              row without them falls back to the sign of `amount`. A negative
  *              `bet_amount` is the provider reversing a stake and nets it off.
+ *   og         `og_transactions` (Original Games) — a `bet` leg and a `win` leg per round,
+ *              both unsigned, paired on `round_id`. One row per applied bet a rollback did
+ *              not undo; the payout is the round's win legs (none yet = open).
  *   seamless   `seamless_transactions` — `amount` signed in the settlement coin
  *              (USDT). A stake is `withdraw`/`pushbet` (negative); a payout is
  *              `deposit`; `rollback`/`cancel` reverse one of those, so a credit
@@ -57,6 +60,12 @@ const OG_ROLLED_BACK = (a) =>
             WHERE ogr.kind = 'rollback' AND ogr.status = 'applied' AND ogr.reference_transaction_id = ${a}.transaction_id)`;
 const OG_PLAYED = (a) => `${a}.kind IN ('bet', 'win') AND ${a}.status = 'applied' AND NOT ${OG_ROLLED_BACK(a)}`;
 
+/** An Original Games round's payout: its applied win legs; NULL while no win leg has landed. */
+const OG_PAYOUT = (a) =>
+  `(SELECT SUM(w.amount) FROM og_transactions w
+     WHERE w.kind = 'win' AND w.status = 'applied' AND w.round_id = ${a}.round_id AND w.user_id = ${a}.user_id
+       AND NOT ${OG_ROLLED_BACK('w')})`;
+
 const SEAMLESS_STAKE = (a) =>
   `(CASE WHEN LOWER(${a}.action) IN ('withdraw', 'pushbet', 'transfer') AND ${a}.amount < 0 THEN -${a}.amount
          WHEN LOWER(${a}.action) IN ('rollback', 'cancel') AND ${a}.amount > 0 THEN -${a}.amount
@@ -90,6 +99,14 @@ function casinoRoundsSql({ range = false, seamless = true } = {}) {
             LOWER(v.transaction_type)::text
        FROM game_transactions v
       WHERE v.user_id IN (:ids) AND LOWER(COALESCE(v.transaction_status, 'completed')) = 'completed'${when('v.created_at')}`,
+    `SELECT 'og', o.id::text, o.user_id::bigint, o.created_at,
+            COALESCE(og.name, o.game_code, 'Original Games')::text, UPPER(o.currency),
+            o.amount, COALESCE(o.payout, 0), COALESCE(o.payout, 0) - o.amount, 1,
+            CASE WHEN o.payout IS NULL THEN 'open' WHEN o.payout > o.amount THEN 'won'
+                 WHEN o.payout = o.amount THEN 'push' ELSE 'lost' END
+       FROM (SELECT b.*, ${OG_PAYOUT('b')} AS payout FROM og_transactions b
+              WHERE b.user_id IN (:ids) AND b.kind = 'bet' AND ${OG_PLAYED('b')}${when('b.created_at')}) o
+       LEFT JOIN og_games og ON og.code = o.game_code`,
   ];
   if (seamless) {
     parts.push(

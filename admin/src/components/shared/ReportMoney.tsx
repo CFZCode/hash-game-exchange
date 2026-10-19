@@ -4,7 +4,7 @@ import { useCallback, useMemo } from 'react'
 
 import { useDefaultCurrency } from '@/components/shared/DefaultCurrency'
 import { useApi } from '@/hooks/use-api'
-import { formatMoney, isPlainInr } from '@/lib/format'
+import { formatMoney, isPlainInr, localeFor } from '@/lib/format'
 
 /**
  * Player money in the site's DEFAULT COIN — the owner's `default_currency` policy (USDT today),
@@ -43,14 +43,14 @@ export function formatIn(value: number, code: string, opts: { digits?: number; s
 
     return (
       sign +
-      new Intl.NumberFormat('en-IN', { style: 'currency', currency: code, minimumFractionDigits: digits, maximumFractionDigits: digits }).format(value)
+      new Intl.NumberFormat(localeFor(code), { style: 'currency', currency: code, minimumFractionDigits: digits, maximumFractionDigits: digits }).format(value)
     )
   }
 
   // Stablecoins read like money (2 places); other coins keep their precision.
   const digits = opts.digits ?? (/^USD[TC]?$/.test(code) ? 2 : Math.abs(value) >= 1 ? 4 : 8)
 
-  return `${sign}${formatMoney(value, undefined, { digits })} ${code}`
+  return `${sign}${formatMoney(value, undefined, { digits, of: code })} ${code}`
 }
 
 export function useReportMoney() {

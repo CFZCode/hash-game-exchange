@@ -614,15 +614,7 @@ class PlayerStatsService {
    * (their `uniqueUsers` rule) — per bucket, or as totals split by product.
    */
   #activeRows({ scope, base, totals }) {
-    const inScope = (owner) => `${owner} IN (SELECT u.id FROM users u WHERE ${scope.sql})`;
-    const plays = [
-      ...CASINO_SOURCES.map(
-        (s) => `SELECT ${bucketSql(s.time)} AS bucket, ${s.owner}::bigint AS owner, 'casino' AS product
-                  FROM ${s.table} WHERE ${rangeSql(s.time)} AND ${inScope(s.owner)}${s.where}`
-      ),
-      `SELECT ${bucketSql('created_at')} AS bucket, user_id::bigint AS owner, 'sports' AS product
-         FROM mssports."SportsBet" WHERE ${rangeSql('created_at')} AND ${inScope('user_id')}`,
-    ].join('\n UNION ALL \n');
+    const plays = playsSql((owner) => `${owner} IN (SELECT u.id FROM users u WHERE ${scope.sql})`);
     const sql = totals
       ? `SELECT COUNT(DISTINCT owner)::int AS active,
                 COUNT(DISTINCT owner) FILTER (WHERE product = 'sports')::int AS sports,
@@ -731,4 +723,20 @@ class PlayerStatsService {
   }
 }
 
-module.exports = { PlayerStatsService };
+/**
+ * Every play row in [:rangeFrom, :rangeTo) as (bucket, owner, product) — the wager reports' sources
+ * (their `uniqueUsers` rule). `inScope(ownerColumn)` limits the players. "Active players" here and
+ * the Users page's "Active users" both count its distinct owners.
+ */
+function playsSql(inScope) {
+  return [
+    ...CASINO_SOURCES.map(
+      (s) => `SELECT ${bucketSql(s.time)} AS bucket, ${s.owner}::bigint AS owner, 'casino' AS product
+                FROM ${s.table} WHERE ${rangeSql(s.time)} AND ${inScope(s.owner)}${s.where}`
+    ),
+    `SELECT ${bucketSql('created_at')} AS bucket, user_id::bigint AS owner, 'sports' AS product
+       FROM mssports."SportsBet" WHERE ${rangeSql('created_at')} AND ${inScope('user_id')}`,
+  ].join('\n UNION ALL \n');
+}
+
+module.exports = { PlayerStatsService, playsSql };

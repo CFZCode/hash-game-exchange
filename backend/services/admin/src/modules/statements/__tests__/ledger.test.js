@@ -303,3 +303,23 @@ test('list queries accept `offset` beside `page` (the admin UI sends limit+offse
     assert.equal(blogs.list.query.safeParse({ limit: '20', skip: '0' }).success, false);
   });
 });
+
+test('a row carrying the wallet after it moved post − running', () => {
+  /**
+   * Live, Testuser10: a fancy YES 55 @ 100 for ₹100 won. The exchange's settlement row says
+   * amount 100 (the profit) while the wallet got 200 (stake back + profit); the statement
+   * closed ₹100 under the wallet. `post` is the wallet the exchange recorded after each row.
+   */
+  const events = [
+    event('2026-01-01T10:00:00Z', KIND.BANK_DEPOSIT, '1000'),
+    { ...event('2026-01-02T10:00:00Z', KIND.SPORTS, '-100'), post: '900' },
+    { ...event('2026-01-02T11:00:00Z', KIND.SPORTS, '100'), post: '1100' },
+    // a lost bet settles with nothing moved: dropped
+    { ...event('2026-01-02T12:00:00Z', KIND.SPORTS, '-100'), post: '1100' },
+  ];
+  const ledger = buildLedger(events, '1100', { page: 1, limit: 100, anchor: 'events' });
+  assert.equal(ledger.closing, '1100.00000000');
+  assert.equal(ledger.rows.length, 3);
+  assert.equal(ledger.rows[0].amount, '200.00000000');
+  assert.equal('post' in ledger.rows[0], false);
+});

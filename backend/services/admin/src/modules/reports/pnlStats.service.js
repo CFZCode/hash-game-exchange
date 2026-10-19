@@ -1,6 +1,7 @@
 'use strict';
 
 const { reportingCurrency } = require('./reportingCurrency');
+const { marketLabel } = require('../exchange-market/betLabels');
 
 const { canManagePromotions } = require('@ibitplay/auth');
 const { INHOUSE_PAYOUT, V2_STAKE, V2_PAYOUT, OG_PLAYED } = require('../statements/casinoRounds');
@@ -170,7 +171,8 @@ class PnlStatsService {
     const ctx = this.#ctx(window, scope, currency);
 
     const [gaming, costRows] = await Promise.all([
-      this.#dashboard().series({
+      // The same Direct / Agent tab as the breakdown below, or the tile and its section disagree.
+      this.#dashboard(channel).series({
         actor: staff,
         from: window.from.toISOString(),
         to: window.to.toISOString(),
@@ -346,7 +348,7 @@ class PnlStatsService {
       const sport = r.src === 'partner' ? 'Partner sportsbook' : sportName(r.sport);
       add(sportsTotal);
       add(bump(sports, sport, { label: sport }));
-      add(bump(markets, r.market, { label: r.market }));
+      add(bump(markets, r.market, { label: marketLabel(r.market) || r.market }));
       add(bump(events, `${sport}|${r.event}`, { label: r.event, sport }));
     }
 
@@ -693,11 +695,11 @@ class PnlStatsService {
     };
   }
 
-  #dashboard() {
+  #dashboard(channel) {
     const db = this.deps.db?.sequelize?.query
       ? this.deps.db
       : { sequelize: this.models.Users.sequelize, QueryTypes: this.models.Users.sequelize.constructor.QueryTypes };
-    return new DashboardStatsService({ ...this.deps, db });
+    return new DashboardStatsService({ ...this.deps, db, directOnly: channel === 'direct', agentOnly: channel === 'agent' });
   }
 }
 

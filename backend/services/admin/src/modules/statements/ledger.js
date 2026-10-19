@@ -64,6 +64,26 @@ function place(ts, from, to) {
 }
 
 /**
+ * A row that records the wallet right after it (`post`: the Sports Exchange's `closing` /
+ * `balance`) moved exactly post − running — the balance sheet's rule. Its `amount` is not the
+ * wallet move: a fancy settlement's `amount` is the profit while the wallet also got the stake
+ * back, and a hedged bet debits less than its stake. A post row that moved nothing (a lost bet
+ * settling at 0) is dropped. Other rows pass through unchanged.
+ */
+function withPostMoves(events) {
+  let running = 0n;
+  const out = [];
+  for (const event of events) {
+    const { post, ...rest } = event;
+    const minor = post == null ? money.toMinorQuantised(event.amount) : money.toMinorQuantised(String(post)) - running;
+    if (post != null && minor === 0n) continue;
+    running += minor;
+    out.push(post == null ? rest : { ...rest, amount: money.toDecimalString(minor) });
+  }
+  return out;
+}
+
+/**
  * Build the ledger.
  *
  * @param {Array<{ts: Date|string, kind: string, amount: string}>} events Oldest first.
@@ -75,7 +95,7 @@ function buildLedger(events, live, { from, to, page = 1, limit = 100, category =
   let periodNet = 0n;
   const inside = [];
 
-  for (const event of events) {
+  for (const event of withPostMoves(events)) {
     const minor = money.toMinorQuantised(event.amount);
     lifetimeNet += minor;
 

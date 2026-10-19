@@ -27,7 +27,9 @@ import { useSession } from '@/contexts/SessionContext'
 import { useApi, useListState, usePagedApi } from '@/hooks/use-api'
 import { api, errorMessage } from '@/lib/api/client'
 import { formatMoney, formatNumber } from '@/lib/format'
-import { ACCOUNT_TYPES, STATEMENT_CATEGORIES, STATEMENT_CATEGORY_LABEL as CATEGORY_LABEL, daysAgo, downloadBlob, type Statement, type StatementRow, type TransferRow } from './types'
+import { useCurrencyCodes } from '@/views/finance/useCurrencyCodes'
+
+import { ACCOUNT_TYPES, STATEMENT_CATEGORIES, STATEMENT_CATEGORY_LABEL as CATEGORY_LABEL, STATEMENT_KIND_LABEL, daysAgo, downloadBlob, type Statement, type StatementRow, type TransferRow } from './types'
 
 // Staff ka alag page nahi (agent wala system Sports Exchange me hai) — sirf naam; user ka link.
 const party = (p: TransferRow['from']) => {
@@ -115,7 +117,7 @@ const TransfersTab = ({ channel }: { channel: Channel }) => {
 
 const statementColumns: Column<StatementRow>[] = [
   { key: 'ts', header: 'When', cell: r => <DateTime value={r.ts} /> },
-  { key: 'kind', header: 'Kind', cell: r => <Badge variant='outline'>{r.kind}</Badge> },
+  { key: 'kind', header: 'Kind', cell: r => <Badge variant='outline'>{STATEMENT_KIND_LABEL[r.kind] ?? r.kind}</Badge> },
   { key: 'label', header: 'Entry', cell: r => <span>{r.label}{r.legacy ? <Badge variant='secondary' className='ml-1 font-normal'>{r.legacy}</Badge> : null}</span> },
   { key: 'party', header: 'Counterparty', cell: r => (typeof r.party === 'string' ? r.party : r.party ? String(r.party.name ?? r.party.id ?? '') : '—') },
   { key: 'amount', header: 'Amount', align: 'right', cell: r => <Money value={r.amount} signed /> },
@@ -138,6 +140,10 @@ const StatementTab = () => {
   const stmt = useApi<Statement>(base ? `${base}/statement` : null, { ...range, category: applied?.category, page, limit })
   const bets = usePagedApi<Record<string, unknown>>(base ? `${base}/bets` : null, { ...range, kind: betKind, page: betPage, limit: 50 })
   const s = stmt.data
+
+  // Every coin the site runs (BTC too, at 0), beside the wallets the player holds or has moved.
+  const coins = useCurrencyCodes()
+  const walletCodes = [...new Set([...(s?.wallets?.map(w => w.currency) ?? []), ...coins])]
   const [downloading, setDownloading] = useState(false)
 
   const pdf = async () => {
@@ -220,7 +226,7 @@ const StatementTab = () => {
                 )}
                 <Badge variant='secondary'>{s.subject.role}</Badge>
                 {s.subject.parentName && <span className='text-muted-foreground text-sm font-normal'>under {s.subject.parentName}</span>}
-                {applied?.subject === 'user' && (s.wallets?.length ?? 0) > 0 && (
+                {applied?.subject === 'user' && walletCodes.length > 0 && (
                   <Select
                     value={s.currency ?? applied.currency}
                     onValueChange={v => {
@@ -234,9 +240,9 @@ const StatementTab = () => {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {s.wallets?.map(w => (
-                        <SelectItem key={w.currency} value={w.currency}>
-                          {w.currency}
+                      {walletCodes.map(code => (
+                        <SelectItem key={code} value={code}>
+                          {code}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -250,10 +256,10 @@ const StatementTab = () => {
           </Card>
           <div className='grid grid-cols-2 gap-4 lg:grid-cols-4'>
             <StatCard label='Opening' value={<Money value={s.balance.opening} currency={s.currency} />} hint='balance before the period' />
-            <StatCard label='Closing' value={<Money value={s.balance.closing} currency={s.currency} />} hint={<>live <Money value={s.balance.live} /></>} />
-            <StatCard label='Total in' value={<Money value={s.balance.totalIn} />} hint={<span title='Credits the upline (agent or staff) transferred to this account in the period. Gateway and bank deposits are in the rows, not in this figure.'>credits from upline <Money value={s.balance.depositIn} /></span>} />
-            <StatCard label='Total out' value={<Money value={s.balance.totalOut} />} hint={<>withdrawals <Money value={s.balance.withdrawOut} /></>} />
-            <StatCard label='Movement' value={<Money value={s.balance.movement} signed />} hint={<>unexplained <Money value={s.balance.unexplained} /></>} />
+            <StatCard label='Closing' value={<Money value={s.balance.closing} currency={s.currency} />} hint={<>live <Money value={s.balance.live} currency={s.currency} /></>} />
+            <StatCard label='Total in' value={<Money value={s.balance.totalIn} currency={s.currency} />} hint={<span title='Credits the upline (agent or staff) transferred to this account in the period. Gateway and bank deposits are in the rows, not in this figure.'>credits from upline <Money value={s.balance.depositIn} /></span>} />
+            <StatCard label='Total out' value={<Money value={s.balance.totalOut} currency={s.currency} />} hint={<>withdrawals <Money value={s.balance.withdrawOut} /></>} />
+            <StatCard label='Movement' value={<Money value={s.balance.movement} currency={s.currency} signed />} hint={<>unexplained <Money value={s.balance.unexplained} /></>} />
             <StatCard label='Open exposure' value={<Money value={s.balance.openExposure} />} />
             {s.balance.adminCredit !== undefined && (
               <StatCard
@@ -262,8 +268,8 @@ const StatementTab = () => {
                 hint={<>not a deposit · bonuses, swaps net <Money value={s.balance.otherNet} signed /></>}
               />
             )}
-            <StatCard label='Sports P&L' value={<Money value={s.gaming.total.headlineSports} signed />} hint={`${formatNumber(s.gaming.counts.settledBets)} settled · ${formatNumber(s.gaming.counts.openBets)} open`} />
-            <StatCard label='Casino P&L' value={<Money value={s.gaming.total.headlineCasino} signed />} hint={`${formatNumber(s.gaming.counts.casinoBets)} bets · ${formatNumber(s.gaming.counts.casinoWins)} wins`} />
+            <StatCard label='Sports P&L' value={<Money value={s.gaming.total.headlineSports} currency={s.currency} signed />} hint={`${formatNumber(s.gaming.counts.settledBets)} settled · ${formatNumber(s.gaming.counts.openBets)} open`} />
+            <StatCard label='Casino P&L' value={<Money value={s.gaming.total.headlineCasino} currency={s.currency} signed />} hint={`${formatNumber(s.gaming.counts.casinoBets)} bets · ${formatNumber(s.gaming.counts.casinoWins)} wins`} />
           </div>
 
           <Tabs defaultValue='rows'>

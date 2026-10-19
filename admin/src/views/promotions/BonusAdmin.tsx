@@ -17,7 +17,7 @@ import FormDialog from '@/components/shared/FormDialog'
 import { SelectField, TextField } from '@/components/shared/FormField'
 import Money from '@/components/shared/Money'
 import PageHeader from '@/components/shared/PageHeader'
-import { RewardCurrencyNotice } from '@/components/shared/RewardCurrency'
+import { RewardCurrencyNotice, useRewardCurrency } from '@/components/shared/RewardCurrency'
 import StatCard from '@/components/shared/StatCard'
 import StatusBadge from '@/components/shared/StatusBadge'
 import { Badge } from '@/components/ui/badge'
@@ -519,6 +519,7 @@ const Awards = ({ userId }: { userId: string }) => {
   const { page, limit, set } = useLocalList()
   const [type, setType] = useState('all')
   const [claimed, setClaimed] = useState('all')
+  const reward = useRewardCurrency()
 
   const list = usePagedApi<BonusAward>('admin/user/bonus/awards', {
     // Agent ke users ye use nahi kar sakte — sirf direct users.
@@ -534,7 +535,7 @@ const Awards = ({ userId }: { userId: string }) => {
     { key: 'at', header: 'When', cell: r => <DateTime value={r.created_at} /> },
     { key: 'user', header: 'User', cell: r => (r.userid != null ? <UserLink id={r.userid} /> : '—') },
     { key: 'type', header: 'Type', cell: r => <StatusBadge value={r.bonus_type} /> },
-    { key: 'amount', header: 'Amount', align: 'right', cell: r => <Money value={r.bonus_amount} currency='USD' digits={2} /> }, // bonus_claims.bonus_amount is the USD figure from vipRewards; the claim pays it in the reward currency
+    { key: 'amount', header: 'Amount', align: 'right', cell: r => <Money value={r.bonus_amount} currency={/^USD[TC]?$/.test(reward.code) ? reward.code : 'USD'} digits={2} /> }, // bonus_claims.bonus_amount is the USD figure from vipRewards; a USD-pegged reward coin (USDT) pays it 1:1
     { key: 'claimed', header: 'Claimed', cell: r => (r.is_claimed ? <DateTime value={r.claimed_at} /> : <StatusBadge value='pending' />) }
   ]
 
