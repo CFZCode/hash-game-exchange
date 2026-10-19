@@ -49,11 +49,11 @@ async function childChain(sequelize, userId, transaction) {
 
 /**
  * @param {import('sequelize').Sequelize} sequelize
- * @param {{ userId: number, delta: string, entryRef: string, gameType?: string, remark?: string, category?: string }} p
+ * @param {{ userId: number, delta: string, entryRef: string, gameType?: string, remark?: string, category?: string, betId?: number }} p
  *   delta = decimal string (win − bet), INR; category picks the bucket (PTS_COLUMN)
  * @returns {Promise<null | { duplicate: true } | { wallets: number }>}
  */
-async function addChildGamePoints(sequelize, { userId, delta, entryRef, gameType, remark, category = CATEGORY }) {
+async function addChildGamePoints(sequelize, { userId, delta, entryRef, gameType, remark, category = CATEGORY, betId = null }) {
   const bucket = PTS_COLUMN[category];
   if (!bucket) throw new Error(`Unknown point category ${category}`);
   return sequelize.transaction(async (transaction) => {
@@ -83,10 +83,10 @@ async function addChildGamePoints(sequelize, { userId, delta, entryRef, gameType
     for (const w of wallets) {
       await sequelize.query(
         `INSERT INTO mssports.point_ledger
-           (entry_ref, event_type, category, game_type, username, wallet_id, delta, all_point_after,
+           (entry_ref, event_type, category, game_type, bet_id, username, wallet_id, delta, all_point_after,
             closing_inr_balance, source_user_id, remark, created_at)
          VALUES
-           (:entryRef, :event, :category, :gameType, :username, :walletId, :delta, :allPointAfter,
+           (:entryRef, :event, :category, :gameType, :betId, :username, :walletId, :delta, :allPointAfter,
             :inr, :userId, :remark, NOW())`,
         {
           replacements: {
@@ -94,6 +94,7 @@ async function addChildGamePoints(sequelize, { userId, delta, entryRef, gameType
             event: EVENT,
             category,
             gameType: gameType ? String(gameType).slice(0, 50) : null,
+            betId,
             username: w.username,
             walletId: w.wallet_id,
             delta,

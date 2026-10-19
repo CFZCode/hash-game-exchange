@@ -286,9 +286,10 @@ class OriginalGamesService {
     // The player's statement reads "Arrow Bow bet", not the aggregator's transaction id.
     const game = money.isZero(amount) ? null : await this.#gameName(body.game_code);
     try {
-      const { id, after } = await this.db.transaction(async (transaction) => {
+      const { id, after, betId } = await this.db.transaction(async (transaction) => {
         const rowId = await this.#insert({ kind, status: 'applied', body, userId, currency, amount, txId, refId, balanceAfter: balance }, transaction);
         if (money.isZero(amount)) return { id: rowId, after: balance };
+        const betId = await this.#roundBetId({ userId, body, refId, rowId }, transaction);
 
         const movement = await this.wallet[isCredit ? 'credit' : 'debit']({
           userId,
@@ -298,13 +299,14 @@ class OriginalGamesService {
           ref: { type: 'OG', id: txId },
           description: `${game} ${kind}`,
           gameType: body.game_code ?? undefined,
+          betId,
         });
         const newBalance = money.toDecimalString(money.toMinorQuantised(String(movement.newBalance)));
         await this.#query('UPDATE og_transactions SET balance_after = :after WHERE id = :id', { after: newBalance, id: rowId }, transaction);
-        return { id: rowId, after: newBalance };
+        return { id: rowId, after: newBalance, betId };
       });
 
-      if (!money.isZero(amount)) await this.#writePoints({ userId, currency, amount, isCredit, txId, kind, body, balanceAfter: after });
+      if (!money.isZero(amount)) await this.#writePoints({ userId, currency, amount, isCredit, txId, kind, body, betId });
       return { fresh: true, response: this.#ok(after, currency, { operator_tx_id: operatorTxId(id) }) };
     } catch (error) {
       if (isDuplicate(error)) {
@@ -470,7 +472,22 @@ class OriginalGamesService {
   }
 
   /** Agent player's point ledger (INR only). A direct player's row is written by the wallet's ledger trigger. */
-  async #writePoints({ userId, currency, amount, isCredit, txId, kind, body, balanceAfter }) {
+  /**
+   * The round as a number for the ledgers' BIGINT `bet_id`: the id of the round's first og_transactions row.
+   * A rollback without `round_id` takes the round of the transaction it undoes; no round at all → this row.
+   */
+  async #roundBetId({ userId, body, refId, rowId }, transaction) {
+    const [row] = await this.#query(
+      `SELECT MIN(t.id) AS id FROM og_transactions t
+        WHERE t.user_id = :userId
+          AND t.round_id = COALESCE(:roundId, (SELECT r.round_id FROM og_transactions r WHERE r.transaction_id = :refId))`,
+      { userId: String(userId), roundId: body.round_id ?? null, refId: refId ?? body.reference_transaction_id ?? null },
+      transaction
+    );
+    return Number(row?.id ?? rowId);
+  }
+
+  async #writePoints({ userId, currency, amount, isCredit, txId, kind, body, betId }) {
     const sequelize = this.db.sequelize;
     const entry = {
       userId,
@@ -478,6 +495,7 @@ class OriginalGamesService {
       entryRef: `og:${txId}`,
       gameType: body.game_code ?? null,
       remark: `Original games ${kind} ${txId}`,
+      betId,
       category: 'ORIGINAL_GAME', // credits.original_game_pts, not the JS / GIS thirdparty_pts
     };
     try {

@@ -57,12 +57,14 @@ test('original games aggregator', async (t) => {
 
   /** user-service stand-in: overdraft refused, idempotent per (reason, ref). */
   const balances = new Map();
+  const moves = [];
   const applied = new Map();
   const wallet = {
     async balance(userId, currency) {
       return { balance: balances.get(`${userId}:${currency}`) ?? null };
     },
-    async move(sign_, { userId, currency, amount, reason, ref }) {
+    async move(sign_, { userId, currency, amount, reason, ref, betId }) {
+      moves.push({ reason, txId: ref.id, betId });
       const key = `${reason}:${ref.id}`;
       if (applied.has(key)) return applied.get(key);
       const k = `${userId}:${currency}`;
@@ -171,6 +173,18 @@ test('original games aggregator', async (t) => {
     assert.deepStrictEqual(again.body, first.body);
     assert.strictEqual(balances.get(`${uid}:INR`), '50.00000000');
     assert.deepStrictEqual(wagers.at(-1), { userId: uid, gameRef: null, wagered: '50.00000000', currency: 'INR', source: 'original-games', ref: bet.transaction_id, category: 'originals', provider: 'BC Originals', catalogueRef: 'crash' });
+  });
+
+  await t.test('bet_id — the round\'s bet, win and rollback all carry the bet row\'s og_transactions id', async () => {
+    const uid = await player('100');
+    const round = `r-${newTx()}`;
+    const bet = { player_id: String(uid), currency: 'INR', transaction_id: newTx(), round_id: round, game_code: 'crash', amount: 1000 };
+    const win = { ...bet, transaction_id: newTx(), amount: 500 };
+    await call('bet', bet);
+    await call('win', win);
+    await call('rollback', { player_id: String(uid), currency: 'INR', transaction_id: newTx(), reference_transaction_id: win.transaction_id, amount: 500 });
+    const [{ id }] = await connection.sequelize.query('SELECT id FROM og_transactions WHERE transaction_id = :tx', { replacements: { tx: bet.transaction_id }, type: 'SELECT' });
+    assert.deepStrictEqual(moves.slice(-3).map((m) => [m.reason, m.betId]), [['BET_STAKE', Number(id)], ['BET_PAYOUT', Number(id)], ['BET_ROLLBACK', Number(id)]]);
   });
 
   await t.test('wallet.insufficient_funds — refused, nothing debited', async () => {
