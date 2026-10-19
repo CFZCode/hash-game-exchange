@@ -34,6 +34,9 @@ export const coinIcon = (currency) => coins[`../../../assets/coins/${currency}.p
 const slugKey = (gameUnique) =>
   gameUnique.toLowerCase().replace(/[^a-z0-9]/g, '').replace('99', '').replace('96', '');
 
+/** Whether the originals' icon map has its own icon for this game (else `gameIcon` falls back). */
+export const hasGameIcon = (gameUnique) => Boolean(iconMap[slugKey(String(gameUnique ?? ''))]);
+
 export function gameIcon(gameUnique) {
   const file = iconMap[slugKey(gameUnique)] ?? iconMap.blackjack;
   return icons[`../../../assets/gameicons/${file}`];

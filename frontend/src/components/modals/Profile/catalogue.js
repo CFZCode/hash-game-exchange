@@ -71,9 +71,10 @@ export function orderMedals(rows) {
 /* Type 9 is dropped by every list that renders these: the profile strip filters
    `a.type !== 9` after ordering, and the other-user medals dialog filters it straight off the
    response. "Contest Master" is title 18's string too, so nothing is lost from the page. */
-/* Also dropped here: the Rain (6, 11) and Puzzle (19-21) medals — no rain or puzzle feature on
-   this site — and the ETH/DOGE/EOS "TOP 1" rows, coins it does not carry (BTC stays). */
-const HIDDEN_TYPES = new Set([9, 6, 11, 19, 20, 21]);
+/* Also dropped here: the Rain (6, 11), COCO Lover (7, bc.game's coin-catching game) and Puzzle
+   (19-21) medals — no such feature on this site — and the ETH/DOGE/EOS "TOP 1" rows, coins it
+   does not carry (BTC stays). */
+const HIDDEN_TYPES = new Set([9, 6, 7, 11, 19, 20, 21]);
 const HIDDEN_COINS = new Set(['ETH', 'DOGE', 'EOS']);
 export const visibleMedals = (rows) =>
   rows.filter(

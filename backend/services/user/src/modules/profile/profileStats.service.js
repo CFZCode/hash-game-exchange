@@ -199,7 +199,7 @@ function buildProfileStats({ casino, sports, rates, asOf }) {
   for (const g of casino?.games ?? []) {
     const usd = toUsd(g.wagered, g.currency, rates);
     if (usd === null) continue;
-    const entry = games.get(g.key) ?? { name: g.name, provider: g.provider ?? null, usd: 0n, bets: 0 };
+    const entry = games.get(g.key) ?? { key: g.key, name: g.name, provider: g.provider ?? null, usd: 0n, bets: 0 };
     entry.usd += usd;
     entry.bets += g.bets;
     games.set(g.key, entry);
@@ -237,7 +237,8 @@ function buildProfileStats({ casino, sports, rates, asOf }) {
       sports: { bets: sections.sports.bets, wins: sections.sports.wins, wageredUsd: dec(sections.sports.usd) },
     },
     biggestWin: biggestWin && { ...biggestWin, usd: biggestWin.usd === null ? null : dec(biggestWin.usd) },
-    favouriteGames: rankedGames.slice(0, 3).map((g) => ({ name: g.name, provider: g.provider, wageredUsd: dec(g.usd), bets: g.bets })),
+    // `key` is casino-service's `<source>:<game id>`, so a client can link the game.
+    favouriteGames: rankedGames.slice(0, 3).map((g) => ({ key: g.key, name: g.name, provider: g.provider, wageredUsd: dec(g.usd), bets: g.bets })),
     favouriteProviders: [...providers.values()].sort(byUsdDesc).slice(0, 3)
       .map((p) => ({ name: p.name, wageredUsd: dec(p.usd), bets: p.bets })),
     firstBetAt,

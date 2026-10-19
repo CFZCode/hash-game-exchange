@@ -12,7 +12,8 @@ import { useIsDesktop } from '../../../hooks/useMediaQuery';
 import { useSelectedCurrency } from '../../../hooks/useSelectedCurrency';
 import { isFiatCode } from '../../../utils/currency';
 import { useResource } from '../../../hooks/useResource';
-import { getContestRank } from '../../../services/contest';
+import React from 'react';
+import { getContestRank, remaining } from '../../../services/contest';
 import { avatarSrc } from '../../../services/avatars';
 import './Contest.css';
 
@@ -302,8 +303,22 @@ function MyPosition({ contest, standings, show }) {
   );
 }
 
+/* The live board sends the instant the window closes (`endsAt`), so the clock ticks down to it;
+   a payload without one (the fixtures) keeps its static h/m/s. */
+function useTimeLeft(contest) {
+  const { endsAt } = contest;
+  const [now, setNow] = React.useState(() => Date.now());
+  React.useEffect(() => {
+    if (!endsAt) return undefined;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [endsAt]);
+  return endsAt ? remaining(endsAt, now) : contest;
+}
+
 export default function Contest({ contest, standings = [] }) {
   const show = useContestMoney(contest.currency);
+  const left = useTimeLeft(contest);
   const { session } = useSession();
 
   return (
@@ -332,18 +347,14 @@ export default function Contest({ contest, standings = [] }) {
 
         <div className="flex-1 rounded-xl bg-layer4 py-6 sm:py-7">
           <div className="mb-3 text-center text-base font-extrabold text-brand">Time Remaining</div>
-          {/* STATIC, deliberately. The payload carries a remaining h/m/s rather than the
-              absolute instant the round closes, and there is no rule to derive one from the
-              way the monthly bonus's "1st of the month, 00:00 UTC" gives DepositOffer a real
-              end time. Ticking these down locally would just walk a captured number to zero
-              and stick there, which reads worse than a clock that does not move. When the feed
-              lands it will send an end time and this becomes a live countdown. */}
+          {/* Static for the fixture capture (a remaining h/m/s, no end instant); the live board
+              sends `endsAt` and `useTimeLeft` ticks down to it. */}
           <div className="center flex">
-            <TimeUnit value={contest.hours} name="Hour" />
+            <TimeUnit value={left.hours} name="Hour" />
             <Colon />
-            <TimeUnit value={contest.minutes} name="Minute" />
+            <TimeUnit value={left.minutes} name="Minute" />
             <Colon />
-            <TimeUnit value={contest.seconds} name="Second" />
+            <TimeUnit value={left.seconds} name="Second" />
           </div>
         </div>
 

@@ -2,11 +2,10 @@ import { request, USE_FIXTURES } from './client';
 import ENDPOINTS, { PLATFORM } from './endpoints';
 import { toBetRow } from './betHistory';
 import { getOriginals, slugFor } from './originals';
-import { isHouseGame } from './game';
 import { publicGates } from './gates';
 import { getSportEvents } from './exchange/feed';
 import { getCasinoSet, toCatalogGame } from './catalog';
-import { assetExact } from '../utils/gameArt';
+import { assetExact, placeholderFor } from '../utils/gameArt';
 import { isFiatCode } from '../utils/currency';
 import { HIDDEN_NAME } from '../context/account';
 import { originals, originalsLink } from '../pages/Home/GameSection/originals';
@@ -22,7 +21,7 @@ import {
   bingo,
   bingoLink,
 } from '../pages/Home/GameSection/sections';
-import { bets } from '../pages/Home/LatestBets/bets';
+import { bets, hasGameIcon } from '../pages/Home/LatestBets/bets';
 import { bigWinsByTab, vipTier, displayName } from '../pages/Home/RecentBigWins/data';
 import { matches } from '../pages/Home/Highlights/matches';
 import { staticBigWins, staticGameWins, STATIC_LATEST_BETS, STATIC_HIGH_ROLLERS } from '../data/staticShowcase';
@@ -138,10 +137,11 @@ const toLatestBet = (row) => {
   return {
     betId: mapped.distributeId,
     gameUnique,
-    /* The row links to its game page; a game the originals' icon map does not know (a
-       third-party title) draws its catalogue art when the build has it. */
+    /* The row links to its game page. A game the originals' icon map does not know draws its
+       catalogue art when the build has it, else the neutral name card — never bc.game's blackjack
+       icon (Original Games codes like `bow` / `diamonds` have neither). */
     slug: slug || undefined,
-    icon: isHouseGame(gameUnique) ? undefined : assetExact(slug),
+    icon: hasGameIcon(gameUnique) ? undefined : assetExact(slug) || placeholderFor(mapped.type || gameUnique),
     fullName: mapped.type,
     userName: HIDDEN_NAME,
     currencyName: mapped.currencyName,
@@ -281,7 +281,9 @@ const toBigWin = (row) => {
   const profit = Number(row.profit ?? 0);
   return {
     gameUnique: slug,
-    icon: assetExact(slug),
+    // The game's name (`title`), not its code, for the alt text and the art when there is none.
+    title: row.title || slug,
+    icon: assetExact(slug) || placeholderFor(row.title || slug),
     tier: vipTier(-1),
     name: displayName(HIDDEN_NAME),
     amount: `${profit.toLocaleString('en-US', { maximumFractionDigits: 8 })} ${row.currency ?? ''}`.trim(),

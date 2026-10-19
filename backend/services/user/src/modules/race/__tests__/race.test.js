@@ -456,3 +456,47 @@ test('race rewards', async (t) => {
     assert.ok(!rows.some((r) => String(r.raceId) === String(open.id)));
   });
 });
+
+test('a switched-off race still ranks today with no prizes', async () => {
+  const row = {
+    type: 'daily', enabled: false, prize_pool: '100', platform_fee_percent: '0', winner_count: 3,
+    top3_percentage: '60', min_points: '0', currency: 'USDT', rank_percentage: [],
+    sports_points: '1', casino_points: '1', slot_points: '1', crash_points: '1', other_points: '1',
+  };
+  const seen = [];
+  const service = new RaceService({
+    models: {
+      RaceConfig: { findOne: async () => row },
+      Exchangerate: { findAll: async () => [{ currency: 'INR', usd_rate: '0.012' }] },
+      Users: { findAll: async () => [{ id: 7, name: 'p7' }, { id: 8, name: 'p8' }] },
+    },
+    logger: createLogger({ name: 'race-test', level: 'silent' }),
+    config: { RACE_TIMEZONE: IST },
+    clients: {
+      casino: {
+        get: async (_path, { query }) => {
+          seen.push(query);
+          return {
+            rows: [
+              { userId: '7', bucket: 'other', currency: 'INR', amount: '2900', bets: 12 },
+              { userId: '8', bucket: 'other', currency: 'USDT', amount: '50', bets: 1 },
+            ],
+          };
+        },
+      },
+      sports: { get: async () => ({ rows: [] }) },
+    },
+    wallet: {},
+    rewardMoney: { fromUsd: async (usd) => ({ currency: 'USDT', amount: usd, usd }), toUsd: async (a) => a },
+  });
+
+  const board = await service.leaderboard({ type: 'daily', userId: '7' });
+  const today = windowFor('daily', new Date(), IST);
+  assert.strictEqual(board.official, false);
+  assert.strictEqual(board.prizePool, '0');
+  assert.strictEqual(new Date(board.endsAt).getTime(), today.endsAt.getTime());
+  assert.strictEqual(seen[0].from, today.startsAt.toISOString());
+  assert.deepStrictEqual(board.leaderboard.map((r) => [r.rank, r.userId, r.reward]), [[1, '8', '0'], [2, '7', '0']]);
+  assert.strictEqual(board.me.rank, 2);
+  assert.strictEqual(board.me.usdWagered, '34.80000000');
+});

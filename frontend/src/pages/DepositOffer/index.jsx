@@ -319,9 +319,10 @@ function ProgressCard({ bonus, resetAt, onOpenDetail }) {
           {/* Inert — there is no deposit flow behind it yet. */}
           <button
             type="button"
+            disabled={bonus.claimed}
             className={`button button-brand w-full rounded-xl${isDesktop ? " button-m" : ""}`}
           >
-            Deposit Now
+            {bonus.claimed ? "Bonus Claimed" : "Deposit Now"}
           </button>
         </div>
       </div>

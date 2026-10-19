@@ -270,7 +270,9 @@ export default function Medals({ onClose, enter }) {
             <p className="text-base font-extrabold">Your achievements</p>
             <p className="ml-auto text-secondary">
               {unlocked.length}
-              {/* `/20` is a literal — see the header note.
+              {/* `/20` is a literal on the original — see the header note. Here it is the count of
+                  medals actually listed (DEPARTURE: this site hides the medals it cannot award, so a
+                  fixed 20 never matched the list).
 
                   ONE DEPARTURE, REQUESTED, AND IT IS A ONE-WORD REVERT: the chunk writes `mx-1`,
                   which opens 4px on BOTH sides and reads as "0 /20 Completed". `mr-1` drops the
@@ -278,7 +280,7 @@ export default function Medals({ onClose, enter }) {
                   the capture, which reads "0/20 Completed" with no gap before the slash — so the
                   4px was arguably never visible on the live page either. Put `mx-1` back to
                   restore the chunk exactly. */}
-              <span className="mr-1">/20</span>
+              <span className="mr-1">/{ordered.length}</span>
               <span>Completed</span>
             </p>
           </div>

@@ -1,7 +1,8 @@
 import { request, USE_FIXTURES } from './client';
 import ENDPOINTS, { PLATFORM } from './endpoints';
 import { ACHIEVEMENTS, MEDAL_COUNT, BONUS_STATUS } from '../data/achievements';
-import { getOriginals } from './originals';
+import { getOriginals, slugFor } from './originals';
+import { assetExact } from '../utils/gameArt';
 
 /* The three profile dialogs' data — `/user/profile/:userId`, `/user/medals/:userId` and
  * `/user/statistics`. Five endpoints between them, all read out of the recovered account-remote
@@ -153,6 +154,24 @@ const PROFILE_DEFAULT = {
  * distinction is kept: `?? PROFILE_DEFAULT.betNum` leaves the dialog showing its default rather
  * than asserting the player has never bet.
  */
+/* One `/user/profile/stats` favourite (`key` = casino-service's `<source>:<id>`) in the card's
+   `{gameUnique, betAmountUsd, gameItem}` shape. An Original (`og:` / `inhouse:`) links and draws
+   by this build's slug; a catalogue game links by its provider id and keeps the card's fallback art. */
+export function toFavourite(game) {
+  const [source, id = ''] = String(game.key ?? '').split(/:(.*)/s);
+  const house = source === 'og' || source === 'inhouse';
+  const slug = house ? slugFor(id) : id;
+  return {
+    gameUnique: slug,
+    betAmountUsd: String(game.wageredUsd ?? '0'),
+    gameItem: {
+      fullName: game.name,
+      iconThreeFour: house ? assetExact(slug) : undefined,
+      gameIdentity: { gameUrl: slug },
+    },
+  };
+}
+
 export function getUserProfile(userId, account) {
   if (!USE_FIXTURES) {
     const self = !!account?.userId && Number(account.userId) === Number(userId);
@@ -185,6 +204,7 @@ export function getUserProfile(userId, account) {
            bets / wins come from the same read: casino AND sports, where the public row may be casino only. */
         ...(stats?.wagered?.usd != null ? { betAmountUsd: String(stats.wagered.usd) } : {}),
         ...(typeof stats?.bets === 'number' ? { betNum: stats.bets, winNum: stats.wins ?? 0 } : {}),
+        ...(stats?.favouriteGames?.length ? { favorite: stats.favouriteGames.map(toFavourite) } : {}),
       }));
   }
 

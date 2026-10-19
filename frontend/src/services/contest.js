@@ -52,7 +52,7 @@ const num = (value) => Number(value) || 0;
 const day = (instant) =>
   instant ? new Date(instant).toLocaleDateString('en-US', { timeZone: 'UTC' }) : '';
 
-function remaining(endsAt, now = Date.now()) {
+export function remaining(endsAt, now = Date.now()) {
   const left = Math.max(0, Math.floor((new Date(endsAt).getTime() - now) / 1000)) || 0;
   return { hours: Math.floor(left / 3600), minutes: Math.floor((left % 3600) / 60), seconds: left % 60 };
 }
@@ -68,8 +68,14 @@ export function toContest({ title, config, board, history }) {
     title,
     currency: board?.payoutCurrency ?? config?.payout?.currency ?? config?.currency ?? '',
     prizePool: num(board?.payoutPrizePool ?? config?.payout?.prizePool ?? config?.prizePool),
-    userBonusRate: ranks.map((r) => num(r.percentage) / 100),
+    /* No prize ladder (pool 0, or the unofficial board of a switched-off race): still `winnerCount`
+       places to race for, so "To reach Top N" names a real place rather than "Top 0". */
+    userBonusRate: ranks.length
+      ? ranks.map((r) => num(r.percentage) / 100)
+      : Array.from({ length: num(board?.winnerCount ?? config?.winnerCount) }, () => 0),
     active: Boolean(board),
+    /* The instant the window closes; the widget ticks its countdown off it. */
+    endsAt: board?.endsAt ?? null,
     ...(board ? remaining(board.endsAt) : { hours: 0, minutes: 0, seconds: 0 }),
     start: day(board?.startsAt ?? last?.startsAt),
     end: day(board?.endsAt ?? last?.endsAt),
@@ -100,22 +106,21 @@ function readBoard(type) {
   });
 }
 
-/* The configs are read FIRST and the leaderboard only when that race is switched on: a disabled
-   race always answers the board with 404 RACE_NOT_RUNNING, which was a red 404 in the console on
-   every home/contest load for a state the config already states. `enabled` rides on the result
-   so a call site can hide the race rather than draw its idle shell. */
+/* The board always answers now (backend race.service `leaderboard`, owner 2026-10-19): a
+   switched-off race still ranks the current day's wagers, with a 0 pool and no prizes. So the
+   board is read whenever the race is configured, and `enabled` (rides on the result so a call site
+   can hide a race that has no board) is "there is a board". */
 function liveContest(title, type = 'daily') {
   return Promise.resolve(request(RACE.configs, { live: true }))
     .catch(emptyIfAgentBlocked([]))
     .then((configs) => {
       const config = (configs ?? []).find((c) => c.type === type);
-      const enabled = Boolean(config?.enabled);
       return Promise.all([
-        enabled ? readBoard(type) : null,
+        config?.configured === false ? null : readBoard(type),
         request(RACE.history, { live: true, params: { type, limit: 1 } }).catch(() => []),
       ]).then(([board, history]) => {
         const out = toContest({ title, config, board, history });
-        return { ...out, contest: { ...out.contest, enabled } };
+        return { ...out, contest: { ...out.contest, enabled: Boolean(board) } };
       });
     });
 }

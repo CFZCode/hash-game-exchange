@@ -47,8 +47,13 @@ const SQL = `
      WHERE b.uid = :userId AND b.profit > 0
 
     UNION ALL
-    -- Slotegrator: a bet row and a win row per spin, both unsigned
-    SELECT CASE WHEN LOWER(g.action) = 'bet' THEN 'stake' ELSE 'win' END,
+    -- Slotegrator: a bet row and a win row per spin, both unsigned. A win that pays back no more
+    -- than its round's stakes is a 'payout' (money back, not a won round); no round_id = a win.
+    SELECT CASE WHEN LOWER(g.action) = 'bet' THEN 'stake'
+                WHEN g.amount > COALESCE((SELECT SUM(b.amount) FROM gis_transactions b
+                                           WHERE b.round_id = g.round_id AND b.user_id = g.user_id
+                                             AND LOWER(b.action) = 'bet'), 0) THEN 'win'
+                ELSE 'payout' END,
            CASE WHEN LOWER(COALESCE(gg.type, '')) LIKE '%sport%' THEN 'sports' ELSE 'casino' END,
            UPPER(COALESCE(g.currency, '')), g.amount, 'gis:' || COALESCE(g.game_uuid, ''),
            COALESCE(gg.name, g.game_uuid), gg.provider, g.created_at

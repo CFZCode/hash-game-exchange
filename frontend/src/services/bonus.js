@@ -49,6 +49,9 @@ export function toDepositOffer(terms) {
         description: `Up to ${top}% bonus on your first deposit.`,
         tags: [template.tags[0]],
         currentStage: 1,
+        /* `claimed` is the player's paid grant (null signed out / not yet paid): the page then
+           says so instead of offering a deposit for a bonus that is already spent. */
+        claimed: Boolean(terms.claimed),
         progress: terms.claimed ? 100 : 0,
         stages: tiers.map((t) => ({
           /* The tier's own floor, e.g. "10+ USDT", rather than a bare index. */

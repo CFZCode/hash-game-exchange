@@ -74,6 +74,12 @@ test('casino profile stats', async (t) => {
       (:u, :t5, 'bet', 60, 'INR', :book, 0, '2026-03-01T00:00:00Z')`,
     { u: UID, slot: `${TAG}-slot`, book: `${TAG}-book`, t1: `${TAG}1`, t2: `${TAG}2`, t3: `${TAG}3`, t4: `${TAG}4`, t5: `${TAG}5` });
 
+    // A round that paid back less than it staked (bet 100, win 50) is not a win.
+    await q(`INSERT INTO gis_transactions (user_id, transaction_id, action, amount, currency, game_uuid, balance_after, round_id, created_at) VALUES
+      (:u, :t6, 'bet', 100, 'INR', :slot, 0, :r, '2026-02-02T00:00:00Z'),
+      (:u, :t7, 'win', 50, 'INR', :slot, 0, :r, '2026-02-02T00:00:01Z')`,
+    { u: UID, slot: `${TAG}-slot`, t6: `${TAG}6`, t7: `${TAG}7`, r: `${TAG}-r1` });
+
     // jsGames v1 (completed bet counts, a failed one does not) and v2 ('loss' is a stake)
     await q(`INSERT INTO js_game_transactions (user_id, game_uid, transaction_type, amount, currency, transaction_status, timestamp) VALUES
       (:u, :g, 'bet', 0.5, 'USDT', 'completed', '2026-04-01T00:00:00Z'),
@@ -85,12 +91,13 @@ test('casino profile stats', async (t) => {
     const s = await casinoProfileStats(connection, UID);
     const row = (section, currency) => s.byCurrency.find((r) => r.section === section && r.currency === currency);
 
-    // INR casino: in-house 100 + 40, slot 200. Wins: in-house round that paid, slot win 300.
-    assert.strictEqual(row('casino', 'INR').wagered, '340.00000000');
-    assert.strictEqual(row('casino', 'INR').bets, 3);
+    // INR casino: in-house 100 + 40, slot 200 + 100. Wins: in-house round that paid, slot win 300
+    // (the 50 back on a 100 round is not one).
+    assert.strictEqual(row('casino', 'INR').wagered, '440.00000000');
+    assert.strictEqual(row('casino', 'INR').bets, 4);
     assert.strictEqual(row('casino', 'INR').wins, 2);
-    // Won: the in-house round's payout 150 (100 + 50) and the slot's 300.
-    assert.strictEqual(row('casino', 'INR').won, '450.00000000');
+    // Won: the in-house round's payout 150 (100 + 50), the slot's 300 and the 50 paid back.
+    assert.strictEqual(row('casino', 'INR').won, '500.00000000');
     // Best in-house multiplier: 150 / 100.
     assert.strictEqual(s.maxMultiplier, '1.5000');
     assert.strictEqual(row('casino', 'INR').firstAt, '2026-01-01T00:00:00.000Z');
@@ -109,7 +116,7 @@ test('casino profile stats', async (t) => {
     // Games named from the catalogues, the sportsbook left out of favourites.
     const names = s.games.map((g) => `${g.currency}:${g.name}:${g.provider}:${g.wagered}`).sort();
     assert.deepStrictEqual(names, [
-      'INR:Test Slot:TestProv:200.00000000',
+      'INR:Test Slot:TestProv:300.00000000',
       'INR:crash:null:140.00000000',
       'USDT:JS Game:JsVendor:2.00000000',
     ]);

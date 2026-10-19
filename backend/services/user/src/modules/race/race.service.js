@@ -282,17 +282,22 @@ class RaceService {
   async leaderboard({ type, userId = null }) {
     const config = await this.getConfig({ type });
     if (!config) throw errors.NOT_CONFIGURED({ type });
-    if (!config.enabled) throw errors.NOT_RUNNING({ type });
 
-    const race = await this.#activeRace(type);
-    if (!race) throw errors.NO_ACTIVE_RACE({ type });
+    /* The board always runs (owner, 2026-10-19): a switched-off race, or one whose window the job
+       has not opened yet, ranks the current window's wagers with no prizes and a 0 pool rather than
+       answering "not running". Only an enabled race with an open row is ever settled and paid. */
+    const open = config.enabled ? await this.#activeRace(type) : null;
+    const race = open ?? (({ startsAt, endsAt }) => ({ id: null, starts_at: startsAt, ends_at: endsAt }))(windowFor(type, new Date(), this.timeZone));
+    const official = Boolean(open);
 
     const { entries, unrated } = await this.#standings(race, config);
 
-    const board = await this.#applyBookedSeats(entries, config, type);
+    const board = official ? await this.#applyBookedSeats(entries, config, type) : entries;
     const paid = board.slice(0, config.winnerCount);
 
-    const prizeByRank = new Map(config.rankPrizes.map((r) => [r.rank, r]));
+    const prizeByRank = new Map(official ? config.rankPrizes.map((r) => [r.rank, r]) : []);
+    const pool = official ? config.prizePool : '0';
+    const netPool = official ? config.netPrizePool : '0';
     const payout = await this.#payoutPricer(config.currency);
 
     const rows = paid.map((entry, index) => {
@@ -335,12 +340,14 @@ class RaceService {
        * headline said $100 and the ranks added up to $85, with nothing on the
        * wire to explain the gap.
        */
-      prizePool: config.prizePool,
-      netPrizePool: config.netPrizePool,
+      /* False for the unofficial board above: nothing is paid for it. */
+      official,
+      prizePool: pool,
+      netPrizePool: netPool,
       currency: config.currency,
       payoutCurrency: payout.currency,
-      payoutPrizePool: payout.price(config.prizePool),
-      payoutNetPrizePool: payout.price(config.netPrizePool),
+      payoutPrizePool: payout.price(pool),
+      payoutNetPrizePool: payout.price(netPool),
       multipliers: config.multipliers,
       minPoints: config.minPoints,
       winnerCount: config.winnerCount,
@@ -351,6 +358,7 @@ class RaceService {
               rank: meIndex + 1,
               points: board[meIndex].points,
               usdWagered: board[meIndex].usdWagered,
+              bets: board[meIndex].bets,
               inPrizes: meIndex < config.winnerCount,
               reward: prizeByRank.get(meIndex + 1)?.amount ?? '0',
               payout: payout.price(meIndex < config.winnerCount ? (prizeByRank.get(meIndex + 1)?.amount ?? '0') : '0'),

@@ -95,6 +95,8 @@ export const QUEST_COPY = {
    handlers that are not built, because deleting one would silently reorder the page the day it
    IS built. */
 export const QUEST_HANDLERS = [
+  /* This platform's own (live only): today's wager / bet targets, see `extract`. */
+  'dailyQuest',
   'instantCashback',
   'appLoginBonus',
   'instantWagerTask',
@@ -203,6 +205,7 @@ export function groupQuests(list) {
    one exists here; anything else returns nothing rather than a placeholder card, which is what
    `fallback: null` on the original's own `<ErrorBoundary>` around each row amounts to. */
 function extract(key, payload) {
+  if (key === 'dailyQuest') return dailyQuests(payload);
   if (key !== 'cWalletConnectionBonus' || !payload) return [];
 
   /* `!(bound && !boundAmount)` — the handler's own guard. */
@@ -233,4 +236,22 @@ function extract(key, payload) {
       actionType: 'connect',
     },
   ];
+}
+
+/* The platform's daily quests (services/quest.js): one card each, a progress bar in the
+   viewer's currency (wager) or as a count (bets), "Ends in" to the day's end, and no reward
+   column — nothing is paid for them yet, so the button only says whether it is done. */
+function dailyQuests(payload) {
+  const endsAt = Date.parse(payload?.endsAt ?? '') || 0;
+  return (payload?.quests ?? []).map((q) => ({
+    questKey: 'dailyQuest',
+    questName: q.key,
+    title: q.title,
+    description: q.description,
+    formula: false,
+    footer: { variant: 'active', expireTime: endsAt },
+    progress: { value: Number(q.progress) || 0, target: Number(q.target) || 0, unit: q.unit },
+    actionLabel: q.completed ? 'Completed' : 'In Progress',
+    disabled: true,
+  }));
 }

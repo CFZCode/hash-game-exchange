@@ -185,6 +185,24 @@ export function QuestAction({ action, variant, loading, disabled, onClick, class
   );
 }
 
+/* A daily quest's progress (live only, not the chunk's): a bar and "done / target", the wager
+   in the viewer's selected currency from USD, a bet count as is. */
+export function QuestProgress({ value, target, unit }) {
+  const cur = useSelectedCurrency();
+  const pct = target > 0 ? Math.min(100, (value / target) * 100) : 0;
+  const fmt = (n) => (unit === 'usd' ? cur.show(n, 'USDFIAT', { precision: 2 }) : String(n));
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="h-1.5 w-full overflow-hidden rounded-full bg-layer5">
+        <div className="h-full rounded-full bg-brand" style={{ width: `${pct}%` }} />
+      </div>
+      <div className="text-xs font-semibold text-secondary">
+        {fmt(value)} / {fmt(target)}
+      </div>
+    </div>
+  );
+}
+
 /* `_e` — bonus-currency-amount-CgQhatqc.js, the figure in a quest's reward column.
  *
  * SIMPLIFIED, and worth knowing how. The original splits the formatted amount into

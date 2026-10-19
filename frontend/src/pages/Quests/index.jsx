@@ -10,7 +10,7 @@ import EmptyPlaceholder from '../../components/shared/EmptyPlaceholder';
 import Loading from '../../components/shared/Loading';
 import { IconArrow } from '../../components/shared/icons';
 import { SectionGroup } from '../../components/shared/SectionGroup';
-import { QuestCard, QuestFooter, QuestAction, QuestReward } from './QuestCard';
+import { QuestCard, QuestFooter, QuestAction, QuestReward, QuestProgress } from './QuestCard';
 import { LockedIcon, CheckIcon } from './icons';
 
 /* The Quest Hub — `/quests`, the sidebar's own row, and the second of the two rows that only
@@ -86,9 +86,10 @@ function QuestRows({ items, children, separated = true }) {
 /* `ga` — the In Progress tab. Its empty state is the odd one on this page and it is the
  * original's: the fallback branches on `we.bcmx`, and only THAT white label gets the "No quests
  * in progress" message. bc.game takes the other arm, which is a spinner in a `min-h-40` box —
- * so an empty in-progress list spins forever rather than saying anything. Reproduced as written;
- * it is unreachable with this fixture, which always carries the Cwallet quest. */
-function InProgress({ groups }) {
+ * so an empty in-progress list spins forever rather than saying anything. DEPARTURE (live QA,
+ * 2026-10-19): the platform has no quests, so that spinner never settled — the spinner is kept
+ * only while the read is pending and an answered empty list takes the bcmx arm's message. */
+function InProgress({ groups, pending }) {
   return (
     <div className="flex flex-col gap-4 sm:gap-5">
       {groups.length > 0 ? (
@@ -111,6 +112,7 @@ function InProgress({ groups }) {
                     /* The ƒ(x) popup is not built — see the header note. */
                     onFormula={undefined}
                     footer={<QuestFooter {...item.footer} />}
+                    progressBar={item.progress ? <QuestProgress {...item.progress} /> : undefined}
                     /* Both are undefined for the one quest that exists, which is why its right
                        column holds nothing but the button and centres it. */
                     rewardAmount={
@@ -122,16 +124,20 @@ function InProgress({ groups }) {
                       item.locked ? <LockedIcon className="icon size-4.5 fill-primary" /> : undefined
                     }
                     rewardClass={item.locked ? 'flex items-center gap-1' : undefined}
-                    action={<QuestAction action={item.actionLabel} />}
+                    action={<QuestAction action={item.actionLabel} disabled={item.disabled} />}
                   />
                 </div>
               ))}
             </div>
           </SectionGroup>
         ))
-      ) : (
+      ) : pending ? (
         <div className="center flex size-full min-h-40">
           <Loading />
+        </div>
+      ) : (
+        <div className="text-quarterary">
+          <EmptyPlaceholder>No quests in progress</EmptyPlaceholder>
         </div>
       )}
     </div>
@@ -269,7 +275,7 @@ export default function Quests() {
   const { session } = useSession();
   const [tab, setTab] = React.useState('progress');
 
-  const { data: list } = useResource(getQuests);
+  const { data: list, loading: listLoading } = useResource(getQuests);
   const { data: completed } = useResource(getCompletedQuests);
   const { data: expired } = useResource(getExpiredQuests);
 
@@ -384,7 +390,7 @@ export default function Quests() {
             the deposit dialog documents. In Progress carries `!rounded-none`, the other two
             `overflow-hidden`; all three kill the panel's own layer4 fill. */}
         <div className={`tabs-content ${panel.panelClass}`}>
-          {tab === 'progress' && <InProgress groups={groups} />}
+          {tab === 'progress' && <InProgress groups={groups} pending={listLoading} />}
           {tab === 'completed' && <Completed items={completed ?? []} />}
           {tab === 'expired' && <Expired items={expired ?? []} />}
         </div>

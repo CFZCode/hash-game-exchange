@@ -142,6 +142,22 @@ class RaceTurnoverService {
 
         UNION ALL
 
+        -- Original Games aggregator (migration 130): an applied bet that was not
+        -- rolled back — the same rule as the profile stats.
+        SELECT o.user_id,
+               ${bucketCaseSql('o.game_code')},
+               UPPER(o.currency),
+               o.amount
+          FROM og_transactions o
+         WHERE o.created_at >= :start AND o.created_at < :end
+           AND o.kind = 'bet' AND o.status = 'applied' AND o.amount > 0
+           AND NOT EXISTS (
+                 SELECT 1 FROM og_transactions r
+                  WHERE r.kind = 'rollback' AND r.status = 'applied'
+                    AND r.reference_transaction_id = o.transaction_id)
+
+        UNION ALL
+
         -- Seamless (the casino provider's seamless wallet, a casino product).
         -- A stake is a 'withdraw' / 'pushbet' debit (amount < 0, settlement
         -- coin USDT), and one that was rolled back or cancelled never happened.

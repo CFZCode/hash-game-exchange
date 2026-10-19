@@ -259,11 +259,11 @@ would put something untrue on the screen.
 | `/bonus` rows, Total Claimable, Claim, Redeem | `GET /user/bonus`, `/user/rakeback`, `POST /user/bonus/claim/:type`, `/user/rakeback/claim`, `/user/bonus/redeem` | Already wired (see above). Level-up and other bc.game reward types have no platform route and keep the declared default |
 | `/bonus` level card | `GET /user/vip` | **Wired.** Name, percentage and "… XP to <next>" now come off the PLATFORM ladder (41 levels, Wood to Diamond); before, the level number was looked up in bc.game's captured ladder and printed bc.game's tier name. `services/vip.js` `getVipStanding` |
 | `/vip-detail` | — | Marketing copy, no data to wire. `GET /user/vip/levels` still has no screen |
-| `/promotions/daily-contest`, Home → Wager Contest | `GET /user/race`, `/user/race/daily/leaderboard`, `/user/race/history` | **Wired** (`services/contest.js`). Both races are `enabled: false` on this delivery, so the board answers 404 `RACE_NOT_RUNNING` and the widget renders its idle form: configured pool, Ended, 00:00:00, empty table. Running-race mapping checked against the service's own field names |
+| `/promotions/daily-contest`, Home → Wager Contest | `GET /user/race`, `/user/race/daily/leaderboard`, `/user/race/history` | **Wired** (`services/contest.js`). Since 2026-10-19 the board always answers: a switched-off race (or one whose window is not open) ranks the current race day (`race_timezone`) with `official: false`, pool 0 and no prizes; the widget ticks down to `endsAt`. Original Games (`og_transactions`) count in race turnover |
 | `/promotions` + Archived | `GET /admin/promotions` (public) | **Wired** (`services/promotions.js`). Feed is empty on this delivery, so the page's Empty state renders. Tabs cut to All + Casino (`segment`); archived = `promoStatus: ended` or past `endsAt` |
 | `/deposit-offer`, fiat tab bonus chips | `GET /user/bonus/first-deposit` | **Wired** (`services/bonus.js`). `enabled: false` here, so no offer and no chip bonus |
 | `/free-plays` | `GET /casino/gis/freespins/mine` | Already wired; free bets have no provider |
-| `/quests` | — | No backend (gap 5). Live mode now renders the empty states instead of bc.game's captured quests |
+| `/quests` | `GET /user/quests` | **Partly built** (gap 5, 2026-10-19): two daily quests (wager $50, 20 bets) with progress off the daily race board and an "Ends in" to the race day's end. No rewards, no claim, Completed/Expired stay empty |
 | `/promotions/weekly-raffle` | — | No backend (gap 6). Live mode keeps the copy but empties the ticker, tickets-sent count and past draws |
 | Spin wheel | `/user/spin-wheel/*` | Backend complete, no screen in this UI |
 
@@ -542,8 +542,9 @@ game page's toolbar, which had been drawn and inert since that page was built, i
 
 - **The page needs** a list of tasks with progress and a reward, in three groups: in progress,
   completed, expired.
-- **Today** there is nothing.
-- **Add** `GET /user/quests` and `POST /user/quests/:id/claim`.
+- **Today** `GET /user/quests` (user-service `quests`) answers two daily progress quests, fixed
+  targets in `quests.service.js`, progress from the daily race board.
+- **Still to add**: rewards, a target config, `POST /user/quests/:id/claim`, completed/expired history.
 - Page: `/quests`.
 
 ### 6. Weekly raffle

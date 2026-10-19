@@ -244,8 +244,8 @@ function Calculator({
       </div>
 
       {/* Inert — there is no wallet to open and no deposit flow behind it. */}
-      <button type="button" className="button button-brand button-m w-full">
-        Deposit Now
+      <button type="button" disabled={bonus.claimed} className="button button-brand button-m w-full">
+        {bonus.claimed ? "Bonus Claimed" : "Deposit Now"}
       </button>
     </div>
   );

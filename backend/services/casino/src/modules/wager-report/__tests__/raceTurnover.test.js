@@ -48,6 +48,7 @@ test('race turnover against a database', async (t) => {
     await models.Bets.destroy({ where: { uid } });
     await models.GameTransaction.destroy({ where: { user_id: uid } });
     await q('DELETE FROM seamless_transactions WHERE user_id = :uid', { uid });
+    await q('DELETE FROM og_transactions WHERE user_id = :uid', { uid });
   };
 
   t.after(async () => {
@@ -93,6 +94,16 @@ test('race turnover against a database', async (t) => {
   await sl(`${tag}-s2`, 'pushbet', '-2');
   await sl(`rollback:${tag}-s2`, 'rollback', '2', `${tag}-s2`);
 
+  // Original Games: a 7 BTC stake, and a 5 BTC one that was rolled back.
+  const og = (id, kind, amount, ref = null) =>
+    models.OgTransactions.create({
+      transaction_id: `${tag}-${id}`, kind, status: 'applied', user_id: uid, game_code: 'bow', currency: 'BTC', amount,
+      reference_transaction_id: ref && `${tag}-${ref}`,
+    });
+  await og('o1', 'bet', '7');
+  await og('o2', 'bet', '5');
+  await og('o3', 'rollback', '5', 'o2');
+
   const service = new RaceTurnoverService({ db: connection, logger });
   const { rows } = await service.racePoints({ from: new Date(now.getTime() - 60_000), to: new Date(now.getTime() + 60_000) });
   const mine = rows.filter((r) => r.userId === String(uid));
@@ -112,5 +123,10 @@ test('race turnover against a database', async (t) => {
   await t.test('seamless stakes count, rolled-back ones do not', () => {
     assert.equal(byCurrency.USDT.amount, 3);
     assert.equal(byCurrency.USDT.bets, 1);
+  });
+
+  await t.test('Original Games stakes count, rolled-back ones do not', () => {
+    assert.equal(byCurrency.BTC.amount, 7);
+    assert.equal(byCurrency.BTC.bets, 1);
   });
 });

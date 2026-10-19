@@ -90,7 +90,7 @@ function WinCard({ win }) {
              portrait box rather than leaving a gap under a square cover. */
           className="absolute left-0 top-0 h-full w-full rounded-lg object-cover"
           src={win.icon}
-          alt={win.gameUnique}
+          alt={win.title ?? win.gameUnique}
         />
       </div>
 

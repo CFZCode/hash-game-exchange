@@ -15,6 +15,29 @@ const art = globMaps.art;
 
 const allKeys = Object.keys(art).filter((k) => !k.includes('gameViewAllCard'));
 
+/* THE MISSING-COVER ART. `game-placeholder.png` was bc.game's own card — its "b" mark on green —
+   so a game with no cover showed another brand's logo. This is a neutral card in the same
+   colours carrying the game's own name instead (the tile, the bet feeds, Recent Big Wins); built inline so there is no asset to keep in
+   sync, and escaped because the name is feed text. */
+const escapeXml = (text) =>
+  String(text ?? '').replace(/[<>&"']/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&apos;' })[c]);
+export const placeholderFor = (name) => {
+  const words = String(name ?? '').trim().split(/\s+/).filter(Boolean);
+  const lines = [];
+  for (const word of words) {
+    const last = lines[lines.length - 1];
+    if (last && (last + ' ' + word).length <= 12) lines[lines.length - 1] = `${last} ${word}`;
+    else lines.push(word.slice(0, 14));
+    if (lines.length === 4) break;
+  }
+  const top = 166 - (lines.length - 1) * 14;
+  const text = lines
+    .map((line, i) => `<text x="125" y="${top + i * 28}" text-anchor="middle" dominant-baseline="middle">${escapeXml(line)}</text>`)
+    .join('');
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 250 333"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2f3836"/><stop offset="1" stop-color="#25553b"/></linearGradient></defs><rect width="250" height="333" fill="url(#g)"/><g fill="#e6f2ea" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="800">${text}</g></svg>`;
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+};
+
 /* Exact-match only, no fuzzy rule and no hash fallback — `undefined` when there is no file for
    this slug. `assetFor` below always returns SOMETHING, which is what keeps the Explore grid
    full, but it means a game with no artwork silently borrows another game's. Where a missing

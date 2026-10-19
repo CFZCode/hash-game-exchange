@@ -1,4 +1,4 @@
-import { request, USE_FIXTURES } from './client';
+import { emptyIfAgentBlocked, request, USE_FIXTURES } from './client';
 import ENDPOINTS from './endpoints';
 import { QUEST_LIST, COMPLETED_QUESTS, EXPIRED_QUESTS } from '../pages/Quests/quests';
 
@@ -19,11 +19,16 @@ import { QUEST_LIST, COMPLETED_QUESTS, EXPIRED_QUESTS } from '../pages/Quests/qu
  * verification quest makes, and that handler is not built.
  */
 
-/* NO-BACKEND: the SmartBet platform has no quests (backend-gaps.md gap 5). With fixtures off the
-   three reads answer the service's own logged-out fallbacks — the empty object and two empty
-   arrays — so the page renders its empty states instead of bc.game's captured quests. */
+/* LIVE: `GET /user/quests` (user-service `quests` module) answers today's daily quests —
+   `{dailyQuest: {second: 'dailyquest', first: {endsAt, quests: [{key, title, description, unit,
+   target, progress, completed}]}}}`, progress off the daily race board. There is no quest payout,
+   so nothing is ever completed-and-claimed: the Completed and Expired reads stay the service's
+   own empty fallbacks. A failed read settles the page on its empty state, not a spinner. */
 export const getQuests = () =>
-  USE_FIXTURES ? request(ENDPOINTS.quest.list, { fixture: QUEST_LIST }) : Promise.resolve({});
+  USE_FIXTURES
+    ? request(ENDPOINTS.quest.list, { fixture: QUEST_LIST })
+    : Promise.resolve(request('/api/v1/user/quests', { live: true }))
+        .catch(emptyIfAgentBlocked({}));
 
 export const getCompletedQuests = () =>
   USE_FIXTURES
