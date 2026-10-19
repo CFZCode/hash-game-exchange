@@ -175,7 +175,7 @@ async function addOwnerDirectBalance(models, { ownerId, amount, note }, { transa
   const decimal = toDecimal(amount);
   await creditOwnerDirectBalance(models, ownerId, decimal, {
     transaction,
-    entry: { type: LEDGER_TYPE.ADD, note: note ?? 'Owner added Direct User balance' },
+    entry: { type: LEDGER_TYPE.ADD, note: note ?? 'Super Admin added Direct User balance' },
   });
 
   const row = await models.StaffTransfers.create(
@@ -187,7 +187,7 @@ async function addOwnerDirectBalance(models, { ownerId, amount, note }, { transa
       amount: decimal,
       direction: 'deposit',
       transfer_type: TRANSFER_TYPE.OWNER_DIRECT_TOPUP,
-      note: note ?? 'Owner added Direct User balance',
+      note: note ?? 'Super Admin added Direct User balance',
       created_at: new Date(),
     },
     { transaction }
@@ -233,7 +233,7 @@ async function addOwnerBalance(models, { ownerId, amount, note }, { transaction 
       amount: decimal,
       direction: 'deposit',
       transfer_type: TRANSFER_TYPE.OWNER_TOPUP,
-      note: note ?? 'Owner added balance',
+      note: note ?? 'Super Admin added balance',
       created_at: new Date(),
     },
     { transaction }
@@ -263,7 +263,7 @@ async function addOwnerBalance(models, { ownerId, amount, note }, { transaction 
         amount: decimal,
         allPoint: wallet.all_point,
         inr: wallet.inr,
-        remark: `${note || 'Owner add balance'}#${username}`.slice(0, 255),
+        remark: `${note || 'Super Admin add balance'}#${username}`.slice(0, 255),
       },
       transaction,
     }

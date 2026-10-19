@@ -67,7 +67,7 @@ const NOT_FAKE = `("result"->>'fake') IS DISTINCT FROM 'true'`;
 const CASINO_SOURCES = Object.freeze([
   {
     key: 'inhouse',
-    label: 'In-house',
+    label: 'Originals',
     category: 'originals',
     table: 'bets',
     owner: 'uid',
@@ -266,7 +266,7 @@ class WagerStatsService {
         const meta = names.get(`${g.source.key}:${g.game}`) ?? {};
         return {
           ...g,
-          vendor: meta.vendor || (g.source.key === 'inhouse' ? 'In-house' : g.source.label),
+          vendor: meta.vendor || (g.source.key === 'inhouse' ? 'Originals' : g.source.label),
           category: g.source.category,
           name: meta.name || g.game || 'Unknown game',
         };

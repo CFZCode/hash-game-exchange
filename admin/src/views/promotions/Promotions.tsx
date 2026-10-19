@@ -263,7 +263,7 @@ const GamesPicker = ({ value, onChange, error }: { value: GameCard[]; onChange: 
     <div className='grid gap-2'>
       <span className='text-sm font-medium'>Qualifying games</span>
       <span className='text-muted-foreground text-xs'>
-        Search the in-house and provider catalogue and add games; they show on the promotion page in this order. A game with no icon needs an image URL. In-house games the site does not list
+        Search our own and provider games and add them; they show on the promotion page in this order. A game with no icon needs an image URL. Our own games the site does not list
         open as “not in the catalogue”.
       </span>
       <Input placeholder='Search games by name, provider or type (2+ letters)…' value={q} onChange={e => setQ(e.target.value)} />

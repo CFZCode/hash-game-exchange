@@ -599,7 +599,7 @@ class GameEngine {
     const amount = money.toDecimalString(signed);
     const magnitude = money.toDecimalString(signed < 0n ? -signed : signed);
     const previousBalance = money.toDecimalString(money.toMinor(newBalance) - signed);
-    const description = `In-house ${game ?? 'game'} ${reason === 'BET_STAKE' ? 'stake' : reason === 'BET_PAYOUT' ? 'payout' : 'refund'} #${betId}`;
+    const description = `Originals ${game ?? 'game'} ${reason === 'BET_STAKE' ? 'stake' : reason === 'BET_PAYOUT' ? 'payout' : 'refund'} #${betId}`;
 
     await this.models.CreditsLedger.create(
       {

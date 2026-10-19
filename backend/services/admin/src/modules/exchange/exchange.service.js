@@ -31,7 +31,7 @@ const { settlePoints } = require('./pointsSettle');
  */
 
 const onlyOwner = () =>
-  new AppError('Only the owner (Super Admin) can add balance to their own wallet', 403, 'EXCHANGE_OWNER_ONLY');
+  new AppError('Only the Super Admin can add balance to their own wallet', 403, 'EXCHANGE_OWNER_ONLY');
 const notInTree = () => new AppError('This account is not in your tree', 404, 'EXCHANGE_NOT_IN_YOUR_TREE');
 
 /** NUMERIC → "123.45" (2 decimals) — dashboard ke liye. */

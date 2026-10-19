@@ -5,7 +5,7 @@ const { AppError, entitlements, money, withdrawalCap, withdrawalCapFigures, with
 
 const { assertTransactionPassword } = require('../staff-auth/transactionPassword');
 
-const onlyOwner = () => new AppError('Only the owner (Super Admin) can manage withdrawal controls', 403, 'WITHDRAWAL_CONTROL_OWNER_ONLY');
+const onlyOwner = () => new AppError('Only the Super Admin can manage withdrawal controls', 403, 'WITHDRAWAL_CONTROL_OWNER_ONLY');
 
 const escapeLike = (v) => String(v).replace(/[\\%_]/g, (c) => `\\${c}`);
 

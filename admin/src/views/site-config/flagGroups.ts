@@ -72,7 +72,7 @@ export const FLAG_LABELS: Record<string, string> = {
   wheelspin: 'Spin wheel',
   provablyfair: 'Provably fair',
   crash: 'Crash games',
-  originals: 'Originals (in-house)',
+  originals: 'Originals',
   livegames: 'Live games',
   slotsgames: 'Slots',
   alllivegames: 'All live games tab',

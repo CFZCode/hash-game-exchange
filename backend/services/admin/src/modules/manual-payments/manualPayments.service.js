@@ -5,7 +5,7 @@ const { AppError, manualPayments } = require('@ibitplay/common');
 
 const { assertTransactionPassword } = require('../staff-auth/transactionPassword');
 
-const onlyOwner = () => new AppError('Only the owner (Super Admin) can switch manual payments', 403, 'MANUAL_PAYMENTS_OWNER_ONLY');
+const onlyOwner = () => new AppError('Only the Super Admin can switch manual payments', 403, 'MANUAL_PAYMENTS_OWNER_ONLY');
 
 /** Manual deposit / withdrawal ON / OFF (`manual_payment_control`). Badalna sirf owner, transaction password ke saath. */
 class ManualPaymentsService {

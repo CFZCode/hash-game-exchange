@@ -461,7 +461,7 @@ class PnlStatsService {
              COALESCE(SUM(amount) FILTER (WHERE kind = 'win'), 0)::text AS won,
              COALESCE(SUM(n), 0)::int AS bets
         FROM (
-          SELECT 'inhouse' AS source, 'In-house' AS provider, 'Originals' AS category, 'inhouse:' || b.game AS game_key,
+          SELECT 'inhouse' AS source, 'Originals' AS provider, 'Originals' AS category, 'inhouse:' || b.game AS game_key,
                  b.game AS name, UPPER(b.coin) AS currency, 'stake' AS kind, b.amount AS amount, 1 AS n
             FROM bets b
            WHERE b.amount > 0 AND (b.result IS NULL OR b.result::text <> '"refunded"') AND ${NOT_FAKE}
@@ -469,7 +469,7 @@ class PnlStatsService {
           UNION ALL
           -- What was PAID: stake + profit on every settled round (a push or a
           -- partial return pays too), not only on rounds with profit > 0.
-          SELECT 'inhouse', 'In-house', 'Originals', 'inhouse:' || b.game, b.game, UPPER(b.coin), 'win', ${INHOUSE_PAYOUT('b')}, 0
+          SELECT 'inhouse', 'Originals', 'Originals', 'inhouse:' || b.game, b.game, UPPER(b.coin), 'win', ${INHOUSE_PAYOUT('b')}, 0
             FROM bets b
            WHERE b.result IS NOT NULL AND b.result::text <> '"refunded"' AND b.amount + b.profit > 0 AND ${NOT_FAKE}
              AND ${rangeSql('b.created')}${cur('b.coin')}${owned('b.uid')}
@@ -703,6 +703,6 @@ class PnlStatsService {
   }
 }
 
-const SOURCE_LABEL = Object.freeze({ inhouse: 'In-house originals', og: 'Original Games', gis: 'Slotegrator', jsgames: 'jsGames', jsgamesv2: 'jsGames v2' });
+const SOURCE_LABEL = Object.freeze({ inhouse: 'Originals', og: 'Original Games', gis: 'Slotegrator', jsgames: 'jsGames', jsgamesv2: 'jsGames v2' });
 
 module.exports = { PnlStatsService, COST_LINES, costLineOf };

@@ -649,7 +649,7 @@ const ProfitLossView = ({ channel }: { channel: Channel }) => {
           />
           <BreakdownChart
             title='Original Games'
-            description='Our own games (Original Games and in-house), by game.'
+            description='Our own games, by game.'
             rows={b?.originals ?? []}
             unit={unit}
             loading={bLoading}
@@ -726,7 +726,7 @@ const ProfitLossView = ({ channel }: { channel: Channel }) => {
           <ul className='text-muted-foreground list-disc space-y-1.5 pl-5'>
             <li>
               <strong className='text-foreground'>GGR (gross gaming revenue)</strong> is what players staked minus what they won back: the
-              house&apos;s share of the play. Casino GGR covers the Original Games (and in-house originals), Slotegrator and jsGames (bot and test rounds are left out;
+              house&apos;s share of the play. Casino GGR covers our own games (Original Games and Originals), Slotegrator and jsGames (bot and test rounds are left out;
               refunded and rolled-back rounds are not stakes); the waterfall shows third-party casino and Original Games on their own lines. Sports GGR is the house side of the sports settlement ledger. These are the same figures as the Dashboard.
             </li>
             <li>

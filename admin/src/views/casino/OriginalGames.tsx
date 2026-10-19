@@ -485,7 +485,7 @@ const GamesTab = () => {
     <div className='grid gap-4'>
       {sw && (
         <div className='grid grid-cols-1 gap-4 md:grid-cols-3'>
-          <Switch label="Owner's plan" on={sw.owner} hint='Owner panel → Originals (in-house)' />
+          <Switch label='Plan' on={sw.owner} hint='Set by the platform' />
           <Switch label='Site switch' on={sw.site} hint='Site config → Originals' />
           <Switch label='On the site now' on={sw.live} hint='Both switches must be ON' />
         </div>

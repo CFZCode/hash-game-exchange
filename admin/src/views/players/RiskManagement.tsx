@@ -180,7 +180,7 @@ type AnyBet = {
 
 const resultTone = (s: string): AnyBet['tone'] => (/won|win/i.test(s) ? 'secondary' : /lost|loss/i.test(s) ? 'destructive' : 'outline')
 
-const CASINO_SOURCE: Record<RiskCasinoBet['source'], string> = { inhouse: 'In-house', og: 'Original Games', gis: 'Slotegrator', jsgames: 'jsGames', jsgamesv2: 'jsGames v2', seamless: 'Seamless' }
+const CASINO_SOURCE: Record<RiskCasinoBet['source'], string> = { inhouse: 'Originals', og: 'Original Games', gis: 'Slotegrator', jsgames: 'jsGames', jsgamesv2: 'jsGames v2', seamless: 'Seamless' }
 
 const fromSports = (b: RiskBet): AnyBet => {
   const result = b.resultStatus && b.resultStatus !== 'pending' ? b.resultStatus : b.status || 'pending'
