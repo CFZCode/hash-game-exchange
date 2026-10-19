@@ -472,8 +472,9 @@ const GameCard = ({ game }: { game: Game }) => (
   </Card>
 )
 
-const GamesTab = ({ channel }: { channel: Channel }) => {
-  const q = useApi<Games>(`${BASE}/games`, { channel })
+// No Direct/Agent tabs here: the catalogue is the same for both, so last-bet figures cover every player.
+const GamesTab = () => {
+  const q = useApi<Games>(`${BASE}/games`)
 
   if (q.error) return <ErrorState error={q.error} />
   const sw = q.data?.switches
@@ -490,7 +491,7 @@ const GamesTab = ({ channel }: { channel: Channel }) => {
         </div>
       )}
       <div className='text-muted-foreground text-sm'>
-        {formatNumber(games.length)} games from the provider · {formatNumber(live)} live. Play counts are for {channel === 'direct' ? 'direct' : 'agent'} users, all time.
+        {formatNumber(games.length)} games from the provider · {formatNumber(live)} live. Play counts are for all players, all time.
       </div>
       {q.isLoading ? (
         <div className='grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3'>
@@ -527,7 +528,7 @@ const OriginalGames = ({ section = 'dashboard' }: { section?: keyof typeof SECTI
   return (
     <div>
       <PageHeader title={title} description={description} />
-      <ChannelTabs>{channel => <Tab channel={channel} />}</ChannelTabs>
+      {section === 'games' ? <GamesTab /> : <ChannelTabs>{channel => <Tab channel={channel} />}</ChannelTabs>}
     </div>
   )
 }
