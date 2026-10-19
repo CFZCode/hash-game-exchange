@@ -50,6 +50,10 @@ const LOGOS = {
 const MARKS = {
   parker567: 'parker567-mark.webp?v=308',
 };
+/* The light theme's mark where the brand has one (image 310, darker metal for a white header). */
+const MARKS_LIGHT = {
+  parker567: 'parker567-mark-light.webp?v=310',
+};
 
 /* This front end is Parker567's. In live mode an unbranded backend (the owner has not uploaded a
    logo yet) must still show Parker567, never the BC.GAME art the code imports, so the live build
@@ -169,16 +173,17 @@ export const siteLogo = (options) =>
   absolute(runtime?.logoUrl) ?? logoFor(env('NEXT_PUBLIC_SITE_LOGO') ?? LIVE_DEFAULT_BRAND, options);
 
 /** The static mark for a brand name, or null. */
-export function markFor(name) {
-  const file = MARKS[String(name ?? '').trim().toLowerCase()];
+export function markFor(name, light = false) {
+  const key = String(name ?? '').trim().toLowerCase();
+  const file = (light && MARKS_LIGHT[key]) || MARKS[key];
   if (!file) return null;
   const base = String(process.env.NEXT_PUBLIC_BASE_PATH ?? '/').replace(/\/*$/, '/');
   return `${base}brand/${file}`;
 }
 
 /** The owner's square mark (favicon, signed-in mobile header, loader), else the build's, or null. */
-export const siteMark = () =>
-  absolute(runtime?.markUrl) ?? markFor(env('NEXT_PUBLIC_SITE_LOGO') ?? LIVE_DEFAULT_BRAND);
+export const siteMark = (options) =>
+  absolute(runtime?.markUrl) ?? markFor(env('NEXT_PUBLIC_SITE_LOGO') ?? LIVE_DEFAULT_BRAND, options?.light);
 
 /** Hooks: the same values, re-rendering when the runtime branding arrives or changes. */
 export function useSiteBranding() {
@@ -192,9 +197,9 @@ export function useBrandName() {
   useSiteBranding();
   return brandName();
 }
-export function useSiteMark() {
+export function useSiteMark(options) {
   useSiteBranding();
-  return siteMark();
+  return siteMark(options);
 }
 
 function setMeta(attr, key, content) {

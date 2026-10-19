@@ -3,6 +3,7 @@ import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSession } from '../../../../context/session';
 import { useGates } from '../../../../context/gates';
+import { useSettings } from '../../../../context/settings';
 import { siteName, useSiteMark } from '../../../../services/siteBranding';
 import useResource from '../../../../hooks/useResource';
 import useMediaQuery from '../../../../hooks/useMediaQuery';
@@ -543,7 +544,8 @@ export function MobileAfterLogin() {
   const { session } = useSession();
   const bonusOn = useGates().on('bonus');
   /* The owner panel's square mark (live mode), in the same h-9 w-9 box; else the original. */
-  const mark = useSiteMark();
+  const { darken } = useSettings();
+  const mark = useSiteMark({ light: !darken });
 
   return (
     <div className="flex size-full items-center justify-between px-3">
