@@ -33,7 +33,7 @@ type Sheet = {
   source?: 'point_ledger'
 
   /** Client user only: the wallet's point buckets (casino = third-party games). */
-  points?: { total: string; sports: string; casino: string; upper: string; down: string; balance: string; credit: string }
+  points?: { total: string; sports: string; casino: string; original?: string; upper: string; down: string; balance: string; credit: string }
   balance: { live: string; ledger: string; openExposure: string; unexplained: string; credited: string; debited: string }
   total: number
   rows: { ts: string; category: string; type: string; description: string; amount: string; balance?: string }[]
@@ -218,12 +218,13 @@ export const BalanceSheetView = ({
 
           {/* Agent system (user, 2026-10-17): points by game, no credit / debit. */}
           {client ? (
-            <div className='grid gap-3 sm:grid-cols-2 lg:grid-cols-5'>
+            <div className='grid gap-3 sm:grid-cols-2 lg:grid-cols-6'>
               <StatCard label='Balance' value={show(liveBalance)} icon={<WalletIcon />} tone='primary' loading={loading} />
               <StatCard label='Credit' value={show(Number(sheets[0]?.points?.credit ?? 0))} icon={<TrendingDownIcon />} tone='danger' loading={loading} />
               <StatCard label='Total Points' value={show(Number(sheets[0]?.points?.total ?? 0))} icon={<ReceiptTextIcon />} tone='success' loading={loading} />
               <StatCard label='Sports Points' value={show(Number(sheets[0]?.points?.sports ?? 0))} icon={<TrendingUpIcon />} tone='warning' loading={loading} />
               <StatCard label='Third-party Points' value={show(Number(sheets[0]?.points?.casino ?? 0))} icon={<ReceiptTextIcon />} tone='info' loading={loading} />
+              <StatCard label='Original Points' value={show(Number(sheets[0]?.points?.original ?? 0))} icon={<ReceiptTextIcon />} tone='info' loading={loading} />
             </div>
           ) : (
           <div className='grid gap-3 sm:grid-cols-2 lg:grid-cols-5'>

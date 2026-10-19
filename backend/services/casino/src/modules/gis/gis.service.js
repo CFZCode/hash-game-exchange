@@ -6,7 +6,7 @@ const { money } = require('@ibitplay/common');
 const { agentPlayerError } = require('@ibitplay/auth');
 
 const E = require('./gis.errors');
-const { addChildGamePoints, addDirectGamePoints } = require('../js-games/pointLedger');
+const { addChildGamePoints } = require('../js-games/pointLedger');
 const { responseIdFor } = require('./responseId');
 const { chosenAggregator, LIVE, PARKED } = require('../games/catalogueSwitch');
 const {
@@ -456,6 +456,7 @@ class GisService {
           reason,
           ref: { type: 'GIS', id: storageId },
           description: `${action} ${storageId}`,
+          gameType: body.game_uuid ?? undefined,
         });
 
         await this.models.GisTransactions.update(
@@ -595,8 +596,8 @@ class GisService {
    * a member that does not exist.
    */
   /**
-   * Point ledger — JS games jaisa: agent ka child user → `point_ledger` (poori chain, sirf INR),
-   * direct user → `point_ledger_direct` (sirf uski ek row, har currency). Paisa move ho chuka hota
+   * Point ledger — JS games jaisa: agent ka child user → `point_ledger` (poori chain, sirf INR).
+   * Direct user ki row wallet ka trigger likhta hai (migration 117). Paisa move ho chuka hota
    * hai; yahan sirf points likhte hain, alag transaction me. Fail ho to callback fail nahi hota
    * (provider ko 200 hi jaata hai) — sirf zor se log. `gis:<storageId>` se dobara nahi likhta.
    */
@@ -612,7 +613,6 @@ class GisService {
     };
     try {
       if (settlement === 'INR') await addChildGamePoints(sequelize, entry);
-      await addDirectGamePoints(sequelize, { ...entry, currency: settlement, balanceAfter });
     } catch (error) {
       this.logger?.error({ err: error, storageId, userId }, 'GIS point ledger write failed — all_point drift');
     }

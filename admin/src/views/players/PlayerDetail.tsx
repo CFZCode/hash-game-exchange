@@ -502,7 +502,7 @@ const ReportDetail = ({ id }: { id: string }) => {
   const tab: Tab = hidden(tabParam) ? 'wallet' : tabParam
 
   // An agent's player is shown in points (INR, no symbol): total, sports, casino (third-party games).
-  const points = useApi<{ points?: { total: string; sports: string; casino: string; balance: string; credit: string } }>(agentPlayer ? `admin/reports/client-balance-sheet/${id}` : null, { limit: 1 })
+  const points = useApi<{ points?: { total: string; sports: string; casino: string; original?: string; balance: string; credit: string } }>(agentPlayer ? `admin/reports/client-balance-sheet/${id}` : null, { limit: 1 })
 
   const close = useApiMutation({
     fn: (reason: string) => api.delete(`admin/players/${id}`, { reason }),
@@ -610,6 +610,7 @@ const ReportDetail = ({ id }: { id: string }) => {
             <StatCard label='Total Points' value={formatAmount(points.data?.points?.total ?? p?.balance)} loading={report.isLoading || points.isLoading} />
             <StatCard label='Sports Points' value={formatAmount(points.data?.points?.sports ?? '0')} loading={points.isLoading} />
             <StatCard label='Third-party Points' value={formatAmount(points.data?.points?.casino ?? '0')} loading={points.isLoading} hint='Casino / third-party games' />
+            <StatCard label='Original Points' value={formatAmount(points.data?.points?.original ?? '0')} loading={points.isLoading} hint='Original games' />
           </>
         ) : (
           <>

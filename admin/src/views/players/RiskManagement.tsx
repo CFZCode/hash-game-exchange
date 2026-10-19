@@ -327,7 +327,7 @@ export const RiskManagementPanel = ({ userId, inDialog = false }: { userId: stri
 
   // An agent's player has no deposits / withdrawals: its money is points (INR, no symbol).
   const agentPlayer = q.data ? !q.data.user.isDirect : false
-  const pts = useApi<{ points?: Record<'total' | 'sports' | 'casino' | 'balance' | 'credit', string> }>(agentPlayer ? `admin/reports/client-balance-sheet/${userId}` : null, { limit: 1 })
+  const pts = useApi<{ points?: Record<'total' | 'sports' | 'casino' | 'original' | 'balance' | 'credit', string> }>(agentPlayer ? `admin/reports/client-balance-sheet/${userId}` : null, { limit: 1 })
 
   if (q.error) return <ErrorState error={q.error} />
   if (!q.data) return <Loading />
@@ -417,14 +417,15 @@ export const RiskManagementPanel = ({ userId, inDialog = false }: { userId: stri
 
       {agentPlayer ? (
         <Section title='Points'>
-          <div className='grid grid-cols-2 gap-4 sm:grid-cols-5'>
+          <div className='grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6'>
             {(
               [
                 ['Balance', 'balance'],
                 ['Credit', 'credit'],
                 ['Total points', 'total'],
                 ['Sports points', 'sports'],
-                ['Third-party points', 'casino']
+                ['Third-party points', 'casino'],
+                ['Original points', 'original']
               ] as const
             ).map(([label, key]) => (
               <div key={key}>

@@ -140,6 +140,7 @@ const AccountListBody = ({ channel }: { channel?: Channel }) => {
     num('exp', 'Exposure', r => r.exposure, 'text-danger'),
     num('spts', 'Sports Pts', r => r.sportsPts),
     num('cpts', 'Casino Pts', r => r.casinoPts),
+    num('opts', 'Original Pts', r => r.originalPts),
     num('pl', 'P/L', r => r.settlementPoints)
   ]
 
@@ -171,13 +172,13 @@ const AccountListBody = ({ channel }: { channel?: Channel }) => {
   const columns: Column<AccountRow>[] = [userName, userTools, cr, ...points, ...tail]
 
   // Export — zip jaisa: wahi columns, raw numbers.
-  const exportHead = ['User Name', 'CR', 'Balance', 'Exposure', 'Sports Pts', 'Casino Pts', 'P/L', 'B st', 'U st', 'PName', 'Account Type']
+  const exportHead = ['User Name', 'CR', 'Balance', 'Exposure', 'Sports Pts', 'Casino Pts', 'Original Pts', 'P/L', 'B st', 'U st', 'PName', 'Account Type']
 
   const exportRows = () =>
     rows.map(r => {
       const locks = [r.betLocked ? 'Locked' : 'Open', r.userLocked ? 'Locked' : 'Open', `${r.percentage ?? 1} Pt`, accountTypeLabel(r)]
 
-      return [r.username, r.credit, r.available, r.exposure, r.sportsPts, r.casinoPts, r.settlementPoints, ...locks]
+      return [r.username, r.credit, r.available, r.exposure, r.sportsPts, r.casinoPts, r.originalPts, r.settlementPoints, ...locks]
     })
 
   const fileName = 'userlist'

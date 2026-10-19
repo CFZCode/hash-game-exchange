@@ -1411,6 +1411,7 @@ class ReportsService {
     const zero = show(0);
     const points = {
       total: show(creditsRow?.all_point), sports: show(creditsRow?.sports_pts), casino: show(creditsRow?.thirdparty_pts),
+      original: show(creditsRow?.original_game_pts),
       upper: show(creditsRow?.upper_point), down: show(creditsRow?.down_point),
       balance: show(creditsRow?.inr), credit: show(creditsRow?.credit),
     };

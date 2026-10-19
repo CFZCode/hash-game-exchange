@@ -2,7 +2,7 @@
 
 const crypto = require('node:crypto');
 
-const { money, currencyRegistry } = require('@ibitplay/common');
+const { money, currencyRegistry, directLedger } = require('@ibitplay/common');
 const { isAgentPlayer } = require('@ibitplay/auth');
 const { EVENTS, roomForUser, encode } = require('@ibitplay/socket');
 
@@ -282,7 +282,7 @@ class WalletService {
   async #move(input, context) {
     const {
       userId, currency, amount, reason, idempotencyKey, direction,
-      refType, refId, description, matchId, marketType, sportId, eventId, betId,
+      refType, refId, description, matchId, marketType, sportId, eventId, betId, gameType,
     } = input;
 
     if (!idempotencyKey) throw errors.IDEMPOTENCY_KEY_REQUIRED({ userId, reason });
@@ -322,6 +322,18 @@ class WalletService {
       const previousBalance = money.fromStored(locked.balance);
 
       // ── 3. Move the money ─────────────────────────────────────────
+      // Tells the direct-ledger trigger what this update is; without it the row reads BALANCE_CHANGE / OTHER.
+      await directLedger.directLedgerContext(this.db.sequelize, transaction, {
+        userId,
+        eventType: reason,
+        category: directLedger.categoryFor(reason, refType),
+        ref: refType ? `${refType}:${refId ?? ''}` : undefined,
+        source: context.sourceService,
+        betId,
+        sportId,
+        gameType,
+        remark: description,
+      });
       let newBalance;
 
       if (isCredit) {

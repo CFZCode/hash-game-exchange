@@ -6,7 +6,7 @@ const { money, entitlements } = require('@ibitplay/common');
 
 const E = require('./originalGames.errors');
 const { sign } = require('./provider/client');
-const { addChildGamePoints, addDirectGamePoints } = require('../js-games/pointLedger');
+const { addChildGamePoints } = require('../js-games/pointLedger');
 const {
   EXPONENT,
   ACTION,
@@ -171,10 +171,11 @@ class OriginalGamesService {
 
       const ctx = { body, userId, currency, balance };
       if (action === ACTION.BALANCE) return this.#ok(balance, currency);
-      if (action === ACTION.BET) return await this.#bet(ctx);
-      if (action === ACTION.WIN) return await this.#win(ctx);
-      if (action === ACTION.ROLLBACK) return await this.#rollback(ctx);
-      return this.#error(ERROR_CODE.INTERNAL, { currency });
+      const handler = { [ACTION.BET]: () => this.#bet(ctx), [ACTION.WIN]: () => this.#win(ctx), [ACTION.ROLLBACK]: () => this.#rollback(ctx) }[action];
+      if (!handler) return this.#error(ERROR_CODE.INTERNAL, { currency });
+      const result = await handler();
+      await this.#saveResponse(body.transaction_id, result.body);
+      return result;
     } catch (error) {
       this.logger?.error({ err: error, action, txId: body?.transaction_id }, 'Original games callback failed');
       return this.#error(ERROR_CODE.INTERNAL, { currency: body?.currency });
@@ -294,6 +295,7 @@ class OriginalGamesService {
           reason,
           ref: { type: 'OG', id: txId },
           description: `original-games ${kind} ${txId}`,
+          gameType: body.game_code ?? undefined,
         });
         const newBalance = money.toDecimalString(money.toMinorQuantised(String(movement.newBalance)));
         await this.#query('UPDATE og_transactions SET balance_after = :after WHERE id = :id', { after: newBalance, id: rowId }, transaction);
@@ -324,8 +326,9 @@ class OriginalGamesService {
     const [row] = await this.#query(
       `INSERT INTO og_transactions
          (transaction_id, kind, status, user_id, session_id, round_id, game_code, currency, amount,
-          reference_transaction_id, balance_after)
-       VALUES (:txId, :kind, :status, :userId, :sessionId, :roundId, :gameCode, :currency, :amount, :refId, :balanceAfter)
+          reference_transaction_id, balance_after, request_json)
+       VALUES (:txId, :kind, :status, :userId, :sessionId, :roundId, :gameCode, :currency, :amount, :refId, :balanceAfter,
+               CAST(:requestJson AS JSONB))
        RETURNING id`,
       {
         txId,
@@ -339,10 +342,24 @@ class OriginalGamesService {
         amount,
         refId: refId ?? body.reference_transaction_id ?? null,
         balanceAfter,
+        requestJson: JSON.stringify(body),
       },
       transaction
     );
     return row.id;
+  }
+
+  /** Our first answer to this transaction, kept on its row (a replay keeps the original). Never fails the callback. */
+  async #saveResponse(txId, responseBody) {
+    if (!txId) return;
+    try {
+      await this.db.sequelize.query(
+        'UPDATE og_transactions SET response_json = CAST(:json AS JSONB) WHERE transaction_id = :txId AND response_json IS NULL',
+        { replacements: { json: JSON.stringify(responseBody), txId: String(txId) } }
+      );
+    } catch (error) {
+      this.logger?.warn({ err: error, txId }, 'Original games response_json not saved');
+    }
   }
 
   /** Insert, but a row already saved by a parallel copy of the same callback is fine. */
@@ -443,7 +460,7 @@ class OriginalGamesService {
     }
   }
 
-  /** Point ledger, like JS / GIS games: agent player → `point_ledger` (INR only), direct player → `point_ledger_direct`. */
+  /** Agent player's point ledger (INR only). A direct player's row is written by the wallet's ledger trigger. */
   async #writePoints({ userId, currency, amount, isCredit, txId, kind, body, balanceAfter }) {
     const sequelize = this.db.sequelize;
     const entry = {
@@ -456,7 +473,6 @@ class OriginalGamesService {
     };
     try {
       if (currency === 'INR') await addChildGamePoints(sequelize, entry);
-      await addDirectGamePoints(sequelize, { ...entry, currency, balanceAfter });
     } catch (error) {
       this.logger?.error({ err: error, txId, userId }, 'Original games point ledger write failed — all_point drift');
     }

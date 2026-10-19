@@ -5,7 +5,7 @@ const { Op } = require('sequelize');
 const { money } = require('@ibitplay/common');
 
 const E = require('./jsGames.errors');
-const { addChildGamePoints, addDirectGamePoints } = require('./pointLedger');
+const { addChildGamePoints } = require('./pointLedger');
 /**
  * `recordPlay` and its trim live with the catalogue they are about. Imported
  * rather than duplicated — the alternative was a second copy of the "keep the
@@ -817,6 +817,7 @@ class JsGamesService {
           reason: isCredit ? 'BET_PAYOUT' : 'BET_STAKE',
           ref: { type: 'JSGAMES', id: refId },
           description: `jsGames ${record.transaction_type} ${refId}`,
+          gameType: record.game_type ?? record.game_uid ?? undefined,
         });
 
         await model.update({ ledger_id: movement.ledgerId ?? null }, { where: { id: created.id }, transaction });
@@ -838,21 +839,6 @@ class JsGamesService {
         } catch (error) {
           this.logger?.error({ err: error, refId, userId }, 'jsGames point ledger write failed — all_point drift');
         }
-      }
-
-      // Direct user (koi parent nahi) — har currency me, `point_ledger_direct` me ek row. Child user pe no-op.
-      try {
-        await addDirectGamePoints(this.models.Users.sequelize, {
-          userId,
-          currency,
-          delta: money.toDecimalString(delta),
-          balanceAfter: result.balance ?? null,
-          entryRef: `jsgames:${refId}`,
-          gameType: record.game_type ?? record.game_uid ?? null,
-          remark: `jsGames ${record.transaction_type ?? ''} ${refId}`,
-        });
-      } catch (error) {
-        this.logger?.error({ err: error, refId, userId }, 'jsGames direct point ledger write failed');
       }
 
       return result;

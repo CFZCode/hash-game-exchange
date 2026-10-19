@@ -92,6 +92,8 @@ const movement = {
       sportId: z.coerce.string().trim().max(64).optional(),
       eventId: z.string().trim().max(64).optional(),
       betId: z.coerce.number().int().positive().optional(),
+      // Casino game, for the direct ledger's game_type.
+      gameType: z.coerce.string().trim().max(200).optional(),
     })
     .strict(),
 };

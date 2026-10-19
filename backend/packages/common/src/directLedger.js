@@ -21,6 +21,7 @@
 const CATEGORY = Object.freeze({
   SPORTS: 'SPORTS',
   CASINO: 'CASINO',
+  ORIGINAL_GAME: 'ORIGINAL_GAME',
   DEPOSIT: 'DEPOSIT',
   WITHDRAW: 'WITHDRAW',
   ADMIN: 'ADMIN',
@@ -35,6 +36,7 @@ const CASINO_REFS = new Set(['GIS', 'JSGAMES', 'JSGAMES_TRANSFER', 'JSGAMES_TRAN
 /** A platform `credits_ledger` reason (+ refType) → category. */
 function categoryFor(reason, refType) {
   const r = String(reason || '').toUpperCase();
+  if (String(refType || '').toUpperCase() === 'OG') return CATEGORY.ORIGINAL_GAME;
   if (CASINO_REFS.has(String(refType || '').toUpperCase())) return CATEGORY.CASINO;
   if (r.startsWith('BET_')) return CATEGORY.CASINO;
   if (r === 'DEPOSIT') return CATEGORY.DEPOSIT;

@@ -1,7 +1,7 @@
 'use strict';
 
 const { QueryTypes } = require('sequelize');
-const { money, AppError } = require('@ibitplay/common');
+const { money, AppError, directLedgerContext } = require('@ibitplay/common');
 
 const { assertTransactionPassword } = require('../staff-auth/transactionPassword');
 const {
@@ -187,6 +187,16 @@ class DirectWalletService {
         transaction,
       });
       const previousMinor = money.toMinorQuantised(wallet.bal);
+
+      // Names the user's balance update for the direct-ledger trigger (the owner's own row is not labelled).
+      await directLedgerContext(this.sequelize, transaction, {
+        userId,
+        eventType: isCredit ? 'ADMIN_CREDIT' : 'ADMIN_DEBIT',
+        category: 'ADMIN',
+        source: 'direct-wallet',
+        ref: `staff:${actor.id}`,
+        remark: entry.note,
+      });
 
       if (isCredit) {
         // Pehle owner ka wallet (guarded): kam ho to kuch nahi badlega.

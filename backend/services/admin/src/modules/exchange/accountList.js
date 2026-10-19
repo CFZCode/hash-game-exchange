@@ -32,7 +32,7 @@ const CHILDREN_SQL = `
          (EXISTS (SELECT 1 FROM staff k WHERE k.parent_id = s.id)
            OR EXISTS (SELECT 1 FROM users p WHERE p.parent_staff_id = s.id)) AS has_children,
          false AS is_direct_user,
-         s.phone, s.country AS city, s.created_at, c.sports_pts, c.upper_point, c.down_point, c.thirdparty_pts
+         s.phone, s.country AS city, s.created_at, c.sports_pts, c.upper_point, c.down_point, c.thirdparty_pts, c.original_game_pts
     FROM staff s
     JOIN roles r ON r.id = s.role_id
     LEFT JOIN credits c ON c.staff_id = s.id
@@ -43,7 +43,7 @@ const CHILDREN_SQL = `
          c.id, c.inr, c.credit, c.all_point,
          COALESCE((SELECT ABS(SUM(e.total_exposure)) FROM mssports.total_exposures e WHERE e.user_id = u.id), 0),
          false, u.parent_staff_id IS NULL,
-         u.phone, u.last_city, u.created, c.sports_pts, c.upper_point, c.down_point, c.thirdparty_pts
+         u.phone, u.last_city, u.created, c.sports_pts, c.upper_point, c.down_point, c.thirdparty_pts, c.original_game_pts
     FROM users u
     LEFT JOIN credits c ON c.uid = u.id
    WHERE u.parent_staff_id = :parentId OR (:withDirectUsers AND u.parent_staff_id IS NULL)`;
@@ -75,6 +75,7 @@ function toRow(r) {
     createdAt: r.created_at ?? null,
     sportsPts: show(r.sports_pts),
     casinoPts: show(r.thirdparty_pts), // third-party (casino) games
+    originalPts: show(r.original_game_pts), // Original games
     upperPoint: show(r.upper_point),
     downPoint: show(r.down_point),
   };
