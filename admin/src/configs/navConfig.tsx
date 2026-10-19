@@ -427,12 +427,19 @@ export const navItems: NavItem[] = [
 
       // Like bet history: `GET admin/reports/wager-stats` is reports:read and tree-scoped. Not for agent logins (user, 2026-10-17).
       { icon: 'FileSpreadsheet', label: 'Wager report', href: '/casino/wager-report', permission: 'reports:read', flag: 'casino', promotions: true },
-
-      // The aggregator's originals: dashboard, bets, games. Super Admin + its executives with originals:read (backend checks both).
-      { icon: 'Dices', label: 'Original Games', href: '/casino/original-games', permission: 'originals:read', direct: true },
       { icon: 'Trophy', label: 'Providers Priority', href: '/providers-priority', permission: 'casino:read', flag: 'casino' },
       { icon: 'ArrowBigUp', label: 'Vendor Priority', href: '/vendor-priority', permission: 'casino:read', flag: 'casino' },
       { icon: 'Gamepad2', label: 'Type Priority', href: '/type-priority', permission: 'casino:read', flag: 'casino' },
+    ]
+  },
+  {
+    // Original Games apna section, Casino se bahar (user, 2026-10-19).
+    groupLabel: 'Original Games',
+    groupIcon: 'Dices',
+    collapsible: true,
+    items: [
+      // The aggregator's originals: dashboard, bets, games. Super Admin + its executives with originals:read (backend checks both).
+      { icon: 'Dices', label: 'Original Games', href: '/casino/original-games', permission: 'originals:read', direct: true }
     ]
   },
   {
