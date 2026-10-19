@@ -19,6 +19,8 @@ type Home = {
   upperPoint: string
   downPoint: string
   sportsPts: string
+  casinoPts: string
+  originalPts: string
   isOwner: boolean
 }
 
@@ -180,7 +182,7 @@ const PanelSkeleton = () => (
  * Upar 7 cards (Balance, Exposure, Credit / All / Settlement / Upper / Down pts),
  * phir do panel: points (bars) aur P/L. Saare points 0 hon to points wala nahi
  * dikhta; P/L tab hi chhupta hai jab points aur P/L dono 0 hon (zip jaisa).
- * Casino / third-party casino P/L aur "Our Live Casino" yahan nahi hain.
+ * P/L = Sports + Third Party (casino) + Original games, agent ke apne credits row se.
  */
 const ExchangeDashboard = () => {
   const { data, isLoading, error } = useApi<Home>('admin/exchange/user-reports/home')
@@ -192,7 +194,9 @@ const ExchangeDashboard = () => {
   const downPts = Number(data?.downPoint) || 0
 
   const sportsPL = negPL(data?.sportsPts)
-  const totalPL = Math.round(sportsPL * 100) / 100
+  const casinoPL = negPL(data?.casinoPts)
+  const originalPL = negPL(data?.originalPts)
+  const totalPL = Math.round((sportsPL + casinoPL + originalPL) * 100) / 100
 
   const points: Item[] = [
     { label: 'Credit Pts', value: creditPts },
@@ -204,6 +208,8 @@ const ExchangeDashboard = () => {
 
   const pl: Item[] = [
     { label: 'Sports P/L', value: sportsPL },
+    { label: 'Third Party P/L', value: casinoPL },
+    { label: 'Original P/L', value: originalPL },
     { label: 'Total P/L', value: totalPL }
   ]
 

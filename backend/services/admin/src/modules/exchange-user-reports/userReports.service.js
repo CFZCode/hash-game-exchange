@@ -35,13 +35,13 @@ class UserReportsService {
   /**
    * Zip `Home.jsx` ke cards — login wale ka apna `credits` row:
    *   Balance = inr, Credit pts = credit, All pts = all_point,
-   *   Settlement pts = all_point − credit, Upper / Down pts, Sports pts (P/L ke liye).
+   *   Settlement pts = all_point − credit, Upper / Down pts, Sports / Casino / Original pts (P/L ke liye).
    * Exposure = tree ke agent players ka open exposure (zip: downline ka total). Direct users
    * (koi parent nahi) Agent System ke nahi — owner ke liye bhi yahan kabhi nahi gine jaate.
    */
   async home({ actor }) {
     const [wallet] = await this.#query(
-      `SELECT inr, credit, all_point, upper_point, down_point, sports_pts
+      `SELECT inr, credit, all_point, upper_point, down_point, sports_pts, thirdparty_pts, original_game_pts
          FROM credits WHERE staff_id = :staffId LIMIT 1`,
       { staffId: actor.id }
     );
@@ -58,6 +58,8 @@ class UserReportsService {
       upperPoint: show(wallet?.upper_point),
       downPoint: show(wallet?.down_point),
       sportsPts: show(wallet?.sports_pts),
+      casinoPts: show(wallet?.thirdparty_pts),
+      originalPts: show(wallet?.original_game_pts),
       isOwner: this.#isOwner(actor),
     };
   }

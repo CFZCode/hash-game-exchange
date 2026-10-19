@@ -117,7 +117,7 @@ test('exchange user reports', async (t) => {
   const page = { limit: 25, offset: 0 };
 
   await t.test('home: own credits row, settlement = all_point − credit, exposure of the downline', async () => {
-    const agent = await seedStaff(null, { inr: '1500.5', credit: '1000', all_point: '1250', upper_point: '30', down_point: '-20', sports_pts: '-250' });
+    const agent = await seedStaff(null, { inr: '1500.5', credit: '1000', all_point: '1250', upper_point: '30', down_point: '-20', sports_pts: '-250', thirdparty_pts: '40', original_game_pts: '-5.5' });
     const sub = await seedStaff(agent);
     const p1 = await seedPlayer(agent);
     const p2 = await seedPlayer(sub);
@@ -131,6 +131,8 @@ test('exchange user reports', async (t) => {
     assert.equal(home.upperPoint, '30.00');
     assert.equal(home.downPoint, '-20.00');
     assert.equal(home.sportsPts, '-250.00');
+    assert.equal(home.casinoPts, '40.00');
+    assert.equal(home.originalPts, '-5.50');
     assert.equal(home.exposure, '140.50', 'both players, sub-agent ka bhi');
     assert.equal(home.isOwner, false);
   });
