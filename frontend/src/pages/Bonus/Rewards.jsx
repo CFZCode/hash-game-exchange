@@ -62,7 +62,7 @@ const REWARD_ICON = {
 function CurrencyAmount({ amount, currency, iconCurrency, className = '' }) {
   /* The figure is in the bonus currency; it is SHOWN in the selected one (the `selected-currency`
      skill), and the coin beside it follows — except BC, which is its own token's mark. */
-  const cur = useSelectedCurrency({ site: true });
+  const cur = useSelectedCurrency();
   const art = coinIcon(iconCurrency === 'BC' ? 'BC' : cur.code);
 
   return (
@@ -211,7 +211,7 @@ const CLAIM_BY_TYPE = {
 
 function TotalClaimable({ payload, onClaimed }) {
   const { session } = useSession();
-  const cur = useSelectedCurrency({ site: true });
+  const cur = useSelectedCurrency();
   const total = payload?.claimableTotal ?? 0;
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState('');

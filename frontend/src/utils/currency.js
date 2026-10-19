@@ -230,3 +230,13 @@ export function printCurrency(amount, currency = 'USDFIAT', options = {}) {
     alias
   );
 }
+
+/* Rupee figures typed into admin-authored copy ("₹1 Lakh Cricket", "₹50K", "₹1,00,000") re-printed
+   in the selected currency through `cur` (useSelectedCurrency()); untouched on INR or when INR has
+   no price. shortcut: only ₹ amounts are found, upgrade when promotions carry a numeric prize field. */
+const RUPEE_UNITS = { k: 1e3, lakh: 1e5, lac: 1e5, cr: 1e7, crore: 1e7 };
+export const rupeesIn = (text, cur) =>
+  !text || cur.code === 'INRFIAT' || !cur.canConvert('INRFIAT')
+    ? text
+    : String(text).replace(/₹\s?(\d[\d,]*(?:\.\d+)?)(?:\s?(lakh|lac|crore|cr|k)\b)?/gi, (_, n, unit) =>
+        cur.show(Number(n.replace(/,/g, '')) * (unit ? RUPEE_UNITS[unit.toLowerCase()] : 1), 'INRFIAT', { precision: 2 }));

@@ -84,20 +84,21 @@ const PANEL_EDGE = {
 /* The minimum deposit in the viewer's selected currency (selected-currency skill), converted from
    the offer's own currency; printed as the offer wrote it when that currency has no price. */
 function useMinDeposit(value, currency) {
-  const cur = useSelectedCurrency({ site: true });
+  const cur = useSelectedCurrency();
   const c = String(currency ?? '').toUpperCase();
   const src = isFiatCode(c) ? `${c}FIAT` : c;
   return cur.canConvert(src) ? cur.show(value, src, { precision: 2 }) : `${value} ${currency}`;
 }
 
-const StageCard = ({ stage, currency }) => {
+const StageCard = ({ stage, currency, live }) => {
   const minDeposit = useMinDeposit(stage.minDeposit, currency);
   return (
   <div
     className="relative flex w-full flex-col gap-2 rounded-md bg-layer3 p-3"
     style={HAIRLINE}
   >
-    <span className="text-xs font-semibold text-primary">{stage.label}</span>
+    {/* The live tier's "10+ USDT" label, re-printed in the header's currency. */}
+    <span className="text-xs font-semibold text-primary">{live ? `${minDeposit}+` : stage.label}</span>
     <span className="flex flex-row items-end gap-1 text-brand">
       <span className="text-2xl font-extrabold">
         {stage.bonus}% + {stage.rakeback}%
@@ -371,6 +372,7 @@ export default function DetailDialog({ bonus, onClose }) {
                   key={s.label}
                   stage={s}
                   currency={bonus.minDepositCurrency}
+                  live={bonus.id === 'first-deposit-bonus'}
                 />
               ))}
             </div>

@@ -8,6 +8,8 @@ import { IconArrow } from '../../components/shared/icons';
 import { useIsDialog } from '../../context/dialogRoute';
 import usePromotion from './usePromotion';
 import sanitizeHtml from '../../utils/sanitizeHtml';
+import { useSelectedCurrency } from '../../hooks/useSelectedCurrency';
+import { rupeesIn } from '../../utils/currency';
 import * as promotionArt from '../Promotions/index.globs.js';
 import './PromotionDetail.css';
 
@@ -196,7 +198,9 @@ export function PromotionDetailView({ promo, loading }) {
   const status = promo ? statusOf(promo, now) : null;
 
   const image = promo ? artFor(promo.image) || promo.imageUrl : undefined;
-  const prize = promo?.tournamentPanel?.prizePool;
+  // The admin writes prizes in ₹ into the copy; they follow the header currency.
+  const cur = useSelectedCurrency();
+  const prize = rupeesIn(promo?.tournamentPanel?.prizePool, cur);
   const cta = promo ? ctaOf(promo) : null;
 
   return (
@@ -275,8 +279,8 @@ export function PromotionDetailView({ promo, loading }) {
                 <div>
                   <div className="items-center sm:flex sm:justify-between">
                     <div>
-                      <div className="text-20px mt-4 text-left text-xl font-extrabold text-primary">{promo.title}</div>
-                      {promo.summary && <div className="my-1 font-semibold">{promo.summary}</div>}
+                      <div className="text-20px mt-4 text-left text-xl font-extrabold text-primary">{rupeesIn(promo.title, cur)}</div>
+                      {promo.summary && <div className="my-1 font-semibold">{rupeesIn(promo.summary, cur)}</div>}
                     </div>
                     {prize && (
                       /* `xr`, cut to the prize line — the platform sends it pre-formatted. */
@@ -298,7 +302,7 @@ export function PromotionDetailView({ promo, loading }) {
                   {promo.description && (
                     <div className="event-detail">
                       <RichHtml
-                        html={promo.description}
+                        html={rupeesIn(promo.description, cur)}
                         className="promotion-richStyle mb-4 text-sm leading-normal text-secondary"
                       />
                     </div>
@@ -314,7 +318,7 @@ export function PromotionDetailView({ promo, loading }) {
                         triggerClassName="h-12"
                       >
                         <RichHtml
-                          html={promo.termsHtml}
+                          html={rupeesIn(promo.termsHtml, cur)}
                           className="promotion-richStyle mb-4 text-sm leading-normal text-secondary"
                         />
                       </AccordionItem>

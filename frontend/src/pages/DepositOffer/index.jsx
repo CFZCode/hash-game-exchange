@@ -2,6 +2,8 @@ import React from "react";
 import { getDepositBonuses } from "../../services/bonus";
 import { useResource } from "../../hooks/useResource";
 import { useIsDesktop } from "../../hooks/useMediaQuery";
+import { useSelectedCurrency } from "../../hooks/useSelectedCurrency";
+import { walletCode } from "../../utils/currency";
 import { stageMatch } from "./depositOffer";
 import DetailDialog from "./DetailDialog";
 import {
@@ -127,8 +129,12 @@ function Countdown({ expiresAt, maxUnit = 2, className = "" }) {
    component too, which is why the inactive dot still carries the outline-less circle rather
    than a different element. `cursor-not-allowed` is on every stage in the capture: nothing is
    claimable while signed out. */
-const Stage = ({ stage, index, current }) => {
+const Stage = ({ stage, index, current, currency }) => {
   const active = index + 1 === current;
+  // A live tier's floor in the header's currency ("₹833.33+"); the fixture's "DEPOSIT 1" otherwise.
+  const cur = useSelectedCurrency();
+  const src = walletCode(currency);
+  const label = stage.minDeposit > 0 && currency && cur.canConvert(src) ? `${cur.show(stage.minDeposit, src, { precision: 2 })}+` : stage.label;
 
   return (
     <div className="relative z-10 flex w-[16%] flex-none flex-col items-center">
@@ -166,7 +172,7 @@ const Stage = ({ stage, index, current }) => {
               : "text-secondary sm:bg-layer3"
           }`}
         >
-          {stage.label}
+          {label}
         </div>
       </div>
     </div>
@@ -278,6 +284,8 @@ function ProgressCard({ bonus, resetAt, onOpenDetail }) {
                 stage={s}
                 index={index}
                 current={bonus.currentStage}
+                // Only the live first-deposit tiers are labelled by their floor (services/bonus.js).
+                currency={bonus.id === "first-deposit-bonus" ? bonus.minDepositCurrency : null}
               />
             ))}
           </div>

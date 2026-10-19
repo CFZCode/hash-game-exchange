@@ -84,7 +84,7 @@ export default function ManualDeposit({ currency, crypto = false }) {
   const walletCode = crypto ? coin : `${coin}FIAT`;
   const bonus = depositBonusConfig(walletCode);
   const extra = extraBonusAmount(amount, walletCode);
-  const site = useSelectedCurrency({ site: true });
+  const site = useSelectedCurrency();
   const fiat = (value) => printCurrency(value, walletCode, { target: walletCode });
 
   const account = accounts?.[picked];

@@ -2,8 +2,7 @@ import React from 'react';
 import { useGates } from '../context/gates';
 import { useSession } from '../context/session';
 import { getUsdPrice } from '../data/usdPrice';
-import { convertCurrency, getAlias, printCurrency, walletCode } from '../utils/currency';
-import { useSiteCurrency } from './useSiteCurrency';
+import { convertCurrency, getAlias, printCurrency } from '../utils/currency';
 
 /**
  * The currency every amount on the player site is SHOWN in, and the helpers that put a figure
@@ -24,20 +23,17 @@ import { useSiteCurrency } from './useSiteCurrency';
  *   cur.convert(row.amount, 'INRFIAT')     // a number in the selected currency, for maths
  *   cur.toSource(typed, 'INRFIAT')         // a typed amount back into what the backend takes
  */
-export function useSelectedCurrency({ site = false } = {}) {
+export function useSelectedCurrency() {
   const { session } = useSession();
-  const siteCode = useSiteCurrency();
   const setting = session?.setting ?? {};
   const signedIn = Boolean(session?.login);
   // An agent's player sees INR alone (user, 2026-10-18): no "View in currency", no owner coin.
   const { ready, agentPlayer } = useGates();
-  // `site`: bonus / promotion / VIP / wager figures always read in the owner's default coin
-  // (owner panel `default_currency`), whatever the player picked in the header.
+  // Bonus / promotion / VIP / wager figures follow the header too (owner, 2026-10-19); they used to
+  // read in the owner's default coin.
   const code = String(
     ready && agentPlayer
       ? 'INRFIAT'
-      : site
-      ? walletCode(siteCode || 'USDT')
       : (setting.enableLocaleCurrency && setting.localeCurrencyName) || (signedIn && setting.currencyName) || 'USDT'
   ).toUpperCase();
   const rate = getUsdPrice(code);

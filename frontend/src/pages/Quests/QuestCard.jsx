@@ -200,7 +200,7 @@ export function QuestAction({ action, variant, loading, disabled, onClick, class
  * reaches for the global — the same signature change every other call site here makes. */
 export function QuestReward({ amount, currency }) {
   // The reward in its own coin, shown in the selected currency (the `selected-currency` skill).
-  const cur = useSelectedCurrency({ site: true });
+  const cur = useSelectedCurrency();
 
   return (
     <span className="inline-flex min-w-0 items-center overflow-hidden">

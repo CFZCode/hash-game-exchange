@@ -62,9 +62,9 @@ function SummaryCell({ title, amount, first }) {
 const noBonus = () => Promise.resolve(null);
 
 function Summary({ balances }) {
-  // Summed in USD (amount2usd), then printed in the owner's DEFAULT coin (user's request): the
+  // Summed in USD (amount2usd), then printed in the header's selected currency: the
   // wallet columns are the deposit money; bonus money is held apart (`/user/bonus-balance`).
-  const cur = useSelectedCurrency({ site: true });
+  const cur = useSelectedCurrency();
   // Agent's player: no bonus at all — no read, no Bonus cell (user, 2026-10-18).
   const bonusOn = useGates().on('bonus');
   const [reloads, setReloads] = React.useState(0);

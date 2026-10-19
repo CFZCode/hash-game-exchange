@@ -4,6 +4,8 @@ import Pagination from '../../components/shared/Pagination';
 import { Empty } from '../../components/Explore/GameGrid';
 import { getPromotions } from '../../services/promotions';
 import { useResource } from '../../hooks/useResource';
+import { useSelectedCurrency } from '../../hooks/useSelectedCurrency';
+import { rupeesIn } from '../../utils/currency';
 import { useIsDialog } from '../../context/dialogRoute';
 import Skeleton from '../../components/shared/Skeleton';
 import * as globMaps from './index.globs.js';
@@ -65,6 +67,8 @@ const ChevronIcon = ({ className }) => (
 export function PromotionCard({ promo }) {
   /* `imageUrl` is the live feed's own art (services/promotions.js); the fixture never sets it. */
   const image = artFor(promo.image) || promo.imageUrl;
+  // The admin writes prizes in ₹; they follow the header currency (selected-currency skill).
+  const cur = useSelectedCurrency();
 
   /* A ROUTER LINK when the card has a detail page (CLAUDE.md: an internal destination is a
      `<Link>`), the inert `<article>` it always was when it does not. Same class list either way —
@@ -86,7 +90,7 @@ export function PromotionCard({ promo }) {
             </div>
           )}
           <div className="line-clamp-1 pt-1 text-2xl font-extrabold leading-7 text-brand">
-            {promo.headline}
+            {rupeesIn(promo.headline, cur)}
           </div>
           <div className="line-clamp-1 pt-1.5 text-sm font-extrabold uppercase leading-5 text-secondary">
             {promo.title}
@@ -99,7 +103,7 @@ export function PromotionCard({ promo }) {
               than it does on the live page. Restore `font-semibold` if the goal returns to
               matching the capture exactly. */}
           <div className="mt-1 line-clamp-2 text-xs font-semibold leading-4 text-quinary">
-            {promo.description}
+            {rupeesIn(promo.description, cur)}
           </div>
         </div>
 
