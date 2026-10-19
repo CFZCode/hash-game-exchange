@@ -660,11 +660,9 @@ const Dashboard = () => {
   const select = (value: Tab) => {
     const next = new URLSearchParams(params.toString())
 
-    if (value === 'direct') next.delete('tab')
-    else next.set('tab', value)
-    const qs = next.toString()
-
-    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+    // Always an explicit ?tab= — replacing to the bare path (param deleted) left the Agent tab stuck.
+    next.set('tab', value)
+    router.replace(`${pathname}?${next.toString()}`, { scroll: false })
   }
 
   return (
