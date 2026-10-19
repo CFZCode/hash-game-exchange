@@ -36,6 +36,7 @@ import MarketBlocks from './MarketBlocks';
 import { useMatchSlip, placementOdds, slipFigures, projectedBook, slipStakeInr } from './useMatchSlip';
 import { TAB_LABELS, marketTab, marketKind, ladder, rowStatus, marketTitle } from './shape';
 import { sportIconOf } from '../model';
+import { marketLabel } from '../../Wallet/BetHistory/sportsBets';
 import { markMatchGone, reviveMatch } from '../../../services/exchange/deadMatches';
 import CricketScorecard from '../../../components/exchange/CricketScorecard';
 
@@ -85,7 +86,7 @@ export default function ExchangeMatchPage() {
   const { sid, gmid } = useParams();
   const [query] = useSearchParams();
   const navigate = useNavigate();
-  const { session } = useSession();
+  const { session, exposure } = useSession();
   const signedIn = Boolean(session?.login) && isSignedIn();
 
   const mk = useMatchMarkets(gmid, sid);
@@ -251,7 +252,7 @@ export default function ExchangeMatchPage() {
   const toRow = (b) => ({
     id: b.id,
     runnerName: b.selection || b.fancyName || '—',
-    marketName: b.marketType || b.gameType,
+    marketName: b.fancyName || marketLabel(b.marketType || b.gameType),
     side: b.side,
     price: b.odds,
     stake: b.stake,
@@ -423,6 +424,7 @@ export default function ExchangeMatchPage() {
       loading={openBetsQ.data === undefined && !openBetsQ.error}
       currency={cur.prefix}
       formatAmount={fmtInr}
+      exposure={exposure}
     />
   ) : (
     <Card className="!py-6">

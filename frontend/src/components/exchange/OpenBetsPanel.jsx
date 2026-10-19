@@ -17,6 +17,7 @@ const backish = (s) => s === 'back' || s === 'yes';
  * @param {string}   [props.currency]
  * @param {(n)=>string} [props.formatAmount]
  * @param {(t)=>string} [props.formatTime]
+ * @param {number}   [props.exposure]             INR held in all open sports bets (not withdrawable).
  * @param {string}   [props.className]
  */
 export default function OpenBetsPanel({
@@ -25,6 +26,7 @@ export default function OpenBetsPanel({
   currency = '',
   formatAmount = defaultFormatAmount,
   formatTime = formatStartTime,
+  exposure = 0,
   className = '',
 }) {
   const rows = matched;
@@ -32,7 +34,14 @@ export default function OpenBetsPanel({
 
   return (
     <section className={cx('rounded-xl bg-layer3 p-3', className)}>
-      <h3 className="text-sm font-extrabold text-primary">Open Bets</h3>
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-extrabold text-primary">Open Bets</h3>
+        {exposure > 0 && (
+          <span className="text-xs text-secondary">
+            In bets <span className="font-semibold text-primary">{money(exposure)}</span>
+          </span>
+        )}
+      </div>
 
       <div className="mt-2 flex flex-col gap-1.5">
         {loading ? (

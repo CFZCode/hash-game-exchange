@@ -211,7 +211,7 @@ const BonusNotifications = () => {
  * `Show when={hideAmount || !mobile} fallback={<IconAdd class="size-4"/>}`.
  */
 function Wallet({ mobile = false }) {
-  const { session, balances, exposure } = useSession();
+  const { session, balances } = useSession();
   const depositOn = useGates().on('deposit');
   const navigate = useNavigate();
   const [open, setOpen] = React.useState(false);
@@ -278,12 +278,6 @@ function Wallet({ mobile = false }) {
               <span className="h-4 w-20 animate-pulse rounded bg-layer5" aria-label="Loading balance" />
             ) : (
               <span>{amount}</span>
-            )}
-            {/* The INR open sports bets hold: still in the balance above, not withdrawable. */}
-            {!walletLoading && exposure > 0 && current.currencyName === 'INRFIAT' && (
-              <span className="ml-1 text-xs font-normal text-secondary">
-                In bets {printCurrency(exposure, 'INRFIAT', { target: 'INRFIAT' })}
-              </span>
             )}
           </div>
           {/* The site's one chevron, a left-pointing `<` that every call site rotates.
