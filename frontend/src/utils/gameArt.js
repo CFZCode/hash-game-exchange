@@ -45,6 +45,7 @@ export const placeholderFor = (name) => {
 export const assetExact = (slug) =>
   slug
     ? art[`../assets/games/${slug}.avif`] ||
+      art[`../assets/games/${slug}.webp`] ||
       art[`../assets/games/${slug}.png`] ||
       art[`../assets/games/${slug}.jpg`]
     : undefined;
@@ -55,6 +56,8 @@ export const assetFor = (slug) => {
   // 1. Exact match (.avif, .png or .jpg)
   const exactAvif = art[`../assets/games/${slug}.avif`];
   if (exactAvif) return exactAvif;
+  const exactWebp = art[`../assets/games/${slug}.webp`];
+  if (exactWebp) return exactWebp;
   const exactPng = art[`../assets/games/${slug}.png`];
   if (exactPng) return exactPng;
   const exactJpg = art[`../assets/games/${slug}.jpg`];

@@ -32,7 +32,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const GLOBS = [
   { caller: 'src/utils/channelArt.js', name: 'ART', pattern: '../assets/deposit/channels/*.png' },
   { caller: 'src/utils/coinArt.js', name: 'coins', pattern: '../assets/coins/*.png' },
-  { caller: 'src/utils/gameArt.js', name: 'art', pattern: '../assets/games/*.{avif,png,jpg}' },
+  { caller: 'src/utils/gameArt.js', name: 'art', pattern: '../assets/games/*.{avif,webp,png,jpg}' },
   { caller: 'src/pages/WeeklyRaffle/index.jsx', name: 'art', pattern: '../../assets/raffle/ticket-*.png' },
   { caller: 'src/pages/WeeklyRaffle/index.jsx', name: 'avatars', pattern: '../../assets/raffle/avatars/*.png' },
   { caller: 'src/pages/VIP/index.jsx', name: 'art', pattern: '../../assets/vip/*.png' },
