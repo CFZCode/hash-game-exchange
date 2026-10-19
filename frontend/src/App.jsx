@@ -13,6 +13,7 @@ import ChatPublicPage from './pages/ChatPublic';
 import ExchangeLobby from './pages/Exchange/Lobby';
 import ExchangeMyBets from './pages/Exchange/MyBets';
 import ExchangeStatement from './pages/Exchange/Statement';
+import SportsInrDialog from './pages/Exchange/SportsInrDialog';
 import Promotions from './pages/Promotions';
 import DepositOffer from './pages/DepositOffer';
 import Blog from './pages/Blog';
@@ -1064,6 +1065,8 @@ function AppShell() {
           enter={dialogEnter}
         />
       )}
+      {/* The exchange is INR-only: a non-INR header wallet is asked to switch (or leave). */}
+      {/^\/sports(\/|$)/.test(pathname) && <SportsInrDialog />}
       {withdrawDetailDialog && (
         <WithdrawDetailDialog onClose={closeOverlay} onBack={backOverlay} enter={dialogEnter} />
       )}
