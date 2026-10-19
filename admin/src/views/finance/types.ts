@@ -22,6 +22,7 @@ export type FiatDepositRow = {
   handledBy?: number | string | null
   handledAt?: string | null
   username?: string | null
+  avatar?: string | null
 }
 
 export type DepositStats = {

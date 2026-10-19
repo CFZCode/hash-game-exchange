@@ -210,13 +210,18 @@ class FiatDepositService {
       raw: true,
     });
 
-    const names = await this.#mapUsernames(result.rows.map((r) => r.user_id));
+    const ids = [...new Set(result.rows.map((r) => r.user_id).filter(Boolean).map(String))];
+    const users = ids.length
+      ? await this.models.Users.findAll({ attributes: ['id', 'name', 'avatar'], where: { id: { [SequelizeOp.in]: ids } }, raw: true })
+      : [];
+    const byId = new Map(users.map((u) => [String(u.id), u]));
 
     return {
       count: result.count,
       rows: result.rows.map((r) => ({
         ...this.#present(r, { forStaff: true }),
-        username: names.get(String(r.user_id)) || String(r.user_id),
+        username: byId.get(String(r.user_id))?.name || String(r.user_id),
+        avatar: byId.get(String(r.user_id))?.avatar ?? null,
       })),
     };
   }
@@ -461,18 +466,6 @@ class FiatDepositService {
     if (ext === '.jpg' || ext === '.jpeg') return 'image/jpeg';
     if (ext === '.pdf') return 'application/pdf';
     return 'application/octet-stream';
-  }
-
-  async #mapUsernames(userIds) {
-    const ids = [...new Set(userIds.filter(Boolean).map(String))];
-    if (!ids.length) return new Map();
-
-    const rows = await this.models.Users.findAll({
-      attributes: ['id', 'name'],
-      where: { id: { [SequelizeOp.in]: ids } },
-      raw: true,
-    });
-    return new Map(rows.map((r) => [String(r.id), r.name]));
   }
 
   /** The screenshot PATH is never returned — only whether one exists. */
