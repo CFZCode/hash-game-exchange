@@ -33,9 +33,6 @@ import AuthBackgroundShape from '@/assets/svg/auth-background-shape'
 
 type Mode = 'staff' | 'executive'
 
-/** Staff levels 4–6 (SUPER_MASTER, MASTER, AGENT): the agent tree, the same test `/api/auth/me` makes. */
-const isAgentTreeLevel = (level: unknown) => Number(level) >= 4 && Number(level) <= 6
-
 const Login = () => {
   const qc = useQueryClient()
   const params = useSearchParams()
@@ -119,11 +116,7 @@ const Login = () => {
 
       if (next) return window.location.assign(next)
 
-      // An agent-tree login (levels 4–6) lands on its players: the Users list, which the platform
-      // scopes to the caller's tree. Everyone above it lands on the dashboard.
-      const me = await request<{ level?: number }>('/api/auth/me', { raw: true }).catch(() => null)
-
-      window.location.assign(isAgentTreeLevel(me?.data?.level) ? '/users' : '/dashboard')
+      window.location.assign('/dashboard')
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.is('TWO_FACTOR_REQUIRED')) {
