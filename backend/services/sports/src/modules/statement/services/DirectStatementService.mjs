@@ -41,6 +41,46 @@ const groupRows = (rows, sportsBetMap) => {
   return out;
 };
 
+const OG_REMARK = /^original-games (bet|win|rollback) (\S+)/;
+
+/**
+ * Rows written before their writers named them: an Original Games move reads "original-games bet
+ * <tx>" (→ "Arrow Bow bet", the game from og_transactions → og_games, as the admin balance sheet
+ * does) and a swap reads BALANCE_CHANGE with no remark (→ its credits_ledger leg, "Swap INR -> USDT":
+ * same currency and amount, within a few seconds). Both written named now; this is for the old rows.
+ */
+async function nameOldRows(target, raw) {
+  const quiet = (sql, replacements) => target.db.query(sql, { replacements, type: QueryTypes.SELECT }).catch(() => []);
+  const ogRows = raw.filter((r) => OG_REMARK.test(r.remark || ""));
+  if (ogRows.length) {
+    const refs = ogRows.map((r) => r.remark.match(OG_REMARK)[2]);
+    const found = await quiet(
+      `SELECT o.transaction_id AS tx, COALESCE(g.name, o.game_code) AS name
+         FROM og_transactions o LEFT JOIN og_games g ON g.code = o.game_code
+        WHERE o.transaction_id IN (:refs)`,
+      { refs }
+    );
+    const names = new Map(found.map((f) => [String(f.tx), f.name]));
+    for (const r of ogRows) {
+      const [, kind, tx] = r.remark.match(OG_REMARK);
+      r.remark = `${names.get(tx) || "Original game"} ${kind}`;
+    }
+  }
+  const unnamed = raw.filter((r) => r.event_type === "BALANCE_CHANGE" && !r.remark);
+  if (unnamed.length) {
+    const legs = await quiet(
+      `SELECT currency, amount, description, created_at FROM public.credits_ledger
+        WHERE user_id = :userId AND meta->>'swap' = 'true'`,
+      { userId: String(target.id) }
+    );
+    for (const r of unnamed) {
+      const leg = legs.find((l) => String(l.currency).toUpperCase() === r.currency && Number(l.amount) === Number(r.delta) &&
+        Math.abs(new Date(l.created_at) - new Date(r.created_at)) < 5000);
+      if (leg) r.remark = leg.description;
+    }
+  }
+}
+
 const DirectStatementService = {
   REPORT_TYPES,
 
@@ -87,6 +127,8 @@ const DirectStatementService = {
         ORDER BY id ASC`,
       { replacements, type: QueryTypes.SELECT }
     );
+
+    await nameOldRows(target, raw);
 
     const sportsBetIds = [...new Set(raw.filter((r) => r.category === "SPORTS" && r.bet_id).map((r) => Number(r.bet_id)))];
     const sportsBetMap = {};

@@ -67,6 +67,7 @@ function Summary({ balances }) {
   const cur = useSelectedCurrency();
   // Agent's player: no bonus at all — no read, no Bonus cell (user, 2026-10-18).
   const bonusOn = useGates().on('bonus');
+  const { exposure } = useSession();
   const [reloads, setReloads] = React.useState(0);
   const readBonus = React.useCallback(() => (bonusOn ? getBonusBalance() : noBonus()), [bonusOn, reloads]); // eslint-disable-line react-hooks/exhaustive-deps
   const { data: bonus } = useResource(readBonus);
@@ -76,7 +77,9 @@ function Summary({ balances }) {
     { title: 'Total Balance', usd: depositUsd + bonusUsd },
     { title: 'Deposit Balance', usd: depositUsd },
     { title: 'Bonus Balance', usd: bonusUsd },
-  ].filter((cell) => bonusOn || cell.title !== 'Bonus Balance').map(({ title, usd }) => ({ title, amount: cur.show(usd, 'USDFIAT') }));
+    // INR held by open sports bets: part of the deposit balance until they settle, not withdrawable.
+    { title: 'In Bets', usd: amount2usd(exposure, 'INRFIAT') },
+  ].filter((cell) => (bonusOn || cell.title !== 'Bonus Balance') && (exposure > 0 || cell.title !== 'In Bets')).map(({ title, usd }) => ({ title, amount: cur.show(usd, 'USDFIAT') }));
 
   /* hash.game's locked deposit bonus: what is still locked, what has unlocked, and a Claim button. */
   const gradual = (bonus?.active ?? []).filter((b) => b.unlockMode === 'gradual');

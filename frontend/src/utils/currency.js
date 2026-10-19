@@ -189,6 +189,9 @@ export function printCurrency(amount, currency = 'USDFIAT', options = {}) {
     settings = {},
     hasAlias = true,
     minDecimals,
+    /* Fixed places for a crypto target, truncated: 31.5765 USDT at 2 → "31.57" (`precision` counts
+       significant digits above 1, so it cannot say this). A fiat target prints its own. */
+    decimals,
   } = opts;
 
   const target =
@@ -210,9 +213,11 @@ export function printCurrency(amount, currency = 'USDFIAT', options = {}) {
 
   if (target.endsWith('FIAT')) return toFiatStr(num, target, lang) + unit;
 
-  const max = exp > 1 ? 2 : precision;
+  const max = decimals ?? (exp > 1 ? 2 : precision);
   const text =
-    exp > 1
+    decimals != null
+      ? num.toFixed(Math.min(decimals + 2, 20)).replace(new RegExp(`(\\.\\d{${decimals}})\\d*$`), '$1')
+      : exp > 1
       ? num.toFixed(2)
       : Math.abs(num) < 1
         ? trimZeros(num.toFixed(precision))
@@ -225,11 +230,18 @@ export function printCurrency(amount, currency = 'USDFIAT', options = {}) {
       roundingMode: 'trunc',
       minimumFractionDigits: min,
       maximumFractionDigits: Math.max(Math.min(max, 20), min),
-    }).format(Number(text)) +
+    }).format(Number(text) || 0) +
     (exp > 1 ? unit : '') +
     alias
   );
 }
+
+/* The places a balance of `code` is shown with (printCurrency's `decimals`): the catalogue's
+   `precisionUnit`, except USDT at 2 like the wallet and the game screens (the catalogue says 4). */
+export const coinDecimals = (code) => {
+  const key = walletCode(code);
+  return key === 'USDT' ? 2 : getCurrency(key)?.precisionUnit ?? 8;
+};
 
 /* Rupee figures typed into admin-authored copy ("₹1 Lakh Cricket", "₹50K", "₹1,00,000") re-printed
    in the selected currency through `cur` (useSelectedCurrency()); untouched on INR or when INR has

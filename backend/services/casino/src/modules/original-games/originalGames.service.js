@@ -283,6 +283,8 @@ class OriginalGamesService {
    */
   async #applyMoney({ kind, body, userId, currency, amount, balance, txId, refId = null, isCredit }) {
     const reason = { bet: 'BET_STAKE', win: 'BET_PAYOUT', rollback: 'BET_ROLLBACK' }[kind];
+    // The player's statement reads "Arrow Bow bet", not the aggregator's transaction id.
+    const game = money.isZero(amount) ? null : await this.#gameName(body.game_code);
     try {
       const { id, after } = await this.db.transaction(async (transaction) => {
         const rowId = await this.#insert({ kind, status: 'applied', body, userId, currency, amount, txId, refId, balanceAfter: balance }, transaction);
@@ -294,7 +296,7 @@ class OriginalGamesService {
           amount,
           reason,
           ref: { type: 'OG', id: txId },
-          description: `original-games ${kind} ${txId}`,
+          description: `${game} ${kind}`,
           gameType: body.game_code ?? undefined,
         });
         const newBalance = money.toDecimalString(money.toMinorQuantised(String(movement.newBalance)));
@@ -369,7 +371,14 @@ class OriginalGamesService {
     });
   }
 
-  async #tx(txId) {
+  /** `og_games.name` for a game code; the code itself, or "Original game", when it is not listed. */
+  async #gameName(code) {
+    if (!code) return 'Original game';
+    const [row] = await this.#query('SELECT name FROM og_games WHERE code = :code', { code: String(code) }).catch(() => []);
+    return row?.name || String(code);
+  }
+
+    async #tx(txId) {
     const [row] = await this.#query('SELECT * FROM og_transactions WHERE transaction_id = :txId', { txId });
     return row ?? null;
   }

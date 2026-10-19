@@ -462,7 +462,30 @@ class WalletRepository {
       { replacements, type: 'SELECT' }
     );
     const [{ count }] = await this.sequelize.query(`SELECT COUNT(*)::int AS count FROM (${union}) l`, { replacements, type: 'SELECT' });
+    await this.#nameOriginalGames(rows);
     return { rows: rows.map(({ seq, ...row }) => row), count };
+  }
+
+  /**
+   * An Original Games row written before casino-service named the game reads "original-games bet
+   * <tx>": the game is read back from og_transactions → og_games ("Arrow Bow bet"), as the admin
+   * balance sheet does. No og tables in a deployment: the stored text stays.
+   */
+  async #nameOriginalGames(rows) {
+    const OG = /^original-games (bet|win|rollback) (\S+)/;
+    const og = rows.filter((r) => OG.test(r.description || ''));
+    if (!og.length) return;
+    const found = await this.sequelize.query(
+      `SELECT o.transaction_id AS tx, COALESCE(g.name, o.game_code) AS name
+         FROM og_transactions o LEFT JOIN og_games g ON g.code = o.game_code
+        WHERE o.transaction_id IN (:refs)`,
+      { replacements: { refs: og.map((r) => r.description.match(OG)[2]) }, type: 'SELECT' }
+    ).catch(() => []);
+    const names = new Map(found.map((f) => [String(f.tx), f.name]));
+    for (const r of og) {
+      const [, kind, tx] = r.description.match(OG);
+      r.description = `${names.get(tx) || 'Original game'} ${kind}`;
+    }
   }
 
   async listHistory({ userId, currency, limit, offset }) {

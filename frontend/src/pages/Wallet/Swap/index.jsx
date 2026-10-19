@@ -6,7 +6,7 @@ import LocalAmountItem from '../../../components/shared/LocalAmountItem';
 import CircleCountdown from '../../../components/shared/CircleCountdown';
 import { useSession } from '../../../context/session';
 import { getCurrency } from '../../../data/currencies';
-import { getAlias, printCurrency, walletCode } from '../../../utils/currency';
+import { coinDecimals, getAlias, printCurrency, walletCode } from '../../../utils/currency';
 import { coinIcon } from '../../../utils/coinArt';
 import { getSwapConfig, getSwapPrice, submitSwap, swapLimits, swapOptions } from '../../../services/swap';
 import { showToast } from '../../../components/shared/Toast/toast';
@@ -434,6 +434,7 @@ function SwapForm({ config }) {
                     settings,
                     target: fromCurrency,
                     hasAlias: false,
+                    decimals: coinDecimals(fromCurrency),
                   })
                 : '-'}
             </div>
@@ -446,6 +447,7 @@ function SwapForm({ config }) {
                     settings,
                     target: fromCurrency,
                     hasAlias: false,
+                    decimals: coinDecimals(fromCurrency),
                   })
                 : '-'}
             </div>

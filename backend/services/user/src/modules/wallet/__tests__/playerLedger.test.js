@@ -59,6 +59,8 @@ test('player ledger against PostgreSQL', async (t) => {
     await q('DELETE FROM public.credits_ledger WHERE user_id = :uid RETURNING id', { uid: UID });
     await q('DELETE FROM mssports.debit_ledger WHERE user_id = :uid RETURNING id', { uid: UID });
     await q('DELETE FROM mssports.credits_ledger WHERE user_id = :uid RETURNING id', { uid: UID });
+    await q('DELETE FROM og_transactions WHERE user_id = :uid RETURNING id', { uid: UID });
+    await q("DELETE FROM og_games WHERE code = 'test-bow' RETURNING code");
   };
   t.after(async () => {
     await cleanup();
@@ -76,6 +78,11 @@ test('player ledger against PostgreSQL', async (t) => {
   await row('TRANSFER_IN', 'INR', '2475', { swap: true }, '2026-10-19T06:02:00Z');
   await row('TRANSFER_OUT', 'USDT', '-5', { refType: 'VAULT' }, '2026-10-19T06:03:00Z');
   await row('BET_STAKE', 'USDT', '-1', { refType: 'OG' }, '2026-10-19T06:04:00Z');
+  // An Original Games row as casino-service used to write it: named from og_transactions → og_games.
+  await q(`UPDATE public.credits_ledger SET description = :d WHERE user_id = :uid AND reason = 'BET_STAKE' RETURNING id`, { uid: UID, d: `original-games bet og-${UID}` });
+  await q(`INSERT INTO og_games (code, name, position, data, synced_at) VALUES ('test-bow', 'Arrow Bow', 999, '{}'::jsonb, NOW())
+           ON CONFLICT (code) DO NOTHING RETURNING code`);
+  await q(`INSERT INTO og_transactions (transaction_id, kind, user_id, game_code, currency, amount) VALUES (:tx, 'bet', :uid, 'test-bow', 'USDT', 1) RETURNING id`, { tx: `og-${UID}`, uid: UID });
   await q(`INSERT INTO mssports.debit_ledger (user_id, currency, amount, reason, description, balance, created_at)
            VALUES (:uid, 'INR', 100, 'bet_placed', 'Ind v Aus Australia', 2375, '2026-10-19T06:05:00Z') RETURNING id`, { uid: UID });
   await q(`INSERT INTO mssports.credits_ledger (user_id, currency, amount, reason, description, closing, created_at)
@@ -90,6 +97,7 @@ test('player ledger against PostgreSQL', async (t) => {
   assert.deepEqual(reasons(all).slice(0, 2), ['SPORTS_SETTLEMENT', 'SPORTS_STAKE'], 'newest first, sports rows merged');
   assert.equal(Number(all.rows[1].amount), -100, 'a stake hold is a debit');
   assert.equal(all.rows.find((x) => x.reason === 'ADMIN_CREDIT').description, 'Credit by admin');
+  assert.equal(all.rows.find((x) => x.reason === 'BET_STAKE').description, 'Arrow Bow bet');
 
   assert.deepEqual(reasons(await list({ category: 'game' })).sort(), ['BET_STAKE', 'SPORTS_SETTLEMENT', 'SPORTS_STAKE']);
   assert.deepEqual(reasons(await list({ category: 'swap' })).sort(), ['TRANSFER_IN', 'TRANSFER_OUT']);

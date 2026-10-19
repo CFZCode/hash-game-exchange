@@ -7,7 +7,7 @@ import { siteName, useSiteMark } from '../../../../services/siteBranding';
 import useResource from '../../../../hooks/useResource';
 import useMediaQuery from '../../../../hooks/useMediaQuery';
 import { getRewards } from '../../../../services/rewards';
-import { printCurrency } from '../../../../utils/currency';
+import { coinDecimals, printCurrency } from '../../../../utils/currency';
 import { coinIcon } from '../../../../utils/coinArt';
 import { ACCOUNT_MENU } from './menu';
 import { DO_NOT_DISTURB_ENABLED, FREE_PLAYS_ENABLED } from '../../../../config/hiddenFeatures';
@@ -211,7 +211,7 @@ const BonusNotifications = () => {
  * `Show when={hideAmount || !mobile} fallback={<IconAdd class="size-4"/>}`.
  */
 function Wallet({ mobile = false }) {
-  const { session, balances } = useSession();
+  const { session, balances, exposure } = useSession();
   const depositOn = useGates().on('deposit');
   const navigate = useNavigate();
   const [open, setOpen] = React.useState(false);
@@ -231,6 +231,8 @@ function Wallet({ mobile = false }) {
      `e.isNegative() ? new Big(0) : e`, a floor at zero, so a negative balance prints as 0. */
   const amount = printCurrency(Math.max(0, Number(current.generalAmount)), current.currencyName, {
     settings: session.setting,
+    // 2 places for USDT, as the wallet and the game print it (31.57, not 31.5765).
+    decimals: coinDecimals(current.currencyName),
   });
   /* While the signed-in wallet is still loading the session holds the captured VISITOR row, a
      BCD (BC.GAME's own token) placeholder this platform never issues — so the pill drew
@@ -276,6 +278,12 @@ function Wallet({ mobile = false }) {
               <span className="h-4 w-20 animate-pulse rounded bg-layer5" aria-label="Loading balance" />
             ) : (
               <span>{amount}</span>
+            )}
+            {/* The INR open sports bets hold: still in the balance above, not withdrawable. */}
+            {!walletLoading && exposure > 0 && current.currencyName === 'INRFIAT' && (
+              <span className="ml-1 text-xs font-normal text-secondary">
+                In bets {printCurrency(exposure, 'INRFIAT', { target: 'INRFIAT' })}
+              </span>
             )}
           </div>
           {/* The site's one chevron, a left-pointing `<` that every call site rotates.

@@ -129,6 +129,9 @@ const INITIAL = restore();
 export function SessionProvider({ children }) {
   const [account, setAccount] = React.useState(INITIAL.account);
   const [balances, setBalances] = React.useState(INITIAL.balances);
+  /* The INR the player's open sports bets hold (the sync state's `exposure`): it stays in the INR
+     balance until the bets settle, and a withdrawal cannot take it. */
+  const [exposure, setExposure] = React.useState(0);
 
   /* `he(() => { const { _isStale, ...u } = a; localStorage.setItem(i, JSON.stringify(u)) })` —
      the original's write-on-every-change, as an effect. Writing to storage is the textbook use
@@ -203,6 +206,7 @@ export function SessionProvider({ children }) {
     let key = null;
     const off = onLiveState((state) => {
       if (!state.signedIn || !state.balances) return;
+      setExposure(Math.max(0, Number(state.exposure) || 0));
       const next = JSON.stringify([state.balances, state.flags, state.currencies]);
       if (next === key) return;
       key = next;
@@ -253,6 +257,7 @@ export function SessionProvider({ children }) {
       onAuthExpired((reason) => {
         setAccount(VISITOR);
         setBalances(VISITOR_BALANCES);
+        setExposure(0);
         if (reason === 'locked' && Date.now() - lockedNoticeAt.current > 5000) {
           lockedNoticeAt.current = Date.now();
           toast.error(LOCKED_MESSAGE);
@@ -267,6 +272,7 @@ export function SessionProvider({ children }) {
          `session.login`, `session.vipLevel`, `session.setting.enableLocaleCurrency`. */
       session: account,
       balances,
+      exposure,
 
       /* Bumped once the FX table has been filled from the backend — see the effect above. It is
          published rather than kept private because publishing it is what makes the re-render
@@ -336,6 +342,7 @@ export function SessionProvider({ children }) {
       signOut: () => {
         setAccount(VISITOR);
         setBalances(VISITOR_BALANCES);
+        setExposure(0);
         apiLogout();
       },
 
@@ -398,7 +405,7 @@ export function SessionProvider({ children }) {
           ),
         ),
     }),
-    [account, balances, fxVersion],
+    [account, balances, exposure, fxVersion],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

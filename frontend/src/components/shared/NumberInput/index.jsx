@@ -16,9 +16,11 @@ import React from 'react';
  *   }
  *
  * where `c` writes straight to the DOM node (`e.value !== h && (e.value = h)`) and `i` is
- * `onChange`. So it CLAMPS ON EVERY KEYSTROKE and rewrites what you typed: against a minimum of
- * 30, typing "1" puts 30 in the box, and "30." becomes "30" because the value is re-parsed and
- * re-printed. That reads as hostile and it is what the live site does.
+ * `onChange`. So the original CLAMPS ON EVERY KEYSTROKE and rewrites what you typed: against a
+ * minimum of 30, typing "1" puts 30 in the box, and "30." becomes "30". THIS BUILD DOES NOT: a
+ * player could not type an amount at all (Swap, live QA 2026-10-19), so typing only reports the
+ * figure and the clamp + rewrite run on BLUR — and nothing is written into the box while it has
+ * focus, which is what keeps a typed "." alive. Call sites still guard their submit on the range.
  *
  * Reproducing it needs the input to stay UNCONTROLLED, which is also the original's arrangement.
  * A controlled input would silently drop the clamp whenever the clamped value equals the state
@@ -59,9 +61,16 @@ export default function NumberInput({
   /* Every render, as the original's render effect runs — which is what keeps the box in step
      when the currency changes under it and the figure is recomputed from outside. */
   React.useLayoutEffect(() => {
-    write(value);
+    if (ref.current !== document.activeElement) write(value);
   });
 
+  // While typing: report the figure, never rewrite the box ("12." and "0.0" must survive).
+  const type = (raw) => {
+    const parsed = Number(String(raw).replace(',', '.'));
+    if (!Number.isNaN(parsed)) onChange(parsed);
+  };
+
+  // On blur: clamp into [min, max] and print the committed figure.
   const commit = (raw) => {
     const parsed = Number(String(raw).replace(',', '.'));
     if (Number.isNaN(parsed)) {
@@ -98,9 +107,10 @@ export default function NumberInput({
         }}
         onBlur={(event) => {
           setFocus(false);
+          if (!readOnly && !disabled) commit(event.target.value);
           onBlur?.(event);
         }}
-        onChange={(event) => commit(event.target.value)}
+        onChange={(event) => type(event.target.value)}
       />
       {children}
     </div>

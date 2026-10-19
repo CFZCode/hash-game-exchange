@@ -1,7 +1,7 @@
 'use strict';
 
 const { Op } = require('sequelize');
-const { money, currencyRegistry } = require('@ibitplay/common');
+const { money, currencyRegistry, directLedger } = require('@ibitplay/common');
 const { assertPlayerCapability } = require('@ibitplay/auth');
 
 const errors = require('./swap.errors');
@@ -108,6 +108,9 @@ class SwapService {
 
       // The full amount leaves the wallet — the fee is retained by the house,
       // only the post-fee remainder is converted.
+      // Each update names itself on the direct player's statement (a bare update reads BALANCE_CHANGE).
+      const label = { userId, eventType: 'SWAP', category: directLedger.CATEGORY.TRANSFER, source: 'user-service', remark: `Swap ${fromCurrency} -> ${toCurrency}` };
+      await directLedger.directLedgerContext(this.db.sequelize, transaction, label);
       const debit = await this.wallet.debit(userId, fromCurrency, amount, transaction);
       if (!debit.ok) {
         throw errors.INSUFFICIENT_BALANCE({
@@ -121,6 +124,7 @@ class SwapService {
       const toBefore = money.fromStored(toLocked?.balance ?? '0');
 
       const convertedString = money.toDecimalString(quote.converted);
+      await directLedger.directLedgerContext(this.db.sequelize, transaction, label);
       const toAfter = await this.wallet.credit(userId, toCurrency, convertedString, transaction);
 
       // Both legs on the ledger, so summing it still reconciles per currency.

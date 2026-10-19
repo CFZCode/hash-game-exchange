@@ -244,11 +244,11 @@ function CommissionByCurrency({ data }) {
               <div className="flex gap-14 pc:gap-10">
                 <div className="flex flex-col items-center">
                   {/* In the row's own coin, floored there, then shown in the selected currency. */}
-                  <span className="font-extrabold text-brand">{cur.show(floor2(row.availableUsd), walletCode(row.currencyName))}</span>
+                  <span className="font-extrabold text-brand">{cur.show(row.availableUsd, walletCode(row.currencyName), REWARD_PRECISION)}</span>
                   <span className="text-secondary">Available</span>
                 </div>
                 <div className="flex flex-col items-end">
-                  <span className="font-extrabold">{cur.show(floor2(row.commissionUsd), walletCode(row.currencyName))}</span>
+                  <span className="font-extrabold">{cur.show(row.commissionUsd, walletCode(row.currencyName), REWARD_PRECISION)}</span>
                   <span className="text-secondary">Total Received</span>
                 </div>
               </div>
@@ -377,10 +377,10 @@ const Primary = ({ children }) => (
   <span className="font-semibold leading-6 text-primary">{children}</span>
 );
 
-/* `new p(v).toFixed(2, p.ROUND_FLOOR)` / `ROUND_DOWN` — Decimal's floor, not `toFixed`'s rounding.
-   They differ on the third decimal and the difference always favours the site, so it is worth
-   keeping: 1.239 prints 1.23 here and 1.24 through the native call. */
-const floor2 = (value) => (Math.floor(Number(value || 0) * 100) / 100).toFixed(2);
+/* Converted FIRST, then printed (truncated, never rounded up): flooring the USDT figure to 2 places
+   before converting printed a 0.02952 USDT commission as 0.02 / ₹1.67. Up to 6 places for a
+   crypto target, so a small commission still reads; a fiat target prints its own 2. */
+const REWARD_PRECISION = { precision: 6 };
 
 export default function MyRewards() {
   const navigate = useNavigate();
@@ -423,7 +423,7 @@ export default function MyRewards() {
      here with the other hooks, above the loading return. */
   const cur = useSelectedCurrency();
   const reward = useRewardCurrency();
-  const money = (value) => cur.show(floor2(value), reward);
+  const money = (value) => cur.show(value, reward, REWARD_PRECISION);
 
   /* The indicator is MEASURED, as the promotions and quest strips are and for the same reason:
      `sm:[&_.tabs-btn]:flex-none sm:[&_.tabs-btn]:px-0` with `sm:[&_.tabs-btn-group]:gap-6` sizes

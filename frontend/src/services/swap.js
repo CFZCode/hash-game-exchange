@@ -2,6 +2,8 @@ import { request, USE_FIXTURES } from './client';
 import ENDPOINTS, { PLATFORM } from './endpoints';
 import { SWAP_CONFIG } from '../data/swapConfig';
 import { getUsdPrice } from '../data/usdPrice';
+import { getCurrency } from '../data/currencies';
+import { walletCode } from '../utils/currency';
 import { isCurrencyListed, enabledCurrencies } from './currencies';
 
 /* `/wallet/swap`. `api-CW_rj_H1.js` is the page's whole request module and is barely minified, so
@@ -172,11 +174,12 @@ export const usdBandFor = (currencyName) => {
  */
 export function swapLimits({ amount, from, fromPrice, balance }) {
   const price = Number(fromPrice) || 0;
-  const floor8 = (value) => Math.floor(value * 1e8) / 1e8;
   const band = usdBandFor(from);
 
-  const min = price ? floor8(band.min / price) : 0;
-  let max = price ? floor8(band.max / price) : 0;
+  /* At the coin's own places, min rounded UP so it still clears the band: ₹83.34, not 83.33333333. */
+  const scale = 10 ** Math.min(getCurrency(walletCode(from))?.precisionUnit ?? 8, 8);
+  const min = price ? Math.ceil(Number(((band.min / price) * scale).toFixed(6))) / scale : 0;
+  let max = price ? Math.floor(Number(((band.max / price) * scale).toFixed(6))) / scale : 0;
 
   let next = amount;
   if (balance <= min) next = balance;

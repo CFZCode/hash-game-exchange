@@ -46,6 +46,8 @@ let timer = null;
 let inFlight = false;
 let keyFor = { id: null, key: null };
 let openedWith = null;
+/** When the last C.CREDIT push landed: a sync asked before it carries the balances from before it. */
+let pushedAt = 0;
 
 /** Every state the socket brings, newest first to a new subscriber. Returns unsubscribe. */
 export const onLiveState = subscribe;
@@ -91,11 +93,32 @@ function sync() {
     unscramble(body.d, id).then(
       (state) => {
         console.log('[socket] SYNC_STATE', state);
-        publishLiveState(state, token, askedAt);
+        // Asked before a balance push: keep the pushed balances, not this older read's.
+        const pushed = askedAt < pushedAt ? storedState()?.balances : null;
+        publishLiveState(pushed ? { ...state, balances: pushed } : state, token, askedAt);
       },
       () => {},
     );
   });
+}
+
+/* C.CREDIT carries every balance (`{ status, credit: { inr, usdt, … } }`, backend
+   wallet.service creditPayload): applied at once, so a settled game round reaches the header even
+   when the re-ask it also triggers is skipped (one already in flight) or refused (rate limit). */
+function applyCredit(frame) {
+  const last = storedState();
+  if (!last?.signedIn || !last.balances) return;
+  let body;
+  try {
+    body = JSON.parse(frameText(frame));
+  } catch {
+    return;
+  }
+  if (!body?.status || !body.credit || typeof body.credit !== 'object') return;
+  const balances = { ...last.balances };
+  for (const [code, value] of Object.entries(body.credit)) balances[code.toUpperCase()] = value;
+  pushedAt = Date.now();
+  publishLiveState({ ...last, balances }, openedWith);
 }
 
 /**
@@ -125,6 +148,7 @@ export function startRealtime() {
   });
   socket.on('connect', sync);
   PUSHES.forEach((name) => socket.on(name, sync));
+  socket.on(CREDIT, applyCredit);
   timer = setInterval(sync, TICK_MS);
 }
 

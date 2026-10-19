@@ -67,6 +67,7 @@ test('withdrawal requirements', async (t) => {
       await m.UserKyc.destroy({ where: { user_id: String(uid) } });
       await m.CreditsLedger.destroy({ where: { user_id: String(uid) } });
       await m.Credits.destroy({ where: { uid } });
+      await connection.sequelize.query('DELETE FROM mssports.total_exposures WHERE user_id = :uid', { replacements: { uid } });
     }
     await m.Users.destroy({ where: { id: created } });
   };
@@ -187,6 +188,28 @@ test('withdrawal requirements', async (t) => {
     }
     assert.equal(results.length, 32);
     t.diagnostic(`matrix: ${results.filter((r) => r.endsWith('OK')).length} accepted, ${results.filter((r) => !r.endsWith('OK')).length} refused`);
+  });
+
+  await t.test('INR held by open sports bets is not withdrawable: at most balance − exposure', async () => {
+    policy = 'none';
+    const uid = await player({ kyc: 'Verified', wagered: '250' });
+    await models.Credits.update({ inr: '1129.82' }, { where: { uid } });
+    await connection.sequelize.query(
+      'INSERT INTO mssports.total_exposures (user_id, total_exposure, "createdAt", "updatedAt") VALUES (:uid, -200, NOW(), NOW())',
+      { replacements: { uid } }
+    );
+    const inr = async () => money.fromStored(String((await models.Credits.findOne({ where: { uid }, raw: true })).inr));
+    const inrRequest = (amount) => fiatRequest(uid, { amount, currency: 'INR', upiId: 'wr@upi' });
+
+    await assert.rejects(inrRequest('930'), (e) =>
+      e.code === 'WITHDRAW_HELD_IN_BETS' && e.status === 402 &&
+      e.details.available === '929.82000000' && e.details.inBets === '200.00000000');
+    assert.equal(await inr(), '1129.82000000', 'nothing held');
+    assert.equal(await requirements.sportsExposure(uid), '200.00000000');
+
+    const row = await inrRequest('929.82');
+    assert.ok(row.heldLedgerId);
+    assert.equal(await inr(), '200.00000000', 'the exposure stays in the wallet');
   });
 
   await t.test('the socket answers the wager refusal with its details, and accepts once complete', async () => {
