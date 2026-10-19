@@ -41,14 +41,14 @@ const config = loadEnv(
 
     /**
      * The owner panel — what this site is entitled to. See docs/OWNER-PANEL.md.
-     * This service polls it every `OWNER_POLL_SECONDS` with the shared secret
-     * and verifies the HMAC on each answer. Unset, the site runs on its last
-     * cached copy, or with everything entitled when there is none.
+     * It sends each signed version to `/api/v1/admin/owner` with
+     * `x-owner-key: OWNER_SHARED_SECRET`; unset, that API is closed and the
+     * site is not owner-managed. The document lives in `owner_entitlements`,
+     * re-read every `OWNER_POLL_SECONDS` (another process may have saved).
      */
-    OWNER_PANEL_URL: coercers.optionalStr(),
     OWNER_SHARED_SECRET: coercers.optionalStr(),
     OWNER_POLL_SECONDS: coercers.int(15),
-    // Hardening — see `modules/entitlements/entitlements.poller.js`. The verify
+    // Hardening — see `modules/entitlements/entitlements.store.js`. The verify
     // key is the owner panel's Ed25519 PUBLIC key; it cannot sign anything.
     OWNER_VERIFY_KEY: coercers.optionalStr(),
     OWNER_SITE_KEY: coercers.optionalStr(),

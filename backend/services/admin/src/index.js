@@ -16,7 +16,7 @@ const { brandingStore } = require('./modules/branding/branding.store');
  * One backend serves every site; what makes one deployment differ from the
  * next is the feature variants in `site_features` — and the VIP ladder, which
  * follows the `vip` variant. The template is the OWNER's choice: the
- * entitlement document's `template` wins whenever it names one (the poller's
+ * entitlement document's `template` wins whenever it names one (the store's
  * onChange applies a new one; this applies it once at boot in case the last
  * attempt failed). `SITE_TEMPLATE` only seeds a database that has never had a
  * template at all. Either may hold an old name (`stake`, …): both resolve
@@ -31,24 +31,26 @@ async function bootstrapSite(container) {
     else if (existing !== featureCatalogue.resolveTemplateKey(template)) container.logger.info({ template, applied: existing }, 'SITE_TEMPLATE differs from the template this site runs — the stored one stands');
   }
   // The owner's document (variants + on/off; an older one: its template).
-  await features.applyOwner(container.entitlementsPoller.current());
-  // The owner's branding images, fetched by content hash (a failed fetch is retried here).
-  brandingStore(container).sync(container.entitlementsPoller.current().branding);
+  await features.applyOwner(container.entitlementsStore.current());
+  // The owner's branding images, loaded by content hash (a failed load is retried here).
+  brandingStore(container).sync(container.entitlementsStore.current().branding);
 }
 
 async function main() {
   const container = await createContainer();
 
   /**
-   * The owner's entitlements, before anything reads them. A new version
-   * applies the owner's document to site_features (every feature's variant
-   * and on/off — the site admin only shows them), and re-pushes the (masked)
-   * public flags and features down the player sockets — the same `siteConfigUpdated` / `featuresUpdated` an operator's save sends.
+   * The owner's entitlements, from the table, before anything reads them. A
+   * new version (an owner save, or one another process stored) applies the
+   * owner's document to site_features (every feature's variant and on/off —
+   * the site admin only shows them), and re-pushes the (masked) public flags
+   * and features down the player sockets — the same `siteConfigUpdated` /
+   * `featuresUpdated` an operator's save sends.
    */
-  container.entitlementsPoller.start({
+  await container.entitlementsStore.start({
     onChange: async (current) => {
       await new FeaturesService(container).onEntitlementsChange(current);
-      // A new version may name new branding images: fetch them (by hash) before players ask.
+      // A new version may name new branding images: load them (by hash) before players ask.
       await brandingStore(container).sync(current.branding);
     },
   });
@@ -64,7 +66,7 @@ async function main() {
     port: config.PORT,
     serviceName: config.SERVICE_NAME,
     logger: container.logger,
-    onShutdown: [() => container.entitlementsPoller.stop(), () => pushScheduler.stop(), () => container.close()],
+    onShutdown: [() => container.entitlementsStore.stop(), () => pushScheduler.stop(), () => container.close()],
   });
 
   // The operator console is a socket surface; see `sockets.js` for why the

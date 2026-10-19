@@ -174,12 +174,12 @@ test('site-config', async (t) => {
     logger,
     config: { SERVICE_NAME: 'admin-service' },
   });
-  // The same service on a site an owner panel manages (OWNER_PANEL_URL set).
+  // The same service on a site an owner panel manages (OWNER_SHARED_SECRET set).
   const managedService = new SiteConfigService({
     models: connection.models,
     db: connection,
     logger,
-    config: { SERVICE_NAME: 'admin-service', OWNER_PANEL_URL: 'http://127.0.0.1:3075' },
+    config: { SERVICE_NAME: 'admin-service', OWNER_SHARED_SECRET: 'owner-test-key' },
   });
 
   /** The owner's reward currency, as the entitlement pull writes it; null removes it. */

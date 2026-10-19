@@ -17,12 +17,6 @@ function to(req: NextRequest, pathname: string) {
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl
 
-  // The backend's pull: authenticated by x-owner-key inside the route, not by a session.
-  if (pathname === '/api/entitlements' && req.method === 'GET') return NextResponse.next()
-
-  // Its fetch of a branding image the signed document names: x-owner-key, checked in the route.
-  if (/^\/api\/branding\/asset\/[0-9a-f]{64}\.(png|webp|svg)$/.test(pathname) && req.method === 'GET') return NextResponse.next()
-
   const signedIn = tokenValid(req.cookies.get(SESSION_COOKIE)?.value)
 
   if (PUBLIC.some(p => pathname === p || pathname.startsWith(p + '/'))) {

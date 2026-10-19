@@ -1,13 +1,12 @@
 'use strict';
 
-const path = require('path');
-const { createLogger, ServiceClient, resolveInternalKey, configureEntitlements, configureCurrencyRegistry, findRepoRoot } = require('@ibitplay/common');
+const { createLogger, ServiceClient, resolveInternalKey, configureEntitlements, configureCurrencyRegistry } = require('@ibitplay/common');
 const { createAuthMiddleware } = require('@ibitplay/auth');
 const db = require('@ibitplay/db');
 
 const config = require('./config');
 const { resolveStaff } = require('./modules/staff-directory/staffDirectory.service');
-const { createEntitlementsPoller } = require('./modules/entitlements/entitlements.poller');
+const { createEntitlementsStore } = require('./modules/entitlements/entitlements.store');
 const { CurrenciesService } = require('./modules/currencies/currencies.service');
 
 /**
@@ -114,17 +113,12 @@ async function createContainer({ logger: injectedLogger } = {}) {
   });
 
   /**
-   * The owner's entitlements — this service is the only poller (docs/OWNER-PANEL.md).
-   * Kept in `backend/data/owner-entitlements.json`, never in the database.
+   * The owner's entitlements, from `owner_entitlements` (docs/OWNER-PANEL.md).
    * Registered as this process's source, so `entitlements.isFeatureEntitled()`
    * here reads memory rather than calling ourselves. `index.js` starts it.
    */
-  const entitlementsPoller = createEntitlementsPoller({
-    config,
-    logger,
-    filePath: path.join(findRepoRoot(path.resolve(__dirname, '..')), 'data', 'owner-entitlements.json'),
-  });
-  configureEntitlements({ read: () => entitlementsPoller.current() });
+  const entitlementsStore = createEntitlementsStore({ config, logger, db: connection });
+  configureEntitlements({ read: () => entitlementsStore.current() });
   // The coin registry is this service's own table: read it directly.
   configureCurrencyRegistry({
     read: () => new CurrenciesService({ models: connection.models, logger, config, clients }).list(),
@@ -135,7 +129,7 @@ async function createContainer({ logger: injectedLogger } = {}) {
   return {
     config,
     logger,
-    entitlementsPoller,
+    entitlementsStore,
     db: connection,
     models: connection.models,
     clients,

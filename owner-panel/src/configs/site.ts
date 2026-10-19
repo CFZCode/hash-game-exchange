@@ -26,6 +26,5 @@ export const serverConfig = {
   siteName: process.env.SITE_NAME || 'Hash Game Exchange',
   gatewayUrl: process.env.SITE_GATEWAY_URL || process.env.NEXT_PUBLIC_API_BASE || 'https://api.parker567.com',
   adminUrl: process.env.SITE_ADMIN_URL ?? '',
-  frontendUrl: process.env.SITE_FRONTEND_URL ?? '',
-  dataDir: process.env.OWNER_DATA_DIR ?? `${process.cwd()}/data`
+  frontendUrl: process.env.SITE_FRONTEND_URL ?? ''
 }

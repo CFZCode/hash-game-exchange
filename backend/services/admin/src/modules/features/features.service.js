@@ -66,11 +66,11 @@ class FeaturesService {
 
   /**
    * Whether this site's features are set in the owner panel. With no
-   * OWNER_PANEL_URL there is no owner panel and no poller: the site is not
+   * OWNER_SHARED_SECRET no owner panel can write here: the site is not
    * managed, and staff keep every switch (the hub's "inert" behaviour).
    */
   ownerManaged() {
-    return Boolean(this.config?.OWNER_PANEL_URL);
+    return Boolean(this.config?.OWNER_SHARED_SECRET);
   }
 
   #secretBox() {

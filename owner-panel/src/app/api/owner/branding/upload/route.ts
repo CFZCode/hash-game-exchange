@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic'
 /**
  * `POST /api/owner/branding/upload?slot=logo|mark|ogImage`, multipart with one `file`.
  * Checks the bytes (PNG / WebP by magic bytes, SVG only when inert, size and shape per slot),
- * stores `data/branding/<sha256>.<ext>` and answers the image's reference. Nothing is in use
+ * uploads them to the site backend as `<sha256>.<ext>` and answers the image's reference. Nothing is in use
  * until a save of the document names it (Review and save on the Branding screen).
  */
 export const POST = handler(async (req: NextRequest) => {

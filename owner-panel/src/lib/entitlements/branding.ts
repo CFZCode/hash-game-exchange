@@ -1,9 +1,9 @@
 /**
  * Site branding (contract §8): the name, the page metadata and the logo files the site shows.
- * Saved in the entitlements document as `branding`, through the same review → save → audit →
- * nudge as every other owner change. The images themselves are stored in
- * `owner-panel/data/branding/<sha256>.<ext>`; the document names them by that hash, so the
- * signature over the document also vouches for the bytes the backend fetches.
+ * Saved in the entitlements document as `branding`, through the same review → save → audit as
+ * every other owner change. The images themselves are uploaded to the site backend
+ * (`owner_branding_assets`, by `<sha256>.<ext>`); the document names them by that hash, so the
+ * signature over the document also vouches for the bytes the site serves.
  *
  * Mirrored by backend/services/admin/src/modules/branding/branding.rules.js (same limits).
  * No '@/' imports and no Node APIs: the tests load it as is and the screen uses it too.

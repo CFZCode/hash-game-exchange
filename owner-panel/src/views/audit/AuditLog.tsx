@@ -31,7 +31,7 @@ const AuditLog = () => {
     <>
       <PageHeader
         title='Audit log'
-        description='Every entitlement save, newest first. Stored in owner-panel/data/audit.jsonl only.'
+        description='Every entitlement save, newest first. Stored in the site database (owner_audit).'
         actions={
           <Button variant='outline' onClick={() => void refresh()} disabled={isFetching}>
             <RefreshCwIcon className={isFetching ? 'animate-spin' : undefined} /> Refresh

@@ -1,21 +1,17 @@
 import 'server-only'
 
 import { createHash } from 'node:crypto'
-import { mkdir, readFile, rename, stat, writeFile } from 'node:fs/promises'
-import path from 'node:path'
 
-import { serverConfig } from '@/configs/site'
 import { HttpError } from '@/lib/owner/guard'
+import { ownerApi, ownerJson } from './backend'
 import { ASSET_FILE_RE, inspectBrandingImage, type BrandingAsset, type BrandingSlot } from './branding'
 
 /**
- * The uploaded branding images: `owner-panel/data/branding/<sha256>.<ext>`, beside the document
- * and like it never committed. An upload only stores the file; it is in use once a save names it.
- * Files are never overwritten (same name = same bytes) and never deleted here, so every audited
- * version's images stay fetchable.
+ * The uploaded branding images, stored by the site backend in `owner_branding_assets`
+ * (`PUT <gateway>/api/v1/admin/owner/branding/asset/<sha256>.<ext>`), never on this host's disk.
+ * An upload only stores the image; it is in use once a save names it. The backend re-checks the
+ * bytes against the name and the image rules, and keeps every version's images (no delete).
  */
-const dir = () => path.join(serverConfig.dataDir, 'branding')
-
 export const CONTENT_TYPE: Record<string, string> = { png: 'image/png', webp: 'image/webp', svg: 'image/svg+xml' }
 
 export async function storeUpload(bytes: Uint8Array, slot: BrandingSlot): Promise<BrandingAsset> {
@@ -25,15 +21,12 @@ export async function storeUpload(bytes: Uint8Array, slot: BrandingSlot): Promis
 
   const hash = createHash('sha256').update(image.data).digest('hex')
   const file = `${hash}.${image.ext}`
-  const target = path.join(dir(), file)
 
-  if (!(await stat(target).catch(() => null))) {
-    await mkdir(dir(), { recursive: true, mode: 0o700 })
-    const tmp = `${target}.${process.pid}.${Date.now()}.tmp`
-
-    await writeFile(tmp, image.data, { mode: 0o600 })
-    await rename(tmp, target)
-  }
+  await ownerJson(`/branding/asset/${file}?slot=${slot}`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/octet-stream' },
+    body: new Uint8Array(image.data)
+  })
 
   return {
     file,
@@ -45,15 +38,17 @@ export async function storeUpload(bytes: Uint8Array, slot: BrandingSlot): Promis
 }
 
 export async function assetExists(file: string) {
-  return ASSET_FILE_RE.test(file) && !!(await stat(path.join(dir(), file)).catch(() => null))
+  return ASSET_FILE_RE.test(file) && (await ownerApi(`/branding/asset/${file}`, { method: 'HEAD' })).ok
 }
 
-/** The bytes of a stored image, re-hashed: a file whose content no longer matches its name is not served. */
+/** The bytes of a stored image, re-hashed: an answer whose content does not match its name is not served. */
 export async function readAsset(file: string): Promise<{ data: Buffer; contentType: string } | null> {
   if (!ASSET_FILE_RE.test(file)) return null
-  const data = await readFile(path.join(dir(), file)).catch(() => null)
+  const res = await ownerApi(`/branding/asset/${file}`)
 
-  if (!data) return null
+  if (!res.ok) return null
+  const data = Buffer.from(await res.arrayBuffer())
+
   if (createHash('sha256').update(data).digest('hex') !== file.split('.')[0]) return null
 
   return { data, contentType: CONTENT_TYPE[file.split('.')[1]] }

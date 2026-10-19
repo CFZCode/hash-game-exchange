@@ -808,7 +808,7 @@ class SiteConfigService {
 
   /** True when an owner panel manages this site (same rule as FeaturesService.ownerManaged). */
   #ownerManaged() {
-    return Boolean(this.config?.OWNER_PANEL_URL);
+    return Boolean(this.config?.OWNER_SHARED_SECRET);
   }
 
   /**
@@ -835,7 +835,7 @@ class SiteConfigService {
   /**
    * Staff change of the reward currency (`PUT /admin/site-config/rewards`).
    *
-   * Owner-managed site (`OWNER_PANEL_URL` set): any CHANGE is
+   * Owner-managed site (`OWNER_SHARED_SECRET` set): any CHANGE is
    * `403 OWNER_MANAGED { feature: 'reward_currency' }` — only the owner panel
    * sets it. Repeating the current value is not a change. Without an owner
    * panel (the hub default) staff may still set it; it is written to the same

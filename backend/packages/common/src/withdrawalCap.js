@@ -42,7 +42,7 @@ const FIELDS = Object.freeze(['enabled', 'depositMultiplier', 'wagerBonus', 'wag
 const isMultiplier = (n) =>
   typeof n === 'number' && Number.isFinite(n) && n > 0 && n <= MAX_MULTIPLIER && Math.round(n * 100) === n * 100;
 
-/** Reading (the poller, every reader): known fields only; a missing or bad value is its default. */
+/** Reading (the entitlements store, every reader): known fields only; a missing or bad value is its default. */
 function cleanWithdrawalCap(value) {
   const given = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   return {

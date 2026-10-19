@@ -12,7 +12,7 @@
  *   list type  the document's `region.listType`: `blocklist` (default) or `allowlist`.
  *   countries  the document's `region.countries`: ISO-3166 alpha-2 codes.
  *
- * The owner panel validates and writes `region`; the poller keeps it through `cleanRegion`.
+ * The owner panel validates and writes `region`; the entitlements store keeps it through `cleanRegion`.
  *
  * ── WHO IS RESTRICTED ───────────────────────────────────────────────────
  *

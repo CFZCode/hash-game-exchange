@@ -22,10 +22,10 @@ module.exports = function adminRoutes(deps) {
     auth.requirePermission(PERMISSIONS.CONFIG_READ),
     validate({ query: v.emptyQuery }),
     asyncHandler(async (_req, res) => {
-      const current = deps.entitlementsPoller?.current() ?? {};
+      const current = deps.entitlementsStore?.current() ?? {};
       return response.ok(res, {
         ...store.view(current.branding ?? null, current.version ?? 0),
-        managedBy: deps.config.OWNER_PANEL_URL ? 'owner' : null,
+        managedBy: deps.config.OWNER_SHARED_SECRET ? 'owner' : null,
         source: current.source ?? 'default',
       });
     })
