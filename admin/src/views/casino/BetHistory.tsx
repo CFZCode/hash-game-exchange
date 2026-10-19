@@ -25,11 +25,7 @@ import { usePageList } from './usePageList'
 
 const ALL = '__all__'
 
-// The API keys the house engine's rounds 'in-house'; on screen they are the Originals.
-const sourceName = (key: string) => (key === 'in-house' ? 'Originals' : key)
-
 const SOURCES = [
-  { value: 'inhouse', label: 'Originals' },
   { value: 'gis', label: 'Slotegrator' },
   { value: 'jsgames', label: 'JS games' }
 ]
@@ -206,7 +202,7 @@ const StatsTab = ({ channel }: { channel: Channel }) => {
             </TableHeader>
             <TableBody>
               {Object.entries(bySource ?? {}).map(([k, v]) => (
-                <TotalsRow key={k} label={sourceName(k)} t={v} currency={currency} />
+                <TotalsRow key={k} label={k} t={v} currency={currency} />
               ))}
               {t && <TotalsRow label='Total' t={t} currency={currency} />}
             </TableBody>
@@ -256,7 +252,7 @@ const AnalyticsTab = ({ channel }: { channel: Channel }) => {
             </TableHeader>
             <TableBody>
               {Object.entries(bySource).map(([k, v]) => (
-                <TotalsRow key={k} label={sourceName(k)} t={v} />
+                <TotalsRow key={k} label={k} t={v} />
               ))}
             </TableBody>
           </Table>
@@ -372,7 +368,7 @@ const BetHistory = () => {
 
   return (
     <div>
-      <PageHeader title='Casino bet history' description={`Every casino movement across Originals, the aggregator and JS games, ${scope}.`} />
+      <PageHeader title='Casino bet history' description={`Every casino movement across the aggregator and JS games (Originals are not casino), ${scope}.`} />
       {/* Direct Users / Agent Users: har tab ki listing aur numbers us taraf ke players ke. */}
       <ChannelTabs>
         {channel => (

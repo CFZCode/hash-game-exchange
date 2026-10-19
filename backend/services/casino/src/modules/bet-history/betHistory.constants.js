@@ -170,6 +170,8 @@ function categoryOf({ sourceKey, vendor, type }) {
 }
 
 const SOURCE_KEYS = Object.freeze(Object.keys(SOURCES));
+/** Third-party casino only: the admin Casino section never shows the Originals (inhouse, og). */
+const CASINO_SOURCE_KEYS = Object.freeze(SOURCE_KEYS.filter((k) => k !== 'inhouse' && k !== 'og'));
 
 
 /**
@@ -413,6 +415,7 @@ const MAX_ROWS_PER_SOURCE = 500;
 module.exports = {
   SOURCES,
   SOURCE_KEYS,
+  CASINO_SOURCE_KEYS,
   BET_CATEGORIES,
   categoryOf,
   CATALOGS,

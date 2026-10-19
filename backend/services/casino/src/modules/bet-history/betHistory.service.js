@@ -45,6 +45,7 @@ const NOT_FAKE = `("result"->>'fake') IS DISTINCT FROM 'true'`;
 const {
   SOURCES,
   SOURCE_KEYS,
+  CASINO_SOURCE_KEYS,
   CATALOGS,
   categoryOf,
   classify,
@@ -127,12 +128,13 @@ class BetHistoryService {
    *
    * Every casino movement the caller is allowed to see, newest first.
    */
-  async list({ page, limit, search, userId, from, to, source, staffId, channel, category, currency }) {
+  async list({ page, limit, search, userId, from, to, source, staffId, channel, category, currency, casinoOnly = false }) {
     const visible = await this.#visibleUserIds({ staffId, userId, channel });
     if (visible.empty) return { rows: [], total: 0 };
 
     // An in-house round is always `original`, so a live / slots filter never reads `bets`.
-    const sources = source ? [source] : SOURCE_KEYS;
+    const keys = casinoOnly ? CASINO_SOURCE_KEYS : SOURCE_KEYS;
+    const sources = source ? [source].filter((k) => keys.includes(k)) : keys;
     const wanted = category === 'live' || category === 'slots' ? sources.filter((k) => k !== 'inhouse') : sources;
     let collected = [];
 
@@ -417,7 +419,7 @@ class BetHistoryService {
    * Counts and net across every source, using ONE definition of win, loss and
    * push — see the class note.
    */
-  async stats({ userId, staffId, from, to, channel }) {
+  async stats({ userId, staffId, from, to, channel, casinoOnly = false }) {
     const visible = await this.#visibleUserIds({ staffId, userId, channel });
     if (visible.empty) return this.#emptyStats();
 
@@ -432,7 +434,7 @@ class BetHistoryService {
       }
     };
 
-    for (const key of SOURCE_KEYS) {
+    for (const key of casinoOnly ? CASINO_SOURCE_KEYS : SOURCE_KEYS) {
       const source = SOURCES[key];
       const model = this.models[source.model];
       if (!model) continue;
@@ -593,7 +595,7 @@ class BetHistoryService {
    * The dashboard summary: all time, today, by outcome, and the busiest
    * players.
    */
-  async analytics({ staffId, channel }) {
+  async analytics({ staffId, channel, casinoOnly = false }) {
     const visible = await this.#visibleUserIds({ staffId, channel });
     if (visible.empty) {
       return { ...this.#emptyStats(), today: null, topUsers: [] };
@@ -603,9 +605,9 @@ class BetHistoryService {
     startOfDay.setUTCHours(0, 0, 0, 0);
 
     const [allTime, today, topUsers] = await Promise.all([
-      this.stats({ staffId, channel }),
-      this.stats({ staffId, from: startOfDay, channel }),
-      this.#topUsers(visible),
+      this.stats({ staffId, channel, casinoOnly }),
+      this.stats({ staffId, from: startOfDay, channel, casinoOnly }),
+      this.#topUsers(visible, 10, null, casinoOnly),
     ]);
 
     return {
@@ -636,8 +638,8 @@ class BetHistoryService {
    * the sources that contributed are NAMED in `scope`, so a reader can see
    * what went into the figure instead of being told to assume.
    */
-  async #topUsers(visible, limit = 10, from = null) {
-    const { ranked, scope } = await this.#rankUsers(visible, from);
+  async #topUsers(visible, limit = 10, from = null, casinoOnly = false) {
+    const { ranked, scope } = await this.#rankUsers(visible, from, casinoOnly);
     const top = ranked.slice(0, limit);
     const names = await this.#namesFor(top.map(([id]) => id));
 
@@ -661,11 +663,11 @@ class BetHistoryService {
    * source (`bets.created`, `gis_transactions.created_at`, …) — that is why it
    * is read from `SOURCES` rather than assumed.
    */
-  async #rankUsers(visible, from = null) {
+  async #rankUsers(visible, from = null, casinoOnly = false) {
     const perUser = new Map();
     const contributing = [];
 
-    for (const key of SOURCE_KEYS) {
+    for (const key of casinoOnly ? CASINO_SOURCE_KEYS : SOURCE_KEYS) {
       const source = SOURCES[key];
       const model = this.models[source.model];
       if (!model) continue;
