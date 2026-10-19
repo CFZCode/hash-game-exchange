@@ -74,9 +74,11 @@ export const GATES = {
   // the OWNER's `blog` feature, and never for an agent's player. Not a promotion section, so a B2B
   // site keeps it when the owner switches it on.
   blog: { feature: 'blog', notAgentPlayer: true },
+  // Deposit rollover: an agent's player has no deposit or withdrawal, so nothing to roll over.
+  rollover: { notAgentPlayer: true },
 };
 
-/** Path prefix → gate, most specific first. History routes (transaction, rollover, bet history,
+/** Path prefix → gate, most specific first. History routes (transaction, bet history,
  *  deposit/withdraw detail) are deliberately absent: they stay readable for everyone. */
 export const ROUTES = [
   ['/wallet/deposit', 'deposit'],
@@ -85,6 +87,7 @@ export const ROUTES = [
   ['/wallet/buy', 'buy'],
   ['/wallet/swap', 'swap'],
   ['/wallet/vault', 'vault'],
+  ['/wallet/rollover', 'rollover'],
   ['/bonus', 'bonus'],
   ['/free-plays', 'rewards'],
   ['/quests', 'quests'],

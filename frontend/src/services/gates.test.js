@@ -17,5 +17,7 @@ describe("agent's player (user, 2026-10-18)", () => {
     for (const gate of ['bonus', 'vip', 'affiliate', 'promotions', 'deposit', 'withdraw', 'kyc']) expect(g.on(gate)).toBe(false);
     expect(gateOf('/settings/payment')).toBe('withdraw');
     expect(g.routeOn('/settings/whitelist/add')).toBe(false);
+    expect(g.routeOn('/wallet/rollover')).toBe(false);
+    expect(makeGates({ capabilities: {} }).routeOn('/wallet/rollover')).toBe(true);
   });
 });
