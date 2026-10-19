@@ -223,7 +223,7 @@ export const BalanceSheetView = ({
               <StatCard label='Credit' value={show(Number(sheets[0]?.points?.credit ?? 0))} icon={<TrendingDownIcon />} tone='danger' loading={loading} />
               <StatCard label='Total Points' value={show(Number(sheets[0]?.points?.total ?? 0))} icon={<ReceiptTextIcon />} tone='success' loading={loading} />
               <StatCard label='Sports Points' value={show(Number(sheets[0]?.points?.sports ?? 0))} icon={<TrendingUpIcon />} tone='warning' loading={loading} />
-              <StatCard label='Third-party Points' value={show(Number(sheets[0]?.points?.casino ?? 0))} icon={<ReceiptTextIcon />} tone='info' loading={loading} />
+              <StatCard label='Casino Points' value={show(Number(sheets[0]?.points?.casino ?? 0))} icon={<ReceiptTextIcon />} tone='info' loading={loading} />
               <StatCard label='Original Points' value={show(Number(sheets[0]?.points?.original ?? 0))} icon={<ReceiptTextIcon />} tone='info' loading={loading} />
             </div>
           ) : (
