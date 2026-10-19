@@ -34,6 +34,7 @@ const { LEDGER_TYPE } = require('../lords/ownerWallet');
 const AGENT_FUNDING_TYPES = [TRANSFER_TYPE.TRANSFER, TRANSFER_TYPE.REFILL, TRANSFER_TYPE.ISSUANCE, TRANSFER_TYPE.ADJUST];
 const { gisMagnitude } = require('../statements/statements.constants');
 const { casinoRoundsSql, INHOUSE_UNLEDGERED } = require('../statements/casinoRounds');
+const { marketName, rateText } = require('../exchange-market/betLabels');
 // The one "withdrawn" rule (bank Approved or Paid) — see dashboard.constants.js.
 const { WITHDRAWAL_DONE } = require('../dashboard/dashboard.constants');
 
@@ -558,7 +559,7 @@ class ReportsService {
         where: { user_id: user.id },
         attributes: [
           'id', 'ip_address', 'created_at', 'stake_amount', 'original_currency', 'status', 'result_status',
-          'event_name', 'match_title', 'market_type', 'selection_name', 'fancy_name', 'bet_type', 'odds',
+          'event_name', 'match_title', 'market_type', 'game_type', 'selection_name', 'fancy_name', 'bet_type', 'odds', 'size',
         ],
         order: [['created_at', 'DESC']],
         limit: RISK_BET_ROWS,
@@ -713,10 +714,10 @@ class ReportsService {
           status: b.status,
           resultStatus: b.result_status,
           event: b.event_name || b.match_title || null,
-          market: b.fancy_name || b.market_type || null,
+          market: marketName(b),
           selection: b.selection_name || null,
           betType: b.bet_type || null,
-          odds: b.odds != null ? String(b.odds) : null,
+          odds: rateText(b),
         })),
         // Casino rounds across the four casino tables (no IP is recorded on them).
         recentCasinoBets: casinoBets,

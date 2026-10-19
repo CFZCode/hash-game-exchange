@@ -5,7 +5,6 @@ import { useState } from 'react'
 import DataTable, { type Column } from '@/components/shared/DataTable'
 import DateTime from '@/components/shared/DateTime'
 import ErrorState from '@/components/shared/ErrorState'
-import JsonView from '@/components/shared/JsonView'
 import Money from '@/components/shared/Money'
 import ChannelTabs, { type Channel } from '@/components/shared/ChannelTabs'
 import PageHeader from '@/components/shared/PageHeader'
@@ -148,9 +147,9 @@ const StatsTab = ({ channel }: { channel: Channel }) => {
   const [to, setTo] = useState('')
   const stats = useApi<CasinoStats>('admin/casino/bet-history/stats', { userId: userId || undefined, from: from || undefined, to: to || undefined, channel })
   const t = stats.data?.totals
-  const { totals: _t, bySource, ...rest } = stats.data ?? { totals: undefined, bySource: {} }
 
-  void _t
+  // `byType` (the rest of the payload) restates the cards above, so it is not drawn again.
+  const bySource = stats.data?.bySource ?? {}
 
   return (
     <div className='grid gap-4'>
@@ -191,16 +190,6 @@ const StatsTab = ({ channel }: { channel: Channel }) => {
           </Table>
         </div>
       </Card>
-      {Object.keys(rest).length > 0 && (
-        <Card className='shadow-none'>
-          <CardHeader>
-            <CardTitle className='text-base'>More</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <JsonView value={rest} />
-          </CardContent>
-        </Card>
-      )}
     </div>
   )
 }
@@ -209,7 +198,13 @@ const AnalyticsTab = ({ channel }: { channel: Channel }) => {
   const q = useApi<Record<string, unknown>>('admin/casino/bet-history/analytics', { channel })
 
   if (q.error) return <ErrorState error={q.error} />
-  const { totals, bySource, ...rest } = (q.data ?? {}) as { totals?: CasinoTotals; bySource?: Record<string, CasinoTotals> } & Record<string, unknown>
+
+  const { totals, bySource, today, topUsers } = (q.data ?? {}) as {
+    totals?: CasinoTotals
+    bySource?: Record<string, CasinoTotals>
+    today?: CasinoTotals | null
+    topUsers?: { userId: string; userName: string | null; bets: number; wagered: string }[]
+  }
 
   return (
     <div className='grid gap-4'>
@@ -244,12 +239,39 @@ const AnalyticsTab = ({ channel }: { channel: Channel }) => {
           </Table>
         </Card>
       )}
+      <div className='grid grid-cols-2 gap-4 lg:grid-cols-4'>
+        <StatCard label='Bets today' value={formatNumber(today?.bets ?? 0)} loading={q.isLoading} />
+        <StatCard label='Wagered today' value={<Money value={today?.wagered ?? '0'} />} loading={q.isLoading} />
+        <StatCard label='Paid out today' value={<Money value={today?.payouts ?? '0'} />} loading={q.isLoading} />
+        <StatCard label='GGR today' value={<Money value={String(-Number(today?.net ?? 0))} signed />} loading={q.isLoading} />
+      </div>
       <Card className='shadow-none'>
         <CardHeader>
-          <CardTitle className='text-base'>Breakdowns</CardTitle>
+          <CardTitle className='text-base'>Busiest players</CardTitle>
         </CardHeader>
         <CardContent>
-          <JsonView value={Object.keys(rest).length ? rest : 'No further breakdowns reported.'} />
+          {topUsers?.length ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Player</TableHead>
+                  <TableHead className='text-right'>Bets</TableHead>
+                  <TableHead className='text-right'>Wagered</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {topUsers.map(u => (
+                  <TableRow key={u.userId}>
+                    <TableCell>{u.userName ?? `#${u.userId}`}</TableCell>
+                    <TableCell className='text-right'>{formatNumber(u.bets)}</TableCell>
+                    <TableCell className='text-right'><Money value={u.wagered} /></TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <p className='text-muted-foreground text-sm'>No casino bets yet.</p>
+          )}
         </CardContent>
       </Card>
     </div>

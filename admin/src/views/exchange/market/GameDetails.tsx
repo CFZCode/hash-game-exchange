@@ -13,7 +13,7 @@ import { Card } from '@/components/ui/card'
 import { useApi } from '@/hooks/use-api'
 import { api, errorMessage } from '@/lib/api/client'
 import { cn } from '@/lib/utils'
-import { MARKET_API, SPORTS_USER, fmtDateTime, isLay, plain, type AnalysisResponse, type Bet, type FeedMarket, type MatchMeta } from './api'
+import { MARKET_API, SPORTS_USER, fmtDateTime, isLay, plain, rateOf, type AnalysisResponse, type Bet, type FeedMarket, type MatchMeta } from './api'
 import BetLockDialog from './BetLockDialog'
 import EventsTree from './EventsTree'
 import { buildExposureIndex } from './exposureIndex'
@@ -246,13 +246,13 @@ const GameDetails = ({ sportId, eventId }: Props) => {
               <Fragment key={b.id}>
                 <tr className={cn('border-t border-l-4', side)}>
                   <td colSpan={4} className='px-2 pt-1'>
-                    <b>{b.marketType}</b> <span className='float-right'>{fmtDateTime(b.createdAt)}</span>
+                    <b>{b.marketLabel || b.marketType}</b> <span className='float-right'>{fmtDateTime(b.createdAt)}</span>
                   </td>
                 </tr>
                 <tr className={cn('border-l-4', side)}>
                   <td className='px-2 pb-1'>{b.username}</td>
                   <td className='px-2 pb-1'>{b.selection || '-'}</td>
-                  <td className='px-2 pb-1 text-right tabular-nums'>{plain(b.odds)}</td>
+                  <td className='px-2 pb-1 text-right tabular-nums'>{rateOf(b)}</td>
                   <td className='px-2 pb-1 text-right tabular-nums'>{plain(b.stake)}</td>
                 </tr>
               </Fragment>

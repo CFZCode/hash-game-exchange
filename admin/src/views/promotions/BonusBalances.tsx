@@ -21,6 +21,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useApi, useApiMutation, useListState, usePagedApi } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
+import { titleCase } from '@/lib/format'
 
 import RewardStats from './RewardStats'
 
@@ -61,7 +62,18 @@ export type PlayerBonus = {
 type Report = { rows: PlayerBonus[]; total: number; totals: { status: string; currency: string; count: number; amount: string }[] }
 
 const STATUSES = ['active', 'completed', 'expired', 'forfeited'] as const
-const SOURCES: Record<string, string> = { first_deposit: 'First deposit', spin_wheel: 'Spin wheel' }
+const SOURCES: Record<string, string> = { first_deposit: 'First deposit', spin_wheel: 'Spin wheel', monthly_deposit: 'Monthly deposit' }
+
+
+/** `player_bonuses.end_reason` (user-service playerBonus.constants END_REASON). */
+const END_REASONS: Record<string, string> = {
+  WAGERING_MET: 'Wagering met',
+  NO_WAGERING: 'No wagering required',
+  WAGERING_LOCK_OFF: 'Bonus lock off',
+  EXPIRED: 'Expired',
+  WITHDRAWAL: 'Forfeited on withdrawal',
+  MANUAL: 'Forfeited by staff'
+}
 
 const Progress = ({ b }: { b: PlayerBonus }) => (
   <div className='flex min-w-36 flex-col gap-1'>
@@ -115,7 +127,7 @@ const columnsFor = (invalidate: unknown[][], withPlayer: boolean): Column<Player
         }
       ]
     : []),
-  { key: 'source', header: 'Source', cell: r => <Badge variant='outline'>{SOURCES[r.source] ?? r.source}</Badge> },
+  { key: 'source', header: 'Source', cell: r => <Badge variant='outline'>{SOURCES[r.source] ?? titleCase(r.source)}</Badge> },
   { key: 'amount', header: 'Bonus', align: 'right', cell: r => <Money value={r.amount} currency={r.currency} /> },
   {
     key: 'x',
@@ -141,7 +153,7 @@ const columnsFor = (invalidate: unknown[][], withPlayer: boolean): Column<Player
     cell: r => (
       <span className='flex flex-col gap-0.5'>
         <StatusBadge value={r.status} />
-        {r.endReason && <span className='text-muted-foreground text-xs'>{r.endReason}</span>}
+        {r.endReason && <span className='text-muted-foreground text-xs'>{END_REASONS[r.endReason] ?? titleCase(r.endReason.toLowerCase())}</span>}
       </span>
     )
   },

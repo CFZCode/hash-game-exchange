@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { cn } from '@/lib/utils'
-import { currency, fmtDateTime, isLay, plain, type Bet } from './api'
+import { currency, fmtDateTime, isLay, rateOf, type Bet } from './api'
 
 type Props = {
   open: boolean
@@ -158,7 +158,7 @@ const ViewMoreBetsDialog = ({ open, bets, onClose, onReload }: Props) => {
                   <tr key={b.id} className={cn('border-t border-l-4', isLay(b) ? 'border-l-pink-400' : 'border-l-sky-400')}>
                     <td className='px-3 py-1.5'>{b.username}</td>
                     <td className='px-3 py-1.5'>{b.selection || '-'}</td>
-                    <td className='px-3 py-1.5 text-right tabular-nums'>{plain(b.odds)}</td>
+                    <td className='px-3 py-1.5 text-right tabular-nums'>{rateOf(b)}</td>
                     <td className='px-3 py-1.5 text-right tabular-nums'>{currency(b.stake)}</td>
                     <td className='px-3 py-1.5 whitespace-nowrap'>{fmtDateTime(b.createdAt)}</td>
                     <td className='text-primary px-3 py-1.5'>{b.ip || '-'}</td>
@@ -193,7 +193,7 @@ const ViewMoreBetsDialog = ({ open, bets, onClose, onReload }: Props) => {
               onClick={() => pickMarket(m)}
               className={cn('-mb-px border-b-2 px-3 py-1.5 text-sm uppercase', m === market ? 'border-primary text-primary font-semibold' : 'border-transparent')}
             >
-              {m}
+              {bets.find(b => marketOf(b) === m)?.marketLabel || m}
             </button>
           ))}
         </div>

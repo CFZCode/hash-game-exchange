@@ -4,6 +4,7 @@ const { QueryTypes } = require('sequelize');
 
 const { manageableStaffIds } = require('../staff-directory/staffDirectory.service');
 const { groupByEvent, buildUserBook, sportName } = require('./marketBook');
+const { marketLabel, rateText } = require('./betLabels');
 
 /**
  * Exchange market — Market Analysis, Game Details (book, bets) aur Current Bets.
@@ -201,6 +202,9 @@ function shapeBet(b) {
     selection: b.selection_name,
     betType: String(b.bet_type || '').toLowerCase(),
     odds: b.odds == null ? null : String(b.odds),
+    // For the screen: "Match Odds" for MATCH_ODDS, the Bookmaker board as 1.40, a fancy as 55 @ 100.
+    marketLabel: marketLabel(b.market_type || b.game_type),
+    rate: rateText(b),
     stake: b.stake_amount == null ? '0' : String(b.stake_amount),
     ip: b.ip_address ?? '',
     browser: b.browser ?? '',

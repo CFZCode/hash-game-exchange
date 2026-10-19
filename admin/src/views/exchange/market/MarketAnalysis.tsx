@@ -28,7 +28,7 @@ const MarketCard = ({ market }: { market: BookMarket }) => (
       <thead>
         <tr className='bg-muted'>
           <th colSpan={2} className='px-3 py-2 text-left font-semibold'>
-            {market.name}
+            {market.label || market.name}
           </th>
         </tr>
       </thead>

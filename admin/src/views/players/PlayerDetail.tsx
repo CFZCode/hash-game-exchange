@@ -15,7 +15,6 @@ import DateTime from '@/components/shared/DateTime'
 import ErrorState from '@/components/shared/ErrorState'
 import FormDialog from '@/components/shared/FormDialog'
 import { SwitchField, TextAreaField, TextField } from '@/components/shared/FormField'
-import JsonView from '@/components/shared/JsonView'
 import Money from '@/components/shared/Money'
 import PageHeader from '@/components/shared/PageHeader'
 import StatCard from '@/components/shared/StatCard'
@@ -29,7 +28,7 @@ import { useSession } from '@/contexts/SessionContext'
 import { useApi, useApiMutation, useListState, usePagedApi } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
 import { check } from '@/lib/validate'
-import { formatAmount, formatNumber } from '@/lib/format'
+import { formatAmount, formatNumber, titleCase } from '@/lib/format'
 import { AdjustWalletDialog } from '@/views/finance/shared'
 import { PlayerBonusesTab } from '@/views/promotions/BonusBalances'
 import GeoAttribution from './GeoAttribution'
@@ -360,23 +359,38 @@ const PrefsTab = ({ userId }: { userId: string }) => {
   )
 }
 
-// Agent-tree logins have no promotions (VIP ladder, ranks), so raw JSON drops those keys for them.
-const PROMOTION_KEY = /vip|rank/i
+type NotificationRow = { id: number | string; title: string | null; body: string | null; type: string | null; read: boolean; createdAt: string }
 
-const stripPromotionKeys = (value: unknown): unknown => {
-  if (Array.isArray(value)) return value.map(stripPromotionKeys)
-  if (!value || typeof value !== 'object') return value
+const notificationColumns: Column<NotificationRow>[] = [
+  { key: 'at', header: 'Sent', cell: r => <DateTime value={r.createdAt} /> },
+  { key: 'title', header: 'Title', cell: r => r.title || '—' },
+  { key: 'body', header: 'Message', cell: r => <span className='text-sm whitespace-normal'>{r.body || '—'}</span> },
+  { key: 'type', header: 'Type', cell: r => (r.type ? titleCase(r.type) : '—') },
+  { key: 'read', header: 'Read', cell: r => <Badge variant={r.read ? 'outline' : 'secondary'}>{r.read ? 'Read' : 'Unread'}</Badge> }
+]
 
-  return Object.fromEntries(Object.entries(value).filter(([key]) => !PROMOTION_KEY.test(key)).map(([key, v]) => [key, stripPromotionKeys(v)]))
+/** `GET admin/notifications/history/:id` — what the player was sent, newest first. */
+const NotificationsTab = ({ userId }: { userId: string }) => {
+  const q = useApi<NotificationRow[]>(`admin/notifications/history/${userId}`)
+
+  return <DataTable columns={notificationColumns} rows={q.data} rowKey={r => String(r.id)} loading={q.isLoading} error={q.error} dense emptyMessage='No notifications sent to this player.' />
 }
 
-const RawTab = ({ path }: { path: string }) => {
-  const q = useApi<unknown>(path)
-  const promotions = useSession().actor?.promotions === true
+type TransferRow = { id: string; at: string; direction: 'deposit' | 'withdraw'; amount: string; counterparty: string | null; note: string | null }
 
-  if (q.error) return <ErrorState error={q.error} />
+const transferColumns: Column<TransferRow>[] = [
+  { key: 'at', header: 'When', cell: r => <DateTime value={r.at} /> },
+  { key: 'direction', header: 'Direction', cell: r => <Badge variant={r.direction === 'deposit' ? 'outline' : 'secondary'}>{r.direction === 'deposit' ? 'In' : 'Out'}</Badge> },
+  { key: 'amount', header: 'Amount', align: 'right', cell: r => <span className='font-mono tabular-nums'>{formatAmount(r.amount)}</span> },
+  { key: 'counterparty', header: 'From / to', cell: r => r.counterparty ?? '—' },
+  { key: 'note', header: 'Note', cell: r => r.note || '—' }
+]
 
-  return <JsonView value={q.data === undefined ? 'loading…' : promotions ? q.data : stripPromotionKeys(q.data)} />
+/** `GET admin/locks/transfers/:id` — staff point transfers to or from the player. */
+const TransfersTab = ({ userId }: { userId: string }) => {
+  const q = useApi<TransferRow[]>(`admin/locks/transfers/${userId}`)
+
+  return <DataTable columns={transferColumns} rows={q.data} rowKey={r => r.id} loading={q.isLoading} error={q.error} dense emptyMessage='No transfers to or from this player.' />
 }
 
 /** `GET admin/user/wallet/:id/balances` — every coin the player holds, formatted; zero coins summarised. */
@@ -469,7 +483,7 @@ const DirectoryDetail = ({ id }: { id: string }) => {
           <CardTitle className='text-base'>Notifications sent</CardTitle>
         </CardHeader>
         <CardContent>
-          <RawTab path={`admin/notifications/history/${id}`} />
+          <NotificationsTab userId={id} />
         </CardContent>
       </Card>
     </div>
@@ -676,10 +690,10 @@ const ReportDetail = ({ id }: { id: string }) => {
           <BalanceSheetView userId={id} name={p?.name} client={p?.channel === 'agent'} active={tab === 'sheet'} />
         </TabsContent>
         <TabsContent value='transfers'>
-          <RawTab path={`admin/locks/transfers/${id}`} />
+          <TransfersTab userId={id} />
         </TabsContent>
         <TabsContent value='notifications'>
-          <RawTab path={`admin/notifications/history/${id}`} />
+          <NotificationsTab userId={id} />
         </TabsContent>
       </Tabs>
     </div>

@@ -15,7 +15,6 @@ import DateTime from '@/components/shared/DateTime'
 import ErrorState from '@/components/shared/ErrorState'
 import FormDialog from '@/components/shared/FormDialog'
 import { SelectField, TextField } from '@/components/shared/FormField'
-import JsonView from '@/components/shared/JsonView'
 import Money from '@/components/shared/Money'
 import PageHeader from '@/components/shared/PageHeader'
 import { RewardCurrencyNotice } from '@/components/shared/RewardCurrency'
@@ -536,8 +535,7 @@ const Awards = ({ userId }: { userId: string }) => {
     { key: 'user', header: 'User', cell: r => (r.userid != null ? <UserLink id={r.userid} /> : '—') },
     { key: 'type', header: 'Type', cell: r => <StatusBadge value={r.bonus_type} /> },
     { key: 'amount', header: 'Amount', align: 'right', cell: r => <Money value={r.bonus_amount} currency='USD' digits={2} /> }, // bonus_claims.bonus_amount is the USD figure from vipRewards; the claim pays it in the reward currency
-    { key: 'claimed', header: 'Claimed', cell: r => (r.is_claimed ? <DateTime value={r.claimed_at} /> : <StatusBadge value='pending' />) },
-    { key: 'raw', header: 'Row', cell: r => <JsonView value={r} className='max-h-24 max-w-md' /> }
+    { key: 'claimed', header: 'Claimed', cell: r => (r.is_claimed ? <DateTime value={r.claimed_at} /> : <StatusBadge value='pending' />) }
   ]
 
   return (

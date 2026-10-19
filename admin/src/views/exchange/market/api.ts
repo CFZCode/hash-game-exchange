@@ -12,7 +12,7 @@ export const SPORTS_USER = 'sports/user'
 // ── Market Analysis ─────────────────────────────────────────────────────
 
 export type BookRow = { label: string; value: number }
-export type BookMarket = { name: string; rows: BookRow[] }
+export type BookMarket = { name: string; label?: string; rows: BookRow[] }
 
 export type BookEvent = {
   eventId: string
@@ -41,6 +41,10 @@ export type Bet = {
   selection: string | null
   betType: string
   odds: string | null
+
+  /** Readable market ("Match Odds") and the rate in its own scale ("1.40", "55 @ 100"), from shapeBet. */
+  marketLabel?: string
+  rate?: string | null
   stake: string
   ip: string
   browser: string
@@ -122,6 +126,9 @@ export function fmtDateTime(raw: string | null | undefined) {
 }
 
 /** "3.4000" → "3.4", "100.00" → "100" (trailing zeros hatao). */
+/** A bet's rate for the screen: shapeBet's own scale, else the raw odds. */
+export const rateOf = (b: Pick<Bet, 'rate' | 'odds'>) => b.rate ?? plain(b.odds)
+
 export function plain(v: string | number | null | undefined) {
   const n = Number.parseFloat(String(v ?? ''))
 

@@ -1,6 +1,7 @@
 'use strict';
 
 const { Op, fn, col, literal, where: whereFn } = require('sequelize');
+const { marketLabel, rateText } = require('../exchange-market/betLabels');
 const { money } = require('@ibitplay/common');
 
 const errors = require('./statements.errors');
@@ -407,7 +408,7 @@ class StatementsService {
       attributes: [
         'id', 'created_at', 'user_id', 'match_title', 'event_name', 'selection_name',
         'fancy_name', 'market_type', 'bet_type', 'odds', 'stake_amount', 'status',
-        'result_status', 'game_type',
+        'result_status', 'game_type', 'size',
       ],
       order: [['created_at', 'DESC'], ['id', 'DESC']],
       limit,
@@ -426,9 +427,9 @@ class StatementsService {
         user: names.get(String(bet.user_id)) ?? String(bet.user_id),
         match: this.#text(bet.match_title, bet.event_name),
         selection: this.#text(bet.fancy_name, bet.selection_name),
-        market: this.#text(bet.market_type, bet.game_type),
+        market: this.#text(marketLabel(bet.market_type), marketLabel(bet.game_type)),
         side: this.#text(bet.bet_type),
-        odds: bet.odds != null ? String(bet.odds) : null,
+        odds: rateText(bet),
         // `toMinorQuantised` — a stored column, see the note in `ledger.js`.
         stake: money.fromStored(bet.stake_amount ?? '0', { field: 'stake' }),
         status: bet.status,

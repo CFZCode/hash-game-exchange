@@ -32,6 +32,7 @@ test('groupByEvent: event wise, markets by market id, sign ulta (fancy Game Deta
   const [dash] = groupByEvent(rows, new Map([['E1', { sportId: '4', startTime: null }]]));
   assert.strictEqual(dash.sportId, '4');
   assert.deepStrictEqual(dash.markets.map((m) => m.name), ['Normal', 'MATCH_ODDS']);
+  assert.deepStrictEqual(dash.markets.map((m) => m.label), ['Fancy', 'Match Odds']);
   assert.deepStrictEqual(dash.markets[1].rows, [{ label: 'A', value: 120 }, { label: 'B', value: -90 }]);
   assert.deepStrictEqual(dash.markets[0].rows, [{ label: '6 over run', value: 50 }]);
 

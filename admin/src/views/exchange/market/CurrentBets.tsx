@@ -16,7 +16,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { usePagedApi } from '@/hooks/use-api'
 import { cn } from '@/lib/utils'
 import { exportExcel, exportPdf } from '../exportList'
-import { MARKET_API, fmtDateTime, isLay, plain, type Bet } from './api'
+import { MARKET_API, fmtDateTime, isLay, plain, rateOf, type Bet } from './api'
 
 const MATCH_STATUS = [
   ['matchbet', 'Matched'],
@@ -81,7 +81,7 @@ const BetsList = ({ channel }: { channel: Channel }) => {
 
   const filtered = term
     ? rows.filter(b =>
-        [b.sportName, b.eventName, b.username, b.marketType, b.selection, b.odds, b.stake, fmtDateTime(b.createdAt), b.ip, b.browser].some(v =>
+        [b.sportName, b.eventName, b.username, b.marketLabel || b.marketType, b.selection, rateOf(b), b.stake, fmtDateTime(b.createdAt), b.ip, b.browser].some(v =>
           String(v ?? '').toLowerCase().includes(term)
         )
       )
@@ -97,7 +97,7 @@ const BetsList = ({ channel }: { channel: Channel }) => {
   }
 
   const exportRows = () =>
-    rows.map(b => [b.sportName ?? '', b.eventName ?? '', b.username, b.marketType ?? '', b.selection ?? '', plain(b.odds), Number(b.stake).toLocaleString(), fmtDateTime(b.createdAt), b.ip, b.browser])
+    rows.map(b => [b.sportName ?? '', b.eventName ?? '', b.username, b.marketLabel || b.marketType || '', b.selection ?? '', rateOf(b), Number(b.stake).toLocaleString(), fmtDateTime(b.createdAt), b.ip, b.browser])
 
   return (
       <Card size='sm' className='gap-4 p-4'>
@@ -169,9 +169,9 @@ const BetsList = ({ channel }: { channel: Channel }) => {
                       <td className='px-3 py-1.5'>{b.sportName}</td>
                       <td className='min-w-48 px-3 py-1.5'>{b.eventName}</td>
                       <td className='px-3 py-1.5'>{b.username}</td>
-                      <td className='px-3 py-1.5'>{b.marketType}</td>
+                      <td className='px-3 py-1.5'>{b.marketLabel || b.marketType}</td>
                       <td className='px-3 py-1.5'>{b.selection}</td>
-                      <td className='px-3 py-1.5 text-right tabular-nums'>{plain(b.odds)}</td>
+                      <td className='px-3 py-1.5 text-right tabular-nums'>{rateOf(b)}</td>
                       <td className='px-3 py-1.5 text-right tabular-nums'>{plain(b.stake)}</td>
                       <td className='px-3 py-1.5 whitespace-nowrap'>{fmtDateTime(b.createdAt)}</td>
                       <td className='px-3 py-1.5'>{b.ip}</td>

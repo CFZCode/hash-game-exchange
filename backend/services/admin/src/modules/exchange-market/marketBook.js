@@ -1,5 +1,7 @@
 'use strict';
 
+const { marketLabel } = require('./betLabels');
+
 /**
  * Market book ke pure helpers — zip ke reportsController (getMarketAnalysisDashboard,
  * getMarketAnalysis, getUserBook) ka hisaab, bina DB ke. Service rows laake yahan deta hai.
@@ -74,6 +76,7 @@ function groupByEvent(rows, meta = new Map(), { fancyAsIs = false } = {}) {
       .sort((a, b) => a.firstMarketId.localeCompare(b.firstMarketId, undefined, { numeric: true }))
       .map((market) => ({
         name: market.name,
+        label: marketLabel(market.name),
         rows: [...market.runners.entries()].map(([label, value]) => {
           const keep = fancyAsIs && isFancyMarket(market.name);
           return { label, value: round2(keep ? value : flip(value)) };
