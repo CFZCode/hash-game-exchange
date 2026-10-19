@@ -57,12 +57,7 @@ const DEPOSIT_PARTS: Part[] = [
   {
     key: 'manual',
     label: 'Manual',
-    view: () => (
-      <>
-        <ManualSwitch kind='deposit' />
-        <FiatDeposits />
-      </>
-    )
+    view: () => <FiatDeposits />
   }
 ]
 

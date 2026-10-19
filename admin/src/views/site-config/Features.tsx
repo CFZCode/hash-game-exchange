@@ -153,7 +153,8 @@ const Features = () => {
     // Owner-only policies and missing features: the site admin does not see them at all.
     const ownerOnly = (key: string) => OWNER_ONLY_FEATURES.has(key)
 
-    return [...CATEGORY_ORDER, 'not_in_ui'].map(cat => ({
+    // Business & payments are the owner's policies (owner panel): not shown to the site admin.
+    return [...CATEGORY_ORDER.filter(c => c !== 'business'), 'not_in_ui'].map(cat => ({
       cat,
       items: catalogue
         .data!.features.filter(f => !ownerOnly(f.key) && (cat === 'not_in_ui' ? absent(f.key) : f.category === cat && !absent(f.key)))

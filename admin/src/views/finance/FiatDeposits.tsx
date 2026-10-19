@@ -27,6 +27,8 @@ import { allConvertedLabel, useFinanceFilters } from './currencyFilter'
 import FinanceStatsPanel, { type FinanceStats } from './FinanceStatsPanel'
 import ListStatsTabs from './ListStatsTabs'
 import { CopyButton, Details, ImageDialog, ViewDialog, stop } from './shared'
+import { PlayerAvatar } from '@/views/players/users/shared'
+
 import { FIAT_CURRENCIES, type FiatDepositRow } from './types'
 import { useOwnerCoinFilter } from './useCurrencyCodes'
 
@@ -190,9 +192,7 @@ const columns: Column<FiatDepositRow>[] = [
     header: 'Player',
     cell: r => (
       <Link href={`/users/${r.userId}`} className='group flex items-center gap-2.5' onClick={stop}>
-        <span className='bg-primary/10 text-primary flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold uppercase'>
-          {(r.username || '#').slice(0, 1)}
-        </span>
+        <PlayerAvatar name={r.username} avatar={r.avatar} className='size-8 text-[11px]' />
         <span className='min-w-0'>
           <span className='block truncate font-medium group-hover:underline'>{r.username || `#${r.userId}`}</span>
           <span className='text-muted-foreground block font-mono text-xs'>
