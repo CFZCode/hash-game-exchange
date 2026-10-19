@@ -121,6 +121,8 @@ const SOURCES = Object.freeze({
     kindColumn: 'kind',
     gameColumn: 'game_code',
     catalog: 'og',
+    /** Bet and win legs are both positive, so the list folds them into one row per round. */
+    oneRowPerRound: true,
     sessionColumn: 'session_id',
     finishedColumn: null,
     statusColumn: null,

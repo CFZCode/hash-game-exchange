@@ -236,7 +236,7 @@ class BetHistoryService {
       raw: true,
     });
 
-    return rows.map((row) => {
+    const legs = rows.map((row) => {
       const profit = row[source.profitColumn];
       const reference = String(row[source.idColumn] ?? '');
       const round = source.roundColumn ? row[source.roundColumn] : null;
@@ -293,6 +293,39 @@ class BetHistoryService {
         gameName: source.gameNameColumn ? (row[source.gameNameColumn] ?? null) : null,
         gameCatalog: source.catalog,
         providerLabel: source.label,
+      };
+    });
+    return source.oneRowPerRound ? this.#foldRounds(legs) : legs;
+  }
+
+  /**
+   * One row per round for a source whose legs are unsigned (`og`): the stake leg and the win
+   * leg would otherwise both read as wins (profit = amount > 0). The round keeps the newest
+   * leg's fields; `amount` is the stake, `profit` the win less the stake. A rolled-back round
+   * nets to 0 (a push). A round with no win leg yet shows the stake as lost until the win lands.
+   */
+  #foldRounds(legs) {
+    const rounds = new Map();
+    for (const leg of legs) {
+      const round = rounds.get(leg.round_id) ?? { row: leg, stake: 0n, win: 0n, settled: false, void: false };
+      const minor = money.toMinorQuantised(leg.amount);
+      if (leg.transaction_type === KIND.BET) round.stake += minor;
+      else if (leg.transaction_type === KIND.WIN) {
+        round.win += minor;
+        round.settled = true;
+      } else if (leg.transaction_type === KIND.REFUND || leg.transaction_type === KIND.ROLLBACK) round.void = true;
+      rounds.set(leg.round_id, round);
+    }
+    return [...rounds.values()].map(({ row, stake, win, settled, void: rolledBack }) => {
+      const profit = rolledBack ? 0n : win - stake;
+      return {
+        ...row,
+        transaction_type: KIND.ROUND,
+        amount: this.#decimal(money.toDecimalString(stake)),
+        profit: this.#decimal(money.toDecimalString(profit)),
+        outcome: classify(money.toDecimalString(profit)),
+        reason: rolledBack ? 'ROLLBACK' : 'ROUND',
+        round_finished: settled || rolledBack,
       };
     });
   }

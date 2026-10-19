@@ -48,3 +48,4 @@ Callbacks you sign and send to our own backend (a test harness that simulates a 
   - **Originals:** INR and USDT, played as signed sandbox callbacks to our own backend.
   - **Third-party slots / casino:** not tested until the aggregator whitelists the real API.
   - **Scope:** this run and these players only.
+- **2026-10-19 — live full scenario, second run (players Testuser01…Testuser05).** The owner asked to repeat the full scenario on five new players with everything deployed. Same terms as run c99s: up to 10,000 USDT self-used balance per player by admin credit, sports INR only, originals INR and USDT (played through the UI, since the live webhook secret is not ours), no third-party slots / casino until the aggregator whitelist. Scope: this run and these players only.
