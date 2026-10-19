@@ -360,6 +360,9 @@ const RawTablesTab = ({ channel }: { channel: Channel }) => {
   )
 }
 
+/** Analytics tab chhupa hai (user, 2026-10-19); zaroorat pade to true kar do. */
+const SHOW_ANALYTICS = false
+
 const BetHistory = () => {
   const { actor } = useSession()
 
@@ -376,7 +379,7 @@ const BetHistory = () => {
         <TabsList className='mb-4 flex-wrap'>
           <TabsTrigger value='txns'>Transactions</TabsTrigger>
           <TabsTrigger value='stats'>Stats</TabsTrigger>
-          <TabsTrigger value='analytics'>Analytics</TabsTrigger>
+          {SHOW_ANALYTICS && <TabsTrigger value='analytics'>Analytics</TabsTrigger>}
           <TabsTrigger value='raw'>Raw provider tables</TabsTrigger>
         </TabsList>
         <TabsContent value='txns'>
@@ -385,9 +388,11 @@ const BetHistory = () => {
         <TabsContent value='stats'>
           <StatsTab channel={channel} />
         </TabsContent>
-        <TabsContent value='analytics'>
-          <AnalyticsTab channel={channel} />
-        </TabsContent>
+        {SHOW_ANALYTICS && (
+          <TabsContent value='analytics'>
+            <AnalyticsTab channel={channel} />
+          </TabsContent>
+        )}
         <TabsContent value='raw'>
           <RawTablesTab channel={channel} />
         </TabsContent>
