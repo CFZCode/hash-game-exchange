@@ -112,33 +112,32 @@ test('swap', async (t) => {
       userId: uid, fromCurrency: 'INR', toCurrency: 'USDT', amount: '1000',
     });
 
-    // INR fee is 15%: 1000 -> 150 fee -> 850 converted.
-    // 850 INR * 0.012 = 10.2 USD / 1 = 10.2 USDT.
-    assert.equal(result.feeAmount, '150.00000000');
-    assert.equal(result.amountAfterFee, '850.00000000');
-    assert.equal(result.toAmount, '10.20000000');
+    // INR fee is 1%: 1000 -> 10 fee -> 990 converted.
+    // 990 INR * 0.012 = 11.88 USD / 1 = 11.88 USDT.
+    assert.equal(result.feeAmount, '10.00000000');
+    assert.equal(result.amountAfterFee, '990.00000000');
+    assert.equal(result.toAmount, '11.88000000');
 
     const after = await balances(uid);
     assert.equal(after.INR, '9000.00000000', 'the FULL amount leaves the source currency');
-    assert.equal(after.USDT, '10.20000000');
+    assert.equal(after.USDT, '11.88000000');
   });
 
-  await t.test('the 0.15 fee is exact — no float drift', async () => {
+  await t.test('the 0.01 fee is exact — no float drift', async () => {
     const uid = newUid();
     await seed(uid, { inr: '10000', usdt: '0' });
 
-    // 0.15 is not representable in binary floating point. 3333 * 0.15 in a
-    // double is 499.95000000000005; the fee must be exactly 499.95.
+    // 3333.33 * 0.01 in a double is 33.333299999999994; the fee must be exactly 33.3333.
     const estimate = await service.estimate({
-      fromCurrency: 'INR', toCurrency: 'USDT', amount: '3333',
+      fromCurrency: 'INR', toCurrency: 'USDT', amount: '3333.33',
     });
 
-    assert.equal(estimate.feeAmount, '499.95000000');
-    assert.equal(estimate.amountAfterFee, '2833.05000000');
+    assert.equal(estimate.feeAmount, '33.33330000');
+    assert.equal(estimate.amountAfterFee, '3299.99670000');
   });
 
   await t.test('fee rates are per-currency', async () => {
-    assert.equal(feeRateFor('INR'), '0.15');
+    assert.equal(feeRateFor('INR'), '0.01');
     assert.equal(feeRateFor('BJB'), '0', 'a retired coin is free to swap OUT of');
     assert.equal(feeRateFor('USDT'), '0.01');
     assert.equal(feeRateFor('unknown'), '0.01');
@@ -213,7 +212,7 @@ test('swap', async (t) => {
     const usdtLeg = rows.find((r) => r.currency === 'USDT');
 
     assert.equal(money.toDecimalString(money.toMinor(inrLeg.amount)), '-1000.00000000');
-    assert.equal(money.toDecimalString(money.toMinor(usdtLeg.amount)), '10.20000000');
+    assert.equal(money.toDecimalString(money.toMinor(usdtLeg.amount)), '11.88000000');
   });
 
   await t.test('the staff history takes a currency filter (a swap out of or into it)', async () => {

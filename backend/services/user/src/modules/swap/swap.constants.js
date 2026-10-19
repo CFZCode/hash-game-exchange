@@ -12,13 +12,13 @@ const { REASON } = require('../wallet/wallet.constants');
  *
  * `0.15` is not representable in binary floating point, so the fee on a large
  * INR swap was consistently a fraction off. Held as strings here and applied
- * through `money`, which works in BigInt minor units.
+ * through `money`, which works in BigInt minor units. INR's legacy 15% is gone: every live coin
+ * swaps at the default 1% (owner, 2026-10-19).
  */
 const FEE_BY_CURRENCY = Object.freeze({
   // Retired (nothing credits it any more): free to swap OUT of, so a leftover
   // balance can be moved into a live coin. Never a swap target.
   BJB: '0',
-  INR: '0.15',
 });
 
 const DEFAULT_FEE = '0.01';
