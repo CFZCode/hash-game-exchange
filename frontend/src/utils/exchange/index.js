@@ -58,6 +58,7 @@ export {
   formatStake,
   formatAmount,
   applyMatchOddsLimits,
+  feedMaxStake,
   classifyMarket,
   isMarketSuspended,
   isSectionSuspended,

@@ -302,13 +302,15 @@ export function betProfit(bet) {
   const stake = num(bet.stake);
   const odds = num(bet.odds);
   const liability = num(bet.liability) || stake;
+  // A fancy row's `odds` is the run line (YES 55 @ 100 -> 55); it pays on the rate, `size`.
+  const rate = num(bet.size) || odds;
 
   if (result === 'won' || result === 'win') {
-    if (isFancyBet(bet)) return isBack ? (stake * odds) / 100 : stake;
+    if (isFancyBet(bet)) return isBack ? (stake * rate) / 100 : stake;
     return isBack ? stake * (odds - 1) : stake;
   }
   if (result === 'lost' || result === 'loss') {
-    if (isFancyBet(bet)) return isBack ? -stake : -((stake * odds) / 100);
+    if (isFancyBet(bet)) return isBack ? -stake : -((stake * rate) / 100);
     return isBack ? -stake : -liability;
   }
   if (result === 'void' || result === 'refund' || result === 'cancelled') return 0;
@@ -331,6 +333,8 @@ export function normaliseBet(raw) {
     selection: pick(raw.selection, raw.selectionName, raw.selection_name, raw.nat, raw.team) ?? '',
     side: String(pick(raw.side, raw.betType, raw.bet_type) ?? '').toLowerCase(),
     odds: num(pick(raw.odds, raw.user_rate, raw.rate)),
+    // A fancy line's rate (YES 55 @ 100). Odd/even carries a placeholder size (1000000), not a rate.
+    size: String(pick(raw.gtype, raw.market_type) ?? '').toLowerCase() === 'oddeven' ? 0 : num(pick(raw.size)),
     stake: num(pick(raw.stake, raw.stakeAmount, raw.stake_amount, raw.amount)),
     liability: num(pick(raw.liability, raw.exposure)),
     status: String(pick(raw.status) ?? '').toLowerCase(),

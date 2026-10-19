@@ -17,6 +17,7 @@ import { SportsConfig_default } from "../../../models/user/SportsConfig.mjs";
 import { Op as Op15 } from "sequelize";
 init_db();
 import { QueryTypes as QueryTypes2 } from "sequelize";
+import { feedMaxStake } from "../../../lib/helper/feedStakeLimit.mjs";
 var BUFFER_MARKETS = BetBufferConfig_default.MARKETS;
 var BUFFER_MARKET_KEYS = BetBufferConfig_default.MARKET_KEYS;
 var MAX_BUFFER_SECONDS = 60;
@@ -254,10 +255,9 @@ var getEventMarkets = async (req, res) => {
     ]);
     const byMarket = new Map(overrides.map((o) => [String(o.market_id), o]));
     const markets = Array.isArray(privateData?.data) ? privateData.data : [];
-    const isRacing = String(sportId) === "10" || String(sportId) === "65";
     const rows = markets.map((market) => {
       const section = Array.isArray(market.section) ? market.section : [];
-      const feedMax = !isRacing && Number(market.maxb) > 0 ? Number(market.maxb) : Number(market.max) > 0 ? Number(market.max) : Number(section[0]?.max) || 0;
+      const feedMax = feedMaxStake(market) || Number(section[0]?.max) || 0;
       const feedMin = Number(section[0]?.min) > 0 ? Number(section[0].min) : Number(market.min) || 0;
       const override = byMarket.get(String(market.mid));
       return {

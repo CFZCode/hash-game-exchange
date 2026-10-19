@@ -56,6 +56,7 @@ describe('P&L in INR', () => {
   it('fancy yes/no sides count as back/lay', () => {
     expect(betPnl(feed({ bet_type: 'yes', odds: '2', result_status: 'won' }))).toBe(100);
     expect(betPnl(feed({ bet_type: 'no', liability: '90', result_status: 'lost' }))).toBe(-90);
+    expect(betPnl(feed({ game_type: 'FAN', bet_type: 'yes', odds: '55', size: '100', result_status: 'won' }))).toBe(100);
   });
 
   it('liability: a back risks its stake, a lay its liability', () => {

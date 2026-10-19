@@ -28,7 +28,7 @@ import {
   betMarketKey,
 } from './addaplay';
 import { prepareBetPayload } from './betHelpers';
-import { isBallRunning } from './oddsHelpers';
+import { isBallRunning, feedMaxStake } from './oddsHelpers';
 import { isBookmakerStyle, isOddsLockedByType, isLaySide, namesOwnLine } from './placeBetRules';
 import { isBookieFavourMarket } from './bookieFavour';
 import { BET_TOAST } from './betToastMessages';
@@ -189,7 +189,7 @@ export function buildPlaceRequest({ bv, odds, stake, isEdited = false, selectedO
   const team = bv?.team || bv?.teamName || '';
   const marketType = bv?.marketType || bv?.mname || '';
   const isLine = String(bv?.gtype || '').toLowerCase() === 'fancy2';
-  const maxStake = Number(bv?.maxb) > 0 ? Number(bv.maxb) : (Number(bv?.max_stake) || Number(bv?.max) || 100000);
+  const maxStake = Number(bv?.max_stake) || feedMaxStake(bv) || 100000;
   const payload = {
     ...prepareBetPayload(bv, oddsNum, stakeNum, user, marketType, betType, team),
     server_buffer: {

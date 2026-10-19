@@ -30,80 +30,25 @@ export function formatMax(val) {
   return String(n);
 }
 
-// MATCH_ODDS bettable limit depends on match state, never on the raw fields
-// alone: pre-match (iplay false) -> umaxbof (the provider's pre-match cap);
-// in-play -> maxb. Every sport, racing included — see the long note inside.
-// maxb is folded into `max` so the header shows a single Max and the
-// stake-validation chain picks the same number. Markets that never quote
-// umaxbof (all-data summaries) are returned untouched.
-// eslint-disable-next-line no-unused-vars -- `sid` kept in the TENEXCH signature (see note below)
+// The feed's per-bet stake cap: its own `max` first; maxb / umaxbof only fill in
+// when max is missing (live football ships max 0, maxb 100000). A value of 1 or
+// less is the provider's "no per-bet cap" flag, never a cap of 1 — Match Odds
+// ships max 2000, maxb 1, umaxbof 10000 and must take a 2000 stake (the old
+// `iplay ? maxb : umaxbof` rule printed "Max: 1" and refused every stake).
+// Mirror: backend/services/sports/src/lib/helper/feedStakeLimit.mjs — the server
+// caps on the same number. An admin override (eventLimits.js) still wins over it.
+export const feedMaxStake = (market) =>
+  [market?.max, market?.maxb, market?.umaxbof].map(Number).find((v) => v > 1) || 0;
+
+// gtype 'match' markets (Match Odds, Over/Under, …): fold the feed cap into
+// `max` so the header shows one Max and stake validation reads the same number;
+// maxb is zeroed so nothing downstream picks it up again. Markets that never
+// quote umaxbof (all-data summaries) and Bookmaker (match1) are untouched.
+// eslint-disable-next-line no-unused-vars -- `sid` kept in the TENEXCH signature
 export function applyMatchOddsLimits(market, sid) {
-  // Keyed on `gtype`, not on `mname`. The reference applies this to EVERY
-  // gtype:"match" market — its Market4 header reads
-  //     size: marketDataNew.iplay ? marketDataNew.maxb : marketDataNew.umaxbof
-  // with no mention of the market's name — and only the `match1` branch
-  // (Bookmaker, BM_*) takes the plain min/max instead. Ours checked
-  // `mname === 'MATCH_ODDS'`, so a sibling like HALF_TIME on the same event
-  // skipped the rule and printed maxb (25K) while pre-match, where the
-  // reference prints umaxbof.
-  //
-  // The gtype gate matters in the other direction too: the feed ships these
-  // fields under match1 as well, and folding umaxbof into `max` there would
-  // cap Bookmaker at the pre-match sentinel and kill betting on it.
   if (market?.gtype !== 'match') return market;
   if (market?.umaxbof === undefined) return market;
-
-  /* RACING IS NOT SPECIAL — it takes the same branch as everything else, and
-     the special case that used to sit here was built on a measurement error.
-     Leaving this note because the wrong version looked perfectly reasonable.
-
-     It read: racing always takes `umaxbof`, justified as "umaxbof is 10000
-     pre-race and 1 once the race is off". That second half is simply not true.
-     Measured across 16 live racecards (8 horse + 8 greyhound), one of them
-     in-play:
-
-         state              iplay   max    maxb   umaxbof
-         pre-race (x15)     false   2000      1     10000
-         in-play  (x1)      true    2000      1     10000
-
-     All three fields are CONSTANT — 2000 / 1 / 10000 on every race, in both
-     states. Nothing in the feed moves at the off except `iplay`. So umaxbof
-     never becomes 1, and a rule pinned to umaxbof can never produce the
-     "Max: 1" the reference shows on an in-play race (gmid 666812815, off+6m:
-     reference 1, ours 10K — the bug this replaced).
-
-     The real origin of the original "Max: 1 everywhere" complaint was that
-     racing never called this helper at all, so the racecard printed the raw
-     `maxb` (1) in every state. Wiring the call up was the whole fix; the extra
-     racing branch then broke the in-play half back again.
-
-     The shared rule below reproduces the reference exactly for racing:
-         pre-race  iplay false -> umaxbof 10000  -> "Max: 10K"
-         in-play   iplay true  -> maxb    1      -> "Max: 1"
-     which is `iplay ? maxb : umaxbof`, the reference's own line, verbatim.
-
-     Consequence worth knowing: `max` drives stake validation as well as the
-     label, so an in-play race caps at 1 and is effectively shut for betting.
-     That IS the reference's behaviour. The server disagrees — for racing
-     sportbetscontroller.js:223 caps on `max` (2000) and never reads maxb or
-     umaxbof — so it would still accept up to 2000. Reported, owned separately.
-
-     `sid` stays in the signature: every call site passes it, and it is what a
-     future per-sport rule would key on. */
-
-  /* EVERY SPORT — racing included.
-     In-play -> maxb (>0), else max. Pre-match -> umaxbof. This is what the
-     server enforces (sportbetscontroller.js:223, `maxb > 0 ? maxb : max`), so
-     header and panel agree and nothing is advertised that would be refused.
-
-     Worth keeping the reason the maxb branch has to stay: live football gmid
-     582288513 ships `max: 0, maxb: 100000, umaxbof: 1`. Reading `max` there
-     printed "Max: 0" while usePlaceBetPanel treats `rawMax <= 0` as "no
-     ceiling" and would have taken 100000. With maxb it shows 1L and accepts
-     100000. */
-  const inPlayMax = Number(market.maxb) > 0 ? market.maxb : market.max;
-  const effectiveMax = Number(market.iplay ? inPlayMax : market.umaxbof) || 0;
-  return { ...market, max: effectiveMax, maxb: 0 };
+  return { ...market, max: feedMaxStake(market), maxb: 0 };
 }
 
 // Book/exposure display — en-IN comma grouping (99800 → "99,800",

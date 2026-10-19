@@ -59,9 +59,12 @@ describe('exchange lobby model', () => {
   });
 
   it('splits a board into live and upcoming', () => {
-    const { live, upcoming } = splitBoard([TEST_MATCH, TENNIS, null, { ename: 'no gmid' }], 4);
+    const before = Date.UTC(2026, 9, 1);
+    const { live, upcoming } = splitBoard([TEST_MATCH, TENNIS, null, { ename: 'no gmid' }], 4, before);
     expect(live.map((m) => m.id)).toEqual(['603326176']);
     expect(upcoming.map((m) => m.id)).toEqual(['640154297']);
+    // Started, not in-play → no longer upcoming.
+    expect(splitBoard([TEST_MATCH], 4, Date.UTC(2026, 9, 19)).upcoming).toEqual([]);
     expect(splitBoard(undefined, 4)).toEqual({ live: [], upcoming: [] });
   });
 

@@ -97,8 +97,15 @@ export function slipFigures(slip, stake, odds) {
   const g = lc(bv.gtype);
   const fancyFamily = ['fancy', 'fancy1', 'fancy2', 'khado', 'meter', 'normal', 'oddeven'].includes(g);
   const mt = fancyFamily ? 'FANCY' : g === 'cricketcasino' ? 'CRICKET_CASINO' : bv.marketType;
-  const { profit, loss } = calcPL(stake, odds, bv.betType, mt);
   const stakeNum = Number(stake) || 0;
+  // Session fancy (YES 55 @ 100): `odds` is the run line; it pays on the rate, bv.size.
+  // YES wins stake x size/100 and risks the stake, NO the other way round (server placeBet).
+  if (g === 'fancy' && slip.kind !== 'line' && Number(bv.size) > 0) {
+    const atRate = Math.round(stakeNum * Number(bv.size)) / 100;
+    const yes = bv.betType === 'yes' || bv.betType === 'back';
+    return { profit: yes ? atRate : stakeNum, liability: yes ? stakeNum : atRate };
+  }
+  const { profit, loss } = calcPL(stake, odds, bv.betType, mt);
   const shown = slip.kind === 'line' ? stakeNum : showsZeroProfit(bv.mname, mt, bv.gtype) ? 0 : profit;
   return { profit: shown, liability: loss };
 }

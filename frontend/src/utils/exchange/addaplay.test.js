@@ -46,6 +46,10 @@ describe('the three odds scales', () => {
     expect(betProfit({ resultStatus: 'won', side: 'yes', stake: 1000, odds: 91, gameType: 'FAN' })).toBe(910);
     expect(betProfit({ resultStatus: 'lost', side: 'no', stake: 1000, odds: 91, gameType: 'FAN' })).toBe(-910);
   });
+  it('fancy settled on the rate (size), not the run line: YES 55 @ 100, ₹100 won → +100', () => {
+    expect(normaliseBet({ result_status: 'won', bet_type: 'yes', stake_amount: 100, odds: 55, size: 100, game_type: 'FAN' }).profit).toBe(100);
+    expect(betProfit({ resultStatus: 'lost', side: 'no', stake: 100, odds: 55, size: 90, gameType: 'FAN' })).toBe(-90);
+  });
   it('zero odds or stake → 0 (betValidation.js:57)', () => {
     expect(calculateProfit(0, 100, 'MATCH_ODDS')).toBe(0);
     expect(calculateProfit(2, 0, 'MATCH_ODDS')).toBe(0);

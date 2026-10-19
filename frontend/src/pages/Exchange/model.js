@@ -152,13 +152,15 @@ export function toLobbyMatch(ev, sid) {
   };
 }
 
-/** Board → { live, upcoming } lobby rows; upcoming sorted by start time (unknown times last). */
-export function splitBoard(events, sid) {
+/** Board → { live, upcoming } lobby rows; upcoming sorted by start time (unknown times last).
+ *  Upcoming is a start time still ahead: a match that has started without the feed calling it
+ *  in-play is in neither list (it was printing "18 Oct 13:30" under Upcoming on the 19th). */
+export function splitBoard(events, sid, now = Date.now()) {
   const rows = (Array.isArray(events) ? events : []).filter((e) => e && e.gmid != null).map((e) => toLobbyMatch(e, sid));
   const t = (m) => (m.startTime ? m.startTime.getTime() : Number.MAX_SAFE_INTEGER);
   return {
     live: rows.filter((m) => m.inPlay),
-    upcoming: rows.filter((m) => !m.inPlay).sort((a, b) => t(a) - t(b)),
+    upcoming: rows.filter((m) => !m.inPlay && t(m) > now).sort((a, b) => t(a) - t(b)),
   };
 }
 

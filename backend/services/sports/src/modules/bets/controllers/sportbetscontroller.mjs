@@ -33,6 +33,7 @@ const { directLedgerContext } = createRequire(import.meta.url)("@ibitplay/common
 
 import xssClean from "xss-clean";
 import { toInr, inrToUsd } from "../../../lib/helper/toInr.mjs";
+import { feedMaxStake } from "../../../lib/helper/feedStakeLimit.mjs";
 init_TotalExposure();
 init_db();
 import axios5 from "axios";
@@ -148,8 +149,7 @@ async function resolveMarketLimits({ eventid, sid, match_id, mname, market_type,
   }
   const selNorm = (selection_name || "").toString().trim().toLowerCase();
   const sec = (mkt.section || []).find((s) => (s.nat || "").trim().toLowerCase() === selNorm) || null;
-  const isRacing = String(sid) === "10" || String(sid) === "65";
-  const maxLimit = !isRacing && Number(mkt.maxb) > 0 ? Number(mkt.maxb) : Number(mkt.max) > 0 ? Number(mkt.max) : Number(sec?.max) || 0;
+  const maxLimit = feedMaxStake(mkt) || Number(sec?.max) || 0;
   const minLimit = Number(sec?.min) > 0 ? Number(sec.min) : Number(mkt.min) || 0;
   return {
     minLimit: Number(override?.min) > 0 ? Number(override.min) : minLimit,

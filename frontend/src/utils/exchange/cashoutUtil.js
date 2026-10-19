@@ -18,6 +18,8 @@
 //   BACK sel: sel += stake*mult, other -= stake
 //   LAY  sel: sel -= stake*mult, other += stake
 
+import { feedMaxStake } from './oddsHelpers';
+
 const EPS = 0.01;
 
 export function isCashoutEligibleMarket(mname, gtype) {
@@ -143,9 +145,9 @@ export function buildMarketCashout({ market, exposures }) {
   }
   candidates.sort((a, b) => b.worstAfter - a.worstAfter);
 
-  // Limits: min = market.min; max = maxb (>0) → max
+  // Limits: min = market.min; max = the feed cap the server enforces (feedMaxStake)
   const minLimit = Number(market.min) || 0;
-  const maxLimit = Number(market.maxb) > 0 ? Number(market.maxb) : (Number(market.max) || 0);
+  const maxLimit = feedMaxStake(market);
 
   let lastReject = { ok: false, reason: 'no_odds' };
   for (const c of candidates) {

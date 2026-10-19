@@ -10,6 +10,7 @@ import {
   isSectionSuspended,
   isBallRunning,
 } from '../../../utils/exchange';
+import { marketLabel } from '../../Wallet/BetHistory/sportsBets';
 
 const num = (v) => Number(v) || 0;
 const gtypeOf = (m) => String(m?.gtype || '').toLowerCase();
@@ -93,10 +94,11 @@ export const TAB_LABELS = [
   ['others', 'Others'],
 ];
 
-/** Market title as printed ("MATCH_ODDS" → "Match Odds"). */
+/** Market title as printed ("MATCH_ODDS" → "Match Odds", "OVER_UNDER_15" → "Over/Under 1.5").
+ *  Only a feed CODE goes through marketLabel; a named market ("10 over run AFG adv") prints as-is. */
 export function marketTitle(market) {
   const n = String(market?.mname || '').trim();
-  if (/^match_odds$/i.test(n)) return 'Match Odds';
+  if (/^[A-Z0-9_]+$/.test(n) && /[A-Z]/.test(n)) return marketLabel(n);
   return n.replace(/_/g, ' ') || 'Market';
 }
 

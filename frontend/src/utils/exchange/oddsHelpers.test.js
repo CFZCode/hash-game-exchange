@@ -18,6 +18,7 @@ import {
   calculateRunnerPL,
   formatPL,
   applyMatchOddsLimits,
+  feedMaxStake,
 } from './oddsHelpers';
 
 describe('formatSize / formatMax', () => {
@@ -173,5 +174,25 @@ describe('applyMatchOddsLimits', () => {
   it('leaves a racing market untouched — its maxb is a flag, not a cap', () => {
     const racing = { mname: 'MATCH_ODDS', gtype: 'match', maxb: 1, max: 2000 };
     expect(applyMatchOddsLimits({ ...racing }, '10')).toEqual(racing);
+  });
+
+  it('takes the feed max; maxb / umaxbof of 1 is "no cap", not a cap of 1 — pre-match and in-play', () => {
+    const mo = { mname: 'MATCH_ODDS', gtype: 'match', min: 0, max: 2000, maxb: 1, umaxbof: 10000 };
+    expect(applyMatchOddsLimits({ ...mo, iplay: false }, '4')).toMatchObject({ max: 2000, maxb: 0 });
+    expect(applyMatchOddsLimits({ ...mo, iplay: true }, '1')).toMatchObject({ max: 2000, maxb: 0 });
+  });
+
+  it('falls back to maxb when the feed max is missing (live football)', () => {
+    const fb = { mname: 'OVER_UNDER_15', gtype: 'match', max: 0, maxb: 100000, umaxbof: 1, iplay: true };
+    expect(applyMatchOddsLimits(fb, '1').max).toBe(100000);
+  });
+});
+
+describe('feedMaxStake', () => {
+  it('max first, then maxb, then umaxbof; values of 1 or less never cap', () => {
+    expect(feedMaxStake({ max: 2000, maxb: 25000 })).toBe(2000);
+    expect(feedMaxStake({ max: 0, maxb: 1, umaxbof: 10000 })).toBe(10000);
+    expect(feedMaxStake({ max: 0, maxb: 1, umaxbof: 1 })).toBe(0);
+    expect(feedMaxStake(null)).toBe(0);
   });
 });

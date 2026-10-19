@@ -34,7 +34,7 @@ import {
 import { BET_TOAST, ODDS_FIELD, ADDAPLAY_MIN_BET } from '../../../utils/exchange';
 import MarketBlocks from './MarketBlocks';
 import { useMatchSlip, placementOdds, slipFigures, projectedBook, slipStakeInr } from './useMatchSlip';
-import { TAB_LABELS, marketTab, marketKind, ladder, rowStatus } from './shape';
+import { TAB_LABELS, marketTab, marketKind, ladder, rowStatus, marketTitle } from './shape';
 import { sportIconOf } from '../model';
 import { markMatchGone, reviveMatch } from '../../../services/exchange/deadMatches';
 import CricketScorecard from '../../../components/exchange/CricketScorecard';
@@ -303,7 +303,7 @@ export default function ExchangeMatchPage() {
       <BetSlipInline
         side={side}
         runnerName={pick ? `${bv.runnerName} · ${pick}` : bv.runnerName}
-        marketName={bv.is_cashout ? `Cashout · ${bv.mname}` : bv.mname}
+        marketName={bv.is_cashout ? `Cashout · ${marketTitle(bv)}` : marketTitle(bv)}
         price={slip.display}
         onPriceChange={slipApi.setPrice}
         priceEditable={slip.fieldMode === ODDS_FIELD.STEPPER && !bv.is_cashout}

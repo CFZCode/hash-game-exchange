@@ -70,7 +70,9 @@ export function betLiability(bet) {
 export function betPnl(bet, status = betStatus(bet)) {
   const stake = Number(bet.stake) || 0;
   const back = isBackSide(bet.side);
-  if (status === 'won') return back ? stake * Math.max(0, (Number(bet.odds) || 0) - 1) : stake;
+  // A fancy YES pays on its rate (55 @ 100 → stake × 100/100), not on the run line in `odds`.
+  const rate = bet.side === 'yes' ? Number(bet.size) || 0 : 0;
+  if (status === 'won') return back ? (rate > 0 ? (stake * rate) / 100 : stake * Math.max(0, (Number(bet.odds) || 0) - 1)) : stake;
   if (status === 'lost') return back ? -stake : -betLiability(bet);
   if (status === 'void') return 0;
   return null;
