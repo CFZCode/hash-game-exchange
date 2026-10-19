@@ -8,6 +8,7 @@ import type { ReactNode } from 'react'
 import Footer from '@/components/layout/Footer'
 import Header from '@/components/layout/Header'
 import Sidebar from '@/components/layout/Sidebar'
+import RealtimeRefresh from '@/components/shared/RealtimeRefresh'
 import RouteGate from '@/components/shared/RouteGate'
 import { SidebarInset } from '@/components/ui/sidebar'
 import { Toaster } from '@/components/ui/sonner'
@@ -24,6 +25,7 @@ const PagesLayout = ({ children }: Readonly<{ children: ReactNode }>) => {
           <RouteGate>{children}</RouteGate>
         </main>
         <Toaster />
+        <RealtimeRefresh />
         <Footer />
       </SidebarInset>
     </div>
