@@ -45,7 +45,6 @@ import SettingsAccountInfo from './pages/Settings/AccountInfo';
 import SettingsSecurity from './pages/Settings/Security';
 import SettingsPreferences from './pages/Settings/Preferences';
 import SettingsVerification from './pages/Settings/Verification';
-import SettingsWhitelist from './pages/Settings/Whitelist';
 import Bonus from './pages/Bonus';
 import Help from './pages/Help';
 import Responsible from './pages/Responsible';
@@ -961,7 +960,8 @@ function AppShell() {
                 pane is gone; `general` was never a pane. Both land on Account Info. */}
             <Route path="payment" element={<Navigate to="/settings/account-info" replace />} />
             <Route path="general" element={<Navigate to="/settings/account-info" replace />} />
-            <Route path="whitelist" element={<SettingsWhitelist />} />
+            {/* Whitelist Management is off (owner, 2026-10-19); old links land on Account Info. */}
+            <Route path="whitelist" element={<Navigate to="/settings/account-info" replace />} />
           </Route>
           <Route path="/wallet" element={<WalletLayout />}>
             <Route index element={<Navigate to="/wallet/balance" replace />} />

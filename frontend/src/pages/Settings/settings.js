@@ -39,14 +39,8 @@
  *
  * `gmail` and `openUserName` are what a CONNECTED row prints beside its name; both are absent
  * here because nothing is connected. */
-/* No `cwallet` row: Cwallet is not offered here (hidden-features skill). */
-export const CONNECTIONS = [
-  { openName: 'google', connected: false },
-  { openName: 'telegram', connected: false },
-  { openName: 'line', connected: false },
-  { openName: 'twitter', connected: false },
-  { openName: 'steam', connected: false },
-];
+/* Google only (owner, 2026-10-19): Telegram, Line, Twitter, Steam and Cwallet are not offered. */
+export const CONNECTIONS = [{ openName: 'google', connected: false }];
 
 /* `/account/link/list/` and `/agent/affiliate/community-links` — the Linked Accounts and
    Exclusive Communities cards. Both are `<Show when={list.length}>` on the original, so an empty

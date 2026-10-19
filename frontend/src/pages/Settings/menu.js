@@ -3,7 +3,6 @@ import {
   IconSet,
   IconPreferences,
   IconPersonalVerification,
-  IconWhitelist,
 } from './icons';
 
 /* `b()` in `index-B0Ab1fJ8.js` — the settings rail, verbatim.
@@ -40,12 +39,7 @@ export const SETTINGS_MENU = [
     href: '/settings/verification',
     icon: IconPersonalVerification,
   },
-  {
-    key: 'whitelist',
-    label: 'Whitelist Management',
-    href: '/settings/whitelist',
-    icon: IconWhitelist,
-  },
+  /* Whitelist Management is off (owner, 2026-10-19): no crypto withdrawal to whitelist. */
 ];
 
 /* Each pane's own `PageLayout title` — the string its chunk pushes into the router's dialog
@@ -58,5 +52,4 @@ export const PANE_TITLE = {
   security: 'Security',
   preferences: 'Preferences',
   verification: 'Personal Verification',
-  whitelist: 'Whitelist Management',
 };
