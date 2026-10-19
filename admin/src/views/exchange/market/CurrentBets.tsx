@@ -10,6 +10,7 @@ import PageHeader from '@/components/shared/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
@@ -31,6 +32,45 @@ const BET_TYPES = [
 ]
 
 const LIMITS = [25, 50, 75, 100, 125, 150]
+
+/** "Detail" dabane pe ek bet ki poori jaankari. */
+function BetDetail({ bet, onClose }: { bet: Bet; onClose: () => void }) {
+  const rows: [string, string | null][] = [
+    ['User Name', bet.username],
+    ['Event Type', bet.sportName],
+    ['Event Name', bet.eventName],
+    ['Market', bet.marketLabel || bet.marketType],
+    ['Nation', bet.selection],
+    ['Side', isLay(bet) ? 'Lay' : 'Back'],
+    ['U Rate', rateOf(bet)],
+    ['Amount', plain(bet.stake)],
+    ['Status', bet.deleted ? 'Deleted' : bet.unmatched ? 'Unmatched' : 'Matched'],
+    ['Place Date', fmtDateTime(bet.createdAt)],
+    ['IP', bet.ip],
+    ['Browser', bet.browser],
+    ['Bet ID', bet.id]
+  ]
+
+  return (
+    <Dialog open onOpenChange={open => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Bet Detail</DialogTitle>
+        </DialogHeader>
+        <table className='w-full text-sm'>
+          <tbody>
+            {rows.map(([k, v]) => (
+              <tr key={k} className='border-b last:border-0'>
+                <th className='text-muted-foreground py-1.5 pr-3 text-left font-normal whitespace-nowrap'>{k}</th>
+                <td className='py-1.5 break-all'>{v || '-'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </DialogContent>
+    </Dialog>
+  )
+}
 
 const COLUMNS = ['Event Type', 'Event Name', 'User Name', 'M Name', 'Nation', 'U Rate', 'Amount', 'Place Date', 'IP', 'Browser', 'Action']
 const EXPORT_COLS = COLUMNS.slice(0, 10)
@@ -61,6 +101,7 @@ const BetsList = ({ channel }: { channel: Channel }) => {
   const [limit, setLimit] = useState(25)
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
+  const [detail, setDetail] = useState<Bet | null>(null)
 
   // Load dabane pe filters yahan "lock" hote hain — tabhi API chalti hai
   const [loaded, setLoaded] = useState<{ matchStatus: string; betType: string } | null>(null)
@@ -176,9 +217,9 @@ const BetsList = ({ channel }: { channel: Channel }) => {
                       <td className='px-3 py-1.5 whitespace-nowrap'>{fmtDateTime(b.createdAt)}</td>
                       <td className='px-3 py-1.5'>{b.ip}</td>
                       <td className='px-3 py-1.5'>
-                        <span className='text-success cursor-help' title={b.browser || undefined}>
+                        <button type='button' className='text-success cursor-pointer hover:underline' title={b.browser || undefined} onClick={() => setDetail(b)}>
                           Detail
-                        </span>
+                        </button>
                       </td>
                       <td className='px-3 py-1.5'>
                         <Checkbox aria-label='Select bet' />
@@ -202,6 +243,7 @@ const BetsList = ({ channel }: { channel: Channel }) => {
             <ChevronRightIcon />
           </Button>
         </div>
+        {detail && <BetDetail bet={detail} onClose={() => setDetail(null)} />}
       </Card>
   )
 }
