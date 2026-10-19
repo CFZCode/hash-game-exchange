@@ -32,6 +32,15 @@ const {
  * The code travels as a bound parameter, never as an identifier, and must name
  * a `currencies` row with `builtin = false` (else `WALLET_UNSUPPORTED_CURRENCY`).
  */
+/** The Transaction pane's Bill types as `credits_ledger` filters (`meta.refType` is the writer's). */
+const LEDGER_CATEGORY_SQL = Object.freeze({
+  game: "reason IN ('BET_STAKE', 'BET_PAYOUT', 'BET_REFUND', 'BET_ROLLBACK')",
+  bonus: "reason IN ('BONUS', 'BONUS_REVERSAL', 'rakeback_claim')",
+  affiliate: "meta->>'refType' LIKE 'AFFILIATE%'",
+  vault: "meta->>'refType' = 'VAULT'",
+  swap: "meta->>'swap' = 'true'",
+});
+
 class WalletRepository {
   constructor({ models, db }) {
     this.models = models;
@@ -416,20 +425,44 @@ class WalletRepository {
   //  Statements
   // ══════════════════════════════════════════════════════════════════════
 
-  async listLedger({ userId, currency, reason, limit, offset }) {
-    return this.models.CreditsLedger.findAndCountAll({
-      where: {
-        // credits_ledger.user_id is TEXT in the legacy schema.
-        user_id: String(userId),
-        ...(currency ? { currency } : {}),
-        // One reason or a list (`REWARDS` expands to several — see the validator).
-        ...(reason ? { reason: Array.isArray(reason) ? (reason.length === 1 ? reason[0] : reason) : reason } : {}),
-      },
-      order: [['created_at', 'DESC'], ['id', 'DESC']],
-      limit,
-      offset,
-      raw: true,
-    });
+  /**
+   * The player's statement. `category` is the Transaction pane's Bill type (LEDGER_CATEGORY_SQL).
+   * Unless a reason or another category narrows it, the sports exchange's own INR rows are merged
+   * in: its stake holds (`mssports.debit_ledger`) and settlements (`mssports.credits_ledger`) never
+   * reach this wallet's `credits_ledger`, and the player still has to see where the money went.
+   */
+  async listLedger({ userId, currency, reason, category, limit, offset }) {
+    // credits_ledger.user_id is TEXT in the legacy schema.
+    const replacements = { uid: String(userId), currency, limit, offset };
+    const where = ['user_id = :uid'];
+    if (currency) where.push('currency = :currency');
+    // One reason or a list (`REWARDS` expands to several — see the validator).
+    if (reason) {
+      replacements.reasons = [].concat(reason);
+      where.push('reason IN (:reasons)');
+    }
+    if (category) where.push(LEDGER_CATEGORY_SQL[category]);
+    const parts = [
+      `SELECT id::text AS id, id AS seq, user_id, currency, amount, reason, description, balance, created_at::timestamptz AS created_at, meta
+         FROM public.credits_ledger WHERE ${where.join(' AND ')}`,
+    ];
+    if (!reason && (!category || category === 'game') && (!currency || currency === 'INR')) {
+      parts.push(
+        `SELECT 'sd' || id, id, user_id, currency, -amount, 'SPORTS_STAKE', description, balance, created_at::timestamptz, NULL::jsonb
+           FROM mssports.debit_ledger WHERE user_id = :uid AND reason = 'bet_placed'`,
+        `SELECT 'sc' || id, id, user_id, currency, amount,
+                CASE reason WHEN 'refund' THEN 'SPORTS_REFUND' WHEN 'settlement_void' THEN 'SPORTS_VOID' ELSE 'SPORTS_SETTLEMENT' END,
+                description, closing, created_at::timestamptz, NULL::jsonb
+           FROM mssports.credits_ledger WHERE user_id = :uid AND reason IN ('settlement', 'refund', 'settlement_void')`
+      );
+    }
+    const union = parts.join(' UNION ALL ');
+    const rows = await this.sequelize.query(
+      `SELECT * FROM (${union}) l ORDER BY created_at DESC, seq DESC LIMIT :limit OFFSET :offset`,
+      { replacements, type: 'SELECT' }
+    );
+    const [{ count }] = await this.sequelize.query(`SELECT COUNT(*)::int AS count FROM (${union}) l`, { replacements, type: 'SELECT' });
+    return { rows: rows.map(({ seq, ...row }) => row), count };
   }
 
   async listHistory({ userId, currency, limit, offset }) {

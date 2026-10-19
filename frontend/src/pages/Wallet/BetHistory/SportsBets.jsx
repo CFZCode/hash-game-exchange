@@ -7,11 +7,9 @@ import { SkeletonBetRows, SkeletonSportsBets } from '../../../components/exchang
 import { useWalletFilter } from '../../../context/walletFilter';
 import useResource from '../../../hooks/useResource';
 import { useSelectedCurrency } from '../../../hooks/useSelectedCurrency';
-import { getSportsBets } from '../../../services/exchange/history';
-import { clampStatementWindow, getSportsStatement, getStatementBets, getStatementKind, STATEMENT_MAX_DAYS } from '../../../services/sportsStatement';
-import { resolveRange } from '../../../services/transaction';
+import { getStatementBets, STATEMENT_MAX_DAYS } from '../../../services/sportsStatement';
 import { isFiatCode } from '../../../utils/currency';
-import { SIDE_OPTIONS, STATUS_OPTIONS, buildRows, filterRows, formatBetDate, isBackSide } from './sportsBets';
+import { SIDE_OPTIONS, STATUS_OPTIONS, filterRows, formatBetDate, isBackSide, loadSportsHistory } from './sportsBets';
 
 /* Bet History → Type = Sports. Exchange bets are not casino rounds — they have a side, odds, a
  * liability and a settled market — so they get their own list in place of the casino table, under
@@ -29,7 +27,6 @@ import { SIDE_OPTIONS, STATUS_OPTIONS, buildRows, filterRows, formatBetDate, isB
  * Amounts print in the selected coin from each row's own currency. Both statements cap the window
  * at 31 days, so a longer Time filter is clamped and the view says so.
  */
-const FEED_LIMIT = 100;
 const PAGE_SIZE = 20;
 
 /* Wallet filter keys for the two extra dropdowns ('' = all, the provider's default). */
@@ -188,15 +185,6 @@ const ExpandIcon = ({ open }) => (
     <path d="M12.31 5.6L22.71 16L12.31 26.4L9.29 23.38L16.67 16L9.29 8.62Z" />
   </svg>
 );
-
-async function loadSportsHistory(time) {
-  const [begin, end] = resolveRange(time);
-  const window = clampStatementWindow(begin, end);
-  const [kind, feed] = await Promise.all([getStatementKind().catch(() => null), getSportsBets({ page: 1, limit: FEED_LIMIT, status: 'all' })]);
-  // A statement that cannot be read is `null`: the feed's settled bets stand in (buildRows).
-  const statement = await getSportsStatement({ kind: kind ?? 'direct', from: window.from, to: window.to }).catch(() => null);
-  return { window, kind, statementOk: Array.isArray(statement), rows: buildRows({ statement, bets: feed.rows }) };
-}
 
 export default function SportsBets() {
   const { get } = useWalletFilter();

@@ -1,5 +1,6 @@
 // sportsbet/sportbetscontroller.js — mssports core, moved unchanged
 import { db_default, init_db } from "../../../lib/config/db.mjs";
+import { createRequire } from "node:module";
 import { isHiddenSport, isHiddenLeague } from "../../../lib/constants/hiddenSports.mjs";
 import { TotalExposure_default, init_TotalExposure } from "../../../models/user/TotalExposure.mjs";
 import { User_default } from "../../../models/user/User.mjs";
@@ -28,6 +29,7 @@ import { leagueNameForBet } from "../../../lib/services/SportsLeagueResolver.mjs
 import { TOTAL_EXPOSURE_SQL } from "../../../lib/helper/totalExposure.mjs";
 import { checkBetLive } from "../buffer/betBuffer.mjs";
 import { StaffMarketLocks_default } from "../../../models/admin/StaffMarketLocks.mjs";
+const { directLedgerContext } = createRequire(import.meta.url)("@ibitplay/common");
 
 import xssClean from "xss-clean";
 import { toInr, inrToUsd } from "../../../lib/helper/toInr.mjs";
@@ -426,14 +428,22 @@ var walletUpdate = async (wallet, balanceChange, transaction, context = {}) => {
   */
   // NEW (credits.inr): `wallet` is the player's credits row, locked by the caller.
   let currentCash = Number(wallet.inr || 0);
+  // Names the move in a direct player's ledger (point_ledger_direct, read by /sports/statement),
+  // which otherwise reads BALANCE_CHANGE. Called only right before the inr actually changes.
+  const label = (eventType) => directLedgerContext(db_default, transaction, {
+    userId: user_id, eventType, source: "sports-service", betId: newBet?.id, sportId: sid, gameType: game_type,
+    remark: [match_title, selection_name].filter(Boolean).join(" ")
+  });
   if (balanceChange < 0) {
     const amountToAdd = Math.abs(balanceChange);
     wallet.inr = currentCash + amountToAdd;
+    await label("BET_RELEASED");
     await wallet.save({ transaction });
   } else if (balanceChange > 0) {
     const amountToDeduct = balanceChange;
     if (currentCash >= amountToDeduct) {
       wallet.inr = currentCash - amountToDeduct;
+      await label("BET_PLACED");
     }
     if (isNaN(wallet.inr)) {
       console.error(`[walletUpdate] \u274C Resulting balance is NaN! Reverting. Curr: ${currentCash}, Ded: ${amountToDeduct}`);

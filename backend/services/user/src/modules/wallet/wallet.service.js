@@ -52,6 +52,22 @@ const creditPayload = (balances) => ({
   credit: Object.fromEntries(Object.entries(balances).map(([code, value]) => [code.toLowerCase(), value])),
 });
 
+/* Staff-written ledger rows (admin adjust, agent float, Super Admin direct wallet, transfers) carry
+   the staff's own note in `description`; the player sees what happened instead. */
+const PLAYER_LABEL = Object.freeze({
+  ADMIN_CREDIT: 'Credit by admin',
+  ADMIN_DEBIT: 'Debit by admin',
+  TRANSFER_IN: 'Transfer in',
+  TRANSFER_OUT: 'Transfer out',
+});
+const STAFF_REFS = new Set(['STAFF', 'STAFF_TRANSFER', 'DIRECT_WALLET', 'TRANSFER']);
+function forPlayer(row) {
+  const ref = row.meta?.refType;
+  if (!STAFF_REFS.has(ref) && !String(row.reason).startsWith('ADMIN_')) return row;
+  const agent = ref === 'STAFF_TRANSFER' && (String(row.amount).startsWith('-') ? 'Debited by agent' : 'Credited by agent');
+  return { ...row, description: agent || PLAYER_LABEL[row.reason] || row.reason };
+}
+
 class WalletService {
   constructor(deps) {
     const { models, db, config, logger, clients } = deps;
@@ -237,8 +253,10 @@ class WalletService {
     return this.repo.listHistory(params);
   }
 
+  /** The PLAYER's ledger: a row a staff member wrote reads as a plain label, never the staff note. */
   async listLedger(params) {
-    return this.repo.listLedger(params);
+    const result = await this.repo.listLedger(params);
+    return { ...result, rows: result.rows.map(forPlayer) };
   }
 
   // ══════════════════════════════════════════════════════════════════════
@@ -807,4 +825,4 @@ class WalletService {
   }
 }
 
-module.exports = { WalletService, CREDIT_REASONS, creditPayload };
+module.exports = { WalletService, CREDIT_REASONS, creditPayload, forPlayer };

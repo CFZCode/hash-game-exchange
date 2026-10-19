@@ -22,6 +22,7 @@ import {
   linksToGameDetail,
 } from '../../../services/betHistory';
 import SportsBets, { SPORTS_SIDE_KEY, SPORTS_STATUS_KEY, SportsFilters } from './SportsBets';
+import { filterRows, loadSportsHistory, toCasinoRow } from './sportsBets';
 
 /* Type = Sports (value "4"): the exchange's bets, drawn by SportsBets instead of the casino table. */
 const SPORTS_TYPE = '4';
@@ -123,7 +124,16 @@ function BetList({ settings }) {
      pair every render and the resource would never settle. Key on the filter string. */
   const read = React.useCallback(() => {
     const [beginTime, endTime] = resolveRange(time);
-    return getBetHistory({ beginTime, endTime, currencyName: assets, type, page: 1 });
+    const casino = Promise.resolve(getBetHistory({ beginTime, endTime, currencyName: assets, type, page: 1 }));
+    if (type !== '') return casino;
+    // All: the exchange's bets too (the Sports type's rows), which the casino feed does not carry.
+    return Promise.all([casino, loadSportsHistory(time).catch(() => null)]).then(([casinoPage, sports]) => {
+      if (!sports) return casinoPage;
+      const coin = assets && assets !== 'all' ? assets : '';
+      const extra = filterRows(sports.rows, { currency: coin, from: sports.window.from, to: sports.window.to }).map(toCasinoRow);
+      const resList = [...(casinoPage?.resList ?? []), ...extra].sort((a, b) => Number(b.time) - Number(a.time));
+      return { ...casinoPage, resList };
+    });
   }, [time, assets, type]);
   const { data: page, loading } = useResource(read);
 

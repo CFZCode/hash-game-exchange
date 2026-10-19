@@ -167,6 +167,8 @@ const listLedger = {
   query: z.object({
     currency: knownCurrency.optional(),
     reason: ledgerReason,
+    // The Transaction pane's Bill type (wallet.repository LEDGER_CATEGORY_SQL).
+    category: z.enum(['game', 'affiliate', 'vault', 'swap', 'bonus']).optional(),
     limit: z.coerce.number().int().min(1).max(100).default(25),
     offset: z.coerce.number().int().min(0).default(0),
   }).strict(),

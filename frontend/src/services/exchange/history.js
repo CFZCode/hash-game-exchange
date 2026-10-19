@@ -1,4 +1,5 @@
 import { exchangeRequest } from './api';
+import { getStatementKind } from '../sportsStatement';
 import { normaliseBets } from '../../utils/exchange/addaplay';
 
 /**
@@ -27,8 +28,12 @@ export async function getSportsBets({ page = 1, limit = 20, search, betType, sta
  *   credit/debit/closing are 2-dp STRINGS, '-' when empty (as the server sends them).
  */
 export async function getAccountStatement({ fromDate, toDate, page = 1, limit = 25, reportType = 'ALL', search } = {}) {
-  const body = await exchangeRequest('/account-statement-v2', {
-    method: 'POST', json: { fromDate, toDate, page, limit, reportType, search }, auth: true,
+  /* v2 is the AGENT-tree statement (`point_ledger`); a direct player's money is in
+     `point_ledger_direct`, so v2 answered them a bare "Opening 0.00" (services/sportsStatement.js
+     has the rule). The exchange is INR, so the direct statement is read in INR. */
+  const direct = (await getStatementKind().catch(() => null)) === 'direct';
+  const body = await exchangeRequest(direct ? '/account-statement-direct' : '/account-statement-v2', {
+    method: 'POST', json: { fromDate, toDate, page, limit, reportType, search, ...(direct ? { currency: 'INR' } : {}) }, auth: true,
   });
   return {
     rows: Array.isArray(body?.data) ? body.data : [],

@@ -9,6 +9,10 @@
  * `dd/mm/yyyy hh:mm:ss (UTC±hh:mm)` in the viewer's zone.
  */
 import { sportIconOf } from '../../Exchange/model';
+import { getSportsBets } from '../../../services/exchange/history';
+import { clampStatementWindow, getSportsStatement, getStatementKind } from '../../../services/sportsStatement';
+import { resolveRange } from '../../../services/transaction';
+import { isFiatCode } from '../../../utils/currency';
 
 const SPORT_NAMES = { 1: 'Football', 2: 'Tennis', 4: 'Cricket', 10: 'Horse Racing', 65: 'Greyhound Racing' };
 
@@ -218,3 +222,26 @@ export const SIDE_OPTIONS = [
   { label: 'Back', value: 'back' },
   { label: 'Lay', value: 'lay' },
 ];
+
+const FEED_LIMIT = 100;
+
+/** Every sports row for a Time filter (Type = Sports, and merged into Type = All). */
+export async function loadSportsHistory(time) {
+  const [begin, end] = resolveRange(time);
+  const window = clampStatementWindow(begin, end);
+  const [kind, feed] = await Promise.all([getStatementKind().catch(() => null), getSportsBets({ page: 1, limit: FEED_LIMIT, status: 'all' })]);
+  // A statement that cannot be read is `null`: the feed's settled bets stand in (buildRows).
+  const statement = await getSportsStatement({ kind: kind ?? 'direct', from: window.from, to: window.to }).catch(() => null);
+  return { window, kind, statementOk: Array.isArray(statement), rows: buildRows({ statement, bets: feed.rows }) };
+}
+
+/** A sports row as a casino-table row (Bet History → All). Payout is the casino rows' own rule,
+ *  (stake + profit) / stake x 1e4, so a loss and a still-open bet read 0x. */
+export const toCasinoRow = (r) => ({
+  distributeId: r.key,
+  type: 'Sports',
+  time: r.time,
+  payout: r.stake > 0 && r.pnl != null ? Math.max(0, ((r.stake + r.pnl) / r.stake) * 1e4) : 0,
+  profit: r.pnl ?? 0,
+  currencyName: isFiatCode(r.currency) ? `${r.currency}FIAT` : r.currency,
+});

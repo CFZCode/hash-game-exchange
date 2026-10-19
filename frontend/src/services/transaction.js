@@ -49,10 +49,10 @@ const PAGE_SIZE = 20;
  * parameter:
  *
  *   assets     → `currency`. Sent, and the only one that reaches the server.
- *   bill type  → the ledger's axis is `reason`, ONE of thirteen values (`BET_STAKE`,
- *                `TRANSFER_IN`, `BONUS`, …), where this filter's options are CATEGORIES — Game,
- *                Affiliate, Vault, Swap. "Game" is four reasons and "Swap" is two, so there is no
- *                value to send. Left unsent rather than approximated.
+ *   bill type  → `category` (game | affiliate | vault | swap | bonus), which the ledger route
+ *                resolves to reasons and the writer's `meta` (user-service wallet.repository);
+ *                the Bonus and Swap TYPES are this table with the category pinned. "All" sends
+ *                none. The route also merges the sports exchange's stake and settlement rows in.
  *   time       → the ledger takes no date range at all. Filtering the fetched page here instead
  *                would show fewer rows than the pager counts, which reads worse than a control
  *                that does nothing.
@@ -62,17 +62,19 @@ const PAGE_SIZE = 20;
  * silently wrong. `/casino/bet-history` DOES take `from`/`to`, which is why the time filter works
  * on that pane and not this one.
  */
-/* The call site still passes `beginTime`, `endTime` and `changeTypeName` — the pane's reader is
-   keyed on all of them and re-fetches when any moves — and they are not destructured here because
-   there is nothing to send them to. Put them back in the signature the day the ledger grows a date
-   range or a category axis; the caller needs no change either way. */
-export function getBillRecords({ currencyName, page = 1 }) {
+/* The pane's Bill Type (or the pinned Bonus / Swap type) → the ledger route's `category`. */
+const BILL_CATEGORY = { Game: 'game', Affiliate: 'affiliate', Vault: 'vault', Swap: 'swap', Bonus: 'bonus', swap: 'swap' };
+
+/* The call site still passes `beginTime` and `endTime` — the pane's reader is keyed on them — and
+   they are not destructured here because the ledger takes no date range. */
+export function getBillRecords({ currencyName, changeTypeName, page = 1 }) {
   const answer = requestPage(PLATFORM.user.wallet.ledger, {
     live: true,
     params: {
       /* The platform keys money by BARE code; `All` is the pane's own "no filter" sentinel and
          must not be sent as a currency. */
       currency: currencyName ? String(currencyName).replace(/FIAT$/, '') : undefined,
+      category: BILL_CATEGORY[changeTypeName],
       limit: PAGE_SIZE,
       offset: (page - 1) * PAGE_SIZE,
     },
@@ -103,11 +105,22 @@ export function getBillRecords({ currencyName, page = 1 }) {
  * and splitting one invented figure across two columns would put a number on screen that no row
  * anywhere holds.
  */
+/* What a ledger `reason` is called on screen — never the raw code. An unknown one shows nothing. */
+const REASON_LABEL = {
+  BET_STAKE: 'Bet', BET_PAYOUT: 'Win', BET_REFUND: 'Refund', BET_ROLLBACK: 'Rollback',
+  DEPOSIT: 'Deposit', WITHDRAWAL: 'Withdrawal', WITHDRAWAL_REVERSAL: 'Withdrawal reversed',
+  ADMIN_CREDIT: 'Credit by admin', ADMIN_DEBIT: 'Debit by admin', TRANSFER_IN: 'Transfer in', TRANSFER_OUT: 'Transfer out',
+  BONUS: 'Bonus', BONUS_REVERSAL: 'Bonus reversed', rakeback_claim: 'Rakeback', TIP_SENT: 'Tip sent', TIP_RECEIVED: 'Tip received',
+  SPORTS_STAKE: 'Sports bet', SPORTS_SETTLEMENT: 'Sports settlement', SPORTS_REFUND: 'Sports refund', SPORTS_VOID: 'Sports void',
+};
+
 function toBillPage({ rows, pagination }) {
   return {
     list: (rows ?? []).map((row) => {
       const amount = Number(row.amount) || 0;
       const balance = Number(row.balance) || 0;
+      const label = REASON_LABEL[row.reason] ?? '';
+      const desc = row.description || label;
 
       return {
         amountLogId: row.id,
@@ -116,9 +129,10 @@ function toBillPage({ rows, pagination }) {
         createTime: row.created_at ? Date.parse(row.created_at) : 0,
         currencyName: isFiatCode(row.currency) ? `${row.currency}FIAT` : row.currency,
         /* `description` is written per movement ("Swap INR -> USDT") and is the better label; the
-           `reason` enum is the fallback and is what the detail line shows either way. */
-        changeTypeDesc: row.description || row.reason || '',
-        changeTypeDetail: row.reason || '',
+           reason's plain name is the fallback and the detail line (staff notes never arrive: the
+           route swaps them for a label). */
+        changeTypeDesc: desc,
+        changeTypeDetail: label !== desc ? label : '',
         changeType: row.reason || '',
         generalChangeAmount: String(amount),
         bonusChangeAmount: '0',

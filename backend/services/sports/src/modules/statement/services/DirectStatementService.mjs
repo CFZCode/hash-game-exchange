@@ -11,7 +11,9 @@ import { isVoidRow, stripVoidPrefix, withVoidSuffix } from "../../../lib/helper/
 import { fanMarketName } from "../../../lib/helper/fanMarketName.mjs";
 import { sportsMarketKey } from "./UserStatementService.mjs";
 
-const REPORT_TYPES = ["ALL", "SPORTS", "CASINO"];
+// TRANSACTION: what /sports/statement's "Transactions" means for a direct player — every move that
+// is not a game (deposit, withdrawal, admin, bonus, transfer, stake holds).
+const REPORT_TYPES = ["ALL", "SPORTS", "CASINO", "TRANSACTION"];
 
 /** Same market + same currency ki rows ek line: delta jodo, baaki aakhri row ka. */
 const groupRows = (rows, sportsBetMap) => {
@@ -62,7 +64,9 @@ const DirectStatementService = {
       where.push("created_at <= :to");
       replacements.to = end;
     }
-    if (reportType !== "ALL") {
+    if (reportType === "TRANSACTION") {
+      where.push("category NOT IN ('SPORTS', 'CASINO', 'ORIGINAL_GAME')");
+    } else if (reportType !== "ALL") {
       where.push("category = :category");
       replacements.category = reportType;
     }

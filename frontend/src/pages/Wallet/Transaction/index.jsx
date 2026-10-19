@@ -30,7 +30,6 @@ import {
   getBillRecords,
   getDepositRecords,
   getWithdrawRecords,
-  getSwapRecords,
   getBuyCryptoRecords,
   TIME_RANGE,
   defaultRange,
@@ -227,13 +226,6 @@ const STATUS_COLUMNS = [
   ['Status', HEAD_END],
 ];
 
-const SWAP_COLUMNS = [
-  ['Type', HEAD],
-  ['Time', HEAD_CENTER],
-  ['Swap From', HEAD_CENTER],
-  ['Swap To', HEAD_END],
-];
-
 /* `Pe`/`ge` — the Bill list, the pane's default and the only one whose rows are written. `be`
  * derives all three of its numbers from four fields, which is worth stating because none of them
  * is served directly:
@@ -248,7 +240,8 @@ const SWAP_COLUMNS = [
 function BillList({ settings }) {
   const { get } = useFilter();
   const type = get('type');
-  const changeTypeName = type === TYPE.Bonus ? TYPE.Bonus : get('billType');
+  // Bonus and Swap are this table with the category pinned (services/transaction.js).
+  const changeTypeName = type === TYPE.Bonus || type === TYPE.Swap ? type : get('billType');
   const assets = get('assets');
   const time = get('time');
 
@@ -513,8 +506,6 @@ function TransactionList({ settings }) {
       return <DepositList settings={settings} />;
     case TYPE.Withdraw:
       return <WithdrawList settings={settings} />;
-    case TYPE.Swap:
-      return <HeaderOnlyList columns={SWAP_COLUMNS} read={getSwapRecords} />;
     case TYPE.Buy:
       return <HeaderOnlyList columns={STATUS_COLUMNS} read={getBuyCryptoRecords} />;
     default:

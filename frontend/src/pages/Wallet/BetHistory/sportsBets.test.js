@@ -83,7 +83,7 @@ describe('the row', () => {
 });
 
 /* ── The statement-based view ─────────────────────────────────────────────────────────────────── */
-import { buildRows, filterRows, statementRow } from './sportsBets';
+import { buildRows, filterRows, statementRow, toCasinoRow } from './sportsBets';
 import { clampStatementWindow, isAgentTreePlayer } from '../../../services/sportsStatement';
 
 const st = (over) => ({
@@ -176,5 +176,13 @@ describe('marketLabel', () => {
     expect(marketLabel('OVER_UNDER_15')).toBe('Over/Under 1.5');
     expect(marketLabel('MATCH_ODDS')).toBe('Match Odds');
     expect(marketLabel('NULL')).toBe('');
+  });
+});
+
+describe('toCasinoRow (Bet History → All)', () => {
+  it('a won bet pays (stake + P&L) / stake, an open one 0x, in the wallet key', () => {
+    const won = toCasinoRow({ key: 'st:1', time: 5, stake: 100, pnl: 150, currency: 'INR' });
+    expect(won).toMatchObject({ distributeId: 'st:1', type: 'Sports', time: 5, payout: 25000, profit: 150, currencyName: 'INRFIAT' });
+    expect(toCasinoRow({ key: 'bet:2', time: 6, stake: 100, pnl: null, currency: 'INR' })).toMatchObject({ payout: 0, profit: 0 });
   });
 });

@@ -74,7 +74,7 @@ var UserStatementController = {
       const { reportType, fromDate, toDate, currency, search, page, limit } = req.body || {};
       const rt = String(reportType || "ALL").toUpperCase().trim();
       if (!DirectStatementService.REPORT_TYPES.includes(rt)) {
-        return res.status(400).json({ success: false, message: "reportType must be ALL, SPORTS or CASINO" });
+        return res.status(400).json({ success: false, message: "reportType must be ALL, SPORTS, CASINO or TRANSACTION" });
       }
       if (currency != null && !/^[A-Za-z]{2,10}$/.test(String(currency))) {
         return res.status(400).json({ success: false, message: "currency must be a coin code like INR or USDT" });
