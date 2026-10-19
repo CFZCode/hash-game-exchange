@@ -3,6 +3,7 @@
 import { useState } from 'react'
 
 import FormDialog from '@/components/shared/FormDialog'
+import { formatIn, useReportMoney } from '@/components/shared/ReportMoney'
 import { SelectField, TextAreaField, TextField } from '@/components/shared/FormField'
 import { useApi, useApiMutation } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
@@ -40,15 +41,22 @@ const OwnerAddBalance = ({ open, onOpenChange }: { open: boolean; onOpenChange: 
   const { data, error } = useApi<OwnerWallet>(open ? 'admin/exchange/owner/wallet' : null)
   const current = data ? (target === 'client' ? data.wallet.balance : data.directBalance) : null
 
+  // Direct balance owner ki default coin (e.g. USDT) me: dikhe bhi usi me, server INR me badal ke save kare.
+  const money = useReportMoney()
+  const coin = target === 'direct' ? money.code : 'INR'
+  const coinPerInr = coin !== 'INR' && Number(form.amount) > 0 ? money.convert(1, 'INR') : null
+  const shownCurrent = current === null ? null : target === 'direct' ? money.format(current, 'INR') : Number(current).toLocaleString()
+
   const add = useApiMutation({
     fn: () =>
       api.post(TARGETS[target].path, {
         amount: form.amount,
+        ...(coin !== 'INR' ? { currency: coin } : {}),
         ...(form.note ? { note: form.note } : {}),
         transactionPassword: form.transactionPassword
       }),
     invalidate: [['api', 'admin/exchange/owner/wallet'], ['api', 'admin/exchange/dashboard'], ['api', 'admin/exchange/user-reports/home'], ['api', 'admin/accounts/float'], ['api', 'admin/exchange/accounts'], ['paged', 'admin/exchange/owner/direct-ledger']],
-    success: () => `${Number(form.amount).toLocaleString()} added to your ${TARGETS[target].label}`,
+    success: () => `${coin === 'INR' ? Number(form.amount).toLocaleString() : formatIn(Number(form.amount), coin)} added to your ${TARGETS[target].label}`,
     onSuccess: () => setForm({ amount: '', note: '', transactionPassword: '' })
   })
 
@@ -77,8 +85,16 @@ const OwnerAddBalance = ({ open, onOpenChange }: { open: boolean; onOpenChange: 
         options={(Object.keys(TARGETS) as Target[]).map(k => ({ value: k, label: TARGETS[k].label }))}
         hint={TARGETS[target].note}
       />
-      <TextField id='ob-current' label='Current Balance' readOnly disabled value={current !== null ? Number(current).toLocaleString() : error ? 'Could not load' : '…'} />
-      <TextField id='ob-amount' label='Amount' required placeholder='Amount' value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} />
+      <TextField id='ob-current' label='Current Balance' readOnly disabled value={shownCurrent ?? (error ? 'Could not load' : '…')} />
+      <TextField
+        id='ob-amount'
+        label={coin === 'INR' ? 'Amount' : `Amount (${coin})`}
+        required
+        placeholder={coin === 'INR' ? 'Amount' : `Amount in ${coin}`}
+        value={form.amount}
+        onChange={e => setForm({ ...form, amount: e.target.value })}
+        hint={coinPerInr ? `Saved in INR at the current rate: ≈ ${formatIn(Number(form.amount) / coinPerInr, 'INR')}` : undefined}
+      />
       <TextAreaField id='ob-note' label='Remark (optional)' maxLength={200} value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} />
       <TextField
         id='ob-tp'
