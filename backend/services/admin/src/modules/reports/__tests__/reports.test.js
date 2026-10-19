@@ -332,7 +332,7 @@ test('reports against a database', async (t) => {
       user_id: String(playerA), currency: 'INR', amount, netamount: 0, reason, source_service: 'casino-service', meta: { refType }, ...extra,
     });
     await models.CreditsLedger.bulkCreate([
-      ledger('BET_STAKE', '-1000', 'OG', { description: 'original-games bet x' }),
+      ledger('BET_STAKE', '-1000', 'OG', { description: 'original-games bet t5-sheet-tx', meta: { refType: 'OG', refId: 't5-sheet-tx' } }),
       ledger('BET_PAYOUT', '1000', 'OG'),
       ledger('BET_STAKE', '-20', 'JSGAMES'),
       // GIS rounds are read from gis_transactions; the ledger copy must not double them.
@@ -340,16 +340,24 @@ test('reports against a database', async (t) => {
       // A sports settlement keeps its netamount and its category.
       { user_id: String(playerA), currency: 'INR', amount: '0', netamount: '30', reason: 'BET_PAYOUT', source_service: 'sports-service' },
     ]);
+    const q = (sql) => models.CreditsLedger.sequelize.query(sql);
+    await q(`INSERT INTO og_games (code, name, position, data, synced_at) VALUES ('t5sheet', 'Sheet Test Game', 999, '{}', now()) ON CONFLICT (code) DO NOTHING`);
+    await q(`INSERT INTO og_transactions (transaction_id, kind, status, user_id, game_code, currency, amount, created_at)
+             VALUES ('t5-sheet-tx', 'bet', 'applied', ${Number(playerA)}, 't5sheet', 'INR', 1000, now())`);
     try {
       const sheet = await service.balanceSheet({ staff: asA, userId: playerA, limit: 500 });
       const by = (c) => sheet.rows.filter((r) => r.category === c).map((r) => r.amount).sort();
       assert.deepEqual(by('Original Games'), ['-1000.00000000', '1000.00000000']);
+      const stake = sheet.rows.find((r) => r.category === 'Original Games' && r.amount === '-1000.00000000');
+      assert.equal(stake.description, 'Sheet Test Game bet · t5-sheet-tx', 'the game is named, not just the transaction id');
       assert.deepEqual(by('Casino'), ['-20.00000000']);
       assert.deepEqual(by('Sports'), ['30.00000000']);
       assert.equal(sheet.balance.debited, '-1020.00000000');
       assert.equal(sheet.balance.credited, '1030.00000000');
     } finally {
       await models.CreditsLedger.destroy({ where: { user_id: String(playerA) } });
+      await q(`DELETE FROM og_transactions WHERE transaction_id = 't5-sheet-tx'`);
+      await q(`DELETE FROM og_games WHERE code = 't5sheet'`);
     }
   });
 

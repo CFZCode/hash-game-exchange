@@ -250,6 +250,27 @@ class ReportsService {
     };
   }
 
+  /**
+   * "Arrow Bow bet · <tx>" for an Original Games ledger row, keyed by its ref id (the aggregator's
+   * transaction id). The ledger only stores "original-games bet <tx>", so the game is read back
+   * from og_transactions → og_games in one query.
+   */
+  async #originalGameNames(rows) {
+    const refs = [];
+    for (const row of rows) {
+      const meta = typeof row.meta === 'string' ? safeJson(row.meta) : row.meta;
+      if (meta?.refType === 'OG' && meta.refId) refs.push(String(meta.refId));
+    }
+    if (!refs.length) return new Map();
+    const found = await this.db.sequelize.query(
+      `SELECT o.transaction_id AS tx, o.kind, COALESCE(g.name, o.game_code) AS name
+         FROM og_transactions o LEFT JOIN og_games g ON g.code = o.game_code
+        WHERE o.transaction_id IN (:refs)`,
+      { replacements: { refs }, type: QueryTypes.SELECT }
+    ).catch(() => []); // no og tables in this deployment: keep the stored description
+    return new Map(found.map((r) => [String(r.tx), `${r.name} ${r.kind} · ${r.tx}`]));
+  }
+
   /** Parent staff ka naam / email (Agent System table). */
   async #parentStaff(parentIds) {
     const ids = [...new Set(parentIds.filter((id) => id != null).map(Number))].filter(Number.isSafeInteger);
@@ -1589,6 +1610,7 @@ class ReportsService {
       },
       raw: true,
     });
+    const ogNames = await this.#originalGameNames(settlements);
     for (const row of settlements) {
       /**
        * casino-service writes these reasons too (originals, js-games, aggregators, in-house) with
@@ -1600,7 +1622,8 @@ class ReportsService {
         if (meta?.refType === 'GIS') continue;
         const signed = money.toDecimalString(money.toMinorQuantised(String(row.amount ?? '0')));
         if (money.toMinor(signed) === 0n) continue;
-        push(row.created_at, meta?.refType === 'OG' ? 'Original Games' : 'Casino', money.toMinor(signed) >= 0n ? 'CREDIT' : 'DEBIT', row.description || row.reason, signed, Number(row.id) || 0);
+        const label = (meta?.refType === 'OG' && ogNames.get(String(meta.refId ?? ''))) || row.description || row.reason;
+        push(row.created_at, meta?.refType === 'OG' ? 'Original Games' : 'Casino', money.toMinor(signed) >= 0n ? 'CREDIT' : 'DEBIT', label, signed, Number(row.id) || 0);
         continue;
       }
       const net = row.netamount != null ? row.netamount : row.amount;

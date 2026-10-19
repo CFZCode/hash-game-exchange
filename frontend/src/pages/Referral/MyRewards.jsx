@@ -409,7 +409,9 @@ export default function MyRewards() {
 
   const readDashboard = React.useCallback(() => getAffiliateDashboard({ reloads }), [reloads]);
   const { data: info } = useResource(readDashboard);
-  const { data: currencies } = useResource(getCommissionList);
+  // Re-read after a claim too: Available drops to 0 the moment the rewards are paid.
+  const readCurrencies = React.useCallback(() => getCommissionList({ reloads }), [reloads]);
+  const { data: currencies } = useResource(readCurrencies);
   const { data: friends } = useResource(getFriendCommissions);
   const { data: codeList } = useResource(getInviteCodes);
   const { data: levelUp } = useResource(getReferralRewards);
@@ -539,7 +541,8 @@ export default function MyRewards() {
             type="button"
             disabled={idle}
             className={`button button-second${size} h-10 flex-1 sm:px-8`}
-            onClick={() => navigate('/rewards-swap')}
+            /* hash.game's `/rewards-swap` is not built; rewards land in the wallet, so Swap opens the wallet's own. */
+            onClick={() => navigate('/wallet/swap')}
           >
             Swap
           </button>

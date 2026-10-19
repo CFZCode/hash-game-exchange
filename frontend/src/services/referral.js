@@ -263,7 +263,9 @@ const usd2 = (value) => (Math.floor(num(value) * 100) / 100).toFixed(2);
 /* `g` in servers-O8_t7p5g.js — Commission by Currency. One row per coin the account has earned
    in, and the page ALSO folds `availableRewardUsd` into a synthetic USDT row when that figure is
    non-zero. It is zero here, so the list stays empty. */
-export const getCommissionList = () => {
+// `reloads` is not read — like getAffiliateDashboard's, it lets a claim re-run this.
+// eslint-disable-next-line no-unused-vars
+export const getCommissionList = ({ reloads } = {}) => {
   if (USE_FIXTURES) return request(ENDPOINTS.referral.commission, { fixture: [] });
   /* One row per reward coin: Available is what is still claimable in it (tier + commission —
      which is the page's own fold of the referral rewards into the coin's row), Total Received is
