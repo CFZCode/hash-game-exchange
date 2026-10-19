@@ -1,0 +1,39 @@
+/* index-DxOqNczA.css verbatim, `rgb(var(--brand))` → this build's `--color-brand`. The pulse
+   around the current tier's dot on /vip-level. */
+@keyframes vip-ripple {
+  0% {
+    transform: scale(1);
+    opacity: 0;
+  }
+  5% {
+    opacity: 0.12;
+  }
+  to {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+.vip-ripple-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background-color: var(--color-brand);
+  animation: vip-ripple 3s ease-out infinite;
+  animation-fill-mode: backwards;
+  pointer-events: none;
+}
+
+.vip-ripple-ring-2 {
+  animation-delay: 1s;
+}
+
+.vip-ripple-ring-3 {
+  animation-delay: 2s;
+}
+
+/* `[&_.dialog-title]:bg-transparent` on the item, restated here: RouteDialog.css paints the bar
+   from unlayered CSS, which beats a Tailwind variant whatever its specificity. */
+.vip-level-dialog .dialog-title {
+  background-color: transparent;
+}

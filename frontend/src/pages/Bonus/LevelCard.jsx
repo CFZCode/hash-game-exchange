@@ -111,9 +111,7 @@ export default function LevelCard({ session }) {
     <Card variant="brand" className="!bg-layer3 !p-3">
       <div className="relative pb-1 pr-8">
         <div className="flex gap-3">
-          {/* `/vip-level` is a real route on the original and is not built here, so this lands
-              on the catch-all. Left as a Link rather than made inert because the path is
-              correct and the row should carry it — the same trade the sidebar made. */}
+          {/* `/vip-level` — the Tiers & Benefits dialog (pages/VipLevel). */}
           <Link to="/vip-level" className="absolute right-0 top-0">
             <span className="button button-second button-s size-5 rounded-lg">
               <IconArrow className="icon rotate-180 fill-secondary text-secondary" />

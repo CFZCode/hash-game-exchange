@@ -60,6 +60,7 @@ import UserEnter from './pages/UserEnter';
 import WithdrawDialog from './pages/Wallet/Withdraw/Dialog';
 import BonusDialog from './pages/Bonus/Dialog';
 import VipDialog from './pages/VIP/Dialog';
+import VipLevelDialog from './pages/VipLevel';
 import HelpDialog from './pages/Help/Dialog';
 import ReferralDialog from './pages/Referral/Dialog';
 import PromotionsDialog from './pages/Promotions/Dialog';
@@ -434,6 +435,9 @@ function AppShell() {
 
      No login guard: this route has none, and the page renders signed-out on purpose. */
   const vipDialog = (pathname === '/vip-detail' || pathname === '/vip-detail/') && !isWide;
+  /* `/vip-level` — Tiers & Benefits. No `info` of its own in the `{dialog: !0}` group, so a dialog
+     at every width, and no guard. See pages/VipLevel. */
+  const vipLevelDialog = pathname === '/vip-level' || pathname === '/vip-level/';
 
   /* `/help` and `/help/:helpId` — `{ component: h("Layout"), path: "/help",
      info: { dialog: m.mobile } }`. The flag is on the LAYOUT, so both children ride one sheet and
@@ -508,6 +512,7 @@ function AppShell() {
     referralDialog ||
     bonusDialog ||
     vipDialog ||
+    vipLevelDialog ||
     helpDialog ||
     promotionsDialog ||
     dailyContestDialog ||
@@ -833,8 +838,8 @@ function AppShell() {
               it, carrying `guards: [() => "/vip-detail"]` — a guard that returns a path is a
               redirect there, so both land on the same component. Its chunk was missing from
               the mirror and was recovered from the deploy's second origin; see
-              services/vip.js. `/vip-level` and `/vip-offer` are siblings there and are not
-              built. */}
+              services/vip.js. `/vip-level` is a sibling there and is a dialog here (mounted
+              below); `/vip-offer` is not built. */}
           {/* Null while the sheet is up, for the reason `/bonus` is — a dialog reached by URL
               has itself as the background location, and the page arm would render underneath. */}
           <Route path="/vip-detail" element={vipDialog ? null : <VIP />} />
@@ -1129,6 +1134,7 @@ function AppShell() {
       {referralDialog && <ReferralDialog onClose={closeOverlay} onBack={backOverlay} enter={dialogEnter} />}
       {bonusDialog && <BonusDialog onClose={closeOverlay} onBack={backOverlay} enter={dialogEnter} />}
       {vipDialog && <VipDialog onClose={closeOverlay} onBack={backOverlay} enter={dialogEnter} />}
+      {vipLevelDialog && <VipLevelDialog onClose={closeOverlay} onBack={backOverlay} enter={dialogEnter} />}
       {helpDialog && <HelpDialog onClose={closeOverlay} onBack={backOverlay} enter={dialogEnter} />}
       {promotionsDialog && (
         <PromotionsDialog onClose={closeOverlay} onBack={backOverlay} enter={dialogEnter} />

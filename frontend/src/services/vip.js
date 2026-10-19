@@ -1,4 +1,5 @@
 import { walletCode } from '../utils/currency';
+import { VIP_LEVELS, splitLevelName } from '../data/vipConfig';
 import { API_BASE, request, USE_FIXTURES, getAccessToken } from './client';
 import ENDPOINTS, { PLATFORM } from './endpoints';
 import {
@@ -103,6 +104,42 @@ export const getVipLevelNames = () =>
     : Promise.resolve(request(PLATFORM.user.vip.levels, { live: true, fixture: null }))
         .then((d) => Object.fromEntries([[0, d?.unranked?.name], ...(d?.levels ?? []).map((l) => [l.level, l.name])]))
         .catch(() => null);
+
+/* ── THE LADDER, FOR `/vip-level` ───────────────────────────────────────────────────────────────
+ *
+ * `GET /user/vip/levels` (public) → `[{ level, name, minXp, family, badgeUrl }]`, Beginner first.
+ * `minXp` is the platform's band floor, USD wager. `card` names the family (`bronze` → Bronze);
+ * the unranked row has no floor and is the original's Beginner. The fixture is the same shape
+ * built from the captured bc.game ladder, so both modes go through one adapter. */
+const capitalize = (s) => (s ? s[0].toUpperCase() + s.slice(1) : '');
+
+export function toVipLadder(d) {
+  if (!d?.levels) return null;
+  return [
+    { level: 0, name: d.unranked?.name || 'Beginner', minXp: 0, family: 'Beginner', badgeUrl: badgeSrc(d.unranked?.badgeUrl) },
+    ...d.levels.map((l) => ({
+      level: Number(l.level),
+      name: l.name,
+      minXp: Number(l.minXp) || 0,
+      family: capitalize(l.card),
+      badgeUrl: badgeSrc(l.badgeUrl),
+    })),
+  ];
+}
+
+const LADDER_FIXTURE = {
+  unranked: { name: 'Beginner' },
+  levels: VIP_LEVELS.slice(1).map((r) => {
+    const { base, fullName } = splitLevelName(r.levelName.replace(/\s+/g, ' '));
+    return { level: r.level, name: fullName, minXp: r.minXp, card: base.toLowerCase() };
+  }),
+};
+
+export const getVipLadder = () =>
+  Promise.resolve(request(PLATFORM.user.vip.levels, { live: true, fixture: LADDER_FIXTURE }))
+    /* `Ev`'s own fallback: a failed read renders the default ladder ("using default config"). */
+    .catch(() => null)
+    .then((d) => toVipLadder(d) ?? toVipLadder(LADDER_FIXTURE));
 
 export const getVipStanding = () =>
   USE_FIXTURES || !getAccessToken()

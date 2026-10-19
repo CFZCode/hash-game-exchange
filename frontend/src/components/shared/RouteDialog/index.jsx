@@ -90,6 +90,9 @@ export default function RouteDialog({
      reads it; defaults to layer4, which is what every route that names no colour gets. */
   titleColor,
   className = '',
+  /* `PageLayout`'s `class`, which the manager puts on `.dialog-item` (the panel), not on the
+     card: a fill there paints over `.dialog-overlayer`'s layer2, one on `.dialog-list` does not. */
+  itemClassName = '',
   onClose,
   /* THE ARROW POPS ONE LEVEL; IT DOES NOT CLOSE THE STACK. `o()` in `FS` is
      `Bd(navigate, stacks.list[index() - 1], 1, navDepth())` — a jump of exactly 1 — against
@@ -256,7 +259,7 @@ export default function RouteDialog({
           <div
             className={`dialog-item${
               transparent || noTitle ? ' dialog-transparent-title' : ''
-            }${noTitle ? ' dialog-no-title' : ''}${pageGutter ? ' dialog-page-gutter' : ''}`}
+            }${noTitle ? ' dialog-no-title' : ''}${pageGutter ? ' dialog-page-gutter' : ''}${itemClassName ? ` ${itemClassName}` : ''}`}
             style={titleColor ? { '--bg': titleColor } : undefined}
           >
             {!noTitle && (
