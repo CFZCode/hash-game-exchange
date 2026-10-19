@@ -154,9 +154,9 @@ export default function Header({
             </button>
             
             {/* Logo container. */}
-            <div className="center h-full w-40 flex-none text-[0] absolute left-16 top-0">
+            <div className="center h-full w-48 flex-none text-[0] absolute left-16 top-0">
               <NavLink to="/">
-                <img alt={logoAlt} className={(brandLogo ? 'h-8 w-36 object-contain' : 'h-8 w-auto object-contain') + logoTone} src={logo} />
+                <img alt={logoAlt} className={(brandLogo ? 'h-10 w-44 object-contain' : 'h-8 w-auto object-contain') + logoTone} src={logo} />
               </NavLink>
             </div>
           </div>
