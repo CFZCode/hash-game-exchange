@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 
 import Link from 'next/link'
 import { parseAsString, useQueryState } from 'nuqs'
@@ -72,7 +72,7 @@ type StatsSeries = {
   unconverted: { metric: string; currency: string | null; amount: string }[]
 }
 type TopEntry = { key: string; name: string; provider?: string | null; wagered: string; bets: number }
-type StatsTop = { currency: string; converted: boolean; games: TopEntry[]; sports: TopEntry[] }
+type StatsTop = { currency: string; converted: boolean; games: TopEntry[]; originals?: TopEntry[]; sports: TopEntry[] }
 
 type UserStats = {
   total: number
@@ -312,9 +312,12 @@ const DirectUserDashboard = () => {
 
   const registrationSeries: ChartSeries[] = [{ name: 'Registrations', data: line.registrations, color: 'chart-7' }]
 
-  const games = top.data?.games ?? []
+  // "Top games" block: third-party casino or the Originals, switched inside the card.
+  const [gameTab, setGameTab] = useState<'casino' | 'original'>('casino')
+  const games = (gameTab === 'casino' ? top.data?.games : top.data?.originals) ?? []
   const gameNames = games.map(g => g.name)
-  const gameSeries: ChartSeries[] = [{ name: 'Wagered', data: games.map(g => n(g.wagered)), color: 'chart-1' }]
+  const gameSeries: ChartSeries[] = [{ name: 'Wagered', data: games.map(g => n(g.wagered)), color: gameTab === 'casino' ? 'chart-1' : 'chart-5' }]
+  const gameLabel = gameTab === 'casino' ? 'casino' : 'original'
 
   const sports = useMemo(() => {
     const all = top.data?.sports ?? []
@@ -533,12 +536,20 @@ const DirectUserDashboard = () => {
         <div className='grid gap-4 xl:grid-cols-3'>
           <ChartCard
             className='xl:col-span-2'
-            title='Top casino games'
+            title={`Top ${gameLabel} games`}
             description={`By amount wagered in the period, in ${unit}.`}
+            actions={
+              <Tabs value={gameTab} onValueChange={v => setGameTab(v as 'casino' | 'original')}>
+                <TabsList>
+                  <TabsTrigger value='casino'>Casino</TabsTrigger>
+                  <TabsTrigger value='original'>Original</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            }
             table={categoryTable({ categories: gameNames, series: gameSeries, format: 'money', currency: unit, categoryHeader: 'Game' })}
           >
             <BarChart
-              ariaLabel={`Top casino games by amount wagered, ${unit}`}
+              ariaLabel={`Top ${gameLabel} games by amount wagered, ${unit}`}
               categories={gameNames}
               series={gameSeries}
               horizontal
@@ -547,7 +558,7 @@ const DirectUserDashboard = () => {
               height={300}
               loading={top.isLoading}
               error={top.error}
-              emptyMessage='No casino play in this period.'
+              emptyMessage={`No ${gameLabel} play in this period.`}
             />
           </ChartCard>
           <ChartCard

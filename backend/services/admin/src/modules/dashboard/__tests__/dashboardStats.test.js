@@ -260,10 +260,15 @@ test('dashboard stats against a database', async (t) => {
   await t.test('top games and sports, scoped', async () => {
     const owner = await service.top({ actor: { id: ownerId }, ...window, currency: COIN, limit: 5 });
     assert.ok(!owner.games.some((g) => /^(inhouse|og):/.test(g.key)), 'Originals are not top casino games');
+    assert.equal(owner.originals[0].key, 'inhouse:dice');
+    assert.ok(!owner.originals.some((g) => g.key === 'inhouse:fake-sim'), 'a fake bot round is not a top game');
+    assert.equal(owner.originals[0].wagered, '10.00000000');
+    assert.equal(owner.originals[0].bets, 1);
     assert.deepEqual(owner.sports.map((s) => [s.key, s.name, s.wagered]), [['4', 'Cricket', '40.00000000']], 'by sport, not by market');
 
     const agent = await service.top({ actor: { id: agentId }, ...window, currency: COIN });
     assert.deepEqual(agent.games, []);
+    assert.deepEqual(agent.originals, []);
   });
 
   await t.test('Slotegrator stakes are read whatever their sign (the handler stores bets negative)', async () => {

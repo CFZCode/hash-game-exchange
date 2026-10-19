@@ -259,7 +259,9 @@ class DashboardStatsService {
     const ctx = this.#context({ from, to, granularity: 'day', currency, scope });
     const rates = currency ? null : await this.#rates();
 
-    const [gameRows, sportRows] = scope.empty ? [[], []] : await Promise.all([this.#topGameRows(ctx), this.#topSportRows(ctx)]);
+    const [gameRows, originalRows, sportRows] = scope.empty
+      ? [[], [], []]
+      : await Promise.all([this.#topGameRows(ctx), this.#topOriginalRows(ctx), this.#topSportRows(ctx)]);
 
     const merge = (rows, keyOf, extra) => {
       const map = new Map();
@@ -283,6 +285,7 @@ class DashboardStatsService {
       currency: currency ?? rates.target,
       converted: !currency,
       games: merge(gameRows, (r) => r.game_key, (r) => ({ name: r.name || r.game_key, provider: r.provider ?? null })),
+      originals: merge(originalRows, (r) => r.game_key, (r) => ({ name: r.name || r.game_key, provider: r.provider ?? null })),
       // By sport (`sport_id`), not `game_type` — MO/BM/FAN are market families, not sports.
       sports: merge(sportRows, (r) => r.sport, (r) => ({ name: sportName(r.sport) })),
     };
@@ -468,6 +471,32 @@ class DashboardStatsService {
               LEFT JOIN js_games jg2 ON jg2.game_uid = v.game_uid
              WHERE ${V2_STAKE('v')} <> 0
                AND ${this.#window('v.created_at')} ${cur('v.currency')} ${this.#owned(ctx, 'v.user_id')}
+          ) stakes
+         GROUP BY game_key, currency
+      ) ranked
+      WHERE rank <= :perCurrency`;
+
+    return this.#query(sql, { ...ctx.replacements, perCurrency: TOP_PER_CURRENCY });
+  }
+
+  /** Top Original games (in-house `bets` + `og_transactions`), the dashboard's "Original" tab beside the casino one. */
+  async #topOriginalRows(ctx) {
+    const cur = (col) => (ctx.currency ? `AND UPPER(${col}) = :currency` : '');
+    const sql = `
+      SELECT game_key, currency, name, provider, total::text AS total, n FROM (
+        SELECT game_key, currency, MAX(name) AS name, MAX(provider) AS provider, SUM(amount) AS total, SUM(bets) AS n,
+               ROW_NUMBER() OVER (PARTITION BY currency ORDER BY SUM(amount) DESC) AS rank
+          FROM (
+            SELECT 'inhouse:' || b.game AS game_key, UPPER(b.coin) AS currency, b.game AS name, NULL::text AS provider, b.amount, 1 AS bets
+              FROM bets b
+             WHERE b.amount > 0 AND (b.result IS NULL OR b.result::text <> '"refunded"') AND ${NOT_FAKE}
+               AND ${this.#window('b.created')} ${cur('b.coin')} ${this.#owned(ctx, 'b.uid')}
+            UNION ALL
+            SELECT 'og:' || COALESCE(o.game_code, ''), UPPER(o.currency), COALESCE(og.name, o.game_code), 'Original Games', o.amount, 1
+              FROM og_transactions o
+              LEFT JOIN og_games og ON og.code = o.game_code
+             WHERE ${OG_PLAYED('o')} AND o.kind = 'bet'
+               AND ${this.#window('o.created_at')} ${cur('o.currency')} ${this.#owned(ctx, 'o.user_id')}
           ) stakes
          GROUP BY game_key, currency
       ) ranked
