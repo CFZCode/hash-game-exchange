@@ -152,15 +152,6 @@ class FiatWithdrawService {
         // order bonuses → wallet, as in the wagering path); a failed debit rolls the forfeit back.
         await this.playerBonuses.beforeWithdrawal(userId, { forfeitBonus, transaction });
 
-        // Never the INR held by open sports bets (WITHDRAW_HELD_IN_BETS): read under the wallet
-        // row lock the debit below takes anyway, so a bet placed meanwhile is counted.
-        const locked = await this.wallet.repo.lockBalance(userId, details.currency, transaction);
-        if (locked) {
-          await this.requirements.assertNotHeldInBets(userId, {
-            amount: details.amount, currency: details.currency, balance: locked.balance, transaction,
-          });
-        }
-
         // The row first, so the hold can name it: the refund in `updateStatus`
         // carries the same refType/refId pair.
         const row = await this.models.FiatWithdrawals.create(

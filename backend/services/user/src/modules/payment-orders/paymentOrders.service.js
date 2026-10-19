@@ -248,9 +248,6 @@ class PaymentOrdersService {
     try {
       movement = await this.db.transaction(async (transaction) => {
         await this.#requirements().assertCapInTransaction(userId, { amount, currency, transaction, applied });
-        // Never the INR held by open sports bets (WITHDRAW_HELD_IN_BETS), read under the wallet row lock.
-        const locked = await this.wallet.repo.lockBalance(userId, currency, transaction);
-        if (locked) await this.#requirements().assertNotHeldInBets(userId, { amount, currency, balance: locked.balance, transaction });
         const held = await this.wallet.debit(
           {
             userId,

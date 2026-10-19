@@ -91,11 +91,6 @@ const errors = defineErrors('WITHDRAW', {
     status: 403,
     message: 'This withdrawal is over your daily withdrawal limit',
   },
-  /** Over balance − open sports exposure. Details `{ currency, balance, inBets, available, attempted }`. */
-  HELD_IN_BETS: {
-    status: 402,
-    message: 'Part of your balance is held in open sports bets',
-  },
   /** The cap could not be checked (a figure unreadable, or no amount / currency): refused. */
   CAP_CHECK_FAILED: {
     status: 503,
@@ -292,36 +287,6 @@ function createWithdrawRequirements(deps) {
     if (dailyOn) await checkDaily(userId, { amount, currency, daily: applied.daily, transaction });
   }
 
-  /** The INR the player's open sports bets hold, positive (mssports `total_exposures`, as the sync socket reads it). */
-  async function sportsExposure(userId, { transaction } = {}) {
-    const [row] = await deps.db.sequelize.query(
-      'SELECT total_exposure FROM mssports.total_exposures WHERE user_id = :userId ORDER BY id DESC LIMIT 1',
-      { replacements: { userId: String(userId) }, type: 'SELECT', transaction }
-    );
-    return dec(money.abs(money.fromStored(String(row?.total_exposure ?? '0'))));
-  }
-
-  /**
-   * Money in open sports bets is not withdrawable: mssports leaves a bet's liability in
-   * `credits.inr` until it settles, so an INR withdrawal may take at most balance − exposure.
-   * Call inside the rail's transaction with `balance` read under the wallet row lock —
-   * sports-service takes that same lock before it writes an exposure, so the read is current.
-   */
-  async function assertNotHeldInBets(userId, { amount, currency, balance, transaction }) {
-    if (String(currency).toUpperCase() !== 'INR') return;
-    const inBets = await sportsExposure(userId, { transaction });
-    if (money.isZero(inBets)) return;
-    const free = money.subtract(balance, inBets);
-    const available = dec(free > 0n ? free : 0n);
-    if (money.gt(amount, available)) {
-      const details = { currency: 'INR', balance: money.fromStored(String(balance)), inBets, available, attempted: money.fromStored(String(amount)) };
-      logger?.info({ userId: String(userId), ...details }, 'Withdrawal refused: balance held in open sports bets');
-      throw errors.HELD_IN_BETS(details, {
-        message: `You can withdraw up to ${fmt(available)} INR now; ${fmt(inBets)} INR is held in open sports bets.`,
-      });
-    }
-  }
-
   /** The player's latest `user_kyc` row (user_id is VARCHAR in the legacy schema). */
   async function kycStatus(userId) {
     const row = await models.UserKyc.findOne({
@@ -461,7 +426,7 @@ function createWithdrawRequirements(deps) {
     return r;
   }
 
-  return { rules, evaluate, assertMet, assertCapInTransaction, assertDailyInTransaction, assertNotHeldInBets, sportsExposure, kycStatus, capFor, dailyFor };
+  return { rules, evaluate, assertMet, assertCapInTransaction, assertDailyInTransaction, kycStatus, capFor, dailyFor };
 }
 
 module.exports = { createWithdrawRequirements, withdrawRequirementErrors: errors, POLICY };

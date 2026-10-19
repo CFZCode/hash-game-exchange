@@ -1,4 +1,3 @@
-import { brandName } from '../../services/siteBranding';
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import Pagination from '../../components/shared/Pagination';
@@ -9,16 +8,14 @@ import AccountRestrictions from '../../components/modals/AccountRestrictions';
 import TwoFactorDisable from '../../components/modals/TwoFactorDisable';
 import { useIsDesktop } from '../../hooks/useMediaQuery';
 import { useResource } from '../../hooks/useResource';
-import { getSessions, getAntiPhishingCode } from '../../services/settings';
+import { getSessions } from '../../services/settings';
 import { securityStatus } from './strength';
 import { useButtonSize } from './buttonSize';
 import {
   IconSet,
   IconEmail,
-  IconPhoneNumber,
   IconTwoFactor,
   IconPasskey,
-  IconAntiPhishing,
   IconSuccess,
   IconAttention,
   IconMobile,
@@ -140,7 +137,6 @@ function SecuritySetup() {
      the flow manager raises it. See components/modals/TwoFactorDisable. */
   const [disabling2fa, setDisabling2fa] = React.useState(false);
   const { isWeak, isMedium, statusText } = securityStatus(session);
-  const { data: phishingCode } = useResource(getAntiPhishingCode);
 
   const emailVerified = Boolean(session.emailVerified && session.email);
 
@@ -211,22 +207,7 @@ function SecuritySetup() {
         </div>
 
         <div className="settings-security-flex">
-          <Tile
-            icon={IconPhoneNumber}
-            done={session.hasPhone}
-            title="Phone Number Verification"
-            desc={
-              session.hasPhone
-                ? 'To update your phone number, please complete identity verification.'
-                : 'Verify your phone number is valid and accessible by you.'
-            }
-            actionLabel={session.hasPhone ? 'Change Phone Number' : 'Verify Phone Number'}
-            /* Both arms are drawn and neither can send a code: there is no SMS provider anywhere
-               in the platform and `users.phone` is read-only (gap 24). */
-            action={() =>
-              navigate(session.hasPhone ? '/user-action/phone-change' : '/user-action/phone-bind')
-            }
-          />
+          {/* Phone Number Verification is off (owner, 2026-10-19): no SMS provider. */}
           <Tile
             spread
             icon={IconTwoFactor}
@@ -271,21 +252,7 @@ function SecuritySetup() {
               action={() => navigate('/settings/passkey')}
             />
           ) : null}
-          {/* `__ENV_HOST__` in the i18n string, expanded through `license.host.toUpperCase()` —
-              "BC.GAME", the same substitution the Buy Crypto disclaimer documents. */}
-          <Tile
-            icon={IconAntiPhishing}
-            done={Boolean(phishingCode)}
-            title="Anti-Phishing Code"
-            desc={`This feature helps you verify the authenticity of communications from ${brandName()}`}
-            actionLabel={phishingCode ? 'Change Anti-Phishing Code' : 'Enable Anti-Phishing Code'}
-            /* THREE dialog routes, and the tile picks the entry point: a code already set goes
-               straight to `detail`, and no code goes to `enter`, the explainer whose one button
-               leads to `create`. See components/modals/AntiPhishing. */
-            action={() =>
-              navigate(phishingCode ? '/settings/phishing/detail' : '/settings/phishing/enter')
-            }
-          />
+          {/* Anti-Phishing Code is off (owner, 2026-10-19). */}
         </div>
 
         {/* The fourth row holds Close Account, behind `<Show when={!1}>` — dead on the live site

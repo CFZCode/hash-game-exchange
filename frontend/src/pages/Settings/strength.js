@@ -34,12 +34,12 @@ import React from 'react';
 export function securityStatus(session) {
   const password = Boolean(session.passwordExist);
   const email = Boolean(session.emailVerified && session.email);
-  const phone = Boolean(session.hasPhone);
   const twofa = Boolean(session.google2StepAuth);
 
-  const isStrong = password && email && phone && twofa;
-  const isMedium = email || phone || twofa;
-  const isWeak = !email && !phone && !twofa;
+  // No phone verification here (owner, 2026-10-19), so phone is not part of the strength.
+  const isStrong = password && email && twofa;
+  const isMedium = email || twofa;
+  const isWeak = !email && !twofa;
 
   return {
     isWeak,
