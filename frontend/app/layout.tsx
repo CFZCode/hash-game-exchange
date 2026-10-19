@@ -22,9 +22,9 @@ const ORIGINAL_METADATA: Metadata = {
 
 /* Live mode with no owner mark yet: Parker567's own square mark (public/brand/, the same
    fallback services/siteBranding.js uses), never the original's favicon and loader art. */
-const FALLBACK_MARK = LIVE ? '/brand/parker567-mark.webp' : null;
+const FALLBACK_MARK = LIVE ? '/brand/parker567-mark.webp?v=308' : null;
 const FALLBACK_ICONS: Metadata['icons'] = FALLBACK_MARK
-  ? { icon: { url: FALLBACK_MARK, type: 'image/webp' }, apple: '/brand/parker567-mark.png' }
+  ? { icon: { url: FALLBACK_MARK, type: 'image/webp' }, apple: '/brand/parker567-mark.png?v=308' }
   : ORIGINAL_METADATA.icons;
 
 /* bc.game's own viewport, read off the live site's <meta name="viewport">:
