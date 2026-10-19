@@ -81,8 +81,8 @@ async function partyWinLoss(sequelize, tree, { type, search }) {
 //  User Win Loss (point category report)
 // ════════════════════════════════════════════════════════════════════════
 
-/** point_ledger.category → report column (zip POINT_CATEGORY_FIELD; casino / sportbook hamare yahan nahi). */
-const POINT_CATEGORY_FIELD = { SPORTS: 'sports_pts' };
+/** point_ledger.category → report column (zip POINT_CATEGORY_FIELD; sportbook hamare yahan nahi). */
+const POINT_CATEGORY_FIELD = { SPORTS: 'sports_pts', CASINO: 'casino_pts', ORIGINAL_GAME: 'original_pts' };
 
 /**
  * Har player ka category-wise SUM(delta) — range ke andar. delta signed hai
@@ -165,14 +165,14 @@ async function directUserWinLoss(sequelize, tree, f) {
       const amount = round2(s.total);
       totals.sports_pts = round2(totals.sports_pts + amount);
       totals.total = round2(totals.total + amount);
-      return { user_id: String(s.id), username: s.username, sports_pts: amount, total: amount };
+      return { user_id: String(s.id), username: s.username, ...emptyTotals(), sports_pts: amount, total: amount };
     })
     .sort((a, b) => b.total - a.total);
   return { rows, totals };
 }
 
 function emptyTotals() {
-  return { sports_pts: 0, total: 0 };
+  return { sports_pts: 0, casino_pts: 0, original_pts: 0, total: 0 };
 }
 
 // ════════════════════════════════════════════════════════════════════════

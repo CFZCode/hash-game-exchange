@@ -299,9 +299,21 @@ test('exchange reports', async (t) => {
   });
 
   await t.test('user win loss: category sums, client = staff narrows to its players', async () => {
+    // Casino aur Original games bhi apne column me; total = teeno ka jod.
+    const extraRefs = [`test:uwl-casino:${base}`, `test:uwl-og:${base}`];
+    await run(
+      `INSERT INTO mssports.point_ledger (entry_ref, event_type, category, wallet_id, username, delta, created_at)
+       VALUES (:r1, 'BET_SETTLEMENT', 'CASINO', :w, 'x', 25, NOW()), (:r2, 'BET_SETTLEMENT', 'ORIGINAL_GAME', :w, 'x', -4.5, NOW())`,
+      { r1: extraRefs[0], r2: extraRefs[1], w: wPlayerA }
+    );
     const res = await reports.userWinLoss({ actor: owner, clientType: 'staff', clientId: agentA, ...range });
-    assert.deepStrictEqual(res.rows.map((r) => [r.username, r.sports_pts, r.total]), [[`rep-playerA-${base}`, -10, -10]]);
-    assert.strictEqual(res.totals.total, -10);
+    await run('DELETE FROM mssports.point_ledger WHERE entry_ref IN (:extraRefs)', { extraRefs });
+    assert.deepStrictEqual(
+      res.rows.map((r) => [r.username, r.sports_pts, r.casino_pts, r.original_pts, r.total]),
+      [[`rep-playerA-${base}`, -10, 25, -4.5, 10.5]]
+    );
+    assert.strictEqual(res.totals.total, 10.5);
+    assert.strictEqual(res.totals.casino_pts, 25);
 
     const mine = await reports.userWinLoss({ actor: agent, ...range });
     assert.ok(!mine.rows.some((r) => r.username === `rep-playerB-${base}`));
@@ -345,14 +357,14 @@ test('exchange reports', async (t) => {
 
     const res = await reports.directUserWinLoss({ actor: owner, ...range });
     const mine = res.rows.find((r) => r.username === `rep-direct-${base}`);
-    assert.deepStrictEqual(mine, { user_id: direct, username: `rep-direct-${base}`, sports_pts: 20, total: 20 });
+    assert.deepStrictEqual(mine, { user_id: direct, username: `rep-direct-${base}`, sports_pts: 20, casino_pts: 0, original_pts: 0, total: 20 });
     assert.ok(!res.rows.some((r) => r.username === `rep-playerA-${base}` || r.username === `rep-playerB-${base}`), 'agent players nahi');
 
     const one1 = await reports.directUserWinLoss({ actor: owner, clientType: 'user', clientId: direct, ...range });
     assert.deepStrictEqual(one1.rows.map((r) => r.total), [20]);
     assert.strictEqual(one1.totals.total, 20);
 
-    assert.deepStrictEqual(await reports.directUserWinLoss({ actor: agent, ...range }), { rows: [], totals: { sports_pts: 0, total: 0 } });
+    assert.deepStrictEqual(await reports.directUserWinLoss({ actor: agent, ...range }), { rows: [], totals: { sports_pts: 0, casino_pts: 0, original_pts: 0, total: 0 } });
     await assert.rejects(reports.directUserWinLoss({ actor: owner, clientType: 'user', clientId: playerA, ...range }));
 
     assert.strictEqual(v.directUserWinLoss.body.safeParse({ ...range, channel: 'agent' }).success, false, 'strict — no channel');

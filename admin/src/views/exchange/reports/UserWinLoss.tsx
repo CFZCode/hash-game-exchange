@@ -25,10 +25,10 @@ import {
   rangeError
 } from './reportKit'
 
-type WinLossRow = { user_id: string; username: string; sports_pts: number; total: number }
+type WinLossRow = { user_id: string; username: string; sports_pts: number; casino_pts: number; original_pts: number; total: number }
 
-// Zip ke Casinopts / Third Party pts / SportBookpts columns yahan nahi (casino aur sportbook hamare yahan nahi).
-const EXPORT_COLS = ['No', 'User Name', 'Sportpts', 'Profit/Loss']
+// Zip ka SportBookpts column yahan nahi (sportbook hamare yahan nahi).
+const EXPORT_COLS = ['No', 'User Name', 'Sportpts', 'Casinopts', 'Originalpts', 'Profit/Loss']
 
 /**
  * User Win Loss — zip ka `reports/UserWinLoss.jsx` (`POST /admin/reports/point-category-report`).
@@ -88,17 +88,22 @@ const UserWinLossReport = ({ channel }: { channel: Channel }) => {
   const totals = filtered.reduce(
     (acc, r) => ({
       sport: acc.sport + (Number(r.sports_pts) || 0),
+      casino: acc.casino + (Number(r.casino_pts) || 0),
+      original: acc.original + (Number(r.original_pts) || 0),
       total: acc.total + (Number(r.total) || 0)
     }),
-    { sport: 0, total: 0 }
+    { sport: 0, casino: 0, original: 0, total: 0 }
   )
 
-  const exportRows = () => filtered.map((r, i) => [i + 1, r.username, fmt(r.sports_pts), fmt(r.total)])
+  const exportRows = () =>
+    filtered.map((r, i) => [i + 1, r.username, fmt(r.sports_pts), fmt(r.casino_pts), fmt(r.original_pts), fmt(r.total)])
 
   const columns: ReportColumn<WinLossRow>[] = [
     { key: 'no', header: 'No', cell: (_, i) => i + 1 },
     { key: 'username', header: 'User Name', cell: r => r.username },
     { key: 'sport', header: 'Sportpts', align: 'right', cell: r => fmt(r.sports_pts) },
+    { key: 'casino', header: 'Casinopts', align: 'right', cell: r => fmt(r.casino_pts) },
+    { key: 'original', header: 'Originalpts', align: 'right', cell: r => fmt(r.original_pts) },
     { key: 'pl', header: 'Profit/Loss', align: 'right', cell: r => fmt(r.total) }
   ]
 
@@ -128,7 +133,7 @@ const UserWinLossReport = ({ channel }: { channel: Channel }) => {
           rows={filtered}
           rowKey={r => r.user_id}
           emptyMessage={search ? 'There are no records matching your request' : 'There are no records to show'}
-          footer={['', '', fmt(totals.sport), fmt(totals.total)]}
+          footer={['', '', fmt(totals.sport), fmt(totals.casino), fmt(totals.original), fmt(totals.total)]}
         />
       </ReportCard>
     </div>
