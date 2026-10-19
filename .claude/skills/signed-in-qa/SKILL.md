@@ -40,7 +40,7 @@ It refuses any origin but `http://localhost:<port>`, generates the username/pass
 A brand-new player has nothing to show. Seed ONLY the local database, and only for the QA player's id (shown on `/user/enter` as `ID:`):
 
 ```bash
-q(){ psql -h 127.0.0.1 -d cfz_hash_game_exchange -At -c "$1"; }
+q(){ psql -h 127.0.0.1 -d parker567 -At -c "$1"; }
 # Rollover: an approved deposit + some wagering (target = deposits x multiplier, default 3)
 q "insert into fiat_deposits (user_id, amount, currency, status, transaction_id, admin_comment, created_at) values (<ID>, 100, 'USDT', 'approved', 'QA-LOCAL-1', 'local QA test row', now())"
 q "insert into userwager (uid, wager) values (<ID>, 120) on conflict (uid) do update set wager = 120"

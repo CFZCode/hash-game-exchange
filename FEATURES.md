@@ -1,7 +1,7 @@
 # Features — kya hai aur kya ON hai
 
 Parker567 (hash-game-exchange) me kaun se features hain, aur **live server (parker567.com) pe abhi kya ON / OFF hai**.
-Ye live owner panel document (`owner-panel/data/entitlements.json`, version 2) aur live DB (`cfz_hash_game_exchange`)
+Ye live owner panel document (`owner-panel/data/entitlements.json`, version 2) aur live DB (`parker567`)
 se padh ke likha hai.
 
 Last updated: 2026-10-17

@@ -1,5 +1,5 @@
 /**
- * What this site offers — the same file in every CFZ site.
+ * What this site offers — the same file in every Parker567 site.
  *
  * GENERATED FROM admins/frontend-kit/siteFeatures.js by agents/push-frontend-kit.mjs.
  *

@@ -1,7 +1,7 @@
 # hash-game-exchange
 
-The client build of the Hash Games site, on the SmartBet (CFZ) platform. Site key
-`hash-game-exchange`, database `cfz_hash_game_exchange`, template `bcgame` (= `emerald_dark`).
+The client build of the Hash Games site, on the SmartBet (Parker567) platform. Site key
+`hash-game-exchange`, database `parker567`, template `bcgame` (= `emerald_dark`).
 
 | folder | what | port |
 |---|---|---|
@@ -20,7 +20,7 @@ The client build of the Hash Games site, on the SmartBet (CFZ) platform. Site ke
 (cd backend && npm ci) && (cd admin && npm ci) && (cd owner-panel && npm ci) && (cd frontend && npm ci)
 node scripts/make-env.mjs                 # backend/.env, admin/.env.local, owner-panel/.env.local; fresh secrets, never printed
 cd backend
-node packages/db/src/cli.js create        # cfz_hash_game_exchange
+node packages/db/src/cli.js create        # parker567
 node packages/db/src/cli.js migrate
 node packages/db/src/cli.js seed          # roles + bootstrap super admin (SEED_ADMIN_* in backend/.env)
 node scripts/seed-data.js --demo          # platform config + demo cast; logins in backend/.demo-credentials.local.md (gitignored)
@@ -80,6 +80,6 @@ last good copy in `backend/data/owner-entitlements.json`. See `docs/OWNER-PANEL.
 ## Tests
 
 ```bash
-cd backend && TEST_DB_NAME=cfz_hash_game_exchange_test npm test
+cd backend && TEST_DB_NAME=parker567_test npm test
 cd owner-panel && npm test
 ```

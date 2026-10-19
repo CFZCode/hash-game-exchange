@@ -24,7 +24,7 @@ expected.
 
 ```bash
 cd backend
-export TEST_DB_NAME=cfz_hash_game_exchange_test   # migrated to 138
+export TEST_DB_NAME=parker567_test   # migrated to 138
 (cd services/user && node --test --test-concurrency=1 \
   src/modules/wager/__tests__/*.test.js \
   src/modules/affiliate/__tests__/*.test.js \

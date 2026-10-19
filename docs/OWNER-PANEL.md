@@ -17,7 +17,7 @@ see or reach a non-entitled thing.
 
 **Data separation:** the owner panel's data (entitlements, its login, its audit log) is stored **only**
 in the owner panel (`owner-panel/data/`, `owner-panel/.env.local`). Nothing of it is written to the
-site database (`cfz_hash_game_exchange`), to the admin, or to the frontend. The backend keeps the
+site database (`parker567`), to the admin, or to the frontend. The backend keeps the
 last copy it fetched in a file (`backend/data/owner-entitlements.json`), never in a table.
 
 ## 1. Owner panel login (config, not database)

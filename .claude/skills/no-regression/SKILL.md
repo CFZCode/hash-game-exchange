@@ -23,8 +23,8 @@ A change is not done until this passes. A failure that also fails on the old cod
 
 ## 3. Tests of every touched backend module
 
-- user / admin / casino: `cd backend/services/<svc> && TEST_DB_NAME=cfz_hash_game_exchange_test node --test --test-concurrency=1 src/modules/<module>/__tests__/*.test.js`
-- sports: `DB_NAME=cfz_hash_game_exchange_test DB_USER=postgres DB_PASSWORD=postgres DB_HOST=127.0.0.1 node --test --test-concurrency=1 src/modules/*/__tests__/*.test.js`
+- user / admin / casino: `cd backend/services/<svc> && TEST_DB_NAME=parker567_test node --test --test-concurrency=1 src/modules/<module>/__tests__/*.test.js`
+- sports: `DB_NAME=parker567_test DB_USER=postgres DB_PASSWORD=postgres DB_HOST=127.0.0.1 node --test --test-concurrency=1 src/modules/*/__tests__/*.test.js`
 - A new migration: run it on the test DB (up, down, up) before the tests.
 - Compare with the baseline. The same failures before and after are fine. Any NEW failure blocks the push.
 - To get a baseline after the fact: `git stash push <files>`, run, `git stash pop`.

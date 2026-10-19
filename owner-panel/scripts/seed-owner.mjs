@@ -19,7 +19,7 @@
  *                       Point it at a copy to try an apply safely.
  *   --template <key>    the demo template (default carbon_gold, or the document's own in merge mode)
  *   --hub <sites.json>  the hub registry to check the site record in (read only;
- *                       default ../../../admins/owner-admin/data/sites.json, $CFZ_HUB_SITES)
+ *                       default ../../../admins/owner-admin/data/sites.json, $PARKER567_HUB_SITES)
  *   --json              print the plan as JSON
  *
  * Merge (default): fills every missing key ON with the demo variant / option default and switches
@@ -296,7 +296,7 @@ async function main() {
   const apply = argv.includes('--apply')
   const reset = argv.includes('--reset')
   const dataDir = path.resolve(arg('--data-dir') ?? process.env.OWNER_DATA_DIR ?? path.join(panel, 'data'))
-  const hubFile = path.resolve(arg('--hub') ?? process.env.CFZ_HUB_SITES ?? path.join(panel, '..', '..', '..', 'admins', 'owner-admin', 'data', 'sites.json'))
+  const hubFile = path.resolve(arg('--hub') ?? process.env.PARKER567_HUB_SITES ?? path.join(panel, '..', '..', '..', 'admins', 'owner-admin', 'data', 'sites.json'))
 
   const plan = await runSeed({ dataDir, site, reset, apply, template: arg('--template') })
   const hub = hubRecord(hubFile, site)

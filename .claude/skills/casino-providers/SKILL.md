@@ -1,11 +1,11 @@
 ---
 name: casino-providers
-description: Every casino game provider and aggregator in the CFZ backend (casino-service modules gis/Slotegrator, js-games V1 huidu + V2 xgames, sportsbook, seamless, x-casino, x-gaming, aggregators, catalogue) — env keys, outbound signing, wallet callbacks and how they are verified, launch routes and bodies, the catalogue tables and how they are filled, currencies, the entitlement guard, how money moves (WalletClient, ledger reasons, refunds/rollbacks, the reverse outbox), tests and gotchas — plus the owner's JSGames/Slotegrator aggregator switch (casino_aggregator, gisgamesnew.aggregator, gisgamesnew_parked). Use it for any work on casino game providers, aggregators, Slotegrator/GIS, JSGames, game launch, catalogue sync or import, provider callbacks, gisgamesnew/js_games, or the JSGames/Slotegrator switch — even if the user only says "the games", "the lobby" or "a provider".
+description: Every casino game provider and aggregator in the Parker567 backend (casino-service modules gis/Slotegrator, js-games V1 huidu + V2 xgames, sportsbook, seamless, x-casino, x-gaming, aggregators, catalogue) — env keys, outbound signing, wallet callbacks and how they are verified, launch routes and bodies, the catalogue tables and how they are filled, currencies, the entitlement guard, how money moves (WalletClient, ledger reasons, refunds/rollbacks, the reverse outbox), tests and gotchas — plus the owner's JSGames/Slotegrator aggregator switch (casino_aggregator, gisgamesnew.aggregator, gisgamesnew_parked). Use it for any work on casino game providers, aggregators, Slotegrator/GIS, JSGames, game launch, catalogue sync or import, provider callbacks, gisgamesnew/js_games, or the JSGames/Slotegrator switch — even if the user only says "the games", "the lobby" or "a provider".
 ---
 
 # Casino providers and aggregators
 
-This copy is for hash-game-exchange (DB `cfz_hash_game_exchange`). Here the aggregator migration is **097**, and `game_transactions` is keyed per user (migration 095). The frontend launches through `frontend/src/services/game.js` (catalogue games) and `src/services/sports.js` (books, via `/casino/js-games/v2/launch`). The source of this skill is casino-sportsbook's `.claude/skills/casino-providers`.
+This copy is for hash-game-exchange (DB `parker567`). Here the aggregator migration is **097**, and `game_transactions` is keyed per user (migration 095). The frontend launches through `frontend/src/services/game.js` (catalogue games) and `src/services/sports.js` (books, via `/casino/js-games/v2/launch`). The source of this skill is casino-sportsbook's `.claude/skills/casino-providers`.
 
 All of it lives in casino-service: `backend/services/casino/src/modules/` (written `M/` below). The config is `backend/services/casino/src/config.js`. Every folder with an `index.js` is auto-mounted by `app.js`:
 
@@ -98,7 +98,7 @@ Checked read-only on 2026-10-14.
 - `js_games` holds 2,002 rows: the same 1,980 plus 22 in-house games.
 - `gis_providers_new` holds the 14 JSGames vendor keys: `2j`, `bgaming`, `evolution`, `ezugi`, `hacksaw`, `ideal`, `jili`, `km`, `microgaming`, `netent`, `pgsoft`, `pragmatic`, `pragmaticlive`, `spribe`.
 
-**`cfz_hash_game_exchange`:**
+**`parker567`:**
 - Live: the same 1,980 JSGames rows.
 - `gisgamesnew_parked` holds **1,710 Slotegrator games from 17 providers**, imported from the dump `cfz/inhouse/gis.txt` (a pg INSERT dump whose truncated last row was skipped):
 

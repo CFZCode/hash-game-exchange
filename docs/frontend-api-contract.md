@@ -2,7 +2,7 @@
 
 Checked on 2026-10-12. The frontend is `frontend/` (the hash-games UI). It was read, not edited.
 The backend is `backend/` (SmartBet, casino-sportsbook `91c27d9`), running on the gateway at
-`http://127.0.0.1:4700` against `cfz_hash_game_exchange` with the standard seed
+`http://127.0.0.1:4700` against `parker567` with the standard seed
 (`seed-data.js --demo`) and the owner plan for template `bcgame`.
 
 **Method.** Every call site in `frontend/src/services/*.js` that passes `live: true` is listed below,

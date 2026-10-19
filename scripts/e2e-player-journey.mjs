@@ -9,7 +9,7 @@ import { execFileSync } from 'node:child_process'
 
 const GW = 'http://127.0.0.1:4700/api/v1'
 const USER_SVC = 'http://127.0.0.1:4701/api/v1'
-const DB = 'postgres://postgres:postgres@127.0.0.1:5432/cfz_hash_game_exchange'
+const DB = 'postgres://postgres:postgres@127.0.0.1:5432/parker567'
 const STAFF = { email: 'admin@ibitplay.local', password: 'P8owNQqmd-1L4ZRlYR214mahaZ9!' }
 const DEPOSIT_INR = '1000' // ≈12 USDT at 0.012, inside the 10 USDT first-deposit tier
 const SPORTS_INR = 85_000 // crosses VIP 2 (1,000 USD) at 0.012

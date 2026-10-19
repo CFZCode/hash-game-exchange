@@ -1,5 +1,5 @@
 /**
- * OneSignal web push — the same file in every CFZ site.
+ * OneSignal web push — the same file in every Parker567 site.
  *
  * GENERATED FROM admins/frontend-kit/onesignal.js by agents/push-frontend-kit.mjs.
  * Edit it there and push again; an edit made here is overwritten.

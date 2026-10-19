@@ -1,6 +1,6 @@
 # Wagering ladder: QA run, level 0 to Diamond 5
 
-Run on 2026-10-12 against the local stack (gateway :4700, DB `cfz_hash_game_exchange`), API and DB only.
+Run on 2026-10-12 against the local stack (gateway :4700, DB `parker567`), API and DB only.
 Script: `backend/scripts/qa/wagering-ladder.mjs` (re-runnable; prints the table below and every check).
 
 ```bash
