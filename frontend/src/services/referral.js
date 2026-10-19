@@ -174,6 +174,8 @@ export const getAffiliateDashboard = ({ reloads } = {}) => {
           availableRewardUsd: String(tier),
           commissionUsd: String(commissionEarned),
           rewardUsd: String(tier + tierPaid),
+          commissionReceivedUsd: String(commissionPaid),
+          rewardReceivedUsd: String(tierPaid),
           todayCommissionUsd: String(num(today?.totalAmount)),
           /* hash.game's "Locked Rewards": friends' referral steps not unlocked yet (USD), from
              `GET /user/affiliate` → `lockedRewards`. `ratio`/`maxRatio`/`todayWagerUsd` keep zeros. */
@@ -267,9 +269,10 @@ const usd2 = (value) => (Math.floor(num(value) * 100) / 100).toFixed(2);
 // eslint-disable-next-line no-unused-vars
 export const getCommissionList = ({ reloads } = {}) => {
   if (USE_FIXTURES) return request(ENDPOINTS.referral.commission, { fixture: [] });
-  /* One row per reward coin: Available is what is still claimable in it (tier + commission —
-     which is the page's own fold of the referral rewards into the coin's row), Total Received is
-     every commission credited in it. */
+  /* One row per reward coin, COMMISSION ONLY: Available is the coin's unclaimed commission rows,
+     Total Received is the commission credited in it minus what is still unclaimed. The referral
+     (tier) rewards are not folded in — bc.game does, and it read here as a joining bonus shown as
+     commission while Available Commission said 0. They have their own Level Up Rewards tab. */
   return Promise.all([readRewards(), readUnclaimed()]).then(([earned, open]) => {
     const byCoin = new Map();
     const at = (code) => {
@@ -277,8 +280,13 @@ export const getCommissionList = ({ reloads } = {}) => {
       return byCoin.get(code);
     };
     for (const row of earned?.rows ?? []) if (row.coin) at(row.coin).commissionUsd += num(row.amount);
-    for (const row of open?.rows ?? []) if (row.currency) at(row.currency).availableUsd += num(row.amount);
+    for (const row of open?.rows ?? []) {
+      if (row.kind !== 'commission' || !row.currency) continue;
+      at(row.currency).availableUsd += num(row.amount);
+      at(row.currency).commissionUsd -= num(row.amount);
+    }
     return [...byCoin.values()]
+      .map((row) => ({ ...row, commissionUsd: Math.max(0, row.commissionUsd) }))
       .filter((row) => row.availableUsd > 0 || row.commissionUsd > 0)
       .map((row) => ({ ...row, availableUsd: String(row.availableUsd), commissionUsd: String(row.commissionUsd) }));
   });
@@ -341,12 +349,12 @@ export const getFriendCommissions = () => {
  * one `aliasCode` per row. */
 const CODE = SIGNED_IN.currentInvitationCode;
 
-const codeRow = (code, registerNum = 0) => ({
+const codeRow = (code, registerNum = 0, createTime = CREATED_AT) => ({
   campaignName: '',
   aliasCode: code,
   invitationUrl: inviteUrl(code),
   ratio: 0.25,
-  createTime: CREATED_AT,
+  createTime,
   registerNum,
 });
 
@@ -382,7 +390,11 @@ export const getInviteCodes = () => {
     summary.catch(emptyIfAgentBlocked(null)),
     team.catch(emptyIfAgentBlocked(null)),
   ]).then(([info, members]) => ({
-    list: info?.referralCode ? [codeRow(info.referralCode, Number(members?.total) || 0)] : [],
+    /* Live, the summary carries no creation time, so the row gets none (the table prints "-")
+       rather than the page-open stamp the fixture uses. `createdAt`, if the API ever sends it. */
+    list: info?.referralCode
+      ? [codeRow(info.referralCode, Number(members?.total) || 0, Date.parse(info.createdAt) || null)]
+      : [],
     totalCodeNum: 20,
     createdNum: info?.referralCode ? 1 : 0,
   }));

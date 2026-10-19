@@ -6,7 +6,7 @@ import { useSession } from '../../context/session';
 import { useGates } from '../../context/gates';
 import { amount2usd, getAlias, printCurrency } from '../../utils/currency';
 import { VIP_LEVELS, vipTier, vipTypeNum } from '../../data/vipConfig';
-import { getInvitationCode } from '../../services/referral';
+import { CAPTURE_RATES, getCommissionRates, getInvitationCode } from '../../services/referral';
 import { getVipStanding } from '../../services/vip';
 import { useSelectedCurrency } from '../../hooks/useSelectedCurrency';
 import useResource from '../../hooks/useResource';
@@ -586,8 +586,8 @@ function ThemeToggle() {
  * `p()` is the commission rate and it comes off `/agent/invitation/code/custom/` as `ratio`,
  * DEFAULTING TO .15 when the response omits it. The capture reads 25%, so the live response
  * carried `ratio: 0.25` for that account — but `ratio` is per-account, this build's fixture is an
- * invented account, and the Refer dialog already prints the chunk's own 15%. Two surfaces reading
- * one rate matters more than matching a figure that cannot be derived, so the default stands.
+ * invented account. Both this banner and the Refer dialog now print the site admin's live
+ * commission rate (`getCommissionRates`, the one Rate & Rules reads), so the surfaces agree.
  */
 const REFERRAL_REWARD = 1000;
 
@@ -596,7 +596,8 @@ function ReferBanner() {
   const { data } = useResource(getInvitationCode);
 
   const link = data?.invitationUrl ?? '';
-  const ratio = data?.ratio ?? 0.15;
+  const { data: rates } = useResource(getCommissionRates);
+  const ratio = (rates ?? CAPTURE_RATES).commissionRate / 100;
 
   return (
     <div className="mt-3 px-4">

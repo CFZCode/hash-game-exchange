@@ -193,7 +193,7 @@ function CodeTable({ data }) {
     {
       title: 'Date Created',
       dataIndex: 'createTime',
-      render: (v) => <span className="font-semibold leading-6 text-secondary">{stamp(v)}</span>,
+      render: (v) => <span className="font-semibold leading-6 text-secondary">{v ? stamp(v) : '-'}</span>,
     },
     {
       title: 'Referrals',

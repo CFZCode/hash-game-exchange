@@ -503,7 +503,7 @@ export default function MyRewards() {
           </span>
           <div>
             <span className="mr-1 text-nowrap">Total Received</span>
-            <span>{money(dashboard.commissionUsd)}</span>
+            <span>{money(dashboard.commissionReceivedUsd)}</span>
           </div>
         </div>
 
@@ -523,7 +523,7 @@ export default function MyRewards() {
               <span className="mr-1 text-nowrap text-secondary">Total Received</span>
               {/* `sub-num` is a dead class in the mirror AND in the current deploy, both
                   checked. Kept like `page-main` and `header-nav-item`. */}
-              <span className="sub-num">{money(dashboard.rewardUsd)}</span>
+              <span className="sub-num">{money(dashboard.rewardReceivedUsd)}</span>
             </div>
             <div>
               <span className="mr-1 text-nowrap text-secondary">Locked Rewards</span>

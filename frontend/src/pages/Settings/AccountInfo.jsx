@@ -6,7 +6,6 @@ import { useResource } from '../../hooks/useResource';
 import { getConnections } from '../../services/settings';
 import { useButtonSize } from './buttonSize';
 import {
-  IconCwallet,
   IconGoogle,
   IconTelegram,
   IconLine,
@@ -43,7 +42,6 @@ import { copyToClipboard } from '../../utils/clipboard';
    "telegram"/"Telegram", …), which is the SERVER being inconsistent rather than the component
    being defensive; the fixture keeps the lower-case spelling the capture shows. */
 const CONNECTION_ICON = {
-  cwallet: IconCwallet,
   google: IconGoogle,
   telegram: IconTelegram,
   Telegram: IconTelegram,

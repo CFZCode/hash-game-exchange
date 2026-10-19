@@ -44,7 +44,6 @@ import SettingsAccountInfo from './pages/Settings/AccountInfo';
 import SettingsSecurity from './pages/Settings/Security';
 import SettingsPreferences from './pages/Settings/Preferences';
 import SettingsVerification from './pages/Settings/Verification';
-import SettingsPayment from './pages/Settings/Payment';
 import SettingsWhitelist from './pages/Settings/Whitelist';
 import Bonus from './pages/Bonus';
 import Help from './pages/Help';
@@ -957,7 +956,10 @@ function AppShell() {
             <Route path="security" element={<SettingsSecurity />} />
             <Route path="preferences" element={<SettingsPreferences />} />
             <Route path="verification" element={<SettingsVerification />} />
-            <Route path="payment" element={<SettingsPayment />} />
+            {/* Payment Methods was bc.game's saved credit/debit cards — no card rail here, so the
+                pane is gone; `general` was never a pane. Both land on Account Info. */}
+            <Route path="payment" element={<Navigate to="/settings/account-info" replace />} />
+            <Route path="general" element={<Navigate to="/settings/account-info" replace />} />
             <Route path="whitelist" element={<SettingsWhitelist />} />
           </Route>
           <Route path="/wallet" element={<WalletLayout />}>

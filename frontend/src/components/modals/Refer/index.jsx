@@ -2,7 +2,7 @@ import React from 'react';
 import PopCenter from '../../shared/PopCenter';
 import useResource from '../../../hooks/useResource';
 import { useSelectedCurrency } from '../../../hooks/useSelectedCurrency';
-import { getInvitationCode } from '../../../services/referral';
+import { CAPTURE_RATES, getCommissionRates, getInvitationCode } from '../../../services/referral';
 import referralArt from '../../../assets/refer.png';
 import Loading from '../../shared/Loading';
 import { toast } from '../../shared/Toast/toast';
@@ -67,6 +67,10 @@ export default function Refer({ open, onClose }) {
      the page. */
   const read = React.useCallback(() => (open ? getInvitationCode() : undefined), [open]);
   const { data, loading } = useResource(read);
+  /* The chunk's "15%" is bc.game's; ours is the site admin's live rate, as on Rate & Rules. */
+  const readRates = React.useCallback(() => (open ? getCommissionRates() : undefined), [open]);
+  const { data: rates } = useResource(readRates);
+  const commissionRate = (rates ?? CAPTURE_RATES).commissionRate;
 
   const link = data?.invitationUrl ?? '';
 
@@ -108,7 +112,7 @@ export default function Refer({ open, onClose }) {
                 {cur.show(REWARD, 'USDFIAT')}
               </span>
               <span className="mx-1">+</span>
-              <span className="text-3xl text-brand">15%</span>
+              <span className="text-3xl text-brand">{commissionRate}%</span>
               <span className="block">COMMISSION</span>
             </p>
             <p className="text-sm font-normal text-brand">Invite friends, earn money.</p>

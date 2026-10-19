@@ -47,13 +47,7 @@ const PERKS = [
     title: 'Zero-fee Deposits & Withdrawals',
     description: 'No transaction fees, ever.',
   },
-  {
-    id: 'crypto-card',
-    Icon: icons.IconCryptoCard,
-    color: 'text-brand',
-    title: 'Crypto Debit Card',
-    description: 'Load with crypto, spend anywhere, withdraw at any ATM.',
-  },
+  /* bc.game's "Crypto Debit Card" perk sat here; no card product on this site. */
   {
     id: 'vip-promotions',
     Icon: icons.IconVipPromotions,

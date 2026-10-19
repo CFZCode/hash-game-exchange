@@ -39,8 +39,8 @@
  *
  * `gmail` and `openUserName` are what a CONNECTED row prints beside its name; both are absent
  * here because nothing is connected. */
+/* No `cwallet` row: Cwallet is not offered here (hidden-features skill). */
 export const CONNECTIONS = [
-  { openName: 'cwallet', connected: false },
   { openName: 'google', connected: false },
   { openName: 'telegram', connected: false },
   { openName: 'line', connected: false },

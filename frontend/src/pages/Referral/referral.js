@@ -243,6 +243,10 @@ export const DASHBOARD = {
   availableCommissionUsd: '0',
   availableRewardUsd: '0',
   commissionUsd: '0',
+  /* Ours, not bc.game's: what was actually CLAIMED, for My Rewards' "Total Received" lines.
+     `commissionUsd`/`rewardUsd` stay the earned totals (claimed + still available). */
+  commissionReceivedUsd: '0',
+  rewardReceivedUsd: '0',
   friendNumber: 0,
   ratio: '0',
   maxRatio: '0',

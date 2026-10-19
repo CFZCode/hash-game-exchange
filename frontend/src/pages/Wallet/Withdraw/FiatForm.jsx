@@ -233,7 +233,7 @@ export default function FiatForm({ currencyName }) {
 
       {missing.includes('kyc') && (
         <RequirementNotice>
-          <Link className="underline" to="/settings/verify">
+          <Link className="underline" to="/settings/verification">
             Complete KYC verification
           </Link>{' '}
           before withdrawing.

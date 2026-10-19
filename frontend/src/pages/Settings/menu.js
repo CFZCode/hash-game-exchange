@@ -3,7 +3,6 @@ import {
   IconSet,
   IconPreferences,
   IconPersonalVerification,
-  IconPayout,
   IconWhitelist,
 } from './icons';
 
@@ -41,7 +40,6 @@ export const SETTINGS_MENU = [
     href: '/settings/verification',
     icon: IconPersonalVerification,
   },
-  { key: 'payment', label: 'Payment Methods', href: '/settings/payment', icon: IconPayout },
   {
     key: 'whitelist',
     label: 'Whitelist Management',
@@ -60,6 +58,5 @@ export const PANE_TITLE = {
   security: 'Security',
   preferences: 'Preferences',
   verification: 'Personal Verification',
-  payment: 'Payment Methods',
   whitelist: 'Whitelist Management',
 };

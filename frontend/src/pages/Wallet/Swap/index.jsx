@@ -6,9 +6,10 @@ import LocalAmountItem from '../../../components/shared/LocalAmountItem';
 import CircleCountdown from '../../../components/shared/CircleCountdown';
 import { useSession } from '../../../context/session';
 import { getCurrency } from '../../../data/currencies';
-import { getAlias, printCurrency } from '../../../utils/currency';
+import { getAlias, printCurrency, walletCode } from '../../../utils/currency';
 import { coinIcon } from '../../../utils/coinArt';
-import { getSwapConfig, getSwapPrice, swapLimits, swapOptions } from '../../../services/swap';
+import { getSwapConfig, getSwapPrice, submitSwap, swapLimits, swapOptions } from '../../../services/swap';
+import { showToast } from '../../../components/shared/Toast/toast';
 import useResource from '../../../hooks/useResource';
 import Loading from '../../../components/shared/Loading';
 import { PaneLoading } from '../../../components/shared/MenuPageLayout';
@@ -46,11 +47,9 @@ import { PaneLoading } from '../../../components/shared/MenuPageLayout';
  *
  * ── NOT BUILT, each inert at its call site ────────────────────────────────────────────────────
  *
- *   the trade        `POST /game/support/swap/trade/`, authenticated. The service seam exists and
- *                    the button cannot reach it with this wallet anyway.
- *   "Swap Completed" `Qe`, a `.pop` with a 56px animated tick, "You've swapped __from__ to __to__"
- *                    and a "Play with __coin__ now" button that flips the wallet's selected
- *                    currency and navigates to /casino. Unreachable without the trade.
+ *   "Swap Completed" `Qe`, a `.pop` with a 56px animated tick and a "Play with __coin__ now"
+ *                    button. The trade IS wired (`submitSwap` -> POST /api/v1/user/swap); a
+ *                    success toast with the same "You've swapped" line stands in for the pop.
  *   `useSwap`        `/game/support/swap/history/`, which belongs to the transaction pane.
  *   the retry arm    the button becomes "Retry" and re-fetches the price when a quote failed. A
  *                    synchronous fixture cannot fail, so only the "Swap Now" label renders — the
@@ -264,7 +263,7 @@ export default function Swap() {
 }
 
 function SwapForm({ config }) {
-  const { session, balances } = useSession();
+  const { session, balances, refreshBalances } = useSession();
   const [searchParams] = useSearchParams();
   const settings = session.setting;
 
@@ -304,6 +303,7 @@ function SwapForm({ config }) {
   /* `expiredTime = Date.now() + 30_000`, re-seeded whenever the pair changes and when the ring
      empties. Held in state so `onComplete` can restart it; the ring itself is uncontrolled. */
   const [quotedAt, setQuotedAt] = React.useState(() => Date.now());
+  const [busy, setBusy] = React.useState(false);
 
   /* `/swap/price/` is re-read on every pair change and on every re-quote, so it is its own
      resource keyed on the pair. It is NOT part of the shell above: the rate arriving late leaves
@@ -320,6 +320,10 @@ function SwapForm({ config }) {
 
   /* `new Big(fromCurrencyPrice).div(toCurrencyPrice)` — how many TO you get for one FROM. */
   const rate = fromPrice && toPrice ? fromPrice / toPrice : 0;
+  /* The backend takes the fee off BEFORE converting (swap.service #quote), so the To box shows
+     what actually lands: fromAmount × (1 − fee) × rate, floored at the TO coin's own decimals. */
+  const netRate = rate * (1 - (Number(feeRate) || 0));
+  const toScale = 10 ** (getCurrency(walletCode(toCurrency))?.precisionUnit ?? 8);
 
   const balance = Number(wallet[fromCurrency]?.generalAmount ?? 0);
   const limits = swapLimits({ amount: amount ?? 0, from: fromCurrency, fromPrice, balance });
@@ -329,10 +333,24 @@ function SwapForm({ config }) {
      this project's lint rejects. Deriving during render gets the same figure, and the two setters
      below reset it so a new pair re-seeds. */
   const fromAmount = amount ?? limits.amount;
-  const toAmount = Math.floor(fromAmount * rate * 1e8) / 1e8;
+  const toAmount = Math.floor(fromAmount * netRate * toScale) / toScale;
 
   const ready = !!fromCurrency && !!toCurrency && rate > 0;
   const outOfRange = fromAmount <= 0 || fromAmount < limits.min || fromAmount > limits.max;
+
+  const swap = () => {
+    setBusy(true);
+    submitSwap(fromCurrency, toCurrency, fromAmount)
+      .then((done) => {
+        const from = printCurrency(done?.fromAmount ?? fromAmount, fromCurrency, { target: fromCurrency });
+        const to = printCurrency(done?.toAmount ?? toAmount, toCurrency, { target: toCurrency });
+        showToast(`You've swapped ${from} to ${to}`, { type: 'success' });
+        setAmount(null);
+        return refreshBalances();
+      })
+      .catch((reason) => showToast(reason?.message || 'Swap failed, please try again.', { type: 'error' }))
+      .finally(() => setBusy(false));
+  };
 
   const repick = (next) => {
     setFromCurrency(next.from);
@@ -397,8 +415,8 @@ function SwapForm({ config }) {
         /* `ge(v, rate)` — typing in the TO box divides back through the rate and re-multiplies,
            so the pair stays consistent and the FROM figure is the one that moves. */
         onChange={(next) => {
-          if (!rate) return;
-          setAmount(Math.floor((next / rate) * 1e8) / 1e8);
+          if (!netRate) return;
+          setAmount(Math.floor((next / netRate) * 1e8) / 1e8);
         }}
         onChangeCurrency={pickTo}
         settings={settings}
@@ -483,15 +501,15 @@ function SwapForm({ config }) {
           reachable now — it is the quote in flight — and it is the first term, so the button is
           dead and spinning while a new pair is priced rather than briefly reading "Retry". With
           a zero USDT balance `fromAmount` is then 0, which fails the range test and leaves it
-          disabled, as the capture shows. `btnLoading` is the trade itself and is not built.
+          disabled, as the capture shows. `btnLoading` is `busy`, the trade in flight.
           `button-m` is the Button component's own, not the call site's. */}
       <button
         type="button"
-        disabled={priceLoading || (ready && outOfRange)}
+        disabled={priceLoading || busy || (ready && outOfRange)}
         className="button button-brand button-m center mx-auto mt-4 w-full sm:mt-3"
-        onClick={() => setQuotedAt(Date.now())}
+        onClick={ready ? swap : () => setQuotedAt(Date.now())}
       >
-        {priceLoading ? <Loading className="text-current" /> : ready ? 'Swap Now' : 'Retry'}
+        {priceLoading || busy ? <Loading className="text-current" /> : ready ? 'Swap Now' : 'Retry'}
       </button>
     </div>
   );
