@@ -3,6 +3,7 @@
 const { Router } = require('express');
 const { response, asyncHandler, entitlements, currencyRegistry } = require('@ibitplay/common');
 const { LITERAL_EVENTS, PLATFORM_EVENTS, encode } = require('@ibitplay/socket');
+const { invalidateSiteState } = require('../../sync/sockets');
 
 /**
  * Site-wide pushes that another service asks for.
@@ -46,6 +47,8 @@ module.exports = function internalRoutes(deps) {
       entitlements.invalidateEntitlements();
       // …and the coin registry (names, networks, switches) likewise.
       if (currencies) currencyRegistry.invalidateCurrencyRegistry();
+      // …and the sockets' shared site state, so the re-sync each push triggers is already new.
+      invalidateSiteState();
       const io = deps.io;
       if (!io) return response.ok(res, { pushed: [], reason: 'socket transport not attached' });
 

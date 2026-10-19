@@ -65,15 +65,36 @@ export function markLiveStale() {
   staleBefore = Date.now();
 }
 
+/* The SITE half (owner / operator config). When it changes after the first state, every read on
+   screen is stale — a coin switched off, a section closed — so `siteEpoch` moves and useResource
+   re-reads (hooks/useResource.js): owner changes show without a reload. */
+let siteSig = null;
+let siteEpoch = 0;
+const epochListeners = new Set();
+const siteSigOf = (s) => JSON.stringify([s?.flags, s?.features, s?.currencies, s?.branding, s?.avatars]);
+
+export const getSiteEpoch = () => siteEpoch;
+export function onSiteEpoch(fn) {
+  epochListeners.add(fn);
+  return () => epochListeners.delete(fn);
+}
+
 export function publishLiveState(state, token, askedAt = Date.now()) {
   // A reply to a sync asked before the last write may already be out of date: drop it for reads.
   if (askedAt < staleBefore) return;
+  const sig = siteSigOf(state);
+  const siteChanged = siteSig !== null && sig !== siteSig;
+  siteSig = sig;
   last = state;
   lastAt = Date.now();
   lastToken = token ?? null;
   for (const w of waiters) w(state);
   waiters.clear();
   listeners.forEach((fn) => fn(state));
+  if (siteChanged) {
+    siteEpoch += 1;
+    epochListeners.forEach((fn) => fn(siteEpoch));
+  }
 }
 
 export const liveState = () => last;

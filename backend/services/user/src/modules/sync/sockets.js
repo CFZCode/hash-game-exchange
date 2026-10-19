@@ -41,6 +41,15 @@ function scramble(value, key) {
   return bytes.toString('base64');
 }
 
+/* The site half of the state, shared by every socket of this process (see SITE_TTL_MS). */
+let site = null;
+let siteAt = 0;
+
+/** A push from admin-service (owner / operator save): the next sync reads the site afresh. */
+function invalidateSiteState() {
+  siteAt = 0;
+}
+
 function register({ on, deps }) {
   const { logger, clients } = deps;
   const auth = new AuthService(deps);
@@ -49,8 +58,6 @@ function register({ on, deps }) {
   const profile = new ProfileService(deps);
   const region = new RegionService(deps);
 
-  let site = null;
-  let siteAt = 0;
   let siteLoading = null;
 
   const body = (result) => (result && typeof result === 'object' && 'data' in result ? result.data : result);
@@ -135,4 +142,4 @@ function register({ on, deps }) {
   });
 }
 
-module.exports = { register, scramble, keyFor, SALT };
+module.exports = { register, scramble, keyFor, SALT, invalidateSiteState };

@@ -1,4 +1,5 @@
 import React from 'react';
+import { getSiteEpoch, onSiteEpoch } from '../services/liveStore';
 
 /* Read a service. Works whether the service answered synchronously (fixtures) or with a
  * Promise (the API), so a component written against this hook needs no change when the flag in
@@ -27,8 +28,12 @@ import React from 'react';
 const isPromise = (v) => Boolean(v) && typeof v.then === 'function';
 
 export function useResource(read) {
-  /* Once per distinct reader, so switching to the API does not refetch on every render. */
-  const source = React.useMemo(() => read(), [read]);
+  /* The owner / operator changed the site (services/liveStore.js): read again. */
+  const epoch = React.useSyncExternalStore(onSiteEpoch, getSiteEpoch, () => 0);
+
+  /* Once per distinct reader (and site epoch), so switching to the API does not refetch on every render. */
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- epoch is the re-read trigger, not an input of read()
+  const source = React.useMemo(() => read(), [read, epoch]);
 
   /* Settled results are stamped with the promise they came from. That is what lets `loading`
      and `data` be derived during render instead of synchronised by an effect — a stale result
@@ -41,19 +46,24 @@ export function useResource(read) {
 
     let live = true;
     source.then(
-      (data) => live && setSettled({ source, data, error: null }),
-      (error) => live && setSettled({ source, data: undefined, error })
+      (data) => live && setSettled({ source, read, data, error: null }),
+      (error) => live && setSettled((prev) => (prev?.read === read && prev.data !== undefined ? prev : { source, read, data: undefined, error }))
     );
     return () => {
       live = false;
     };
-  }, [source]);
+  }, [source, read]);
 
   if (!isPromise(source)) {
     return { data: source, loading: false, error: null };
   }
 
   const matched = settled !== null && settled.source === source;
+  /* A re-read after a site change keeps the previous answer on screen until the new one lands,
+     so the page updates in place instead of flashing its skeleton. */
+  if (!matched && settled !== null && settled.read === read && settled.data !== undefined) {
+    return { data: settled.data, loading: false, error: null };
+  }
   return {
     data: matched ? settled.data : undefined,
     loading: !matched,
