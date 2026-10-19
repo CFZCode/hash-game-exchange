@@ -425,7 +425,7 @@ export const RiskManagementPanel = ({ userId, inDialog = false }: { userId: stri
                 ['Credit', 'credit'],
                 ['Total points', 'total'],
                 ['Sports points', 'sports'],
-                ['Third-party points', 'casino'],
+                ['Casino points', 'casino'],
                 ['Original points', 'original']
               ] as const
             ).map(([label, key]) => (
