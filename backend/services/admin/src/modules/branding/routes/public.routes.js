@@ -9,7 +9,7 @@ const { brandingStore } = require('../branding.store');
 /**
  * What every browser reads (docs/OWNER-PANEL.md §8): the owner's site name, page metadata and
  * logo URLs, and the image bytes themselves. Signed-out visitors need both (the first paint is
- * branded), so there is no auth; reads only, from memory and a folder, rate-limited.
+ * branded), so there is no auth; reads only, from memory (loaded from the table), rate-limited.
  *
  *   GET /api/v1/admin/branding/public        { siteName, title, …, logoUrl, markUrl, ogImageUrl }
  *   GET /api/v1/admin/branding/asset/:file   the image, `<sha256>.<ext>`, immutable
@@ -29,7 +29,7 @@ module.exports = function publicRoutes(deps) {
     limiter,
     validate({ query: v.emptyQuery }),
     asyncHandler(async (_req, res) => {
-      const current = deps.entitlementsPoller?.current() ?? {};
+      const current = deps.entitlementsStore?.current() ?? {};
       res.set('Cache-Control', 'public, max-age=15');
       return response.ok(res, store.view(current.branding ?? null, current.version ?? 0));
     })

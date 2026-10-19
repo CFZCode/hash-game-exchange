@@ -101,7 +101,7 @@ test('coin registry (currencies)', async (t) => {
 
   const pushes = [];
   const deps = {
-    config: { SERVICE_NAME: 'admin-service', NODE_ENV: 'test', RATE_LIMIT_ENABLED: false, OWNER_PANEL_URL: 'http://127.0.0.1:3075', OWNER_SHARED_SECRET: 'owner-test-key' },
+    config: { SERVICE_NAME: 'admin-service', NODE_ENV: 'test', RATE_LIMIT_ENABLED: false, OWNER_SHARED_SECRET: 'owner-test-key' },
     logger,
     db: connection,
     models,

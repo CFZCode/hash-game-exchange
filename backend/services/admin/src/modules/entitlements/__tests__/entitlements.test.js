@@ -2,20 +2,18 @@
 
 const test = require('node:test');
 const assert = require('node:assert');
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
 const express = require('express');
 
 const { createLogger, entitlements, errorHandler, requestContext } = require('@ibitplay/common');
 
-const { createEntitlementsPoller, sign } = require('../entitlements.poller');
+const { createEntitlementsStore, sign } = require('../entitlements.store');
 const { FeaturesService } = require('../../features/features.service');
 const { SiteConfigService } = require('../../site-config/siteConfig.service');
+const { memoryDb } = require('./memoryDb');
 
 /**
  * The owner panel's entitlements — docs/OWNER-PANEL.md §3 and §4.
- * No database: the poller is driven by a stub fetch, the services by fake models.
+ * No database: the store runs over an in-memory table, the services over fake models.
  */
 
 const SECRET = 'test-owner-shared-secret-0123456789abcdef';
@@ -30,33 +28,30 @@ const doc = (version, extra = {}) => ({
   ...extra,
 });
 
-/** A fetch that answers like the owner panel; `next` decides each answer. */
+/** What the owner panel sends next (`next`); `pollOnce()` below offers it to the store. */
 function ownerPanel() {
-  const state = { next: null, calls: [] };
-  state.fetchImpl = async (url, init) => {
-    state.calls.push({ url, headers: init.headers });
-    const answer = typeof state.next === 'function' ? state.next() : state.next;
-    if (answer instanceof Error) throw answer;
-    return { ok: true, status: 200, json: async () => answer };
-  };
-  return state;
+  return { next: null };
 }
 
 const signed = (data, secret = SECRET) => ({ data, signature: sign(data, secret) });
 
-function tmpFile() {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'owner-entitlements-'));
-  return path.join(dir, 'data', 'owner-entitlements.json');
-}
-
-function poller(panel, filePath, onChange, extra = {}) {
-  return createEntitlementsPoller({
-    config: { OWNER_PANEL_URL: 'https://owner.test/', OWNER_SHARED_SECRET: SECRET, OWNER_POLL_SECONDS: 15, ...extra },
+/**
+ * The store, with `pollOnce()`: offer the panel's next document as the owner API would,
+ * a refusal leaving everything as it was, and answer `current()`.
+ */
+function poller(panel, db, onChange, extra = {}) {
+  const store = createEntitlementsStore({
+    config: { OWNER_SHARED_SECRET: SECRET, OWNER_POLL_SECONDS: 15, ...extra },
     logger,
-    filePath,
+    db,
     onChange,
-    fetchImpl: panel.fetchImpl,
   });
+  store.refused = [];
+  store.pollOnce = async () => {
+    await store.accept(panel.next).catch((error) => store.refused.push(error.code));
+    return store.current();
+  };
+  return store;
 }
 
 /** Point this process's helper at a fixed plan. */
@@ -66,51 +61,61 @@ const plan = (features = {}, flags = {}) =>
 test('entitlements', async (t) => {
   t.after(() => entitlements.resetEntitlements());
 
-  // ── The poller ───────────────────────────────────────────────────────
+  // ── The store ────────────────────────────────────────────────────────
 
-  await t.test('owner → cache → default: the last good copy survives an outage', async () => {
+  await t.test('table → memory → default: a restart loads the newest row', async () => {
     const panel = ownerPanel();
-    const file = tmpFile();
+    const db = memoryDb();
     const pushes = [];
 
-    // Nothing anywhere: everything entitled.
-    panel.next = new Error('ECONNREFUSED');
-    const p = poller(panel, file, (current) => pushes.push(current.version));
-    let current = await p.pollOnce();
-    assert.equal(current.source, 'default');
-    assert.deepEqual(current.features, {});
+    // Nothing stored: everything entitled.
+    const p = poller(panel, db, (current) => pushes.push(current.version));
+    await p.start();
+    p.stop();
+    assert.equal(p.current().source, 'default');
+    assert.deepEqual(p.current().features, {});
 
-    // The owner answers: kept, written to the file, pushed.
+    // The owner saves: stored, kept, pushed.
     panel.next = signed(doc(7));
-    current = await p.pollOnce();
+    let current = await p.pollOnce();
     assert.equal(current.source, 'owner');
     assert.equal(current.version, 7);
     assert.equal(current.features.gift_cards, false);
-    assert.equal(panel.calls.at(-1).url, 'https://owner.test/api/entitlements');
-    assert.equal(panel.calls.at(-1).headers['x-owner-key'], SECRET);
-    assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).data.version, 7);
+    assert.equal(db.rows.at(-1).version, 7);
+    assert.deepEqual(db.rows.at(-1).doc, doc(7), 'stored exactly as signed');
     assert.deepEqual(pushes, [7]);
 
-    // Same version again: no write, no push.
+    // Same version again: refused, no write, no push.
     await p.pollOnce();
+    assert.deepEqual(p.refused, ['VERSION_CONFLICT']);
+    assert.equal(db.rows.length, 1);
     assert.deepEqual(pushes, [7]);
 
-    // Outage: memory.
-    panel.next = new Error('ECONNREFUSED');
-    current = await p.pollOnce();
-    assert.equal(current.source, 'cache');
+    // The table unreadable: memory.
+    const findOne = db.models.OwnerEntitlement.findOne;
+    db.models.OwnerEntitlement.findOne = async () => { throw new Error('ECONNREFUSED'); };
+    current = await p.load();
     assert.equal(current.version, 7);
+    db.models.OwnerEntitlement.findOne = findOne;
 
-    // A fresh process with the owner panel down: the file.
-    const restarted = poller(panel, file);
-    current = await restarted.pollOnce();
-    assert.equal(current.source, 'cache');
-    assert.equal(current.features.gift_cards, false);
+    // A fresh process: the newest row, without a push (boot applies it itself).
+    const restarted = poller(panel, db, (c) => pushes.push(c.version));
+    await restarted.start();
+    restarted.stop();
+    assert.equal(restarted.current().source, 'owner');
+    assert.equal(restarted.current().features.gift_cards, false);
+    assert.deepEqual(pushes, [7]);
+
+    // Another process stored v8: a reload follows it and pushes.
+    db.rows.push({ version: 8, site: 'casino-sportsbook', doc: doc(8, { features: { vault: false } }), created_at: new Date() });
+    assert.equal((await restarted.load()).features.vault, false);
+    assert.deepEqual(pushes, [7, 8]);
   });
 
   await t.test('a bad signature is refused and the last good copy is kept', async () => {
     const panel = ownerPanel();
-    const p = poller(panel, tmpFile());
+    const db = memoryDb();
+    const p = poller(panel, db);
 
     panel.next = signed(doc(3));
     assert.equal((await p.pollOnce()).version, 3);
@@ -123,34 +128,23 @@ test('entitlements', async (t) => {
     ]) {
       panel.next = answer;
       const current = await p.pollOnce();
-      assert.equal(current.source, 'cache');
       assert.equal(current.version, 3);
       assert.equal(current.features.gift_cards, false);
     }
+    assert.deepEqual(p.refused, ['BAD_SIGNATURE', 'BAD_SIGNATURE', 'BAD_SIGNATURE']);
+    assert.equal(db.rows.length, 1, 'nothing refused is stored');
 
     // And with nothing to fall back on, a bad signature is still not believed.
-    const fresh = poller(panel, tmpFile());
+    const fresh = poller(panel, memoryDb());
     panel.next = signed(doc(5, { features: { vault: false } }), 'some-other-secret');
     const current = await fresh.pollOnce();
     assert.equal(current.source, 'default');
     assert.deepEqual(current.features, {});
   });
 
-  await t.test('http:// to another host is never called, so the key is never sent in clear', async () => {
+  await t.test('an older version, another site, or a stale document is refused', async () => {
     const panel = ownerPanel();
-    panel.next = signed(doc(2));
-    const p = poller(panel, tmpFile(), undefined, { OWNER_PANEL_URL: 'http://owner.example.com:3075' });
-    assert.equal((await p.pollOnce()).source, 'default');
-    assert.equal(panel.calls.length, 0);
-
-    // This host over http is fine.
-    const local = poller(panel, tmpFile(), undefined, { OWNER_PANEL_URL: 'http://127.0.0.1:3075' });
-    assert.equal((await local.pollOnce()).version, 2);
-  });
-
-  await t.test('an older version, another site, or a stale answer is refused', async () => {
-    const panel = ownerPanel();
-    const p = poller(panel, tmpFile(), undefined, { OWNER_SITE_KEY: 'casino-sportsbook' });
+    const p = poller(panel, memoryDb(), undefined, { OWNER_SITE_KEY: 'casino-sportsbook' });
 
     panel.next = signed(doc(10, { issuedAt: new Date().toISOString() }));
     assert.equal((await p.pollOnce()).version, 10);
@@ -158,7 +152,6 @@ test('entitlements', async (t) => {
     // A replayed v9 "everything on" — validly signed — does not undo v10.
     panel.next = signed(doc(9, { features: {}, flags: {}, issuedAt: new Date().toISOString() }));
     let current = await p.pollOnce();
-    assert.equal(current.source, 'cache');
     assert.equal(current.version, 10);
     assert.equal(current.features.gift_cards, false);
 
@@ -171,6 +164,7 @@ test('entitlements', async (t) => {
     panel.next = signed(doc(12, { features: {}, issuedAt: new Date(Date.now() - 60 * 60 * 1000).toISOString() }));
     current = await p.pollOnce();
     assert.equal(current.version, 10);
+    assert.deepEqual(p.refused, ['VERSION_CONFLICT', 'WRONG_SITE', 'STALE_DOCUMENT']);
 
     panel.next = signed(doc(12, { features: {}, issuedAt: new Date().toISOString() }));
     assert.equal((await p.pollOnce()).version, 12);
@@ -183,7 +177,7 @@ test('entitlements', async (t) => {
     const ed = (data, key = privateKey) => crypto.sign(null, Buffer.from(JSON.stringify(data)), key).toString('base64');
 
     const panel = ownerPanel();
-    const p = poller(panel, tmpFile(), undefined, { OWNER_VERIFY_KEY: verifyKey });
+    const p = poller(panel, memoryDb(), undefined, { OWNER_VERIFY_KEY: verifyKey });
 
     // A correct HMAC — what anyone holding the shared secret can make — is not enough.
     const fresh = () => doc(5, { issuedAt: new Date().toISOString() });
@@ -288,7 +282,7 @@ test('entitlements', async (t) => {
     // The poller keeps known options only.
     const panel = ownerPanel();
     panel.next = signed(doc(3, { options: { spin_wheel: { grant_on_registration: false, bogus: true }, nope: { x: true } } }));
-    const current = await poller(panel, tmpFile()).pollOnce();
+    const current = await poller(panel, memoryDb()).pollOnce();
     assert.deepEqual(current.options, { spin_wheel: { grant_on_registration: false } });
 
     // Readers get every option, the document's value or the default (today's behaviour).
@@ -396,7 +390,7 @@ test('entitlements', async (t) => {
     const container = { models, logger, config: {}, clients };
 
     const panel = ownerPanel();
-    const p = poller(panel, tmpFile(), (current) => new FeaturesService(container).onEntitlementsChange(current));
+    const p = poller(panel, memoryDb(), (current) => new FeaturesService(container).onEntitlementsChange(current));
     entitlements.configureEntitlements({ read: () => p.current() });
 
     // No template in the document: the rows are left alone, the push still goes.
@@ -459,7 +453,7 @@ test('entitlements', async (t) => {
     };
     const pushes = [];
     const clients = { user: { post: async (_url, body) => pushes.push(body) } };
-    const container = { models, logger, config: { OWNER_PANEL_URL: 'https://owner.test/' }, clients };
+    const container = { models, logger, config: { OWNER_SHARED_SECRET: 'owner-test-key' }, clients };
     return { rows, writes, pushes, container };
   }
 
@@ -473,7 +467,7 @@ test('entitlements', async (t) => {
     const vipVariant = featureCatalogue.featureByKey('vip').variants.find((v) => v.key !== 'none').key;
 
     const panel = ownerPanel();
-    const p = poller(panel, tmpFile(), (current) => new FeaturesService(site.container).onEntitlementsChange(current));
+    const p = poller(panel, memoryDb(), (current) => new FeaturesService(site.container).onEntitlementsChange(current));
     entitlements.configureEntitlements({ read: () => p.current() });
 
     panel.next = signed(doc(1, {
@@ -542,7 +536,7 @@ test('entitlements', async (t) => {
   await t.test('reward currency: owner document → site_features → admin source → user-service resolver → public', async () => {
     const site = ownerSite([{ feature: 'reward_currency', variant: 'USDT', enabled: true }]);
     const panel = ownerPanel();
-    const p = poller(panel, tmpFile(), (current) => new FeaturesService(site.container).onEntitlementsChange(current));
+    const p = poller(panel, memoryDb(), (current) => new FeaturesService(site.container).onEntitlementsChange(current));
     entitlements.configureEntitlements({ read: () => p.current() });
 
     panel.next = signed(doc(5, { features: {}, flags: {}, variants: { reward_currency: 'INR' } }));
@@ -588,7 +582,7 @@ test('entitlements', async (t) => {
   await t.test('default coin: owner document → site_features → /site-config/public, separate from the reward currency', async () => {
     const site = ownerSite([{ feature: 'default_currency', variant: 'USDT', enabled: true }, { feature: 'reward_currency', variant: 'USDT', enabled: true }]);
     const panel = ownerPanel();
-    const p = poller(panel, tmpFile(), (current) => new FeaturesService(site.container).onEntitlementsChange(current));
+    const p = poller(panel, memoryDb(), (current) => new FeaturesService(site.container).onEntitlementsChange(current));
     entitlements.configureEntitlements({ read: () => p.current() });
 
     panel.next = signed(doc(5, { features: {}, flags: {}, variants: { default_currency: 'INR' } }));
@@ -650,7 +644,7 @@ test('entitlements', async (t) => {
     // A policy save repeating its variant is not a change either.
     await service.update({ feature: 'deposit_mode', patch: { variant: 'both', enabled: true }, staff });
 
-    // No owner panel (OWNER_PANEL_URL unset): inert, staff keep the switches.
+    // No owner panel (OWNER_SHARED_SECRET unset): inert, staff keep the switches.
     const unmanaged = new FeaturesService({ ...site.container, config: {} });
     await unmanaged.update({ feature: 'deposit_mode', patch: { variant: 'manual' }, staff });
     assert.equal(site.rows.get('deposit_mode').variant, 'manual');

@@ -31,7 +31,7 @@ module.exports = function adminRoutes(deps) {
 
   /**
    * The template is the owner's (docs/OWNER-PANEL.md §4): it arrives in the
-   * entitlement document and the poller applies it. Staff are refused whatever
+   * entitlement document and the entitlements store applies it. Staff are refused whatever
    * the body says; registered before `/:feature` so `template` is never read as
    * a feature key.
    */

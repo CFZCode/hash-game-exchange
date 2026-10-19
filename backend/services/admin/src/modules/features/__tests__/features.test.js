@@ -115,7 +115,7 @@ test('features', async (t) => {
       },
       Siteconfig: { findOne: async () => ({ id: 1 }), update: async () => {} },
     };
-    const config = { SERVICE_NAME: 'admin-service', OWNER_PANEL_URL: 'https://owner.test/', TOTP_ENCRYPTION_KEY: 'a'.repeat(64) };
+    const config = { SERVICE_NAME: 'admin-service', OWNER_SHARED_SECRET: 'owner-test-key', TOTP_ENCRYPTION_KEY: 'a'.repeat(64) };
     const { base, close } = await staffServer({ models, config, clients: { admin: { post: async () => ({}) }, user: { post: async () => ({}) } } });
     const put = (feature, body) => fetch(`${base}/${feature}`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
     try {

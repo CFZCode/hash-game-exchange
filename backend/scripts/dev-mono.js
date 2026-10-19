@@ -48,7 +48,6 @@ const {
   adminJwtEnvShape,
   configureEntitlements,
   configureCurrencyRegistry,
-  findRepoRoot,
 } = require('@ibitplay/common');
 const { createAuthMiddleware, configureAgentPlayers } = require('@ibitplay/auth');
 const db = require('@ibitplay/db');
@@ -65,7 +64,6 @@ const config = loadEnv(
     ...adminJwtEnvShape,
     MONO_PORT: coercers.int(4000),
     // The owner panel — same keys as admin-service's config (docs/OWNER-PANEL.md §3).
-    OWNER_PANEL_URL: coercers.optionalStr(),
     OWNER_SHARED_SECRET: coercers.optionalStr(),
     OWNER_POLL_SECONDS: coercers.int(15),
     OWNER_VERIFY_KEY: coercers.optionalStr(),
@@ -211,23 +209,19 @@ async function main() {
 
   /**
    * The owner's entitlements, exactly as admin-service's container and index
-   * do it: one poller, the same cache file, registered as this process's
+   * do it: one store over `owner_entitlements`, registered as this process's
    * source BEFORE any module is mounted. Without it every module here read
    * the default — everything entitled — and enforcement was off in this mode.
    */
-  const { createEntitlementsPoller } = require(path.join(ROOT, 'services/admin/src/modules/entitlements/entitlements.poller'));
+  const { createEntitlementsStore } = require(path.join(ROOT, 'services/admin/src/modules/entitlements/entitlements.store'));
   const { FeaturesService } = require(path.join(ROOT, 'services/admin/src/modules/features/features.service'));
-  const entitlementsPoller = createEntitlementsPoller({
-    config,
-    logger,
-    filePath: path.join(findRepoRoot(path.join(ROOT, 'services/admin')), 'data', 'owner-entitlements.json'),
-  });
-  configureEntitlements({ read: () => entitlementsPoller.current() });
+  const entitlementsStore = createEntitlementsStore({ config, logger, db: connection });
+  configureEntitlements({ read: () => entitlementsStore.current() });
   const { CurrenciesService } = require(path.join(ROOT, 'services/admin/src/modules/currencies/currencies.service'));
   configureCurrencyRegistry({ read: () => new CurrenciesService(container).list(), logger, config });
-  // The owner panel's nudge route (`POST /api/v1/admin/entitlements/refresh`) reads it from the container.
-  container.entitlementsPoller = entitlementsPoller;
-  entitlementsPoller.start({
+  // The owner API (`/api/v1/admin/owner`) reads it from the container.
+  container.entitlementsStore = entitlementsStore;
+  await entitlementsStore.start({
     onChange: (current) => new FeaturesService(container).onEntitlementsChange(current),
   });
 
@@ -257,15 +251,15 @@ async function main() {
   logger.info({ total }, 'Monolith assembled — all services in one process');
 
   // Same as admin-service's bootstrapSite(): apply the owner's document once
-  // at boot, in case the poller's last onChange attempt failed. Never throws.
-  await new FeaturesService(container).applyOwner(entitlementsPoller.current());
+  // at boot, in case the store's last onChange attempt failed. Never throws.
+  await new FeaturesService(container).applyOwner(entitlementsStore.current());
 
   startServer({
     app,
     port: config.MONO_PORT,
     serviceName: 'monolith',
     logger,
-    onShutdown: [() => entitlementsPoller.stop(), () => connection.close()],
+    onShutdown: [() => entitlementsStore.stop(), () => connection.close()],
   });
 }
 

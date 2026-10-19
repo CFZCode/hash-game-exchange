@@ -86,6 +86,10 @@ const LENIENT = {
     paths: ['/template'],
     reason: 'always answers 403 OWNER_ONLY before reading any input',
   },
+  'admin/owner:public': {
+    paths: ['/branding/asset/'],
+    reason: 'raw image bytes (x-owner-key): kept only when they hash to the file name and pass the image checks',
+  },
   // services/sports — docs/STRUCTURE.md §3a
   'sports/odds-events:public': { reason: MSSPORTS },
   'sports/bets:public': { reason: MSSPORTS },

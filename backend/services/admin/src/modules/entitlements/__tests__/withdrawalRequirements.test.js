@@ -2,13 +2,11 @@
 
 const test = require('node:test');
 const assert = require('node:assert');
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
 
 const { createLogger, entitlements, featureCatalogue, sitePolicy } = require('@ibitplay/common');
 
-const { createEntitlementsPoller, sign } = require('../entitlements.poller');
+const { createEntitlementsStore, sign } = require('../entitlements.store');
+const { memoryDb } = require('./memoryDb');
 const { FeaturesService } = require('../../features/features.service');
 
 /**
@@ -33,7 +31,7 @@ function site() {
     Siteconfig: { findOne: async () => ({ id: 1 }), update: async () => {} },
   };
   const clients = { user: { post: async () => {} } };
-  return { rows, writes, models, container: { models, logger, config: { OWNER_PANEL_URL: 'https://owner.test/' }, clients } };
+  return { rows, writes, models, container: { models, logger, config: { OWNER_SHARED_SECRET: 'owner-test-key' }, clients } };
 }
 
 test('withdrawal requirements through the owner document', async (t) => {
@@ -57,13 +55,14 @@ test('withdrawal requirements through the owner document', async (t) => {
   });
 
   let answer = null;
-  const p = createEntitlementsPoller({
-    config: { OWNER_PANEL_URL: 'https://owner.test/', OWNER_SHARED_SECRET: SECRET, OWNER_POLL_SECONDS: 15 },
+  const p = createEntitlementsStore({
+    config: { OWNER_SHARED_SECRET: SECRET, OWNER_POLL_SECONDS: 15 },
     logger,
-    filePath: path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'owner-wreq-')), 'owner-entitlements.json'),
+    db: memoryDb(),
     onChange: (current) => new FeaturesService(s.container).onEntitlementsChange(current),
-    fetchImpl: async () => ({ ok: true, status: 200, json: async () => answer }),
   });
+  // The owner API's save: the signed answer offered to the store.
+  p.pollOnce = () => p.accept(answer);
   entitlements.configureEntitlements({ read: () => p.current() });
 
   let version = 1;

@@ -6,17 +6,18 @@
  * ═════════════════════════════════════════════════════════════════════════
  * WHERE THE ANSWER COMES FROM
  *
- * The owner panel (never handed to the client) decides; admin-service is the
- * only process that asks it — see `services/admin/src/modules/entitlements`.
- * Every other service asks admin-service, `GET /internal/admin/entitlements`,
- * through this one helper, cached 15 s. admin-service itself registers its
+ * The owner panel (never handed to the client) decides and sends each signed
+ * version to admin-service, which stores it in `owner_entitlements` and loads
+ * it from there at boot and on every change — see
+ * `services/admin/src/modules/entitlements/entitlements.store.js`. Every other
+ * service asks admin-service, `GET /internal/admin/entitlements`, through this
+ * one helper, cached a few seconds. admin-service itself registers its
  * in-process copy with `configureEntitlements({ read })`, so the same calls
  * work there without a loopback request.
  *
- * Nothing here is ever written to a table. The site's own choices
- * (`site_features`, `siteconfig`) stay as they are; effective = entitled AND
- * enabled by the site, so an entitlement switched back on restores the
- * client's own setting.
+ * The site's own choices (`site_features`, `siteconfig`) stay as they are;
+ * effective = entitled AND enabled by the site, so an entitlement switched
+ * back on restores the client's own setting.
  *
  * ── FAILS OPEN, LIKE `operatorSettings` ──────────────────────────────────
  *
@@ -32,9 +33,9 @@ const { featureByKey } = require('./featureCatalogue');
 const { resolveOptions } = require('./featureOptions');
 
 /**
- * Short on purpose: the owner panel nudges admin-service right after a save
- * (`POST /api/v1/admin/entitlements/refresh`), and a player route in another
- * service should follow within seconds, not another 15. One small internal GET
+ * Short on purpose: admin-service applies an owner save at once (and its
+ * push drops this cache, `invalidateEntitlements`), and a player route in
+ * another service should follow within seconds, not another 15. One small internal GET
  * per service every few seconds at most, de-duplicated while in flight.
  */
 const DEFAULT_TTL_MS = 3_000;
@@ -60,7 +61,7 @@ let reader = null;
  * from its container.
  *
  * @param {object}   options
- * @param {Function} [options.read]   a local source (admin-service's poller);
+ * @param {Function} [options.read]   a local source (admin-service's store);
  *                                    wins over `clients` and is never replaced by them
  * @param {object}   [options.clients] needs `clients.admin`
  */
@@ -69,7 +70,7 @@ function configureEntitlements({ read, clients, logger, config } = {}) {
     reader = { local: true, get: async () => (await read()) ?? defaultEntitlements() };
     return;
   }
-  // dev:mono builds several containers in one process; the poller's copy is the truth there.
+  // dev:mono builds several containers in one process; the store's copy is the truth there.
   if (reader?.local) return;
 
   const client = clients?.admin;

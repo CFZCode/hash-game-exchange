@@ -3,22 +3,20 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const crypto = require('crypto');
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
 const express = require('express');
 
 const { createLogger, errorHandler, requestContext } = require('@ibitplay/common');
 
-const { createEntitlementsPoller, sign } = require('../../entitlements/entitlements.poller');
+const { createEntitlementsStore, sign } = require('../../entitlements/entitlements.store');
+const { memoryDb } = require('../../entitlements/__tests__/memoryDb');
 const { createBrandingStore } = require('../branding.store');
 const { cleanBranding, imageProblem } = require('../branding.rules');
 const publicRoutes = require('../routes/public.routes');
 
 /**
- * Branding (docs/OWNER-PANEL.md §8): the signed document carries the block with images named by
- * their SHA-256; the store fetches each image from the owner panel and keeps it only when the
- * bytes hash to the name and pass the image checks; the public read lists only what is here;
+ * Branding (docs/OWNER-PANEL.md §8): the owner panel uploads each image, kept only when its
+ * bytes hash to its name and pass the image checks; the signed document names images by that
+ * SHA-256; the public read lists only what the current document names and the table holds;
  * the asset route serves it immutable and inert.
  */
 
@@ -74,31 +72,36 @@ test('rules: image checks by bytes', () => {
   assert.match(imageProblem(Buffer.alloc(300 * 1024, 1), logo.file, 'logo'), /too large/);
 });
 
-test('branding: signed document → fetched images → public read → served bytes', async (t) => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'branding-'));
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
-
-  // The owner panel: the document, and the images by name (one of them tampered on demand).
-  let answer = doc(1);
-  const served = new Map([[logo.file, PNG], [mark.file, SVG], [evil.file, EVIL]]);
-  const assetCalls = [];
-  const fetchImpl = async (url, init) => {
-    if (url.endsWith('/api/entitlements')) {
-      const data = answer;
-      return { ok: true, status: 200, json: async () => ({ data, signature: sign(data, SECRET) }) };
-    }
-    const name = url.split('/').pop();
-    assetCalls.push({ name, key: init?.headers?.['x-owner-key'] });
-    const bytes = served.get(name);
-    return bytes ? { ok: true, status: 200, arrayBuffer: async () => bytes } : { ok: false, status: 404 };
+/** `owner_branding_assets` as a Map (the real table: ownerApi.test.js). */
+function assetTable() {
+  const rows = new Map();
+  return {
+    rows,
+    OwnerBrandingAsset: {
+      findOrCreate: async ({ where, defaults }) => {
+        if (!rows.has(where.file)) rows.set(where.file, { ...defaults });
+        return [rows.get(where.file), true];
+      },
+      findByPk: async (file) => (rows.has(file) ? { ...rows.get(file) } : null),
+    },
   };
-  const config = { OWNER_PANEL_URL: 'https://owner.test/', OWNER_SHARED_SECRET: SECRET, OWNER_POLL_SECONDS: 3600, RATE_LIMIT_ENABLED: false };
-  const poller = createEntitlementsPoller({ config, logger, filePath: path.join(dir, 'owner-entitlements.json'), fetchImpl });
-  const store = createBrandingStore({ config, logger, dir: path.join(dir, 'branding'), fetchImpl });
+}
+
+test('branding: uploaded images → signed document → public read → served bytes', async (t) => {
+  const config = { OWNER_SHARED_SECRET: SECRET, OWNER_POLL_SECONDS: 3600, RATE_LIMIT_ENABLED: false };
+  const table = assetTable();
+  const entitlementsStore = createEntitlementsStore({ config, logger, db: memoryDb() });
+  const store = createBrandingStore({ logger, models: table });
+  let version = 0;
+  const save = (b) => {
+    version += 1;
+    const data = doc(version, b);
+    return entitlementsStore.accept({ data, signature: sign(data, SECRET) });
+  };
 
   const app = express();
   app.use(requestContext());
-  app.use('/api/v1/admin/branding', publicRoutes({ entitlementsPoller: poller, brandingStore: store, config, logger }));
+  app.use('/api/v1/admin/branding', publicRoutes({ entitlementsStore, brandingStore: store, config, logger }));
   app.use(errorHandler({ logger }));
   const server = app.listen(0);
   t.after(() => server.close());
@@ -106,29 +109,43 @@ test('branding: signed document → fetched images → public read → served by
   const read = async () => (await (await fetch(`${base}/public`)).json()).data;
 
   await t.test('not branded: every field null, the UI keeps its own', async () => {
-    await poller.pollOnce();
+    await save(undefined);
     const data = await read();
     assert.equal(data.branded, false);
     assert.equal(data.siteName, null);
     assert.equal(data.logoUrl, null);
   });
 
-  await t.test('a document names images: none listed until fetched, then listed with hash URLs', async () => {
-    answer = doc(2, branding());
-    await poller.pollOnce();
+  await t.test('uploads are checked: bytes must hash to the name and pass the image checks', async () => {
+    await assert.rejects(() => store.put(`${'0'.repeat(64)}.png`, PNG, 'logo'), (e) => e.status === 422 && /hash/.test(e.message));
+    await assert.rejects(() => store.put(evil.file, EVIL, 'mark'), (e) => e.status === 422 && /unsafe SVG/.test(e.message));
+    await assert.rejects(() => store.put(logo.file, PNG, 'banner'), (e) => e.status === 422);
+    assert.equal(table.rows.size, 0, 'nothing refused is stored');
+    await store.put(logo.file, PNG, 'logo');
+    await store.put(mark.file, SVG, 'mark');
+    await store.put(mark.file, SVG, 'mark'); // same name = same bytes: a second upload is a no-op
+    assert.equal(table.rows.size, 2);
+  });
+
+  await t.test('an uploaded image is not served until a document names it', async () => {
+    assert.equal((await fetch(`${base}/asset/${logo.file}`)).status, 404);
+    assert.ok(await store.stored(logo.file), 'the owner panel can preview it');
+  });
+
+  await t.test('a document names images: listed with hash URLs once loaded from the table', async () => {
+    await save(branding());
     const before = await read();
     assert.equal(before.siteName, 'parker567');
     assert.equal(before.titleTemplate, '%s · Parker567');
     assert.deepEqual(before.keywords, ['casino', 'sports']);
     assert.equal(before.themeColor, '#24EE89');
-    // The read kicked a fetch; wait for the explicit sync too.
-    const result = await store.sync(poller.current().branding);
+    // The read kicked a load; wait for the explicit sync too (what the store's onChange runs).
+    const result = await store.sync(entitlementsStore.current().branding);
     assert.deepEqual(result.failed, []);
     const after = await read();
     assert.equal(after.logoUrl, `/api/v1/admin/branding/asset/${logo.file}`);
     assert.equal(after.markUrl, `/api/v1/admin/branding/asset/${mark.file}`);
     assert.equal(after.ogImageUrl, null);
-    assert.ok(assetCalls.every((c) => c.key === SECRET));
     assert.ok(!JSON.stringify(after).includes(SECRET));
   });
 
@@ -155,25 +172,17 @@ test('branding: signed document → fetched images → public read → served by
     assert.ok([400, 422].includes((await fetch(`${base}/asset/${logo.file}?v=1`)).status));
   });
 
-  await t.test('bytes that do not hash to the signed name are never stored', async () => {
+  await t.test('a document naming an image never uploaded lists no URL for it', async () => {
     const other = { ...logo, file: `${'0'.repeat(64)}.png` };
-    served.set(other.file, PNG); // right format, wrong hash
-    const result = await store.sync({ ...poller.current().branding, ogImage: other });
+    const result = await store.sync({ ...entitlementsStore.current().branding, ogImage: other });
     assert.deepEqual(result.failed, [other.file]);
-    assert.equal(fs.existsSync(path.join(dir, 'branding', other.file)), false);
+    assert.equal((await fetch(`${base}/asset/${other.file}`)).status, 404);
   });
 
-  await t.test('an unsafe SVG is refused even when its hash matches', async () => {
-    const result = await store.sync({ ...poller.current().branding, mark: evil });
-    assert.deepEqual(result.failed, [evil.file]);
-    assert.equal((await fetch(`${base}/asset/${evil.file}`)).status, 404);
-  });
-
-  await t.test('http:// to another host is never called', async () => {
-    const calls = assetCalls.length;
-    const insecure = createBrandingStore({ config: { ...config, OWNER_PANEL_URL: 'http://owner.example.com' }, logger, dir: path.join(dir, 'b2'), fetchImpl });
-    const result = await insecure.sync({ logo });
-    assert.deepEqual(result.failed, [logo.file]);
-    assert.equal(assetCalls.length, calls);
+  await t.test('an image the document stops naming stops being served', async () => {
+    await save(branding({ mark: null }));
+    await store.sync(entitlementsStore.current().branding);
+    assert.equal((await fetch(`${base}/asset/${mark.file}`)).status, 404);
+    assert.equal((await fetch(`${base}/asset/${logo.file}`)).status, 200);
   });
 });

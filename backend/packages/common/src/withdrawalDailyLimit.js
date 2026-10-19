@@ -48,7 +48,7 @@ const isLimit = (v) => {
 
 const normalise = (v) => money.toDecimalString(money.toMinor(String(v).trim()));
 
-/** Reading (the poller, every reader): known fields; a bad currency or amount is dropped. */
+/** Reading (the entitlements store, every reader): known fields; a bad currency or amount is dropped. */
 function cleanWithdrawalDailyLimit(value) {
   const given = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   const limits = {};

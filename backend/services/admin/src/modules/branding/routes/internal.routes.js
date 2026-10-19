@@ -15,7 +15,7 @@ module.exports = function internalRoutes(deps) {
   router.get(
     '/public',
     asyncHandler(async (_req, res) => {
-      const current = deps.entitlementsPoller?.current() ?? {};
+      const current = deps.entitlementsStore?.current() ?? {};
       return response.ok(res, store.view(current.branding ?? null, current.version ?? 0));
     })
   );

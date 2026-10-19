@@ -97,7 +97,7 @@ class CurrenciesService {
   }
 
   ownerManaged() {
-    return Boolean(this.config?.OWNER_PANEL_URL);
+    return Boolean(this.config?.OWNER_SHARED_SECRET);
   }
 
   async #rows() {
@@ -116,7 +116,7 @@ class CurrenciesService {
   }
 
   #serialise(row, plan) {
-    // The live plan AND the applied column: right before the poller's apply
+    // The live plan AND the applied column: right before the store's apply
     // has run, and right after an apply when the cached plan is a beat old.
     const ownerEnabled = Boolean(row.owner_enabled) && ownerAllows(plan, row.code, row.kind);
     const siteEnabled = Boolean(row.site_enabled);
