@@ -107,7 +107,12 @@ const myRewards = {
   query: paging.extend({ filter: z.enum(['today', 'all']).default('all') }),
 };
 
+/** My Rewards → History: `referral` = level-up (tier) rewards, `commission` = commission rows. */
+const rewardHistory = {
+  query: paging.extend({ kind: z.enum(['referral', 'commission']).default('referral') }),
+};
+
 module.exports = {
-  myPaging, myRewards, joinTeam, claimReward,
+  myPaging, myRewards, rewardHistory, joinTeam, claimReward,
   listTeams, teamMembers, listRewards, topAffiliates, unlock, recordReward,
 };

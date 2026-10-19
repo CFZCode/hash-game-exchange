@@ -426,6 +426,13 @@ export const getReferralRewards = () => {
  * that would have nothing to decide. `pages/Referral/MyRewards.jsx` records that at the call site.
  */
 
+/* Reward History (My Rewards → History): one kind's rows, `{amount, currency, createdAt, status}`
+   with status `available | claimed | void`, newest first. */
+export const getRewardHistory = (kind) =>
+  Promise.resolve(
+    request(PLATFORM.user.affiliate.history, { live: true, fixture: { rows: [] }, params: { kind, limit: 200 } })
+  ).then((answer) => answer?.rows ?? [], () => []);
+
 export const getUnclaimedRewards = () =>
   Promise.resolve(request(PLATFORM.user.affiliate.unclaimed, { live: true, fixture: [] }))
     .then((rows) => (Array.isArray(rows) ? rows : (rows?.rows ?? [])))

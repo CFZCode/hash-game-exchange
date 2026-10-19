@@ -30,6 +30,7 @@ module.exports = function userRoutes(deps) {
   router.get('/team', validate(v.myPaging), ctrl.myTeam);
   router.get('/rewards', validate(v.myRewards), ctrl.myRewards);
   router.get('/rewards/unclaimed', noQuery(), ctrl.unclaimed);
+  router.get('/rewards/history', validate(v.rewardHistory), ctrl.rewardHistory);
 
   router.post('/team/join', validate(v.joinTeam), ctrl.joinTeam);
   router.post('/rewards/claim', validate(v.claimReward), ctrl.claim);

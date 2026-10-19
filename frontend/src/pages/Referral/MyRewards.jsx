@@ -11,6 +11,7 @@ import {
   getInviteCodes,
   getReferralRewards,
   claimAllAffiliateRewards,
+  getRewardHistory,
 } from '../../services/referral';
 import { toast } from '../../components/shared/Toast/toast';
 import { getAlias } from '../../utils/currency';
@@ -68,7 +69,6 @@ const lastSegment = (pathname) => pathname.split('/').pop() || '';
  *   zero and no row exists to click.
  * - The PAGER under each table (`total > 10`, which no empty list reaches) and the skeleton the
  *   chunk shows while a table's resource is pending, which a synchronous fixture cannot trip.
- * - `/reward-history?type=<pane>` behind the History button.
  */
 
 /* `ve` — the ⓘ popup beside each figure. Both bodies are one i18n value apiece with the h3/p
@@ -104,7 +104,7 @@ function RewardTip({ tip, onClose }) {
 
    `button-m` is written unconditionally rather than through the page's `size`, because this
    whole component only ever renders on a desktop, which is where `ot` would supply it. */
-function StripActions({ pane }) {
+function StripActions({ onHistory }) {
   const navigate = useNavigate();
 
   return (
@@ -120,7 +120,7 @@ function StripActions({ pane }) {
       <button
         type="button"
         className="button button-second button-m center h-8 gap-1 px-2"
-        onClick={() => navigate(`/reward-history?type=${pane}`)}
+        onClick={onHistory}
       >
         <IconBetHistory className="icon size-4" />
         <span className="font-extrabold">History</span>
@@ -175,6 +175,48 @@ const IconClose = ({ className = '' }) => (
 );
 
 const Empty = () => <EmptyPlaceholder>No rewards yet invite friends to join you now!</EmptyPlaceholder>;
+
+/* hash.game's Reward History dialog (`/reward-history?type=…` there): a kind picker over a
+   Currency / Amount / Time / Status table. Opened over the pane rather than routed, so the
+   page under it stays put. The Commission pane opens on commission, the others on referral. */
+const HISTORY_KINDS = { referral: 'Referral Rewards', commission: 'Commission Rewards' };
+const HISTORY_STATUS = { available: 'Available', claimed: 'Received', void: 'Void' };
+
+function RewardHistory({ pane, onClose }) {
+  const [kind, setKind] = React.useState(pane === 'commission' ? 'commission' : 'referral');
+  const read = React.useCallback(() => getRewardHistory(kind), [kind]);
+  const { data, loading } = useResource(read);
+  const columns = [
+    {
+      title: 'Currency',
+      dataIndex: 'currency',
+      render: (v) => (
+        <div className="flex items-center gap-2">
+          <img className="size-5" alt="" src={coinIcon(v)} />
+          <span>{getAlias(v)}</span>
+        </div>
+      ),
+    },
+    { title: 'Amount', dataIndex: 'amount', render: (v) => <Primary>{Number(v).toLocaleString('en-US', { maximumFractionDigits: 8 })}</Primary> },
+    { title: 'Time', dataIndex: 'createdAt', render: (v) => <Secondary>{v ? new Date(v).toLocaleString('en-US') : '--'}</Secondary> },
+    {
+      title: 'Status',
+      dataIndex: 'status',
+      render: (v) => <span className={v === 'available' ? 'text-brand' : 'text-secondary'}>{HISTORY_STATUS[v] ?? v}</span>,
+    },
+  ];
+
+  return (
+    <PopCenter open onClose={onClose} title="Reward History">
+      <div className="flex min-h-[30rem] flex-col gap-4">
+        <Select className="w-fit" value={kind} options={Object.keys(HISTORY_KINDS)} onChange={setKind}>
+          {(option) => HISTORY_KINDS[option]}
+        </Select>
+        {loading ? <Loading /> : <DataTable columns={columns} data={data ?? []} empty={<EmptyPlaceholder className="w-full" />} />}
+      </div>
+    </PopCenter>
+  );
+}
 
 /* `ct` — Commission by Currency. One row per coin, and note the page ALSO folds
    `availableRewardUsd` into a synthetic USDT row when that figure is non-zero, which is a rule
@@ -373,6 +415,7 @@ export default function MyRewards() {
   const { data: levelUp } = useResource(getReferralRewards);
 
   const [tip, setTip] = React.useState(null);
+  const [history, setHistory] = React.useState(null);
   /* The summary card's figures are sums of reward credits (the reward currency), floored there to
      2dp so a balance never reads higher than it is, then shown in the selected currency. Held up
      here with the other hooks, above the loading return. */
@@ -575,13 +618,14 @@ export default function MyRewards() {
             8px of `pt-2` plus `.tabs-title`'s own 2.5rem is 48px, which is `top-12`. */}
         {isDesktop ? (
           <>
-            <StripActions pane={active} />
+            <StripActions onHistory={() => setHistory(active)} />
             <div className="absolute top-12 h-[1px] w-full bg-third" />
           </>
         ) : null}
       </section>
 
       <RewardTip tip={tip} onClose={() => setTip(null)} />
+      {history ? <RewardHistory pane={history} onClose={() => setHistory(null)} /> : null}
     </div>
   );
 }

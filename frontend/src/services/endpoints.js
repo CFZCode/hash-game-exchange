@@ -913,6 +913,8 @@ export const PLATFORM = {
       team: '/api/v1/user/affiliate/team',
       rewards: '/api/v1/user/affiliate/rewards',
       unclaimed: '/api/v1/user/affiliate/rewards/unclaimed',
+      /* `?kind=referral|commission` — every reward of that kind, claimed or not (Reward History). */
+      history: '/api/v1/user/affiliate/rewards/history',
       claim: '/api/v1/user/affiliate/rewards/claim',
       claimAll: '/api/v1/user/affiliate/rewards/claim-all',
     },

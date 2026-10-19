@@ -546,6 +546,22 @@ test('affiliate', async (t) => {
     assert.equal(summary.total, '4.00000000');
   });
 
+  await t.test('reward history lists one kind, claimed and available, newest first', async () => {
+    const owner = await seed(newUid());
+    for (const [amount, claimed] of [['3.00', true], ['4.00', false]]) {
+      await connection.models.UnlockedRewards.create({
+        uid: owner.uid, ownername: owner.name, membername: 'member',
+        amount, cointype: 'USDT', wager_amount: '0', claimed, referalCode: owner.code,
+      });
+    }
+
+    const referral = await service.rewardHistory({ userId: owner.uid, kind: 'referral' });
+    assert.equal(referral.total, 2);
+    assert.deepEqual(referral.rows.map((r) => [r.amount, r.status]), [['4.00000000', 'available'], ['3.00000000', 'claimed']]);
+    assert.ok(referral.rows[0].createdAt);
+    assert.equal((await service.rewardHistory({ userId: owner.uid, kind: 'commission' })).total, 0);
+  });
+
   await t.test('the dashboard reports what is still owed', async () => {
     const stats = await service.dashboardStats();
     assert.equal(

@@ -557,6 +557,32 @@ class AffiliateService {
   }
 
   /**
+   * The Reward History dialog (My Rewards → History): one kind's rewards, claimed or not, newest
+   * first. `referral` reads the tier unlocks, `commission` the commission rows.
+   */
+  async rewardHistory({ userId, kind = 'referral', limit = 50, offset = 0 }) {
+    const commission = kind === 'commission';
+    const [{ rows, count }, rewardCurrency] = await Promise.all([
+      (commission ? this.models.Rewards : this.models.UnlockedRewards).findAndCountAll({
+        where: commission ? { owner_id: userId } : { uid: userId },
+        order: [['id', 'DESC']],
+        limit,
+        offset,
+        raw: true,
+      }),
+      this.rewardMoney.currency(),
+    ]);
+    return {
+      total: count,
+      rows: rows.map((row) => {
+        const shaped = commission ? this.#shapeCommission(row, rewardCurrency) : this.#shapeUnlocked(row, rewardCurrency);
+        const status = row.voided ? 'void' : shaped.claimed ? 'claimed' : 'available';
+        return { ...shaped, createdAt: row.createdAt ?? null, status };
+      }),
+    };
+  }
+
+  /**
    * @legacy POST /affiliate/claim-reward
    *
    * Claim one reward. `kind` names the table: `tier` (default, the legacy
