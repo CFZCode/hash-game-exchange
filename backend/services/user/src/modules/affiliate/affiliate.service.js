@@ -1300,8 +1300,8 @@ class AffiliateService {
 
   /**
    * Commission by Friends' "Total Deposits (Past 7D)", in USD per member.
-   * shortcut: approved manual deposits + admin direct-wallet credits only (the two rails live uses);
-   * add the other rails from withdrawalCapFigures' DEPOSITED_SQL if a gateway goes live.
+   * shortcut: approved manual deposits only (the one deposit rail live uses; admin credits are not
+   * deposits); add the other rails from withdrawalCapFigures' DEPOSITED_SQL if a gateway goes live.
    */
   async #deposits7dUsd(ids) {
     const totals = new Map();
@@ -1310,11 +1310,8 @@ class AffiliateService {
       `SELECT uid, cur, SUM(amt)::text AS amt FROM (
          SELECT user_id::text AS uid, upper(currency) AS cur, amount AS amt FROM fiat_deposits
           WHERE user_id IN (:ids) AND lower(status) = 'approved' AND COALESCE(handled_at, created_at) >= now() - interval '7 days'
-         UNION ALL
-         SELECT user_id::text, COALESCE(upper(currency), 'INR'), COALESCE(currency_amount, amount) FROM owner_direct_ledger
-          WHERE user_id::text IN (:idTexts) AND entry_type = 'user_deposit' AND created_at >= now() - interval '7 days'
        ) d GROUP BY uid, cur`,
-      { replacements: { ids, idTexts: ids.map(String) }, type: QueryTypes.SELECT }
+      { replacements: { ids }, type: QueryTypes.SELECT }
     );
     for (const row of rows) {
       const usd = (await this.rewardMoney.toUsd(row.amt, row.cur)) ?? '0';
