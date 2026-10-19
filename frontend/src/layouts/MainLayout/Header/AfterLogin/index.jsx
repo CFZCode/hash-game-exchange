@@ -543,14 +543,14 @@ export function MobileAfterLogin() {
   const navigate = useNavigate();
   const { session } = useSession();
   const bonusOn = useGates().on('bonus');
-  /* The owner panel's square mark (live mode), in the same h-9 w-9 box; else the original. */
+  /* The owner panel's square mark (live mode) at h-10, the wallet pill's height; else the original at h-9. */
   const { darken } = useSettings();
   const mark = useSiteMark({ light: !darken });
 
   return (
     <div className="flex size-full items-center justify-between px-3">
       <Link to="/" className="flex-none text-[0]">
-        <img alt={(mark && siteName()) || 'logo'} className={mark ? 'h-9 w-9 object-contain' : 'h-9 w-9'} src={mark ?? logoSmall} />
+        <img alt={(mark && siteName()) || 'logo'} className={mark ? 'h-10 w-10 object-contain' : 'h-9 w-9'} src={mark ?? logoSmall} />
       </Link>
 
       <div className="flex items-center gap-2">
