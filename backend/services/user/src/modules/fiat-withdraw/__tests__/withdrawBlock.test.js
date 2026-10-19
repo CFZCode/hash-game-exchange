@@ -4,7 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 
 const db = require('@ibitplay/db');
-const { createLogger, money } = require('@ibitplay/common');
+const { createLogger, entitlements, money } = require('@ibitplay/common');
 const { hashPassword } = require('@ibitplay/auth');
 const { EVENTS } = require('@ibitplay/socket');
 
@@ -310,6 +310,41 @@ test('the withdrawal block', async (t) => {
     assert.equal(Boolean(row.sports_betlocked), false);
     assert.equal(Boolean(row.system_locked), false);
     assert.deepEqual(row.lock_sources.withdraw_locked, { own: false, by: [String(agent)] });
+  });
+
+  await t.test("the owner's Withdrawals switch OFF refuses every rail and /me says withdraw false; ON / absent lets them through", async () => {
+    await reset();
+    let doc = { withdrawalsEnabled: false };
+    entitlements.configureEntitlements({ read: () => doc });
+    try {
+      const disabled = (error) => {
+        assert.equal(error.code, 'WITHDRAW_DISABLED', `${error.code}: ${error.message}`);
+        assert.equal(error.statusCode ?? error.status, 403);
+        return true;
+      };
+      await assert.rejects(fiatWithdraw(player), disabled);
+      await assert.rejects(cryptoWithdraw(player), disabled);
+      await assert.rejects(
+        payments.createWithdrawal({ userId: player, provider: 'any', currency: 'INR', amount: '100', details: {} }),
+        disabled
+      );
+      await assert.rejects(
+        p2p.createSellOrder({ userId: player, offerId: 1, cryptoAmount: '10', paymentTypeId: 1, accountName: 'x' }),
+        disabled
+      );
+      assert.equal((await auth.me(player)).capabilities.withdraw, false);
+      await assertNothingMoved(player);
+
+      doc = { withdrawalsEnabled: true };
+      assert.equal((await auth.me(player)).capabilities.withdraw, true);
+      assert.ok((await fiatWithdraw(player)).withdrawalId);
+
+      doc = {};
+      assert.equal((await auth.me(player)).capabilities.withdraw, true);
+      assert.ok((await cryptoWithdraw(player)).id);
+    } finally {
+      entitlements.resetEntitlements();
+    }
   });
 
   await t.test('a system lock refuses a withdrawal too', async () => {

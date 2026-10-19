@@ -73,6 +73,7 @@ export const PUT = handler(async (req: NextRequest) => {
     region?: unknown
     withdrawalCap?: unknown
     withdrawalDailyLimit?: unknown
+    withdrawalsEnabled?: unknown
     branding?: unknown
   } | null
 
@@ -105,6 +106,9 @@ export const PUT = handler(async (req: NextRequest) => {
       // Daily withdrawal limit per currency; validated strictly in the store (bad code / amount → 422).
       withdrawalDailyLimit:
         body.withdrawalDailyLimit === undefined ? undefined : (body.withdrawalDailyLimit as WithdrawalDailyLimit),
+
+      // Player withdrawals on every rail; validated strictly in the store (not a boolean → 422).
+      withdrawalsEnabled: body.withdrawalsEnabled as boolean | undefined,
 
       // Site name, metadata and logo files; validated strictly in the store (bad field → 422).
       branding: body.branding === undefined ? undefined : (body.branding as Partial<Branding>)

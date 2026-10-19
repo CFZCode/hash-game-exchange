@@ -3,7 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert');
 
-const { createLogger, entitlements, featureCatalogue, sitePolicy } = require('@ibitplay/common');
+const { createLogger, entitlements, featureCatalogue, sitePolicy, withdrawBlock } = require('@ibitplay/common');
 
 const { createEntitlementsStore, sign } = require('../entitlements.store');
 const { memoryDb } = require('./memoryDb');
@@ -147,6 +147,26 @@ test('withdrawal requirements through the owner document', async (t) => {
     );
     assert.equal(s.writes.length, before);
     assert.equal(p.current().withdrawalCap.enabled, true);
+  });
+
+  await t.test('the global withdrawals switch travels in the signed document; withdrawBlock follows it', async () => {
+    const publishDoc = async (extra) => {
+      version += 1;
+      const data = { site: 'hash-game-exchange', version, updatedAt: new Date().toISOString(), features: {}, flags: {}, variants: { [KEY]: 'kyc' }, ...extra };
+      answer = { data, signature: sign(data, SECRET) };
+      return p.pollOnce();
+    };
+    // An older document (no key) = on.
+    await publishDoc({});
+    assert.equal(p.current().withdrawalsEnabled, true);
+    assert.equal(await withdrawBlock.withdrawalsEnabled(), true);
+
+    await publishDoc({ withdrawalsEnabled: false });
+    assert.equal(p.current().withdrawalsEnabled, false);
+    assert.equal(await withdrawBlock.withdrawalsEnabled(), false);
+
+    await publishDoc({ withdrawalsEnabled: true });
+    assert.equal(await withdrawBlock.withdrawalsEnabled(), true);
   });
 
   await t.test('players read it in features/public as a policy row', async () => {

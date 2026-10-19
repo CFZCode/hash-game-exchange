@@ -27,6 +27,7 @@
  */
 
 const { defineErrors } = require('./defineErrors');
+const { getEntitlements } = require('./entitlements');
 
 const errors = defineErrors('WITHDRAW', {
   /** Code `WITHDRAW_BLOCKED` — the player site maps it to its own message. */
@@ -34,7 +35,7 @@ const errors = defineErrors('WITHDRAW', {
     status: 403,
     message: 'Withdrawals are blocked on this account. Contact support.',
   },
-  /** Code `WITHDRAW_DISABLED` — the global switch (Admin → Users → Financial) is OFF. */
+  /** Code `WITHDRAW_DISABLED` — the owner's "Withdrawals enabled" switch is OFF. */
   DISABLED: {
     status: 403,
     message: 'Withdrawals are switched off right now. Please try again later.',
@@ -42,18 +43,14 @@ const errors = defineErrors('WITHDRAW', {
 });
 
 /**
- * Global withdrawals ON / OFF (`withdrawal_control`, migration 108). No table yet (an older
- * database) reads as ON — nothing changes until an operator switches it off.
+ * Global withdrawals ON / OFF: the owner document's `withdrawalsEnabled` (owner panel →
+ * Features & plan → Withdrawals), read through the shared entitlements reader like the
+ * daily limit. Absent, or no document reachable, reads as ON (fails open like the rest).
+ * The old `withdrawal_control.withdrawals_enabled` column (migration 108) is no longer read.
+ * Callers still pass `(sequelize, transaction)`; both are ignored now.
  */
-async function withdrawalsEnabled(sequelize, transaction) {
-  if (!sequelize?.query) return true;
-  try {
-    const [rows] = await sequelize.query('SELECT withdrawals_enabled FROM withdrawal_control WHERE id = 1', { transaction });
-    return rows[0] ? rows[0].withdrawals_enabled !== false : true;
-  } catch (error) {
-    if (error?.original?.code === '42P01' || error?.parent?.code === '42P01') return true;
-    throw error;
-  }
+async function withdrawalsEnabled() {
+  return (await getEntitlements()).withdrawalsEnabled !== false;
 }
 
 /**

@@ -147,6 +147,8 @@ function normalise(data) {
     withdrawalCap: withdrawalCap.cleanWithdrawalCap(data.withdrawalCap),
     // Daily withdrawal limit per currency (withdrawalDailyLimit.js); absent = off.
     withdrawalDailyLimit: withdrawalDailyLimit.cleanWithdrawalDailyLimit(data.withdrawalDailyLimit),
+    // Player withdrawals on every rail (withdrawBlock.js); absent = on.
+    withdrawalsEnabled: data.withdrawalsEnabled !== false,
     // Site name, metadata and logo file references (modules/branding); null = not branded.
     branding: cleanBranding(data.branding),
   };
@@ -282,7 +284,7 @@ function createEntitlementsStore({ config, logger, db, onChange: initialOnChange
 
   /** `{ features, flags, template, variants, version, fetchedAt, source }` — never a secret. */
   function current() {
-    if (!doc) return { features: {}, flags: {}, template: null, variants: null, coins: [], options: {}, region: regionPolicy.cleanRegion(null), withdrawalCap: withdrawalCap.cleanWithdrawalCap(null), withdrawalDailyLimit: withdrawalDailyLimit.cleanWithdrawalDailyLimit(null), branding: null, version: 0, fetchedAt: null, source: 'default' };
+    if (!doc) return { features: {}, flags: {}, template: null, variants: null, coins: [], options: {}, region: regionPolicy.cleanRegion(null), withdrawalCap: withdrawalCap.cleanWithdrawalCap(null), withdrawalDailyLimit: withdrawalDailyLimit.cleanWithdrawalDailyLimit(null), withdrawalsEnabled: true, branding: null, version: 0, fetchedAt: null, source: 'default' };
     return {
       features: { ...doc.features },
       flags: { ...doc.flags },
@@ -293,6 +295,7 @@ function createEntitlementsStore({ config, logger, db, onChange: initialOnChange
       region: regionPolicy.cleanRegion(doc.region),
       withdrawalCap: withdrawalCap.cleanWithdrawalCap(doc.withdrawalCap),
       withdrawalDailyLimit: withdrawalDailyLimit.cleanWithdrawalDailyLimit(doc.withdrawalDailyLimit),
+      withdrawalsEnabled: doc.withdrawalsEnabled !== false,
       branding: doc.branding ? JSON.parse(JSON.stringify(doc.branding)) : null,
       version: doc.version,
       fetchedAt: savedAt,

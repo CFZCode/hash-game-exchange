@@ -1,15 +1,13 @@
 'use client'
 
-import { useState, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 
 import Link from 'next/link'
 
-import { BanIcon, CalendarClockIcon, CircleCheckIcon, DicesIcon, GaugeIcon, LockIcon, ShieldCheckIcon, UsersIcon, WalletIcon } from 'lucide-react'
+import { BanIcon, CalendarClockIcon, CircleCheckIcon, DicesIcon, GaugeIcon, LockIcon, UsersIcon, WalletIcon } from 'lucide-react'
 
 import useReportMoney from '@/components/shared/ReportMoney'
 import DataTable, { type Column } from '@/components/shared/DataTable'
-import FormDialog from '@/components/shared/FormDialog'
-import { TextField } from '@/components/shared/FormField'
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
@@ -17,7 +15,6 @@ import { useSession } from '@/contexts/SessionContext'
 import { useApi, useApiMutation, useListState, usePagedApi } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
 import { cn } from '@/lib/utils'
-import { TxnPasswordLabel } from '@/views/finance/StaffFloat'
 import { Chip, PlayerAvatar, StatCard, TONES, inr, type Tone } from './shared'
 
 /**
@@ -25,19 +22,16 @@ import { Chip, PlayerAvatar, StatCard, TONES, inr, type Tone } from './shared'
  * components/users/FinancialTab.tsx `WithdrawalControl`) jaisa:
  *
  *   Overview cards      withdrawals ON/OFF, direct users, locked, limit
- *   Global Withdrawals  ON / OFF                           PUT admin/withdrawal-control/global
  *   Withdrawal rules    limit + wagering bonus, read-only — owner panel → Features & plan → Withdrawals
  *   Per-user withdrawal lock table                         GET admin/withdrawal-control/users + POST admin/locks
  *
- * Global switch transaction password se confirm hota hai (sirf owner / Super Admin).
+ * Global withdrawals ON / OFF sirf owner panel (Features & plan → Withdrawals) se; yahan sirf status.
  */
 
 const API = 'admin/withdrawal-control'
 
 type Summary = {
   enabled: boolean
-  updatedAt: string | null
-  updatedBy: { id: string; name: string | null } | null
   limit: { enabled: boolean; depositMultiplier: number; wagerBonus: boolean; wagerMultiplier: number; source: 'owner' }
 
   /** The owner's daily withdrawal limit per currency, rolling 24 hours (absent from an older backend). */
@@ -63,9 +57,6 @@ type LockUser = {
   wagerBonus: string
   maxWithdrawable: string | null
 }
-
-/** Global switch ka pending change — confirm dialog (transaction password) ke baad jaata hai. */
-type Pending = { enabled: boolean }
 
 const fmtMult = (n: number) => `${Number(n)}×`
 const fmtDate = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : '—')
@@ -99,30 +90,9 @@ const Rule = ({ icon, tone, on, name, value, children, loading }: { icon: ReactN
 )
 
 const WithdrawalControl = () => {
-  const { can } = useSession()
-  const canEdit = can('wallet:adjust')
   const summary = useApi<Summary>(API, undefined, { retry: false })
   const s = summary.data
   const loading = summary.isLoading
-
-  const [pending, setPending] = useState<Pending | null>(null)
-  const [password, setPassword] = useState('')
-
-  const close = () => {
-    setPending(null)
-    setPassword('')
-  }
-
-  const save = useApiMutation({
-    fn: () => {
-      if (!pending) return Promise.resolve(null)
-
-      return api.put(`${API}/global`, { enabled: pending.enabled, transactionPassword: password })
-    },
-    invalidate: [['api', API], ['paged', `${API}/users`]],
-    success: 'Saved',
-    onSuccess: close
-  })
 
   const enabled = s?.enabled ?? true
   const limit = s?.limit
@@ -134,13 +104,6 @@ const WithdrawalControl = () => {
   const dailyRows = Object.entries(daily?.limits ?? {})
   const dailyOn = Boolean(daily?.enabled && dailyRows.length)
 
-  // Confirm dialog ka title / text — reference jaisa.
-  const confirm = !pending
-    ? null
-    : pending.enabled
-      ? { title: 'Turn withdrawals ON?', body: 'Players can request withdrawals again by every method.' }
-      : { title: 'Turn withdrawals OFF?', body: 'No player will be able to withdraw by any method until you switch it back on.' }
-
   return (
     <div className='flex flex-col gap-4'>
       {/* Overview */}
@@ -151,35 +114,10 @@ const WithdrawalControl = () => {
         <StatCard label='Max withdrawal' value={limitOn ? `${fmtMult(m)} deposits` : 'No limit'} icon={<GaugeIcon />} tone='warning' loading={loading} />
       </div>
 
-      {/* Global switch */}
-      <Card className={cn('flex flex-col gap-4 border-l-4 p-5 sm:flex-row sm:items-center sm:justify-between', !s ? '' : enabled ? 'border-l-success' : 'border-danger/60 border-l-danger')}>
-        <div className='flex min-w-0 items-start gap-4'>
-          <span className={cn('flex size-12 shrink-0 items-center justify-center rounded-xl [&_svg]:size-5', TONES[enabled ? 'success' : 'danger'])}>
-            <ShieldCheckIcon />
-          </span>
-          <div className='min-w-0'>
-            <p className='font-bold'>Global Withdrawals</p>
-            <p className='text-muted-foreground mt-1 text-sm'>Applies to every player and every method: bank / UPI, payment gateway, crypto, P2P sell and tips.</p>
-            {loading ? (
-              <Skeleton className='mt-2 h-3.5 w-48' />
-            ) : (
-              <p className='text-muted-foreground mt-1 text-xs'>
-                Last config change: {fmtDate(s?.updatedAt)}
-                {s?.updatedBy?.name ? ` by ${s.updatedBy.name}` : ''}
-              </p>
-            )}
-          </div>
-        </div>
-        <label className='bg-muted/50 flex shrink-0 items-center justify-between gap-3 rounded-lg border px-3 py-2 sm:justify-start'>
-          <span className='text-sm font-semibold'>{loading ? '…' : enabled ? 'Withdrawals on' : 'Withdrawals off'}</span>
-          <Switch checked={enabled} disabled={!s || !canEdit} onCheckedChange={() => setPending({ enabled: !enabled })} aria-label='Global withdrawals' />
-        </label>
-      </Card>
-
       {s && !enabled && (
         <p className='bg-danger/10 text-danger border-danger/30 flex items-center gap-2 rounded-md border px-3 py-2 text-sm'>
           <BanIcon className='size-4 shrink-0' />
-          Withdrawals are OFF. No player can withdraw by any method until this is switched back on.
+          Withdrawals are OFF in the owner panel. No player can withdraw by any method until the owner switches them back on.
         </p>
       )}
 
@@ -224,17 +162,6 @@ const WithdrawalControl = () => {
 
       <LockTable locked={s?.lockedDirectUsers} />
 
-      <FormDialog
-        open={pending !== null}
-        onOpenChange={o => !o && close()}
-        trigger={null}
-        title={confirm?.title ?? ''}
-        description={confirm?.body}
-        submitLabel='Confirm'
-        onSubmit={() => save.mutateAsync()}
-      >
-        <TextField id='wc-tp' label={<TxnPasswordLabel />} type='password' required value={password} onChange={e => setPassword(e.target.value)} />
-      </FormDialog>
     </div>
   )
 }

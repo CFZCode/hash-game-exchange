@@ -1,7 +1,5 @@
 'use strict';
 
-process.env.TXN_PASSWORD_MODE = 'separate';
-
 const test = require('node:test');
 const assert = require('node:assert');
 
@@ -10,16 +8,16 @@ const { createLogger, entitlements, withdrawBlock, withdrawalCap } = require('@i
 const { hashPassword } = require('@ibitplay/auth');
 
 const { WithdrawalControlService } = require('../withdrawalControl.service');
+const adminRoutes = require('../routes/admin.routes');
 
 /**
- * Global withdrawals ON / OFF (migration 108):
- *   - sirf owner badal sakta hai, transaction password ke saath
+ * Global withdrawals ON / OFF — owner document ka `withdrawalsEnabled`:
+ *   - admin ka PUT /global ab 403 OWNER_MANAGED; `withdrawal_control` table padhi nahi jaati
  *   - OFF = player ka withdrawal WITHDRAW_DISABLED; staff pe asar nahi
- *   - ON = wapas normal
+ *   - ON / key absent = wapas normal
  */
 
 const TEST_DB = process.env.TEST_DB_NAME || 'ibitplay_test';
-const TXN = 'withdrawal control txn';
 
 test('global withdrawal switch against a database', async (t) => {
   const logger = createLogger({ name: 'withdrawal-control-test', level: 'silent' });
@@ -72,7 +70,7 @@ test('global withdrawal switch against a database', async (t) => {
   await models.Staff.destroy({ where: { id: ownerId } });
   await models.Staff.create({
     id: ownerId, name: `wc-owner-${ownerId}`, email: `wc-owner-${ownerId}@test.invalid`,
-    password: await hashPassword('x', 4), transaction_password: await hashPassword(TXN, 4),
+    password: await hashPassword('x', 4),
     role_id: roleId, status: 'active',
   });
   await models.Users.create({ id: uid, name: `wc-player-${uid}`, password: 'x', status: 'active' });
@@ -85,20 +83,31 @@ test('global withdrawal switch against a database', async (t) => {
     );
     await models.Users.destroy({ where: { id: uid } });
     await models.Staff.destroy({ where: { id: ownerId } });
+    entitlements.resetEntitlements();
     await connection.close();
   });
 
-  const owner = { id: ownerId, canIssueFunds: true };
+  // The owner's document, as admin-service's store answers it.
+  let ownerDoc = {};
+  entitlements.configureEntitlements({ read: () => ownerDoc });
 
-  await t.test('only the owner, only with the transaction password', async () => {
-    await assert.rejects(() => service.setGlobal({ actor: { id: ownerId, canIssueFunds: false }, enabled: false, transactionPassword: TXN }), (e) => e.code === 'WITHDRAWAL_CONTROL_OWNER_ONLY');
-    await assert.rejects(() => service.setGlobal({ actor: owner, enabled: false, transactionPassword: 'wrong' }), (e) => String(e.code).startsWith('TXN_PASSWORD'));
+  await t.test('the admin PUT /global is refused: 403 OWNER_MANAGED, the old table is not written', async () => {
+    const router = adminRoutes({ models, db: connection, logger, auth: { requirePermission: () => (_req, _res, next) => next() } });
+    const layer = router.stack.find((l) => l.route?.path === '/global' && l.route.methods.put);
+    assert.ok(layer, 'the route still answers, with a refusal');
+    const handle = layer.route.stack.at(-1).handle;
+    const error = await new Promise((resolve) => handle({ body: { enabled: false } }, {}, resolve));
+    assert.equal(error.code, 'OWNER_MANAGED');
+    assert.equal(error.statusCode ?? error.status, 403);
+    assert.equal(typeof service.setGlobal, 'undefined', 'the admin can no longer switch withdrawals');
+    const [[after]] = await sequelize.query('SELECT withdrawals_enabled FROM withdrawal_control WHERE id = 1');
+    assert.equal(after.withdrawals_enabled, before.withdrawals_enabled);
   });
 
-  await t.test('OFF refuses every player withdrawal; staff are not players', async () => {
-    const off = await service.setGlobal({ actor: owner, enabled: false, transactionPassword: TXN });
-    assert.equal(off.enabled, false);
-    assert.equal(off.updatedBy.id, String(ownerId));
+  await t.test('owner OFF refuses every player withdrawal; staff are not players; the old column is ignored', async () => {
+    await sequelize.query('UPDATE withdrawal_control SET withdrawals_enabled = TRUE WHERE id = 1');
+    ownerDoc = { withdrawalsEnabled: false };
+    assert.equal((await service.read()).enabled, false);
     await assert.rejects(() => withdrawBlock.assertWithdrawAllowed(models, { userId: uid }), (e) => e.code === 'WITHDRAW_DISABLED');
     await withdrawBlock.assertWithdrawAllowed(models, { staffId: ownerId });
   });
@@ -123,10 +132,12 @@ test('global withdrawal switch against a database', async (t) => {
     assert.equal(me.maxWithdrawable, limit.enabled ? '0.00000000' : null, 'nothing deposited → max 0 while the limit is on, none while off');
   });
 
-  await t.test('ON lets them withdraw again', async () => {
-    const on = await service.setGlobal({ actor: owner, enabled: true, transactionPassword: TXN });
-    assert.equal(on.enabled, true);
-    await withdrawBlock.assertWithdrawAllowed(models, { userId: uid });
-    assert.equal((await service.read()).enabled, true);
+  await t.test('owner ON (or no key) lets them withdraw again, whatever the old column says', async () => {
+    await sequelize.query('UPDATE withdrawal_control SET withdrawals_enabled = FALSE WHERE id = 1');
+    for (const doc of [{ withdrawalsEnabled: true }, {}]) {
+      ownerDoc = doc;
+      await withdrawBlock.assertWithdrawAllowed(models, { userId: uid });
+      assert.equal((await service.read()).enabled, true);
+    }
   });
 });

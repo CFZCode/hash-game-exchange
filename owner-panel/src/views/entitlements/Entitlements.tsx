@@ -169,7 +169,7 @@ const POLICY_KEYS = new Set(FEATURE_CATALOGUE.filter(f => f.policy).map(f => f.k
 /** The tab an unsaved change belongs to, for the count on each tab. */
 const tabOf = (c: Change): Tab => {
   if (c.kind === 'template') return 'template'
-  if (c.kind === 'withdrawal_cap' || c.kind === 'withdrawal_daily_limit' || c.key === WITHDRAWAL_REQUIREMENTS) return 'withdrawals'
+  if (c.kind === 'withdrawal_cap' || c.kind === 'withdrawal_daily_limit' || c.kind === 'withdrawals_enabled' || c.key === WITHDRAWAL_REQUIREMENTS) return 'withdrawals'
   if (c.kind === 'flag') return 'flags'
   if ((c.kind === 'variant' || c.kind === 'feature') && POLICY_KEYS.has(c.key)) return 'policies'
 
@@ -742,7 +742,8 @@ const Entitlements = () => {
         ...(prev?.withdrawalCap ? { withdrawalCap: { ...prev.withdrawalCap } } : {}),
         ...(prev?.withdrawalDailyLimit
           ? { withdrawalDailyLimit: { ...prev.withdrawalDailyLimit, limits: { ...prev.withdrawalDailyLimit.limits } } }
-          : {})
+          : {}),
+        ...(prev?.withdrawalsEnabled !== undefined ? { withdrawalsEnabled: prev.withdrawalsEnabled } : {})
       }
 
       fn(next)
@@ -801,7 +802,8 @@ const Entitlements = () => {
         options: draft!.options,
         region: draft!.region,
         withdrawalCap: draft!.withdrawalCap,
-        withdrawalDailyLimit: draft!.withdrawalDailyLimit
+        withdrawalDailyLimit: draft!.withdrawalDailyLimit,
+        withdrawalsEnabled: draft!.withdrawalsEnabled
       }),
     invalidate: [['api']],
     errorTitle: 'Features & plan not saved',
@@ -1122,7 +1124,22 @@ const Entitlements = () => {
                         below).
                       </CardDescription>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className='flex flex-col gap-4'>
+                      <div
+                        className={cn(
+                          'border-b pb-4',
+                          changed.has('withdrawals_enabled:withdrawalsEnabled') && 'bg-primary/5 -mx-1 rounded px-1'
+                        )}
+                        data-withdrawals-enabled
+                      >
+                        <RequirementSwitch
+                          name='enabled'
+                          label='Withdrawals enabled'
+                          description='Off stops every player withdrawal on every rail (bank, crypto, gateway payouts, P2P sell). Refused while off: 403 WITHDRAW_DISABLED.'
+                          checked={draft.withdrawalsEnabled !== false}
+                          onChecked={v => edit(next => void (next.withdrawalsEnabled = v))}
+                        />
+                      </div>
                       {withdrawalVariant ? (
                         <WithdrawalRequirementsEditor
                           key={`withdrawal-${epoch}`}
