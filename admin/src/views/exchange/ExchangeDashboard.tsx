@@ -1,10 +1,23 @@
 'use client'
 
-import { MinusIcon, TrendingDownIcon, TrendingUpIcon } from 'lucide-react'
+import type { ReactNode } from 'react'
+
+import {
+  ArrowDownToLineIcon,
+  ArrowUpFromLineIcon,
+  CreditCardIcon,
+  HandCoinsIcon,
+  LayersIcon,
+  MinusIcon,
+  ShieldAlertIcon,
+  TrendingDownIcon,
+  TrendingUpIcon,
+  WalletIcon
+} from 'lucide-react'
 
 import { ChartCard, type ChartTableData } from '@/components/shared/charts'
 import ErrorState from '@/components/shared/ErrorState'
-import StatCard from '@/components/shared/StatCard'
+import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useApi } from '@/hooks/use-api'
 import { cn } from '@/lib/utils'
@@ -167,6 +180,32 @@ const PLPanel = ({ items, total }: { items: Item[]; total: number }) => {
   )
 }
 
+/** One figure: an icon chip, the label, the value (red below zero), and a thin accent line. */
+const Tile = ({ label, value, icon, hint, loading }: { label: string; value: number; icon: ReactNode; hint: string; loading: boolean }) => (
+  <Card className='group relative gap-0 overflow-hidden py-4 shadow-none transition-colors hover:border-primary/30'>
+    <span aria-hidden className={cn('absolute inset-x-0 top-0 h-0.5', value < 0 ? 'bg-danger/60' : 'bg-primary/40')} />
+    <CardContent className='flex items-center gap-3 px-4'>
+      <span
+        className={cn(
+          'flex size-10 shrink-0 items-center justify-center rounded-xl [&_svg]:size-5',
+          value < 0 ? 'bg-danger-soft text-danger' : 'bg-primary/10 text-primary'
+        )}
+      >
+        {icon}
+      </span>
+      <div className='min-w-0'>
+        <p className='text-muted-foreground text-xs font-medium'>{label}</p>
+        {loading ? (
+          <Skeleton className='mt-1.5 h-7 w-20' />
+        ) : (
+          <p className={cn('truncate text-2xl font-semibold tracking-tight tabular-nums', value < 0 && 'text-danger')}>{fmt(value)}</p>
+        )}
+        <p className='text-muted-foreground truncate text-[11px]'>{hint}</p>
+      </div>
+    </CardContent>
+  </Card>
+)
+
 const PanelSkeleton = () => (
   <div className='flex flex-col gap-4'>
     <Skeleton className='h-16 w-full rounded-xl' />
@@ -219,14 +258,17 @@ const ExchangeDashboard = () => {
   // Exposure API se positive aata hai, card pe loss (-) dikhta hai.
   const exposure = -Math.abs(Number(data?.exposure) || 0) || 0
 
-  const tiles = [
-    { label: 'Balance', value: Number(data?.balance) || 0 },
-    { label: 'Exposure', value: exposure },
-    { label: 'Credit pts', value: creditPts },
-    { label: 'All pts', value: allPts },
-    { label: 'Settlement pts', value: settlementPts },
-    { label: 'Upper pts', value: upperPts },
-    { label: 'Down pts', value: downPts }
+  const wallet = [
+    { label: 'Balance', value: Number(data?.balance) || 0, icon: <WalletIcon />, hint: 'Your own balance' },
+    { label: 'Exposure', value: exposure, icon: <ShieldAlertIcon />, hint: 'Held in open bets' },
+    { label: 'Credit pts', value: creditPts, icon: <CreditCardIcon />, hint: 'Credit given to you' },
+    { label: 'All pts', value: allPts, icon: <LayersIcon />, hint: 'Across your tree' }
+  ]
+
+  const settle = [
+    { label: 'Settlement pts', value: settlementPts, icon: <HandCoinsIcon />, hint: 'Still to settle' },
+    { label: 'Upper pts', value: upperPts, icon: <ArrowUpFromLineIcon />, hint: 'With your upline' },
+    { label: 'Down pts', value: downPts, icon: <ArrowDownToLineIcon />, hint: 'With your downline' }
   ]
 
   const showPoints = isLoading || hasPoints
@@ -235,9 +277,14 @@ const ExchangeDashboard = () => {
   return (
     <div className='flex flex-col gap-4'>
       {error && !data && <ErrorState error={error} title='Could not load your points' />}
-      <div className='grid grid-cols-2 gap-3 md:grid-cols-4'>
-        {tiles.map(t => (
-          <StatCard key={t.label} label={t.label} value={fmt(t.value)} loading={isLoading} />
+      <div className='grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4'>
+        {wallet.map(t => (
+          <Tile key={t.label} {...t} loading={isLoading} />
+        ))}
+      </div>
+      <div className='grid grid-cols-1 gap-3 sm:grid-cols-3'>
+        {settle.map(t => (
+          <Tile key={t.label} {...t} loading={isLoading} />
         ))}
       </div>
 
