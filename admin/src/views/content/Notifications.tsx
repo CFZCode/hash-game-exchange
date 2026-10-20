@@ -25,7 +25,7 @@ import { api } from '@/lib/api/client'
 import { check } from '@/lib/validate'
 import { NOTIFICATION_TYPES, type Device, type NotificationRow, type SentNotification } from './types'
 
-const TYPE_OPTIONS = NOTIFICATION_TYPES.map(t => ({ value: t, label: t[0].toUpperCase() + t.slice(1) }))
+const TYPE_OPTIONS = NOTIFICATION_TYPES.map(t => ({ value: t, label: `${t[0].toUpperCase() + t.slice(1)} — ${t === 'general' ? 'direct or all users' : 'direct users only'}` }))
 
 const SENDS = 'admin/notifications/sends'
 
@@ -80,11 +80,16 @@ const Compose = () => {
         <TextField id='n-title' label='Title' required maxLength={200} value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
         <TextAreaField id='n-body' label='Body' rows={3} maxLength={1000} value={form.body} onChange={e => setForm({ ...form, body: e.target.value })} />
         <SelectField id='n-type' label='Type' value={form.type} onChange={type => setForm({ ...form, type })} options={TYPE_OPTIONS} />
-        {form.type === 'general' ? (
-          <SelectField id='n-audience' label='Send to' value={form.audience} onChange={audience => setForm({ ...form, audience })} options={AUDIENCE_OPTIONS} />
-        ) : (
-          <p className='text-muted-foreground -mt-2 text-xs'>Goes to: Direct users only</p>
-        )}
+        {/* Always shown: general picks the audience, every other type is fixed to direct users. */}
+        <SelectField
+          id='n-audience'
+          label='Send to'
+          value={form.type === 'general' ? form.audience : 'direct'}
+          onChange={audience => setForm({ ...form, audience })}
+          options={AUDIENCE_OPTIONS}
+          disabled={form.type !== 'general'}
+          hint={form.type === 'general' ? undefined : 'Only a general notification can go to agent players.'}
+        />
         <Can permission='config:write'>
           <ConfirmDialog
             trigger={

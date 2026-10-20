@@ -220,13 +220,15 @@ export const SelectField = ({
   value,
   onChange,
   options,
-  placeholder
+  placeholder,
+  disabled
 }: Base & {
   name?: string
   value: string
   onChange: (value: string) => void
   options: { value: string; label: ReactNode }[]
   placeholder?: string
+  disabled?: boolean
 }) => {
   const { message, clear } = useFieldError(id, name, error)
 
@@ -235,6 +237,7 @@ export const SelectField = ({
       <FieldLabel htmlFor={id}>{label}{required && ' *'}</FieldLabel>
       <Select
         value={value}
+        disabled={disabled}
         onValueChange={v => {
           if (v === null) return
           clear()
