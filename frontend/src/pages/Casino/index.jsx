@@ -438,7 +438,7 @@ export default function Casino() {
                   neighbour's. Reachable since the BC Originals tab went live — five of the
                   platform's twenty have no bc.game original of that name. No transcribed tab
                   loses a single image to it, checked across all twelve. */}
-              <GameGrid games={pageGames} exactArt />
+              <GameGrid games={pageGames} exactArt loading={!USE_FIXTURES && livePage === undefined} />
               <Pagination page={page} pages={pages} onChange={setPage} />
             </>
           )}
