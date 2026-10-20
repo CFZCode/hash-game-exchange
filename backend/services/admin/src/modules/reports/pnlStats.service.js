@@ -95,6 +95,14 @@ const sportName = (id) => (id === 'other' ? 'Other' : SPORT_NAMES[id] ?? `Sport 
 
 /** `gis_transactions.currency` says PKR for this platform's INR wallet (statements.constants). */
 const GIS_CURRENCY = `(CASE WHEN UPPER(g.currency) = 'PKR' THEN 'INR' ELSE UPPER(COALESCE(g.currency, '')) END)`;
+// A Slotegrator round's game, as `gg`: the lobby's catalogue first (gisgamesnew, or parked when the other aggregator is live), the legacy gis_games after.
+const GIS_GAME_JOIN = `LEFT JOIN LATERAL (
+            SELECT name, provider, type FROM (
+              SELECT 1 AS o, name, provider, type FROM gisgamesnew WHERE uuid = g.game_uuid
+              UNION ALL SELECT 2, name, provider, type FROM gisgamesnew_parked WHERE uuid = g.game_uuid
+              UNION ALL SELECT 3, name, provider, type FROM gis_games WHERE uuid = g.game_uuid
+            ) c ORDER BY o LIMIT 1
+          ) gg ON true`;
 const SPORTS_CURRENCY = (alias) => `UPPER(COALESCE(NULLIF(${alias}.original_currency, ''), 'INR'))`;
 
 /** Ledger reasons that are a reward paid to a wallet. */
@@ -478,7 +486,7 @@ class PnlStatsService {
                  'gis:' || COALESCE(g.game_uuid, ''), COALESCE(gg.name, g.game_uuid), ${GIS_CURRENCY},
                  ${gisKindSql('g')}, ${gisSideAmountSql('g')}, ${gisBetCountSql('g')}
             FROM gis_transactions g
-            LEFT JOIN gis_games gg ON gg.uuid = g.game_uuid
+            ${GIS_GAME_JOIN}
            WHERE ${gisPlayFilterSql('g')} AND LOWER(COALESCE(gg.type, '')) NOT LIKE '%sport%'
              AND ${rangeSql('g.created_at')}${ctx.currency ? ` AND ${GIS_CURRENCY} = :currency` : ''}${owned('g.user_id')}
           UNION ALL
@@ -553,7 +561,7 @@ class PnlStatsService {
                UPPER(COALESCE(NULLIF(gg.provider, ''), 'Partner')), COALESCE(gg.name, g.game_uuid, 'Partner sportsbook'),
                ${GIS_CURRENCY}, ${gisSideAmountSql('g')}, ${gisBetCountSql('g')}
           FROM gis_transactions g
-          JOIN gis_games gg ON gg.uuid = g.game_uuid
+          ${GIS_GAME_JOIN}
          WHERE ${gisPlayFilterSql('g')} AND LOWER(COALESCE(gg.type, '')) LIKE '%sport%'
            AND ${rangeSql('g.created_at')}${ctx.currency ? ` AND ${GIS_CURRENCY} = :currency` : ''}${owned('g.user_id')}
       ) x
@@ -586,7 +594,7 @@ class PnlStatsService {
         SELECT g.user_id, CASE WHEN LOWER(COALESCE(gg.type, '')) LIKE '%sport%' THEN 'sports' ELSE 'casino' END,
                ${gisKindSql('g')}, 'partner', ${GIS_CURRENCY}, ${gisSideAmountSql('g')}, ${gisBetCountSql('g')}
           FROM gis_transactions g
-          LEFT JOIN gis_games gg ON gg.uuid = g.game_uuid
+          ${GIS_GAME_JOIN}
          WHERE ${gisPlayFilterSql('g')}
            AND ${rangeSql('g.created_at')}${ctx.currency ? ` AND ${GIS_CURRENCY} = :currency` : ''}${owned('g.user_id')}
         UNION ALL
