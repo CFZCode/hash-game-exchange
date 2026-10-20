@@ -51,13 +51,14 @@ const SearchBox = ({ value, onCommit, placeholder }: { value: string; onCommit: 
 
 // ── Aggregator (GIS / Slotegrator) catalogue ────────────────────────────────
 
-const EditImage = ({ game }: { game: GisGame }) => {
+export const EditImage = ({ game, onSaved }: { game: Pick<GisGame, 'uuid' | 'name' | 'image'>; onSaved?: () => void }) => {
   const [image, setImage] = useState(game.image ?? '')
 
   const save = useApiMutation({
     fn: () => api.put(`admin/casino/games/catalogue/${encodeURIComponent(game.uuid)}/image`, { image }),
     invalidate: [['api', 'admin/casino/games/catalogue/search'], ['api', 'admin/casino/games/vendor-search'], ['api', 'admin/casino/games/type-search']],
-    success: 'Image updated'
+    success: 'Image updated',
+    onSuccess: () => onSaved?.()
   })
 
   return (

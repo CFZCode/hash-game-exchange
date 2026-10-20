@@ -30,6 +30,9 @@ type Props = {
   max?: number
   header?: ReactNode
   emptyMessage?: string
+
+  /** An extra per-row control (e.g. the tile image editor), drawn before the priority arrows. */
+  rowAction?: (item: OrderedItem) => ReactNode
 }
 
 const Thumb = ({ src, alt }: { src?: string | null; alt: string }) =>
@@ -147,7 +150,7 @@ const Picker = ({ search, exclude, onAdd, disabled }: { search: Props['search'];
 }
 
 /** An ordered list with move/remove/add and a dirty-gated save. The order is the whole value: saving PUTs every id. */
-const OrderedList = ({ items, loading, search, onSave, canWrite, max, header, emptyMessage = 'Nothing curated yet. Add games to build the list.' }: Props) => {
+const OrderedList = ({ items, loading, search, onSave, canWrite, max, header, emptyMessage = 'Nothing curated yet. Add games to build the list.', rowAction }: Props) => {
   const [edited, setEdited] = useState<OrderedItem[] | null>(null)
   const draft = useMemo(() => edited ?? items ?? [], [edited, items])
   const [saving, setSaving] = useState(false)
@@ -210,7 +213,7 @@ const OrderedList = ({ items, loading, search, onSave, canWrite, max, header, em
               <TableHead className='w-14'></TableHead>
               <TableHead>Game</TableHead>
               <TableHead>Vendor / type</TableHead>
-              <TableHead className='w-52 pr-4 text-right'>Priority</TableHead>
+              <TableHead className='w-52 pr-4 text-right'>{rowAction ? 'Image / priority' : 'Priority'}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -251,6 +254,7 @@ const OrderedList = ({ items, loading, search, onSave, canWrite, max, header, em
                   </TableCell>
                   <TableCell className='pr-4'>
                     <div className='flex justify-end gap-1'>
+                      {canWrite && rowAction?.(g)}
                       <Button size='icon-sm' variant='ghost' disabled={!canWrite || i === 0} onClick={() => move(i, 0)} aria-label='Top'>
                         <ArrowUpToLineIcon />
                       </Button>
