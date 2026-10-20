@@ -126,7 +126,7 @@ const AgentLedger = ({ direction }: { direction: 'deposit' | 'withdraw' }) => {
       <div className={`${card} mb-4 flex flex-col gap-4 p-4 md:flex-row md:items-center`}>
         <div className='relative'>
           <SearchIcon className='absolute top-1/2 left-3 size-[15px] -translate-y-1/2 text-muted-foreground' />
-          <input className={`${input} min-w-40 pl-9`} placeholder='Search by ID…' value={f.q} onChange={e => change('q', e.target.value)} />
+          <input autoComplete='off' className={`${input} min-w-40 pl-9`} placeholder='Search by ID…' value={f.q} onChange={e => change('q', e.target.value)} />
         </div>
         <label className='grid gap-0.5 text-[0.7rem] text-muted-foreground'>
           From
@@ -136,8 +136,8 @@ const AgentLedger = ({ direction }: { direction: 'deposit' | 'withdraw' }) => {
           To
           <input type='date' className={`${input} min-w-[150px]`} value={f.to} onChange={e => change('to', e.target.value)} />
         </label>
-        <input className={`${input} w-[110px]`} placeholder='Min' value={f.min} onChange={e => change('min', e.target.value)} />
-        <input className={`${input} w-[110px]`} placeholder='Max' value={f.max} onChange={e => change('max', e.target.value)} />
+        <input autoComplete='off' className={`${input} w-[110px]`} placeholder='Min' value={f.min} onChange={e => change('min', e.target.value)} />
+        <input autoComplete='off' className={`${input} w-[110px]`} placeholder='Max' value={f.max} onChange={e => change('max', e.target.value)} />
         {hasFilters && (
           <button
             type='button'
