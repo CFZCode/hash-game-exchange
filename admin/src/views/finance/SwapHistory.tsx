@@ -96,17 +96,6 @@ const columns: Column<SwapRow>[] = [
   { key: 'from', header: 'From', align: 'right', cell: r => <Money value={r.from_amount} currency={r.from_currency} /> },
   { key: 'to', header: 'To', align: 'right', cell: r => <Money value={r.to_amount} currency={r.to_currency} /> },
   {
-    key: 'fee',
-    header: 'Fee',
-    align: 'right',
-    cell: r => (
-      <span className='whitespace-nowrap'>
-        <Money value={r.fee_amount} currency={r.fee_currency} />
-        <span className='text-muted-foreground ml-1 text-xs tabular-nums'>({(Number(r.fee_percentage) * 100).toFixed(2)}%)</span>
-      </span>
-    )
-  },
-  {
     key: 'rate',
     header: 'Rate',
     cell: r => (
@@ -115,8 +104,20 @@ const columns: Column<SwapRow>[] = [
       </span>
     )
   },
-  { key: 'value', header: 'Value (USDT)', align: 'right', cell: r => <Money value={String(Number(r.from_amount) * Number(r.usd_rate_from || 0))} currency='USDT' /> },
-  { key: 'feeUsdt', header: 'Fee (USDT)', align: 'right', cell: r => <Money value={feeUsdt(r)} currency='USDT' /> }
+  { key: 'value', header: 'Value (USDT)', align: 'right', cell: r => <Money value={String(Number(r.from_amount) * Number(r.usd_rate_from || 0))} currency='USDT' /> }
+]
+
+/** The fee history: one row per swap's fee, kept apart from the swaps table. */
+const feeColumns: Column<SwapRow>[] = [
+  ...columns.slice(0, 3),
+  {
+    key: 'swap',
+    header: 'Swap',
+    cell: r => <span className='text-muted-foreground text-xs whitespace-nowrap'>{r.from_currency} → {r.to_currency}</span>
+  },
+  { key: 'fee', header: 'Fee', align: 'right', cell: r => <Money value={r.fee_amount} currency={r.fee_currency} /> },
+  { key: 'pct', header: 'Fee %', align: 'right', cell: r => <span className='tabular-nums'>{(Number(r.fee_percentage) * 100).toFixed(2)}%</span> },
+  { key: 'feeUsdt', header: 'Fee (USDT)', align: 'right', cell: r => <span className='font-medium'><Money value={feeUsdt(r)} currency='USDT' /></span> }
 ]
 
 const SwapHistory = () => {
@@ -145,12 +146,13 @@ const SwapHistory = () => {
       <Tabs value={tab} onValueChange={v => setTab(String(v))}>
         <TabsList variant='line' className='mb-4'>
           <TabsTrigger value='swaps'>Swaps</TabsTrigger>
+          <TabsTrigger value='fees'>Fee history</TabsTrigger>
           <TabsTrigger value='profit'>Fee profit by day</TabsTrigger>
         </TabsList>
         <TabsContent value='profit'>{tab === 'profit' && <FeeHistory userId={query.userId ? String(query.userId) : undefined} />}</TabsContent>
-        <TabsContent value='swaps'>
-      {tab === 'swaps' && <DataTable
-        columns={columns}
+        <TabsContent value={tab === 'fees' ? 'fees' : 'swaps'}>
+      {tab !== 'profit' && <DataTable
+        columns={tab === 'fees' ? feeColumns : columns}
         rows={list.data?.rows}
         rowKey={r => String(r.id)}
         loading={list.isLoading}
