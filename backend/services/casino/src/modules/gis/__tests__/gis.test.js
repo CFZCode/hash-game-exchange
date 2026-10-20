@@ -681,8 +681,8 @@ test('slotegrator (gis)', async (t) => {
     assert.match(result.error_description, /Unsupported currency/);
   });
 
-  await t.test('INR and PKR swap: a PKR callback moves the INR wallet, an INR callback the PKR wallet', async () => {
-    for (const [sent, wallet] of [['PKR', 'INR'], ['INR', 'PKR']]) {
+  await t.test('INR and PKR callbacks move the wallet of the same name', async () => {
+    for (const [sent, wallet] of [['INR', 'INR'], ['PKR', 'PKR']]) {
       const uid = await seedPlayer(newUid());
       const { service } = build(new Map([[String(uid), '900']]));
 

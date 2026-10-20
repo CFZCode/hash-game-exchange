@@ -32,14 +32,11 @@ const SETTLEMENT_CURRENCY = Object.freeze({
 
 const SUPPORTED_CURRENCIES = Object.freeze(Object.keys(SETTLEMENT_CURRENCY));
 
-/**
- * What the provider is told a wallet's currency is called. INR and PKR swap on purpose (user,
- * 2026-10-20): an INR player launches in PKR and a PKR player in INR; the wallet stays the player's.
- */
-const OUTBOUND_CURRENCY = Object.freeze({ USDT: 'USD', INR: 'PKR', PKR: 'INR' });
+/** What the provider is told a wallet's currency is called. INR and PKR go as themselves. */
+const OUTBOUND_CURRENCY = Object.freeze({ USDT: 'USD' });
 
 /** A callback's currency → the wallet it moves: the reverse of OUTBOUND_CURRENCY. */
-const CALLBACK_CURRENCY = Object.freeze({ USD: 'USDT', USDT: 'USDT', PKR: 'INR', INR: 'PKR' });
+const CALLBACK_CURRENCY = Object.freeze({ USD: 'USDT', USDT: 'USDT', INR: 'INR', PKR: 'PKR' });
 
 /**
  * The uuid-v5 namespace used to derive the transaction id we hand back.
