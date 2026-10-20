@@ -52,7 +52,7 @@ const fmt = (value: string | number | null | undefined, cur: string) =>
 
 const fmtDate = (iso: string) => (iso ? new Date(iso).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : '—')
 
-const CATEGORY_TONE: Record<string, Tone> = { Deposit: 'success', Withdrawal: 'danger', Agent: 'info', Sports: 'warning', Casino: 'primary', 'Original Games': 'primary' }
+const CATEGORY_TONE: Record<string, Tone> = { Deposit: 'success', Withdrawal: 'danger', 'Withdrawal Taken': 'danger', Agent: 'info', Sports: 'warning', Casino: 'primary', 'Original Games': 'primary' }
 
 /**
  * Balance Sheet — reference admin ka BalanceSheetDialog: user ka har paisa-move, running balance ke saath.
