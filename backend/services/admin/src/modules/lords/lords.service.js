@@ -404,8 +404,8 @@ class LordsService {
     // spent attempt) for a probe at someone else's player.
     await this.#assertMoneyTarget(actor, userId);
     await assertTransactionPassword(this.models, actor.id, transactionPassword, {
-      // Owner: required once set (the old house-adjust rule). Everyone else: always.
-      required: !actor.canIssueFunds,
+      // Everyone, the owner too (user, 2026-10-20).
+      required: true,
       executiveId: actor.executiveId ?? null,
     });
 

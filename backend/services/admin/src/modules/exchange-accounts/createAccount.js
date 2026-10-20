@@ -2,7 +2,6 @@
 
 const { Op } = require('sequelize');
 const { AppError, money } = require('@ibitplay/common');
-const { canIssueFunds } = require('@ibitplay/auth');
 
 const { StaffService } = require('../staff/staff.service');
 const { PlayersService } = require('../players/players.service');
@@ -119,9 +118,9 @@ class CreateAccountService {
       if (taken) throw new AppError('This email is already in use', 409, 'EXCHANGE_ACCOUNTS_EMAIL_EXISTS');
     }
 
-    // 2. Transaction Code — form pe hamesha hai. Owner ka sirf tab check hota hai jab set ho.
+    // 2. Transaction Code — form pe hamesha hai, aur sabke liye zaroori (owner bhi; user, 2026-10-20).
     await assertTransactionPassword(this.models, staffActor.id, transactionPassword, {
-      required: !canIssueFunds(staffActor) || Boolean(staffActor.executiveId),
+      required: true,
       executiveId: staffActor.executiveId ?? null,
     });
 

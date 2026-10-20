@@ -6,6 +6,7 @@ import { Loader2Icon } from 'lucide-react'
 import { toast } from 'sonner'
 
 import PageHeader from '@/components/shared/PageHeader'
+import TxnCodeInput from '@/components/shared/TxnCodeInput'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -39,6 +40,7 @@ const keyOf = (m: MoMatch) => `${m.matchId}-${m.marketType}-${m.gameType}`
 const SettlementModal = ({ mode, match, onClose }: { mode: 'declare' | 'void'; match: MoMatch | null; onClose: (done: boolean) => void }) => {
   const [selected, setSelected] = useState<number | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [code, setCode] = useState('')
 
   if (!match) return null
 
@@ -60,7 +62,8 @@ const SettlementModal = ({ mode, match, onClose }: { mode: 'declare' | 'void'; m
           eventid: match.eventId,
           match_id: match.matchId,
           market_type: match.marketType,
-          gametype: match.gameType || 'FAN'
+          gametype: match.gameType || 'FAN',
+          transactionPassword: code
         })
       } else {
         await zipCall('POST', `${SETTLE_API}/declareresult`, {
@@ -69,7 +72,8 @@ const SettlementModal = ({ mode, match, onClose }: { mode: 'declare' | 'void'; m
           match_title: titleOf(match),
           game_type: match.gameType,
           market_type: match.marketType,
-          winnerName: runners[selected ?? -1] ?? ''
+          winnerName: runners[selected ?? -1] ?? '',
+          transactionPassword: code
         })
       }
 
@@ -88,7 +92,7 @@ const SettlementModal = ({ mode, match, onClose }: { mode: 'declare' | 'void'; m
     </Button>
   )
 
-  const canSubmit = mode === 'void' || selected != null
+  const canSubmit = Boolean(code) && (mode === 'void' || selected != null)
 
   return (
     <Dialog open onOpenChange={open => !open && onClose(false)}>
@@ -127,6 +131,8 @@ const SettlementModal = ({ mode, match, onClose }: { mode: 'declare' | 'void'; m
             Do you really want to cancel or refund the bets? All stakes will be refunded to the users. This action cannot be undone.
           </div>
         )}
+
+        <TxnCodeInput id='ms-tp' value={code} onChange={setCode} />
 
         <DialogFooter>
           <Button variant='outline' onClick={() => onClose(false)}>

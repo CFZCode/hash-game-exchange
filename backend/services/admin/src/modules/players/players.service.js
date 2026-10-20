@@ -3,14 +3,7 @@
 const crypto = require('node:crypto');
 const { Op, literal } = require('sequelize');
 const { money } = require('@ibitplay/common');
-const {
-  hashPassword,
-  hasPermission,
-  canIssueFunds,
-  effectiveStaffLevel,
-  PERMISSIONS,
-  AGENT_TREE_LEVELS,
-} = require('@ibitplay/auth');
+const { hashPassword, canIssueFunds } = require('@ibitplay/auth');
 
 const errors = require('./players.errors');
 const { PLAYER_ROLE_ID, PASSWORD_ROUNDS, CLOSED_STATUS, WALLET_SEED } = require('./players.constants');
@@ -94,11 +87,9 @@ class PlayersService {
       if (Number(anchor) !== Number(actor.id) && !canIssueFunds(actor)) {
         throw errors.NOT_PERMITTED({ reason: 'only the account a player reports to can fund it' });
       }
-      // Required for everyone but the platform owner, who keeps the old rule
-      // (required once set) — the same split as `StaffService.transfer`.
-      const parentFunding = !(canIssueFunds(actor) && hasPermission(actor.permissions, PERMISSIONS.WALLET_ADJUST));
+      // Required for everyone, the platform owner too (user, 2026-10-20) — as in `StaffService.transfer`.
       await assertTransactionPassword(this.models, actor.id, transactionPassword, {
-        required: parentFunding || AGENT_TREE_LEVELS.includes(Number(effectiveStaffLevel(actor))),
+        required: true,
         executiveId: actor.executiveId ?? null,
       });
     }

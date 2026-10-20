@@ -6,6 +6,7 @@ import { Loader2Icon } from 'lucide-react'
 import { toast } from 'sonner'
 
 import PageHeader from '@/components/shared/PageHeader'
+import TxnCodeInput from '@/components/shared/TxnCodeInput'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -56,6 +57,7 @@ const FancyModal = ({ mode, row, onClose }: { mode: 'declare' | 'void'; row: Fan
   const [winnerId, setWinnerId] = useState('')
   const [selected, setSelected] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [code, setCode] = useState('')
 
   const marketType = row.marketType ?? ''
   const matchTitle = row.eventName || row.matchTitle || ''
@@ -87,7 +89,8 @@ const FancyModal = ({ mode, row, onClose }: { mode: 'declare' | 'void'; row: Fan
           match_id: row.matchId,
           market_type: marketType,
           gametype: row.gameType || 'FAN',
-          ...(isRunResultMarket(marketType) ? { selection_name: row.selectionName } : {})
+          ...(isRunResultMarket(marketType) ? { selection_name: row.selectionName } : {}),
+          transactionPassword: code
         })
       } else {
         const common = { eventid: row.eventId, match_id: row.matchId, match_title: row.matchTitle, game_type: row.gameType || 'FAN', market_type: marketType }
@@ -100,7 +103,7 @@ const FancyModal = ({ mode, row, onClose }: { mode: 'declare' | 'void'; row: Fan
               ? { ...common, winnerId: winnerId.trim(), fancyName: row.selectionName }
               : { ...common, winnerName: winnerId.trim() }
 
-        await zipCall('POST', `${SETTLE_API}/declareresult`, payload)
+        await zipCall('POST', `${SETTLE_API}/declareresult`, { ...payload, transactionPassword: code })
       }
 
       toast.success(mode === 'void' ? `${marketType || 'Market'} voided — stakes refunded` : `Result declared for ${row.selectionName || marketType || matchTitle}`)
@@ -119,7 +122,7 @@ const FancyModal = ({ mode, row, onClose }: { mode: 'declare' | 'void'; row: Fan
   )
 
   const ready = useTeamSelection ? selected != null : winnerId.trim() !== ''
-  const disabled = (mode === 'declare' && (!ready || Boolean(winnerError))) || submitting
+  const disabled = !code || (mode === 'declare' && (!ready || Boolean(winnerError))) || submitting
 
   return (
     <Dialog open onOpenChange={open => !open && onClose()}>
@@ -182,6 +185,8 @@ const FancyModal = ({ mode, row, onClose }: { mode: 'declare' | 'void'; row: Fan
             Do you really want to cancel or refund the bets? All stakes will be refunded to the users. This action cannot be undone.
           </div>
         )}
+
+        <TxnCodeInput id='fs-tp' value={code} onChange={setCode} />
 
         <DialogFooter>
           <Button variant='outline' onClick={onClose}>

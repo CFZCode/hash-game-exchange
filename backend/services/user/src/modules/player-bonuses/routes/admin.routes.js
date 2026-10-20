@@ -1,7 +1,7 @@
 'use strict';
 
 const { Router } = require('express');
-const { validate, response, asyncHandler, createActivityRecorder } = require('@ibitplay/common');
+const { validate, response, asyncHandler, createActivityRecorder, requireTxnPassword } = require('@ibitplay/common');
 const { PERMISSIONS } = require('@ibitplay/auth');
 
 const v = require('../playerBonus.validators');
@@ -20,6 +20,8 @@ module.exports = function adminRoutes(deps) {
   const { auth, clients, logger, config } = deps;
   const service = new PlayerBonusService(deps);
   const router = Router();
+  // Gives or takes balance: the staff caller's transaction code first.
+  const txnCode = requireTxnPassword({ clients });
 
   const withActivity = createActivityRecorder({ client: clients.admin, logger, serviceName: config.SERVICE_NAME });
   const canRead = auth.requireAnyPermission(PERMISSIONS.REPORTS_READ, PERMISSIONS.USERS_READ, PERMISSIONS.WALLET_READ);
@@ -49,6 +51,7 @@ module.exports = function adminRoutes(deps) {
   router.post(
     '/:id/forfeit',
     canForfeit,
+    txnCode,
     validate(v.forfeit),
     withActivity({
       action: 'bonus.player-bonus.forfeit',

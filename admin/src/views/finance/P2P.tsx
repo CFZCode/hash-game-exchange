@@ -27,6 +27,7 @@ import { check } from '@/lib/validate'
 import { ALL_CURRENCIES } from '@/components/shared/charts'
 import { useDefaultCurrency } from '@/components/shared/DefaultCurrency'
 import { Details, ImageDialog, ViewDialog, stop, usePageNumbered } from './shared'
+import { TxnPasswordLabel } from './StaffFloat'
 import {
   P2P_COINS,
   P2P_DISPUTE_STATUSES,
@@ -72,6 +73,7 @@ const StatusFilter = ({ value, onChange, options }: { value: string; onChange: (
 const NoteAction = ({ path, title, description, label, icon, destructive, success, multipart }: { path: string; title: string; description: ReactNode; label: string; icon: ReactNode; destructive?: boolean; success: string; multipart?: boolean }) => {
   const [note, setNote] = useState('')
   const [file, setFile] = useState<File | null>(null)
+  const [code, setCode] = useState('')
 
   const run = useApiMutation({
     fn: () => {
@@ -80,11 +82,12 @@ const NoteAction = ({ path, title, description, label, icon, destructive, succes
 
         if (note) form.append('note', note)
         if (file) form.append('admin_payment_proof', file)
+        form.append('transactionPassword', code)
 
         return api.upload(path, form)
       }
 
-      return api.post(path, note ? { note } : {})
+      return api.post(path, { ...(note ? { note } : {}), transactionPassword: code })
     },
     invalidate: ALL_LISTS,
     success
@@ -103,7 +106,8 @@ const NoteAction = ({ path, title, description, label, icon, destructive, succes
       destructive={destructive}
       validate={() => ({
         [`na-${path}`]: check.length(note, 'Note', { max: 2000 }),
-        [`nf-${path}`]: file && !['image/png', 'image/jpeg'].includes(file.type) ? 'Payment proof must be a PNG or JPEG image' : undefined
+        [`nf-${path}`]: file && !['image/png', 'image/jpeg'].includes(file.type) ? 'Payment proof must be a PNG or JPEG image' : undefined,
+        [`nt-${path}`]: code ? undefined : 'Transaction password is required'
       })}
       onSubmit={() => run.mutateAsync()}
     >
@@ -116,6 +120,7 @@ const NoteAction = ({ path, title, description, label, icon, destructive, succes
           <Input id={`nf-${path}`} type='file' accept='image/png,image/jpeg' onChange={e => setFile(e.target.files?.[0] ?? null)} />
         </div>
       )}
+      <TextField id={`nt-${path}`} name='transactionPassword' label={<TxnPasswordLabel />} type='password' autoComplete='new-password' required value={code} onChange={e => setCode(e.target.value)} />
     </FormDialog>
   )
 }

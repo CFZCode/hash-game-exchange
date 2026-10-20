@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import Link from 'next/link'
 
@@ -15,6 +15,7 @@ import Money from '@/components/shared/Money'
 import PageHeader from '@/components/shared/PageHeader'
 import StatCard from '@/components/shared/StatCard'
 import StatusBadge from '@/components/shared/StatusBadge'
+import TxnCodeInput from '@/components/shared/TxnCodeInput'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -87,8 +88,10 @@ const Progress = ({ b }: { b: PlayerBonus }) => (
 )
 
 const Forfeit = ({ b, invalidate }: { b: PlayerBonus; invalidate: unknown[][] }) => {
+  const [code, setCode] = useState('')
+
   const forfeit = useApiMutation({
-    fn: () => api.post(`admin/user/bonus-balance/${b.id}/forfeit`, {}),
+    fn: () => api.post(`admin/user/bonus-balance/${b.id}/forfeit`, { transactionPassword: code }),
     invalidate: invalidate as never,
     success: 'Bonus forfeited'
   })
@@ -107,8 +110,11 @@ const Forfeit = ({ b, invalidate }: { b: PlayerBonus; invalidate: unknown[][] })
         description='The locked bonus is removed from the player’s bonus balance and will never become cash. This cannot be undone and is written to the audit log.'
         confirmLabel='Forfeit'
         destructive
+        confirmDisabled={!code}
         onConfirm={() => forfeit.mutateAsync()}
-      />
+      >
+        <TxnCodeInput id={`bf-tp-${b.id}`} value={code} onChange={setCode} />
+      </ConfirmDialog>
     </Can>
   )
 }

@@ -86,6 +86,7 @@ const { requestContext, getContext, getRequestId, REQUEST_ID_HEADER } = require(
 const { errorHandler } = require('./middleware/errorHandler');
 const { notFound } = require('./middleware/notFound');
 const { validate, schemas, z, isStrictSchema, VALIDATE_SCHEMAS, noQuery, noBody } = require('./middleware/validate');
+const { requireTxnPassword } = require('./middleware/requireTxnPassword');
 const { createRateLimiter, configureRateLimitStore, closeRateLimitStore } = require('./middleware/rateLimit');
 const { auditProductionConfig, assertProductionPosture } = require('./productionGuards');
 const internalAclExports = require('./internalAcl');
@@ -184,6 +185,7 @@ module.exports = {
   VALIDATE_SCHEMAS,
   noQuery,
   noBody,
+  requireTxnPassword,
   createRateLimiter,
   configureRateLimitStore,
   closeRateLimitStore,

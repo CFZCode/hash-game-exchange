@@ -1,7 +1,7 @@
 'use strict';
 
 const { Router } = require('express');
-const { validate } = require('@ibitplay/common');
+const { validate, requireTxnPassword } = require('@ibitplay/common');
 const { PERMISSIONS } = require('@ibitplay/auth');
 
 const v = require('../jsGames.validators');
@@ -44,6 +44,8 @@ module.exports = function adminRoutes(deps) {
   router.post(
     '/v1/transfer',
     auth.requirePermission(PERMISSIONS.WALLET_CREDIT),
+    // Moves the player's wallet: the staff caller's transaction code first.
+    requireTxnPassword({ clients: deps.clients }),
     validate(v.transferV1),
     ctrl.transferV1
   );

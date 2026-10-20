@@ -91,7 +91,7 @@ test('wallet adjust routing', async (t) => {
 
     const names = service.calls.map((c) => c[0]);
     assert.deepEqual(names, ['visible', 'checkTxn', 'adminAdjust']);
-    assert.deepEqual(service.calls[1].slice(1), [3, 'tp', { required: false, executiveId: null }]);
+    assert.deepEqual(service.calls[1].slice(1), [3, 'tp', { required: true, executiveId: null }]);
   });
 
   await t.test('the Super Admin adjusting INR goes to admin-service (owner wallet / direct user)', async () => {

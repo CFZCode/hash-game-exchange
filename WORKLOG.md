@@ -15,6 +15,17 @@ Format:
 
 ---
 
+## 2026-10-20 — Admin me har balance len-den pe transaction code zaroori (route middleware + form)
+**Kya kiya:**
+- Naya shared middleware `requireTxnPassword({ clients })` (`@ibitplay/common`): `body.transactionPassword` ko admin-service (`/internal/admin/staff-directory/verify-transaction-password`) se check karta hai, phir field hata deta hai (strict validators ke liye). Khaali → 403 `TXN_PASSWORD_REQUIRED`, galat → 403.
+- Jahan code bilkul nahi tha, wahan route pe laga: crypto withdrawal decision, P2P buy/sell release + cancel (4), bonus forfeit, casino js-games v1 transfer. Sports `declareresult`, `void`, `void-single-bet` pe sports ka apna `verifyTransactionPassword`.
+- Owner wale raaste jo sirf "set ho to" check karte the, ab hamesha zaroori: staff transfer (D/W), Create Account opening credit, player create opening balance, player wallet adjust (INR via lords + non-INR operator adjust).
+- Admin forms me Transaction password field (naya `components/shared/TxnCodeInput.tsx`): Crypto withdrawal Decide, P2P release/cancel, Bonus forfeit, Match/Fancy settlement (declare + void), single bet void. Wallet adjust me field ab sabke liye required.
+- Live check (Super Admin token, fake ids): bina code `TXN_PASSWORD_REQUIRED`, galat code `Invalid transaction password`, sports "Transaction password is required".
+**Kyun:** User: admin panel me jahan bhi balance diya ya liya jaaye, transaction code zaroori ho, aur route pe middleware bhi.
+**Files / jagah:** `backend/packages/common/src/{middleware/requireTxnPassword.js,index.js}`, `backend/services/user/src/modules/{crypto-withdraw,p2p,player-bonuses}/routes/admin.routes.js`, `backend/services/user/src/modules/wallet/controllers/admin.controller.js` (+ `__tests__/adjustRouting.test.js`), `backend/services/casino/src/modules/js-games/routes/admin.routes.js`, `backend/services/sports/src/modules/settlement/routes/admin.routes.js`, `backend/services/admin/src/modules/{staff/staff.service.js,exchange-accounts/createAccount.js,players/players.service.js,lords/lords.service.js}`, `admin/src/components/shared/TxnCodeInput.tsx`, `admin/src/views/finance/{CryptoWithdrawals,P2P,shared}.tsx`, `admin/src/views/promotions/BonusBalances.tsx`, `admin/src/views/exchange/settlement/{MatchSettlement,FancySettlement,shared}.tsx`.
+**Notes / pending:** Live `TXN_PASSWORD_MODE=separate`; owner aur Super Admin ka code set hai, ek L6 agent ka nahi (usko My account me set karna padega). Jo cheezein seedha balance nahi badaltin par paise ka haq banati hain, unpe abhi code nahi hai: redeem code / gift card / bonus records banana, affiliate unlock/rewards, race settle, casino free spins/vouchers. Tests: chhue modules 488/499; jo fail hue (staff role FK, tipping) wo test DB setup ke hain, in files ko chhua nahi.
+
 ## 2026-10-20 — Deposit / Withdraw stats hamesha USDT me (site ki default coin)
 **Kya kiya:** Finance stats (Stats tab + Manual tab ke upar wale cards) ab list ke currency filter se nahi chalte: saari currencies owner ki `default_currency` (live: USDT) me convert hoke dikhti hain (`useStatsQuery` → `convertTo`). List ka currency filter waisa hi hai.
 **Kyun:** User: `/transactions/deposit` pe har jagah stats USDT me dikhein.

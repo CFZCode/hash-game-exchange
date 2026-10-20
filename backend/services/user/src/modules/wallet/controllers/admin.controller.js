@@ -52,7 +52,7 @@ function createAdminController({ service }) {
       await assertPlayerCapability(req.body.userId, 'deposit');
 
       await service.checkTransactionPassword(req.staff.id, req.body.transactionPassword, {
-        required: false,
+        required: true,
         executiveId: req.staff.executiveId ?? null,
       });
       const result = await service.adminAdjust(req.body, {

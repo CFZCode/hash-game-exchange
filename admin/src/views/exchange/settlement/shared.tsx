@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Loader2Icon } from 'lucide-react'
 import { toast } from 'sonner'
 
+import TxnCodeInput from '@/components/shared/TxnCodeInput'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -135,13 +136,14 @@ export const TabBar = ({ tabs, active, onChange }: { tabs: { key: string; label:
 export const OpenBetsPanel = ({ title, bets, loading, onVoided }: { title: string; bets: OpenBet[]; loading: boolean; onVoided: () => void }) => {
   const [confirm, setConfirm] = useState<OpenBet | null>(null)
   const [busy, setBusy] = useState(false)
+  const [code, setCode] = useState('')
 
   const voidBet = async () => {
     if (!confirm) return
     setBusy(true)
 
     try {
-      await zipCall('POST', `${SETTLE_API}/void-single-bet`, { bet_id: confirm.id })
+      await zipCall('POST', `${SETTLE_API}/void-single-bet`, { bet_id: confirm.id, transactionPassword: code })
       toast.success(`Bet #${confirm.id} voided for ${confirm.username || confirm.userId}`)
       setConfirm(null)
       onVoided()
@@ -219,11 +221,12 @@ export const OpenBetsPanel = ({ title, bets, loading, onVoided }: { title: strin
               <p className='text-muted-foreground'>The stake will be refunded. This action cannot be undone.</p>
             </div>
           )}
+          <TxnCodeInput id='vb-tp' value={code} onChange={setCode} />
           <DialogFooter>
             <Button variant='outline' onClick={() => setConfirm(null)}>
               Cancel
             </Button>
-            <Button variant='destructive' disabled={busy} onClick={voidBet}>
+            <Button variant='destructive' disabled={busy || !code} onClick={voidBet}>
               {busy && <Loader2Icon className='animate-spin' />}
               {busy ? 'Processing...' : 'Confirm Void'}
             </Button>

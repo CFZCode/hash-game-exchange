@@ -228,7 +228,7 @@ export const AdjustWalletDialog = ({ userId, userName, currencies, invalidate = 
         // wallet.validators.js adminAdjust: amount > 0, ≤ 8 decimals; reason 1–500 chars.
         amount: check.amount(form.amount, 'Amount', { decimals: 8 }),
         description: check.required(form.description, 'Reason') ?? check.length(form.description, 'Reason', { max: 500 }),
-        transactionPassword: agentTree && !form.transactionPassword ? 'Transaction password is required' : undefined
+        transactionPassword: form.transactionPassword ? undefined : 'Transaction password is required'
       })}
       onSubmit={() => adjust.mutateAsync()}
     >
@@ -239,7 +239,7 @@ export const AdjustWalletDialog = ({ userId, userName, currencies, invalidate = 
       </div>
       <TextField id='aw-amt' name='amount' label='Amount' required inputMode='decimal' placeholder='100.00' value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} />
       <TextAreaField id='aw-desc' name='description' label='Reason' required value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
-      <TextField id='aw-tp' name='transactionPassword' label={<TxnPasswordLabel />} type='password' required={agentTree} hint={agentTree ? 'Required for every balance move' : 'Required (if your account uses one)'} value={form.transactionPassword} onChange={e => setForm({ ...form, transactionPassword: e.target.value })} />
+      <TextField id='aw-tp' name='transactionPassword' label={<TxnPasswordLabel />} type='password' autoComplete='new-password' required hint='Required for every balance move' value={form.transactionPassword} onChange={e => setForm({ ...form, transactionPassword: e.target.value })} />
     </FormDialog>
   )
 }

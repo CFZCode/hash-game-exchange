@@ -33,10 +33,10 @@ module.exports = function adminRoutes({ auth }) {
 
   router.get('/momatches', canSettle, authMiddleware, requireOwner, settle('getMoMatches'));
   router.get('/fanmatches', canSettle, authMiddleware, requireOwner, settle('getFanOpenBets'));
-  router.post('/declareresult', canSettle, authMiddleware, requireOwner, settle('declareResult'));
-  router.post('/void', canSettle, authMiddleware, requireOwner, settle('voidResult'));
+  router.post('/declareresult', canSettle, authMiddleware, requireOwner, verifyTransactionPassword, settle('declareResult'));
+  router.post('/void', canSettle, authMiddleware, requireOwner, verifyTransactionPassword, settle('voidResult'));
   router.get('/open-bets', canSettle, authMiddleware, requireOwner, settle('getOpenBetsForMarket'));
-  router.post('/void-single-bet', canSettle, authMiddleware, requireOwner, settle('voidSingleOpenBet'));
+  router.post('/void-single-bet', canSettle, authMiddleware, requireOwner, verifyTransactionPassword, settle('voidSingleOpenBet'));
   // Sports — settle ho chuke markets ka void (admin "Void Bets (After Settlement)" page).
   router.get('/settled-markets', canSettle, authMiddleware, requireOwner, settle('getSettledMarkets'));
   router.get('/settled-bets', canSettle, authMiddleware, requireOwner, settle('getSettledBets'));

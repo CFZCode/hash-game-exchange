@@ -7,7 +7,6 @@ const {
   canActOn,
   canCreateLevel,
   STAFF_LEVELS,
-  AGENT_TREE_LEVELS,
 } = require('@ibitplay/auth');
 const { money, withdrawBlock } = require('@ibitplay/common');
 
@@ -108,13 +107,9 @@ class StaffService {
     const parentFunding = !(actor.canAdjustWallets && actor.canIssueFunds);
     if (parentFunding) this.#assertParentFunding(actor, toType, toId, direction);
 
-    /**
-     * The second factor. Agent-tree staff (4–6) must have one and give it;
-     * house staff give it once they have set one. A parent moving its own
-     * float without `wallet:adjust` always needs it.
-     */
+    // The second factor: every staff member moving balance gives it, the owner too (user, 2026-10-20).
     await assertTransactionPassword(this.models, actor.id, transactionPassword, {
-      required: parentFunding || AGENT_TREE_LEVELS.includes(Number(actor.level)),
+      required: true,
       executiveId: actor.executiveId ?? null,
     });
     const target = await this.#assertDirectChild(actor, toType, toId, outer);
