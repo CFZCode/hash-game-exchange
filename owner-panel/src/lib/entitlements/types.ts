@@ -58,6 +58,12 @@ export type EntitlementsDoc = {
   withdrawalDailyLimit?: WithdrawalDailyLimit
 
   /**
+   * Master switch for player withdrawals on every rail (bank, crypto, gateway payouts, P2P sell).
+   * Absent in an older document = on.
+   */
+  withdrawalsEnabled?: boolean
+
+  /**
    * Site name, page metadata and logo files (./branding, contract §8). Absent in an older
    * document = not branded: the site keeps its own name and the UI's own logo.
    */
@@ -101,7 +107,7 @@ export type SiteCoin = {
 export type VariantsSeed = 'backend' | 'template' | null
 
 /** What the owner screen edits: the document with a full `variants` map. */
-export type EditableDoc = EntitlementsDoc & { variants: Record<string, string>; options: Record<string, Record<string, boolean>>; region: RegionSetting; withdrawalCap: WithdrawalCap; withdrawalDailyLimit: WithdrawalDailyLimit; branding: Branding; seededFrom: VariantsSeed }
+export type EditableDoc = EntitlementsDoc & { variants: Record<string, string>; options: Record<string, Record<string, boolean>>; region: RegionSetting; withdrawalCap: WithdrawalCap; withdrawalDailyLimit: WithdrawalDailyLimit; withdrawalsEnabled: boolean; branding: Branding; seededFrom: VariantsSeed }
 
 export type ToggleChange = { kind: 'feature' | 'flag'; key: string; from: boolean; to: boolean }
 export type TemplateChange = { kind: 'template'; key: 'template'; from: string | null; to: string }
@@ -125,10 +131,13 @@ export type WithdrawalCapChange = { kind: 'withdrawal_cap'; key: 'withdrawalCap'
 /** The daily withdrawal limit switched or a currency's amount changed (audit kind `withdrawal_daily_limit`). */
 export type WithdrawalDailyLimitChange = { kind: 'withdrawal_daily_limit'; key: 'withdrawalDailyLimit'; from: WithdrawalDailyLimit; to: WithdrawalDailyLimit }
 
+/** Player withdrawals switched on or off on every rail (audit kind `withdrawals_enabled`). */
+export type WithdrawalsEnabledChange = { kind: 'withdrawals_enabled'; key: 'withdrawalsEnabled'; from: boolean; to: boolean }
+
 /** One currency's cashier limits changed (audit kind `cashier_limits`, older audit lines only — the limits are the Super Admin's now). */
 export type CashierLimitsChange = { kind: 'cashier_limits'; key: string; from: CashierLimit; to: CashierLimit }
 export type { BrandingChange }
-export type Change = ToggleChange | TemplateChange | VariantChange | CoinsChange | CoinChange | OptionChange | RegionChange | WithdrawalCapChange | WithdrawalDailyLimitChange | CashierLimitsChange | BrandingChange
+export type Change = ToggleChange | TemplateChange | VariantChange | CoinsChange | CoinChange | OptionChange | RegionChange | WithdrawalCapChange | WithdrawalDailyLimitChange | WithdrawalsEnabledChange | CashierLimitsChange | BrandingChange
 
 export type AuditEntry = { at: string; user: string; version: number; changes: Change[]; seededFrom?: Exclude<VariantsSeed, null> }
 
@@ -147,6 +156,7 @@ type Diffable = Pick<EntitlementsDoc, 'features' | 'flags'> & {
   region?: RegionSetting
   withdrawalCap?: WithdrawalCap
   withdrawalDailyLimit?: WithdrawalDailyLimit
+  withdrawalsEnabled?: boolean
   branding?: Branding
 }
 
@@ -205,6 +215,11 @@ export function diffDocs(before: Diffable, after: Diffable) {
   const dailyChange = after.withdrawalDailyLimit ? diffWithdrawalDailyLimit(before.withdrawalDailyLimit, after.withdrawalDailyLimit) : null
 
   if (dailyChange) changes.push(dailyChange)
+
+  // Withdrawals master switch: an older document (no key) equals on.
+  if (after.withdrawalsEnabled !== undefined && (before.withdrawalsEnabled !== false) !== after.withdrawalsEnabled) {
+    changes.push({ kind: 'withdrawals_enabled', key: 'withdrawalsEnabled', from: before.withdrawalsEnabled !== false, to: after.withdrawalsEnabled })
+  }
 
   // Branding: one change per field; an older document (no branding) equals an empty one.
   if (after.branding) changes.push(...diffBranding(before.branding, after.branding))

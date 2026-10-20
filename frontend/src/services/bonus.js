@@ -101,6 +101,13 @@ export function toRechargeConfig(terms) {
         extraBonusRatio: null,
         maxBonus: Number(low.maxBonus) > 0 ? Number(low.maxBonus) : null,
         fiatRechargeV2: null,
+        /* Every tier: the backend pays the HIGHEST tier the deposit reaches (firstDepositBonus.service
+           `#quote`), so "Extra +…" must pick the same one, not the lowest. */
+        tiers: tiers.map((t) => ({
+          minDeposit: Number(t.minDeposit),
+          ratio: Number(t.percent) / 100,
+          maxBonus: Number(t.maxBonus) > 0 ? Number(t.maxBonus) : null,
+        })),
       },
     ],
   };

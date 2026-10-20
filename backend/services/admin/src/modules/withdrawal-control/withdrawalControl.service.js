@@ -1,11 +1,7 @@
 'use strict';
 
 const { Op, QueryTypes } = require('sequelize');
-const { AppError, entitlements, money, withdrawalCap, withdrawalCapFigures, withdrawalDailyLimit } = require('@ibitplay/common');
-
-const { assertTransactionPassword } = require('../staff-auth/transactionPassword');
-
-const onlyOwner = () => new AppError('Only the Super Admin can manage withdrawal controls', 403, 'WITHDRAWAL_CONTROL_OWNER_ONLY');
+const { entitlements, money, withdrawBlock, withdrawalCap, withdrawalCapFigures, withdrawalDailyLimit } = require('@ibitplay/common');
 
 const escapeLike = (v) => String(v).replace(/[\\%_]/g, (c) => `\\${c}`);
 
@@ -13,14 +9,14 @@ const escapeLike = (v) => String(v).replace(/[\\%_]/g, (c) => `\\${c}`);
  * Admin → Users → Financial → Withdrawal — reference admin (admin-structure.zip →
  * siteconfig/routes/withdrawalControlRoutes.js) jaisa:
  *
- *   Global withdrawals ON / OFF   `withdrawal_control.withdrawals_enabled` → withdrawBlock
+ *   Global withdrawals ON / OFF   owner panel → Features & plan → Withdrawals (read-only yahan)
  *   Withdrawal limit              owner panel → Features & plan → Withdrawals (read-only yahan)
  *   Wagering bonus                same
  *   Per-user withdrawal lock      list yahan; lock/unlock purane `POST admin/locks` se
  *
  * Limit / wagering bonus sirf owner panel badalta hai (signed document ka `withdrawalCap`);
- * `withdrawal_control` ke purane limit columns ab padhe nahi jaate. Global switch badalna sirf
- * owner (Super Admin), transaction password ke saath.
+ * `withdrawal_control` table (migration 108/109) ab bilkul padhi nahi jaati — global switch bhi
+ * signed document ka `withdrawalsEnabled` hai (withdrawBlock.js). Table chhodi hai, drop nahi ki.
  */
 class WithdrawalControlService {
   constructor({ models, db, logger }) {
@@ -51,13 +47,8 @@ class WithdrawalControlService {
 
   /** Summary — upar ke teen card + direct users / locked ki ginti. */
   async read() {
-    const [[row], cap, [counts]] = await Promise.all([
-      this.sequelize.query(
-        `SELECT w.withdrawals_enabled, w.updated_at, w.updated_by, s.name AS updated_by_name
-           FROM withdrawal_control w LEFT JOIN staff s ON s.id = w.updated_by
-          WHERE w.id = 1`,
-        { type: QueryTypes.SELECT }
-      ),
+    const [enabled, cap, [counts]] = await Promise.all([
+      withdrawBlock.withdrawalsEnabled(),
       this.#capInForce(),
       this.sequelize.query(
         `SELECT COUNT(*)::int AS direct_users,
@@ -68,9 +59,8 @@ class WithdrawalControlService {
     ]);
 
     return {
-      enabled: row ? row.withdrawals_enabled !== false : true,
-      updatedAt: row?.updated_at ?? null,
-      updatedBy: row?.updated_by != null ? { id: String(row.updated_by), name: row.updated_by_name ?? null } : null,
+      // Owner's global switch (Features & plan → Withdrawals); read-only here.
+      enabled,
       limit: {
         enabled: cap.enabled,
         depositMultiplier: cap.depositMultiplier,
@@ -83,27 +73,6 @@ class WithdrawalControlService {
       directUsers: counts?.direct_users ?? 0,
       lockedDirectUsers: counts?.locked_direct_users ?? 0,
     };
-  }
-
-  async #owner(actor, transactionPassword) {
-    if (!actor.canIssueFunds) throw onlyOwner();
-    await assertTransactionPassword(this.models, actor.id, transactionPassword, { required: true });
-  }
-
-  /** Global switch ON / OFF. */
-  async setGlobal({ actor, enabled, transactionPassword }) {
-    await this.#owner(actor, transactionPassword);
-
-    await this.sequelize.query(
-      `INSERT INTO withdrawal_control (id, withdrawals_enabled, updated_by, updated_at)
-       VALUES (1, :enabled, :staffId, now())
-       ON CONFLICT (id) DO UPDATE
-         SET withdrawals_enabled = EXCLUDED.withdrawals_enabled, updated_by = EXCLUDED.updated_by, updated_at = now()`,
-      { replacements: { enabled, staffId: actor.id } }
-    );
-
-    this.logger?.warn({ actorStaffId: actor.id, enabled }, `Global withdrawals switched ${enabled ? 'ON' : 'OFF'}`);
-    return this.read();
   }
 
   /**

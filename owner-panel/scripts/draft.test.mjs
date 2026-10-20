@@ -37,3 +37,10 @@ test('only an item press in the open list changes a variant', () => {
   // Browser autofill / form restore of the hidden input and type-ahead over a closed trigger.
   for (const reason of ['none', undefined, 'keyboard', 'list-navigation']) assert.equal(isOwnerPick(reason), false, String(reason))
 })
+
+test('the withdrawals master switch: carried from the document, an edit wins, absent stays absent', () => {
+  assert.equal('withdrawalsEnabled' in buildDraft(doc, null), false)
+  assert.equal(buildDraft({ ...doc, withdrawalsEnabled: true }, null).withdrawalsEnabled, true)
+  assert.equal(buildDraft({ ...doc, withdrawalsEnabled: true }, { withdrawalsEnabled: false }).withdrawalsEnabled, false)
+  assert.equal(buildDraft({ ...doc, withdrawalsEnabled: false }, null).withdrawalsEnabled, false)
+})

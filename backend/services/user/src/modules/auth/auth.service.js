@@ -328,7 +328,7 @@ class AuthService {
     if (user.withdraw_locked || systemLocked) user.capabilities = { ...(user.capabilities ?? {}), withdraw: false };
     /*
      * Admin ke switch, taaki site form hi na dikhaye (routes waise bhi refuse karte hain):
-     * Users → Financial "Global Withdrawals" OFF → withdraw false; Transactions → Manual ON / OFF →
+     * owner panel → Withdrawals "Withdrawals enabled" OFF → withdraw false; Transactions → Manual ON / OFF →
      * manualDeposit / manualWithdraw. Padh na paaye to chhod do (sab ON maana jaata hai).
      */
     try {

@@ -105,6 +105,14 @@ const ChangeList = ({ changes, labelOf }: { changes: Change[]; labelOf: (c: Togg
             {withdrawalDailyLimitLabel(c.from)} → {withdrawalDailyLimitLabel(c.to)}
           </span>
         </li>
+      ) : c.kind === 'withdrawals_enabled' ? (
+        <li key='withdrawals_enabled' className='flex flex-wrap items-center gap-2 text-sm'>
+          <span className='text-muted-foreground w-14 text-xs uppercase'>policy</span>
+          <span className='font-medium'>Withdrawals</span>
+          <span className='text-muted-foreground font-mono text-xs'>
+            {c.from ? 'on' : 'off'} → {c.to ? 'on' : 'off'}
+          </span>
+        </li>
       ) : c.kind === 'cashier_limits' ? (
         <li key={`cashier:${c.key}`} className='flex flex-wrap items-center gap-2 text-sm'>
           <span className='text-muted-foreground w-14 text-xs uppercase'>cashier</span>
