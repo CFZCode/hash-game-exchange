@@ -246,6 +246,9 @@ const EXTENSIONS = {
   CurrencyPaymentDetails: {
     network: { type: DataTypes.STRING(32), allowNull: true, field: 'network' },
     wallet_address: { type: DataTypes.STRING(128), allowNull: true, field: 'wallet_address' },
+    // migration 147: the deposit amounts this destination is shown for (NULL = no bound).
+    min_amount: { type: DataTypes.DECIMAL(20, 2), allowNull: true, field: 'min_amount' },
+    max_amount: { type: DataTypes.DECIMAL(20, 2), allowNull: true, field: 'max_amount' },
   },
 
   Withdrawals: {

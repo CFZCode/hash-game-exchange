@@ -21,6 +21,23 @@ import { coinIcon } from '../../utils/coinArt';
  * the KYC form's dashed file tile. */
 
 const ACCEPT = 'image/png,image/jpeg,image/webp';
+const STEPS = ['Amount', 'Pay', 'Confirm'];
+
+/** The progress line on top: one segment per step, filled up to the current one. */
+function StepLine({ step }) {
+  return (
+    <div className="mt-4 grid grid-cols-3 gap-2">
+      {STEPS.map((label, index) => (
+        <div key={label}>
+          <div className={`h-1 rounded-full ${index <= step ? 'bg-brand' : 'bg-layer4'}`} />
+          <div className={`mt-1 text-xs ${index === step ? 'font-extrabold text-primary' : 'text-secondary'}`}>
+            {index + 1}. {label}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 /** One "label / value [copy]" row — CryptoTab's AddressBox, labelled. */
 function CopyRow({ label, value }) {
@@ -62,6 +79,10 @@ function Qr({ coin, id }) {
 export default function ManualDeposit({ currency, crypto = false }) {
   const coin = String(currency).toUpperCase().replace(/FIAT$/, '');
   const [accounts, setAccounts] = React.useState(null);
+  // Step 0 the amount, 1 the account(s) the site admin set for that amount, 2 the reference + screenshot.
+  const [step, setStep] = React.useState(0);
+  const [matching, setMatching] = React.useState([]);
+  const [noMatch, setNoMatch] = React.useState(false);
   const [picked, setPicked] = React.useState(0);
   const [amount, setAmount] = React.useState('');
   const [reference, setReference] = React.useState('');
@@ -87,19 +108,40 @@ export default function ManualDeposit({ currency, crypto = false }) {
   const site = useSelectedCurrency();
   const fiat = (value) => printCurrency(value, walletCode, { target: walletCode });
 
-  const account = accounts?.[picked];
+  const account = matching[picked];
   const ready = account && Number(amount) > 0 && reference.trim() && (file || crypto) && !busy;
+
+  const toAccounts = async () => {
+    if (!(Number(amount) > 0) || busy) return;
+    setBusy(true);
+    const rows = await getBankDetails(coin, amount);
+    setBusy(false);
+    setNoMatch(!rows.length);
+    if (!rows.length) return;
+    setMatching(rows);
+    setPicked(0);
+    setStep(1);
+  };
 
   const submit = async (event) => {
     event.preventDefault();
     if (!ready) return;
     setBusy(true);
     try {
-      await submitFiatDeposit({ amount, currency: coin, transactionId: reference.trim(), destination: account }, file);
+      await submitFiatDeposit(
+        {
+          amount,
+          currency: coin,
+          transactionId: reference.trim(),
+          destination: account,
+        },
+        file,
+      );
       showToast('Deposit submitted — it will be credited once it is approved.', { type: 'success' });
       setAmount('');
       setReference('');
       setFile(null);
+      setStep(0);
     } catch (failure) {
       toastError(failure, 'Could not submit the deposit');
     } finally {
@@ -124,94 +166,143 @@ export default function ManualDeposit({ currency, crypto = false }) {
 
   return (
     <form onSubmit={submit}>
+      <StepLine step={step} />
       <div className="my-4 flex rounded-xl bg-success/10 p-2 text-secondary">
         <IconInform className="icon -mt-0.5 mr-1.5 size-6 flex-none fill-success" />
         <div>
           {crypto
-            ? `Send ${coin} to the address below on the network shown, then enter the transaction hash. Your balance is credited once the deposit is approved.`
-            : 'Transfer the amount to the account below, then enter the bank reference (UTR) and upload the payment screenshot. Your balance is credited once the deposit is approved.'}
+            ? `Enter the amount, send ${coin} to the address shown on its network, then enter the transaction hash. Your balance is credited once the deposit is approved.`
+            : 'Enter the amount, transfer it to the account shown, then enter the bank reference (UTR) and upload the payment screenshot. Your balance is credited once the deposit is approved.'}
         </div>
       </div>
 
-      {bonus && (
-        <div className="mb-4 flex rounded-xl bg-brand/10 p-2 text-secondary">
-          <IconInform className="icon -mt-0.5 mr-1.5 size-6 flex-none fill-brand" />
-          <div>
-            {bonus.monthly ? `Deposit bonus ${bonus.monthly.n}/${bonus.monthly.total} · ` : 'First deposit bonus: '}
-            <span className="font-extrabold text-brand">+{Math.round(bonus.ratio * 100)}%</span> on a
-            deposit of {fiat(bonus.minDeposit)} or more
-            {bonus.maxBonusAmount < Number.MAX_SAFE_INTEGER / 2 && <>, up to {site.show(bonus.maxBonusAmount, walletCode, { precision: 2 })}</>}.
-            {bonus.monthly?.gradual && <> Locked — unlocks as you wager, claim any time.</>}
-          </div>
-        </div>
-      )}
-
-      {accounts.length > 1 && (
+      {step === 0 && (
         <>
-          <div className="mb-1 mt-5 text-secondary">Pay To</div>
-          <div className="grid grid-cols-2 gap-2">
-            {accounts.map((row, index) => (
-              <button
-                key={row.id}
-                type="button"
-                className={`button button-m h-10 ${index === picked ? 'button-brand' : 'button-second'}`}
-                onClick={() => setPicked(index)}
-              >
-                {row.network || (row.upiId && !row.accountNumber ? 'UPI' : row.bankName || `Account ${index + 1}`)}
-              </button>
-            ))}
+          {bonus && (
+            <div className="mb-4 flex rounded-xl bg-brand/10 p-2 text-secondary">
+              <IconInform className="icon -mt-0.5 mr-1.5 size-6 flex-none fill-brand" />
+              <div>
+                {bonus.monthly ? `Deposit bonus ${bonus.monthly.n}/${bonus.monthly.total} · ` : 'First deposit bonus: '}
+                <span className="font-extrabold text-brand">+{Math.round(bonus.ratio * 100)}%</span> on a deposit of {fiat(bonus.minDeposit)} or more
+                {bonus.maxBonusAmount < Number.MAX_SAFE_INTEGER / 2 && (
+                  <>
+                    , up to{' '}
+                    {site.show(bonus.maxBonusAmount, walletCode, {
+                      precision: 2,
+                    })}
+                  </>
+                )}
+                .{bonus.monthly?.gradual && <> Locked — unlocks as you wager, claim any time.</>}
+              </div>
+            </div>
+          )}
+
+          <div className="mb-1 mt-5 text-secondary">Deposit Amount ({coin})</div>
+          <div className="input bg-input_bright text-base">
+            <input inputMode="decimal" name="amount" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))} />
+            {/* FiatTab's `iC` line: zero below the bonus minimum, so it disappears rather than shrinking. */}
+            {extra > 0 && <div className="px-2 font-extrabold text-success">Extra +{fiat(extra)}</div>}
           </div>
+
+          {noMatch && (
+            <div className="mt-3 flex rounded-xl bg-warning/10 p-2 text-secondary">
+              <IconInform className="icon -mt-0.5 mr-1.5 size-6 flex-none fill-warning" />
+              <div>No account takes a deposit of {fiat(amount)} right now. Please try a different amount.</div>
+            </div>
+          )}
+          <button type="button" className="button button-brand button-m my-5 w-full" disabled={!(Number(amount) > 0) || busy} onClick={toAccounts}>
+            {busy ? 'Loading…' : 'Next'}
+          </button>
         </>
       )}
 
-      {account.walletAddress && (
+      {step === 1 && account && (
         <>
-          <div className="mt-4 flex justify-center">
-            <div className="rounded-xl bg-layer3_alt p-2">
-              <QrCode value={account.walletAddress} logo={coinIcon(coin)} className="block" />
-            </div>
+          <div className="mt-5 flex items-center justify-between text-secondary">
+            <span>
+              Deposit Amount: <span className="font-extrabold text-primary">{fiat(amount)}</span>
+            </span>
+            <button type="button" className="text-brand" onClick={() => setStep(0)}>
+              Change
+            </button>
           </div>
-          <CopyRow label="Network" value={account.network} />
-          <CopyRow label="Deposit Address" value={account.walletAddress} />
-          <div className="mt-3 flex rounded-xl bg-warning/10 p-2 text-secondary">
-            <IconInform className="icon -mt-0.5 mr-1.5 size-6 flex-none fill-warning" />
-            <div>
-              Send only {coin} on the {account.network} network to this address. Anything else sent here will be lost.
-            </div>
-          </div>
+          {matching.length > 1 && (
+            <>
+              <div className="mb-1 mt-5 text-secondary">Pay To</div>
+              <div className="grid grid-cols-2 gap-2">
+                {matching.map((row, index) => (
+                  <button
+                    key={row.id}
+                    type="button"
+                    className={`button button-m h-10 ${index === picked ? 'button-brand' : 'button-second'}`}
+                    onClick={() => setPicked(index)}
+                  >
+                    {row.network || (row.upiId && !row.accountNumber ? 'UPI' : row.bankName || `Account ${index + 1}`)}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {account.walletAddress && (
+            <>
+              <div className="mt-4 flex justify-center">
+                <div className="rounded-xl bg-layer3_alt p-2">
+                  <QrCode value={account.walletAddress} logo={coinIcon(coin)} className="block" />
+                </div>
+              </div>
+              <CopyRow label="Network" value={account.network} />
+              <CopyRow label="Deposit Address" value={account.walletAddress} />
+              <div className="mt-3 flex rounded-xl bg-warning/10 p-2 text-secondary">
+                <IconInform className="icon -mt-0.5 mr-1.5 size-6 flex-none fill-warning" />
+                <div>
+                  Send only {coin} on the {account.network} network to this address. Anything else sent here will be lost.
+                </div>
+              </div>
+            </>
+          )}
+          <CopyRow label="Bank" value={account.bankName} />
+          {!account.walletAddress && <CopyRow label="Account Holder" value={account.accountHolderName} />}
+          <CopyRow label="Account Number" value={account.accountNumber} />
+          <CopyRow label="IFSC" value={account.ifscCode} />
+          <CopyRow label="UPI ID" value={account.upiId} />
+          {account.hasQrImage && <Qr coin={coin} id={account.id} />}
+
+          <button type="button" className="button button-brand button-m my-5 w-full" onClick={() => setStep(2)}>
+            {crypto ? 'I Have Sent It' : 'I Have Paid'}
+          </button>
         </>
       )}
-      <CopyRow label="Bank" value={account.bankName} />
-      {!account.walletAddress && <CopyRow label="Account Holder" value={account.accountHolderName} />}
-      <CopyRow label="Account Number" value={account.accountNumber} />
-      <CopyRow label="IFSC" value={account.ifscCode} />
-      <CopyRow label="UPI ID" value={account.upiId} />
-      {account.hasQrImage && <Qr coin={coin} id={account.id} />}
 
-      <div className="mb-1 mt-5 text-secondary">Deposit Amount ({coin})</div>
-      <div className="input bg-input_bright text-base">
-        <input inputMode="decimal" name="amount" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))} />
-        {/* FiatTab's `iC` line: zero below the bonus minimum, so it disappears rather than shrinking. */}
-        {extra > 0 && <div className="px-2 font-extrabold text-success">Extra +{fiat(extra)}</div>}
-      </div>
+      {step === 2 && (
+        <>
+          <div className="mt-5 flex items-center justify-between text-secondary">
+            <span>
+              Paid {fiat(amount)} to {account?.network || account?.bankName || account?.upiId || 'the account'}
+            </span>
+            <button type="button" className="text-brand" onClick={() => setStep(1)}>
+              Back
+            </button>
+          </div>
+          <div className="mb-1 mt-3 text-secondary">{crypto ? 'Transaction Hash' : 'Bank Reference / UTR'}</div>
+          <div className="input bg-input_bright text-base">
+            <input name="transactionId" value={reference} maxLength={128} onChange={(e) => setReference(e.target.value)} />
+          </div>
 
-      <div className="mb-1 mt-3 text-secondary">{crypto ? 'Transaction Hash' : 'Bank Reference / UTR'}</div>
-      <div className="input bg-input_bright text-base">
-        <input name="transactionId" value={reference} maxLength={128} onChange={(e) => setReference(e.target.value)} />
-      </div>
+          <div className="mb-1 mt-3 text-secondary">Payment Screenshot{crypto ? ' (optional)' : ''}</div>
+          <label
+            htmlFor={fileId}
+            className="flex h-24 w-full cursor-pointer items-center justify-center rounded-lg border border-dashed border-third px-3 text-center text-sm text-secondary"
+          >
+            {file ? <span className="truncate font-semibold text-primary">{file.name}</span> : <span>JPG or PNG</span>}
+          </label>
+          <input id={fileId} type="file" className="hidden" accept={ACCEPT} onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
 
-      <div className="mb-1 mt-3 text-secondary">Payment Screenshot{crypto ? ' (optional)' : ''}</div>
-      <label
-        htmlFor={fileId}
-        className="flex h-24 w-full cursor-pointer items-center justify-center rounded-lg border border-dashed border-third px-3 text-center text-sm text-secondary"
-      >
-        {file ? <span className="truncate font-semibold text-primary">{file.name}</span> : <span>JPG or PNG</span>}
-      </label>
-      <input id={fileId} type="file" className="hidden" accept={ACCEPT} onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-
-      <button type="submit" className="button button-brand button-m my-5 w-full" disabled={!ready}>
-        {busy ? 'Submitting…' : 'Submit Deposit'}
-      </button>
+          <button type="submit" className="button button-brand button-m my-5 w-full" disabled={!ready}>
+            {busy ? 'Submitting…' : 'Submit Deposit'}
+          </button>
+        </>
+      )}
     </form>
   );
 }

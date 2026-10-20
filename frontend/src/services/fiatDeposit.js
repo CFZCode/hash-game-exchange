@@ -84,9 +84,10 @@ export default getFiatDepositByReference;
  * on purpose, the way `gates.js` keeps its one path: this file is the only reader. */
 const BANK_DETAILS = (coin) => `/api/v1/user/bank-details/${encodeURIComponent(coin)}`;
 
-/** The active house accounts for one fiat (`INR`), `[]` when there are none or the read fails. */
-export const getBankDetails = (coin) =>
-  Promise.resolve(request(BANK_DETAILS(coin), { live: true, fixture: [] }))
+/** The active house accounts for one fiat (`INR`), `[]` when there are none or the read fails.
+ *  With `amount`: only the accounts the site admin set to take that amount (their deposit range). */
+export const getBankDetails = (coin, amount) =>
+  Promise.resolve(request(BANK_DETAILS(coin), { live: true, fixture: [], ...(amount ? { params: { amount } } : {}) }))
     .then((rows) => (Array.isArray(rows) ? rows : []))
     .catch(() => []);
 

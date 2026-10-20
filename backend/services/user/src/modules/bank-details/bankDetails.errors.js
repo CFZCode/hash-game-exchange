@@ -19,6 +19,10 @@ module.exports = defineErrors('BANK_DETAILS', {
     status: 422,
     message: 'This network is not enabled for the coin',
   },
+  AMOUNT_RANGE_INVALID: {
+    status: 422,
+    message: 'The minimum amount cannot be above the maximum',
+  },
   INVALID_QR: {
     status: 422,
     message: 'The QR image must be a JPEG or PNG under 2 MB',

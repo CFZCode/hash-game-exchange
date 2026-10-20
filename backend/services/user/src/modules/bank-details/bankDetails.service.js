@@ -39,14 +39,16 @@ class BankDetailsService {
    *
    * @legacy GET /bankdetails/:coin_type
    */
-  async listActive(coinType) {
+  async listActive(coinType, amount) {
     const rows = await this.models.CurrencyPaymentDetails.findAll({
       where: { coin_type: coinType, is_active: true },
       order: [['id', 'ASC']],
       raw: true,
     });
 
-    return rows.map((r) => this.#present(r));
+    // With the player's amount: only the destinations whose range holds it (a NULL bound is open).
+    const fits = (r) => amount == null || ((r.min_amount == null || amount >= Number(r.min_amount)) && (r.max_amount == null || amount <= Number(r.max_amount)));
+    return rows.filter(fits).map((r) => this.#present(r));
   }
 
   /** Everything, including deactivated rows — for staff. */
@@ -73,6 +75,8 @@ class BankDetailsService {
       wallet_address: details.walletAddress ?? null,
       qr_image: qrImage ?? null,
       is_active: details.isActive ?? true,
+      min_amount: details.minAmount ?? null,
+      max_amount: details.maxAmount ?? null,
     });
 
     this.logger?.info({ coinType, id: row.id }, 'Payment destination added');
@@ -89,7 +93,13 @@ class BankDetailsService {
       await assertCryptoDestination(coinType, details.network ?? row.network, details.walletAddress ?? row.wallet_address);
     }
 
+    const min = details.minAmount !== undefined ? details.minAmount : row.min_amount;
+    const max = details.maxAmount !== undefined ? details.maxAmount : row.max_amount;
+    if (min != null && max != null && Number(min) > Number(max)) throw errors.AMOUNT_RANGE_INVALID({ min, max });
+
     await row.update({
+      ...(details.minAmount !== undefined ? { min_amount: details.minAmount } : {}),
+      ...(details.maxAmount !== undefined ? { max_amount: details.maxAmount } : {}),
       ...(details.bankName !== undefined ? { bank_name: details.bankName } : {}),
       ...(details.accountNumber !== undefined ? { account_number: details.accountNumber } : {}),
       ...(details.ifscCode !== undefined ? { ifsc_code: details.ifscCode } : {}),
@@ -141,6 +151,8 @@ class BankDetailsService {
       network: row.network ?? null,
       walletAddress: row.wallet_address ?? null,
       hasQrImage: Boolean(row.qr_image),
+      minAmount: row.min_amount == null ? null : Number(row.min_amount),
+      maxAmount: row.max_amount == null ? null : Number(row.max_amount),
       ...(includeInactive ? { isActive: row.is_active } : {}),
     };
   }

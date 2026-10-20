@@ -26,7 +26,7 @@ module.exports = function userRoutes(deps) {
   // Where to send a deposit — agent-tree players have no deposit rail.
   router.use(denyAgentPlayer('deposit'));
 
-  router.get('/:coin_type', noQuery(), validate(v.coinParam), ctrl.listActive);
+  router.get('/:coin_type', validate(v.activeList), ctrl.listActive);
   router.get('/:coin_type/:id/qr', noQuery(), validate(v.remove), ctrl.qrImage);
 
   return router;
