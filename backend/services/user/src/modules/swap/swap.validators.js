@@ -58,4 +58,14 @@ const adminSummary = {
   query: z.object({ userId: z.coerce.number().int().positive().optional(), channel: z.enum(['direct', 'agent']).optional() }).strict(),
 };
 
-module.exports = { estimate, swap, listHistory, adminHistory, adminSummary, userParam };
+/** The fee earnings by day, paged. */
+const feeHistory = {
+  query: z.object({
+    userId: z.coerce.number().int().positive().optional(),
+    channel: z.enum(['direct', 'agent']).optional(),
+    limit: z.coerce.number().int().min(1).max(200).default(50),
+    offset: z.coerce.number().int().min(0).default(0),
+  }).strict(),
+};
+
+module.exports = { estimate, swap, listHistory, adminHistory, adminSummary, feeHistory, userParam };

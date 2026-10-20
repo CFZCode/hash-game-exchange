@@ -257,6 +257,49 @@ class SwapService {
     return { swaps: row?.swaps ?? 0, feeUsdt: row?.feeUsdt ?? '0', todayUsdt: row?.todayUsdt ?? '0', monthUsdt: row?.monthUsdt ?? '0' };
   }
 
+  /**
+   * The fee earnings day by day, newest first: swaps, the value swapped and the fee in USDT (each at
+   * its own swap's rate), and the fee as taken, coin by coin.
+   */
+  async feeHistory({ staff, userId, channel = 'direct', limit, offset }) {
+    const where = withChannel(await ownerWhere(this, staff?.id, 'uid', userId), 'uid', channel);
+    const day = literal("date_trunc('day', created_at)");
+    const [rows, total] = await Promise.all([
+      this.models.SwapHistory.findAll({
+        where,
+        attributes: [
+          [literal("to_char(date_trunc('day', created_at), 'YYYY-MM-DD')"), 'day'],
+          [literal('COUNT(*)::int'), 'swaps'],
+          [literal('ROUND(COALESCE(SUM(fee_amount * COALESCE(usd_rate_from, 0)), 0), 8)::text'), 'feeUsdt'],
+          [literal('ROUND(COALESCE(SUM(from_amount * COALESCE(usd_rate_from, 0)), 0), 8)::text'), 'volumeUsdt'],
+        ],
+        group: [day],
+        order: [[day, 'DESC']],
+        limit,
+        offset,
+        raw: true,
+      }),
+      this.models.SwapHistory.findAll({ where, attributes: [[literal("COUNT(DISTINCT date_trunc('day', created_at))::int"), 'n']], raw: true }),
+    ]);
+    // The same days' fees per coin, as the player paid them.
+    const coins = rows.length
+      ? await this.models.SwapHistory.findAll({
+          where: { ...where, [Op.and]: [...(where[Op.and] ?? []), literal(`to_char(date_trunc('day', created_at), 'YYYY-MM-DD') IN (${rows.map((r) => `'${r.day}'`).join(',')})`)] },
+          attributes: [
+            [literal("to_char(date_trunc('day', created_at), 'YYYY-MM-DD')"), 'day'],
+            'fee_currency',
+            [literal('ROUND(SUM(fee_amount), 8)::text'), 'fee'],
+          ],
+          group: [day, 'fee_currency'],
+          raw: true,
+        })
+      : [];
+    return {
+      rows: rows.map((r) => ({ ...r, fees: coins.filter((c) => c.day === r.day).map((c) => ({ currency: c.fee_currency, amount: c.fee })) })),
+      count: total[0]?.n ?? 0,
+    };
+  }
+
   async listAllHistory({ staff, userId, currency, channel, limit, offset }) {
     const where = withChannel(await ownerWhere(this, staff?.id, 'uid', userId), 'uid', channel);
     // The site admin's currency filter: a swap out of OR into that coin.

@@ -242,6 +242,11 @@ test('swap', async (t) => {
     assert.equal(summary.swaps, 1);
     assert.equal(Number(summary.feeUsdt), Number(row.fee_amount) * Number(row.usd_rate_from));
     assert.equal(summary.todayUsdt, summary.feeUsdt, 'made today');
+
+    const days = await scoped.feeHistory({ staff: { id: 1 }, userId: uid, channel: 'all', limit: 10, offset: 0 });
+    assert.equal(days.count, 1);
+    assert.equal(days.rows[0].swaps, 1);
+    assert.equal(days.rows[0].feeUsdt, summary.feeUsdt);
   });
 
   await t.test('swap history records the rates used, so a swap can be re-derived', async () => {

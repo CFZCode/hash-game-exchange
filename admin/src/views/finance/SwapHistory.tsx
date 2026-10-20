@@ -2,12 +2,15 @@
 
 import Link from 'next/link'
 
+import { parseAsString, useQueryState } from 'nuqs'
+
 import DataTable, { type Column } from '@/components/shared/DataTable'
 import DateTime from '@/components/shared/DateTime'
 import Money from '@/components/shared/Money'
 import PageHeader from '@/components/shared/PageHeader'
 import StatCard from '@/components/shared/StatCard'
 import { Input } from '@/components/ui/input'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useApi, useListState, usePagedApi } from '@/hooks/use-api'
 import { formatNumber } from '@/lib/format'
 import { CurrencySelect, useCurrencyChoices, useCurrencyParam } from './currencyFilter'
@@ -36,6 +39,48 @@ type SwapSummary = { swaps: number; feeUsdt: string; todayUsdt: string; monthUsd
 /** One fee in USDT: the fee times the USD rate that swap used (USDT is 1 USD). */
 const feeUsdt = (r: SwapRow) => String(Number(r.fee_amount) * Number(r.usd_rate_from || 0))
 
+/** `GET admin/user/swap/fee-history` — one row per day. */
+type FeeDay = { day: string; swaps: number; feeUsdt: string; volumeUsdt: string; fees: { currency: string; amount: string }[] }
+
+const feeDayColumns: Column<FeeDay>[] = [
+  { key: 'day', header: 'Day', cell: d => <span className='font-mono text-sm'>{d.day}</span> },
+  { key: 'swaps', header: 'Swaps', align: 'right', cell: d => formatNumber(d.swaps) },
+  { key: 'volume', header: 'Swapped (USDT)', align: 'right', cell: d => <Money value={d.volumeUsdt} currency='USDT' /> },
+  {
+    key: 'coins',
+    header: 'Fee taken',
+    cell: d => (
+      <span className='flex flex-wrap gap-x-3'>
+        {d.fees.map(f => (
+          <Money key={f.currency} value={f.amount} currency={f.currency} />
+        ))}
+      </span>
+    )
+  },
+  { key: 'fee', header: 'Profit (USDT)', align: 'right', cell: d => <span className='font-medium'><Money value={d.feeUsdt} currency='USDT' /></span> }
+]
+
+/** Fee profit, day by day: what was swapped, the fee in each coin, and its USDT value. */
+const FeeHistory = ({ userId }: { userId?: string }) => {
+  const { set, query } = useListState()
+  const list = usePagedApi<FeeDay>('admin/user/swap/fee-history', { channel: 'direct', limit: query.limit, page: query.page, userId })
+
+  return (
+    <DataTable
+      columns={feeDayColumns}
+      rows={list.data?.rows}
+      rowKey={d => d.day}
+      loading={list.isLoading}
+      fetching={list.isFetching}
+      error={list.error}
+      pagination={list.data?.pagination}
+      onPageChange={page => set({ page })}
+      onLimitChange={limit => set({ limit })}
+      emptyMessage='No swap fees yet.'
+    />
+  )
+}
+
 const columns: Column<SwapRow>[] = [
   { key: 'id', header: 'ID', cell: r => <span className='font-mono text-xs'>{r.id}</span> },
   { key: 'at', header: 'When', cell: r => <DateTime value={r.created_at} /> },
@@ -61,15 +106,26 @@ const columns: Column<SwapRow>[] = [
       </span>
     )
   },
+  {
+    key: 'rate',
+    header: 'Rate',
+    cell: r => (
+      <span className='text-muted-foreground text-xs whitespace-nowrap tabular-nums'>
+        1 {r.from_currency} = {Number(r.usd_rate_to) ? +(Number(r.usd_rate_from) / Number(r.usd_rate_to)).toPrecision(6) : '—'} {r.to_currency}
+      </span>
+    )
+  },
+  { key: 'value', header: 'Value (USDT)', align: 'right', cell: r => <Money value={String(Number(r.from_amount) * Number(r.usd_rate_from || 0))} currency='USDT' /> },
   { key: 'feeUsdt', header: 'Fee (USDT)', align: 'right', cell: r => <Money value={feeUsdt(r)} currency='USDT' /> }
 ]
 
 const SwapHistory = () => {
+  const [tab, setTab] = useQueryState('tab', parseAsString.withDefault('swaps').withOptions({ history: 'replace', scroll: false }))
   const { state, set, query } = useListState(['userId'])
 
   // One currency at a time — a swap out of OR into it; the site's default coin until somebody picks
   // another (in the URL). The validator is strict: `userId`, `currency`, `limit` and `offset` only.
-  const cur = useCurrencyParam()
+  const cur = useCurrencyParam({ allowAll: true })
   const choices = useCurrencyChoices()
   const list = usePagedApi<SwapRow>(LIST, { channel: 'direct', limit: query.limit, page: query.page, userId: query.userId, currency: cur.currency })
 
@@ -86,7 +142,14 @@ const SwapHistory = () => {
         <StatCard label='Today' value={<Money value={s?.todayUsdt ?? '0'} currency='USDT' />} hint='fees since midnight' loading={summary.isLoading} />
         <StatCard label='Swaps' value={formatNumber(s?.swaps ?? 0)} hint={query.userId ? `user #${query.userId}` : 'by direct users'} loading={summary.isLoading} />
       </div>
-      <DataTable
+      <Tabs value={tab} onValueChange={v => setTab(String(v))}>
+        <TabsList variant='line' className='mb-4'>
+          <TabsTrigger value='swaps'>Swaps</TabsTrigger>
+          <TabsTrigger value='profit'>Fee profit by day</TabsTrigger>
+        </TabsList>
+        <TabsContent value='profit'>{tab === 'profit' && <FeeHistory userId={query.userId ? String(query.userId) : undefined} />}</TabsContent>
+        <TabsContent value='swaps'>
+      {tab === 'swaps' && <DataTable
         columns={columns}
         rows={list.data?.rows}
         rowKey={r => String(r.id)}
@@ -96,7 +159,7 @@ const SwapHistory = () => {
         pagination={list.data?.pagination}
         onPageChange={page => set({ page })}
         onLimitChange={limit => set({ limit })}
-        emptyMessage={`No swaps out of or into ${cur.currency}.`}
+        emptyMessage={cur.currency ? `No swaps out of or into ${cur.currency}.` : 'No swaps yet.'}
         toolbar={
           <>
           <CurrencySelect filter={cur} currencies={choices.all} />
@@ -110,7 +173,9 @@ const SwapHistory = () => {
           />
           </>
         }
-      />
+      />}
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
