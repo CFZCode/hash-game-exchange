@@ -452,11 +452,15 @@ class DashboardStatsService {
           FROM (
             -- Third-party casino only: the Originals (in-house bets, og_transactions) have their own section.
             -- Stakes less the refunds / rollbacks that returned them, as in the series.
-            SELECT 'gis:' || COALESCE(g.game_uuid, '') AS game_key, ${gisCurrency} AS currency, COALESCE(gg.name, g.game_uuid) AS name, gg.provider AS provider,
+            SELECT 'gis:' || COALESCE(g.game_uuid, '') AS game_key, ${gisCurrency} AS currency,
+                   COALESCE(gn.name, gp.name, gg.name, g.game_uuid) AS name, COALESCE(gn.provider, gp.provider, gg.provider) AS provider,
                    ${gisSideAmountSql('g')} AS amount, ${gisBetCountSql('g')} AS bets
               FROM gis_transactions g
+              -- The lobby's catalogue first (gisgamesnew, or parked when the other aggregator is live); gis_games is the legacy sync.
+              LEFT JOIN gisgamesnew gn ON gn.uuid = g.game_uuid
+              LEFT JOIN gisgamesnew_parked gp ON gp.uuid = g.game_uuid
               LEFT JOIN gis_games gg ON gg.uuid = g.game_uuid
-             WHERE ${gisPlayFilterSql('g')} AND ${gisKindSql('g')} = 'stake' AND LOWER(COALESCE(gg.type, '')) NOT LIKE '%sport%'
+             WHERE ${gisPlayFilterSql('g')} AND ${gisKindSql('g')} = 'stake' AND LOWER(COALESCE(gn.type, gp.type, gg.type, '')) NOT LIKE '%sport%'
                AND ${this.#window('g.created_at')} ${ctx.currency ? `AND ${gisCurrency} = :currency` : ''} ${this.#owned(ctx, 'g.user_id')}
             UNION ALL
             SELECT 'js:' || COALESCE(j.game_uid, ''), UPPER(j.currency), COALESCE(jg.game_name, j.game_uid), jg.vendor, ABS(j.amount), 1
@@ -487,14 +491,11 @@ class DashboardStatsService {
         SELECT game_key, currency, MAX(name) AS name, MAX(provider) AS provider, SUM(amount) AS total, SUM(bets) AS n,
                ROW_NUMBER() OVER (PARTITION BY currency ORDER BY SUM(amount) DESC) AS rank
           FROM (
-            SELECT 'inhouse:' || b.game AS game_key, UPPER(b.coin) AS currency, b.game AS name, NULL::text AS provider, b.amount, 1 AS bets
-              FROM bets b
-             WHERE b.amount > 0 AND (b.result IS NULL OR b.result::text <> '"refunded"') AND ${NOT_FAKE}
-               AND ${this.#window('b.created')} ${cur('b.coin')} ${this.#owned(ctx, 'b.uid')}
-            UNION ALL
-            SELECT 'og:' || COALESCE(o.game_code, ''), UPPER(o.currency), COALESCE(og.name, o.game_code), 'Original Games', o.amount, 1
+            -- Only the games the provider offers today (og_games): the old in-house crash / dice
+            -- rounds (bets, and og rows for codes no longer offered) stay out of this chart.
+            SELECT 'og:' || o.game_code AS game_key, UPPER(o.currency) AS currency, og.name AS name, 'Original Games' AS provider, o.amount, 1 AS bets
               FROM og_transactions o
-              LEFT JOIN og_games og ON og.code = o.game_code
+              JOIN og_games og ON og.code = o.game_code
              WHERE ${OG_PLAYED('o')} AND o.kind = 'bet'
                AND ${this.#window('o.created_at')} ${cur('o.currency')} ${this.#owned(ctx, 'o.user_id')}
           ) stakes
