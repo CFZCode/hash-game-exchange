@@ -9,11 +9,13 @@ const { visibleStaffIds } = require('../staff-directory/staffDirectory.service')
 const { FeaturesService } = require('../features/features.service');
 
 /**
- * Who a staff send reaches: a general notification goes to the audience picked (`all` = direct and
- * agent players, `direct`), every other type to direct users only.
+ * Who a staff send reaches (a `#visibleUserIds` channel): a general notification goes to the audience
+ * picked (`all` = direct and agent players, `direct`, `agent`), every other type to direct users only.
  */
-const audienceOf = (type, audience) =>
-  (type ?? NOTIFICATION_TYPES.GENERAL) === NOTIFICATION_TYPES.GENERAL && audience !== 'direct' ? undefined : 'direct';
+const audienceOf = (type, audience) => {
+  if ((type ?? NOTIFICATION_TYPES.GENERAL) !== NOTIFICATION_TYPES.GENERAL) return 'direct';
+  return audience === 'direct' || audience === 'agent' ? audience : undefined;
+};
 
 /**
  * Sending a push, and the record of what was sent.

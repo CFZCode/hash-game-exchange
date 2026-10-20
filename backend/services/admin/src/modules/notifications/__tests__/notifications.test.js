@@ -249,6 +249,11 @@ test('admin notifications', async (t) => {
       () => service.sendToUser({ staff, userId: uid, title: 'Hi', type: 'general', audience: 'direct' }),
       (err) => err.code === 'NOTIFICATIONS_NOT_IN_YOUR_TREE'
     );
+    assert.equal((await service.sendToUser({ staff, userId: uid, title: 'Agents', type: 'general', audience: 'agent' })).recorded, 1);
+    await assert.rejects(
+      () => service.sendToUser({ staff, userId: uid, title: 'Bonus!', type: 'bonus', audience: 'agent' }),
+      (err) => err.code === 'NOTIFICATIONS_NOT_IN_YOUR_TREE'
+    );
     await assert.rejects(
       () => service.sendToUser({ staff, userId: uid, title: 'Bonus!', type: 'bonus' }),
       (err) => err.code === 'NOTIFICATIONS_NOT_IN_YOUR_TREE'

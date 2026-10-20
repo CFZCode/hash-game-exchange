@@ -30,12 +30,15 @@ const TYPE_OPTIONS = NOTIFICATION_TYPES.map(t => ({ value: t, label: t[0].toUppe
 const SENDS = 'admin/notifications/sends'
 
 const AUDIENCE_OPTIONS = [
-  { value: 'all', label: 'All users (direct + agent)' },
-  { value: 'direct', label: 'Direct users only' }
+  { value: 'direct', label: 'Direct users' },
+  { value: 'all', label: 'All users' },
+  { value: 'agent', label: 'Agent users' }
 ]
 
+const AUDIENCE_TEXT: Record<string, string> = { direct: 'Direct users', all: 'All users (direct + agent)', agent: 'Agent users' }
+
 /** The backend rule: general reaches the audience picked, every other type direct users only. */
-const audienceOf = (type: string, audience: string) => (type === 'general' && audience === 'all' ? 'Direct users and agent players' : 'Direct users only')
+const audienceOf = (type: string, audience: string) => AUDIENCE_TEXT[type === 'general' ? audience : 'direct']
 
 const Compose = () => {
   const [mode, setMode] = useState<'broadcast' | 'user'>('broadcast')
