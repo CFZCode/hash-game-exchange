@@ -7,18 +7,31 @@
 /** Yahan nahi dikhte — apni alag screen hai (sports = Settings → Site config → Sports switch). */
 // The old per-studio flags (spribe, evolution …) are kept off this screen: providers are switched per
 // provider from the live list in the Providers card (casino provider settings).
-export const FLAGS_ELSEWHERE = new Set(['sports', 'spribe', 'evolution', 'pragmaticslots', 'pragmaticlive', 'ideal', 'microgaming', 'pgsoft', 'hacksawgaming', 'jili', 'jilli', 'netent'])
+// The lobby's game-category switches are not offered to the site admin either (user's request, 2026-10-20).
+export const FLAGS_ELSEWHERE = new Set([
+  'sports',
+  'spribe', 'evolution', 'pragmaticslots', 'pragmaticlive', 'ideal', 'microgaming', 'pgsoft', 'hacksawgaming', 'jili', 'jilli', 'netent',
+  'crash', 'originals', 'livegames', 'slotsgames', 'alllivegames', 'allslotsgames', 'lotterygames', 'cards', 'instantgames'
+])
+
+/** A flag that belongs to an owner feature (backend featureCatalogue `flag`): off in the owner's plan → not listed. */
+export const FLAG_FEATURE: Record<string, string> = {
+  vipclub: 'vip',
+  wheelspin: 'spin_wheel',
+  giftcards: 'gift_cards',
+  bonus: 'bonus',
+  affiliate: 'affiliate',
+  lotto: 'raffles',
+  home_heroSection: 'banners',
+  casino: 'casino_lobby',
+  clubmembership: 'club_membership'
+}
 
 export const FLAG_GROUPS: { title: string; description: string; keys: string[] }[] = [
   {
     title: 'Products',
     description: 'Whole sections of the site. Off hides the section and its navigation.',
     keys: ['casino', 'lotto', 'vipclub', 'clubmembership', 'bonus', 'affiliate', 'giftcards', 'welcomepack', 'wheelspin', 'provablyfair']
-  },
-  {
-    title: 'Game categories',
-    description: 'Casino lobby tabs.',
-    keys: ['crash', 'originals', 'livegames', 'slotsgames', 'alllivegames', 'allslotsgames', 'lotterygames', 'cards', 'instantgames']
   },
   {
     title: 'Fiat currencies',
