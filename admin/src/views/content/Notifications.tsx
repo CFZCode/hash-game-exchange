@@ -52,13 +52,13 @@ const Compose = () => {
       <CardHeader>
         <CardTitle className='text-base'>Send a push notification</CardTitle>
         <CardDescription>
-          Goes to direct users only; agent players get no notifications. A broadcast is capped by the platform so a mistake is refused rather than delivered.
+          Goes to every registered device for the audience you pick. A broadcast is capped by the platform so a mistake is refused rather than delivered.
         </CardDescription>
       </CardHeader>
       <CardContent className='grid gap-4'>
         <Tabs value={mode} onValueChange={v => setMode(v as 'broadcast' | 'user')}>
           <TabsList>
-            <TabsTrigger value='broadcast'>All direct users</TabsTrigger>
+            <TabsTrigger value='broadcast'>Everyone</TabsTrigger>
             <TabsTrigger value='user'>One user</TabsTrigger>
           </TabsList>
         </Tabs>
@@ -76,7 +76,7 @@ const Compose = () => {
                 {mode === 'broadcast' ? 'Broadcast' : 'Send'}
               </Button>
             }
-            title={mode === 'broadcast' ? 'Send to every direct user?' : `Send to user ${form.userId}?`}
+            title={mode === 'broadcast' ? 'Send to every device?' : `Send to user ${form.userId}?`}
             description={`“${form.title}” — a push cannot be recalled once it is delivered.`}
             confirmLabel='Send'
             onConfirm={() => send.mutateAsync()}
