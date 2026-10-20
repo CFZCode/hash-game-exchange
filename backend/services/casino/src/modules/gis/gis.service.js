@@ -2,7 +2,7 @@
 
 const crypto = require('crypto');
 const { Op } = require('sequelize');
-const { money } = require('@ibitplay/common');
+const { money, sitePolicy } = require('@ibitplay/common');
 const { agentPlayerError } = require('@ibitplay/auth');
 
 const E = require('./gis.errors');
@@ -18,6 +18,9 @@ const {
   CALLBACK_CURRENCY,
   BALANCE_SCALE,
 } = require('./gis.constants');
+
+/** gis_sessions.currency for an INR-wallet session played at Slotegrator in PKR. */
+const INR_AS_PKR = 'INR>PKR';
 
 /**
  * Slotegrator (GIS) — the second seamless wallet on the platform, and the one
@@ -133,35 +136,63 @@ class GisService {
       // then went on to query `credits` with it anyway, one branch later.
       if (!/^\d+$/.test(playerId)) return this.#fail('Player not found');
 
-      const settlement = CALLBACK_CURRENCY[currency];
+      // A PKR callback for a session launched from the INR wallet (owner's slotegrator_inr_as_pkr):
+      // the money is INR, converted at `fx` PKR per INR both ways.
+      const fx = currency === 'PKR' ? await this.#inrAsPkrRate(body.session_id) : null;
+      const settlement = fx ? 'INR' : CALLBACK_CURRENCY[currency];
       if (!settlement) return this.#fail('Unsupported currency');
-
-      const userId = Number(playerId);
-      const balance = await this.#balanceOf(userId, settlement);
-      if (balance == null) return this.#fail('Player not found');
-
-      if (action === ACTION.BALANCE) return this.#probe({ body, balance });
-
-      const amount = money.toDecimalString(money.toMinor(String(body.amount ?? '0')));
-      if (MONEY_ACTIONS.has(action) && money.lt(amount, '0')) {
-        return this.#fail('amount must be non-negative');
-      }
-
-      switch (action) {
-        case ACTION.BET:
-          return await this.#bet({ body, userId, settlement, amount, balance });
-        case ACTION.WIN:
-          return withoutInternal(await this.#win({ body, userId, settlement, amount, balance }));
-        case ACTION.REFUND:
-          return withoutInternal(await this.#refund({ body, userId, settlement, amount, balance }));
-        case ACTION.ROLLBACK:
-          return await this.#rollback({ body, userId, settlement, balance });
-        default:
-          return this.#fail('Invalid action');
-      }
+      if (fx && body.amount != null) body = { ...body, amount: money.toDecimalString(money.divide(String(body.amount), fx)) };
+      const result = await this.#settle({ body, action, playerId, settlement });
+      if (fx && result?.balance != null) result.balance = this.#quote(money.toDecimalString(money.multiply(result.balance, fx)));
+      return result;
     } catch (error) {
       this.logger?.error({ err: error, action: body?.action }, 'GIS callback failed');
       return this.#fail('Unhandled internal error');
+    }
+  }
+
+  /** PKR per INR for a session opened from the INR wallet in PKR; null for any other session. */
+  async #inrAsPkrRate(sessionId) {
+    if (!sessionId) return null;
+    const session = await this.models.GisSessions.findOne({ where: { session_id: String(sessionId) }, attributes: ['currency'], raw: true });
+    if (session?.currency !== INR_AS_PKR) return null;
+    return this.#pkrPerInr();
+  }
+
+  /** PKR per INR at the site's exchange rates (usd_rate is USD per unit). */
+  async #pkrPerInr() {
+    const rows = await this.db.sequelize.query(
+      "SELECT UPPER(currency) AS currency, usd_rate FROM exchangerate WHERE UPPER(currency) IN ('INR', 'PKR')",
+      { type: this.db.sequelize.QueryTypes.SELECT }
+    );
+    const rate = Object.fromEntries(rows.map((r) => [r.currency, String(r.usd_rate)]));
+    if (!rate.INR || !rate.PKR || money.isZero(rate.PKR)) throw E.UNSUPPORTED_CURRENCY({ currency: 'PKR' });
+    return money.toDecimalString(money.divide(rate.INR, rate.PKR));
+  }
+
+  async #settle({ body, action, playerId, settlement }) {
+    const userId = Number(playerId);
+    const balance = await this.#balanceOf(userId, settlement);
+    if (balance == null) return this.#fail('Player not found');
+
+    if (action === ACTION.BALANCE) return this.#probe({ body, balance });
+
+    const amount = money.toDecimalString(money.toMinor(String(body.amount ?? '0')));
+    if (MONEY_ACTIONS.has(action) && money.lt(amount, '0')) {
+      return this.#fail('amount must be non-negative');
+    }
+
+    switch (action) {
+      case ACTION.BET:
+        return await this.#bet({ body, userId, settlement, amount, balance });
+      case ACTION.WIN:
+        return withoutInternal(await this.#win({ body, userId, settlement, amount, balance }));
+      case ACTION.REFUND:
+        return withoutInternal(await this.#refund({ body, userId, settlement, amount, balance }));
+      case ACTION.ROLLBACK:
+        return await this.#rollback({ body, userId, settlement, balance });
+      default:
+        return this.#fail('Invalid action');
     }
   }
 
@@ -685,12 +716,14 @@ class GisService {
     if (await this.#casinoLocked(userId)) throw E.CASINO_LOCKED({ userId });
 
     const sessionId = crypto.randomUUID();
+    // Owner's switch: an INR game opens at Slotegrator in PKR; the session remembers it for the callbacks.
+    const inPkr = settlement === 'INR' && (await sitePolicy.readPolicy(this.models, 'slotegrator_inr_as_pkr')) === 'on';
 
     await this.models.GisSessions.create({
       user_id: userId,
       session_id: sessionId,
       game_uuid: gameUuid,
-      currency: settlement,
+      currency: inPkr ? INR_AS_PKR : settlement,
       device,
       return_url: returnUrl ?? null,
       language: language ?? null,
@@ -708,7 +741,7 @@ class GisService {
       game_uuid: gameUuid,
       player_id: userId,
       player_name: playerName,
-      currency: OUTBOUND_CURRENCY[settlement] ?? settlement,
+      currency: inPkr ? 'PKR' : OUTBOUND_CURRENCY[settlement] ?? settlement,
       session_id: sessionId,
       device,
       // Configuration, not a literal. Legacy hard-coded

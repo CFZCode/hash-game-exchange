@@ -219,6 +219,34 @@ const CATALOGUE: FeatureEntry[] = [
     ]
   },
   {
+    // Slotegrator INR games in PKR: a policy (always on, owner-only). Mirrors backend featureCatalogue.js.
+    key: 'slotegrator_inr_as_pkr',
+    label: 'Slotegrator: INR games in PKR',
+    category: 'business',
+    flag: null,
+    policy: true,
+    defaultVariant: 'off',
+    note: 'On: a player betting in INR gets the Slotegrator game in PKR; each bet, win and refund is converted PKR → INR at the site rate, and only the INR wallet moves. Off: INR in, INR out. Needs PKR limits on the Slotegrator contract.',
+    variants: [
+      { key: 'off', label: 'Off', description: 'An INR bet launches the game in INR and settles in INR. The default.' },
+      { key: 'on', label: 'On', description: 'An INR bet launches the Slotegrator game in PKR; every bet, win and refund is converted PKR → INR at the site rate and moves the INR wallet.' }
+    ]
+  },
+  {
+    // API encryption: a policy (always on, owner-only). Mirrors backend featureCatalogue.js.
+    key: 'api_encryption',
+    label: 'API encryption',
+    category: 'business',
+    flag: null,
+    policy: true,
+    defaultVariant: 'off',
+    note: 'On: the player site\'s API data travels encrypted (AES-256-GCM) and the site decrypts it. Off: plain JSON. Takes effect within about 15 seconds.',
+    variants: [
+      { key: 'off', label: 'Off', description: "The player site's API data comes as plain JSON. The default." },
+      { key: 'on', label: 'On', description: "The player site's API data comes encrypted (AES-256-GCM) and the site decrypts it." }
+    ]
+  },
+  {
     key: 'vip',
     label: 'VIP club',
     category: 'engagement',

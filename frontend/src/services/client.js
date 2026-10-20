@@ -1,3 +1,4 @@
+import { ENC_ACCEPT, openSealed } from './apiCrypto';
 import { SOCKET_READS, liveRead, markLiveStale, setLiveActive } from './liveStore';
 import {
   clearTokens,
@@ -261,7 +262,7 @@ async function sendOnce(url, path, { json, headers, ...init }) {
   const res = await fetch(url, {
     ...init,
     headers: {
-      Accept: 'application/json',
+      Accept: ENC_ACCEPT ?? 'application/json',
       ...(json === undefined ? null : { 'Content-Type': 'application/json' }),
       ...(token ? { Authorization: `Bearer ${token}` } : null),
       ...headers,
@@ -277,7 +278,7 @@ async function sendOnce(url, path, { json, headers, ...init }) {
   const type = res.headers.get('content-type') ?? '';
   /* Binary routes — images, a PDF, one CSV — answer with bytes and a detected content type.
      Handing a call site the Blob is more useful than a parse failure. */
-  const body = type.includes('json') ? await res.json().catch(() => null) : await res.blob();
+  const body = type.includes('json') ? await openSealed(await res.json().catch(() => null)) : await res.blob();
 
   return { res, body };
 }

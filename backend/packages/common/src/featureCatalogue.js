@@ -830,7 +830,43 @@ const THEME_MODE_POLICY = {
   ],
 };
 
-const FEATURES = Object.freeze([...POLICIES, REWARD_CURRENCY_POLICY, DEFAULT_CURRENCY_POLICY, REGION_RESTRICTION_POLICY, WITHDRAWAL_REQUIREMENTS_POLICY, CASINO_AGGREGATOR_POLICY, THEME_MODE_POLICY, ...GENERATED, TIPS, P2P, PUSH_NOTIFICATIONS, ANALYTICS]);
+/**
+ * Slotegrator INR games launched in PKR — a policy (owner-only). `on`: an INR-wallet game opens
+ * at Slotegrator in PKR; each callback's PKR is converted to INR at the site's rates and the INR
+ * wallet is checked, debited and credited. `off` (the default): INR launches and settles as INR.
+ * Read by casino-service gis.service.js, per launch (the session remembers it).
+ */
+const SLOTEGRATOR_INR_AS_PKR_POLICY = {
+  key: 'slotegrator_inr_as_pkr',
+  label: 'Slotegrator: INR games in PKR',
+  category: 'business',
+  kind: 'policy',
+  flag: null,
+  defaultVariant: 'off',
+  variants: [
+    { key: 'off', label: 'Off', description: 'An INR bet launches the game in INR and settles in INR. The default.' },
+    { key: 'on', label: 'On', description: 'An INR bet launches the Slotegrator game in PKR; every bet, win and refund is converted PKR → INR at the site rate and moves the INR wallet.' },
+  ],
+};
+
+/**
+ * API encryption — a policy (owner-only). `on`: the gateway answers the player site's API calls
+ * AES-256-GCM encrypted and the site decrypts them; `off` (the default): plain JSON.
+ */
+const API_ENCRYPTION_POLICY = {
+  key: 'api_encryption',
+  label: 'API encryption',
+  category: 'business',
+  kind: 'policy',
+  flag: null,
+  defaultVariant: 'off',
+  variants: [
+    { key: 'off', label: 'Off', description: 'The player site\'s API data comes as plain JSON. The default.' },
+    { key: 'on', label: 'On', description: 'The player site\'s API data comes encrypted (AES-256-GCM) and the site decrypts it.' },
+  ],
+};
+
+const FEATURES = Object.freeze([...POLICIES, REWARD_CURRENCY_POLICY, DEFAULT_CURRENCY_POLICY, REGION_RESTRICTION_POLICY, WITHDRAWAL_REQUIREMENTS_POLICY, CASINO_AGGREGATOR_POLICY, THEME_MODE_POLICY, SLOTEGRATOR_INR_AS_PKR_POLICY, API_ENCRYPTION_POLICY, ...GENERATED, TIPS, P2P, PUSH_NOTIFICATIONS, ANALYTICS]);
 
 /**
  * Site templates — the bundles the OWNER picks for a site (docs/OWNER-PANEL.md

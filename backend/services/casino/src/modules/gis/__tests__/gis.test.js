@@ -840,4 +840,61 @@ test('slotegrator (gis)', async (t) => {
     // Key order in the object must not change the signature.
     assert.equal(flat, provider.sign({ a: 1, b: 'two words' }, headers));
   });
+
+  await t.test("owner's INR-as-PKR: the game opens in PKR, callbacks convert PKR → INR and move the INR wallet", async () => {
+    const q = (sql) => connection.sequelize.query(sql);
+    // 1 INR = 3 PKR at these rates. Inserted only for this test, removed after.
+    const added = [];
+    for (const [cur, rate] of [['INR', '0.012'], ['PKR', '0.004']]) {
+      const [rows] = await q(`SELECT 1 FROM exchangerate WHERE UPPER(currency) = '${cur}'`);
+      if (!rows.length) {
+        await q(`INSERT INTO exchangerate (currency, usd_rate) VALUES ('${cur}', ${rate})`);
+        added.push(cur);
+      }
+    }
+    await q("INSERT INTO site_features (feature, enabled, variant) VALUES ('slotegrator_inr_as_pkr', true, 'on') ON CONFLICT (feature) DO UPDATE SET variant = 'on'");
+    try {
+      const uid = await seedPlayer(newUid());
+      const balances = new Map([[String(uid), '1000']]);
+      const sent = [];
+      const service = new GisService({
+        models,
+        db: connection,
+        logger,
+        wallet: makeWallet(balances),
+        provider: { configured: true, sign: (...a) => provider.sign(...a), async post(_path, params) { sent.push(params); return { url: 'https://game.test' }; } },
+        games: { async recordPlay() {}, async recordActivity() {} },
+        config: { SERVICE_NAME: 'casino-service', GIS_MAX_SKEW_SECONDS: 300 },
+      });
+
+      const { sessionId } = await service.launch({ userId: uid, gameUuid: 'g-pkr', playerName: 'p', currency: 'INR', device: 'desktop' });
+      assert.equal(sent[0].currency, 'PKR', 'an INR game opens in PKR');
+
+      const call = (body) => service.handleTransaction(callback({ player_id: String(uid), currency: 'PKR', session_id: sessionId, ...body }));
+      const [r] = await connection.sequelize.query("SELECT usd_rate FROM exchangerate WHERE UPPER(currency) = 'INR'");
+      const [p] = await connection.sequelize.query("SELECT usd_rate FROM exchangerate WHERE UPPER(currency) = 'PKR'");
+      const fx = Number(r[0].usd_rate) / Number(p[0].usd_rate);
+
+      const probe = await call({ action: 'balance' });
+      assert.equal(Number(probe.balance).toFixed(2), (1000 * fx).toFixed(2), 'the balance is quoted in PKR');
+
+      const bet = await call({ action: 'bet', amount: String(30 * fx), transaction_id: newTxId() });
+      assert.equal(Number(balances.get(String(uid))).toFixed(4), '970.0000', 'a PKR bet debits its INR value');
+      assert.equal(Number(bet.balance).toFixed(2), (970 * fx).toFixed(2));
+
+      await call({ action: 'win', amount: String(50 * fx), transaction_id: newTxId() });
+      assert.equal(Number(balances.get(String(uid))).toFixed(4), '1020.0000', 'a PKR win credits its INR value');
+
+      // A PKR callback for any other session is the PKR wallet's, untouched by the switch.
+      const other = await service.handleTransaction(callback({ action: 'balance', player_id: String(uid), currency: 'PKR', session_id: 'not-an-inr-session' }));
+      assert.equal(other.balance, '1020.0000', 'no conversion outside an INR-as-PKR session');
+
+      await q("UPDATE site_features SET variant = 'off' WHERE feature = 'slotegrator_inr_as_pkr'");
+      await service.launch({ userId: uid, gameUuid: 'g-pkr', playerName: 'p', currency: 'INR', device: 'desktop' });
+      assert.equal(sent[1].currency, 'INR', 'switched off: INR opens in INR');
+    } finally {
+      await q("DELETE FROM site_features WHERE feature = 'slotegrator_inr_as_pkr'");
+      for (const cur of added) await q(`DELETE FROM exchangerate WHERE UPPER(currency) = '${cur}'`);
+    }
+  });
 });

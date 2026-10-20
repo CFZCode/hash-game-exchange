@@ -44,6 +44,10 @@ const POLICY_DEFAULTS = Object.freeze({
   casino_aggregator: 'js_games',
   // Not a channel switch: whether the player site offers the light theme (frontend gates.js).
   theme_mode: 'dark_only',
+  // Not a channel switch: Slotegrator INR games launched in PKR (casino gis.service.js).
+  slotegrator_inr_as_pkr: 'off',
+  // Not a channel switch: the gateway encrypts the player site's API answers (gateway apiEncryption.js).
+  api_encryption: 'off',
 });
 
 /** For each policy, which stored variants allow each channel. */

@@ -41,7 +41,7 @@ const agents = {
  * @param {string} options.name       Upstream name, for logs and errors.
  * @param {number} options.timeoutMs
  */
-function createProxy({ target, name, timeoutMs = 35_000, logger }) {
+function createProxy({ target, name, timeoutMs = 35_000, logger, encryption }) {
   const base = new URL(target);
 
   return function proxyMiddleware(req, res, next) {
@@ -61,6 +61,9 @@ function createProxy({ target, name, timeoutMs = 35_000, logger }) {
     headers['x-forwarded-proto'] = req.protocol;
     headers['x-forwarded-host'] = req.headers.host || '';
     if (req.id) headers[REQUEST_ID_HEADER] = req.id;
+    // An answer to encrypt is read whole, so ask the upstream for it uncompressed.
+    const encrypt = encryption?.wants(req) ?? false;
+    if (encrypt) delete headers['accept-encoding'];
 
     const upstreamReq = transport.request(
       {
@@ -78,6 +81,18 @@ function createProxy({ target, name, timeoutMs = 35_000, logger }) {
         const responseHeaders = { ...upstreamRes.headers };
         for (const header of Object.keys(responseHeaders)) {
           if (HOP_BY_HOP.has(header.toLowerCase())) delete responseHeaders[header];
+        }
+
+        if (encrypt && String(responseHeaders['content-type'] ?? '').includes('json')) {
+          const chunks = [];
+          upstreamRes.on('data', (c) => chunks.push(c));
+          upstreamRes.on('end', () => {
+            delete responseHeaders['content-length'];
+            delete responseHeaders.etag;
+            res.writeHead(upstreamRes.statusCode, { ...responseHeaders, 'content-type': 'application/json; charset=utf-8' });
+            res.end(encryption.encrypt(Buffer.concat(chunks)));
+          });
+          return;
         }
 
         res.writeHead(upstreamRes.statusCode, responseHeaders);

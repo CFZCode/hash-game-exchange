@@ -7,6 +7,7 @@ const { buildApp, TARGETS } = require('./app');
 const { attachWsProxy } = require('./wsProxy');
 
 const app = buildApp();
+app.locals.encryption.start();
 
 const { server } = startServer({
   app,

@@ -9,6 +9,7 @@ const { stripHeaders } = require('./middleware/stripHeaders');
 const { verifyToken } = require('./middleware/verifyToken');
 const { buildLegacyRewriter } = require('./legacyRoutes');
 const { createHealthAggregator } = require('./health');
+const { createApiEncryption } = require('./apiEncryption');
 
 /**
  * The single public entry point.
@@ -77,6 +78,7 @@ function buildApp() {
   const logger = createLogger({ name: config.SERVICE_NAME, level: config.LOG_LEVEL, pretty: config.LOG_PRETTY });
 
   const routes = express.Router();
+  const encryption = createApiEncryption({ config, logger });
 
   // ── Health, before auth: an orchestrator has no token ────────────────
   routes.use(createHealthAggregator({ targets: TARGETS, config, logger }));
@@ -122,6 +124,7 @@ function buildApp() {
         name: `${route.service}-service`,
         timeoutMs: config.GATEWAY_PROXY_TIMEOUT_MS,
         logger,
+        encryption,
       })
     );
   }
@@ -139,6 +142,7 @@ function buildApp() {
   });
 
   app.locals.logger = logger;
+  app.locals.encryption = encryption;
   return app;
 }
 
