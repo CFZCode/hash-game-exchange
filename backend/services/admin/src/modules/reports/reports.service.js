@@ -1679,7 +1679,7 @@ class ReportsService {
     for (const row of directMoves) {
       const credit = row.reason === DIRECT_WALLET_LEDGER.deposit;
       const abs = money.toDecimalString(money.toMinorQuantised(String(row.amount ?? '0').replace(/^-/, '')));
-      push(row.created_at, 'Deposit', credit ? 'CREDIT' : 'DEBIT', row.description || (credit ? 'Admin deposit' : 'Admin withdrawal'), credit ? abs : `-${abs}`, Number(row.id) || 0);
+      push(row.created_at, credit ? 'Deposit' : 'Withdrawal', credit ? 'CREDIT' : 'DEBIT', row.description || (credit ? 'Admin deposit' : 'Admin withdrawal'), credit ? abs : `-${abs}`, Number(row.id) || 0);
     }
 
     /**
