@@ -24,7 +24,7 @@ import { useApi, useApiMutation, useListState, usePagedApi } from '@/hooks/use-a
 import { api } from '@/lib/api/client'
 import { check } from '@/lib/validate'
 import { allConvertedLabel, useFinanceFilters } from './currencyFilter'
-import FinanceStatsPanel, { type FinanceStats } from './FinanceStatsPanel'
+import FinanceStatsPanel, { useStatsQuery, type FinanceStats } from './FinanceStatsPanel'
 import ListStatsTabs from './ListStatsTabs'
 import { CopyButton, Details, ImageDialog, ViewDialog, stop } from './shared'
 import { PlayerAvatar } from '@/views/players/users/shared'
@@ -282,12 +282,12 @@ const columns: Column<FiatDepositRow>[] = [
  * (reports:read): the selected period's pending / approved / rejected, plus today's approvals.
  */
 const Summary = ({ filters }: { filters: StatsFilters }) => {
-  const query = { kind: 'deposits', rail: 'fiat', ...filters.query, ...(!filters.currency && filters.defaultCurrency ? { convertTo: filters.defaultCurrency } : {}) }
+  const query = useStatsQuery('deposits', 'fiat', filters)
   const today = new Date().toISOString().slice(0, 10)
   const period = useApi<FinanceStats>(STATS, query)
   const todays = useApi<FinanceStats>(STATS, { ...query, ...toApiRange(today, today) })
   const t = period.data?.totals.byStatus
-  const currency = period.data?.currency ?? filters.currency
+  const currency = period.data?.currency ?? query.convertTo
   const label = PRESETS.find(p => p.value === filters.preset)?.label ?? 'Selected period'
   const count = (n?: number) => (n ?? 0).toLocaleString('en-IN')
 

@@ -16,6 +16,7 @@ import {
   type ChartColor,
   type StatsFilters
 } from '@/components/shared/charts'
+import { useDefaultCurrency } from '@/components/shared/DefaultCurrency'
 import Money from '@/components/shared/Money'
 import { useApi } from '@/hooks/use-api'
 import { formatNumber } from '@/lib/format'
@@ -26,6 +27,17 @@ import { formatNumber } from '@/lib/format'
  */
 
 const STATS = 'admin/reports/finance-stats'
+
+/**
+ * The finance-stats query of a screen: every currency, valued in the site's default coin (USDT
+ * unless the owner set another), whatever coin the list below is filtered to.
+ */
+export function useStatsQuery(kind: string, rail: string, filters: StatsFilters) {
+  const site = useDefaultCurrency()
+  const rest = Object.fromEntries(Object.entries(filters.query).filter(([key]) => key !== 'currency'))
+
+  return { kind, rail, ...rest, convertTo: site.code || 'USDT' }
+}
 
 type StatusKey = 'success' | 'pending' | 'failed' | 'other'
 type Figure = { count: number; amount: string }
@@ -62,14 +74,13 @@ const STATUS_COLOR: Record<StatusKey, ChartColor> = { success: 'success', pendin
 const DONUT_SLICES = 6
 
 const FinanceStatsPanel = ({ kind, rail, filters, statusLabels }: Props) => {
-  // Every currency: valued in the site's default coin (`convertTo`), not USD.
-  const query = { kind, rail, ...filters.query, ...(!filters.currency && filters.defaultCurrency ? { convertTo: filters.defaultCurrency } : {}) }
+  const query = useStatsQuery(kind, rail, filters)
   const stats = useApi<FinanceStats>(STATS, query)
   const prev = useApi<FinanceStats>(STATS, { ...query, ...filters.previous.apiRange })
 
   const s = stats.data
   const p = prev.data
-  const currency = s?.currency ?? (filters.currency || 'USD')
+  const currency = s?.currency ?? query.convertTo
   const loading = stats.isLoading
   const noun = kind === 'deposits' ? 'deposits' : 'withdrawals'
 

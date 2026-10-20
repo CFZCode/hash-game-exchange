@@ -15,6 +15,12 @@ Format:
 
 ---
 
+## 2026-10-20 — Deposit / Withdraw stats hamesha USDT me (site ki default coin)
+**Kya kiya:** Finance stats (Stats tab + Manual tab ke upar wale cards) ab list ke currency filter se nahi chalte: saari currencies owner ki `default_currency` (live: USDT) me convert hoke dikhti hain (`useStatsQuery` → `convertTo`). List ka currency filter waisa hi hai.
+**Kyun:** User: `/transactions/deposit` pe har jagah stats USDT me dikhein.
+**Files / jagah:** `admin/src/views/finance/FinanceStatsPanel.tsx`, `admin/src/views/finance/FiatDeposits.tsx` (Crypto/Fiat deposits + withdrawals ke stats sab isi panel se).
+**Notes / pending:** Jis currency ka rate nahi hai, wo totals se bahar rehti hai aur panel uska note dikhata hai.
+
 ## 2026-10-20 — Check: encryption / internal ACL naye notifications ko block nahi karte
 **Kya kiya:** API encryption (`gateway/src/apiEncryption.js`) PSP `/psp/:provider/callback`, `/crypto/ccpayment/callback` aur GIS callback ko plain chhodta hai, isliye koi naya bypass nahi chahiye. Per-service internal keys live pe set hain, isliye ACL lagu hai. Live test: casino ki key se `PUT /internal/admin/notifications/player` → `VALIDATION_ERROR` (ACL paar). Sports → 403, jo sahi hai kyunki sports notification nahi bhejta.
 **Kyun:** User: "jo chije encryption block karegi usko bypass karwa do jo jaruri hai".
