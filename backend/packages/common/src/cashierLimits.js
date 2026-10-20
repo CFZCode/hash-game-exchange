@@ -2,11 +2,13 @@
 
 const money = require('./money');
 const { AppError } = require('./errors');
+const { getEntitlements } = require('./entitlements');
 
 /**
- * Cashier limits per currency — set by the Super Admin in the site admin (Site config → Limits and
- * policy → Cashier), stored in `cashier_limits` (migration 112), checked on every deposit and
- * withdrawal rail.
+ * Cashier limits per currency — the owner's `cashierLimits` block (owner panel → Features & plan →
+ * Policies → Cashier limits); the site admin shows them read-only. A document without the block
+ * (an older owner panel) falls back to the `cashier_limits` table (migration 112). Checked on every
+ * deposit and withdrawal rail.
  *
  *   { INR:  { depositMin: '100', depositMax: '100000', withdrawMin: '500', withdrawMax: '50000' },
  *     USDT: { depositMin: '10',  depositMax: null,     withdrawMin: null,  withdrawMax: '5000'  } }
@@ -86,8 +88,13 @@ function assertWithinCashierLimits(all, { currency, amount, flow }) {
 
 const COLUMN = { depositMin: 'deposit_min', depositMax: 'deposit_max', withdrawMin: 'withdraw_min', withdrawMax: 'withdraw_max' };
 
-/** Every stored row as the block above. An older database without the table reads as no limits. */
+/**
+ * The limits in force: the owner document's block when it has one, else every stored row of the
+ * table. An older database without the table reads as no limits.
+ */
 async function readCashierLimits(sequelize, { transaction } = {}) {
+  const doc = await getEntitlements();
+  if (doc.cashierLimits && typeof doc.cashierLimits === 'object') return cleanCashierLimits(doc.cashierLimits);
   if (!sequelize?.query) return {};
   try {
     const [rows] = await sequelize.query('SELECT currency, deposit_min, deposit_max, withdraw_min, withdraw_max FROM cashier_limits', { transaction });

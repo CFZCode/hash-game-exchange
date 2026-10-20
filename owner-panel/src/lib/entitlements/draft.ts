@@ -5,11 +5,13 @@
 import type { RegionSetting } from './region'
 import type { WithdrawalCap } from './withdrawalCap'
 import type { WithdrawalDailyLimit } from './withdrawalDailyLimit'
+import type { CashierLimits } from './cashierLimits'
 
 export type Draft = {
   region?: RegionSetting
   withdrawalCap?: WithdrawalCap
   withdrawalDailyLimit?: WithdrawalDailyLimit
+  cashierLimits?: CashierLimits
   withdrawalsEnabled?: boolean
   template?: string
   features: Record<string, boolean>
@@ -22,6 +24,7 @@ type Loaded = {
   region?: RegionSetting
   withdrawalCap?: WithdrawalCap
   withdrawalDailyLimit?: WithdrawalDailyLimit
+  cashierLimits?: CashierLimits
   withdrawalsEnabled?: boolean
   template: string
   features: Record<string, boolean>
@@ -42,6 +45,7 @@ export function buildDraft(doc: Loaded, edits: Partial<Draft> | null): Draft {
     ...(edits?.withdrawalDailyLimit ?? doc.withdrawalDailyLimit
       ? { withdrawalDailyLimit: edits?.withdrawalDailyLimit ?? doc.withdrawalDailyLimit }
       : {}),
+    ...(edits?.cashierLimits ?? doc.cashierLimits ? { cashierLimits: edits?.cashierLimits ?? doc.cashierLimits } : {}),
     ...((edits?.withdrawalsEnabled ?? doc.withdrawalsEnabled) !== undefined
       ? { withdrawalsEnabled: edits?.withdrawalsEnabled ?? doc.withdrawalsEnabled }
       : {})

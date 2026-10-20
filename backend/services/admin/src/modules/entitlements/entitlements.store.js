@@ -3,7 +3,7 @@
 const crypto = require('crypto');
 const { Op } = require('sequelize');
 
-const { AppError, featureCatalogue, featureOptions, regionPolicy, withdrawalCap, withdrawalDailyLimit } = require('@ibitplay/common');
+const { AppError, featureCatalogue, featureOptions, regionPolicy, withdrawalCap, withdrawalDailyLimit, cashierLimits } = require('@ibitplay/common');
 const { cleanBranding } = require('../branding/branding.rules');
 
 /**
@@ -147,6 +147,8 @@ function normalise(data) {
     withdrawalCap: withdrawalCap.cleanWithdrawalCap(data.withdrawalCap),
     // Daily withdrawal limit per currency (withdrawalDailyLimit.js); absent = off.
     withdrawalDailyLimit: withdrawalDailyLimit.cleanWithdrawalDailyLimit(data.withdrawalDailyLimit),
+    // Cashier limits per currency (cashierLimits.js); absent = the `cashier_limits` table applies.
+    ...(data.cashierLimits !== undefined ? { cashierLimits: cashierLimits.cleanCashierLimits(data.cashierLimits) } : {}),
     // Player withdrawals on every rail (withdrawBlock.js); absent = on.
     withdrawalsEnabled: data.withdrawalsEnabled !== false,
     // Site name, metadata and logo file references (modules/branding); null = not branded.
@@ -295,6 +297,7 @@ function createEntitlementsStore({ config, logger, db, onChange: initialOnChange
       region: regionPolicy.cleanRegion(doc.region),
       withdrawalCap: withdrawalCap.cleanWithdrawalCap(doc.withdrawalCap),
       withdrawalDailyLimit: withdrawalDailyLimit.cleanWithdrawalDailyLimit(doc.withdrawalDailyLimit),
+      ...(doc.cashierLimits ? { cashierLimits: cashierLimits.cleanCashierLimits(doc.cashierLimits) } : {}),
       withdrawalsEnabled: doc.withdrawalsEnabled !== false,
       branding: doc.branding ? JSON.parse(JSON.stringify(doc.branding)) : null,
       version: doc.version,

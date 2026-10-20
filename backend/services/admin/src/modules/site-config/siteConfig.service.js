@@ -1087,9 +1087,10 @@ class SiteConfigService {
   }
 
   /**
-   * Cashier limits per currency (`cashier_limits`, migration 112):
-   * `{ currencies: [{ code, name, depositMin, depositMax, withdrawMin, withdrawMax }] }` — one row
-   * per coin the site has switched on, null = no limit on that side. Every rail checks them.
+   * Cashier limits per currency — the owner's `cashierLimits` (the `cashier_limits` table only
+   * while the owner document has no block):
+   * `{ currencies: [{ code, name, depositMin, depositMax, withdrawMin, withdrawMax }], managedBy }` —
+   * one row per coin the site has switched on, null = no limit on that side. Every rail checks them.
    */
   async cashierLimits() {
     const [limits, coins] = await Promise.all([cashierLimitsLib.readCashierLimits(this.#sequelize), currencyRegistry.listCurrencies()]);
@@ -1102,15 +1103,19 @@ class SiteConfigService {
         name: nameOf.get(code) ?? null,
         ...cashierLimitsLib.limitsFor(limits, code),
       })),
+      managedBy: this.#ownerManaged() ? 'owner' : 'admin',
     };
   }
 
   /**
-   * Replace the cashier limits — the Super Admin only, with the transaction password.
+   * Replace the cashier limits — only on a site without an owner panel (else `403 OWNER_MANAGED`),
+   * the Super Admin only, with the transaction password.
    * `limits` is `{ [CODE]: { depositMin, depositMax, withdrawMin, withdrawMax } }`, each an amount
    * above 0 or null; a currency left out has no limits.
    */
   async setCashierLimits({ actor, limits, transactionPassword }) {
+    // With an owner panel the limits are the owner's (Features & plan → Policies → Cashier limits).
+    if (this.#ownerManaged()) throw ownerErrors.MANAGED({ feature: 'cashier_limits' });
     if (!actor?.isSuperAdmin) throw errors.CASHIER_LIMITS_SUPER_ADMIN_ONLY();
     const problem = cashierLimitsLib.cashierLimitsProblem(limits);
     if (problem) throw errors.CASHIER_LIMITS_INVALID({ problem });

@@ -298,13 +298,16 @@ const cashierProblem = (rows: CashierRow[]) => {
 }
 
 /**
- * Deposit / withdrawal limits per currency. The Super Admin edits them (transaction password);
- * every other staff account sees them read-only. Every deposit and withdrawal rail checks them.
+ * Deposit / withdrawal limits per currency. With an owner panel they are the owner's (owner panel →
+ * Features & plan → Policies → Cashier limits) and read-only here; otherwise the Super Admin edits
+ * them (transaction password). Every deposit and withdrawal rail checks them.
  */
 const CashierLimitsCard = () => {
   const { actor, can } = useSession()
   const isSuperAdmin = actor?.level === 1 && can('config:write')
-  const q = useApi<{ currencies: CashierRow[] }>('admin/site-config/cashier-limits')
+  const q = useApi<{ currencies: CashierRow[]; managedBy?: 'owner' | 'admin' }>('admin/site-config/cashier-limits')
+  const ownerManaged = q.data?.managedBy === 'owner'
+  const editable = isSuperAdmin && !ownerManaged
   const [draft, setDraft] = useState<Record<string, Partial<Record<CashierField, string | null>>>>({})
   const [confirming, setConfirming] = useState(false)
   const [password, setPassword] = useState('')
@@ -342,8 +345,12 @@ const CashierLimitsCard = () => {
       <CardHeader>
         <CardTitle className='text-base'>Cashier</CardTitle>
         <CardDescription>
-          Deposit and withdrawal limits for each currency, in that currency. Leave a box empty for no limit.{' '}
-          {isSuperAdmin ? 'Saving asks for your transaction password.' : 'Only the Super Admin can change them.'}
+          Deposit and withdrawal limits for each currency, in that currency.{' '}
+          {ownerManaged
+            ? 'Set by the owner (owner panel → Features & plan → Policies → Cashier limits); shown here read-only.'
+            : isSuperAdmin
+              ? 'Leave a box empty for no limit. Saving asks for your transaction password.'
+              : 'Only the Super Admin can change them.'}
         </CardDescription>
       </CardHeader>
       <CardContent className='grid gap-3'>
@@ -375,7 +382,7 @@ const CashierLimitsCard = () => {
                     </td>
                     {CASHIER_COLUMNS.map(c => (
                       <td key={c.field} className='px-3 py-2 text-right'>
-                        {isSuperAdmin ? (
+                        {editable ? (
                           <Input
                             inputMode='decimal'
                             aria-label={`${r.code} ${c.label}`}
@@ -395,7 +402,7 @@ const CashierLimitsCard = () => {
             </table>
           </div>
         )}
-        {isSuperAdmin && dirty && (
+        {editable && dirty && (
           <div className='flex flex-wrap items-center gap-2'>
             <Button disabled={!!problem || save.isPending} onClick={() => setConfirming(true)}>
               Save cashier limits
