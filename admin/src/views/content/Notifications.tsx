@@ -67,7 +67,7 @@ const Compose = ({ channel }: { channel: Channel }) => {
       <CardContent className='grid gap-4'>
         <Tabs value={mode} onValueChange={v => setMode(v as 'broadcast' | 'user')}>
           <TabsList>
-            <TabsTrigger value='broadcast'>{agentTab ? 'All agent users' : 'All direct users'}</TabsTrigger>
+            <TabsTrigger value='broadcast'>All users</TabsTrigger>
             <TabsTrigger value='user'>One user</TabsTrigger>
           </TabsList>
         </Tabs>
