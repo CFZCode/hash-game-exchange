@@ -98,7 +98,10 @@ export function layerPosition(rect, height, width = 18 * 16, triggerWidth = rect
 export function scrollParent(node) {
   for (let el = node?.parentElement; el; el = el.parentElement) {
     const overflow = getComputedStyle(el).overflowY;
-    if (overflow === 'auto' || overflow === 'scroll') return el;
+    /* Only an ancestor that really scrolls vertically: `overflow-x: auto` (a tab strip, the
+       page row) computes `overflow-y` to `auto` too, and binding to that one meant the page's
+       own scroll never closed the layer, which then floated over the grid. */
+    if ((overflow === 'auto' || overflow === 'scroll') && el.scrollHeight > el.clientHeight) return el;
   }
   return window;
 }
