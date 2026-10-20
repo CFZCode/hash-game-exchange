@@ -22,20 +22,30 @@ const SOURCE_CATEGORY = Object.freeze({
   sports: 'sports',
 });
 
-/** A catalogue `type` / `game_type` string → category (`Live Casino`, `live`, `slot`, `crash`…). */
-function categoryFromType(type) {
+/** Studios that only stream dealer tables: every game of theirs is live, whatever its `type` says.
+    Same studios as the lobby's LIVE_PROVIDERS (casino games.constants.js). */
+const LIVE_STUDIO = /ezugi|sa ?gaming|iconic ?21|ho ?gaming|betgames|xpro ?gaming|vivo ?gaming|smartbet|evolution|pragmatic ?play ?live|pragmaticlive/;
+
+/**
+ * A catalogue `type` / `game_type` string (+ the game's provider, when known) → category.
+ * The catalogue files dealer tables by game (`blackjack`, `baccarat`, `roulette`…), not as `live`.
+ * With a provider that is not a live studio, those table types are RNG games: 3rd-party slots.
+ */
+function categoryFromType(type, provider) {
   const t = String(type ?? '').toLowerCase();
-  if (!t) return null;
+  const studio = String(provider ?? '').toLowerCase();
   if (t.includes('sport')) return 'sports';
-  // The catalogue files dealer tables by game (`blackjack`, `baccarat`, `roulette`…), not as `live`.
-  if (/live|dealer|baccarat|blackjack|roulette|poker|table|sic ?bo|dragon/.test(t)) return 'live';
+  if (LIVE_STUDIO.test(studio)) return 'live';
+  if (/live|dealer|game ?_?shows?/.test(t)) return 'live';
+  if (!t) return null;
+  if (/baccarat|blackjack|roulette|poker|table|sic ?bo|dragon/.test(t)) return studio ? 'slots' : 'live';
   return 'slots';
 }
 
-/** The category a stake counts as: explicit > source rule > catalogue type > slots. */
-function resolveCategory({ category, source, type } = {}) {
+/** The category a stake counts as: explicit > source rule > catalogue type (+ provider) > slots. */
+function resolveCategory({ category, source, type, provider } = {}) {
   if (CATEGORIES.includes(category)) return category;
-  return SOURCE_CATEGORY[source] ?? categoryFromType(type) ?? 'slots';
+  return SOURCE_CATEGORY[source] ?? categoryFromType(type, provider) ?? 'slots';
 }
 
 /** `1 − RTP` capped, from an RTP in percent (96.5) or fraction (0.965); null when unusable. */
@@ -52,6 +62,7 @@ module.exports = {
   DEFAULT_HOUSE_EDGE,
   MAX_HOUSE_EDGE,
   SOURCE_CATEGORY,
+  LIVE_STUDIO,
   categoryFromType,
   resolveCategory,
   houseEdgeFromRtp,

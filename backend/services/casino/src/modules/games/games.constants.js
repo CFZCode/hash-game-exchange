@@ -119,6 +119,7 @@ const NAME_CATEGORIES = Object.freeze({
  */
 const LIVE_PROVIDERS = Object.freeze([
   'evolution gaming', 'pragmaticplaylive', 'ezugi', 'sa gaming', 'iconic21', 'vivogaming', 'xprogaming', 'betgames',
+  'hogaming', 'smartbet',
 ]);
 const LIVE_TYPES = Object.freeze(['live dealer', 'game show', 'game shows', 'game_shows']);
 const TYPE_CATEGORIES = Object.freeze({

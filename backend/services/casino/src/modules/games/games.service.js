@@ -1317,7 +1317,7 @@ class GamesService {
         this.logger?.warn({ err: error, gameRef }, 'stake kind lookup failed');
       }
     }
-    const kind = { category: wagerCategory.resolveCategory({ category, source, type }) };
+    const kind = { category: wagerCategory.resolveCategory({ category, source, type, provider: vendor }) };
     if (vendor) kind.provider = String(vendor).slice(0, 120);
     if (gameRef) kind.gameRef = String(gameRef).slice(0, 190);
     if (odds != null && /^\d+(\.\d+)?$/.test(String(odds))) kind.odds = Number(odds).toFixed(4).replace(/\.?0+$/, '');
