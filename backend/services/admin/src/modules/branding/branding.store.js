@@ -1,9 +1,12 @@
 'use strict';
 
 const crypto = require('crypto');
-const { ValidationError } = require('@ibitplay/common');
+const { ValidationError, imageUpload } = require('@ibitplay/common');
 
 const { SLOTS, ASSET_FILE_RE, CONTENT_TYPES, imageProblem } = require('./branding.rules');
+
+/** The slots the Super Admin may set (site admin → Branding). */
+const SITE_SLOTS = Object.freeze(['logo', 'mark']);
 
 /**
  * The branding images, kept in `owner_branding_assets` (migration 142), one row per content hash.
@@ -28,6 +31,33 @@ function createBrandingStore({ logger, models }) {
 
   const has = (name) => cache.has(name);
 
+  // slot → the Super Admin's image (`site_branding`, migration 145).
+  let overrides = new Map();
+  const query = (sql, replacements) =>
+    models.OwnerBrandingAsset.sequelize.query(sql, { replacements, type: models.OwnerBrandingAsset.sequelize.QueryTypes.SELECT });
+
+  async function loadOverrides() {
+    try {
+      const rows = await query('SELECT slot, file, content_type, byte_size, owner_file FROM site_branding');
+      overrides = new Map(rows.map((r) => [r.slot, r]));
+    } catch (error) {
+      logger?.warn({ err: error.message }, 'site_branding not readable — the owner branding stands');
+    }
+  }
+
+  /**
+   * The branding players get: the owner's, with each Super Admin image laid over it while it is
+   * the newer one — the owner's document still names the image the owner had when it was saved.
+   */
+  function effective(branding) {
+    let out = branding;
+    for (const [slot, o] of overrides) {
+      if ((o.owner_file ?? null) !== (branding?.[slot]?.file ?? null)) continue;
+      out = { ...(out ?? { siteName: '', keywords: [] }), [slot]: { file: o.file, type: o.content_type, bytes: o.byte_size } };
+    }
+    return out;
+  }
+
   /** An upload from the owner panel. Throws a 422 for bytes that do not match the name or fail the checks. */
   async function put(file, buffer, slot) {
     if (!ASSET_FILE_RE.test(file)) throw new ValidationError('Not a branding image name');
@@ -51,9 +81,11 @@ function createBrandingStore({ logger, models }) {
   }
 
   /** Load every image the branding names into memory. Never throws; one run at a time. */
-  function sync(branding) {
+  function sync(ownerBranding) {
     if (running) return running;
     running = (async () => {
+      await loadOverrides();
+      const branding = effective(ownerBranding);
       const result = { fetched: [], failed: [] };
       const named = new Set();
       for (const slot of SLOTS) {
@@ -98,7 +130,8 @@ function createBrandingStore({ logger, models }) {
    * What players read. Every string already passed the rules; an image is listed only once it
    * is here (so a URL never 404s), else null and the UI keeps its own picture.
    */
-  function view(branding, version) {
+  function view(ownerBranding, version) {
+    const branding = effective(ownerBranding);
     const url = (asset) => (asset && has(asset.file) ? `${PUBLIC_PREFIX}${asset.file}` : null);
     if (!branding) {
       return {
@@ -117,7 +150,7 @@ function createBrandingStore({ logger, models }) {
         ogImageUrl: null,
       };
     }
-    if (SLOTS.some((s) => branding[s] && !has(branding[s].file))) kick(branding);
+    if (SLOTS.some((s) => branding[s] && !has(branding[s].file))) kick(ownerBranding);
     const orNull = (v) => v || null;
     return {
       version,
@@ -136,7 +169,35 @@ function createBrandingStore({ logger, models }) {
     };
   }
 
-  return { sync, read, view, put, stored };
+  /** The Super Admin sets a logo / icon: stored by hash like the owner's, then shown (it is the newest). */
+  async function setSite(slot, buffer, { staff, ownerBranding }) {
+    if (!SITE_SLOTS.includes(slot)) throw new ValidationError(`slot must be one of ${SITE_SLOTS.join(', ')}`);
+    const ext = imageUpload.sniff(buffer)?.extension?.replace('.', '') ?? 'svg';
+    if (!CONTENT_TYPES[ext]) throw new ValidationError('Upload a PNG, WebP or SVG image');
+    const file = `${sha(buffer)}.${ext}`;
+    await put(file, buffer, slot);
+    await query(
+      `INSERT INTO site_branding (slot, file, content_type, byte_size, owner_file, updated_by, updated_at)
+       VALUES (:slot, :file, :type, :bytes, :ownerFile, :staffId, CURRENT_TIMESTAMP)
+       ON CONFLICT (slot) DO UPDATE SET file = EXCLUDED.file, content_type = EXCLUDED.content_type, byte_size = EXCLUDED.byte_size,
+         owner_file = EXCLUDED.owner_file, updated_by = EXCLUDED.updated_by, updated_at = EXCLUDED.updated_at`,
+      { slot, file, type: CONTENT_TYPES[ext], bytes: buffer.length, ownerFile: ownerBranding?.[slot]?.file ?? null, staffId: staff?.id ?? null }
+    );
+    overrides.set(slot, { slot, file, content_type: CONTENT_TYPES[ext], byte_size: buffer.length, owner_file: ownerBranding?.[slot]?.file ?? null });
+    await sync(ownerBranding);
+    return { slot, file };
+  }
+
+  /** Back to the owner's image (or the UI's own) for that slot. */
+  async function clearSite(slot, { ownerBranding }) {
+    if (!SITE_SLOTS.includes(slot)) throw new ValidationError(`slot must be one of ${SITE_SLOTS.join(', ')}`);
+    await query('DELETE FROM site_branding WHERE slot = :slot', { slot });
+    overrides.delete(slot);
+    await sync(ownerBranding);
+    return { slot };
+  }
+
+  return { sync, read, view, put, stored, setSite, clearSite };
 }
 
 let shared = null;
@@ -147,4 +208,4 @@ function brandingStore({ logger, models }) {
   return shared;
 }
 
-module.exports = { createBrandingStore, brandingStore, PUBLIC_PREFIX };
+module.exports = { createBrandingStore, brandingStore, PUBLIC_PREFIX, SITE_SLOTS };

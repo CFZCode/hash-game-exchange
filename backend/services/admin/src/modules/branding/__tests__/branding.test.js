@@ -75,6 +75,7 @@ test('rules: image checks by bytes', () => {
 /** `owner_branding_assets` as a Map (the real table: ownerApi.test.js). */
 function assetTable() {
   const rows = new Map();
+  const site = new Map();
   return {
     rows,
     OwnerBrandingAsset: {
@@ -83,6 +84,16 @@ function assetTable() {
         return [rows.get(where.file), true];
       },
       findByPk: async (file) => (rows.has(file) ? { ...rows.get(file) } : null),
+      // `site_branding` (the Super Admin's images) as a Map, for the three statements the store runs.
+      sequelize: {
+        QueryTypes: { SELECT: 'SELECT' },
+        query: async (sql, { replacements: r = {} } = {}) => {
+          if (sql.startsWith('SELECT')) return [...site.values()];
+          if (sql.startsWith('DELETE')) site.delete(r.slot);
+          else site.set(r.slot, { slot: r.slot, file: r.file, content_type: r.type, byte_size: r.bytes, owner_file: r.ownerFile });
+          return [];
+        },
+      },
     },
   };
 }
@@ -185,4 +196,31 @@ test('branding: uploaded images → signed document → public read → served b
     assert.equal((await fetch(`${base}/asset/${mark.file}`)).status, 404);
     assert.equal((await fetch(`${base}/asset/${logo.file}`)).status, 200);
   });
+});
+
+test('the Super Admin logo: the newer of the owner\'s and the Super Admin\'s shows', async () => {
+  const store = createBrandingStore({ logger, models: assetTable() });
+  const PNG2 = Buffer.concat([PNG, Buffer.from('super-admin')]);
+  const PNG3 = Buffer.concat([PNG, Buffer.from('owner-new')]);
+  await store.put(logo.file, PNG, 'logo');
+  const owner = branding({ mark: null });
+  await store.sync(owner);
+  assert.match(store.view(owner, 1).logoUrl, new RegExp(logo.file));
+
+  await store.setSite('logo', PNG2, { staff: { id: 1 }, ownerBranding: owner });
+  assert.match(store.view(owner, 1).logoUrl, new RegExp(sha(PNG2)), 'the Super Admin set it last');
+
+  // The owner saves a different logo afterwards: the owner's is the newer one now.
+  const newer = { ...ref(PNG3, 'png', 'image/png'), width: 576 };
+  await store.put(newer.file, PNG3, 'logo');
+  const owner2 = branding({ mark: null, logo: newer });
+  await store.sync(owner2);
+  assert.match(store.view(owner2, 2).logoUrl, new RegExp(newer.file));
+
+  // A Super Admin image with no owner branding at all still shows; reset brings back the UI's own.
+  await store.setSite('mark', SVG, { staff: { id: 1 }, ownerBranding: null });
+  assert.match(store.view(null, 0).markUrl, new RegExp(sha(SVG)));
+  await store.clearSite('mark', { ownerBranding: null });
+  assert.equal(store.view(null, 0).markUrl, null);
+  await assert.rejects(() => store.setSite('ogImage', PNG, { ownerBranding: null }));
 });

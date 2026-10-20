@@ -1,15 +1,19 @@
 'use client'
 
-import { LockIcon } from 'lucide-react'
+import { useRef } from 'react'
+
+import { LockIcon, RotateCcwIcon, UploadIcon } from 'lucide-react'
 
 import ErrorState from '@/components/shared/ErrorState'
 import PageHeader from '@/components/shared/PageHeader'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useLivePoll } from '@/lib/realtime-status'
-import { useApi } from '@/hooks/use-api'
+import { useSession } from '@/contexts/SessionContext'
+import { useApi, useApiMutation } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
 
 /** `GET /api/v1/admin/branding` — set in the owner panel only; there is no write route. */
@@ -55,20 +59,69 @@ const Picture = ({ label, url, className, dark = true }: { label: string; url: s
 )
 
 /**
- * Site config → Branding: the site's name, page metadata and logo, read-only. The platform sets
- * them (owner panel); staff see what players get.
+ * The Super Admin's upload / reset for the logo or the icon (`PUT|DELETE admin/branding/:slot`).
+ * The newer of the Super Admin's and the owner's image is what players get.
+ */
+const SiteImage = ({ slot }: { slot: 'logo' | 'mark' }) => {
+  const input = useRef<HTMLInputElement>(null)
+  const name = slot === 'logo' ? 'Logo' : 'Icon'
+  const invalidate = [['api', 'admin/branding']]
+
+  const upload = useApiMutation({
+    fn: (file: File) => {
+      const fd = new FormData()
+
+      fd.set('image', file)
+
+      return api.upload(`admin/branding/${slot}`, fd, 'PUT')
+    },
+    invalidate,
+    success: `${name} updated on the site`
+  })
+
+  const reset = useApiMutation({ fn: () => api.delete(`admin/branding/${slot}`), invalidate, success: `${name} reset to the platform's` })
+
+  return (
+    <div className='flex gap-2'>
+      <input
+        ref={input}
+        type='file'
+        accept='image/png,image/webp,image/svg+xml'
+        className='hidden'
+        onChange={e => {
+          const file = e.target.files?.[0]
+
+          e.target.value = ''
+          if (file) upload.mutate(file)
+        }}
+      />
+      <Button size='sm' variant='outline' disabled={upload.isPending} onClick={() => input.current?.click()}>
+        <UploadIcon /> Change {name.toLowerCase()}
+      </Button>
+      <Button size='sm' variant='ghost' disabled={reset.isPending} onClick={() => reset.mutate()} title="Back to the platform's image">
+        <RotateCcwIcon /> Reset
+      </Button>
+    </div>
+  )
+}
+
+/**
+ * Site config → Branding: the site's name, page metadata and logo as players get them. The
+ * platform sets them (owner panel); the Super Admin can also change the logo and the icon.
  */
 const Branding = () => {
   const brandingPoll = useLivePoll(15_000)
   const q = useApi<SiteBranding>('admin/branding', undefined, { refetchInterval: brandingPoll })
   const b = q.data
+  const { can, actor } = useSession()
+  const canEdit = actor?.direct === true && can('config:write')
 
   return (
     <div>
       <PageHeader title='Branding' description="The site's name, page title and meta tags, and its logo, as players get them." />
       <Alert className='mb-4'>
         <LockIcon />
-        <AlertDescription>Managed by the platform. Ask the platform to change the name, the metadata or the logo.</AlertDescription>
+        <AlertDescription>The name and metadata are managed by the platform.{canEdit ? ' The logo and the icon can be changed here; the latest change, here or by the platform, is what players see.' : ''}</AlertDescription>
       </Alert>
       {q.error && <ErrorState error={q.error} />}
       {q.isLoading || !b ? (
@@ -100,11 +153,18 @@ const Branding = () => {
               <CardTitle className='text-base'>Logo and icons</CardTitle>
               <CardDescription>On the site&apos;s dark header colour and on white.</CardDescription>
             </CardHeader>
-            <CardContent className='flex flex-wrap gap-4'>
-              <Picture label='Logo' url={src(b.logoUrl)} className='h-8 w-36 object-contain' />
-              <Picture label='Logo (light)' url={src(b.logoUrl)} className='h-8 w-36 object-contain' dark={false} />
-              <Picture label='Square mark / favicon' url={src(b.markUrl)} className='size-10 object-contain' />
-              <Picture label='Open Graph image' url={src(b.ogImageUrl)} className='max-h-14 max-w-28 object-contain' />
+            <CardContent className='grid gap-4'>
+              <div className='flex flex-wrap gap-4'>
+                <Picture label='Logo' url={src(b.logoUrl)} className='h-8 w-36 object-contain' />
+                <Picture label='Logo (light)' url={src(b.logoUrl)} className='h-8 w-36 object-contain' dark={false} />
+              </div>
+              {canEdit && <SiteImage slot='logo' />}
+              <div className='flex flex-wrap gap-4'>
+                <Picture label='Square mark / favicon' url={src(b.markUrl)} className='size-10 object-contain' />
+                <Picture label='Open Graph image' url={src(b.ogImageUrl)} className='max-h-14 max-w-28 object-contain' />
+              </div>
+              {canEdit && <SiteImage slot='mark' />}
+              {canEdit && <p className='text-muted-foreground text-xs'>PNG, WebP or SVG, up to 256 KB. Logo: wide, transparent (576×128 is sharp). Icon: square.</p>}
             </CardContent>
           </Card>
         </div>

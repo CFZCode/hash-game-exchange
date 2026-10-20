@@ -8,4 +8,7 @@ const assetParams = z.object({ file: z.string().regex(/^[0-9a-f]{64}\.(png|webp|
 /** The reads take no query string at all. */
 const emptyQuery = z.preprocess((v) => v ?? {}, z.object({}).strict());
 
-module.exports = { assetParams, emptyQuery };
+/** The slots the Super Admin sets: the header logo and the square icon. */
+const siteSlot = z.object({ slot: z.enum(['logo', 'mark']) }).strict();
+
+module.exports = { assetParams, emptyQuery, siteSlot };
