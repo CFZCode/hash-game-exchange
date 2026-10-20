@@ -9,6 +9,7 @@ import {
   deleteNotice,
   readNotice,
   readAllNotices,
+  noticesChanged,
 } from '../../services/notification';
 import { useNoticeStore } from './store';
 import { useGates } from '../../context/gates';
@@ -146,7 +147,7 @@ export default function NotificationPanel({ className = '', onAnimationEnd, titl
   };
 
   const onRead = (id, type) => {
-    readNotice(id, type);
+    readNotice(id, type).then(noticesChanged);
     store.markRead(type);
   };
   const onDelete = (id, type) => {
@@ -154,7 +155,7 @@ export default function NotificationPanel({ className = '', onAnimationEnd, titl
     store.removeNotice(id);
   };
   const onReadAll = () => {
-    readAllNotices();
+    readAllNotices().then(noticesChanged);
     store.markAllRead();
   };
 

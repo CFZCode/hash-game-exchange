@@ -346,4 +346,17 @@ export const deleteNotice = (afficheId, afficheType) =>
     fixture: null,
   });
 
+/* The bell's dot: how many notifications the player has not read yet (the server's own count,
+   so it agrees with the drawer). Fixture builds have no feed and answer 0. */
+export const getUnreadCount = () =>
+  USE_FIXTURES
+    ? Promise.resolve(0)
+    : Promise.resolve(
+        request(PLATFORM.user.notifications.unreadCount, { live: true, fixture: { unread: 0 } }),
+      ).then((r) => Number(r?.unread ?? 0));
+
+/* Fired after the drawer reads a notice, so the bell refreshes at once instead of on its next poll. */
+export const NOTICES_CHANGED = 'notices:changed';
+export const noticesChanged = () => window.dispatchEvent(new Event(NOTICES_CHANGED));
+
 export default getSystemNotices;

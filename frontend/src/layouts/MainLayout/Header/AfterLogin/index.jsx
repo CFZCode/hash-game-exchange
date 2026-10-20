@@ -8,6 +8,7 @@ import { siteName, useSiteMark } from '../../../../services/siteBranding';
 import useResource from '../../../../hooks/useResource';
 import useMediaQuery from '../../../../hooks/useMediaQuery';
 import { getRewards } from '../../../../services/rewards';
+import { getUnreadCount, NOTICES_CHANGED } from '../../../../services/notification';
 import { coinDecimals, printCurrency } from '../../../../utils/currency';
 import { coinIcon } from '../../../../utils/coinArt';
 import { ACCOUNT_MENU } from './menu';
@@ -76,6 +77,25 @@ import './AfterLogin.css';
 const Dot = ({ className }) => (
   <div className={`h-2 w-2 -translate-y-1/2 rounded-full bg-brand z-50 ${className}`} />
 );
+
+/* The bell's unread count: read on mount, every 30 s, when the tab regains focus and when the
+   drawer marks something read. A failed read keeps the last count. */
+const useUnreadNotices = () => {
+  const [unread, setUnread] = React.useState(0);
+  React.useEffect(() => {
+    const load = () => getUnreadCount().then(setUnread, () => {});
+    load();
+    const timer = setInterval(load, 30000);
+    window.addEventListener('focus', load);
+    window.addEventListener(NOTICES_CHANGED, load);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('focus', load);
+      window.removeEventListener(NOTICES_CHANGED, load);
+    };
+  }, []);
+  return unread;
+};
 
 /* The gift — `we`, the default export of `notification-shell-BOaO8MP0.js` (off `hash.game/assets/`,
  * not in the mirror). It serves BOTH headers, since the desktop tree and `Cs` each render it inside
@@ -460,6 +480,7 @@ const SpriteIcon = ({ name }) => (
 export default function AfterLogin({ onToggleChat, onToggleNotice }) {
   /* The gift is the bonus section's door: gone when the site or the account has no bonus. */
   const bonusOn = useGates().on('bonus');
+  const unread = useUnreadNotices();
   return (
     <div className="ml-3 flex items-center">
       <Wallet />
@@ -511,10 +532,8 @@ export default function AfterLogin({ onToggleChat, onToggleNotice }) {
           aria-label="Notifications"
         >
           <SpriteIcon name="notice" />
-          {/* The unread dot is DELIBERATELY NOT DRAWN — a requested departure. The original
-              renders `<Dot/>` here off `session.redDot.systemNotice`, which this build's
-              fixture sets to 2. One-line revert:
-                {!!session.redDot.systemNotice && <Dot className="absolute right-0 top-1" />} */}
+          {/* The original draws `<Dot/>` off `session.redDot.systemNotice`; here it is the live unread count. */}
+          {unread > 0 && <Dot className="absolute right-0 top-1" />}
         </button>
       </div>
 
@@ -540,6 +559,7 @@ export default function AfterLogin({ onToggleChat, onToggleNotice }) {
  * opening the dropdown — there is no dropdown on mobile.
  */
 export function MobileAfterLogin() {
+  const unread = useUnreadNotices();
   const navigate = useNavigate();
   const { session } = useSession();
   const bonusOn = useGates().on('bonus');
@@ -582,8 +602,7 @@ export function MobileAfterLogin() {
             aria-label="Notifications"
           >
             <SpriteIcon name="notice" />
-            {/* No unread dot here either — see the desktop tree above. Revert:
-                {!!session.redDot.systemNotice && <Dot className="absolute right-1 top-1.5" />} */}
+            {unread > 0 && <Dot className="absolute right-1 top-1.5" />}
           </button>
         </div>
 
