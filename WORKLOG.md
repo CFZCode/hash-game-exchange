@@ -15,6 +15,40 @@ Format:
 
 ---
 
+## 2026-10-20 — Check: encryption / internal ACL naye notifications ko block nahi karte
+**Kya kiya:** API encryption (`gateway/src/apiEncryption.js`) PSP `/psp/:provider/callback`, `/crypto/ccpayment/callback` aur GIS callback ko plain chhodta hai, isliye koi naya bypass nahi chahiye. Per-service internal keys live pe set hain, isliye ACL lagu hai. Live test: casino ki key se `PUT /internal/admin/notifications/player` → `VALIDATION_ERROR` (ACL paar). Sports → 403, jo sahi hai kyunki sports notification nahi bhejta.
+**Kyun:** User: "jo chije encryption block karegi usko bypass karwa do jo jaruri hai".
+**Files / jagah:** Code nahi badla (casino ki ACL entry `c0c0d88` me hai).
+
+## 2026-10-20 — Deposit callbacks aur har bonus ka bell notification (`c0c0d88`)
+**Kya kiya:**
+- Transactions tab: PSP aur CCPayment crypto deposit ka failed/rejected callback ab `deposit_failed` bhejta hai. Success aur manual approve/reject pehle se bhejte the.
+- Promotions tab: naya helper `notifyBonus` / `afterBonus` (`notifyPlayer.js`), kind `bonus_credited`, COMMIT ke baad chalta hai: daily/weekly/monthly claim, redeem code, staff bonus grant, rakeback, race reward, gift card, registration bonus, affiliate reward/commission/claim-all, gradual unlocked bonus claim.
+- Casino GIS free spins: grant aur free-spin win pe `free_spins` (`gis.service.js #notifyFreeSpins`). Casino-service ko `internalAcl.js` me `/internal/admin/notifications` diya.
+- `categories.js` + frontend `services/notification.js` ki `PROMOTION_TYPES` me `bonus_credited`, `free_spins`, `vip_level_up`, `vip_rank_up`, `affiliate_reward`, `affiliate_commission`. VIP aur referral rewards ab Promotions tab me.
+- Push templates: `deposit_failed`, `bonus_credited`, `free_spins`.
+**Kyun:** User: har deposit callback ka notification Transactions me, aur har bonus/promotion/free spin ka Promotions me.
+**Files / jagah:** `backend/services/user/src/modules/{notifications,psp,crypto,bonus,rakeback,race,gift-cards,affiliate,player-bonuses}`, `backend/services/casino/src/modules/gis/gis.service.js`, `backend/packages/common/src/internalAcl.js`, `backend/services/admin/src/modules/push/push.constants.js`, `frontend/src/services/notification.js`.
+**Notes / pending:** Naya `bonusNotice.test.js` + chhue modules ke 353 tests pass (`playerNotifications.test.js` me VIP ka tab Promotions kiya). Restart: user-svc, user-worker, casino-svc, admin-svc, frontend build. Deposit refund ka code system me nahi, isliye uska notification nahi. Free spin ki har jeet pe alag notification. Staff wallet credit (Direct User Wallet, agent transfer, `adminAdjust`) aur P2P release/cancel notify nahi karte.
+
+## 2026-10-20 — Bank details: on/off switch, deposit range, site pe step-by-step deposit (`90b753f`)
+**Kya kiya:**
+- Admin Bank details: har row me "Shown to users" switch (delete button hataya), form me Min/Max deposit, list me "Deposit range".
+- Migration `147`: `currency_payment_details.min_amount` / `max_amount` (NULL = koi limit nahi). `GET /user/bank-details/:coin?amount=` sirf wahi active accounts deta hai jinki range me amount aata hai.
+- Bug fix: multipart `isActive: 'false'` ko `z.coerce.boolean()` true padhta tha, isliye form se band nahi hota tha.
+- Site `ManualDeposit.jsx`: progress line (1. Amount → 2. Pay → 3. Confirm): pehle amount, phir us range wale accounts, phir UTR + screenshot.
+**Kyun:** User: enable/disable, aur amount ke hisaab se kaunsa account dikhe (0–10000 pe A, 10000–20000 pe B), Tinder jaisa section-by-section flow.
+**Files / jagah:** `backend/packages/db/migrations/147-bank-detail-amount-range.js`, `backend/packages/db/src/models/extensions.js`, `backend/services/user/src/modules/bank-details/*` (+ `__tests__/amountRange.test.js`), `admin/src/views/finance/BankDetails.tsx`, `frontend/src/pages/Deposit/ManualDeposit.jsx`, `frontend/src/services/fiatDeposit.js`.
+**Notes / pending:** Purane accounts me range khaali, isliye wo har amount pe dikhte hain. Submit pe server range dobara check nahi karta. Range set karne ka haq har `config:write` staff ke paas.
+
+## 2026-10-20 — P&L: Original Games section sirf Original Games; casino games ke naam (`800c607`, `9c214f5`)
+**Kya kiya:** `pnlStats.service.js`: Slotegrator ka naam ab `gisgamesnew` → `gisgamesnew_parked` → `gis_games` se (pehle khaali `gis_games` se aata tha, isliye uuid dikhta tha). "Original Games" sirf `og` source se; purane in-house `bets` casino lists me. `og_games` me naam na ho to code capital (crash → Crash).
+**Files / jagah:** `backend/services/admin/src/modules/reports/pnlStats.service.js`, `__tests__/pnlStats.test.js`.
+
+## 2026-10-20 — Admin search box me browser autofill band (`e8bb65d`)
+**Kya kiya:** Shared `Input` ka default `autoComplete='off'`; login/password fields apni value khud dete hain. AgentLedger ke raw inputs pe bhi off.
+**Files / jagah:** `admin/src/components/ui/input.tsx`, `admin/src/views/transactions/AgentLedger.tsx`.
+
 ## 2026-10-20 — Owner: API encryption (on/off) + callbacks hamesha plain
 **Kya kiya:** Owner panel → Policies me "API encryption" (default Off). On: gateway player site ke API jawab AES-256-GCM `{enc}` me bhejta hai, site `services/apiCrypto.js` se kholti hai. Sirf wahi request encrypt jo `Accept: application/vnd.enc+json` bheje (sirf site ka `client.js` bhejta hai). Bypass: koi bhi path jisme `callback`/`webhook` ho (GIS, JS games, PSP deposit/payout, ccpayment, Google), `PROVIDER_CALLBACK_PREFIXES`, HEAD, aur admin/owner panel (header nahi bhejte). Aane wala data kabhi nahi chhuya jata, isliye signature checks same. 304 se bachne ke liye encrypt wali request se If-None-Match hataya, `Vary: Accept` lagaya. Gateway har 15 s `features/public` padhta hai.
 **Kyun:** User: owner on kare to API data encrypted aaye, abhi off; callbacks reject na hon.
