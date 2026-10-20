@@ -208,7 +208,7 @@ export const BalanceSheetView = ({
           </div>
         </div>
 
-        <div className={cn('flex flex-col gap-4 px-6 py-4', inDialog && 'overflow-y-auto')}>
+        <div className={cn('flex flex-col gap-4 px-6 py-4', inDialog && 'min-h-0 flex-1 overflow-y-auto')}>
           {error && <p className='text-danger text-sm'>{errorMessage(error)}</p>}
           {converted && (
             <p className='text-muted-foreground text-xs'>

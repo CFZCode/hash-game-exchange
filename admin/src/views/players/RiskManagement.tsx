@@ -576,7 +576,7 @@ export const RiskManagementDialog = ({
             <RefreshCwIcon className={cn(q.isFetching && 'animate-spin')} />
           </Button>
         </DialogHeader>
-        <div className='overflow-y-auto px-6 py-4'>{userId && isOpen && <RiskManagementPanel userId={userId} inDialog />}</div>
+        <div className='min-h-0 flex-1 overflow-y-auto px-6 py-4'>{userId && isOpen && <RiskManagementPanel userId={userId} inDialog />}</div>
       </DialogContent>
     </Dialog>
   )
