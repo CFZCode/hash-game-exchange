@@ -279,7 +279,7 @@ const Coins = () => {
   const coins = useApi<CurrencyRow[]>(house ? CURRENCIES_PATH : null, undefined, { refetchInterval: 15_000, refetchOnWindowFocus: true })
 
   // Coins outside the owner's plan are not the site's to see.
-  const rows = useMemo(() => (coins.data ?? []).filter(c => c.ownerEnabled).sort((a, b) => a.sortOrder - b.sortOrder || a.code.localeCompare(b.code)), [coins.data])
+  const rows = useMemo(() => (coins.data ?? []).filter(c => c.ownerEnabled && !c.retired).sort((a, b) => a.sortOrder - b.sortOrder || a.code.localeCompare(b.code)), [coins.data])
   const writable = can('config:write')
 
   const columns: Column<CurrencyRow>[] = [
