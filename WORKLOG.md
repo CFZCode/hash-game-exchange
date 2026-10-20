@@ -15,6 +15,12 @@ Format:
 
 ---
 
+## 2026-10-20 — Admin Casino bets: provider naam hataye, Stats me USDT graph, Raw tab hata
+**Kya kiya:** `/casino/bets`: Transactions me game ke neeche studio/vendor ki jagah sirf "Casino feed" label. Stats tab: sab wallets USDT me (site ke current rate, USDT = 1), cards Bets / Wagered / Paid out / GGR + "Casino by day" bar graph (wagered, paid out, GGR); currency select aur source table (jisme "slotegrator"/"jsgames" raw dikh raha tha) hataya. "Raw provider tables" tab aur chhupa Analytics tab code se hataye. Backend `stats` ab din + currency group karke `usdt: { totals, days, unconverted }` deta hai.
+**Kyun:** User: is section me koi provider naam na aaye, stats me graph, USDT me; Slotegrator admin me kahin na dikhe.
+**Files / jagah:** `admin/src/views/casino/BetHistory.tsx`, `backend/services/casino/src/modules/bet-history/betHistory.service.js`, test `betHistory.test.js`.
+**Notes / pending:** bet-history 35/35 pass. Vendor scan: static saaf, live 73 pages saaf. Live check: ₹600 wager = 6.3123 USDT.
+
 ## 2026-10-20 — Admin me har balance len-den pe transaction code zaroori (route middleware + form)
 **Kya kiya:**
 - Naya shared middleware `requireTxnPassword({ clients })` (`@ibitplay/common`): `body.transactionPassword` ko admin-service (`/internal/admin/staff-directory/verify-transaction-password`) se check karta hai, phir field hata deta hai (strict validators ke liye). Khaali → 403 `TXN_PASSWORD_REQUIRED`, galat → 403.
