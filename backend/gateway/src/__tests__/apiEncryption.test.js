@@ -47,4 +47,7 @@ test('api encryption through the proxy', async (t) => {
 
   assert.ok((await get('/api/v1/user/x', 'application/json')).data, 'a caller that does not ask gets plain JSON');
   assert.ok((await get('/api/v1/casino/gis/callback/transactions', ACCEPT)).data, 'provider callbacks stay plain');
+  assert.ok((await get('/api/v1/user/psp/upi/callback', ACCEPT)).data, 'payment callbacks stay plain');
+  assert.ok((await get('/api/v1/casino/js-games/v2/bet-callback', ACCEPT)).data, 'game callbacks stay plain');
+  assert.ok((await get('/api/v1/user/crypto/ccpayment/callback', ACCEPT)).data, 'crypto webhooks stay plain');
 });

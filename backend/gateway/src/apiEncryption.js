@@ -15,6 +15,8 @@ const { PROVIDER_CALLBACK_PREFIXES } = require('@ibitplay/common');
  */
 const ACCEPT = 'application/vnd.enc+json';
 const POLL_MS = 15_000;
+/** Any callback or webhook (casino wallets, PSP / crypto deposit and payout callbacks, OAuth). */
+const CALLBACK_PATH = /callback|webhook/i;
 
 function createApiEncryption({ config, logger }) {
   const key = config.API_ENCRYPTION_KEY ? Buffer.from(config.API_ENCRYPTION_KEY, 'base64') : null;
@@ -45,7 +47,8 @@ function createApiEncryption({ config, logger }) {
       if (!on || !key) return false;
       if (!String(req.headers.accept ?? '').includes(ACCEPT)) return false;
       const path = String(req.originalUrl ?? '').split('?')[0];
-      return !PROVIDER_CALLBACK_PREFIXES.some((p) => path.startsWith(p));
+      // Machine callers stay plain even if one ever sends the Accept: game wallets and payment callbacks.
+      return !CALLBACK_PATH.test(path) && !PROVIDER_CALLBACK_PREFIXES.some((p) => path.startsWith(p));
     },
     encrypt(plain) {
       const iv = crypto.randomBytes(12);
