@@ -256,7 +256,8 @@ export const BalanceSheetView = ({
             </p>
           )}
 
-          <div className='overflow-hidden rounded-lg border'>
+          {/* shrink-0: a clipped flex item would otherwise shrink to the dialog and hide rows instead of scrolling. */}
+          <div className='shrink-0 overflow-hidden rounded-lg border'>
             <Table>
               <TableHeader>
                 <TableRow>
