@@ -36,6 +36,41 @@ function assertSiteManaged(currency, row) {
  *      for a satoshi-denominated currency. Rates are strings end to end and go
  *      through `money`, which works in BigInt minor units.
  */
+/** CoinGecko id → our code. Stablecoins stay at the 1.0 they are seeded with. */
+const COINGECKO_IDS = {
+  bitcoin: 'BTC', ethereum: 'ETH', litecoin: 'LTC', 'bitcoin-cash': 'BCH', binancecoin: 'BNB', ripple: 'XRP',
+  cardano: 'ADA', tron: 'TRX', dogecoin: 'DOGE', 'matic-network': 'MATIC', 'shiba-inu': 'SHIB', nexo: 'NEXO', maker: 'MKR',
+};
+const FIAT_CODES = ['INR', 'PKR', 'AED', 'NPR', 'BDT', 'MVR', 'EUR'];
+
+async function getJson(url) {
+  const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
+  if (!res.ok) throw new Error(`${url} answered ${res.status}`);
+  return res.json();
+}
+
+/** USD value of one unit, from CoinGecko (crypto) and open.er-api (fiat). A feed that fails is left out. */
+async function fetchMarketRates() {
+  const [crypto, fiat] = await Promise.allSettled([
+    getJson(`https://api.coingecko.com/api/v3/simple/price?ids=${Object.keys(COINGECKO_IDS).join(',')}&vs_currencies=usd`),
+    getJson('https://open.er-api.com/v6/latest/USD'),
+  ]);
+  const rates = {};
+  if (crypto.status === 'fulfilled') {
+    for (const [id, code] of Object.entries(COINGECKO_IDS)) {
+      const usd = Number(crypto.value[id]?.usd);
+      if (usd > 0) rates[code] = usd;
+    }
+  }
+  if (fiat.status === 'fulfilled') {
+    for (const code of FIAT_CODES) {
+      const perUsd = Number(fiat.value.rates?.[code]);
+      if (perUsd > 0) rates[code] = 1 / perUsd;
+    }
+  }
+  return { rates, failed: [crypto, fiat].filter((r) => r.status === 'rejected').map((r) => r.reason.message) };
+}
+
 class ExchangeRateService {
   constructor({ models, db, logger }) {
     this.models = models;
@@ -146,6 +181,30 @@ class ExchangeRateService {
     return { currency, usdRate, previousRate: previous };
   }
 
+  /**
+   * Hourly job: every site-managed row with a market price gets it. Rows the owner manages and
+   * codes the feeds do not carry keep their rate; a failed feed changes nothing.
+   */
+  async refreshFromMarket() {
+    const { rates, failed } = await fetchMarketRates();
+    if (failed.length) this.logger?.warn({ failed }, 'Exchange rate feed failed');
+
+    const rows = await this.models.Exchangerate.findAll({ raw: true });
+    const updated = [];
+    for (const row of rows) {
+      const code = String(row.currency).toUpperCase();
+      const usd = rates[code];
+      if (!usd || row.managed_by === 'owner' || isCustomCurrency(code)) continue;
+      await this.models.Exchangerate.update(
+        { usd_rate: usd.toFixed(8), last_updated: new Date() },
+        { where: { id: row.id } }
+      );
+      updated.push(code);
+    }
+    this.logger?.info({ updated }, 'Exchange rates refreshed from market');
+    return { updated, failed };
+  }
+
   /** @legacy DELETE /exchangeRate/rates/:currency */
   async deleteRate(currency) {
     const existing = await this.#findRate(currency);
@@ -183,4 +242,4 @@ class ExchangeRateService {
   }
 }
 
-module.exports = { ExchangeRateService };
+module.exports = { ExchangeRateService, fetchMarketRates };
