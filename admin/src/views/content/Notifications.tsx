@@ -25,7 +25,7 @@ import { api } from '@/lib/api/client'
 import { check } from '@/lib/validate'
 import { NOTIFICATION_TYPES, type Device, type NotificationRow, type SentNotification } from './types'
 
-const TYPE_OPTIONS = NOTIFICATION_TYPES.map(t => ({ value: t, label: `${t[0].toUpperCase() + t.slice(1)} — ${t === 'general' ? 'direct or all users' : 'direct users only'}` }))
+const TYPE_OPTIONS = NOTIFICATION_TYPES.map(t => ({ value: t, label: t[0].toUpperCase() + t.slice(1) }))
 
 const SENDS = 'admin/notifications/sends'
 
