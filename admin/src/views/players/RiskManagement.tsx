@@ -24,6 +24,7 @@ import { cn } from '@/lib/utils'
 import GeoAttribution from './GeoAttribution'
 import { countryFlag } from './geo'
 import type { PlayerRisk, RiskBet, RiskCasinoBet, RiskIp, RiskLogin } from './types'
+import { casinoSourceLabel } from '@/lib/casinoSource'
 
 /**
  * Risk Management — one player as a risk reviewer sees them, after the legacy Addaplay dialog:
@@ -180,7 +181,6 @@ type AnyBet = {
 
 const resultTone = (s: string): AnyBet['tone'] => (/won|win/i.test(s) ? 'secondary' : /lost|loss/i.test(s) ? 'destructive' : 'outline')
 
-const CASINO_SOURCE: Record<RiskCasinoBet['source'], string> = { inhouse: 'Originals', og: 'Original Games', gis: 'Slotegrator', jsgames: 'jsGames', jsgamesv2: 'jsGames v2', seamless: 'Seamless' }
 
 const fromSports = (b: RiskBet): AnyBet => {
   const result = b.resultStatus && b.resultStatus !== 'pending' ? b.resultStatus : b.status || 'pending'
@@ -215,7 +215,7 @@ const fromCasino = (b: RiskCasinoBet): AnyBet => {
     what: (
       <span className='block text-sm'>
         {b.game ?? 'Casino round'}
-        <span className='text-muted-foreground block text-xs'>{CASINO_SOURCE[b.source] ?? b.source}</span>
+        <span className='text-muted-foreground block text-xs'>{casinoSourceLabel(b.source)}</span>
       </span>
     ),
     stake: b.stakeAmount,

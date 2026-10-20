@@ -504,7 +504,7 @@ const CreateFreespin = () => {
         'fs-game': check.required(f.gameUuid, 'Game UUID'),
         'fs-pid': check.id(f.playerId, 'User id'),
         'fs-pname': check.required(f.playerName, 'User name') || check.length(f.playerName, 'User name', { max: 120 }),
-        'fs-cur': cur.currency ? undefined : 'No GIS currency is enabled for this site',
+        'fs-cur': cur.currency ? undefined : 'No casino currency is enabled for this site',
         'fs-qty': check.number(f.quantity, 'Spins', { integer: true, min: 1, max: 10000 }),
         'fs-from': check.required(f.validFrom, 'Valid from'),
         'fs-until': check.required(f.validUntil, 'Valid until') || (f.validFrom && toEpoch(f.validUntil) <= toEpoch(f.validFrom) ? 'Valid until must be after valid from' : undefined),
@@ -565,7 +565,7 @@ const CreateVoucher = () => {
           'v-id': check.required(f.voucherId, 'Voucher id') || check.length(f.voucherId, 'Voucher id', { max: 190 }),
           'v-title': check.required(f.title, 'Title') || check.length(f.title, 'Title', { max: 200 }),
           'v-pid': check.id(f.playerId, 'User id'),
-          'v-cur': cur.currency ? undefined : 'No GIS currency is enabled for this site',
+          'v-cur': cur.currency ? undefined : 'No casino currency is enabled for this site',
           'v-bal': check.number(f.initialBalance, 'Initial balance', { positive: true }),
           'v-max': check.number(f.maxWinnings, 'Max winnings', { positive: true }),
           'v-until': check.required(f.validUntil, 'Valid until') || (new Date(f.validUntil).getTime() <= Date.now() ? 'Valid until must be in the future' : undefined),
@@ -655,7 +655,7 @@ const GameCatalogue = () => {
 
   return (
     <div>
-      <PageHeader title='Game catalogue' description={`The aggregator catalogue (Slotegrator/GIS), the lobby games the site renders${promotions ? ', upstream providers, and provider promotions' : ' and upstream providers'}.`} />
+      <PageHeader title='Game catalogue' description={`The casino catalogue, the lobby games the site renders${promotions ? ', upstream providers, and provider promotions' : ' and upstream providers'}.`} />
       <Tabs value={tab} onValueChange={v => setTab(String(v))}>
         <TabsList className='mb-4 flex-wrap'>
           <TabsTrigger value='gis'>Aggregator games</TabsTrigger>

@@ -22,12 +22,13 @@ import { useApi, useListState } from '@/hooks/use-api'
 import { formatNumber } from '@/lib/format'
 import type { CasinoStats, CasinoTotals, CasinoTxn, RawTxn } from './types'
 import { usePageList } from './usePageList'
+import { casinoSourceLabel } from '@/lib/casinoSource'
 
 const ALL = '__all__'
 
 const SOURCES = [
-  { value: 'gis', label: 'Slotegrator' },
-  { value: 'jsgames', label: 'JS games' }
+  { value: 'gis', label: casinoSourceLabel('gis') },
+  { value: 'jsgames', label: casinoSourceLabel('jsgames') }
 ]
 
 const txnColumns: Column<CasinoTxn>[] = [
@@ -48,7 +49,7 @@ const txnColumns: Column<CasinoTxn>[] = [
     cell: r => (
       <div>
         <div>{r.game_title ?? '—'}</div>
-        <div className='text-muted-foreground text-xs'>{r.game_vendor ?? r.source}</div>
+        <div className='text-muted-foreground text-xs'>{r.game_vendor ?? casinoSourceLabel(r.source)}</div>
       </div>
     )
   },
@@ -371,7 +372,7 @@ const BetHistory = () => {
 
   return (
     <div>
-      <PageHeader title='Casino bet history' description={`Every casino movement across the aggregator and JS games (Originals are not casino), ${scope}.`} />
+      <PageHeader title='Casino bet history' description={`Every third-party casino movement (Originals are not casino), ${scope}.`} />
       {/* Direct Users / Agent Users: har tab ki listing aur numbers us taraf ke players ke. */}
       <ChannelTabs>
         {channel => (
