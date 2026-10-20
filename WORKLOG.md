@@ -15,6 +15,32 @@ Format:
 
 ---
 
+## 2026-10-20 — Owner: API encryption (on/off) + callbacks hamesha plain
+**Kya kiya:** Owner panel → Policies me "API encryption" (default Off). On: gateway player site ke API jawab AES-256-GCM `{enc}` me bhejta hai, site `services/apiCrypto.js` se kholti hai. Sirf wahi request encrypt jo `Accept: application/vnd.enc+json` bheje (sirf site ka `client.js` bhejta hai). Bypass: koi bhi path jisme `callback`/`webhook` ho (GIS, JS games, PSP deposit/payout, ccpayment, Google), `PROVIDER_CALLBACK_PREFIXES`, HEAD, aur admin/owner panel (header nahi bhejte). Aane wala data kabhi nahi chhuya jata, isliye signature checks same. 304 se bachne ke liye encrypt wali request se If-None-Match hataya, `Vary: Accept` lagaya. Gateway har 15 s `features/public` padhta hai.
+**Kyun:** User: owner on kare to API data encrypted aaye, abhi off; callbacks reject na hon.
+**Files / jagah:** `backend/gateway/src/{apiEncryption,proxy,app,config,index}.js`, test `__tests__/apiEncryption.test.js`, `frontend/src/services/{apiCrypto,client}.js`, `featureCatalogue.js`, `sitePolicy.js`, `owner-panel/src/configs/entitlementCatalogue.ts`, `admin/.../Features.tsx` (site admin ko nahi dikhta). Key: `backend/.env` `API_ENCRYPTION_KEY` = `frontend/.env.local` `NEXT_PUBLIC_API_ENC_KEY`.
+**Notes / pending:** Key site ke bundle me hai: sirf network tab me chhupata hai, asli suraksha HTTPS. Live pe On karke browser me nahi dekha.
+
+## 2026-10-20 — Owner: Slotegrator INR games in PKR (on/off)
+**Kya kiya:** Owner policy `slotegrator_inr_as_pkr` (default Off). On: INR wallet ka game Slotegrator pe PKR me khulta hai, session `gis_sessions.currency = 'INR>PKR'` yaad rakhta hai; callback ka PKR site rate (exchangerate INR/PKR) se INR me badalta hai, balance/bet/win/refund sab INR wallet me, jawab ka balance wapas PKR me. Off: INR me khule, INR me kate.
+**Files / jagah:** `backend/services/casino/src/modules/gis/gis.service.js`, `gis.test.js` (32 pass).
+**Notes / pending:** Slotegrator contract me PKR limits abhi 0 hain — tab tak On mat karo.
+
+## 2026-10-20 — Swap: fee Super Admin set kare, fee history alag table, profit by day
+**Kya kiya:** Admin `/swap`: upar "Swap fee" box (direct staff + config:write, 0–50%), `GET/PUT admin/user/swap/fee`, `admin_configurations.swap_fee` (nahi = 1%). Tabs: Swaps | Fee history | Fee profit by day; cards: kul fee, mahina, aaj (USDT). Swap sirf direct users.
+**Files / jagah:** `backend/services/user/src/modules/swap/*`, `admin/src/views/finance/SwapHistory.tsx`.
+
+## 2026-10-20 — Features / Originals switches, Branding upload, notifications, reports, rates
+**Kya kiya:**
+- Super Admin site admin → Features me feature on/off; Original games ka har game on/off (migration 146).
+- Branding: logo/icon upload/reset (migration 145).
+- Notifications: Direct Users | Agent Users tabs, Sent list edit/delete (migration 144); site ke bell pe unread dot.
+- User reports: Overview/Users tabs, Originals players chart.
+- Exchange rates: hourly market refresh (CoinGecko + open.er-api), stablecoins 1.0.
+- Slotegrator: INR↔PKR swap hataya (INR, PKR apne naam se).
+**Files / jagah:** commits `9dda5e5`, `e51ba19`, `db02fb5`, `9c2f48f`, `a6e9112`, `ecdc344`, `da64309`, `1addc18`, `d8cb518`, `a33313a`.
+**Notes / pending:** Site admin → Coins me PKR on karna; admin pages browser me check karne; pagination audit.
+
 ## 2026-10-17 — Admin "Agent System" page hata diya (page + backend)
 **Kya kiya:** Pehle hide kiya tha, phir user ne poora hatane ko bola. `/agent-system` page, `views/agent-system/` (Staff Portal, Hierarchy tabs), sidebar entry aur backend module `agent-hierarchy` (`GET admin/agent-hierarchy`, sirf isi page ka tha, apni koi table nahi) delete kiye. `admin/staff/transfer`, `admin/accounts/status`, `admin/exchange/accounts-admin/create` dusre pages me use hote hain, isliye rakhe.
 **Kyun:** User: is page ki chije ab use nahi hongi.

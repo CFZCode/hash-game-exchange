@@ -44,7 +44,7 @@ function createApiEncryption({ config, logger }) {
     },
     /** Whether this request's JSON answer is to be encrypted. */
     wants(req) {
-      if (!on || !key) return false;
+      if (!on || !key || req.method === 'HEAD') return false;
       if (!String(req.headers.accept ?? '').includes(ACCEPT)) return false;
       const path = String(req.originalUrl ?? '').split('?')[0];
       // Machine callers stay plain even if one ever sends the Accept: game wallets and payment callbacks.

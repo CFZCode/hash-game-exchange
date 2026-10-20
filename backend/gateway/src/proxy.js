@@ -63,7 +63,12 @@ function createProxy({ target, name, timeoutMs = 35_000, logger, encryption }) {
     if (req.id) headers[REQUEST_ID_HEADER] = req.id;
     // An answer to encrypt is read whole, so ask the upstream for it uncompressed.
     const encrypt = encryption?.wants(req) ?? false;
-    if (encrypt) delete headers['accept-encoding'];
+    if (encrypt) {
+      delete headers['accept-encoding'];
+      // A browser cache holding the plain answer would get a bodiless 304; always fetch the full answer.
+      delete headers['if-none-match'];
+      delete headers['if-modified-since'];
+    }
 
     const upstreamReq = transport.request(
       {
@@ -89,8 +94,10 @@ function createProxy({ target, name, timeoutMs = 35_000, logger, encryption }) {
           upstreamRes.on('end', () => {
             delete responseHeaders['content-length'];
             delete responseHeaders.etag;
-            res.writeHead(upstreamRes.statusCode, { ...responseHeaders, 'content-type': 'application/json; charset=utf-8' });
-            res.end(encryption.encrypt(Buffer.concat(chunks)));
+            const plain = Buffer.concat(chunks);
+            // Vary: a shared cache must not hand the sealed answer to a caller that asked for plain JSON.
+            res.writeHead(upstreamRes.statusCode, { ...responseHeaders, 'content-type': 'application/json; charset=utf-8', vary: 'Accept' });
+            res.end(plain.length ? encryption.encrypt(plain) : plain);
           });
           return;
         }
