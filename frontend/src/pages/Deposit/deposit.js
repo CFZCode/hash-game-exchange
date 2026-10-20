@@ -421,6 +421,11 @@ export function depositBonusConfig(currencyName) {
       config.currency,
       currencyName,
     ),
+    tiers: (config.tiers ?? []).map((t) => ({
+      minDeposit: convertCurrency(t.minDeposit, config.currency, currencyName),
+      ratio: t.ratio,
+      maxBonus: t.maxBonus == null ? Number.MAX_SAFE_INTEGER : convertCurrency(t.maxBonus, config.currency, currencyName),
+    })),
   };
 }
 
@@ -432,7 +437,15 @@ export function extraBonusAmount(amount, currencyName) {
 
   const value = Number(amount) || 0;
   if (value < config.minDeposit) return 0;
+  const tiered = tierBonus(value, config.tiers);
+  if (tiered !== null) return tiered;
   return Math.min(value * config.ratio, config.maxBonusAmount);
+}
+
+/** The highest tier `value` reaches (tiers lowest first), as the backend pays it; null when none. */
+export function tierBonus(value, tiers = []) {
+  const tier = [...tiers].reverse().find((t) => value >= t.minDeposit);
+  return tier ? Math.min(value * tier.ratio, tier.maxBonus) : null;
 }
 
 /* The chip's corner tag: the config, but only for amounts it actually applies to. `a()` in `dC`
@@ -442,7 +455,10 @@ export function chipBonusConfig(amount, currencyName) {
   if (!config) return null;
 
   const value = Number(amount);
-  return value >= config.minDeposit && value <= config.maxDeposit ? config : null;
+  if (!(value >= config.minDeposit && value <= config.maxDeposit)) return null;
+  // The tag prints the ratio of the tier this chip reaches, not the lowest one.
+  const tier = [...config.tiers].reverse().find((t) => value >= t.minDeposit);
+  return tier ? { ...config, ratio: tier.ratio } : config;
 }
 
 /* ── RECOVERED: the quick-amount ladder ────────────────────────────────────────────────────
