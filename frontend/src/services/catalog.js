@@ -157,11 +157,30 @@ export function getCasinoSet(key, { limit = LIVE_LIMIT, ...options } = {}) {
 
 /* Several sets at once, as a map: the casino lobby's rows. A failed set reads as empty rather
    than taking the whole lobby down with it. */
-export function getCasinoSets(keys, options) {
+export function getCasinoSets(keys, options = {}) {
   if (USE_FIXTURES) return null;
+  /* A row reads a wider page and is dealt out provider by provider, so it does not open on four
+     tiles of one studio (the lobby order groups each studio's art-first games together). */
+  const limit = options.limit ?? LIVE_LIMIT;
+  const wide = { ...options, limit: Math.min(LIVE_LIMIT, limit * 4) };
   return Promise.all(
-    keys.map((key) => Promise.resolve(getCasinoSet(key, options)).catch(() => [])),
-  ).then((lists) => Object.fromEntries(keys.map((key, i) => [key, lists[i] ?? []])));
+    keys.map((key) => Promise.resolve(getCasinoSet(key, wide)).catch(() => [])),
+  ).then((lists) => Object.fromEntries(keys.map((key, i) => [key, mixProviders(lists[i] ?? []).slice(0, limit)])));
+}
+
+/** Round-robin by provider, keeping each provider's own order: A1 B1 C1 A2 B2 C2 … */
+export function mixProviders(games) {
+  const queues = new Map();
+  for (const game of games) {
+    const key = game.provider || '';
+    if (!queues.has(key)) queues.set(key, []);
+    queues.get(key).push(game);
+  }
+  const out = [];
+  for (let round = 0; out.length < games.length; round += 1) {
+    for (const queue of queues.values()) if (queue[round]) out.push(queue[round]);
+  }
+  return out;
 }
 
 /* The provider list, live: `{rows: [{name, displayName, logoUrl}]}` -> the catalogue names,

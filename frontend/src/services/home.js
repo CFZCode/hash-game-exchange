@@ -4,7 +4,7 @@ import { toBetRow } from './betHistory';
 import { getOriginals, slugFor } from './originals';
 import { publicGates } from './gates';
 import { getSportEvents } from './exchange/feed';
-import { apiAsset, getCasinoSet, toCatalogGame } from './catalog';
+import { apiAsset, getCasinoSet, mixProviders, toCatalogGame } from './catalog';
 import { assetExact, placeholderFor } from '../utils/gameArt';
 import { isFiatCode } from '../utils/currency';
 import { getUsdPrice } from '../data/usdPrice';
@@ -73,12 +73,23 @@ const toHomeRow = (game) => ({ slug: game.slug, fullName: game.name, icon: game.
 
 const liveList = (read) => Promise.resolve(read()).catch(() => []);
 
+/* A row is dealt out provider by provider (user's request: never a run of one studio). The
+   curated collection comes first within each provider, topped up from the row's category so a
+   one-studio collection (Live Casino was all Ezugi) still mixes. */
+const WIDE = HOME_ROW * 4;
+const mixed = (...lists) => {
+  const seen = new Set();
+  const all = lists.flat().filter((g) => g && !seen.has(g.uuid ?? g.slug) && seen.add(g.uuid ?? g.slug));
+  return mixProviders(all).slice(0, HOME_ROW).map(toHomeRow);
+};
+
 function readLiveSections() {
-  const collection = (name) =>
+  const collection = (name, category) =>
     liveList(() =>
-      Promise.resolve(request(COLLECTION(name), { live: true, params: { limit: HOME_ROW }, fixture: [] })).then(
-        (rows) => (rows ?? []).map(toCatalogGame).map(toHomeRow),
-      ),
+      Promise.all([
+        Promise.resolve(request(COLLECTION(name), { live: true, params: { limit: WIDE }, fixture: [] })).then((rows) => (rows ?? []).map(toCatalogGame)),
+        category ? Promise.resolve(getCasinoSet(category, { limit: WIDE })).catch(() => []) : [],
+      ]).then(([curated, more]) => mixed(curated, more ?? [])),
     );
 
   return Promise.all([
@@ -88,9 +99,9 @@ function readLiveSections() {
       ),
     ),
     collection('hot'),
-    collection('popular-slots'),
-    collection('live-casino'),
-    liveList(() => Promise.resolve(getCasinoSet('bingo', { limit: HOME_ROW })).then((games) => (games ?? []).map(toHomeRow))),
+    collection('popular-slots', 'slots'),
+    collection('live-casino', 'live'),
+    liveList(() => Promise.resolve(getCasinoSet('bingo', { limit: WIDE })).then((games) => mixed(games ?? []))),
   ]).then(([originalsRow, hot, slotsRow, live, bingoRow]) => ({
     originals: { games: originalsRow, link: originalsLink },
     hotGames: { games: hot, link: hotGamesLink },
