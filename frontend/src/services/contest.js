@@ -28,8 +28,10 @@ import { CONTEST as DAILY_CONTEST, STANDINGS as DAILY_STANDINGS } from '../pages
  *                                       the per-rank payout ladder (`payout.ranks`)
  *   GET /user/race/daily/leaderboard    the running race: window, pool, paid rows and, with a
  *                                       token, `me` — the caller's own rank
- *   GET /user/race/history?type=daily   settled races, newest first, each with its podium; the
- *                                       Last Champion card is the newest one's rank 1
+ *   GET /user/race/daily/last           the PREVIOUS window's board (hash.game's `<type>/last/`):
+ *                                       its rank 1 is the Last Champion card and the whole list
+ *                                       is the History dialog — it answers for a switched-off
+ *                                       race too, ranked from the same wagers as the live board
  *
  * WHEN NO RACE IS RUNNING the leaderboard answers 404 (`RACE_NOT_RUNNING`, `RACE_NO_ACTIVE_RACE`,
  * `RACE_NOT_CONFIGURED`). That is a normal state, not a failure, so it renders the widget's own
@@ -42,7 +44,7 @@ import { CONTEST as DAILY_CONTEST, STANDINGS as DAILY_STANDINGS } from '../pages
 const RACE = {
   configs: '/api/v1/user/race',
   leaderboard: (type) => `/api/v1/user/race/${type}/leaderboard`,
-  history: '/api/v1/user/race/history',
+  last: (type) => `/api/v1/user/race/${type}/last`,
 };
 
 const IDLE_CODES = ['RACE_NOT_RUNNING', 'RACE_NO_ACTIVE_RACE', 'RACE_NOT_CONFIGURED'];
@@ -57,12 +59,21 @@ export function remaining(endsAt, now = Date.now()) {
   return { hours: Math.floor(left / 3600), minutes: Math.floor((left % 3600) / 60), seconds: left % 60 };
 }
 
-/** Exported for the verification script: `(config, board|null, history[]) -> {contest, standings}`. */
-export function toContest({ title, config, board, history }) {
+const toStandings = (rows) =>
+  (rows ?? []).map((row) => ({
+    rank: Number(row.rank),
+    player: row.name ?? '',
+    wager: num(row.usdWagered),
+    bonus: num(row.payout),
+    rate: num(row.percentage) / 100,
+  }));
+
+/** Exported for the verification script: `(config, board|null, last|null) -> {contest, standings}`. */
+export function toContest({ title, config, board, last }) {
   const ranks = config?.payout?.ranks ?? [];
-  const last = history?.[0];
-  const champ = last?.winners?.find((w) => Number(w.rank) === 1);
-  const lastPool = num(last?.prizePool);
+  const prev = toStandings(last?.leaderboard);
+  /* hash.game's Last Champion is `prevList[0]`: the previous window's #1, whoever is viewing. */
+  const champ = prev[0];
 
   const contest = {
     title,
@@ -80,23 +91,13 @@ export function toContest({ title, config, board, history }) {
     start: day(board?.startsAt ?? last?.startsAt),
     end: day(board?.endsAt ?? last?.endsAt),
     champion: champ
-      ? {
-          player: champ.name ?? '',
-          rate: lastPool > 0 ? num(champ.amount) / lastPool : 0,
-          totalBonus: num(champ.amount),
-        }
+      ? { player: champ.player, rate: champ.rate, totalBonus: champ.bonus }
       : { player: '', rate: 0, totalBonus: 0 },
+    /* The History dialog: the previous window, as hash.game's `bt` draws `prevList`. */
+    prev: { start: day(last?.startsAt), end: day(last?.endsAt), standings: prev },
   };
 
-  const standings = (board?.leaderboard ?? []).map((row) => ({
-    rank: Number(row.rank),
-    player: row.name ?? '',
-    wager: num(row.usdWagered),
-    bonus: num(row.payout),
-    rate: num(row.percentage) / 100,
-  }));
-
-  return { contest, standings };
+  return { contest, standings: toStandings(board?.leaderboard) };
 }
 
 function readBoard(type) {
@@ -117,9 +118,9 @@ function liveContest(title, type = 'daily') {
       const config = (configs ?? []).find((c) => c.type === type);
       return Promise.all([
         config?.configured === false ? null : readBoard(type),
-        request(RACE.history, { live: true, params: { type, limit: 1 } }).catch(() => []),
-      ]).then(([board, history]) => {
-        const out = toContest({ title, config, board, history });
+        config?.configured === false ? null : request(RACE.last(type), { live: true }).catch(() => null),
+      ]).then(([board, last]) => {
+        const out = toContest({ title, config, board, last });
         return { ...out, contest: { ...out.contest, enabled: Boolean(board) } };
       });
     });

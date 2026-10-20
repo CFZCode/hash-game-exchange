@@ -299,6 +299,7 @@ class RaceService {
     const pool = official ? config.prizePool : '0';
     const netPool = official ? config.netPrizePool : '0';
     const payout = await this.#payoutPricer(config.currency);
+    const shares = this.#shares(config);
 
     const rows = paid.map((entry, index) => {
       const rank = index + 1;
@@ -322,7 +323,9 @@ class RaceService {
         reward: entry.isBoat ? '0' : (prize?.amount ?? '0'),
         /** `reward` in the reward currency (`payoutCurrency`): what this rank is paid. */
         payout: entry.isBoat ? payout.price('0') : payout.price(prize?.amount ?? '0'),
-        percentage: prize?.percentage ?? 0,
+        /* The rank's share of the pool, as hash.game prints it beside every prize — also on a
+           0 pool or a switched-off race, where the amount is 0 but the ladder still applies. */
+        percentage: shares.get(rank) ?? 0,
       };
     });
 
@@ -370,6 +373,58 @@ class RaceService {
        * `exchangerate` and a leaderboard that is quietly incomplete.
        */
       unratedCurrencies: unrated,
+    };
+  }
+
+  /**
+   * The PREVIOUS window's standings — hash.game's `<type>/last/`: its #1 is the Last Champion
+   * and the whole list is the History dialog. Ranked from the same turnover as the live board,
+   * so it answers for a switched-off race too; a settled race adds what each player was paid.
+   */
+  async lastLeaderboard({ type }) {
+    const config = await this.getConfig({ type });
+    if (!config) throw errors.NOT_CONFIGURED({ type });
+
+    const current = windowFor(type, new Date(), this.timeZone);
+    const { startsAt, endsAt } = windowFor(type, new Date(new Date(current.startsAt).getTime() - 1), this.timeZone);
+    const race = await this.models.Race.findOne({ where: { type, starts_at: startsAt }, raw: true });
+    const settled = race?.status === RACE_STATUS.SETTLED;
+
+    const { entries } = await this.#standings({ starts_at: startsAt, ends_at: endsAt }, config);
+    const rewards = settled ? await this.models.RaceReward.findAll({ where: { race_id: race.id }, raw: true }) : [];
+    const paidTo = new Map(rewards.map((r) => [String(r.user_id), r]));
+    // A settled race keeps the ladder it paid by.
+    const shares = this.#shares(settled && race.snapshot?.rankPrizes?.length ? { ...config, rankPrizes: race.snapshot.rankPrizes } : config);
+    const winnerCount = (settled && Number(race.winner_count)) || config.winnerCount;
+    const payout = await this.#payoutPricer(config.currency);
+
+    const rows = [];
+    for (const [index, entry] of entries.slice(0, winnerCount).entries()) {
+      const reward = paidTo.get(entry.userId);
+      const quote = reward ? await this.#priced(reward.amount, reward.currency) : null;
+      rows.push({
+        rank: index + 1,
+        userId: entry.userId,
+        name: entry.name,
+        points: entry.points,
+        usdWagered: entry.usdWagered,
+        bets: entry.bets,
+        isBoat: false,
+        payout: quote?.amount ?? payout.price('0'),
+        percentage: shares.get(reward?.rank ?? index + 1) ?? 0,
+      });
+    }
+
+    return {
+      raceId: race?.id ?? null,
+      type,
+      startsAt,
+      endsAt,
+      official: settled,
+      payoutCurrency: payout.currency,
+      payoutPrizePool: payout.price(settled ? race.prize_pool ?? '0' : '0'),
+      winnerCount,
+      leaderboard: rows,
     };
   }
 
@@ -464,8 +519,9 @@ class RaceService {
   async settle({ raceId }) {
     const race = await this.models.Race.findByPk(raceId, { raw: true });
     if (!race) throw errors.NO_ACTIVE_RACE({ raceId });
-    // A cancelled race was closed with no prizes on purpose; settling it would pay them.
-    if (race.status === RACE_STATUS.CANCELLED) throw errors.NOT_OPEN({ raceId, status: race.status });
+    // Only an OPEN race settles: a cancelled one was closed with no prizes on purpose, and a
+    // settled one re-ranked later (a sports bet settling after the window) would pay new players.
+    if (race.status !== RACE_STATUS.OPEN) throw errors.NOT_OPEN({ raceId, status: race.status });
 
     const config = await this.getConfig({ type: race.type });
     if (!config) throw errors.NOT_CONFIGURED({ type: race.type });
@@ -519,11 +575,10 @@ class RaceService {
     const totalAwarded = money.toDecimalString(money.sum(rewards.map((r) => r.amount)));
 
     await this.db.transaction(async (transaction) => {
-      if (rewards.length) {
-        await this.models.RaceReward.bulkCreate(rewards, { transaction, ignoreDuplicates: true });
-      }
-
-      await this.models.Race.update(
+      /* The close is the claim: `status = open` in the WHERE, first, so of two settlements racing
+         (the worker and staff's End & pay) exactly one closes the race and writes prizes; the
+         other blocks on the row, matches nothing and rolls back. */
+      const [closed] = await this.models.Race.update(
         {
           status: RACE_STATUS.SETTLED,
           settled_at: new Date(),
@@ -544,8 +599,13 @@ class RaceService {
           winner_count: config.winnerCount,
           total_awarded: totalAwarded,
         },
-        { where: { id: race.id }, transaction }
+        { where: { id: race.id, status: RACE_STATUS.OPEN }, transaction }
       );
+      if (closed !== 1) throw errors.NOT_OPEN({ raceId: race.id, status: 'settled' });
+
+      if (rewards.length) {
+        await this.models.RaceReward.bulkCreate(rewards, { transaction, ignoreDuplicates: true });
+      }
 
       /** Decorative entries reset with the race they were placed in. */
       if (config.bookedSeatsEnabled) {
@@ -1201,6 +1261,22 @@ class RaceService {
       raw: true,
     });
     return new Map(rows.map((r) => [String(r.id), r]));
+  }
+
+  /**
+   * Rank -> % of the net pool. A curve on a 0 pool stores no ranks (`buildRankPrizes`), so its
+   * shares come from a nominal pool: the split does not depend on the size.
+   */
+  #shares(config) {
+    const ranks = config.rankPrizes?.length
+      ? config.rankPrizes
+      : buildRankPrizes({
+          prizePool: '100',
+          winnerCount: config.winnerCount,
+          platformFeePercent: 0,
+          top3Percentage: config.top3Percentage,
+        }).ranks;
+    return new Map(ranks.map((r) => [Number(r.rank), Number(r.percentage) || 0]));
   }
 
   #shapeConfig(row) {

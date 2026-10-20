@@ -26,7 +26,7 @@ const { bucketCaseSql } = require('@ibitplay/common');
  *   bets                   in-house originals. One row IS a round: `amount` is
  *                          the stake, so every row counts, with no kind column
  *                          to filter on.
- *   gis_transactions       Slotegrator. `action = 'bet'`.
+ *   gis_transactions       Slotegrator. `action = 'bet'`, stake = ABS(amount), not rolled back.
  *   js_game_transactions   jsGames v1. `transaction_type = 'bet'` AND
  *                          `transaction_status = 'completed'`.
  *   game_transactions      jsGames v2. `amount` is the round's net, so the
@@ -97,16 +97,21 @@ class RaceTurnoverService {
 
         UNION ALL
 
-        -- Slotegrator
+        -- Slotegrator. gis.service writes a bet as a DEBIT (negative amount; legacy rows were
+        -- unsigned), so the stake is ABS(amount); a bet it rolled back (its 'rb:<id>' row) never
+        -- happened. The type comes from the lobby's catalogue (gisgamesnew), the legacy gis_games
+        -- after it — gis_games is emptied by its own sync, which left every slot in 'other'.
         SELECT g.user_id,
-               ${bucketCaseSql('gg.type')},
+               ${bucketCaseSql('COALESCE(gn.type, gg.type)')},
                UPPER(g.currency),
-               g.amount
+               ABS(g.amount)
           FROM gis_transactions g
+          LEFT JOIN gisgamesnew gn ON gn.uuid = g.game_uuid
           LEFT JOIN gis_games gg ON gg.uuid = g.game_uuid
          WHERE g.created_at >= :start AND g.created_at < :end
            AND LOWER(g.action) = 'bet'
-           AND g.amount > 0
+           AND g.amount <> 0
+           AND NOT EXISTS (SELECT 1 FROM gis_transactions r WHERE r.transaction_id = 'rb:' || g.transaction_id)
 
         UNION ALL
 

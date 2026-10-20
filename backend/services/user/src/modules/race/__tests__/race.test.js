@@ -455,6 +455,29 @@ test('race rewards', async (t) => {
     const rows = await service.history({ type: 'weekly', limit: 30 });
     assert.ok(!rows.some((r) => String(r.raceId) === String(open.id)));
   });
+
+  await t.test('two settlements racing (worker + End & pay) close the race once; a settled race never re-settles', async () => {
+    const open = await models.Race.create({
+      type: 'weekly', starts_at: new Date('2026-01-19T00:00:00Z'),
+      ends_at: new Date('2026-01-26T00:00:00Z'), status: 'open',
+    });
+    created.races.push(open.id);
+    const settler = new RaceService({
+      models, db: connection, logger,
+      config: { SERVICE_NAME: 'user-service', RACE_TIMEZONE: IST },
+      clients: {
+        casino: { get: async () => ({ rows: [{ userId: String(userId), bucket: 'slot', currency: 'USDT', amount: '50', bets: 1 }] }) },
+        sports: { get: async () => ({ rows: [] }) },
+      },
+    });
+
+    const outcomes = await Promise.allSettled([settler.settle({ raceId: open.id }), settler.settle({ raceId: open.id })]);
+    assert.strictEqual(outcomes.filter((o) => o.status === 'fulfilled').length, 1);
+    assert.ok(outcomes.find((o) => o.status === 'rejected').reason.code === 'RACE_NOT_OPEN');
+    assert.ok(await models.RaceReward.count({ where: { race_id: open.id } }) <= 1);
+
+    await assert.rejects(() => settler.settle({ raceId: open.id }), (error) => error.code === 'RACE_NOT_OPEN');
+  });
 });
 
 test('a switched-off race still ranks today with no prizes', async () => {
@@ -499,4 +522,64 @@ test('a switched-off race still ranks today with no prizes', async () => {
   assert.deepStrictEqual(board.leaderboard.map((r) => [r.rank, r.userId, r.reward]), [[1, '8', '0'], [2, '7', '0']]);
   assert.strictEqual(board.me.rank, 2);
   assert.strictEqual(board.me.usdWagered, '34.80000000');
+});
+
+test("the board prints each rank's share on a 0 pool, and last window's board names the champion", async () => {
+  const row = {
+    type: 'daily', enabled: false, prize_pool: '0', platform_fee_percent: '0', winner_count: 10,
+    top3_percentage: '60', min_points: '0', currency: 'USDT', rank_percentage: [],
+    sports_points: '1', casino_points: '1', slot_points: '1', crash_points: '1', other_points: '1',
+  };
+  const seen = [];
+  let settledRace = null;
+  const service = new RaceService({
+    models: {
+      RaceConfig: { findOne: async () => row },
+      Race: { findOne: async () => settledRace },
+      RaceReward: { findAll: async () => (settledRace ? [{ user_id: '8', rank: 1, amount: '5', currency: 'USDT' }] : []) },
+      Exchangerate: { findAll: async () => [] },
+      Users: { findAll: async () => [{ id: 7, name: 'p7' }, { id: 8, name: 'p8' }] },
+    },
+    logger: createLogger({ name: 'race-test', level: 'silent' }),
+    config: { RACE_TIMEZONE: IST },
+    clients: {
+      casino: {
+        get: async (_path, { query }) => {
+          seen.push(query);
+          return {
+            rows: [
+              { userId: '7', bucket: 'slot', currency: 'USDT', amount: '3', bets: 1 },
+              { userId: '8', bucket: 'slot', currency: 'USDT', amount: '9', bets: 2 },
+            ],
+          };
+        },
+      },
+      sports: { get: async () => ({ rows: [] }) },
+    },
+    wallet: {},
+    rewardMoney: { fromUsd: async (usd) => ({ currency: 'USDT', amount: usd, usd }), toUsd: async (a) => a },
+  });
+
+  const curve = buildRankPrizes({ prizePool: '100', winnerCount: 10, platformFeePercent: 0, top3Percentage: 60 }).ranks;
+  const board = await service.leaderboard({ type: 'daily' });
+  assert.deepStrictEqual(board.leaderboard.map((r) => [r.rank, r.payout, r.percentage]), [
+    [1, '0.00000000', curve[0].percentage],
+    [2, '0.00000000', curve[1].percentage],
+  ]);
+  assert.ok(curve[0].percentage > curve[1].percentage && curve[1].percentage > 0);
+
+  const today = windowFor('daily', new Date(), IST);
+  const last = await service.lastLeaderboard({ type: 'daily' });
+  assert.strictEqual(new Date(last.endsAt).getTime(), today.startsAt.getTime(), 'the window that ended when today began');
+  assert.strictEqual(seen.at(-1).to, today.startsAt.toISOString());
+  assert.strictEqual(last.official, false);
+  assert.deepStrictEqual(last.leaderboard.map((r) => [r.rank, r.name, r.payout]), [[1, 'p8', '0.00000000'], [2, 'p7', '0.00000000']]);
+
+  // Settled: the paid amount rides beside the player who was paid it.
+  settledRace = { id: 1, status: 'settled', prize_pool: '10', winner_count: 10, snapshot: {} };
+  const paid = await service.lastLeaderboard({ type: 'daily' });
+  assert.strictEqual(paid.official, true);
+  assert.strictEqual(Number(paid.leaderboard[0].payout), 5);
+  assert.strictEqual(paid.leaderboard[1].payout, '0.00000000');
+  assert.strictEqual(paid.payoutPrizePool, '10.00000000');
 });

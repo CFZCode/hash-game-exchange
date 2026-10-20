@@ -49,6 +49,8 @@ test('race turnover against a database', async (t) => {
     await models.GameTransaction.destroy({ where: { user_id: uid } });
     await q('DELETE FROM seamless_transactions WHERE user_id = :uid', { uid });
     await q('DELETE FROM og_transactions WHERE user_id = :uid', { uid });
+    await q('DELETE FROM gis_transactions WHERE user_id = :uid', { uid });
+    await q('DELETE FROM gisgamesnew WHERE uuid = :g', { g: `race-gis-${uid}` });
   };
 
   t.after(async () => {
@@ -104,6 +106,22 @@ test('race turnover against a database', async (t) => {
   await og('o2', 'bet', '5');
   await og('o3', 'rollback', '5', 'o2');
 
+  // Slotegrator (EUR so it stands alone): a 5 stake written as gis.service writes it (a debit,
+  // −5), a legacy unsigned 4, and a −3 the provider rolled back ('rb:<id>' row). The game is a
+  // slot in the lobby's catalogue (gisgamesnew) only.
+  const gisGame = `race-gis-${uid}`;
+  await q("INSERT INTO gisgamesnew (uuid, name, provider, type) VALUES (:g, 'Race Slot', 'p', 'Slots')", { g: gisGame });
+  const gis = (id, action, amount) =>
+    q(
+      `INSERT INTO gis_transactions (user_id, transaction_id, action, amount, currency, game_uuid, balance_after)
+       VALUES (:uid, :id, :action, :amount, 'EUR', :g, 0)`,
+      { uid, id, action, amount, g: gisGame }
+    );
+  await gis(`${tag}-g1`, 'bet', '-5');
+  await gis(`${tag}-g2`, 'bet', '4');
+  await gis(`${tag}-g3`, 'bet', '-3');
+  await gis(`rb:${tag}-g3`, 'rollback', '3');
+
   const service = new RaceTurnoverService({ db: connection, logger });
   const { rows } = await service.racePoints({ from: new Date(now.getTime() - 60_000), to: new Date(now.getTime() + 60_000) });
   const mine = rows.filter((r) => r.userId === String(uid));
@@ -128,5 +146,10 @@ test('race turnover against a database', async (t) => {
   await t.test('Original Games stakes count, rolled-back ones do not', () => {
     assert.equal(byCurrency.BTC.amount, 7);
     assert.equal(byCurrency.BTC.bets, 1);
+  });
+
+  await t.test('Slotegrator stakes count by size (debit or legacy), rolled-back ones do not, typed from gisgamesnew', () => {
+    const eur = mine.filter((r) => r.currency === 'EUR');
+    assert.deepEqual(eur.map((r) => [r.bucket, Number(r.amount), r.bets]), [['slot', 9, 2]]);
   });
 });

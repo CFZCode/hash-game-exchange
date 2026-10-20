@@ -156,6 +156,9 @@ const ConfigEditor = ({ type }: { type: RaceType }) => {
   const payout = pub.data?.find(r => r.type === type)?.payout
   const [draft, setDraft] = useState<Partial<RaceConfig>>({})
 
+  // The booked ranks as typed ("3, 7"); null = show the saved list.
+  const [seatsText, setSeatsText] = useState<string | null>(null)
+
   const reset = useApiMutation({
     fn: () => api.put(`admin/user/race/config/${type}`, { resetLadder: true }),
     invalidate: [['api', `admin/user/race/config/${type}`], ['api', 'user/race']],
@@ -167,7 +170,10 @@ const ConfigEditor = ({ type }: { type: RaceType }) => {
     fn: () => api.put(`admin/user/race/config/${type}`, draft),
     invalidate: [['api', `admin/user/race/config/${type}`], ['api', 'user/race']],
     success: `${type} race configuration saved`,
-    onSuccess: () => setDraft({})
+    onSuccess: () => {
+      setDraft({})
+      setSeatsText(null)
+    }
   })
 
   if (q.error) return <ErrorState error={q.error} />
@@ -191,6 +197,10 @@ const ConfigEditor = ({ type }: { type: RaceType }) => {
   const errors = cleanErrors(
     Object.fromEntries(NUMERIC_FIELDS.filter(f => f.key in draft).map(f => [`r-${String(f.key)}`, FIELD_RULE[f.key]?.(draft[f.key], f.label)]))
   )
+
+  if (draft.bookedSeats?.some(r => !Number.isInteger(r) || r < 1 || r > Number(c.winnerCount))) {
+    errors['r-seats-ranks'] = `Booked ranks must be whole ranks from 1 to ${c.winnerCount}`
+  }
 
   const submit = () => {
     const problem = firstError(errors)
@@ -231,6 +241,19 @@ const ConfigEditor = ({ type }: { type: RaceType }) => {
             checked={!!c.bookedSeatsEnabled}
             onChange={bookedSeatsEnabled => setDraft(d => ({ ...d, bookedSeatsEnabled }))}
           />
+          {c.bookedSeatsEnabled ? (
+            <TextField
+              id='r-seats-ranks'
+              label='Booked ranks'
+              hint='The ranks a decorative entry takes, e.g. 2, 5, 8. Only ranks up to "Ranks paid" are kept.'
+              error={errors['r-seats-ranks']}
+              value={seatsText ?? (c.bookedSeats ?? []).join(', ')}
+              onChange={e => {
+                setSeatsText(e.target.value)
+                setDraft(d => ({ ...d, bookedSeats: parseShares(e.target.value) }))
+              }}
+            />
+          ) : null}
           <Can permission='config:write'>
             <Button onClick={submit} disabled={!dirty || save.isPending} className='justify-self-start'>
               {save.isPending ? <Loader2Icon className='animate-spin' /> : <SaveIcon />} Save {dirty ? `(${dirty})` : ''}

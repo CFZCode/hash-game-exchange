@@ -27,6 +27,9 @@ function createControllers({ service }) {
       response.ok(res, await service.leaderboard({ type: req.params.type, userId: req.user?.id ?? null }))
     ),
 
+    /** The previous window's standings (Last Champion, History). */
+    last: asyncHandler(async (req, res) => response.ok(res, await service.lastLeaderboard({ type: req.params.type }))),
+
     /** Finished races with their podium; a caller with a token also gets their own placing. */
     history: asyncHandler(async (req, res) =>
       response.ok(res, await service.history({ ...req.query, userId: req.user?.id ?? null }))

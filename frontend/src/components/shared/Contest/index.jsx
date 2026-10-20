@@ -15,6 +15,7 @@ import { useResource } from '../../../hooks/useResource';
 import React from 'react';
 import { getContestRank, remaining } from '../../../services/contest';
 import { avatarSrc } from '../../../services/avatars';
+import DialogShell from '../DialogShell';
 import './Contest.css';
 
 /* The wager-contest widget — three summary cards over a standings table.
@@ -320,6 +321,7 @@ export default function Contest({ contest, standings = [] }) {
   const show = useContestMoney(contest.currency);
   const left = useTimeLeft(contest);
   const { session } = useSession();
+  const [historyOpen, setHistoryOpen] = React.useState(false);
 
   return (
     <div className="flex flex-col gap-3 text-secondary">
@@ -424,6 +426,7 @@ export default function Contest({ contest, standings = [] }) {
           <button
             type="button"
             className="button center mr-3 h-8 gap-1.5 rounded-md bg-button_bright font-extrabold text-primary"
+            onClick={() => setHistoryOpen(true)}
           >
             <span>History</span>
             <svg viewBox="0 0 32 32" className="size-4 rotate-180 fill-secondary">
@@ -443,34 +446,56 @@ export default function Contest({ contest, standings = [] }) {
               <td className="font-semibold">Wager</td>
               <td className="!text-center font-semibold">Prize</td>
             </tr>
-            {standings.map((row) => {
-              /* The API's sentinel for a private player is the same `****` the bet feed and
-                 Recent Big Wins use, so it comes from context/account.js rather than being a
-                 literal here. A hidden row is NOT just a different string — it is a step
-                 dimmer, `quarterary` against the others' white; sampling the capture puts it
-                 at #A1ABAF where a named player is pure #FFFFFF. */
-              const hidden = row.player === HIDDEN_NAME;
-              return (
-                <tr key={row.rank} className="font-semibold even:bg-layer5-table">
-                  <td className="center flex w-14 sm:w-16">
-                    <Rank num={row.rank} />
-                  </td>
-                  <td className={`ellipsis ${hidden ? 'text-quarterary' : 'text-primary'}`}>
-                    {hidden ? 'Hidden' : row.player}
-                  </td>
-                  <td className="whitespace-nowrap text-brand">{show(row.wager)}</td>
-                  <td className="!text-center">
-                    <span className="whitespace-nowrap text-brand">
-                      {show(row.bonus)}
-                    </span>
-                    <span className="ml-1">({pct(row.rate)})</span>
-                  </td>
-                </tr>
-              );
-            })}
+            <StandingRows standings={standings} show={show} />
           </tbody>
         </table>
       </div>
+
+      {historyOpen && (
+        /* `bt` in the chunk: a `w-[30rem]` dialog titled with the previous window's dates over
+           the same rows, `isHistory` striping odd rows instead of even. */
+        <DialogShell title={`${contest.prev?.start ?? ''} ~ ${contest.prev?.end ?? ''}`} onClose={() => setHistoryOpen(false)} size="lg:!w-[30rem]">
+          <table className="table text-xs [&_td]:px-2 [&_td]:py-3">
+            <tbody>
+              <tr className="list-head item">
+                <td className="w-14 !text-center font-semibold">#</td>
+                <td className="font-semibold">Player</td>
+                <td className="font-semibold">Wager</td>
+                <td className="!text-center font-semibold">Prize</td>
+              </tr>
+              <StandingRows standings={contest.prev?.standings ?? []} show={show} history />
+            </tbody>
+          </table>
+        </DialogShell>
+      )}
     </div>
   );
+}
+
+function StandingRows({ standings, show, history = false }) {
+  return standings.map((row) => {
+    /* The API's sentinel for a private player is the same `****` the bet feed and
+       Recent Big Wins use, so it comes from context/account.js rather than being a
+       literal here. A hidden row is NOT just a different string — it is a step
+       dimmer, `quarterary` against the others' white; sampling the capture puts it
+       at #A1ABAF where a named player is pure #FFFFFF. */
+    const hidden = row.player === HIDDEN_NAME;
+    return (
+      <tr key={row.rank} className={`font-semibold ${history ? 'odd:bg-black_alpha5 odd:dark:bg-white_alpha5' : 'even:bg-layer5-table'}`}>
+        <td className={`center flex w-14 ${history ? '' : 'sm:w-16'}`}>
+          <Rank num={row.rank} />
+        </td>
+        <td className={`ellipsis ${hidden ? 'text-quarterary' : 'text-primary'}`}>
+          {hidden ? 'Hidden' : row.player}
+        </td>
+        <td className="whitespace-nowrap text-brand">{show(row.wager)}</td>
+        <td className="!text-center">
+          <span className="whitespace-nowrap text-brand">
+            {show(row.bonus)}
+          </span>
+          <span className="ml-1">({pct(row.rate)})</span>
+        </td>
+      </tr>
+    );
+  });
 }
