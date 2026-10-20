@@ -170,11 +170,11 @@ test('admin notifications', async (t) => {
     // Five routes over `user_notifications` returned "relation does not exist"
     // for the life of the platform — the table was created by nothing.
     const uid = newUid();
-    await seedPlayer(uid);
+    await seedPlayer(uid, { staffId: null }); // a deposit notification is for direct users only
     const push = makePush();
 
     const result = await build(push).sendToUser({
-      staff, userId: uid, title: 'Deposit received', body: 'Your 500 has landed', type: 'deposit',
+      staff: { id: 1 }, userId: uid, title: 'Deposit received', body: 'Your 500 has landed', type: 'deposit',
     });
 
     assert.equal(result.recorded, 1);
@@ -237,6 +237,47 @@ test('admin notifications', async (t) => {
       () => build(makePush()).sendToUser({ staff, userId: uid, title: 'Hello' }),
       (err) => err.code === 'NOTIFICATIONS_NOT_IN_YOUR_TREE' && err.status === 404
     );
+  });
+
+  await t.test('a general notification reaches agent players, any other type direct users only', async () => {
+    const uid = newUid();
+    await seedPlayer(uid, { tokens: 0 }); // under the agent tree
+    const service = build(makePush());
+
+    assert.equal((await service.sendToUser({ staff, userId: uid, title: 'Hi', type: 'general' })).recorded, 1);
+    await assert.rejects(
+      () => service.sendToUser({ staff, userId: uid, title: 'Hi', type: 'general', audience: 'direct' }),
+      (err) => err.code === 'NOTIFICATIONS_NOT_IN_YOUR_TREE'
+    );
+    await assert.rejects(
+      () => service.sendToUser({ staff, userId: uid, title: 'Bonus!', type: 'bonus' }),
+      (err) => err.code === 'NOTIFICATIONS_NOT_IN_YOUR_TREE'
+    );
+    await service.broadcast({ staff, title: 'Promo', type: 'promotion' });
+    assert.equal(await connection.models.UserNotifications.count({ where: { user_id: uid, title: 'Promo' } }), 0);
+  });
+
+  await t.test('the Sent list groups one send, edits and deletes it in every inbox', async () => {
+    const a = newUid();
+    const b = newUid();
+    await seedPlayer(a, { tokens: 0 });
+    await seedPlayer(b, { tokens: 0 });
+    const service = build(makePush());
+    const title = `Sent-${a}`;
+
+    await service.broadcast({ staff, title, body: 'old' });
+    const sent = (await service.listSends({ staff, limit: 50, offset: 0 })).rows.find((r) => r.title === title);
+    assert.ok(sent, 'the broadcast is listed');
+    assert.ok(sent.players >= 2);
+
+    await service.updateSend({ staff, sendId: sent.sendId, title: `${title}-new`, body: 'new' });
+    const inbox = await connection.models.UserNotifications.findOne({ where: { user_id: a, send_id: sent.sendId }, raw: true });
+    assert.equal(inbox.title, `${title}-new`);
+    assert.equal(inbox.body, 'new');
+
+    await service.deleteSend({ staff, sendId: sent.sendId });
+    assert.equal(await connection.models.UserNotifications.count({ where: { send_id: sent.sendId } }), 0);
+    await assert.rejects(() => service.deleteSend({ staff, sendId: sent.sendId }), (err) => err.code === 'NOTIFICATIONS_SEND_NOT_FOUND');
   });
 
   await t.test('a dead token is deactivated, not retried forever', async () => {

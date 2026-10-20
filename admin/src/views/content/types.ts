@@ -39,6 +39,17 @@ export type Blog = {
 export const NOTIFICATION_TYPES = ['general', 'deposit', 'withdrawal', 'bonus', 'bet', 'promotion'] as const
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number]
 
+/** One staff send (`admin/notifications/sends`): a broadcast or a one-user push. */
+export type SentNotification = {
+  sendId: string
+  title: string
+  body: string | null
+  type: string
+  players: number
+  userId: number | string | null
+  sentAt: string | null
+}
+
 export type Device = {
   id: number
   userId: number | string

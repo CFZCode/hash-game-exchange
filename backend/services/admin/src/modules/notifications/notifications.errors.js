@@ -4,6 +4,7 @@ const { defineErrors } = require('@ibitplay/common');
 
 module.exports = defineErrors('NOTIFICATIONS', {
   NOT_IN_YOUR_TREE: { status: 404, message: 'Player not found' },
+  SEND_NOT_FOUND: { status: 404, message: 'Notification not found' },
 
   NO_DEVICES: {
     status: 422,

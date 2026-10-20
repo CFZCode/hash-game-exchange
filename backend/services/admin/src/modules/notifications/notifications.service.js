@@ -1,11 +1,19 @@
 'use strict';
 
+const crypto = require('crypto');
 const { Op, fn, col } = require('sequelize');
 
 const errors = require('./notifications.errors');
 const { NOTIFICATION_TYPES, MAX_BROADCAST_DEVICES, FCM_BATCH_SIZE } = require('./notifications.constants');
 const { visibleStaffIds } = require('../staff-directory/staffDirectory.service');
 const { FeaturesService } = require('../features/features.service');
+
+/**
+ * Who a staff send reaches: a general notification goes to the audience picked (`all` = direct and
+ * agent players, `direct`), every other type to direct users only.
+ */
+const audienceOf = (type, audience) =>
+  (type ?? NOTIFICATION_TYPES.GENERAL) === NOTIFICATION_TYPES.GENERAL && audience !== 'direct' ? undefined : 'direct';
 
 /**
  * Sending a push, and the record of what was sent.
@@ -146,11 +154,11 @@ class NotificationsService {
    *
    * Push to one player, and record it.
    */
-  async sendToUser({ staff, userId, title, body, type, data }) {
-    const visible = await this.#visibleUserIds(staff);
+  async sendToUser({ staff, userId, title, body, type, data, audience }) {
+    const visible = await this.#visibleUserIds(staff, audienceOf(type, audience));
     this.#assertVisible(visible, userId);
 
-    const record = await this.#record([userId], { title, body, type, data });
+    const record = await this.#record([userId], { title, body, type, data, staff });
 
     const onesignal = await this.#oneSignal();
     if (onesignal) {
@@ -191,8 +199,8 @@ class NotificationsService {
    * own tree rather than everyone, bounded, and audited.
    * ─────────────────────────────────────────────────────────────────────
    */
-  async broadcast({ staff, title, body, type, data }) {
-    const visible = await this.#visibleUserIds(staff);
+  async broadcast({ staff, title, body, type, data, audience }) {
+    const visible = await this.#visibleUserIds(staff, audienceOf(type, audience));
 
     /**
      * OneSignal is addressed by PLAYER, so the broadcast names the caller's
@@ -206,7 +214,7 @@ class NotificationsService {
       if (recipients.length > MAX_BROADCAST_DEVICES) {
         throw errors.BROADCAST_TOO_LARGE({ players: recipients.length, max: MAX_BROADCAST_DEVICES });
       }
-      const record = await this.#record(recipients, { title, body, type, data });
+      const record = await this.#record(recipients, { title, body, type, data, staff });
       const outcome = recipients.length
         ? await onesignal.sendToUsers(recipients, { title, body, type, data })
         : { accepted: 0, failures: [] };
@@ -227,7 +235,7 @@ class NotificationsService {
     }
 
     // Inbox rows for every player in scope — not only those with push tokens.
-    const record = await this.#record(visible, { title, body, type, data });
+    const record = await this.#record(visible, { title, body, type, data, staff });
 
     const outcome = tokens.length
       ? await this.#deliver(tokens, { title, body, type, data })
@@ -408,6 +416,70 @@ class NotificationsService {
    * same 404 as a player that does not exist, like every other per-player
    * staff route.
    */
+  // ══════════════════════════════════════════════════════════════════════
+  //  What staff sent
+  // ══════════════════════════════════════════════════════════════════════
+
+  /** The Sent list: one row per staff send by the caller's tree, newest first. */
+  async listSends({ staff, limit, offset }) {
+    const where = { send_id: { [Op.ne]: null }, sent_by: await visibleStaffIds(this.models, staff.id, { logger: this.logger }) };
+    const groups = await this.models.UserNotifications.findAll({
+      where,
+      attributes: [
+        'send_id',
+        [fn('MIN', col('title')), 'title'],
+        [fn('MIN', col('body')), 'body'],
+        [fn('MIN', col('type')), 'type'],
+        [fn('MIN', col('sent_by')), 'sent_by'],
+        [fn('MIN', col('created_at')), 'created_at'],
+        [fn('COUNT', col('id')), 'players'],
+        [fn('MIN', col('user_id')), 'user_id'],
+      ],
+      group: ['send_id'],
+      order: [[fn('MIN', col('created_at')), 'DESC']],
+      limit,
+      offset,
+      raw: true,
+    });
+    const total = await this.models.UserNotifications.count({ where, distinct: true, col: 'send_id' });
+    return {
+      total,
+      rows: groups.map((g) => ({
+        sendId: g.send_id,
+        title: g.title,
+        body: g.body,
+        type: g.type,
+        players: Number(g.players),
+        // A one-user send names its player.
+        userId: Number(g.players) === 1 ? g.user_id : null,
+        sentBy: g.sent_by,
+        sentAt: g.created_at,
+      })),
+    };
+  }
+
+  /** Edits the inbox copy of a send; a push already delivered cannot be recalled. */
+  async updateSend({ staff, sendId, title, body }) {
+    const where = await this.#sendWhere(staff, sendId);
+    const changes = { title, ...(body !== undefined ? { body: body || null } : {}) };
+    const [updated] = await this.models.UserNotifications.update(changes, { where });
+    return { sendId, updated };
+  }
+
+  /** Removes a send from every player's inbox. */
+  async deleteSend({ staff, sendId }) {
+    const where = await this.#sendWhere(staff, sendId);
+    const removed = await this.models.UserNotifications.destroy({ where });
+    return { sendId, removed };
+  }
+
+  /** A send by the caller's tree, or 404. */
+  async #sendWhere(staff, sendId) {
+    const where = { send_id: sendId, sent_by: await visibleStaffIds(this.models, staff.id, { logger: this.logger }) };
+    if (!(await this.models.UserNotifications.count({ where }))) throw errors.SEND_NOT_FOUND({ sendId });
+    return where;
+  }
+
   async staffHistory({ staff, userId, ...rest }) {
     await this.#assertPlayerVisible(staff, userId);
     return this.history({ userId, ...rest });
@@ -445,9 +517,10 @@ class NotificationsService {
   // ══════════════════════════════════════════════════════════════════════
 
   /** Write the history rows first — a push with no record is invisible. */
-  async #record(userIds, { title, body, type, data }) {
+  async #record(userIds, { title, body, type, data, staff }) {
     if (!userIds.length) return [];
     const now = new Date();
+    const sendId = crypto.randomUUID();
     const rows = await this.models.UserNotifications.bulkCreate(
       userIds.map((userId) => ({
         user_id: userId,
@@ -458,6 +531,8 @@ class NotificationsService {
         is_read: false,
         delivered: false,
         created_at: now,
+        send_id: sendId,
+        sent_by: staff?.id ?? null,
       })),
       { returning: true }
     );

@@ -24,6 +24,8 @@ const message = {
   body: z.string().trim().max(1000).optional(),
   type: z.enum(NOTIFICATION_TYPE_NAMES).default('general'),
   data: z.record(z.union([z.string(), z.number(), z.boolean()])).optional(),
+  /** Only a general notification may reach agent players; any other type goes to direct users regardless. */
+  audience: z.enum(['all', 'direct']).default('all'),
 };
 
 const sendToUser = { body: z.object({ userId: id, ...message }).strict() };
@@ -60,4 +62,16 @@ const markRead = {
     .strict(),
 };
 
-module.exports = { sendToUser, broadcast, listDevices, userParam, registerDevice, markRead };
+const listSends = { query: paging };
+
+const sendParam = z.object({ sendId: z.string().uuid() });
+
+/** Title and body only: changing the type would change who it was meant for. */
+const updateSend = {
+  params: sendParam,
+  body: z.object({ title: message.title, body: z.string().trim().max(1000).optional() }).strict(),
+};
+
+const deleteSend = { params: sendParam };
+
+module.exports = { sendToUser, broadcast, listDevices, userParam, registerDevice, markRead, listSends, updateSend, deleteSend };
