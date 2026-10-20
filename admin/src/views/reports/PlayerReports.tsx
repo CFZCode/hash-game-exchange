@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
 import { DownloadIcon, FileTextIcon, SearchIcon } from 'lucide-react'
+import { parseAsString, useQueryState } from 'nuqs'
 import { toast } from 'sonner'
 
 import DataTable, { type Column } from '@/components/shared/DataTable'
@@ -16,6 +17,7 @@ import PageHeader from '@/components/shared/PageHeader'
 import StatusBadge from '@/components/shared/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useSession } from '@/contexts/SessionContext'
 import { useListState, usePagedApi } from '@/hooks/use-api'
 import { api, errorMessage } from '@/lib/api/client'
@@ -67,7 +69,7 @@ const playerColumns: Column<PlayerReportRow>[] = [
   { key: 'games', header: <span title='Lifetime bets, every product (stakes on the wallet ledger).'>Bets</span>, align: 'right', cell: r => formatNumber(r.gamesPlayed) }
 ]
 
-const PlayersTab = () => {
+const PlayersTab = ({ withStats }: { withStats: boolean }) => {
   // Sirf direct users (bina parent) — agent ke clients Sports Exchange me hain.
   // Agent-tree logins see no promotions: the VIP column goes with them.
   const promotions = useSession().actor?.promotions === true
@@ -93,7 +95,7 @@ const PlayersTab = () => {
 
   return (
     <>
-    <PlayerStatsOverview channel='direct' />
+    {withStats && <PlayerStatsOverview channel='direct' />}
     <DataTable
       columns={promotions ? playerColumns : playerColumns.filter(c => c.key !== 'vip')}
       rows={list.data?.rows}
@@ -173,6 +175,7 @@ const PlayerSheet = () => {
 
 const PlayerReports = () => {
   const promotions = useSession().actor?.promotions === true
+  const [tab, setTab] = useQueryState('tab', parseAsString.withDefault('overview').withOptions({ history: 'replace', scroll: false }))
 
   return (
     <div>
@@ -186,7 +189,15 @@ const PlayerReports = () => {
           </>
         }
       />
-      <PlayersTab />
+      {/* The list stays under the charts on Overview; the Users tab shows it alone. */}
+      <Tabs value={tab} onValueChange={v => setTab(String(v))}>
+        <TabsList variant='line' className='mb-4'>
+          <TabsTrigger value='overview'>Overview</TabsTrigger>
+          <TabsTrigger value='users'>Users</TabsTrigger>
+        </TabsList>
+        <TabsContent value='overview'>{tab === 'overview' && <PlayersTab withStats />}</TabsContent>
+        <TabsContent value='users'>{tab === 'users' && <PlayersTab withStats={false} />}</TabsContent>
+      </Tabs>
     </div>
   )
 }
