@@ -2,14 +2,14 @@
 
 import { useState } from 'react'
 
-import { CheckCircle2Icon, ImageIcon, Loader2Icon, RefreshCwIcon, SaveIcon, SearchIcon, XCircleIcon } from 'lucide-react'
+import { CheckCircle2Icon, ImageIcon, Loader2Icon, SaveIcon, SearchIcon, XCircleIcon } from 'lucide-react'
 
 import Can from '@/components/shared/Can'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import DataTable, { type Column } from '@/components/shared/DataTable'
 import ErrorState from '@/components/shared/ErrorState'
 import FormDialog from '@/components/shared/FormDialog'
-import { DateTimeField, SelectField, SwitchField, TextAreaField, TextField } from '@/components/shared/FormField'
+import { DateTimeField, SelectField, TextAreaField, TextField } from '@/components/shared/FormField'
 import JsonView from '@/components/shared/JsonView'
 import PageHeader from '@/components/shared/PageHeader'
 import StatusBadge from '@/components/shared/StatusBadge'
@@ -20,7 +20,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { isAgentTreeLevel, useSession } from '@/contexts/SessionContext'
+import { useSession } from '@/contexts/SessionContext'
 import { useApi, useApiMutation } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
 import { check } from '@/lib/validate'
@@ -316,16 +316,12 @@ const JsTab = () => {
 // ── Upstream providers + syncs ──────────────────────────────────────────────
 
 const ProvidersTab = () => {
-  const { actor, can } = useSession()
+  const { can } = useSession()
   const providers = useApi<GisProvider[]>('admin/casino/games/providers')
   const [draft, setDraft] = useState<Record<string, boolean>>({})
   const [filter, setFilter] = useState('')
   const [tp, setTp] = useState('')
-  const [result, setResult] = useState<unknown>(null)
   const canManage = can('casino:manage')
-
-  // `GET admin/casino/gis/self-validate` makes a live provider call: casino:manage, house staff only.
-  const canSelfValidate = canManage && !!actor && !isAgentTreeLevel(actor.level)
 
   const current = (name: string, enabled: boolean) => (name in draft ? draft[name] : enabled)
   const updates = (providers.data ?? []).filter(p => name(p) in draft && draft[name(p)] !== p.enabled).map(p => ({ name: name(p), enabled: draft[name(p)] }))
@@ -344,26 +340,10 @@ const ProvidersTab = () => {
     }
   })
 
-  const useRun = (label: string, fn: () => Promise<unknown>) =>
-    useApiMutation({
-      fn,
-      invalidate: [['api', 'admin/casino/games/providers'], ['api', 'admin/casino/games/vendors'], ['api', 'admin/casino/games/types'], ['api', 'admin/casino/games/catalogue/search']],
-      success: `${label} finished`,
-      onSuccess: r => setResult(r)
-    })
-
-  // Hooks are called unconditionally, in a fixed order.
-  const syncGames = useRun('Game sync', () => api.post('admin/casino/gis/sync/games'))
-  const syncProviders = useRun('Provider sync', () => api.post('admin/casino/gis/sync/providers'))
-  const [preview, setPreview] = useState(true)
-  const syncImages = useRun('Image sync', () => api.post('admin/casino/catalogue/images/sync', { previewOnly: preview, limit: 1000 }))
-  const validate = useApiMutation({ fn: () => api.get('admin/casino/gis/self-validate'), success: 'Integration check finished', onSuccess: r => setResult(r) })
-
   const rows = (providers.data ?? []).filter(p => !filter || p.name.toLowerCase().includes(filter.toLowerCase()))
-  const busy = syncGames.isPending || syncProviders.isPending || syncImages.isPending || validate.isPending
 
   return (
-    <div className='grid gap-6 lg:grid-cols-[1fr_20rem]'>
+    <div className='grid gap-6'>
       <Card className='shadow-none'>
         <CardHeader className='flex flex-wrap items-center justify-between gap-3'>
           <div>
@@ -397,7 +377,7 @@ const ProvidersTab = () => {
         </CardHeader>
         <CardContent>
           {providers.error && <ErrorState error={providers.error} />}
-          {providers.data && providers.data.length === 0 && <p className='text-muted-foreground text-sm'>No providers loaded yet — run &ldquo;Sync providers&rdquo;.</p>}
+          {providers.data && providers.data.length === 0 && <p className='text-muted-foreground text-sm'>No providers loaded yet.</p>}
           <div className='grid gap-1 sm:grid-cols-2 xl:grid-cols-3'>
             {rows.map(p => {
               const on = current(p.name, p.enabled)
@@ -413,45 +393,6 @@ const ProvidersTab = () => {
           </div>
         </CardContent>
       </Card>
-      <div className='grid content-start gap-4'>
-        <Card className='shadow-none'>
-          <CardHeader>
-            <CardTitle className='text-base'>Refresh from provider</CardTitle>
-            <CardDescription>Syncs run for a while and rewrite hundreds of rows. Each is audited.</CardDescription>
-          </CardHeader>
-          <CardContent className='grid gap-2'>
-            <Can permission='casino:manage' fallback={<p className='text-muted-foreground text-sm'>Syncs need casino:manage.</p>}>
-              <ConfirmDialog trigger={<Button variant='outline' disabled={busy}>{syncProviders.isPending ? <Loader2Icon className='animate-spin' /> : <RefreshCwIcon />} Sync providers</Button>} title='Sync providers from the aggregator?' onConfirm={() => syncProviders.mutateAsync()} />
-              <ConfirmDialog trigger={<Button variant='outline' disabled={busy}>{syncGames.isPending ? <Loader2Icon className='animate-spin' /> : <RefreshCwIcon />} Sync games</Button>} title='Sync the game catalogue?' description='Pulls every game from the aggregator. This can take minutes.' onConfirm={() => syncGames.mutateAsync()} />
-            </Can>
-            <Can permission='config:write'>
-              <ConfirmDialog
-                trigger={<Button variant='outline' disabled={busy}>{syncImages.isPending ? <Loader2Icon className='animate-spin' /> : <RefreshCwIcon />} Sync artwork</Button>}
-                title='Sync tile artwork?'
-                description='Matches games by NAME and rewrites their images. Preview first.'
-                onConfirm={() => syncImages.mutateAsync()}
-              >
-                <SwitchField id='preview' label='Preview only' hint='Report what would change without writing' checked={preview} onChange={setPreview} />
-              </ConfirmDialog>
-            </Can>
-            {canSelfValidate && (
-              <Button variant='outline' disabled={busy} onClick={() => validate.mutate()}>
-                {validate.isPending ? <Loader2Icon className='animate-spin' /> : <CheckCircle2Icon />} Self-validate integration
-              </Button>
-            )}
-          </CardContent>
-        </Card>
-        {result !== null && (
-          <Card className='shadow-none'>
-            <CardHeader>
-              <CardTitle className='text-base'>Last result</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <JsonView value={result} />
-            </CardContent>
-          </Card>
-        )}
-      </div>
     </div>
   )
 }
