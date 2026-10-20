@@ -64,7 +64,10 @@ function categoryMatch(key) {
 
 /** True for a row with no artwork: the lobby lists those after the rest (`#order`). */
 const NO_ART_SQL = `(coalesce("image", '') = '')`;
-const noArt = (row) => (row.image ? 0 : 1);
+/* Slotegrator's own art (gis-static.com) is 287x193 landscape: it crops badly in the 3:4 tile,
+   so those games rank after the ones with portrait art (fix-game-artwork.js replaces it). */
+const LANDSCAPE_ART_SQL = `(coalesce("image", '') ILIKE '%gis-static.com%')`;
+const noArt = (row) => (!row.image ? 2 : /gis-static\.com/i.test(row.image) ? 1 : 0);
 
 /**
  * Two catalogue rows that would draw the same tile — same name, provider, type and art —
@@ -432,7 +435,7 @@ class GamesService {
     const byName = ['name', sort === 'za' ? 'DESC' : 'ASC'];
     const order = [];
     if (isMobile !== undefined) order.push(['is_mobile', isMobile ? 'DESC' : 'ASC']);
-    if (sort !== 'az' && sort !== 'za') order.push([literal(NO_ART_SQL), 'ASC']);
+    if (sort !== 'az' && sort !== 'za') order.push([literal(NO_ART_SQL), 'ASC'], [literal(LANDSCAPE_ART_SQL), 'ASC']);
     order.push(byName, ['uuid', 'ASC']);
     return order;
   }
