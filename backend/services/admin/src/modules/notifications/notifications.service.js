@@ -8,14 +8,6 @@ const { NOTIFICATION_TYPES, MAX_BROADCAST_DEVICES, FCM_BATCH_SIZE } = require('.
 const { visibleStaffIds } = require('../staff-directory/staffDirectory.service');
 const { FeaturesService } = require('../features/features.service');
 
-/**
- * Who a staff send reaches (a `#visibleUserIds` channel): a general notification goes to the audience
- * picked (`all` = direct and agent players, `direct`, `agent`), every other type to direct users only.
- */
-const audienceOf = (type, audience) => {
-  if ((type ?? NOTIFICATION_TYPES.GENERAL) !== NOTIFICATION_TYPES.GENERAL) return 'direct';
-  return audience === 'direct' || audience === 'agent' ? audience : undefined;
-};
 
 /**
  * Sending a push, and the record of what was sent.
@@ -156,8 +148,9 @@ class NotificationsService {
    *
    * Push to one player, and record it.
    */
-  async sendToUser({ staff, userId, title, body, type, data, audience }) {
-    const visible = await this.#visibleUserIds(staff, audienceOf(type, audience));
+  async sendToUser({ staff, userId, title, body, type, data }) {
+    // Staff notifications go to direct users only; agent-tree players get none.
+    const visible = await this.#visibleUserIds(staff, 'direct');
     this.#assertVisible(visible, userId);
 
     const record = await this.#record([userId], { title, body, type, data, staff });
@@ -201,8 +194,8 @@ class NotificationsService {
    * own tree rather than everyone, bounded, and audited.
    * ─────────────────────────────────────────────────────────────────────
    */
-  async broadcast({ staff, title, body, type, data, audience }) {
-    const visible = await this.#visibleUserIds(staff, audienceOf(type, audience));
+  async broadcast({ staff, title, body, type, data }) {
+    const visible = await this.#visibleUserIds(staff, 'direct');
 
     /**
      * OneSignal is addressed by PLAYER, so the broadcast names the caller's

@@ -24,8 +24,6 @@ const message = {
   body: z.string().trim().max(1000).optional(),
   type: z.enum(NOTIFICATION_TYPE_NAMES).default('general'),
   data: z.record(z.union([z.string(), z.number(), z.boolean()])).optional(),
-  /** Only a general notification may reach agent players; any other type goes to direct users regardless. */
-  audience: z.enum(['all', 'direct', 'agent']).default('all'),
 };
 
 const sendToUser = { body: z.object({ userId: id, ...message }).strict() };

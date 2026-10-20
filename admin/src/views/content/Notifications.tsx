@@ -29,24 +29,14 @@ const TYPE_OPTIONS = NOTIFICATION_TYPES.map(t => ({ value: t, label: t[0].toUppe
 
 const SENDS = 'admin/notifications/sends'
 
-const AUDIENCE_OPTIONS = [
-  { value: 'direct', label: 'Direct users' },
-  { value: 'all', label: 'All users' },
-  { value: 'agent', label: 'Agent users' }
-]
-
-const AUDIENCE_TEXT: Record<string, string> = { direct: 'Direct users', all: 'All users (direct + agent)', agent: 'Agent users' }
-
-/** The backend rule: general reaches the audience picked, every other type direct users only. */
-const audienceOf = (type: string, audience: string) => AUDIENCE_TEXT[type === 'general' ? audience : 'direct']
 
 const Compose = () => {
   const [mode, setMode] = useState<'broadcast' | 'user'>('broadcast')
-  const [form, setForm] = useState({ userId: '', title: '', body: '', type: 'general', audience: 'all' })
+  const [form, setForm] = useState({ userId: '', title: '', body: '', type: 'general' })
 
   const send = useApiMutation({
     fn: () => {
-      const message: Record<string, string> = { title: form.title, type: form.type, audience: form.type === 'general' ? form.audience : 'direct' }
+      const message: Record<string, string> = { title: form.title, type: form.type }
 
       if (form.body) message.body = form.body
 
@@ -67,13 +57,13 @@ const Compose = () => {
       <CardHeader>
         <CardTitle className='text-base'>Send a push notification</CardTitle>
         <CardDescription>
-          Goes to every registered device for the audience you pick. A broadcast is capped by the platform so a mistake is refused rather than delivered.
+          Goes to direct users only; agent players get no notifications. A broadcast is capped by the platform so a mistake is refused rather than delivered.
         </CardDescription>
       </CardHeader>
       <CardContent className='grid gap-4'>
         <Tabs value={mode} onValueChange={v => setMode(v as 'broadcast' | 'user')}>
           <TabsList>
-            <TabsTrigger value='broadcast'>Everyone</TabsTrigger>
+            <TabsTrigger value='broadcast'>All direct users</TabsTrigger>
             <TabsTrigger value='user'>One user</TabsTrigger>
           </TabsList>
         </Tabs>
@@ -83,16 +73,6 @@ const Compose = () => {
         <TextField id='n-title' label='Title' required maxLength={200} value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
         <TextAreaField id='n-body' label='Body' rows={3} maxLength={1000} value={form.body} onChange={e => setForm({ ...form, body: e.target.value })} />
         <SelectField id='n-type' label='Type' value={form.type} onChange={type => setForm({ ...form, type })} options={TYPE_OPTIONS} />
-        {/* Always shown: general picks the audience, every other type is fixed to direct users. */}
-        <SelectField
-          id='n-audience'
-          label='Send to'
-          value={form.type === 'general' ? form.audience : 'direct'}
-          onChange={audience => setForm({ ...form, audience })}
-          options={AUDIENCE_OPTIONS}
-          disabled={form.type !== 'general'}
-          hint={form.type === 'general' ? undefined : 'Only a general notification can go to agent players.'}
-        />
         <Can permission='config:write'>
           <ConfirmDialog
             trigger={
@@ -101,8 +81,8 @@ const Compose = () => {
                 {mode === 'broadcast' ? 'Broadcast' : 'Send'}
               </Button>
             }
-            title={mode === 'broadcast' ? 'Send to every device?' : `Send to user ${form.userId}?`}
-            description={`“${form.title}” goes to: ${audienceOf(form.type, form.audience)}. A push cannot be recalled once it is delivered.`}
+            title={mode === 'broadcast' ? 'Send to every direct user?' : `Send to user ${form.userId}?`}
+            description={`“${form.title}” goes to direct users only. A push cannot be recalled once it is delivered.`}
             confirmLabel='Send'
             onConfirm={() => send.mutateAsync()}
           />

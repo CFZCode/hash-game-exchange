@@ -165,16 +165,18 @@ test('admin notifications', async (t) => {
   };
 
   const staff = { id: STAFF_ID };
+  // Notifications reach direct users only, so sends run as the Super Admin to unassigned players.
+  const house = { id: 1 };
 
   await t.test('a send records the notification AND pushes it', async () => {
     // Five routes over `user_notifications` returned "relation does not exist"
     // for the life of the platform — the table was created by nothing.
     const uid = newUid();
-    await seedPlayer(uid, { staffId: null }); // a deposit notification is for direct users only
+    await seedPlayer(uid, { staffId: null });
     const push = makePush();
 
     const result = await build(push).sendToUser({
-      staff: { id: 1 }, userId: uid, title: 'Deposit received', body: 'Your 500 has landed', type: 'deposit',
+      staff: house, userId: uid, title: 'Deposit received', body: 'Your 500 has landed', type: 'deposit',
     });
 
     assert.equal(result.recorded, 1);
@@ -190,9 +192,9 @@ test('admin notifications', async (t) => {
   await t.test('a player with no device still gets a record', async () => {
     // The push cannot land, but the history is what support reads.
     const uid = newUid();
-    await seedPlayer(uid, { tokens: 0 });
+    await seedPlayer(uid, { staffId: null, tokens: 0 });
 
-    const result = await build(makePush()).sendToUser({ staff, userId: uid, title: 'Hello' });
+    const result = await build(makePush()).sendToUser({ staff: house, userId: uid, title: 'Hello' });
 
     assert.equal(result.recorded, 1);
     assert.equal(result.devices, 0);
@@ -219,11 +221,29 @@ test('admin notifications', async (t) => {
       created_at: new Date(), updated_at: new Date(),
     });
 
-    const result = await build(makePush()).broadcast({ staff, title: 'Maintenance tonight' });
+    await build(makePush()).broadcast({ staff, title: 'Maintenance tonight' });
 
     const reached = await connection.models.UserNotifications.count({ where: { user_id: theirs } });
     assert.equal(reached, 0, 'a player outside the tree must not be reached');
-    assert.ok(result.players >= 1);
+    const agentsOwn = await connection.models.UserNotifications.count({ where: { user_id: mine } });
+    assert.equal(agentsOwn, 0, 'an agent-tree player gets no notifications');
+  });
+
+  await t.test('the Super Admin reaches direct users only, never an agent-tree player', async () => {
+    const direct = newUid();
+    const agents = newUid();
+    await seedPlayer(direct, { staffId: null, tokens: 0 });
+    await seedPlayer(agents, { tokens: 0 });
+    const service = build(makePush());
+
+    await service.broadcast({ staff: house, title: 'Direct only' });
+    assert.equal(await connection.models.UserNotifications.count({ where: { user_id: direct, title: 'Direct only' } }), 1);
+    assert.equal(await connection.models.UserNotifications.count({ where: { user_id: agents } }), 0);
+
+    await assert.rejects(
+      () => service.sendToUser({ staff: house, userId: agents, title: 'Hello' }),
+      (err) => err.code === 'NOTIFICATIONS_NOT_IN_YOUR_TREE'
+    );
   });
 
   await t.test('a player outside the tree cannot be sent to directly', async () => {
@@ -239,50 +259,27 @@ test('admin notifications', async (t) => {
     );
   });
 
-  await t.test('a general notification reaches agent players, any other type direct users only', async () => {
-    const uid = newUid();
-    await seedPlayer(uid, { tokens: 0 }); // under the agent tree
-    const service = build(makePush());
-
-    assert.equal((await service.sendToUser({ staff, userId: uid, title: 'Hi', type: 'general' })).recorded, 1);
-    await assert.rejects(
-      () => service.sendToUser({ staff, userId: uid, title: 'Hi', type: 'general', audience: 'direct' }),
-      (err) => err.code === 'NOTIFICATIONS_NOT_IN_YOUR_TREE'
-    );
-    assert.equal((await service.sendToUser({ staff, userId: uid, title: 'Agents', type: 'general', audience: 'agent' })).recorded, 1);
-    await assert.rejects(
-      () => service.sendToUser({ staff, userId: uid, title: 'Bonus!', type: 'bonus', audience: 'agent' }),
-      (err) => err.code === 'NOTIFICATIONS_NOT_IN_YOUR_TREE'
-    );
-    await assert.rejects(
-      () => service.sendToUser({ staff, userId: uid, title: 'Bonus!', type: 'bonus' }),
-      (err) => err.code === 'NOTIFICATIONS_NOT_IN_YOUR_TREE'
-    );
-    await service.broadcast({ staff, title: 'Promo', type: 'promotion' });
-    assert.equal(await connection.models.UserNotifications.count({ where: { user_id: uid, title: 'Promo' } }), 0);
-  });
-
   await t.test('the Sent list groups one send, edits and deletes it in every inbox', async () => {
     const a = newUid();
     const b = newUid();
-    await seedPlayer(a, { tokens: 0 });
-    await seedPlayer(b, { tokens: 0 });
+    await seedPlayer(a, { staffId: null, tokens: 0 });
+    await seedPlayer(b, { staffId: null, tokens: 0 });
     const service = build(makePush());
     const title = `Sent-${a}`;
 
-    await service.broadcast({ staff, title, body: 'old' });
-    const sent = (await service.listSends({ staff, limit: 50, offset: 0 })).rows.find((r) => r.title === title);
+    await service.broadcast({ staff: house, title, body: 'old' });
+    const sent = (await service.listSends({ staff: house, limit: 50, offset: 0 })).rows.find((r) => r.title === title);
     assert.ok(sent, 'the broadcast is listed');
     assert.ok(sent.players >= 2);
 
-    await service.updateSend({ staff, sendId: sent.sendId, title: `${title}-new`, body: 'new' });
+    await service.updateSend({ staff: house, sendId: sent.sendId, title: `${title}-new`, body: 'new' });
     const inbox = await connection.models.UserNotifications.findOne({ where: { user_id: a, send_id: sent.sendId }, raw: true });
     assert.equal(inbox.title, `${title}-new`);
     assert.equal(inbox.body, 'new');
 
-    await service.deleteSend({ staff, sendId: sent.sendId });
+    await service.deleteSend({ staff: house, sendId: sent.sendId });
     assert.equal(await connection.models.UserNotifications.count({ where: { send_id: sent.sendId } }), 0);
-    await assert.rejects(() => service.deleteSend({ staff, sendId: sent.sendId }), (err) => err.code === 'NOTIFICATIONS_SEND_NOT_FOUND');
+    await assert.rejects(() => service.deleteSend({ staff: house, sendId: sent.sendId }), (err) => err.code === 'NOTIFICATIONS_SEND_NOT_FOUND');
   });
 
   await t.test('a dead token is deactivated, not retried forever', async () => {
@@ -290,10 +287,10 @@ test('admin notifications', async (t) => {
     // uninstalled. Legacy never read the per-token results, so every future
     // broadcast paid for them again.
     const uid = newUid();
-    const [good, bad] = await seedPlayer(uid, { tokens: 2 });
+    const [good, bad] = await seedPlayer(uid, { staffId: null, tokens: 2 });
     const push = makePush({ dead: [bad] });
 
-    await build(push).sendToUser({ staff, userId: uid, title: 'Hello' });
+    await build(push).sendToUser({ staff: house, userId: uid, title: 'Hello' });
 
     const rows = await connection.models.UserFcmToken.findAll({ where: { user_id: uid }, raw: true });
     const byToken = new Map(rows.map((r) => [r.token, r]));
@@ -346,10 +343,10 @@ test('admin notifications', async (t) => {
     // Legacy stored `is_read` as a bare boolean, so "when did they see it" had
     // no answer.
     const uid = newUid();
-    await seedPlayer(uid);
+    await seedPlayer(uid, { staffId: null });
     const service = build(makePush());
 
-    await service.sendToUser({ staff, userId: uid, title: 'One' });
+    await service.sendToUser({ staff: house, userId: uid, title: 'One' });
     const first = await service.markRead({ userId: uid });
     assert.equal(first.marked, 1);
 
@@ -366,11 +363,11 @@ test('admin notifications', async (t) => {
 
   await t.test('the unread count follows', async () => {
     const uid = newUid();
-    await seedPlayer(uid);
+    await seedPlayer(uid, { staffId: null });
     const service = build(makePush());
 
-    await service.sendToUser({ staff, userId: uid, title: 'One' });
-    await service.sendToUser({ staff, userId: uid, title: 'Two' });
+    await service.sendToUser({ staff: house, userId: uid, title: 'One' });
+    await service.sendToUser({ staff: house, userId: uid, title: 'Two' });
     assert.equal((await service.unreadCount({ userId: uid })).unread, 2);
 
     await service.markRead({ userId: uid });
@@ -396,9 +393,9 @@ test('admin notifications', async (t) => {
     // A deployment without the Firebase credential should keep a history
     // rather than fail at boot or silently do nothing.
     const uid = newUid();
-    await seedPlayer(uid);
+    await seedPlayer(uid, { staffId: null });
 
-    const result = await build(null).sendToUser({ staff, userId: uid, title: 'Recorded only' });
+    const result = await build(null).sendToUser({ staff: house, userId: uid, title: 'Recorded only' });
 
     assert.equal(result.recorded, 1);
     assert.equal(result.delivered, 0);
@@ -434,8 +431,9 @@ test('admin notifications', async (t) => {
       await seedPlayer(othersPlayer, { tokens: 0 });
 
       const service = build(makePush());
-      await service.sendToUser({ staff: agent, userId: agentsPlayer, title: 'Mine' });
-      await service.sendToUser({ staff, userId: othersPlayer, title: 'Not yours' });
+      // Sends no longer reach agent-tree players, so the inbox rows are written directly.
+      const row = (user_id, title) => ({ user_id, title, type: 'general', is_read: false, delivered: false, created_at: new Date() });
+      await connection.models.UserNotifications.bulkCreate([row(agentsPlayer, 'Mine'), row(othersPlayer, 'Not yours')]);
 
       // In tree: visible.
       const own = await service.staffHistory({ staff: agent, userId: agentsPlayer, limit: 50, offset: 0 });
