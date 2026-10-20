@@ -5,7 +5,9 @@
  * "Other", so a new column never goes invisible.
  */
 /** Yahan nahi dikhte — apni alag screen hai (sports = Settings → Site config → Sports switch). */
-export const FLAGS_ELSEWHERE = new Set(['sports'])
+// The old per-studio flags (spribe, evolution …) are kept off this screen: providers are switched per
+// provider from the live list in the Providers card (casino provider settings).
+export const FLAGS_ELSEWHERE = new Set(['sports', 'spribe', 'evolution', 'pragmaticslots', 'pragmaticlive', 'ideal', 'microgaming', 'pgsoft', 'hacksawgaming', 'jili', 'jilli', 'netent'])
 
 export const FLAG_GROUPS: { title: string; description: string; keys: string[] }[] = [
   {
@@ -17,11 +19,6 @@ export const FLAG_GROUPS: { title: string; description: string; keys: string[] }
     title: 'Game categories',
     description: 'Casino lobby tabs.',
     keys: ['crash', 'originals', 'livegames', 'slotsgames', 'alllivegames', 'allslotsgames', 'lotterygames', 'cards', 'instantgames']
-  },
-  {
-    title: 'Providers',
-    description: 'Third-party game providers offered in the lobby.',
-    keys: ['spribe', 'evolution', 'pragmaticslots', 'pragmaticlive', 'ideal', 'microgaming', 'pgsoft', 'hacksawgaming', 'jili', 'jilli', 'netent']
   },
   {
     title: 'Fiat currencies',

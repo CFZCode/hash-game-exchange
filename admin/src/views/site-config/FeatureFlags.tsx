@@ -15,10 +15,13 @@ import { Switch } from '@/components/ui/switch'
 import { useSession } from '@/contexts/SessionContext'
 import { useApi, useApiMutation } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
+import type { ProviderSetting } from '@/views/casino/types'
 import { useOwnerCoinFilter } from '@/views/finance/useCurrencyCodes'
 import { CRYPTO_COIN_FLAGS, CRYPTO_MASTER_FLAG, FLAG_GROUPS, FLAGS_ELSEWHERE, flagLabel } from './flagGroups'
 
 type Flags = Record<string, boolean>
+
+const PROVIDERS = 'admin/casino/games/provider-settings'
 
 /** Only the boolean columns are switches; anything else the backend adds (e.g. an `entitled` map) is not. */
 const onlyBooleans = (data: Record<string, unknown>): Flags =>
@@ -48,20 +51,39 @@ const FeatureFlags = () => {
     setDraft(flags.data)
   }
 
-  const dirty = useMemo(() => Object.keys(draft).filter(k => flags.data && draft[k] !== flags.data[k]), [draft, flags.data])
+  const flagsDirty = useMemo(() => Object.keys(draft).filter(k => flags.data && draft[k] !== flags.data[k]), [draft, flags.data])
+
+  // Providers: the lobby's live provider list (casino provider settings), switched on the same Save.
+  const providers = useApi<ProviderSetting[]>(PROVIDERS, undefined, { retry: false })
+  const [provDraft, setProvDraft] = useState<Flags>({})
+  const [provLoaded, setProvLoaded] = useState<ProviderSetting[] | undefined>(undefined)
+  const provSaved = useMemo(() => Object.fromEntries((providers.data ?? []).map(p => [p.name, p.enabled])) as Flags, [providers.data])
+
+  if (providers.data && providers.data !== provLoaded) {
+    setProvLoaded(providers.data)
+    setProvDraft(provSaved)
+  }
+
+  const provDirty = Object.keys(provDraft).filter(k => provDraft[k] !== provSaved[k])
+  const dirty = [...flagsDirty, ...provDirty]
 
   const save = useApiMutation({
-    fn: () => {
+    fn: async () => {
       const patch: Flags = {}
 
-      for (const k of dirty) patch[k] = draft[k]
-
-      return api.put<Flags>('admin/site-config/global', patch)
+      for (const k of flagsDirty) patch[k] = draft[k]
+      if (flagsDirty.length) await api.put<Flags>('admin/site-config/global', patch)
+      for (const name of provDirty) await api.patch(`${PROVIDERS}/${encodeURIComponent(name)}`, { enabled: provDraft[name] })
     },
-    invalidate: [['api', 'admin/site-config/global']],
-    success: () => `${dirty.length} flag${dirty.length === 1 ? '' : 's'} saved`,
+    invalidate: [['api', 'admin/site-config/global'], ['api', PROVIDERS]],
+    success: () => `${dirty.length} switch${dirty.length === 1 ? '' : 'es'} saved`,
     onSuccess: () => refreshFlags()
   })
+
+  const reset = () => {
+    if (flags.data) setDraft(flags.data)
+    setProvDraft(provSaved)
+  }
 
   const known = new Set(FLAG_GROUPS.flatMap(g => g.keys))
   const other = Object.keys(draft).filter(k => !known.has(k) && !FLAGS_ELSEWHERE.has(k))
@@ -76,7 +98,7 @@ const FeatureFlags = () => {
         actions={
           <>
             <Input placeholder='Filter flags…' value={filter} onChange={e => setFilter(e.target.value)} className='w-48' />
-            <Button variant='outline' disabled={!dirty.length || save.isPending} onClick={() => flags.data && setDraft(flags.data)}>
+            <Button variant='outline' disabled={!dirty.length || save.isPending} onClick={reset}>
               <RotateCcwIcon /> Reset
             </Button>
             <Button disabled={!dirty.length || save.isPending || !canWrite} onClick={() => save.mutate()}>
@@ -147,9 +169,64 @@ const FeatureFlags = () => {
             </Card>
           )
         })}
+
+        {(providers.data?.length ?? 0) > 0 && (
+          <ProvidersCard
+            providers={(providers.data ?? []).filter(p => !q || p.name.toLowerCase().includes(q) || (p.displayName ?? '').toLowerCase().includes(q))}
+            draft={provDraft}
+            saved={provSaved}
+            canWrite={canWrite}
+            onChange={(name, v) => setProvDraft(d => ({ ...d, [name]: v }))}
+          />
+        )}
       </div>
     </div>
   )
 }
+
+/** The lobby's providers, one switch each: off takes every game of that provider off the site. */
+const ProvidersCard = ({
+  providers,
+  draft,
+  saved,
+  canWrite,
+  onChange
+}: {
+  providers: ProviderSetting[]
+  draft: Flags
+  saved: Flags
+  canWrite: boolean
+  onChange: (name: string, v: boolean) => void
+}) => (
+  <Card className='shadow-none lg:col-span-2'>
+    <CardHeader>
+      <CardTitle className='flex items-center gap-2 text-base'>
+        Providers
+        <Badge variant='secondary' className='font-normal'>
+          {providers.filter(p => draft[p.name]).length}/{providers.length} on
+        </Badge>
+      </CardTitle>
+      <CardDescription>Game providers in the casino lobby. Off takes every one of its games off the site (lobby, search and launch).</CardDescription>
+    </CardHeader>
+    <CardContent className='grid gap-1 sm:grid-cols-2 xl:grid-cols-3'>
+      {providers.map(p => {
+        const changed = draft[p.name] !== saved[p.name]
+
+        return (
+          <label
+            key={p.name}
+            className={`flex cursor-pointer items-center justify-between gap-3 rounded-md border px-3 py-2 text-sm ${changed ? 'border-primary/60 bg-primary/5' : 'border-transparent hover:bg-muted/50'}`}
+          >
+            <span className='min-w-0'>
+              <span className='block truncate'>{p.displayName ?? p.name}</span>
+              <span className='text-muted-foreground block truncate text-xs'>{p.games} games</span>
+            </span>
+            <Switch checked={!!draft[p.name]} disabled={!canWrite} onCheckedChange={v => onChange(p.name, v)} />
+          </label>
+        )
+      })}
+    </CardContent>
+  </Card>
+)
 
 export default FeatureFlags
