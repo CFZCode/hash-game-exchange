@@ -17,12 +17,12 @@ import StatusBadge from '@/components/shared/StatusBadge'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { useApi, useApiMutation, useInvalidate, useListState } from '@/hooks/use-api'
 import { API_V1, api, errorMessage, request } from '@/lib/api/client'
 import type { Pagination } from '@/lib/api/types'
 import { check, type FieldErrors } from '@/lib/validate'
-import type { JsGame } from '@/views/casino/types'
 
 /**
  * Promotions on the player site (`/promotions`), one segment each: casino or sports.
@@ -98,18 +98,6 @@ const imageSrc = (p: Promotion) =>
 /** frontend/src/services/originals.js SLUG_ALIAS + normalise: uid → this site's slug. */
 const ORIGINAL_ALIAS: Record<string, string> = { mine: 'mines', tower: 'tower-legend', videopoker: 'video-poker' }
 const originalSlug = (uid: string) => ORIGINAL_ALIAS[uid] ?? uid.replace(/_/g, '-')
-
-/**
- * `/game/<ref>`. An in-house game (`vendor = 'in-house'`) is addressed by its slug. A provider
- * game is addressed by its uuid: `js_games.game_uid` is the catalogue's uuid, and the game page
- * (`getLiveGame`) resolves a ref by page slug and then by uuid — the same fallback
- * `toCatalogGame` uses (`row.slug || row.uuid`), without guessing the slug's collision suffix.
- */
-const gameCard = (g: JsGame): GameCard => ({
-  name: g.game_name,
-  href: `/game/${g.vendor === 'in-house' ? originalSlug(g.game_uid) : encodeURIComponent(g.game_uid)}`,
-  img: g.game_icon ?? ''
-})
 
 // ── Form state ──────────────────────────────────────────────────────────────────────────────
 
@@ -245,69 +233,162 @@ const useDebounced = <T,>(value: T, ms = 300) => {
   return v
 }
 
+type LobbyGame = { uuid: string; name: string; provider: string | null; type: string | null; image: string | null }
+type OriginalRow = { game_code: string; name: string; image: string | null }
+type PickRow = { key: string; name: string; meta: string; img: string; card: GameCard }
+
+const ANY = '__any__'
+
+/** Lobby (Slotegrator) games by provider → type → name, or the Original games; every pick links the way the player site routes it. */
 const GamesPicker = ({ value, onChange, error }: { value: GameCard[]; onChange: (next: GameCard[]) => void; error?: string }) => {
+  const [source, setSource] = useState<'lobby' | 'originals'>('lobby')
+  const [provider, setProvider] = useState(ANY)
+  const [type, setType] = useState(ANY)
   const [q, setQ] = useState('')
   const term = useDebounced(q.trim())
 
-  const search = useQuery({
-    queryKey: ['promo-game-search', term],
-    queryFn: ({ signal }) => api.get<JsGame[]>('admin/casino/js-games/v1/catalogue/search', { q: term, limit: 30 }, signal),
-    enabled: term.length >= 2,
+  const providers = useApi<{ vendor: string; total?: number }[]>(source === 'lobby' ? 'admin/casino/games/vendors' : null)
+  const types = useApi<{ type: string; total?: number }[]>(source === 'lobby' ? 'admin/casino/games/types' : null)
+
+  const lobby = useQuery({
+    queryKey: ['promo-lobby-games', provider, type, term],
+    queryFn: ({ signal }) =>
+      api.get<LobbyGame[]>(
+        'casino/games',
+        { limit: 100, ...(provider !== ANY ? { provider } : {}), ...(type !== ANY ? { type } : {}), ...(term ? { search: term } : {}) },
+        signal
+      ),
+    enabled: source === 'lobby' && (provider !== ANY || type !== ANY || term.length >= 2),
     retry: false
   })
 
+  const originals = useQuery({
+    queryKey: ['promo-original-games'],
+    queryFn: ({ signal }) => api.get<OriginalRow[]>('casino/original-games/games', undefined, signal),
+    enabled: source === 'originals',
+    retry: false
+  })
+
+  const rows: PickRow[] =
+    source === 'lobby'
+      ? (lobby.data ?? []).map(g => ({
+          key: g.uuid,
+          name: g.name,
+          meta: `${g.provider ?? '—'} · ${g.type ?? '—'}`,
+          img: g.image ?? '',
+          card: { name: g.name, href: `/game/${encodeURIComponent(g.uuid)}`, img: g.image ?? '' }
+        }))
+      : (originals.data ?? [])
+          .filter(g => !term || g.name.toLowerCase().includes(term.toLowerCase()))
+          .map(g => ({
+            key: g.game_code,
+            name: g.name,
+            meta: 'Original game',
+            img: g.image ?? '',
+
+            // No image: the player site draws its own art for the slug.
+            card: { name: g.name, href: `/game/${originalSlug(g.game_code)}`, img: g.image ?? '' }
+          }))
+
+  const query = source === 'lobby' ? lobby : originals
+  const idle = source === 'lobby' && !lobby.isFetching && !lobby.data
   const taken = new Set(value.map(g => g.href))
   const set = (i: number, patch: Partial<GameCard>) => onChange(value.map((g, j) => (j === i ? { ...g, ...patch } : g)))
+  const addAll = () => onChange([...value, ...rows.filter(r => !taken.has(r.card.href)).map(r => r.card)].slice(0, MAX_ROWS))
 
   return (
     <div className='grid gap-2'>
       <span className='text-sm font-medium'>Qualifying games</span>
-      <span className='text-muted-foreground text-xs'>
-        Search our own and provider games and add them; they show on the promotion page in this order. A game with no icon needs an image URL. Our own games the site does not list
-        open as “not in the catalogue”.
-      </span>
-      <Input placeholder='Search games by name, provider or type (2+ letters)…' value={q} onChange={e => setQ(e.target.value)} />
-      {term.length >= 2 && (
-        <div className='max-h-56 overflow-y-auto rounded-md border'>
-          {search.isLoading ? (
+      <span className='text-muted-foreground text-xs'>Pick a provider, then a game type, then add the games. Original games are listed on their own. They show on the promotion page in this order.</span>
+      <div className='flex flex-wrap gap-2'>
+        <Select
+          value={source}
+          onValueChange={v => {
+            if (!v) return
+            setSource(v as typeof source)
+            setQ('')
+          }}
+        >
+          <SelectTrigger className='w-40'>
+            <SelectValue>{(v: string) => (v === 'originals' ? 'Original games' : 'Casino games')}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value='lobby'>Casino games</SelectItem>
+            <SelectItem value='originals'>Original games</SelectItem>
+          </SelectContent>
+        </Select>
+        {source === 'lobby' && (
+          <>
+            <Select value={provider} onValueChange={v => v && setProvider(v)}>
+              <SelectTrigger className='w-48'>
+                <SelectValue>{(v: string) => (v === ANY ? 'All providers' : v)}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ANY}>All providers</SelectItem>
+                {(providers.data ?? []).map(p => (
+                  <SelectItem key={p.vendor} value={p.vendor}>
+                    {p.vendor} {p.total !== undefined ? `(${p.total})` : ''}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={type} onValueChange={v => v && setType(v)}>
+              <SelectTrigger className='w-44'>
+                <SelectValue>{(v: string) => (v === ANY ? 'All types' : v)}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ANY}>All types</SelectItem>
+                {(types.data ?? []).map(t => (
+                  <SelectItem key={t.type} value={t.type}>
+                    {t.type} {t.total !== undefined ? `(${t.total})` : ''}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </>
+        )}
+        <Input className='min-w-48 flex-1' placeholder='Game name…' value={q} onChange={e => setQ(e.target.value)} />
+      </div>
+      {idle ? (
+        <div className='text-muted-foreground rounded-md border p-3 text-sm'>Choose a provider or a type (or type 2+ letters) to list games.</div>
+      ) : (
+        <div className='max-h-64 overflow-y-auto rounded-md border'>
+          {query.isLoading ? (
             <div className='text-muted-foreground flex items-center gap-2 p-3 text-sm'>
-              <Loader2Icon className='size-4 animate-spin' /> Searching…
+              <Loader2Icon className='size-4 animate-spin' /> Loading games…
             </div>
-          ) : search.error ? (
-            <div className='text-destructive p-3 text-sm'>Could not search games: {errorMessage(search.error)}. You can still add a game by hand below.</div>
-          ) : !search.data?.length ? (
-            <div className='text-muted-foreground p-3 text-sm'>No game matches “{term}”.</div>
+          ) : query.error ? (
+            <div className='text-destructive p-3 text-sm'>Could not load games: {errorMessage(query.error)}. You can still add a game by hand below.</div>
+          ) : !rows.length ? (
+            <div className='text-muted-foreground p-3 text-sm'>No game matches these filters.</div>
           ) : (
-            search.data.map(g => {
-              const card = gameCard(g)
-              const added = taken.has(card.href)
+            <>
+              <div className='bg-muted/40 flex items-center justify-between border-b px-3 py-1.5 text-xs'>
+                <span className='text-muted-foreground'>
+                  {rows.length} game{rows.length === 1 ? '' : 's'}
+                  {source === 'lobby' && rows.length === 100 ? ' (first 100 — narrow the filters)' : ''}
+                </span>
+                <Button type='button' size='xs' variant='ghost' disabled={value.length >= MAX_ROWS} onClick={addAll}>
+                  <PlusIcon /> Add all
+                </Button>
+              </div>
+              {rows.map(r => {
+                const added = taken.has(r.card.href)
 
-              return (
-                <div key={g.game_uid} className='flex items-center gap-3 border-b px-3 py-2 last:border-b-0'>
-                  {g.game_icon ? (
-                     
-                    <img src={g.game_icon} alt='' className='bg-muted size-9 shrink-0 rounded object-cover' />
-                  ) : (
-                    <span className='bg-muted size-9 shrink-0 rounded' />
-                  )}
-                  <span className='min-w-0 flex-1'>
-                    <span className='block truncate text-sm'>{g.game_name}</span>
-                    <span className='text-muted-foreground block truncate text-xs'>
-                      {g.vendor ?? '—'} · {g.game_type ?? '—'} {!g.is_active && '· inactive'}
+                return (
+                  <div key={r.key} className='flex items-center gap-3 border-b px-3 py-2 last:border-b-0'>
+                    {r.img ? <img src={r.img} alt='' className='bg-muted size-9 shrink-0 rounded object-cover' /> : <span className='bg-muted size-9 shrink-0 rounded' />}
+                    <span className='min-w-0 flex-1'>
+                      <span className='block truncate text-sm'>{r.name}</span>
+                      <span className='text-muted-foreground block truncate text-xs'>{r.meta}</span>
                     </span>
-                  </span>
-                  <Button
-                    type='button'
-                    size='xs'
-                    variant={added ? 'ghost' : 'outline'}
-                    disabled={added || value.length >= MAX_ROWS}
-                    onClick={() => onChange([...value, card])}
-                  >
-                    {added ? 'Added' : 'Add'}
-                  </Button>
-                </div>
-              )
-            })
+                    <Button type='button' size='xs' variant={added ? 'ghost' : 'outline'} disabled={added || value.length >= MAX_ROWS} onClick={() => onChange([...value, r.card])}>
+                      {added ? 'Added' : 'Add'}
+                    </Button>
+                  </div>
+                )
+              })}
+            </>
           )}
         </div>
       )}
@@ -326,9 +407,8 @@ const GamesPicker = ({ value, onChange, error }: { value: GameCard[]; onChange: 
                 <Input aria-label='Game link' placeholder='/game/<slug>' className='font-mono text-xs' value={g.href} onChange={e => set(i, { href: e.target.value })} />
                 <Input
                   aria-label='Game image URL'
-                  placeholder='Image URL (https://… or /path)'
+                  placeholder='Image URL (empty = the site’s own art for this game)'
                   className='font-mono text-xs'
-                  aria-invalid={!g.img.trim() ? true : undefined}
                   value={g.img}
                   onChange={e => set(i, { img: e.target.value })}
                 />
@@ -565,9 +645,9 @@ const PromotionDialog = ({ existing }: { existing?: Promotion }) => {
     let events: string | undefined
 
     if (form.segment === 'casino') {
-      const bad = form.qualifyingGames.findIndex(g => !g.name.trim() || !g.img.trim() || !g.href.trim() || !isLink(g.href))
+      const bad = form.qualifyingGames.findIndex(g => !g.name.trim() || !g.href.trim() || !isLink(g.href))
 
-      if (bad >= 0) games = `Qualifying game ${bad + 1} needs a name, a link (/game/…) and an image URL`
+      if (bad >= 0) games = `Qualifying game ${bad + 1} needs a name and a link (/game/…)`
       else if (form.qualifyingGames.some(g => g.name.length > 200 || g.href.length > 512 || g.img.length > 512)) games = 'A game name is at most 200 characters; links and image URLs 512'
     } else {
       const bad = form.sportEvents.findIndex(e => !e.label.trim() || !e.href.trim() || !isLink(e.href))

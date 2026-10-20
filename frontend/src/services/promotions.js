@@ -157,7 +157,12 @@ export function toPromotionDetail(row) {
     endsAt: row.endsAt ?? null,
     promoStatus: row.promoStatus ?? 'live',
     viewAllHref: row.viewAllHref ?? null,
-    qualifyingGames: (row.qualifyingGames ?? []).map((game) => ({ ...game, img: absolute(game.img) })),
+    // No image (an Original game): the tile draws this site's own art for the /game/<slug>.
+    qualifyingGames: (row.qualifyingGames ?? []).map((game) => ({
+      ...game,
+      img: absolute(game.img),
+      slug: game.img ? undefined : /^\/game\/([^/?#]+)/.exec(game.href ?? '')?.[1],
+    })),
     sportEvents: (row.sportEvents ?? []).map((event) => ({ ...event, icon: absolute(event.icon) })),
     tags: row.tags ?? [],
     leaderboard: row.leaderboard ?? null,
