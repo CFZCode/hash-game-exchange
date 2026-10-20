@@ -266,8 +266,7 @@ test('P&L against a database', async (t) => {
     const slot = b.casino.topGames.find((g) => g.key === 'gis:p-slot');
     assert.ok(slot);
     assert.equal(m(slot.ggr), m('30'));
-    assert.equal(b.originals.length, 1, 'the bot round is not a game played');
-    assert.equal(m(b.originals[0].ggr), m('15'));
+    assert.equal(b.originals.length, 0, 'in-house bets are not Original Games');
     assert.equal(b.sports.bySport[0].label, 'Cricket');
     assert.equal(b.sports.byMarket[0].label, 'Match Odds');
     assert.equal(b.sports.topEvents[0].label, 'Test v Test');

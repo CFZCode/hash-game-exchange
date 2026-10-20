@@ -395,7 +395,8 @@ class PnlStatsService {
     const best = (map) => byGgr(map).filter((e) => e.ggr > 0n).slice(0, TOP_N).map(out);
     const worst = (map) => byGgr(map).filter((e) => e.ggr < 0n).reverse().slice(0, TOP_N).map(out);
 
-    const originals = new Map([...games].filter(([, g]) => g.source === 'inhouse' || g.source === 'og'));
+    // Only the Original Games aggregator's games; the old in-house bets stay in the casino lists.
+    const originals = new Map([...games].filter(([, g]) => g.source === 'og'));
 
     return {
       range: this.#range(window, valuer.currency),
@@ -512,7 +513,7 @@ class PnlStatsService {
            WHERE k.amount <> 0
              AND ${rangeSql('v.created_at')}${cur('v.currency')}${owned('v.user_id')}
           UNION ALL
-          SELECT 'og', 'Original Games', 'Originals', 'og:' || COALESCE(o.game_code, ''), COALESCE(og.name, o.game_code),
+          SELECT 'og', 'Original Games', 'Originals', 'og:' || COALESCE(o.game_code, ''), COALESCE(og.name, INITCAP(o.game_code)),
                  UPPER(o.currency), CASE WHEN o.kind = 'bet' THEN 'stake' ELSE 'win' END, o.amount,
                  CASE WHEN o.kind = 'bet' THEN 1 ELSE 0 END
             FROM og_transactions o
