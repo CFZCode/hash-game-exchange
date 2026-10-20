@@ -3,7 +3,7 @@
 
 /**
  * Find lobby games (`gisgamesnew`) whose tile art is the wrong shape, missing, broken or on
- * plain http, look the same game up on a reference lobby (hash.game, shuffle, powbet,
+ * plain http, look the same game up in our own JSGames catalogue first, then on a reference lobby (hash.game, shuffle, powbet,
  * bitcasino, off by default) and, with --apply, point `gisgamesnew.image` at that lobby's art.
  *
  *   node scripts/fix-game-artwork.js                        dry run: measure, match, download, report.csv
@@ -46,7 +46,7 @@ const path = require('node:path');
 const { Client } = require('pg');
 
 const { imageSize } = require('./lib/image-size');
-const { UA, SOURCES, fromBitcasino, importSource, categoryOf } = require('./lib/artwork-sources');
+const { UA, SOURCES, setOwnCatalogue, fromBitcasino, importSource, categoryOf } = require('./lib/artwork-sources');
 const { brandedArt } = require('./lib/branded-art');
 const migration = require('../packages/db/migrations/098-game-artwork-store');
 
@@ -187,6 +187,25 @@ async function revert(db, opts) {
   console.log(`reverted ${restored.rowCount} game(s), removed ${removed.rowCount} game_artwork row(s)`);
 }
 
+/**
+ * The JSGames catalogue already in this DB (source `own`): curated lobby / parked rows first,
+ * then `js_games`. A table this DB does not have is skipped.
+ */
+async function ownCatalogue(db) {
+  const parts = [];
+  for (const t of ['gisgamesnew', 'gisgamesnew_parked']) {
+    const { rows } = await db.query(
+      `SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = $1 AND column_name = 'aggregator'`,
+      [t]
+    );
+    if (rows.length) parts.push(`SELECT name, provider, type, image FROM ${t} WHERE aggregator = 'js_games'`);
+  }
+  if ((await db.query(`SELECT to_regclass('js_games') AS t`)).rows[0].t) {
+    parts.push(`SELECT game_name, vendor, game_type, game_icon FROM js_games WHERE is_active IS NOT FALSE`);
+  }
+  return parts.length ? (await db.query(parts.join(' UNION ALL '))).rows : [];
+}
+
 /** What the current image is: empty / broken / wrong shape / http / ok. */
 async function measure(row) {
   const image = String(row.image || '').trim();
@@ -233,6 +252,7 @@ async function main() {
       if (++measured % 200 === 0) console.log(`  measured ${measured}/${rows.length}`);
     });
 
+    console.log(`own catalogue: ${setOwnCatalogue(await ownCatalogue(db))} JSGames name(s) with https art`);
     const imported = opts.import ? importSource(JSON.parse(fs.readFileSync(opts.import, 'utf8'))) : null;
     const sources = [...SOURCES, ...(imported ? [imported] : []), ...(opts.bitcasino ? [fromBitcasino] : [])];
 
@@ -346,7 +366,7 @@ function report(results, todo, opts, sources) {
   const count = (list, fn) => list.reduce((m, r) => ((m[fn(r)] = (m[fn(r)] || 0) + 1), m), {});
   console.log('\ncurrent art:', count(results, (r) => (r.status.startsWith('not found') ? r.status.slice(11, -1) : r.status)));
 
-  const names = sources.map((s) => ({ fromHash: 'hash.game', fromShuffle: 'shuffle', fromPowbet: 'powbet', fromBitcasino: 'bitcasino', fromImport: 'import' })[s.name] || s.name);
+  const names = sources.map((s) => ({ fromOwnCatalogue: 'own', fromHash: 'hash.game', fromShuffle: 'shuffle', fromPowbet: 'powbet', fromBitcasino: 'bitcasino', fromImport: 'import' })[s.name] || s.name);
   const byProvider = {};
   for (const r of todo) {
     const p = (byProvider[r.provider] ||= { todo: 0, found: 0, missed: 0, ...Object.fromEntries(names.map((n) => [n, 0])), branded: 0, kept: 0 });

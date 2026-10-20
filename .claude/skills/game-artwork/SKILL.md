@@ -1,6 +1,6 @@
 ---
 name: game-artwork
-description: Fix casino lobby tile images (gisgamesnew.image) that are missing, broken, on the bare-IP http host, or the wrong shape for the 3:4 tile. The script looks each game up on reference lobbies (hash.game, powbet, shuffle; bitcasino is blocked and off), matching provider + name + live-or-not, then points the row at that art with a game_artwork backup for --revert. Use for "game images kharab hain", "images missing", "82.180.146.91 images", "reference site se game images lao", "image URL DB me update karo", or any work on gisgamesnew.image, game_artwork or fix-game-artwork.js.
+description: Fix casino lobby tile images (gisgamesnew.image) that are missing, broken, on the bare-IP http host, or the wrong shape for the 3:4 tile. The script looks each game up first in our own DB's JSGames catalogue (js_games, parked js_games rows), then on reference lobbies (hash.game, shuffle, powbet; bitcasino is blocked and off), matching provider + name + live-or-not, then points the row at that art with a game_artwork backup for --revert. Use for "game images kharab hain", "images missing", "82.180.146.91 images", "reference site se game images lao", "image URL DB me update karo", or any work on gisgamesnew.image, game_artwork or fix-game-artwork.js.
 ---
 
 # Game tile artwork (hash-game-exchange)
@@ -17,7 +17,26 @@ The lobby tile is **portrait 3:4**. `frontend/src/components/shared/GameTile/ind
 
 ## The script
 
-`backend/scripts/fix-game-artwork.js`, with helpers `scripts/lib/artwork-sources.js` (sources and matcher) and `scripts/lib/image-size.js`. It reads the DB settings from `backend/.env` itself, so never open that file.
+`backend/scripts/fix-game-artwork.js`, with helpers `scripts/lib/artwork-sources.js` (sources and matcher) and `scripts/lib/image-size.js`. It reads the DB settings from `backend/.env` itself, so never open that file. Variables already set in the shell win over the file (`process.loadEnvFile` does not override), so a local run can point elsewhere: `DB_HOST=127.0.0.1 DB_NAME=<local db> DB_USER=postgres DB_PASSWORD=postgres node scripts/fix-game-artwork.js ...`. A worktree has no `node_modules`: add `NODE_PATH=<main checkout>/backend/node_modules`.
+
+## On the server (live: casino_aggregator = slotegrator, ~9,550 lobby rows)
+
+```bash
+cd backend
+set -a; . ./.env; set +a                     # only so pg_dump gets the same DB; never print it
+# 1. backup
+PGPASSWORD="$DB_PASSWORD" pg_dump -h "$DB_HOST" -p "${DB_PORT:-5432}" -U "$DB_USER" -d "$DB_NAME" -Fc -t gisgamesnew -f ~/gisgamesnew-before-artwork-$(date +%F).dump
+# 2. dry run, read report.csv (status / source / matched / note)
+node scripts/fix-game-artwork.js --aggregator=slotegrator --with-empty --with-broken --with-http --no-download --out=~/game-artwork
+# 3. apply the reference / own-catalogue art
+node scripts/fix-game-artwork.js --aggregator=slotegrator --with-empty --with-broken --with-http --no-download --out=~/game-artwork --apply
+#    undo if needed (only rows still showing what the script set)
+node scripts/fix-game-artwork.js --revert
+# 4. the rest: misses that are empty / broken / wrong shape get a branded self-hosted tile
+node scripts/fix-game-artwork.js --aggregator=slotegrator --with-empty --with-broken --brand --no-download --out=~/game-artwork-brand --apply
+```
+
+Restore the whole table instead: `pg_restore -h ... -U ... -d "$DB_NAME" --clean -t gisgamesnew ~/gisgamesnew-before-artwork-<date>.dump`.
 
 ```bash
 cd backend
@@ -60,6 +79,34 @@ node scripts/fix-game-artwork.js --with-bitcasino ...                           
 | Betgames | betgames, betgames-tv | Betgames, BetGames.TV | yes |
 | Vivogaming | vivo-gaming | Vivo Gaming | yes |
 | XProgaming | xprogaming, xpro-gaming | XPro Gaming, XPG | yes |
+| NetEnt | netent ✓ | NetEnt, Net Entertainment (shuffle, powbet, JSGames `netent`) | |
+
+   Added 2026-10-20 for the live 79-provider Slotegrator lobby (hash.game slugs are its provider-list names slugged; ✓ = checked with a real game; `[]` = not on hash.game, so it is not asked):
+
+| Slotegrator | hash.game | names accepted (where seen) |
+|---|---|---|
+| AmigoGaming | amigo-gaming ✓ | Amigo Gaming (hash, powbet) |
+| Belatra Games | belatra ✓ | Belatra |
+| Booongo | booongo ✓ | Booongo, BNG |
+| Caleta | caleta-gaming ✓ | Caleta Gaming (hash), Caleta (powbet) |
+| FaChai | fa-chai ✓ | FA CHAI |
+| JDB | jdb ✓, jdb-gaming | JDB, JDB Gaming |
+| No Limit City | nolimitcity ✓ | NoLimitCity (hash), Nolimit City (shuffle), nolimit (powbet) |
+| OnlyPlay | onlyplay | OnlyPlay (hash, powbet) |
+| PlayNGo | playngo ✓ | PlaynGo |
+| PopiPlay | popiplay | Popiplay (hash, powbet) |
+| Quickspin | quickspin ✓ | Quickspin (hash, powbet) |
+| RTG SLOTS | real-time-gaming | Real Time Gaming, RTG |
+| RubyPlay | ruby-play | Ruby Play (hash, powbet) |
+| Skywind Slot | skywind | Skywind |
+| Spadegaming | spadegaming ✓ | Spadegaming (hash, powbet) |
+| Thunderkick | thunderkick ✓ | Thunderkick (hash, shuffle, powbet) |
+| OneTouch, Relax Gaming | [] | shuffle (Relax Gaming / relax), powbet onetouch |
+| Apparat, BarbaraBang, BFGames (beefee), CTInteractive (ct), EnjoyGaming, Fugaso, Gamebeat, HolleGames Standard (Hölle Games), PlayHub, Salsa (Salsa Technology), Turbogames, VibraGaming (vibra-aleaplay), Yggdrasil, Zillion Games (zillion-direct) | [] | powbet only |
+
+   Not on hash.game, shuffle or powbet (2026-10-20), so not mapped (no guessing): Amarix, ApolloGames, Blueprint, Boldplay, Clawbuster, ConceptGaming, Dlv, Dragoon Soft, Elbet, Espressogames, Evoplay, ExcellentReel, FormulaSpin, FunkyGames, HoGaming, KAGaming, KajotGames, Kalamba, Lotto Instant Win, Lucksome, MacawGaming, MPlay, Nucleus, RevolverGaming, Rich88, RivalGames, SimplePlay, Spearhead Studios, TripleCherry, TripleProfitsGames, Wazdan, ZeusPlay. An unmapped provider still tries its own name slugged, so it is harmless. Live-only in the lobby: Betgames, Ezugi, ICONIC21, SA Gaming, Vivogaming, XProgaming (and PragmaticPlayLive, Evolution Gaming).
+
+   JSGames vendor keys (own catalogue) sit in the same `names`: `evolution`, `pragmatic`, `pragmaticlive`, `bgaming`, `hacksaw`, `pgsoft`, `netent`, `spribe`, `ezugi`. `jili`, `microgaming`, `ideal`, `km` (KingMaker) and `2j` have no Slotegrator studio in the lobby, so they never match.
 
    SmartBet (house games) and `type='lobby'` rows are skipped. If a provider never matches, add it to this map first.
 2. **Name:** `nameKey()` ignores case, ™ ® © and punctuation, and treats "&" and "and" as equal. `baseName()` also tries the name without an RTP or platform suffix, so "Gladiator Legends 96% Mobile" can match "Gladiator Legends". A number that belongs to the name ("Gates of Olympus 1000") stays.
@@ -71,11 +118,14 @@ The art must also load, measure as portrait, and be over 2 KB.
 
 | Site | API (plain Node fetch, read-only GET) | Art used |
 |---|---|---|
-| **hash.game** (first) | `GET https://hash.game/api/game/home/detail/?gameUrl=<name-slug>-by-<provider-slug>&areaCode=IN` | `iconThreeFour` + `?_v=4,dpr=1,width=480`, giving 480x640 (exactly 3:4). `.../common.png` means no art. Don't send `image/avif` in Accept |
-| **shuffle** (second) | `GET https://shuffle.com/main-api/bp-storage/public-assets/games/games.json`, the whole lobby, once per run | imgix `?width=480&fm=jpg&q=85`, giving 480x672 |
-| **powbet** (third) | `GET https://powbet.com/en/api/v2/game/list?page=1&count=30&search=<name>` | `imagex3`, 400x600. `image` is landscape and not used |
+| **own DB** (first, added 2026-10-20) | The JSGames catalogue already in this DB: `gisgamesnew` and `gisgamesnew_parked` rows with `aggregator='js_games'` (curated art, first), then `js_games` (`game_name`, `vendor`, `game_type`, `game_icon`). Read ONCE per run over the script's own connection (`ownCatalogue(db)` → `setOwnCatalogue(rows)`); a missing table is skipped. Live = the JSGames type says live (`CasinoLive`) | that row's image, absolute https only (relative `abc.png` and http are ignored). Most of it is softswiss / coincasino / imgxcut / rajabet; huidu's 520x520 squares fail the portrait check and fall through to hash.game |
+| **hash.game** (second) | `GET https://hash.game/api/game/home/detail/?gameUrl=<name-slug>-by-<provider-slug>&areaCode=IN` | `iconThreeFour` + `?_v=4,dpr=1,width=480`, giving 480x640 (exactly 3:4). `.../common.png` means no art. Don't send `image/avif` in Accept |
+| **shuffle** (third) | `GET https://shuffle.com/main-api/bp-storage/public-assets/games/games.json`, the whole lobby, once per run | imgix `?width=480&fm=jpg&q=85`, giving 480x672 |
+| **powbet** (fourth) | `GET https://powbet.com/en/api/v2/game/list?page=1&count=30&search=<name>` | `imagex3`, 400x600. `image` is landscape and not used |
 | **`--import=<file>`** | a JSON file the USER exported from their own browser, `[{ "name", "provider", "category", "image" }]` | `image` (must measure portrait). Same three checks. This is how bitcasino can be used: the user opens bitcasino.io in their own browser and saves its catalogue themselves. We don't script that |
 | **bitcasino.io** (off, `--with-bitcasino`) | `POST https://bitcasino.io/graphql` `casinoGameInventory.searchGames` | **Blocked.** Cloudflare challenges every scripted request (403, `cf-mitigated: challenge`, on every path including robots.txt). The source does one plain fetch; after the 403 every row gets the miss "bitcasino blocks scripted access (Cloudflare)". Do NOT run its GraphQL from a browser tab to bulk-read it: that gets around the bot protection. Using bitcasino needs an official feed or their permission. For reference, its art is on `cdn.coingaming.io`/`cdn.hub88.io`; `thumbUrlTab` is portrait and `thumbUrl` is 490x368 landscape |
+
+Provider lists used to build the map (read-only GET): hash.game `GET /api/game/home/provider/list/?areaCode=IN&categoryId=1` (slots, 66 providers) and `categoryId=4` (live, 8); it has no slug field, so slugs are checked with `.../home/detail/?gameUrl=<game>-by-<slug>`. shuffle: the `provider.name`/`slug` of games.json. powbet: `GET https://powbet.com/en/api/v2/brand/list?page=1..6` (`title`, `name` = the `brand_code` in game results).
 
 To add a source, write `fromX(row)` in `artwork-sources.js` that returns `{ source, url, matched }` or `{ miss }` after all three checks, append it to `SOURCES`, and add a case to `scripts/__tests__/artwork-sources.test.js`.
 

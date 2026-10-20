@@ -21,6 +21,9 @@ const {
   importSource,
   BITCASINO_BLOCKED,
   bitcasinoUrl,
+  SOURCES,
+  setOwnCatalogue,
+  fromOwnCatalogue,
 } = require('../lib/artwork-sources');
 const { portrait } = require('../fix-game-artwork');
 
@@ -98,6 +101,35 @@ test('--import: a user-exported catalogue, same three checks', async () => {
   assert.equal((await from({ name: 'Mega Wheel', provider: 'PragmaticPlayLive', type: 'game show' })).source, 'import');
   assert.ok((await from({ name: 'Le Bandit', provider: 'PGSoft', type: 'slots' })).miss);
   assert.equal(importSource([]), null);
+});
+
+test('own catalogue: JSGames rows matched on provider, name and live-or-not', async () => {
+  assert.deepEqual(await fromOwnCatalogue({ name: 'Le Bandit', provider: 'Hacksaw Gaming', type: 'slots' }), { miss: 'own catalogue not loaded' });
+  setOwnCatalogue([
+    { name: 'Le Bandit', provider: 'hacksaw', type: 'Slot', image: 'https://cdn.softswiss.net/le-bandit.png' },
+    { name: 'Crazy Time', provider: 'evolution', type: 'CasinoLive', image: 'https://imgxcut.com/game/image/ct.png' },
+    { name: 'Starburst', provider: 'netent', type: 'Slot Game', image: '0bace5f8418a61a7f6efccabefdb30aa.png' }, // relative: ignored
+  ]);
+  const hit = await fromOwnCatalogue({ name: 'Le Bandit 96% Mobile', provider: 'Hacksaw Gaming', type: 'slots' });
+  assert.equal(hit.source, 'own');
+  assert.equal(hit.url, 'https://cdn.softswiss.net/le-bandit.png');
+  assert.equal((await fromOwnCatalogue({ name: 'Crazy Time', provider: 'Evolution Gaming', type: 'game show' })).source, 'own');
+  // provider mismatch
+  assert.ok((await fromOwnCatalogue({ name: 'Le Bandit', provider: 'PGSoft', type: 'slots' })).miss);
+  // live mismatch: an RNG row never takes the live table's art
+  assert.ok((await fromOwnCatalogue({ name: 'Crazy Time', provider: 'Evolution Gaming', type: 'slots' })).miss);
+  assert.deepEqual(await fromOwnCatalogue({ name: 'Starburst', provider: 'NetEnt', type: 'slots' }), { miss: 'not in own catalogue' });
+  assert.equal(SOURCES[0], fromOwnCatalogue);
+});
+
+test('provider map: the live Slotegrator names', () => {
+  assert.ok(sameProvider('No Limit City', 'NoLimitCity'));
+  assert.ok(sameProvider('No Limit City', 'nolimit'));
+  assert.ok(sameProvider('RTG SLOTS', 'Real Time Gaming'));
+  assert.ok(sameProvider('HolleGames Standard', 'Hölle Games'));
+  assert.ok(sameProvider('BGaming', 'bgmng'));
+  assert.ok(sameProvider('NetEnt', 'netent'));
+  assert.ok(!sameProvider('NetEnt', 'Red Tiger'));
 });
 
 test('portrait range fits the 3:4 tile', () => {

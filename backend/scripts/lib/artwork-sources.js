@@ -18,6 +18,8 @@
  *
  * ── SOURCES (checked 2026-10-14) ───────────────────────────────────────────
  *
+ *   own        FIRST. Our own DB's JSGames catalogue (js_games + aggregator='js_games' rows of
+ *              gisgamesnew / gisgamesnew_parked), read once per run (`setOwnCatalogue`).
  *   hash.game  GET https://hash.game/api/game/home/detail/?gameUrl=<name>-by-<provider>&areaCode=IN
  *              `iconThreeFour`, exactly 3:4, resized by imgxcut `?_v=4,dpr=1,width=480`.
  *              `.../common.png` = no art. Never ask imgxcut for AVIF.
@@ -50,7 +52,7 @@ const PROVIDERS = {
     names: ['pragmaticplaylive', 'pragmaticplay', 'pragmatic', 'pragmaticlive'],
     live: true,
   },
-  'hacksaw gaming': { hash: ['hacksaw-gaming', 'hacksaw'], names: ['hacksawgaming', 'hacksaw'] },
+  'hacksaw gaming': { hash: ['hacksaw', 'hacksaw-gaming'], names: ['hacksawgaming', 'hacksaw'] }, // ✓ hacksaw
   'evolution gaming': {
     hash: ['evolution-gaming', 'evolution'],
     names: ['evolutiongaming', 'evolution', 'evolutionhubasia', 'evolutionasia'],
@@ -59,7 +61,7 @@ const PROVIDERS = {
   playtech: { hash: ['playtech', 'playtech-live'], names: ['playtech', 'playtechlive', 'playtechcasino'] },
   pgsoft: { hash: ['pg-soft', 'pgsoft'], names: ['pgsoft', 'pocketgamessoft'] },
   platipus2: { hash: ['platipus', 'platipus-gaming'], names: ['platipus', 'platipusgaming'] },
-  bgaming: { hash: ['bgaming'], names: ['bgaming'] },
+  bgaming: { hash: ['bgaming'], names: ['bgaming', 'bgmng'] }, // shuffle slug bgmng
   ezugi: { hash: ['ezugi'], names: ['ezugi'], live: true },
   'sa gaming': { hash: ['sa-gaming', 'sagaming'], names: ['sagaming', 'sa'], live: true },
   'sevenmojos slots': { hash: ['7mojos', '7-mojos', 'seven-mojos'], names: ['7mojos', 'sevenmojos', '7mojosslots', 'sevenmojosslots'] },
@@ -70,6 +72,42 @@ const PROVIDERS = {
   betgames: { hash: ['betgames', 'betgames-tv'], names: ['betgames', 'betgamestv'], live: true },
   vivogaming: { hash: ['vivo-gaming', 'vivogaming'], names: ['vivogaming', 'vivo'], live: true },
   xprogaming: { hash: ['xprogaming', 'xpro-gaming', 'xpg'], names: ['xprogaming', 'xpro', 'xpg'], live: true },
+  netent: { hash: ['netent'], names: ['netent', 'netentertainment'] }, // ✓ shuffle, powbet, JSGames netent
+
+  // The rest of the live Slotegrator lobby (2026-10-20). hash.game slugs are its provider-list
+  // names slugged (✓ = checked with a real game); [] = not on hash.game, so it is not asked.
+  amigogaming: { hash: ['amigo-gaming'], names: ['amigogaming', 'amigo'] }, // ✓ powbet amigo-gaming
+  apparat: { hash: [], names: ['apparat'] }, // powbet
+  barbarabang: { hash: [], names: ['barbarabang'] }, // powbet
+  'belatra games': { hash: ['belatra'], names: ['belatra', 'belatragames'] }, // ✓
+  bfgames: { hash: [], names: ['bfgames', 'beefee'] }, // powbet "BF Games" / beefee
+  booongo: { hash: ['booongo'], names: ['booongo', 'bng'] }, // ✓
+  caleta: { hash: ['caleta-gaming'], names: ['caleta', 'caletagaming'] }, // ✓ powbet caleta
+  ctinteractive: { hash: [], names: ['ctinteractive', 'ct'] }, // powbet "CT Interactive" / ct
+  enjoygaming: { hash: [], names: ['enjoygaming'] }, // powbet
+  fachai: { hash: ['fa-chai'], names: ['fachai'] }, // ✓
+  fugaso: { hash: [], names: ['fugaso'] }, // powbet
+  gamebeat: { hash: [], names: ['gamebeat'] }, // powbet
+  'hollegames standard': { hash: [], names: ['hollegames', 'hollegamesstandard'] }, // powbet "Hölle Games"
+  jdb: { hash: ['jdb', 'jdb-gaming'], names: ['jdb', 'jdbgaming'] }, // ✓
+  'no limit city': { hash: ['nolimitcity'], names: ['nolimitcity', 'nolimit'] }, // ✓ shuffle, powbet nolimit
+  onetouch: { hash: [], names: ['onetouch'] }, // shuffle, powbet
+  onlyplay: { hash: ['onlyplay'], names: ['onlyplay'] }, // powbet
+  playhub: { hash: [], names: ['playhub'] }, // powbet
+  playngo: { hash: ['playngo'], names: ['playngo'] }, // ✓
+  popiplay: { hash: ['popiplay'], names: ['popiplay'] }, // powbet
+  quickspin: { hash: ['quickspin'], names: ['quickspin'] }, // ✓ powbet
+  'relax gaming': { hash: [], names: ['relaxgaming', 'relax'] }, // shuffle
+  'rtg slots': { hash: ['real-time-gaming'], names: ['rtgslots', 'rtg', 'realtimegaming'] },
+  rubyplay: { hash: ['ruby-play'], names: ['rubyplay'] }, // powbet
+  salsa: { hash: [], names: ['salsa', 'salsatechnology'] }, // powbet
+  'skywind slot': { hash: ['skywind'], names: ['skywindslot', 'skywind', 'skywindgroup'] },
+  spadegaming: { hash: ['spadegaming'], names: ['spadegaming'] }, // ✓ powbet
+  thunderkick: { hash: ['thunderkick'], names: ['thunderkick'] }, // ✓ shuffle, powbet
+  turbogames: { hash: [], names: ['turbogames'] }, // powbet
+  vibragaming: { hash: [], names: ['vibragaming', 'vibraaleaplay'] }, // powbet "Vibra Gaming" / vibra-aleaplay
+  yggdrasil: { hash: [], names: ['yggdrasil'] }, // powbet
+  'zillion games': { hash: [], names: ['zilliongames', 'zillion', 'zilliondirect'] }, // powbet "Zillion" / zillion-direct
 };
 
 /** Lowercase, no ™ ® ©, "&" read as "and", only letters and digits. */
@@ -345,13 +383,45 @@ function importSource(list) {
   };
 }
 
-/** Best art first: hash.game is exactly 3:4, shuffle 5:7, powbet 2:3. fromBitcasino joins last only with --with-bitcasino. */
-const SOURCES = [fromHash, fromShuffle, fromPowbet];
+/**
+ * Our own DB first: the same game in the JSGames catalogue (`js_games`, and `gisgamesnew` /
+ * `gisgamesnew_parked` rows with aggregator='js_games'). fix-game-artwork.js reads those rows
+ * once over its own connection and hands them to `setOwnCatalogue`, curated rows first.
+ * JSGames providers are short vendor keys (evolution, pragmaticlive, hacksaw, netent...) found in
+ * PROVIDERS' `names`; its `type` says live ("CasinoLive"). Only absolute https art is used.
+ */
+let ownIndex = null;
+function setOwnCatalogue(rows) {
+  ownIndex = new Map();
+  for (const g of rows || []) {
+    const k = nameKey(g?.name);
+    if (!k || !/^https:\/\//i.test(String(g.image || '').trim())) continue;
+    if (!ownIndex.has(k)) ownIndex.set(k, []);
+    ownIndex.get(k).push(g);
+  }
+  return ownIndex.size;
+}
+
+async function fromOwnCatalogue(row) {
+  if (!ownIndex) return { miss: 'own catalogue not loaded' };
+  const candidates = nameKeys(row.name).flatMap((k) => ownIndex.get(k) || []);
+  for (const g of candidates) {
+    if (!sameProvider(row.provider, g.provider)) continue;
+    if (isLive(g.type) !== rowIsLive(row)) continue;
+    return { source: 'own', url: String(g.image).trim(), matched: `${g.name} | ${g.provider} | ${g.type}` };
+  }
+  return { miss: candidates.length ? 'own catalogue had the name, not the provider/type' : 'not in own catalogue' };
+}
+
+/** Own DB first, then best art: hash.game is exactly 3:4, shuffle 5:7, powbet 2:3. fromBitcasino joins last only with --with-bitcasino. */
+const SOURCES = [fromOwnCatalogue, fromHash, fromShuffle, fromPowbet];
 
 module.exports = {
   UA,
   PROVIDERS,
   SOURCES,
+  setOwnCatalogue,
+  fromOwnCatalogue,
   fromBitcasino,
   importSource,
   BITCASINO_BLOCKED,
