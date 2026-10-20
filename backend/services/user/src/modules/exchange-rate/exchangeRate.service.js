@@ -36,11 +36,12 @@ function assertSiteManaged(currency, row) {
  *      for a satoshi-denominated currency. Rates are strings end to end and go
  *      through `money`, which works in BigInt minor units.
  */
-/** CoinGecko id → our code. Stablecoins stay at the 1.0 they are seeded with. */
+/** CoinGecko id → our code. Stablecoins are pegged: written as 1.0 every run. */
 const COINGECKO_IDS = {
   bitcoin: 'BTC', ethereum: 'ETH', litecoin: 'LTC', 'bitcoin-cash': 'BCH', binancecoin: 'BNB', ripple: 'XRP',
   cardano: 'ADA', tron: 'TRX', dogecoin: 'DOGE', 'matic-network': 'MATIC', 'shiba-inu': 'SHIB', nexo: 'NEXO', maker: 'MKR',
 };
+const STABLECOINS = ['USDT', 'USDC', 'BUSD', 'TUSD', 'USDP'];
 const FIAT_CODES = ['INR', 'PKR', 'AED', 'NPR', 'BDT', 'MVR', 'EUR'];
 
 async function getJson(url) {
@@ -55,7 +56,7 @@ async function fetchMarketRates() {
     getJson(`https://api.coingecko.com/api/v3/simple/price?ids=${Object.keys(COINGECKO_IDS).join(',')}&vs_currencies=usd`),
     getJson('https://open.er-api.com/v6/latest/USD'),
   ]);
-  const rates = {};
+  const rates = Object.fromEntries(STABLECOINS.map((code) => [code, 1]));
   if (crypto.status === 'fulfilled') {
     for (const [id, code] of Object.entries(COINGECKO_IDS)) {
       const usd = Number(crypto.value[id]?.usd);

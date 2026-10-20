@@ -25,14 +25,14 @@ test('refreshFromMarket writes market rates, skips owner rows and leaves unknown
 
   const result = await new ExchangeRateService({ models }).refreshFromMarket();
 
-  assert.deepEqual(result.updated, ['BTC', 'INR']);
-  assert.deepEqual(writes, { 1: '80000.00000000', 2: '0.01000000' });
+  assert.deepEqual(result.updated, ['BTC', 'INR', 'USDT']);
+  assert.deepEqual(writes, { 1: '80000.00000000', 2: '0.01000000', 4: '1.00000000' });
 });
 
-test('a failed feed changes nothing', async (t) => {
+test('a failed feed changes no market rate', async (t) => {
   t.mock.method(global, 'fetch', async () => ({ ok: false, status: 503 }));
   let wrote = false;
-  const models = { Exchangerate: { findAll: async () => [{ id: 1, currency: 'BTC' }], update: async () => { wrote = true; } } };
+  const models = { Exchangerate: { findAll: async () => [{ id: 1, currency: 'BTC' }, { id: 2, currency: 'INR' }], update: async () => { wrote = true; } } };
 
   const result = await new ExchangeRateService({ models }).refreshFromMarket();
 
