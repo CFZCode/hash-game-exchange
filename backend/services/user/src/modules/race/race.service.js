@@ -3,6 +3,7 @@
 const { createRewardMoney, USD_CODES } = require('../../lib/rewardMoney');
 const { Op } = require('sequelize');
 const { money, operatorSettings } = require('@ibitplay/common');
+const { notifyBonus } = require('../notifications/notifyPlayer');
 const { siteHasNoPromotions, promotionsBlocked } = require('@ibitplay/auth');
 
 const { WalletService } = require('../wallet/wallet.service');
@@ -796,6 +797,7 @@ class RaceService {
       { userId: String(userId), rewardId: reward.id, amount: String(reward.amount), ledgerId: movement.ledgerId },
       'Race reward claimed'
     );
+    void notifyBonus(userId, { key: `race-reward:${reward.id}`, title: 'Race reward claimed', amount: payout.amount, currency: payout.currency });
 
     return {
       rewardId: reward.id,

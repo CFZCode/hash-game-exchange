@@ -169,6 +169,8 @@ const INTERNAL_ACL = Object.freeze({
   'casino-service': [
     '/internal/admin/audit',
     '/internal/admin/entitlements',
+    /** Free spins granted / won → the player's bell (gis.service.js `#notifyFreeSpins`). */
+    '/internal/admin/notifications',
     '/internal/admin/site-config',
     '/internal/admin/staff-directory',
     '/internal/user/exchange-rate',

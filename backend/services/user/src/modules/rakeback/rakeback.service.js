@@ -11,6 +11,7 @@ const { ACCRUED_COLUMN, MIN_CLAIM, REASON } = require('./rakeback.constants');
 const { vipRewards } = require('@ibitplay/common');
 const { DEFAULT_RAKEBACK_RATE } = vipRewards;
 const { createRewardMoney } = require('../../lib/rewardMoney');
+const { afterBonus } = require('../notifications/notifyPlayer');
 
 /**
  * Rakeback — a share of the house edge, accrued from wagering and claimed.
@@ -379,7 +380,8 @@ class RakebackService {
          */
         remaining: money.toDecimalString(money.toMinor('0')),
       };
-    });
+      // A second claim is refused before it gets here, so the time names this one.
+    }).then(afterBonus(userId, (r) => ({ key: `rakeback:claim:${Date.now()}`, title: 'Rakeback claimed', amount: r.claimed, currency: r.currency, link: '/vip' })));
   }
 }
 

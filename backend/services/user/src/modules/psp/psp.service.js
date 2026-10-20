@@ -119,6 +119,14 @@ class PspService {
       // Logged, but NOT as an accepted digest: a failure notice must not burn
       // the fingerprint of a payload the provider may resend as a success.
       await this.#record(audit, { accepted: false, rejection: 'REPORTED_FAILED' });
+      void notifyPlayer(record.userId, {
+        kind: 'deposit_failed',
+        key: `psp-deposit:failed:${providerName}:${parsed.reference}`,
+        title: 'Deposit failed',
+        body: 'Your {amount} deposit did not go through. Nothing was credited.',
+        link: '#transactions',
+        meta: { amount: record.amount, currency: record.currency, reference: String(parsed.reference) },
+      });
       return { status: 'ok', settled: false, reference: parsed.reference };
     }
 

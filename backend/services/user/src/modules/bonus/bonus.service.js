@@ -17,6 +17,7 @@ const { WalletService } = require('../wallet/wallet.service');
 const { REASON } = require('../wallet/wallet.constants');
 const { VipService } = require('../vip/vip.service');
 const { createRewardMoney } = require('../../lib/rewardMoney');
+const { afterBonus } = require('../notifications/notifyPlayer');
 const { addToUserbonus } = require('../../lib/userbonusTotals');
 const { ownerWhere, assertPlayerVisible, withChannel } = require('../directory/playerScope');
 
@@ -307,7 +308,7 @@ class BonusService {
       this.logger?.info({ userId, type, amount, awardId: award.id, ledgerId: movement.ledgerId }, 'Bonus claimed');
 
       return { type, amount, amountUsd, currency, newBalance: movement.newBalance };
-    });
+    }).then(afterBonus(userId, (r) => ({ key: `bonus:claim:${award.id}`, title: `${type[0].toUpperCase()}${type.slice(1)} bonus claimed`, amount: r.amount, currency: r.currency })));
   }
 
   /**
@@ -373,7 +374,7 @@ class BonusService {
       this.logger?.info({ userId, code, amount }, 'Redeem code claimed');
 
       return { code, amount, currency, newBalance: movement.newBalance };
-    });
+    }).then(afterBonus(userId, (r) => ({ key: `bonus:redeem:${r.code}`, title: 'Redeem code bonus', amount: r.amount, currency: r.currency })));
   }
 
   /** @legacy POST /bonus/user — a player's own codes. */
@@ -687,7 +688,7 @@ class BonusService {
         currency,
         newBalance: movement?.newBalance ?? null,
       };
-    });
+    }).then(afterBonus(userId, (r) => ({ key: `bonus:grant:${idempotencyKey}`, title: 'Bonus credited', amount: r.granted, currency: r.currency })));
   }
 
   /**

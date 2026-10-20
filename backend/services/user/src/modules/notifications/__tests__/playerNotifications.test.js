@@ -476,8 +476,9 @@ test('player notifications', async (t) => {
       (await inbox.list({ userId: uid, limit: 50, offset: 0, unreadOnly: false, category })).rows.map((r) => r.title).sort();
 
     assert.deepEqual(await titles(direct, 'system'), ['Maintenance tonight', 'Old notice']);
-    assert.deepEqual(await titles(direct, 'transactions'), ['Deposit approved', 'VIP level 2 reached']);
-    assert.deepEqual(await titles(direct, 'promotions'), ['Weekend reload']);
+    assert.deepEqual(await titles(direct, 'transactions'), ['Deposit approved']);
+    // A VIP reward is a bonus, so it sits with the offers.
+    assert.deepEqual(await titles(direct, 'promotions'), ['VIP level 2 reached', 'Weekend reload']);
     assert.equal((await titles(direct, 'all')).length, 5);
     const page = await inbox.list({ userId: direct, limit: 2, offset: 0, unreadOnly: false, category: 'all' });
     assert.equal(page.rows.length, 2);

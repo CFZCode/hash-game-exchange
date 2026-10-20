@@ -96,7 +96,8 @@ function withoutInternal(outcome) {
 }
 
 class GisService {
-  constructor({ models, db, config, logger, wallet, provider, games }) {
+  constructor({ models, db, config, logger, wallet, provider, games, clients }) {
+    this.clients = clients;
     this.models = models;
     this.db = db;
     this.config = config;
@@ -229,8 +230,8 @@ class GisService {
     return response;
   }
 
-  #win({ body, userId, settlement, amount, balance }) {
-    return this.#apply({
+  async #win({ body, userId, settlement, amount, balance }) {
+    const response = await this.#apply({
       body,
       userId,
       settlement,
@@ -240,6 +241,31 @@ class GisService {
       isCredit: true,
       reason: 'BET_PAYOUT',
     });
+    if (body.freespin_id && !money.isZero(amount)) {
+      this.#notifyFreeSpins(userId, {
+        key: `gis:freespin-win:${body.transaction_id}`,
+        title: 'Free spins win',
+        template: '{amount} won with your free spins.',
+        meta: { amount: String(amount), currency: settlement },
+      });
+    }
+    return response;
+  }
+
+  /**
+   * A free-spins event → the player's bell, Promotions tab (user-service categories.js `free_spins`).
+   * Written straight to admin-service's inbox route, as user-service's notifyPlayer does; after the
+   * money moved, never awaited, never fails the callback.
+   */
+  #notifyFreeSpins(userId, { key, title, template, meta = null }) {
+    const text = meta ? template.replaceAll('{amount}', `${meta.amount} ${meta.currency}`) : template;
+    void Promise.resolve()
+      .then(() =>
+        this.clients?.admin?.request('PUT', '/internal/admin/notifications/player', {
+          body: { userId: Number(userId), kind: 'free_spins', title, body: text, key, data: { kind: 'free_spins', link: '/casino', ...(meta ? { meta, template } : {}) } },
+        })
+      )
+      .catch((error) => this.logger?.warn({ err: error?.message, userId: String(userId), key }, 'Free spins notification not sent'));
   }
 
   /**
@@ -841,6 +867,11 @@ class GisService {
     });
 
     if (!created) throw E.FREESPIN_EXISTS({ freespinId: input.freespinId });
+    this.#notifyFreeSpins(input.playerId, {
+      key: `gis:freespin:${input.freespinId}`,
+      title: 'Free spins added',
+      template: `You got ${input.quantity} free spins. Open the game to play them.`,
+    });
     return row.get({ plain: true });
   }
 

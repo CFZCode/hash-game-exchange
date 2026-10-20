@@ -28,6 +28,13 @@ const PROMOTION_TYPES = Object.freeze([
   'first_deposit_bonus',
   'spin_wheel_bonus',
   'bonus_unlocked',
+  // Every bonus / reward credit and casino free spins (notifyBonus, casino gis), and the VIP / referral rewards.
+  'bonus_credited',
+  'free_spins',
+  'vip_level_up',
+  'vip_rank_up',
+  'affiliate_reward',
+  'affiliate_commission',
 ]);
 
 /**

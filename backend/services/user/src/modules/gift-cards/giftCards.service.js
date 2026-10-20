@@ -3,6 +3,7 @@
 const { createRewardMoney } = require('../../lib/rewardMoney');
 const { Op, fn, col } = require('sequelize');
 const { money } = require('@ibitplay/common');
+const { afterBonus } = require('../notifications/notifyPlayer');
 
 const errors = require('./giftCards.errors');
 const { STATUS, DEPOSIT_SOURCES } = require('./giftCards.constants');
@@ -486,7 +487,7 @@ class GiftCardsService {
       );
 
       return { giftCardId, status: STATUS.CLAIMED, amount, currency: rewardCurrency, newBalance: movement.newBalance };
-    });
+    }).then(afterBonus(userId, (r) => ({ key: `giftcard:${activation.id}`, title: 'Gift card claimed', amount: r.amount, currency: r.currency })));
   }
 
   /** @legacy GET /giftCard/user/:userId/claimed */

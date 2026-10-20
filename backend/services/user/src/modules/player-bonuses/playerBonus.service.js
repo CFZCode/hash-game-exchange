@@ -7,7 +7,7 @@ const { promotionsBlocked } = require('@ibitplay/auth');
 const { WalletService } = require('../wallet/wallet.service');
 const { REASON } = require('../wallet/wallet.constants');
 const { createRewardMoney } = require('../../lib/rewardMoney');
-const { notifyPlayer } = require('../notifications/notifyPlayer');
+const { notifyPlayer, notifyBonus } = require('../notifications/notifyPlayer');
 const { ownerWhere, assertPlayerVisible, withChannel } = require('../directory/playerScope');
 const errors = require('./playerBonus.errors');
 const { settleItem } = require('../wager/stakeShare');
@@ -411,6 +411,7 @@ class PlayerBonusService {
     });
     if (!paid.length) throw errors.NOTHING_TO_CLAIM({ userId: String(userId) });
     this.logger?.info({ userId: String(userId), paid }, 'Unlocked bonus claimed');
+    for (const p of paid) void notifyBonus(userId, { key: `bonus:claim-unlocked:${p.bonusId}:${p.ledgerId ?? Date.now()}`, title: 'Unlocked bonus claimed', amount: p.amount, currency: p.currency });
     return { claimed: paid };
   }
 

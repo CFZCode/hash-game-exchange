@@ -183,6 +183,12 @@ const PROMOTION_TYPES = [
   'first_deposit_bonus',
   'spin_wheel_bonus',
   'bonus_unlocked',
+  'bonus_credited',
+  'free_spins',
+  'vip_level_up',
+  'vip_rank_up',
+  'affiliate_reward',
+  'affiliate_commission',
 ];
 
 const typeOf = (name) => {

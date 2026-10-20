@@ -139,6 +139,28 @@ function notifyPlayer(userId, input, deps = defaultDeps) {
   return run;
 }
 
+/**
+ * A bonus / reward that just landed in the wallet: one `bonus_credited` row, the bell's Promotions
+ * tab. `n` is `{ key, title, amount, currency, link? }`; a zero amount tells nobody.
+ */
+function notifyBonus(userId, n) {
+  if (!n || !(Number(n.amount) > 0)) return Promise.resolve([]);
+  return notifyPlayer(userId, {
+    kind: 'bonus_credited',
+    key: n.key,
+    title: n.title,
+    body: '{amount} has been added to your wallet.',
+    link: n.link ?? '/bonus',
+    meta: { amount: String(n.amount), currency: n.currency },
+  });
+}
+
+/** `notifyBonus` as a `.then()` after the COMMIT: `describe(result)` names the notice, the result passes through. */
+const afterBonus = (userId, describe) => (result) => {
+  void notifyBonus(userId, describe(result));
+  return result;
+};
+
 /** Wait for every notification this process has in flight. */
 async function settleNotifications() {
   while (PENDING.size) await Promise.allSettled([...PENDING]);
@@ -149,4 +171,4 @@ function resetNotifierMemo() {
   SENT.clear();
 }
 
-module.exports = { notifyPlayer, configureNotifier, settleNotifications, resetNotifierMemo, amountText };
+module.exports = { notifyPlayer, notifyBonus, afterBonus, configureNotifier, settleNotifications, resetNotifierMemo, amountText };

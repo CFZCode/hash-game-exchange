@@ -13,7 +13,7 @@ const { WalletService } = require('../wallet/wallet.service');
 const { REASON } = require('../wallet/wallet.constants');
 const { resolveReferrerOwner, referralLinkFor } = require('./referrerResolver');
 const { createRewardMoney } = require('../../lib/rewardMoney');
-const { notifyPlayer } = require('../notifications/notifyPlayer');
+const { notifyPlayer, notifyBonus, afterBonus } = require('../notifications/notifyPlayer');
 const { settleItem } = require('../wager/stakeShare');
 
 /**
@@ -241,11 +241,12 @@ class AffiliateService {
 
     if (!agentMember && settings.registerBonusEnabled && money.gt(settings.registerBonus, "0")) {
       const amount = money.toDecimalString(money.toMinor(settings.registerBonus));
+      // The site's reward currency; the operator enters the amount in it.
+      const currency = await this.rewardMoney.currency();
       await this.wallet.credit(
         {
           userId,
-          // The site's reward currency; the operator enters the amount in it.
-          currency: await this.rewardMoney.currency(),
+          currency,
           amount,
           reason: REASON.BONUS,
           idempotencyKey: `affiliate:register-bonus:${userId}`,
@@ -256,6 +257,7 @@ class AffiliateService {
         { sourceService: "user-service" }
       );
       results.registerBonus = true;
+      void notifyBonus(userId, { key: 'affiliate:register-bonus', title: 'Registration bonus', amount, currency });
     }
 
     if (!joined || !referredBy?.trim() || !money.gt(settings.affiliateBonus, "0")) {
@@ -615,7 +617,7 @@ class AffiliateService {
 
       this.logger?.info({ userId, rewardId, amount, currency: paid.payoutCurrency }, 'Affiliate reward claimed');
       return { rewardId, kind: 'tier', amount, currency: paid.payoutCurrency, newBalance: paid.newBalance };
-    });
+    }).then(afterBonus(userId, (r) => ({ key: `affiliate:claim:tier:${rewardId}`, title: 'Referral reward claimed', amount: r.amount, currency: r.currency, link: '/affiliate' })));
   }
 
   async #claimCommission({ userId, rewardId }) {
@@ -630,7 +632,7 @@ class AffiliateService {
 
       this.logger?.info({ userId, rewardId, amount, currency: paid.payoutCurrency }, 'Affiliate commission claimed');
       return { rewardId, kind: 'commission', amount, currency: paid.payoutCurrency, newBalance: paid.newBalance };
-    });
+    }).then(afterBonus(userId, (r) => ({ key: `affiliate:claim:commission:${rewardId}`, title: 'Commission claimed', amount: r.amount, currency: r.currency, link: '/affiliate' })));
   }
 
   /**
@@ -685,7 +687,8 @@ class AffiliateService {
 
       this.logger?.info({ userId, count: claimed.length, totals }, 'All affiliate rewards claimed');
       return { total, currency, totals, count: claimed.length, rewards: claimed };
-    });
+      // Nothing left to claim twice once this commits, so the time names the claim.
+    }).then(afterBonus(userId, (r) => ({ key: `affiliate:claim-all:${Date.now()}`, title: 'Referral rewards claimed', amount: r.total, currency: r.currency, link: '/affiliate' })));
   }
 
   // ══════════════════════════════════════════════════════════════════════

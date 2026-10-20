@@ -145,6 +145,16 @@ class CryptoService {
         meta: { amount: outcome.amount, currency: outcome.currency, reference: String(outcome.orderId) },
       });
     }
+    if (outcome?.failed) {
+      void notifyPlayer(outcome.userId, {
+        kind: 'deposit_failed',
+        key: `crypto-deposit:failed:${outcome.orderId}`,
+        title: 'Deposit failed',
+        body: 'Your {amount} deposit did not go through. Nothing was credited.',
+        link: '#transactions',
+        meta: { amount: outcome.amount, currency: outcome.currency, reference: String(outcome.orderId) },
+      });
+    }
     return outcome;
   }
 
@@ -172,7 +182,9 @@ class CryptoService {
         { status: status ?? CCPAYMENT_STATUS.PROCESSING, updated_at: new Date() },
         { where: { orderid: String(orderId) }, transaction }
       );
-      return { handled: true, credited: false, status };
+      // A final failure (not "still processing") is told to the player after COMMIT, in handleWebhook.
+      const failed = status === CCPAYMENT_STATUS.FAILED || status === CCPAYMENT_STATUS.REJECTED;
+      return { handled: true, credited: false, status, ...(failed ? { failed, userId: deposit.userid, amount: String(deposit.price ?? deposit.amount ?? '0'), currency: String(coinSymbol ?? '').toUpperCase(), orderId } : {}) };
     }
 
     /**
