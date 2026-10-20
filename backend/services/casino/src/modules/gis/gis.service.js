@@ -1146,8 +1146,11 @@ class GisService {
       written += 1;
     }
 
-    this.logger?.info({ written, skipped, table }, 'Slotegrator game catalogue synced');
-    return { written, skipped, fetched: items.length, table };
+    // The same crawl names the providers, so the admin's provider list moves with the games.
+    const { providers } = await this.#saveProviders(items);
+
+    this.logger?.info({ written, skipped, table, providers }, 'Slotegrator game catalogue synced');
+    return { written, skipped, fetched: items.length, table, providers };
   }
 
   /**
@@ -1170,6 +1173,11 @@ class GisService {
       expand: 'tags,parameters,images,related_games',
     });
 
+    return this.#saveProviders(items);
+  }
+
+  /** Upsert each provider the crawl named into `gis_providers_new`; the `enabled` flags survive. */
+  async #saveProviders(items) {
     const names = [
       ...new Set(items.map((g) => String(g?.provider ?? g?.label ?? '').trim()).filter(Boolean)),
     ].sort();

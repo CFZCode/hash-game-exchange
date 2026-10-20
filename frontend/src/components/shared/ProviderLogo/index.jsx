@@ -1,4 +1,4 @@
-import { canonicalProvider, providerLogo } from '../../../data/providers';
+import { canonicalProvider, providerDisplayName, providerLogo } from '../../../data/providers';
 import { useSiteLogo } from '../../../services/siteBranding';
 import { useSettings } from '../../../context/settings';
 
@@ -34,13 +34,15 @@ export default function ProviderLogo({
   const brandLogo = useSiteLogo({ own: 'hash-games' });
   const logo = (brandLogo && canonicalProvider(name) === 'BC.GAME' ? brandLogo : null) ?? providerLogo(name, darken);
 
+  const label = providerDisplayName(name);
+
   if (!logo) {
-    return <span className="px-2 text-center text-sm font-semibold text-secondary">{name}</span>;
+    return <span className="px-2 text-center text-sm font-semibold text-secondary">{label}</span>;
   }
 
   return (
     <div className={`center flex overflow-hidden ${boxClassName}`}>
-      <img className={`${className} object-contain`} alt={name} src={logo} />
+      <img className={`${className} object-contain`} alt={label} src={logo} />
     </div>
   );
 }

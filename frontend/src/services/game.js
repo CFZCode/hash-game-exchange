@@ -94,7 +94,8 @@ export const isHouseGame = (ref) => HOUSE_SLUGS.has(ref) || HOUSE_SLUGS.has(slug
  * `null` and the page renders its own failure dialog. A refusal rejects with the transport's
  * `ApiError` and the caller decides what the player sees. */
 const LAUNCH_CURRENCIES = {
-  aggregator: ['INR'],
+  /* Slotegrator takes INR as INR and USDT as USD. shortcut: a JSGames-lobby USDT launch fails upstream (INR only), split by row aggregator if JSGames comes back. */
+  aggregator: ['INR', 'USDT'],
   /* The Original Games Aggregator settles INR and USDT only (agreed at onboarding). */
   'in-house': ['INR', 'USDT'],
 };

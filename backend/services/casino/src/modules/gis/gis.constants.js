@@ -21,37 +21,19 @@ const MONEY_ACTIONS = Object.freeze(new Set([ACTION.BET, ACTION.WIN, ACTION.REFU
  * Currencies the integration accepts from the provider, and the wallet currency
  * each settles against.
  *
- * ── WHY PKR SETTLES IN INR ───────────────────────────────────────────────
- * This is legacy's `CUR2COL`, kept exactly:
- *
- *     const CUR2COL = { PKR: 'inr', INR: 'inr', USD: 'usdt', USDT: 'usdt' };
- *
- * A PKR-denominated game moves the player's INR balance, and a USD game moves
- * USDT — one rupee treated as one rupee and one dollar as one tether, with no
- * conversion anywhere. Whether that is right is a product decision with a
- * reconciliation behind it, not something a port may quietly change: altering
- * it would silently re-denominate every existing player's casino play.
- *
- * It is declared here, once, instead of being implied by a column name built
- * inside a query.
+ * INR settles in INR and USD/USDT in USDT, one unit for one unit, no conversion.
+ * PKR is not on our Slotegrator contract (checked 2026-10-20), so it is not accepted.
  */
 const SETTLEMENT_CURRENCY = Object.freeze({
   USDT: 'USDT',
   USD: 'USDT',
   INR: 'INR',
-  PKR: 'INR',
 });
 
 const SUPPORTED_CURRENCIES = Object.freeze(Object.keys(SETTLEMENT_CURRENCY));
 
-/**
- * What the provider is told a currency is called.
- *
- * Slotegrator has no USDT and no INR on some accounts, so legacy quoted USD and
- * PKR outbound. Inbound it accepts both spellings — which is why
- * `SETTLEMENT_CURRENCY` above maps four codes onto two balances.
- */
-const OUTBOUND_CURRENCY = Object.freeze({ USDT: 'USD', INR: 'PKR' });
+/** What the provider is told a currency is called: the contract has USD, not USDT. INR goes as INR. */
+const OUTBOUND_CURRENCY = Object.freeze({ USDT: 'USD' });
 
 /**
  * The uuid-v5 namespace used to derive the transaction id we hand back.

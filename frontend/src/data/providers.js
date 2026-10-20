@@ -124,8 +124,21 @@ for (const provider of PROVIDERS) {
 /* `darken` defaults TRUE so every existing call site keeps its dark mark with no argument, and
    so a caller that has no opinion cannot accidentally ask for the light one. Only `BC.GAME`
    carries a `logoLight`; the `??` is what makes the parameter a no-op for the other twenty-odd. */
+/* What the admin set per provider (Casino → Providers): logo and display name, from the live
+   provider list (`services/catalog.js` fills it). It wins over the local marks below. */
+const liveByName = new Map();
+export function setLiveProviders(rows) {
+  for (const row of rows) liveByName.set(row.name.toLowerCase().trim(), row);
+}
+
+export function providerDisplayName(name) {
+  return (name && liveByName.get(name.toLowerCase().trim())?.displayName) || name;
+}
+
 export function providerLogo(name, darken = true) {
   if (!name) return undefined;
+  const live = liveByName.get(name.toLowerCase().trim())?.logoUrl;
+  if (live) return live;
   const entry = byName.get(name.toLowerCase().trim());
   if (!entry) return undefined;
   return darken ? entry.logo : entry.logoLight ?? entry.logo;

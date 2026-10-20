@@ -1,7 +1,7 @@
 import { request, requestPage, USE_FIXTURES, API_BASE } from './client';
 import ENDPOINTS from './endpoints';
 import { GAMES } from '../data/games';
-import { PROVIDERS } from '../data/providers';
+import { PROVIDERS, setLiveProviders } from '../data/providers';
 
 /* The game catalogue, shared by the Explore panel and the casino page.
  *
@@ -169,9 +169,12 @@ export function getCasinoSets(keys, options) {
    (`ProviderLogo`'s own fallback). */
 export function getLiveProviders() {
   if (USE_FIXTURES) return null;
-  return Promise.resolve(request(API.providers, { live: true, fixture: { rows: [] } })).then((data) =>
-    (data?.rows ?? []).map((row) => row.name).filter(Boolean),
-  );
+  return Promise.resolve(request(API.providers, { live: true, fixture: { rows: [] } })).then((data) => {
+    const rows = (data?.rows ?? []).filter((row) => row.name);
+    /* The admin's logo is an API path (`/api/v1/casino/games/providers/:name/logo`). */
+    setLiveProviders(rows.map((row) => ({ ...row, logoUrl: row.logoUrl && `${API_BASE}${row.logoUrl}` })));
+    return rows.map((row) => row.name);
+  });
 }
 
 /* One game for `/game/:gameUnique`: by page slug, then by uuid (a recently-played row links by

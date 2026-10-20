@@ -681,18 +681,15 @@ test('slotegrator (gis)', async (t) => {
     assert.match(result.error_description, /Unsupported currency/);
   });
 
-  await t.test('PKR settles against the INR balance, as legacy mapped it', async () => {
+  await t.test('PKR is not a settlement currency any more', async () => {
     const uid = await seedPlayer(newUid());
-    const balances = new Map([[String(uid), '900']]);
-    const { service, wallet } = build(balances);
+    const { service } = build(new Map([[String(uid), '900']]));
 
-    await service.handleTransaction(
+    const result = await service.handleTransaction(
       callback({ action: 'bet', player_id: String(uid), currency: 'PKR', amount: '100', transaction_id: newTxId() })
     );
 
-    const row = await models.GisTransactions.findOne({ where: { user_id: uid }, order: [['id', 'DESC']], raw: true });
-    assert.equal(row.currency, 'INR');
-    assert.ok([...wallet.applied.keys()].length, 'and the movement was made');
+    assert.match(result.error_description, /Unsupported currency/);
   });
 
   // ══════════════════════════════════════════════════════════════════════
@@ -808,6 +805,8 @@ test('slotegrator (gis)', async (t) => {
 
     assert.equal(result.written, 1);
     assert.equal(result.skipped, 1, 'a row with no uuid is counted, not silently dropped');
+    assert.equal(result.providers, 1, 'the same crawl records its providers');
+    assert.ok(await models.GisProvidersNew.findOne({ where: { name: 'X' } }), 'provider X is in gis_providers_new');
 
     const row = await models.Gisgamesnew.findOne({ where: { uuid }, raw: true });
     assert.equal(row.name, 'After');
