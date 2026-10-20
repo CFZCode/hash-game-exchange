@@ -102,7 +102,7 @@ export const TABS = [
   { label: 'Poker', tab: 'poker' },
   /* Feature Buy-in removed (user's request, 2026-10-16): no such list on this platform. */
   { label: 'Providers', tab: 'provider' },
-  { label: 'Themes', tab: 'themes' },
+  /* Themes removed (user's request, 2026-10-20): /casino/themes falls back to the lobby. */
 ];
 
 /* Providers and Themes are not game lists — they are lists of links, so their tab bodies are
@@ -202,7 +202,6 @@ export const ROWS = [
   { title: 'Poker', key: 'poker', href: '/tagname/Poker' },
   { type: 'providers' },
   { title: 'Blackjack', key: 'blackjack', href: '/casino/blackjack' },
-  { type: 'themes' },
   { title: 'Table Games', key: 'table-game', href: '/casino/table-game' },
 ];
 

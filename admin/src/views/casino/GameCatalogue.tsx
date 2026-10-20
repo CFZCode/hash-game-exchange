@@ -106,6 +106,7 @@ const gisColumns: Column<GisGame>[] = [
   }
 ]
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- its tab is hidden for now; it comes back with it
 const GisTab = () => {
   // Free spins are a promotion; agent-tree logins (no promotions) don't see the column.
   const promotions = useSession().actor?.promotions === true
@@ -248,6 +249,7 @@ const jsColumns: Column<JsGame>[] = [
   }
 ]
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- its tab is hidden for now; it comes back with it
 const JsTab = () => {
   const [q, setQ] = useState('')
   const [vendor, setVendor] = useState(ALL)
@@ -648,7 +650,7 @@ const ToolsTab = () => (
 )
 
 const GameCatalogue = () => {
-  const [tab, setTab] = useState('gis')
+  const [tab, setTab] = useState('providers')
 
   // Free spins and vouchers are promotions: agent-tree logins do not get the tab.
   const promotions = useSession().actor?.promotions === true
@@ -658,17 +660,10 @@ const GameCatalogue = () => {
       <PageHeader title='Game catalogue' description={`The casino catalogue, the lobby games the site renders${promotions ? ', upstream providers, and provider promotions' : ' and upstream providers'}.`} />
       <Tabs value={tab} onValueChange={v => setTab(String(v))}>
         <TabsList className='mb-4 flex-wrap'>
-          <TabsTrigger value='gis'>Aggregator games</TabsTrigger>
-          <TabsTrigger value='js'>Lobby games</TabsTrigger>
+          {/* Aggregator games and Lobby games tabs hidden for now (user's request, 2026-10-20). */}
           <TabsTrigger value='providers'>Providers & sync</TabsTrigger>
           {promotions && <TabsTrigger value='tools'>Free spins & vouchers</TabsTrigger>}
         </TabsList>
-        <TabsContent value='gis'>
-          <GisTab />
-        </TabsContent>
-        <TabsContent value='js'>
-          <JsTab />
-        </TabsContent>
         <TabsContent value='providers'>
           <ProvidersTab />
         </TabsContent>
