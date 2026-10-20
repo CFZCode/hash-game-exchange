@@ -147,7 +147,8 @@ class NotificationsService {
    * Push to one player, and record it.
    */
   async sendToUser({ staff, userId, title, body, type, data }) {
-    const visible = await this.#visibleUserIds(staff);
+    // Notifications go to direct users only; agent-tree players get none.
+    const visible = await this.#visibleUserIds(staff, 'direct');
     this.#assertVisible(visible, userId);
 
     const record = await this.#record([userId], { title, body, type, data });
@@ -192,7 +193,7 @@ class NotificationsService {
    * ─────────────────────────────────────────────────────────────────────
    */
   async broadcast({ staff, title, body, type, data }) {
-    const visible = await this.#visibleUserIds(staff);
+    const visible = await this.#visibleUserIds(staff, 'direct');
 
     /**
      * OneSignal is addressed by PLAYER, so the broadcast names the caller's
