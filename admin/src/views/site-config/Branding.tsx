@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useLivePoll } from '@/lib/realtime-status'
 import { useApi } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
 
@@ -58,7 +59,8 @@ const Picture = ({ label, url, className, dark = true }: { label: string; url: s
  * them (owner panel); staff see what players get.
  */
 const Branding = () => {
-  const q = useApi<SiteBranding>('admin/branding', undefined, { refetchInterval: 15_000 })
+  const brandingPoll = useLivePoll(15_000)
+  const q = useApi<SiteBranding>('admin/branding', undefined, { refetchInterval: brandingPoll })
   const b = q.data
 
   return (

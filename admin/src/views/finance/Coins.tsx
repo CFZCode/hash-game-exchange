@@ -15,6 +15,7 @@ import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { useSession } from '@/contexts/SessionContext'
+import { useLivePoll } from '@/lib/realtime-status'
 import { useApi, useApiMutation } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
 import { cn } from '@/lib/utils'
@@ -276,7 +277,8 @@ const State = ({ row }: { row: CurrencyRow }) => {
 const Coins = () => {
   const { can, actor } = useSession()
   const house = actor?.promotions !== false
-  const coins = useApi<CurrencyRow[]>(house ? CURRENCIES_PATH : null, undefined, { refetchInterval: 15_000, refetchOnWindowFocus: true })
+  const coinsPoll = useLivePoll(15_000)
+  const coins = useApi<CurrencyRow[]>(house ? CURRENCIES_PATH : null, undefined, { refetchInterval: coinsPoll, refetchOnWindowFocus: true })
 
   // Coins outside the owner's plan are not the site's to see.
   const rows = useMemo(() => (coins.data ?? []).filter(c => c.ownerEnabled && !c.retired).sort((a, b) => a.sortOrder - b.sortOrder || a.code.localeCompare(b.code)), [coins.data])

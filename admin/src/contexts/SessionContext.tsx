@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { api, request } from '@/lib/api/client'
 import { setPlainInr } from '@/lib/format'
+import { useRealtimeConnected } from '@/lib/realtime-status'
 
 export type Actor = {
   staffId: number
@@ -112,6 +113,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     retry: false
   })
 
+  // Socket up: owner / operator saves arrive as pushes (RealtimeRefresh), so no timers; down: the polls below.
+  const live = useRealtimeConnected()
+  const poll = (ms: number) => (live ? false : ms)
+
   const flags = useQuery<SiteFlags>({
     queryKey: ['api', 'admin/site-config/global', null],
     queryFn: () => api.get<SiteFlags>('admin/site-config/global'),
@@ -123,7 +128,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     refetchOnMount: false,
 
     // Another tab (or another operator) may switch a flag; the sidebar follows without a reload.
-    refetchInterval: FLAGS_POLL_MS,
+    refetchInterval: poll(FLAGS_POLL_MS),
     refetchOnWindowFocus: true
   })
 
@@ -147,7 +152,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
     // The owner can change the plan at any time; the backend re-pulls it the moment the owner saves,
     // so a short poll here is what makes the sidebar and the Features screens follow live.
-    refetchInterval: ENTITLEMENTS_POLL_MS,
+    refetchInterval: poll(ENTITLEMENTS_POLL_MS),
     refetchOnWindowFocus: true
   })
 
@@ -164,7 +169,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         .catch(() => null),
     enabled: !!me.data && !hasPermission(me.data.permissions, 'config:read'),
     staleTime: ENTITLEMENTS_POLL_MS - 1_000,
-    refetchInterval: ENTITLEMENTS_POLL_MS * 4,
+    refetchInterval: poll(ENTITLEMENTS_POLL_MS * 4),
     refetchOnWindowFocus: true,
     retry: false
   })

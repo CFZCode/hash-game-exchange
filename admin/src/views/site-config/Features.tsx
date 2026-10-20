@@ -16,6 +16,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { UI_LABEL, uiSupport } from '@/configs/siteUi'
 import { useSession } from '@/contexts/SessionContext'
+import { useLivePoll } from '@/lib/realtime-status'
 import { useApi, useApiMutation } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
 import {
@@ -135,11 +136,12 @@ const Features = () => {
   const { can, featureEntitled } = useSession()
   const canWrite = can('config:write')
   const catalogue = useApi<Catalogue>('admin/features/catalogue')
+  const featuresPoll = useLivePoll(FEATURES_POLL_MS)
 
   // The platform owner sets every variant, switch and the template; a short poll (plus the
   // session's entitlements watch, which refetches on a new owner version) keeps this read-only view current.
   const current = useApi<SiteFeatures>('admin/features', undefined, {
-    refetchInterval: FEATURES_POLL_MS,
+    refetchInterval: featuresPoll,
     refetchOnWindowFocus: true
   })
 
