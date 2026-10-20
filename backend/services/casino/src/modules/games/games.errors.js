@@ -27,6 +27,11 @@ module.exports = defineErrors('GAMES', {
     message: 'Some of the supplied game uuids do not exist',
   },
 
+  LOGO_URL_FAILED: {
+    status: 422,
+    message: 'Could not fetch an image from that URL (https only, public host, PNG/JPEG/WebP up to 1 MB)',
+  },
+
   IMAGE_URL_INVALID: {
     status: 422,
     // The image is rendered in every player's lobby. An unchecked URL here is

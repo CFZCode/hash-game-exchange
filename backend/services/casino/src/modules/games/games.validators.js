@@ -194,6 +194,11 @@ const providerName = z.string().trim().min(1).max(190);
 
 const providerParam = { params: z.object({ name: providerName }).strict() };
 
+const providerLogoUrl = {
+  params: z.object({ name: providerName }).strict(),
+  body: z.object({ url: z.string().trim().url().max(2048) }).strict(),
+};
+
 const updateProviderSetting = {
   params: z.object({ name: providerName }).strict(),
   body: z
@@ -263,6 +268,7 @@ const favouriteParam = {
 const unfavouriteParam = { params: z.object({ gameRef }) };
 
 module.exports = {
+  providerLogoUrl,
   launch,
   browse,
   byProvider,

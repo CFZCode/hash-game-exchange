@@ -36,6 +36,10 @@ const UploadLogo = ({ provider }: { provider: ProviderSetting }) => {
   const [open, setOpen] = useState(false)
   const [file, setFile] = useState<File | null>(null)
 
+  // Or an image URL: the platform fetches it (public https only) and checks it like an upload.
+  const [url, setUrl] = useState('')
+  const urlOk = /^https:\/\/\S+$/i.test(url.trim())
+
   // The chosen file's preview lives only while it is chosen.
   const preview = useMemo(() => (file ? URL.createObjectURL(file) : null), [file])
 
@@ -44,12 +48,18 @@ const UploadLogo = ({ provider }: { provider: ProviderSetting }) => {
   }, [preview])
 
   const onOpenChange = (next: boolean) => {
-    if (next) setFile(null)
+    if (next) {
+      setFile(null)
+      setUrl('')
+    }
+
     setOpen(next)
   }
 
   const upload = useApiMutation({
     fn: () => {
+      if (!file && urlOk) return api.put<ProviderSetting>(`${LIST}/${encodeURIComponent(provider.name)}/logo-url`, { url: url.trim() })
+
       const fd = new FormData()
 
       if (file) fd.set('image', file)
@@ -70,12 +80,14 @@ const UploadLogo = ({ provider }: { provider: ProviderSetting }) => {
         </Button>
       }
       title={`${provider.hasLogo ? 'Replace' : 'Upload'} the ${label(provider)} logo`}
-      description='PNG, JPEG or WebP, up to 1 MB. A wide logo on a transparent background reads best (about 240×80). SVG is not accepted: it can carry script.'
+      description='A file or an https image URL. PNG, JPEG or WebP, up to 1 MB. A wide logo on a transparent background reads best (about 240×80). SVG is not accepted: it can carry script.'
       submitLabel='Upload'
       onSubmit={() => upload.mutateAsync()}
       validate={() => ({
-        'p-logo': !file
-          ? 'Choose an image file'
+        'p-logo': !file && urlOk
+          ? undefined
+          : !file
+          ? url.trim() ? 'The URL must start with https://' : 'Choose an image file or paste an image URL'
           : !['image/png', 'image/jpeg', 'image/webp'].includes(file.type)
             ? 'The logo must be a PNG, JPEG or WebP image'
             : file.size > 1024 * 1024
@@ -87,15 +99,19 @@ const UploadLogo = ({ provider }: { provider: ProviderSetting }) => {
         <label htmlFor='p-logo' className='text-sm font-medium'>
           Image *
         </label>
-        <input id='p-logo' type='file' accept='image/png,image/jpeg,image/webp' className='text-sm' required onChange={e => setFile(e.target.files?.[0] ?? null)} />
+        <input id='p-logo' type='file' accept='image/png,image/jpeg,image/webp' className='text-sm' onChange={e => setFile(e.target.files?.[0] ?? null)} />
+        <label htmlFor='p-logo-url' className='text-sm font-medium'>
+          Or image URL
+        </label>
+        <Input id='p-logo-url' type='url' inputMode='url' placeholder='https://…/logo.png' value={url} disabled={!!file} onChange={e => setUrl(e.target.value)} />
         {file && !['image/png', 'image/jpeg', 'image/webp'].includes(file.type) && <p role='alert' className='text-destructive text-sm'>The logo must be a PNG, JPEG or WebP image</p>}
         {file && file.size > 1024 * 1024 && <p role='alert' className='text-destructive text-sm'>The image is larger than 1 MB</p>}
-        {(preview || provider.hasLogo) && (
+        {(preview || urlOk || provider.hasLogo) && (
           <div className='grid gap-1'>
-            <span className='text-muted-foreground text-xs'>{preview ? 'The new logo' : 'The current logo'}</span>
+            <span className='text-muted-foreground text-xs'>{preview || urlOk ? 'The new logo' : 'The current logo'}</span>
             <img
-              src={preview ?? logoSrc(provider)}
-              alt={preview ? 'The new logo' : 'The current logo'}
+              src={preview ?? (urlOk ? url.trim() : logoSrc(provider))}
+              alt={preview || urlOk ? 'The new logo' : 'The current logo'}
               className='h-24 w-full rounded border bg-neutral-900 object-contain p-3'
             />
           </div>

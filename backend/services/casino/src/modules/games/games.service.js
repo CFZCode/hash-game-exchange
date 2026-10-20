@@ -5,6 +5,7 @@
 const { Op, fn, col, literal, QueryTypes, where: whereExpr } = require('sequelize');
 
 const E = require('./games.errors');
+const { fetchPublicImage } = require('./publicImage');
 const {
   COLLECTIONS,
   NAME_CATEGORIES,
@@ -876,6 +877,18 @@ class GamesService {
       'Provider logo replaced'
     );
     return this.#settingFor(key);
+  }
+
+  /**
+   * The same as an upload, from an image URL. Only https to a public host (every address the
+   * name resolves to is checked, so a link cannot reach the platform's own network), 10 s, 1 MB;
+   * then the bytes go through the upload's own checks (PNG, JPEG or WebP).
+   */
+  async putProviderLogoFromUrl({ name, url, actor }) {
+    await this.#knownProvider(name);
+    const buffer = await fetchPublicImage(url, LOGO_MAX_BYTES).catch(() => null);
+    if (!buffer) throw E.LOGO_URL_FAILED();
+    return this.putProviderLogo({ name, file: { buffer, size: buffer.length }, actor });
   }
 
   /** Take the logo away; the site falls back to the provider's name. */

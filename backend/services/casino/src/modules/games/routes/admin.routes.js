@@ -136,6 +136,18 @@ module.exports = function adminRoutes(deps) {
     ctrl.putProviderLogo
   );
 
+  // The same logo from an image URL: the platform fetches it (public https hosts only).
+  router.put(
+    '/provider-settings/:name/logo-url',
+    canManage,
+    validate(v.providerLogoUrl),
+    withActivity({
+      action: 'casino.provider.logo',
+      describe: (req) => ({ targetType: 'CASINO_PROVIDER', targetId: req.params.name, details: { url: String(req.body?.url ?? '').slice(0, 300) } }),
+    }),
+    ctrl.putProviderLogoUrl
+  );
+
   router.delete(
     '/provider-settings/:name/logo',
     noBody(),

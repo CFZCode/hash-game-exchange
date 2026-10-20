@@ -196,6 +196,10 @@ function createControllers({ service }) {
       response.ok(res, await service.putProviderLogo({ name: req.params.name, file: req.file, actor: req.staff }))
     ),
 
+    putProviderLogoUrl: asyncHandler(async (req, res) =>
+      response.ok(res, await service.putProviderLogoFromUrl({ name: req.params.name, url: req.body.url, actor: req.staff }))
+    ),
+
     removeProviderLogo: asyncHandler(async (req, res) =>
       response.ok(res, await service.removeProviderLogo({ name: req.params.name, actor: req.staff }))
     ),
