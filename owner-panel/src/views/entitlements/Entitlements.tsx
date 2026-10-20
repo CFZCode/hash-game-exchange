@@ -145,7 +145,9 @@ const GROUPS: Section[] = [
   {
     id: 'flags',
     section: 'Site flags',
-    groups: FLAG_GROUPS.map(g => ({
+
+    // Game categories are not offered here (user's request, 2026-10-20); their keys stay in the document as they are.
+    groups: FLAG_GROUPS.filter(g => g.title !== 'Game categories').map(g => ({
       id: `flag:${g.title}`,
       title: g.title,
       description: g.description,
