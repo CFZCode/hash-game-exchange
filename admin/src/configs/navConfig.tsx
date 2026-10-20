@@ -376,6 +376,9 @@ export const navItems: NavItem[] = [
       // House only: `promotions` is the mark that hides a screen from agent-tree logins.
       { icon: 'Bitcoin', label: 'Coins', href: '/coins', permission: 'config:read', promotions: true },
       { icon: 'Vault', label: 'Vault', href: '/vault', permission: 'reports:read', promotions: true, feature: 'vault' },
+
+      // Casino se Finance me (user, 2026-10-20); route wahi. `GET admin/reports/wager-stats` is reports:read and tree-scoped. Not for agent logins (user, 2026-10-17).
+      { icon: 'FileSpreadsheet', label: 'Wager report', href: '/casino/wager-report', permission: 'reports:read', flag: 'casino', promotions: true },
       {
         icon: 'Repeat',
         label: 'Swap history',
@@ -424,9 +427,6 @@ export const navItems: NavItem[] = [
 
       // The house-games and bet-history admin reads are guarded by reports:read, not casino:read.
       { icon: 'History', label: 'Bet history', href: '/casino/bets', permission: 'reports:read', flag: 'casino' },
-
-      // Like bet history: `GET admin/reports/wager-stats` is reports:read and tree-scoped. Not for agent logins (user, 2026-10-17).
-      { icon: 'FileSpreadsheet', label: 'Wager report', href: '/casino/wager-report', permission: 'reports:read', flag: 'casino', promotions: true },
       { icon: 'Trophy', label: 'Providers Priority', href: '/providers-priority', permission: 'casino:read', flag: 'casino' },
       { icon: 'ArrowBigUp', label: 'Vendor Priority', href: '/vendor-priority', permission: 'casino:read', flag: 'casino' },
       { icon: 'Gamepad2', label: 'Type Priority', href: '/type-priority', permission: 'casino:read', flag: 'casino' },
