@@ -1,7 +1,7 @@
 'use strict';
 
 const crypto = require('crypto');
-const { Op, fn, col } = require('sequelize');
+const { Op, fn, col, literal } = require('sequelize');
 
 const errors = require('./notifications.errors');
 const { NOTIFICATION_TYPES, MAX_BROADCAST_DEVICES, FCM_BATCH_SIZE } = require('./notifications.constants');
@@ -148,9 +148,8 @@ class NotificationsService {
    *
    * Push to one player, and record it.
    */
-  async sendToUser({ staff, userId, title, body, type, data }) {
-    // Staff notifications go to direct users only; agent-tree players get none.
-    const visible = await this.#visibleUserIds(staff, 'direct');
+  async sendToUser({ staff, userId, title, body, type, data, channel = 'direct' }) {
+    const visible = await this.#visibleUserIds(staff, this.#channelFor(channel, type));
     this.#assertVisible(visible, userId);
 
     const record = await this.#record([userId], { title, body, type, data, staff });
@@ -194,8 +193,8 @@ class NotificationsService {
    * own tree rather than everyone, bounded, and audited.
    * ─────────────────────────────────────────────────────────────────────
    */
-  async broadcast({ staff, title, body, type, data }) {
-    const visible = await this.#visibleUserIds(staff, 'direct');
+  async broadcast({ staff, title, body, type, data, channel = 'direct' }) {
+    const visible = await this.#visibleUserIds(staff, this.#channelFor(channel, type));
 
     /**
      * OneSignal is addressed by PLAYER, so the broadcast names the caller's
@@ -415,9 +414,21 @@ class NotificationsService {
   //  What staff sent
   // ══════════════════════════════════════════════════════════════════════
 
-  /** The Sent list: one row per staff send by the caller's tree, newest first. */
-  async listSends({ staff, limit, offset }) {
-    const where = { send_id: { [Op.ne]: null }, sent_by: await visibleStaffIds(this.models, staff.id, { logger: this.logger }) };
+  /** Direct Users tab: any type to direct users. Agent Users tab: general notifications only, to agent players. */
+  #channelFor(channel, type) {
+    if (channel !== 'agent') return 'direct';
+    if ((type ?? NOTIFICATION_TYPES.GENERAL) !== NOTIFICATION_TYPES.GENERAL) throw errors.AGENT_GENERAL_ONLY({ type });
+    return 'agent';
+  }
+
+  /** The Sent list of one tab: one row per staff send by the caller's tree, newest first. */
+  async listSends({ staff, limit, offset, channel = 'direct' }) {
+    const players = `(SELECT id FROM users WHERE parent_staff_id IS ${channel === 'agent' ? 'NOT ' : ''}NULL)`;
+    const where = {
+      send_id: { [Op.ne]: null },
+      sent_by: await visibleStaffIds(this.models, staff.id, { logger: this.logger }),
+      user_id: { [Op.in]: literal(players) },
+    };
     const groups = await this.models.UserNotifications.findAll({
       where,
       attributes: [

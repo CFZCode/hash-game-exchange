@@ -30,13 +30,17 @@ const TYPE_OPTIONS = NOTIFICATION_TYPES.map(t => ({ value: t, label: t[0].toUppe
 const SENDS = 'admin/notifications/sends'
 
 
-const Compose = () => {
+const Compose = ({ channel }: { channel: Channel }) => {
   const [mode, setMode] = useState<'broadcast' | 'user'>('broadcast')
   const [form, setForm] = useState({ userId: '', title: '', body: '', type: 'general' })
 
+  // Agent users get general notifications only.
+  const agentTab = channel === 'agent'
+  const audience = agentTab ? 'agent users' : 'direct users'
+
   const send = useApiMutation({
     fn: () => {
-      const message: Record<string, string> = { title: form.title, type: form.type }
+      const message: Record<string, string> = { title: form.title, type: agentTab ? 'general' : form.type, channel }
 
       if (form.body) message.body = form.body
 
@@ -57,13 +61,13 @@ const Compose = () => {
       <CardHeader>
         <CardTitle className='text-base'>Send a push notification</CardTitle>
         <CardDescription>
-          Goes to direct users only; agent players get no notifications. A broadcast is capped by the platform so a mistake is refused rather than delivered.
+          {agentTab ? 'Goes to agent users only, general notifications only.' : 'Goes to direct users only.'} A broadcast is capped by the platform so a mistake is refused rather than delivered.
         </CardDescription>
       </CardHeader>
       <CardContent className='grid gap-4'>
         <Tabs value={mode} onValueChange={v => setMode(v as 'broadcast' | 'user')}>
           <TabsList>
-            <TabsTrigger value='broadcast'>All direct users</TabsTrigger>
+            <TabsTrigger value='broadcast'>{agentTab ? 'All agent users' : 'All direct users'}</TabsTrigger>
             <TabsTrigger value='user'>One user</TabsTrigger>
           </TabsList>
         </Tabs>
@@ -72,7 +76,7 @@ const Compose = () => {
         )}
         <TextField id='n-title' label='Title' required maxLength={200} value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
         <TextAreaField id='n-body' label='Body' rows={3} maxLength={1000} value={form.body} onChange={e => setForm({ ...form, body: e.target.value })} />
-        <SelectField id='n-type' label='Type' value={form.type} onChange={type => setForm({ ...form, type })} options={TYPE_OPTIONS} />
+        <SelectField id='n-type' label='Type' value={agentTab ? 'general' : form.type} onChange={type => setForm({ ...form, type })} options={agentTab ? TYPE_OPTIONS.filter(o => o.value === 'general') : TYPE_OPTIONS} />
         <Can permission='config:write'>
           <ConfirmDialog
             trigger={
@@ -81,8 +85,8 @@ const Compose = () => {
                 {mode === 'broadcast' ? 'Broadcast' : 'Send'}
               </Button>
             }
-            title={mode === 'broadcast' ? 'Send to every direct user?' : `Send to user ${form.userId}?`}
-            description={`“${form.title}” goes to direct users only. A push cannot be recalled once it is delivered.`}
+            title={mode === 'broadcast' ? `Send to every ${audience.slice(0, -1)}?` : `Send to user ${form.userId}?`}
+            description={`“${form.title}” goes to ${audience} only. A push cannot be recalled once it is delivered.`}
             confirmLabel='Send'
             onConfirm={() => send.mutateAsync()}
           />
@@ -124,9 +128,9 @@ const EditSent = ({ row }: { row: SentNotification }) => {
 }
 
 /** What the admin has sent — beside Compose; edit or delete changes every inbox it reached. */
-const SentList = () => {
+const SentList = ({ channel }: { channel: Channel }) => {
   const { set, query } = useListState()
-  const list = usePagedApi<SentNotification>(SENDS, { limit: query.limit, page: query.page })
+  const list = usePagedApi<SentNotification>(SENDS, { limit: query.limit, page: query.page, channel })
 
   const remove = useApiMutation({
     fn: (sendId: string) => api.delete(`${SENDS}/${sendId}`),
@@ -169,7 +173,7 @@ const SentList = () => {
     <Card className='min-w-0 shadow-none'>
       <CardHeader>
         <CardTitle className='text-base'>Sent notifications</CardTitle>
-        <CardDescription>Everything the admin has sent, newest first.</CardDescription>
+        <CardDescription>Everything sent to {channel === 'agent' ? 'agent' : 'direct'} users, newest first.</CardDescription>
       </CardHeader>
       <CardContent>
         <DataTable
@@ -291,10 +295,14 @@ const Notifications = () => {
         </TabsList>
         {canSend && (
           <TabsContent value='compose'>
-            <div className='grid items-start gap-4 xl:grid-cols-2'>
-              <Compose />
-              {canRead && <SentList />}
-            </div>
+            <ChannelTabs>
+              {channel => (
+                <div className='grid items-start gap-4 xl:grid-cols-2'>
+                  <Compose channel={channel} />
+                  {canRead && <SentList channel={channel} />}
+                </div>
+              )}
+            </ChannelTabs>
           </TabsContent>
         )}
         {canRead && (

@@ -24,6 +24,8 @@ const message = {
   body: z.string().trim().max(1000).optional(),
   type: z.enum(NOTIFICATION_TYPE_NAMES).default('general'),
   data: z.record(z.union([z.string(), z.number(), z.boolean()])).optional(),
+  /** Direct Users | Agent Users tab; agent users take general notifications only. */
+  channel: z.enum(['direct', 'agent']).default('direct'),
 };
 
 const sendToUser = { body: z.object({ userId: id, ...message }).strict() };
@@ -60,7 +62,7 @@ const markRead = {
     .strict(),
 };
 
-const listSends = { query: paging };
+const listSends = { query: paging.extend({ channel: z.enum(['direct', 'agent']).default('direct') }) };
 
 const sendParam = z.object({ sendId: z.string().uuid() });
 

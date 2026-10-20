@@ -282,6 +282,27 @@ test('admin notifications', async (t) => {
     await assert.rejects(() => service.deleteSend({ staff: house, sendId: sent.sendId }), (err) => err.code === 'NOTIFICATIONS_SEND_NOT_FOUND');
   });
 
+  await t.test('the Agent Users tab sends general only to agent players, and lists apart', async () => {
+    const agents = newUid();
+    const direct = newUid();
+    await seedPlayer(agents, { tokens: 0 }); // under the agent tree
+    await seedPlayer(direct, { staffId: null, tokens: 0 });
+    const service = build(makePush());
+    const title = `Agents-${agents}`;
+
+    await service.broadcast({ staff, title, channel: 'agent' });
+    assert.equal(await connection.models.UserNotifications.count({ where: { user_id: agents, title } }), 1);
+    assert.equal(await connection.models.UserNotifications.count({ where: { user_id: direct, title } }), 0);
+    await assert.rejects(
+      () => service.sendToUser({ staff, userId: agents, title: 'Bonus!', type: 'bonus', channel: 'agent' }),
+      (err) => err.code === 'NOTIFICATIONS_AGENT_GENERAL_ONLY'
+    );
+
+    const listed = async (channel) => (await service.listSends({ staff, limit: 200, offset: 0, channel })).rows.some((r) => r.title === title);
+    assert.equal(await listed('agent'), true);
+    assert.equal(await listed('direct'), false);
+  });
+
   await t.test('a dead token is deactivated, not retried forever', async () => {
     // Firebase reports `registration-token-not-registered` for a device that
     // uninstalled. Legacy never read the per-token results, so every future
