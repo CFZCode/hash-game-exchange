@@ -392,7 +392,13 @@ class BetHistoryService {
 
         const found = await model.findAll({
           where: { [catalog.keyColumn]: { [Op.in]: missing } },
-          attributes: [catalog.keyColumn, catalog.nameColumn, catalog.vendorColumn, ...(catalog.typeColumn ? [catalog.typeColumn] : [])],
+          attributes: [
+            catalog.keyColumn,
+            catalog.nameColumn,
+            catalog.vendorColumn,
+            ...(catalog.typeColumn ? [catalog.typeColumn] : []),
+            ...(catalog.imageColumn ? [catalog.imageColumn] : []),
+          ],
           raw: true,
         });
 
@@ -401,6 +407,7 @@ class BetHistoryService {
             name: game[catalog.nameColumn] ?? null,
             vendor: game[catalog.vendorColumn] ?? null,
             type: catalog.typeColumn ? (game[catalog.typeColumn] ?? null) : null,
+            image: catalog.imageColumn ? (game[catalog.imageColumn] ?? null) : null,
           });
         }
       }
@@ -894,6 +901,7 @@ class BetHistoryService {
       outcome: classify(row.profit),
       currency: row.coin ?? null,
       at: row.created,
+      category: 'original',
     }));
 
     // Third-party rounds too: the ticker showed only in-house games (on live, only Limbo).
@@ -942,6 +950,7 @@ class BetHistoryService {
         const at = leg[source.timeColumn];
         const round = rounds.get(id) ?? {
           reference: String(roundId ?? leg[source.idColumn] ?? ''),
+          sourceKey: key,
           gameCatalog: source.catalog,
           gameId: leg[source.gameColumn] ?? null,
           gameName: source.gameNameColumn ? (leg[source.gameNameColumn] ?? null) : null,
@@ -984,10 +993,14 @@ class BetHistoryService {
 
     return finished.map((r) => {
       const profit = r.win - r.stake + r.net;
+      const label = names.get(`${r.gameCatalog}:${r.gameId}`);
       return {
         reference: r.reference,
         game: r.gameId,
-        title: names.get(`${r.gameCatalog}:${r.gameId}`)?.name ?? r.gameName ?? null,
+        title: label?.name ?? r.gameName ?? null,
+        // The lobby tile's art and its original | live | slots tab, for the home widgets.
+        image: label?.image ?? null,
+        category: categoryOf({ sourceKey: r.sourceKey, vendor: label?.vendor, type: label?.type }),
         amount: this.#decimal(r.stake),
         profit: this.#decimal(profit),
         outcome: classify(profit),
@@ -1166,6 +1179,7 @@ class BetHistoryService {
       profit: money.toDecimalString(money.toMinor(row.profit ?? '0')),
       currency: row.coin ?? null,
       at: row.created,
+      category: 'original',
     }));
 
     const provider = (await this.#providerRounds())

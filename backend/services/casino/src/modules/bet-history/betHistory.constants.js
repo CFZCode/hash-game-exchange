@@ -139,8 +139,8 @@ const SOURCES = Object.freeze({
  */
 const CATALOGS = Object.freeze({
   // Slotegrator: the lobby's own catalogue (`gisgamesnew`) first, the legacy `gis_games` after.
-  gis: { model: 'Gisgamesnew', fallbackModel: 'GisGames', keyColumn: 'uuid', nameColumn: 'name', vendorColumn: 'provider', typeColumn: 'type' },
-  jsgames: { model: 'JsGames', keyColumn: 'game_uid', nameColumn: 'game_name', vendorColumn: 'vendor', typeColumn: 'game_type' },
+  gis: { model: 'Gisgamesnew', fallbackModel: 'GisGames', keyColumn: 'uuid', nameColumn: 'name', vendorColumn: 'provider', typeColumn: 'type', imageColumn: 'image' },
+  jsgames: { model: 'JsGames', keyColumn: 'game_uid', nameColumn: 'game_name', vendorColumn: 'vendor', typeColumn: 'game_type', imageColumn: 'game_icon' },
   og: { model: 'OgGames', keyColumn: 'code', nameColumn: 'name', vendorColumn: 'code' },
 });
 

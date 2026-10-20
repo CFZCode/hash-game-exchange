@@ -57,3 +57,46 @@ test('top wins ranks provider wins with in-house ones and drops losses', async (
   const rows = await build().topWins({ limit: 10 });
   assert.deepEqual(rows.map((r) => [r.game, r.profit]), [['aviator-uid', '15']]);
 });
+
+/** Slotegrator (`gis_transactions`): signed legs keyed by `round_id`, `action` bet / win / refund. */
+const gis = (action, round, amount, at, extra = {}) => ({
+  action,
+  amount: String(amount),
+  currency: 'USDT',
+  game_uuid: 'cd33-aviator',
+  round_id: round,
+  transaction_id: `${round}-${action}`,
+  finished: null,
+  created_at: at,
+  ...extra,
+});
+
+function buildGis() {
+  return new BetHistoryService({
+    models: {
+      Bets: { findAll: async () => [] },
+      GisTransactions: stub([
+        gis('win', 'r-won', '2.55', ago(1_000), { finished: true }),
+        gis('bet', 'r-won', '-1', ago(2_000)),
+        gis('refund', 'r-void', '1', ago(3_000)),
+        gis('bet', 'r-void', '-1', ago(4_000)),
+        gis('bet', 'r-lost', '-2', ago(120_000)), // a losing spin's zero win is never stored
+      ]),
+      Gisgamesnew: stub([{ uuid: 'cd33-aviator', name: 'Aviator', provider: 'Spribe', type: 'crash', image: 'https://cdn/aviator.png' }]),
+    },
+    logger: { warn() {} },
+  });
+}
+
+test('slotegrator rounds reach the ticker and top wins with their name, art and tab', async () => {
+  const live = await buildGis().liveFeed({ limit: 10 });
+  assert.deepEqual(live.map((r) => [r.reference, r.profit]), [['r-won', '1.55'], ['r-lost', '-2']]);
+  assert.equal(live[0].title, 'Aviator');
+  assert.equal(live[0].image, 'https://cdn/aviator.png');
+  assert.equal(live[0].category, 'slots');
+
+  const top = await buildGis().topWins({ limit: 10 });
+  assert.deepEqual(top.map((r) => [r.title, r.amount, r.profit, r.currency, r.image]), [
+    ['Aviator', '1', '1.55', 'USDT', 'https://cdn/aviator.png'],
+  ]);
+});

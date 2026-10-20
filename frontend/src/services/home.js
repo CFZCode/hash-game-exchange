@@ -4,9 +4,10 @@ import { toBetRow } from './betHistory';
 import { getOriginals, slugFor } from './originals';
 import { publicGates } from './gates';
 import { getSportEvents } from './exchange/feed';
-import { getCasinoSet, toCatalogGame } from './catalog';
+import { apiAsset, getCasinoSet, toCatalogGame } from './catalog';
 import { assetExact, placeholderFor } from '../utils/gameArt';
 import { isFiatCode } from '../utils/currency';
+import { getUsdPrice } from '../data/usdPrice';
 import { HIDDEN_NAME } from '../context/account';
 import { originals, originalsLink } from '../pages/Home/GameSection/originals';
 import {
@@ -141,7 +142,8 @@ const toLatestBet = (row) => {
        catalogue art when the build has it, else the neutral name card — never bc.game's blackjack
        icon (Original Games codes like `bow` / `diamonds` have neither). */
     slug: slug || undefined,
-    icon: hasGameIcon(gameUnique) ? undefined : assetExact(slug) || placeholderFor(mapped.type || gameUnique),
+    // A casino round carries its lobby tile (`image`, from the catalogue).
+    icon: hasGameIcon(gameUnique) ? undefined : apiAsset(row.image) || assetExact(slug) || placeholderFor(mapped.type || gameUnique),
     fullName: mapped.type,
     userName: HIDDEN_NAME,
     currencyName: mapped.currencyName,
@@ -179,6 +181,13 @@ export function getLatestBets() {
     staticBets(STATIC_LATEST_BETS),
   );
 }
+
+/* The top-wins pool the home boards rank from (the route's own cap). The server orders by raw
+   profit, which puts ₹450 above 299 USDT; the boards re-rank by USD value here, where the FX
+   table lives (casino-service has none). */
+const TOP_WINS_POOL = 100;
+const usdProfit = (row) => (Number(row.profit) || 0) * getUsdPrice(walletKey(row.currency));
+export const byUsdProfit = (rows) => [...(rows ?? [])].sort((a, b) => usdProfit(b) - usdProfit(a));
 
 /* THE HIGH ROLLER TAB'S OWN FEED, wired 2026-09-04 — and it is a SECOND feed, which is the whole
  * point. `ThrowAndHighRolles-C7GElDRJ.js` keys the panel on the tab:
@@ -219,8 +228,8 @@ export function getHighRollers() {
   return orStatic(
     () =>
       Promise.resolve(
-        request(PLATFORM.casino.topWins, { live: true, params: { limit: LIVE_BETS }, fixture: [] }),
-      ).then((rows) => (rows ?? []).map(toLatestBet)),
+        request(PLATFORM.casino.topWins, { live: true, params: { limit: TOP_WINS_POOL }, fixture: [] }),
+      ).then((rows) => byUsdProfit(rows).slice(0, LIVE_BETS).map(toLatestBet)),
     staticBets(STATIC_HIGH_ROLLERS),
   );
 }
@@ -246,26 +255,30 @@ export function getGameTopWins(ref, slug) {
  * `tab` is the `gameTypeId` itself (0 All, 1 BC Originals, 2 Slots, 3 Live Casino), so it goes
  * straight into the path the day this stops being a capture. Falls back to All for a tab with no
  * captured list rather than answering nothing. */
+/* Tab → the backend's `category` (0 All takes every row). */
+const BIG_WIN_TABS = { 1: 'original', 2: 'slots', 3: 'live' };
+
 export const getRecentBigWins = ({ tab = 0 } = {}) => {
   if (USE_FIXTURES) return request(ENDPOINTS.recentBigWins, { fixture: bigWinsByTab[tab] ?? bigWinsByTab[0] });
-  /* LIVE: `GET /casino/bet-history/top-wins` (public, `profit > 0`, biggest first). It records
-     in-house rounds only, so All and BC Originals read it and Slots / Live Casino are empty
-     (no aggregator wins feed exists). It names nobody and carries no VIP level, so every card
-     is the site's hidden name with no tier, and the amount is the real profit in its own coin
-     rather than the capture's USD figure. */
+  /* LIVE: `GET /casino/bet-history/top-wins` (public, `profit > 0`): in-house, Original Games and
+     casino (Slotegrator) wins, each row filed `original | slots | live` by the backend. Every tab
+     reads the one pool, keeps its own category and ranks by USD value. It names nobody and carries
+     no VIP level, so every card is the site's hidden name with no tier. */
   /* An empty or failed read falls back to the static showcase for that tab (see `orStatic`). */
   const fallback = () => originalsOn().then((originals) => staticBigWins(tab, { originals }));
-  if (tab !== 0 && tab !== 1) return fallback();
-  /* Every row of this feed is an in-house round, so with BC Originals switched off it has
-     nothing to show (and nothing to link to). */
+  const want = BIG_WIN_TABS[tab];
   return orStatic(
     () =>
       publicGates().then((gates) =>
-        gates.on('originals')
-          ? Promise.resolve(
-              request(PLATFORM.casino.topWins, { live: true, params: { limit: 20 }, fixture: [] }),
-            ).then((rows) => (rows ?? []).map(toBigWin))
-          : [],
+        Promise.resolve(
+          request(PLATFORM.casino.topWins, { live: true, params: { limit: TOP_WINS_POOL }, fixture: [] }),
+        ).then((rows) =>
+          byUsdProfit(rows)
+            .filter((row) => (row.category ?? 'original') !== 'original' || gates.on('originals'))
+            .filter((row) => !want || (row.category ?? 'original') === want)
+            .slice(0, 20)
+            .map(toBigWin),
+        ),
       ),
     fallback,
   );
@@ -283,7 +296,7 @@ const toBigWin = (row) => {
     gameUnique: slug,
     // The game's name (`title`), not its code, for the alt text and the art when there is none.
     title: row.title || slug,
-    icon: assetExact(slug) || placeholderFor(row.title || slug),
+    icon: apiAsset(row.image) || assetExact(slug) || placeholderFor(row.title || slug),
     tier: vipTier(-1),
     name: displayName(HIDDEN_NAME),
     amount: `${profit.toLocaleString('en-US', { maximumFractionDigits: 8 })} ${row.currency ?? ''}`.trim(),

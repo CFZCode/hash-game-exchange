@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import SectionHeader from '../../../components/shared/SectionHeader';
-import { toTableRow, isAdvertised } from './bets';
+import { toTableRow, isAdvertised, tableCurrency } from './bets';
 import { useSelectedCurrency } from '../../../hooks/useSelectedCurrency';
 import Loading from '../../../components/shared/Loading';
 import { getLatestBets, getHighRollers } from '../../../services/home';
@@ -419,7 +419,7 @@ export default function LatestBets() {
   // `cur` is rebuilt when the selection or its rate changes, so the rows re-print then.
   const cur = useSelectedCurrency();
   const feed = React.useMemo(
-    () => (rawFeed ?? []).filter(isAdvertised).map((bet) => toTableRow(bet, cur.code)),
+    () => (rawFeed ?? []).filter(isAdvertised).map((bet) => toTableRow(bet, tableCurrency(cur.code))),
     [rawFeed, cur],
   );
   const feedLoading = tab === 1 ? rollersLoading : betsLoading;

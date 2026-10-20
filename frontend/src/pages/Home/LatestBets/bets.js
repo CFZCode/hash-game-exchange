@@ -75,6 +75,11 @@ const toTarget = (amount, coin, target) => {
   return { text: printCurrency(Math.abs(Number(amount) || 0), from, { target: to, hasAlias: false }), coin: to };
 };
 
+/* The table prints MONEY, as hash.game's does ("₹4,855.24", "-₹1,549.09"): a fiat viewer reads
+   their own fiat, a viewer on a coin (USDT, BTC) reads the site's fiat, INR, rather than a bare
+   "0.1" beside a coin icon. */
+export const tableCurrency = (code) => (String(code).toUpperCase().endsWith('FIAT') ? String(code).toUpperCase() : 'INRFIAT');
+
 export function toTableRow(bet, target = 'USDFIAT') {
   const mult = multiplier(bet.payout);
   const won = mult >= 1;
