@@ -3,7 +3,9 @@
 import { useState } from 'react'
 
 import Link from 'next/link'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
+
+import { parseAsString, useQueryStates } from 'nuqs'
 
 import { ChartColumnIcon, LandmarkIcon, NetworkIcon, UserIcon, UsersIcon } from 'lucide-react'
 
@@ -110,9 +112,8 @@ type Section = 'direct' | 'agent' | 'financial'
  * Tab URL me `?tab=agent|financial`.
  */
 const UsersPage = () => {
-  const router = useRouter()
-  const pathname = usePathname()
-  const params = useSearchParams()
+  // The tab lives in the URL through nuqs, like the table's search/page, so the two never overwrite each other.
+  const [url, setUrl] = useQueryStates({ tab: parseAsString, search: parseAsString, page: parseAsString }, { history: 'replace', scroll: false })
   const { actor } = useSession()
   const house = actor?.direct === true
   const promotions = actor?.promotions === true
@@ -123,8 +124,9 @@ const UsersPage = () => {
     ...(house ? [{ value: 'financial' as const, label: 'Financial', icon: <LandmarkIcon /> }] : [])
   ]
 
-  const section: Section = sections.find(s => s.value === params.get('tab'))?.value ?? sections[0].value
-  const select = (value: Section) => router.replace(value === sections[0].value ? pathname : `${pathname}?tab=${value}`, { scroll: false })
+  const section: Section = sections.find(s => s.value === url.tab)?.value ?? sections[0].value
+  // A new tab starts unfiltered on page 1.
+  const select = (value: Section) => void setUrl({ tab: value === sections[0].value ? null : value, search: null, page: null })
 
   // Users / Overview (graphs) — Direct aur Agent tab me.
   const [view, setView] = useState<'users' | 'overview'>('users')
