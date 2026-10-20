@@ -767,7 +767,7 @@ const ProfitLoss = () => {
 
   return (
     <div>
-      <PageHeader title='Profit & loss' description={`What the house made from players, minus what it gave back.${direct ? ' Direct and agent players are shown separately.' : ''}`} />
+      <PageHeader title='Profit & loss' description={`What was made from players, minus what was given back.${direct ? ' Direct and agent players are shown separately.' : ''}`} />
       <ChannelTabs>{channel => <ProfitLossView channel={channel} />}</ChannelTabs>
     </div>
   )

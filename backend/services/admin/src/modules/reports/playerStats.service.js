@@ -152,7 +152,7 @@ class PlayerStatsService {
     ]);
 
     // ── Series ────────────────────────────────────────────────────────────
-    const zero = { newPlayers: 0, activePlayers: 0, depositors: 0, firstTimeDepositors: 0, deposits: 0, depositAmount: 0n, wagerUsd: '0.00000000' };
+    const zero = { newPlayers: 0, activePlayers: 0, originalsPlayers: 0, depositors: 0, firstTimeDepositors: 0, deposits: 0, depositAmount: 0n, wagerUsd: '0.00000000' };
     const series = new Map();
     let newPlayers = 0;
     let direct = 0;
@@ -161,7 +161,11 @@ class PlayerStatsService {
       newPlayers += row.players;
       direct += row.direct;
     }
-    for (const row of activity) seriesRow(series, row.bucket, zero).activePlayers = row.active;
+    for (const row of activity) {
+      const s = seriesRow(series, row.bucket, zero);
+      s.activePlayers = row.active;
+      s.originalsPlayers = row.originals;
+    }
     // Wagered: the wager reports' own sources and rules, valued like every
     // other amount here (native with a currency filter, today's USD without).
     const wagerPerBucket = new Map();
@@ -219,6 +223,7 @@ class PlayerStatsService {
         countries: signupCountries.map((row) => ({ key: row.country, label: row.country, value: row.players })),
         activeByProduct: [
           { key: 'casino', label: 'Casino', value: Number(active.casino ?? 0) },
+          { key: 'originals', label: 'Originals', value: Number(active.originals ?? 0) },
           { key: 'sports', label: 'Sports', value: Number(active.sports ?? 0) },
         ],
       },
@@ -618,9 +623,12 @@ class PlayerStatsService {
     const sql = totals
       ? `SELECT COUNT(DISTINCT owner)::int AS active,
                 COUNT(DISTINCT owner) FILTER (WHERE product = 'sports')::int AS sports,
-                COUNT(DISTINCT owner) FILTER (WHERE product = 'casino')::int AS casino
+                COUNT(DISTINCT owner) FILTER (WHERE product = 'casino')::int AS casino,
+                COUNT(DISTINCT owner) FILTER (WHERE product = 'originals')::int AS originals
            FROM (${plays}) AS p`
-      : `SELECT bucket, COUNT(DISTINCT owner)::int AS active FROM (${plays}) AS p GROUP BY 1`;
+      : `SELECT bucket, COUNT(DISTINCT owner)::int AS active,
+                COUNT(DISTINCT owner) FILTER (WHERE product = 'originals')::int AS originals
+           FROM (${plays}) AS p GROUP BY 1`;
     return select(this.models, sql, base);
   }
 
@@ -731,7 +739,7 @@ class PlayerStatsService {
 function playsSql(inScope) {
   return [
     ...CASINO_SOURCES.map(
-      (s) => `SELECT ${bucketSql(s.time)} AS bucket, ${s.owner}::bigint AS owner, 'casino' AS product
+      (s) => `SELECT ${bucketSql(s.time)} AS bucket, ${s.owner}::bigint AS owner, '${s.category === 'originals' ? 'originals' : 'casino'}' AS product
                 FROM ${s.table} WHERE ${rangeSql(s.time)} AND ${inScope(s.owner)}${s.where}`
     ),
     `SELECT ${bucketSql('created_at')} AS bucket, user_id::bigint AS owner, 'sports' AS product

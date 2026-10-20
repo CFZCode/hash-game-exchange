@@ -83,7 +83,8 @@ const CONFIG: StatsPanelConfig = {
       kind: 'line',
       series: [
         { key: 'newPlayers', name: 'New players', color: 'chart-1' },
-        { key: 'activePlayers', name: 'Active players', color: 'chart-2' }
+        { key: 'activePlayers', name: 'Active players', color: 'chart-2' },
+        { key: 'originalsPlayers', name: 'Originals players', color: 'chart-4' }
       ]
     },
     {
