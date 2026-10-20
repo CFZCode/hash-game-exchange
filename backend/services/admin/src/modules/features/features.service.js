@@ -222,16 +222,17 @@ class FeaturesService {
     const policy = isPolicy(feature);
     const managed = this.ownerManaged();
 
-    // On/off and variant are the owner's (docs/OWNER-PANEL.md §4). A save that
-    // repeats them unchanged — the config and keys of the current variant — is
-    // still the site's to make.
+    // The variant is the owner's (docs/OWNER-PANEL.md §4). The on/off switch the
+    // Super Admin may flip too, inside the owner's plan: the latest change, either
+    // side, stands (applyOwnerDocument keeps it until the owner changes that feature).
+    let enabledChange = false;
     if (managed) {
       const currentVariant = resolveVariantKey(feature, current?.variant ?? defaultVariantOf(feature));
       const currentEnabled = policy ? currentVariant !== 'none' : Boolean(current?.enabled);
       const variantChange = patch.variant !== undefined && resolveVariantKey(feature, patch.variant) !== currentVariant;
       // A policy has no switch of its own (its `enabled` follows the variant).
-      const enabledChange = !policy && patch.enabled !== undefined && Boolean(patch.enabled) !== currentEnabled;
-      if (variantChange || enabledChange) throw ownerErrors.MANAGED({ feature });
+      enabledChange = !policy && patch.enabled !== undefined && Boolean(patch.enabled) !== currentEnabled;
+      if (variantChange) throw ownerErrors.MANAGED({ feature });
     }
     // An old name from a client that has not been redeployed is accepted and
     // stored under the current one — see LEGACY_VARIANTS.
@@ -266,7 +267,7 @@ class FeaturesService {
 
     // The owner's plan comes first: nothing outside it can be left switched on.
     // Owner-managed, staff cannot switch anything on; the owner's own choice stands.
-    if (enabled && !managed) await entitlements.assertFeatureEntitled(feature);
+    if (enabled && (!managed || enabledChange)) await entitlements.assertFeatureEntitled(feature);
 
     // Refuse to switch an integration on without what it needs to run.
     if (enabled) {
@@ -432,17 +433,22 @@ class FeaturesService {
           else ignored.push({ feature: f.key, variant: asked });
         }
         // `none` is off whatever the switch says, as in update().
-        const enabled = policy ? variant !== 'none' : doc.features?.[f.key] !== false && variant !== 'none';
-        if (row && row.variant === variant && Boolean(row.enabled) === enabled) continue;
+        const ownerOn = policy ? variant !== 'none' : doc.features?.[f.key] !== false && variant !== 'none';
+        // A Super Admin's switch stands while the owner has not changed this feature since.
+        const staffKept =
+          !policy && variant === currentVariant && String(row?.updated_by ?? '').startsWith('staff:') && row?.owner_enabled === ownerOn;
+        const enabled = staffKept ? Boolean(row.enabled) : ownerOn;
+        if (row && row.variant === variant && Boolean(row.enabled) === enabled && row.owner_enabled === ownerOn) continue;
         if (!row && variant === currentVariant && enabled === currentEnabled) continue;
 
         await this.models.SiteFeature.upsert({
           feature: f.key,
           variant,
           enabled,
+          owner_enabled: ownerOn,
           config: row?.config ?? {},
           secrets: row?.secrets ?? {},
-          updated_by: OWNER_WRITER,
+          updated_by: staffKept ? row.updated_by : OWNER_WRITER,
         });
         if (!policy && enabled !== currentEnabled) await this.#syncFlag(f, enabled, null);
         applied.push({ feature: f.key, variant, enabled });

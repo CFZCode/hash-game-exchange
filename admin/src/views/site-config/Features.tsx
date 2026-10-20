@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { UI_LABEL, uiSupport } from '@/configs/siteUi'
 import { useSession } from '@/contexts/SessionContext'
@@ -28,6 +29,63 @@ import {
   type SiteFeature,
   type SiteFeatures
 } from './featureTypes'
+
+/** `admin/casino/original-games/games`: one Original game and its own switch. */
+type OriginalGame = { gameCode: string; name: string; enabled: boolean; image: string | null }
+
+const ORIGINALS = 'admin/casino/original-games/games'
+
+/** The Super Admin's on/off for a feature in the plan (the variant stays the platform's). */
+const FeatureSwitch = ({ spec, on }: { spec: CatalogueFeature; on: boolean }) => {
+  const save = useApiMutation({
+    fn: (enabled: boolean) => api.put(`admin/features/${spec.key}`, { enabled }),
+    invalidate: [['api', 'admin/features']],
+    success: (_r, enabled) => `${spec.label} ${enabled ? 'on' : 'off'}`
+  })
+
+  return <Switch checked={on} disabled={save.isPending} onCheckedChange={v => save.mutate(v)} aria-label={`${spec.label} on or off`} />
+}
+
+/** Original games, one switch each: off takes the game out of the lobby and refuses its launch. */
+const OriginalGames = ({ canWrite }: { canWrite: boolean }) => {
+  const games = useApi<OriginalGame[]>(ORIGINALS)
+
+  const save = useApiMutation({
+    fn: ({ gameCode, enabled }: { gameCode: string; enabled: boolean }) => api.put(`${ORIGINALS}/${gameCode}`, { enabled }),
+    invalidate: [['api', ORIGINALS]],
+    success: (_r, v) => `${v.gameCode} ${v.enabled ? 'on' : 'off'}`
+  })
+
+  if (games.error) return <ErrorState error={games.error} />
+  if (!games.data?.length) return null
+
+  return (
+    <Card className='gap-0 py-0 shadow-none'>
+      <CardHeader className='border-b py-3'>
+        <CardTitle className='text-muted-foreground text-xs font-semibold tracking-wider uppercase'>Original games</CardTitle>
+      </CardHeader>
+      <Table>
+        <TableBody>
+          {games.data.map(g => (
+            <TableRow key={g.gameCode}>
+              <TableCell className='pl-4 font-medium'>
+                {g.name}
+                <span className='text-muted-foreground block font-mono text-xs'>{g.gameCode}</span>
+              </TableCell>
+              <TableCell className='pr-4 text-right'>
+                {canWrite ? (
+                  <Switch checked={g.enabled} disabled={save.isPending} onCheckedChange={enabled => save.mutate({ gameCode: g.gameCode, enabled })} aria-label={`${g.name} on or off`} />
+                ) : (
+                  <Badge variant={g.enabled ? 'default' : 'outline'}>{g.enabled ? 'On' : 'Off'}</Badge>
+                )}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </Card>
+  )
+}
 
 /** How often the features read is refreshed so what the platform changes shows up live. */
 
@@ -133,8 +191,11 @@ const IntegrationSettings = ({ feature, current }: { feature: CatalogueFeature; 
 }
 
 const Features = () => {
-  const { can, featureEntitled } = useSession()
+  const { can, featureEntitled, actor } = useSession()
   const canWrite = can('config:write')
+
+  // The Super Admin (and executives) switch features too; agents only read.
+  const canSwitch = canWrite && actor?.direct === true
   const catalogue = useApi<Catalogue>('admin/features/catalogue')
   const featuresPoll = useLivePoll(FEATURES_POLL_MS)
 
@@ -181,7 +242,7 @@ const Features = () => {
 
       <Alert className='mb-4'>
         <InfoIcon />
-        <AlertDescription>{OWNER_MANAGED_MESSAGE}</AlertDescription>
+        <AlertDescription>{canSwitch ? 'Switch a feature on or off here; the platform picks the variant. The latest change, here or by the platform, is what players get.' : OWNER_MANAGED_MESSAGE}</AlertDescription>
       </Alert>
 
       {error && <ErrorState error={error} />}
@@ -278,6 +339,8 @@ const Features = () => {
                       <TableCell className='pr-4'>
                         {policy ? (
                           <span className='text-muted-foreground text-xs'>always on</span>
+                        ) : canSwitch && entitled && cur.variant !== 'none' && ui?.status !== 'fixed' ? (
+                          <FeatureSwitch spec={spec} on={on} />
                         ) : (
                           <Badge variant={on ? 'default' : 'outline'}>{on ? 'On' : 'Off'}</Badge>
                         )}
@@ -289,6 +352,7 @@ const Features = () => {
             </Table>
           </Card>
         ))}
+        {actor?.direct === true && <OriginalGames canWrite={canSwitch} />}
       </div>
     </div>
   )

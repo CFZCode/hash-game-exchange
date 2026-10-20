@@ -53,6 +53,8 @@ class OriginalGamesService {
   async launch({ userId, gameCode, currency, device, language }) {
     if (!this.provider?.configured) throw E.NOT_CONFIGURED();
     if (!(await this.originalsOn())) throw E.DISABLED();
+    const [game] = await this.#query('SELECT enabled FROM og_games WHERE code = :gameCode', { gameCode });
+    if (game && !game.enabled) throw E.GAME_DISABLED({ gameCode });
     const code = String(currency).toUpperCase();
     if (!EXPONENT[code]) throw E.UNSUPPORTED_CURRENCY({ currency });
 
@@ -110,12 +112,30 @@ class OriginalGamesService {
   /** The lobby's list from `og_games`; empty while Originals are off. */
   async listGames() {
     if (!(await this.originalsOn())) return [];
-    const rows = await this.#query('SELECT code, name, data FROM og_games ORDER BY position, code');
+    const rows = await this.#query('SELECT code, name, data FROM og_games WHERE enabled ORDER BY position, code');
     return rows.map((row) => ({
       game_code: row.code,
       name: row.name,
       image: row.data?.image_url ?? row.data?.image ?? row.data?.thumbnail ?? null,
     }));
+  }
+
+  /** The admin's list: every catalogue game with its own on/off switch. */
+  async adminGames() {
+    const rows = await this.#query('SELECT code, name, enabled, data FROM og_games ORDER BY position, code');
+    return rows.map((row) => ({
+      gameCode: row.code,
+      name: row.name,
+      enabled: row.enabled,
+      image: row.data?.image_url ?? row.data?.image ?? row.data?.thumbnail ?? null,
+    }));
+  }
+
+  /** One Original on or off: off leaves the lobby and refuses a launch. */
+  async setGameEnabled({ gameCode, enabled }) {
+    const rows = await this.#query('UPDATE og_games SET enabled = :enabled WHERE code = :gameCode RETURNING code', { gameCode, enabled });
+    if (!rows.length) throw E.GAME_NOT_FOUND({ gameCode });
+    return { gameCode, enabled };
   }
 
   /** Replace `og_games` with the aggregator's `GET /v1/games` (scripts/sync-original-games.js). */

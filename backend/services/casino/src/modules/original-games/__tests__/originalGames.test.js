@@ -239,6 +239,22 @@ test('original games aggregator', async (t) => {
     assert.deepStrictEqual(res.body, { status: 'OK', balance: 0, currency: 'INR' });
   });
 
+  await t.test('one Original switched off leaves the list, refuses its launch, and survives a sync', async () => {
+    await service.syncGames();
+    await service.setGameEnabled({ gameCode: 'mines', enabled: false });
+    try {
+      assert.deepStrictEqual((await service.listGames()).map((g) => g.game_code), ['crash']);
+      assert.strictEqual((await service.adminGames()).find((g) => g.gameCode === 'mines').enabled, false);
+      const uid = await player('100');
+      await assert.rejects(service.launch({ userId: uid, gameCode: 'mines', currency: 'INR' }), { code: 'ORIGINAL_GAMES_GAME_DISABLED' });
+      await service.syncGames();
+      assert.deepStrictEqual((await service.listGames()).map((g) => g.game_code), ['crash'], 'the sync keeps the switch');
+      await assert.rejects(service.setGameEnabled({ gameCode: 'nope', enabled: true }), { status: 404 });
+    } finally {
+      await service.setGameEnabled({ gameCode: 'mines', enabled: true });
+    }
+  });
+
   await t.test('catalogue sync, and the admin switch closes list, launch and new bets', async () => {
     const out = await service.syncGames();
     assert.deepStrictEqual(out.codes, ['crash', 'mines']);

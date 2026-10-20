@@ -101,7 +101,29 @@ test('features', async (t) => {
     }
   });
 
-  await t.test('owner-managed: staff PUT changing variant or on/off is 403 OWNER_MANAGED; a keys-only save is allowed', async () => {
+  await t.test('a Super Admin switch stands until the owner changes that feature', async () => {
+    const rows = new Map([['vip', { feature: 'vip', variant: 'program_page', enabled: false, owner_enabled: true, updated_by: 'staff:1', config: {}, secrets: {} }]]);
+    const models = {
+      SiteFeature: {
+        findByPk: async (key) => (rows.has(key) ? { ...rows.get(key) } : null),
+        findAll: async () => [...rows.values()].map((r) => ({ ...r })),
+        upsert: async (row) => rows.set(row.feature, { ...rows.get(row.feature), ...row }),
+      },
+      Siteconfig: { findOne: async () => ({ id: 1 }), update: async () => {} },
+    };
+    const service = new FeaturesService({ models, logger, config: { SERVICE_NAME: 'admin-service' }, clients: { user: { post: async () => ({}) } } });
+    const doc = (vip) => ({ variants: { vip: 'program_page' }, features: { vip } });
+
+    await service.applyOwnerDocument(doc(true));
+    assert.equal(rows.get('vip').enabled, false, 'an unrelated owner save keeps the Super Admin off');
+    await service.applyOwnerDocument(doc(false));
+    assert.equal(rows.get('vip').enabled, false);
+    await service.applyOwnerDocument(doc(true));
+    assert.equal(rows.get('vip').enabled, true, 'the owner switched it on again: the owner is the latest');
+    assert.equal(rows.get('vip').updated_by, 'owner');
+  });
+
+  await t.test('owner-managed: staff PUT changing a variant is 403 OWNER_MANAGED; on/off and a keys-only save are allowed', async () => {
     const rows = new Map([
       ['vip', { feature: 'vip', variant: 'program_page', enabled: true, config: {}, secrets: {} }],
       ['business_model', { feature: 'business_model', variant: 'hybrid', enabled: true, config: {}, secrets: {} }],
@@ -119,11 +141,15 @@ test('features', async (t) => {
     const { base, close } = await staffServer({ models, config, clients: { admin: { post: async () => ({}) }, user: { post: async () => ({}) } } });
     const put = (feature, body) => fetch(`${base}/${feature}`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
     try {
+      // The Super Admin's on/off, inside the owner's plan (the latest change stands).
+      const off = await put('vip', { enabled: false });
+      assert.equal(off.status, 200);
+      assert.equal(rows.get('vip').enabled, false);
+      assert.equal((await put('vip', { enabled: true })).status, 200);
+
       for (const [feature, body] of [
-        ['vip', { enabled: false }],
         ['vip', { variant: 'none' }],
         ['business_model', { variant: 'b2b' }],
-        ['push_notifications', { enabled: true }],
       ]) {
         const res = await put(feature, body);
         assert.equal(res.status, 403, `${feature} ${JSON.stringify(body)}`);
