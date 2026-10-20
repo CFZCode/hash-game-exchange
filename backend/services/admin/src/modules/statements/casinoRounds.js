@@ -111,7 +111,7 @@ function casinoRoundsSql({ range = false, seamless = true } = {}) {
   if (seamless) {
     parts.push(
       `SELECT 'seamless', s.id::text, s.user_id::bigint, s.created_at,
-              COALESCE(NULLIF(s.game_code, ''), s.product_code, 'Seamless')::text, 'USDT',
+              COALESCE(NULLIF(s.game_code, ''), s.product_code, 'Casino')::text, 'USDT',
               ${SEAMLESS_STAKE('s')}, ${SEAMLESS_PAYOUT('s')}, s.amount,
               CASE WHEN LOWER(s.action) IN ('withdraw', 'pushbet') AND s.amount < 0 THEN 1 ELSE 0 END,
               LOWER(s.action)::text

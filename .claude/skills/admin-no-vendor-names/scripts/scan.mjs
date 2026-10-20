@@ -56,7 +56,8 @@ async function liveScan(base) {
   const { chromium } = require('playwright-core')
   const { execSync } = await import('node:child_process')
   const exe = execSync('ls -d ~/.cache/ms-playwright/chromium-*/chrome-linux*/chrome | tail -1').toString().trim()
-  const routes = [...new Set([...fs.readFileSync(path.join(ADMIN_SRC, 'configs/navConfig.tsx'), 'utf8').matchAll(/href: '([^']+)'/g)].map((m) => m[1]))]
+  // ROUTES=/a,/b re-checks only those pages.
+  const routes = process.env.ROUTES ? process.env.ROUTES.split(',') : [...new Set([...fs.readFileSync(path.join(ADMIN_SRC, 'configs/navConfig.tsx'), 'utf8').matchAll(/href: '([^']+)'/g)].map((m) => m[1]))]
 
   const browser = await chromium.launch({ executablePath: exe })
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } })

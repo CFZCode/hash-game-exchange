@@ -858,7 +858,7 @@ class StatementsService {
     for (const row of rounds) {
       const label = row.source === 'inhouse'
         ? `Casino ${row.game} (${row.status === 'open' ? 'open' : row.status})`
-        : `Casino ${row.source === 'jsgamesv2' ? 'jsGames' : 'seamless'} ${row.status}`;
+        : `Casino ${row.status}`;
       push(
         row.ts,
         KIND.CASINO,

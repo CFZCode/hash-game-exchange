@@ -32,6 +32,8 @@ npm i --no-save --prefix <scratchpad> playwright-core@1.56.1   # once
 PW_DIR=<scratchpad> node .claude/skills/admin-no-vendor-names/scripts/scan.mjs live [https://admin.parker567.com]
 ```
 
+`ROUTES=/casino/wager-report,/reports/pnl` re-checks only those pages after a fix.
+
 Exit 1 lists `file:line  text` (static) or `route [tab]  text` (live). A page that will not open is
 reported but does not fail the run. Build + `pm2 restart parker-admin` before the live scan, or it
 checks the old build.

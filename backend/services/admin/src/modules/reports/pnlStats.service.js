@@ -474,7 +474,7 @@ class PnlStatsService {
            WHERE b.result IS NOT NULL AND b.result::text <> '"refunded"' AND b.amount + b.profit > 0 AND ${NOT_FAKE}
              AND ${rangeSql('b.created')}${cur('b.coin')}${owned('b.uid')}
           UNION ALL
-          SELECT 'gis', COALESCE(NULLIF(gg.provider, ''), 'Slotegrator'), COALESCE(NULLIF(gg.type, ''), 'Other'),
+          SELECT 'gis', COALESCE(NULLIF(gg.provider, ''), 'Casino'), COALESCE(NULLIF(gg.type, ''), 'Other'),
                  'gis:' || COALESCE(g.game_uuid, ''), COALESCE(gg.name, g.game_uuid), ${GIS_CURRENCY},
                  ${gisKindSql('g')}, ${gisSideAmountSql('g')}, ${gisBetCountSql('g')}
             FROM gis_transactions g
@@ -482,7 +482,7 @@ class PnlStatsService {
            WHERE ${gisPlayFilterSql('g')} AND LOWER(COALESCE(gg.type, '')) NOT LIKE '%sport%'
              AND ${rangeSql('g.created_at')}${ctx.currency ? ` AND ${GIS_CURRENCY} = :currency` : ''}${owned('g.user_id')}
           UNION ALL
-          SELECT 'jsgames', COALESCE(NULLIF(jg.vendor, ''), 'jsGames'), COALESCE(NULLIF(jg.game_type, ''), 'Other'),
+          SELECT 'jsgames', COALESCE(NULLIF(jg.vendor, ''), 'Casino'), COALESCE(NULLIF(jg.game_type, ''), 'Other'),
                  'js:' || COALESCE(j.game_uid, ''), COALESCE(jg.game_name, j.game_uid), UPPER(j.currency),
                  CASE WHEN LOWER(j.transaction_type) = 'win' THEN 'win' ELSE 'stake' END, ABS(j.amount),
                  CASE WHEN LOWER(j.transaction_type) = 'win' THEN 0 ELSE 1 END
@@ -494,7 +494,7 @@ class PnlStatsService {
           -- jsGames v2: 'amount' is win − bet, so the stake and the payout come
           -- from the callback's own bet_amount / win_amount (one row may carry
           -- both; a negative bet_amount is a correction and nets the stake off).
-          SELECT 'jsgamesv2', COALESCE(NULLIF(jg2.vendor, ''), 'jsGames'), COALESCE(NULLIF(jg2.game_type, ''), 'Other'),
+          SELECT 'jsgamesv2', COALESCE(NULLIF(jg2.vendor, ''), 'Casino'), COALESCE(NULLIF(jg2.game_type, ''), 'Other'),
                  'js:' || COALESCE(v.game_uid, ''), COALESCE(jg2.game_name, v.game_name, v.game_uid), UPPER(v.currency),
                  k.kind, k.amount, k.n
             FROM game_transactions v
@@ -703,6 +703,6 @@ class PnlStatsService {
   }
 }
 
-const SOURCE_LABEL = Object.freeze({ inhouse: 'Originals', og: 'Original Games', gis: 'Slotegrator', jsgames: 'jsGames', jsgamesv2: 'jsGames v2' });
+const SOURCE_LABEL = Object.freeze({ inhouse: 'Originals', og: 'Original Games', gis: 'Casino feed 1', jsgames: 'Casino feed 2', jsgamesv2: 'Casino feed 2' });
 
 module.exports = { PnlStatsService, COST_LINES, costLineOf };

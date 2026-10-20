@@ -87,7 +87,7 @@ const CASINO_SOURCES = Object.freeze([
   },
   {
     key: 'gis',
-    label: 'Slotegrator',
+    label: 'Casino feed 1',
     category: 'casino',
     table: 'gis_transactions',
     owner: 'user_id',
@@ -106,7 +106,7 @@ const CASINO_SOURCES = Object.freeze([
     refunds: `COUNT(*) FILTER (WHERE LOWER(action) IN ('refund', 'rollback'))`,
   },
   ...[
-    { key: 'jsgames', label: 'jsGames', table: 'js_game_transactions', time: '"timestamp"', kind: 'transaction_type', game: 'game_uid' },
+    { key: 'jsgames', label: 'Casino feed 2', table: 'js_game_transactions', time: '"timestamp"', kind: 'transaction_type', game: 'game_uid' },
     { key: 'jsgamesv2', label: 'jsGames v2', table: 'game_transactions', time: 'created_at', kind: 'transaction_type', game: 'game_uid' },
   ].map((s) => {
     const kind = `LOWER(${s.kind}::text)`;
