@@ -22,6 +22,7 @@ module.exports = function adminRoutes(deps) {
   router.use(denyAgentTree({ code: SWAP_NOT_FOR_AGENTS, message: 'Swap is not available to agent accounts' }));
 
   router.get('/history', auth.requirePermission(PERMISSIONS.WALLET_READ), validate(v.adminHistory), ctrl.adminHistory);
+  router.get('/summary', auth.requirePermission(PERMISSIONS.WALLET_READ), validate(v.adminSummary), ctrl.adminSummary);
   router.get('/history/:userId', auth.requirePermission(PERMISSIONS.WALLET_READ), validate({ ...v.userParam, ...v.listHistory }), ctrl.adminUserHistory);
 
   return router;

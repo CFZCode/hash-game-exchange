@@ -1,6 +1,6 @@
 'use strict';
 
-const { Op } = require('sequelize');
+const { Op, literal } = require('sequelize');
 const { money, currencyRegistry, directLedger } = require('@ibitplay/common');
 const { assertPlayerCapability } = require('@ibitplay/auth');
 
@@ -236,6 +236,27 @@ class SwapService {
    * Scoped to the caller's tree — this listed every player's swaps to any
    * staff member with `wallet:read`, agents included.
    */
+  /**
+   * What the swap fees earned, in USDT: each fee at the USD rate its own swap used (USDT is 1 USD).
+   * The caller's tree, direct users by default (agent-tree players cannot swap).
+   */
+  async feeSummary({ staff, userId, channel = 'direct' }) {
+    const where = withChannel(await ownerWhere(this, staff?.id, 'uid', userId), 'uid', channel);
+    const fee = 'fee_amount * COALESCE(usd_rate_from, 0)';
+    const sum = (filter) => literal(`ROUND(COALESCE(SUM(${fee})${filter ? ` FILTER (WHERE ${filter})` : ''}, 0), 8)::text`);
+    const [row] = await this.models.SwapHistory.findAll({
+      where,
+      attributes: [
+        [literal('COUNT(*)::int'), 'swaps'],
+        [sum(null), 'feeUsdt'],
+        [sum("created_at >= date_trunc('day', NOW())"), 'todayUsdt'],
+        [sum("created_at >= date_trunc('month', NOW())"), 'monthUsdt'],
+      ],
+      raw: true,
+    });
+    return { swaps: row?.swaps ?? 0, feeUsdt: row?.feeUsdt ?? '0', todayUsdt: row?.todayUsdt ?? '0', monthUsdt: row?.monthUsdt ?? '0' };
+  }
+
   async listAllHistory({ staff, userId, currency, channel, limit, offset }) {
     const where = withChannel(await ownerWhere(this, staff?.id, 'uid', userId), 'uid', channel);
     // The site admin's currency filter: a swap out of OR into that coin.

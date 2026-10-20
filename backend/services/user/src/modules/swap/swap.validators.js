@@ -53,4 +53,9 @@ const adminHistory = {
 
 const userParam = { params: z.object({ userId: z.coerce.number().int().positive() }) };
 
-module.exports = { estimate, swap, listHistory, adminHistory, userParam };
+/** The fee summary: one user, or every direct user. */
+const adminSummary = {
+  query: z.object({ userId: z.coerce.number().int().positive().optional(), channel: z.enum(['direct', 'agent']).optional() }).strict(),
+};
+
+module.exports = { estimate, swap, listHistory, adminHistory, adminSummary, userParam };

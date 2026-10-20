@@ -231,6 +231,19 @@ test('swap', async (t) => {
     assert.equal(await list('BTC'), 0);
   });
 
+  await t.test('the fee summary values each fee in USDT at its own swap\'s rate', async () => {
+    const uid = newUid();
+    await seed(uid, { inr: '10000', usdt: '0' });
+    const result = await service.swap({ userId: uid, fromCurrency: 'INR', toCurrency: 'USDT', amount: '1000' });
+    const scoped = new SwapService({ models: connection.models, db: connection, logger, config: { SERVICE_NAME: 'user-service', ROOT_STAFF_ID: 1 }, clients: { admin: { get: async () => ({ ids: [1] }) } } });
+
+    const summary = await scoped.feeSummary({ staff: { id: 1 }, userId: uid, channel: 'all' }) // the test player has no users row;
+    const row = await connection.models.SwapHistory.findByPk(result.swapId, { raw: true });
+    assert.equal(summary.swaps, 1);
+    assert.equal(Number(summary.feeUsdt), Number(row.fee_amount) * Number(row.usd_rate_from));
+    assert.equal(summary.todayUsdt, summary.feeUsdt, 'made today');
+  });
+
   await t.test('swap history records the rates used, so a swap can be re-derived', async () => {
     const uid = newUid();
     await seed(uid, { inr: '10000', usdt: '0' });

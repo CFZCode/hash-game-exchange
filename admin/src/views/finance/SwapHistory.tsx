@@ -6,8 +6,10 @@ import DataTable, { type Column } from '@/components/shared/DataTable'
 import DateTime from '@/components/shared/DateTime'
 import Money from '@/components/shared/Money'
 import PageHeader from '@/components/shared/PageHeader'
+import StatCard from '@/components/shared/StatCard'
 import { Input } from '@/components/ui/input'
-import { useListState, usePagedApi } from '@/hooks/use-api'
+import { useApi, useListState, usePagedApi } from '@/hooks/use-api'
+import { formatNumber } from '@/lib/format'
 import { CurrencySelect, useCurrencyChoices, useCurrencyParam } from './currencyFilter'
 
 /** `GET admin/user/swap/history` — raw `swap_history` rows (snake_case, decimals as strings). */
@@ -27,6 +29,12 @@ type SwapRow = {
 }
 
 const LIST = 'admin/user/swap/history'
+
+/** `GET admin/user/swap/summary` — the fees earned, in USDT (each at its own swap's rate). */
+type SwapSummary = { swaps: number; feeUsdt: string; todayUsdt: string; monthUsdt: string }
+
+/** One fee in USDT: the fee times the USD rate that swap used (USDT is 1 USD). */
+const feeUsdt = (r: SwapRow) => String(Number(r.fee_amount) * Number(r.usd_rate_from || 0))
 
 const columns: Column<SwapRow>[] = [
   { key: 'id', header: 'ID', cell: r => <span className='font-mono text-xs'>{r.id}</span> },
@@ -52,7 +60,8 @@ const columns: Column<SwapRow>[] = [
         <span className='text-muted-foreground ml-1 text-xs tabular-nums'>({(Number(r.fee_percentage) * 100).toFixed(2)}%)</span>
       </span>
     )
-  }
+  },
+  { key: 'feeUsdt', header: 'Fee (USDT)', align: 'right', cell: r => <Money value={feeUsdt(r)} currency='USDT' /> }
 ]
 
 const SwapHistory = () => {
@@ -64,9 +73,19 @@ const SwapHistory = () => {
   const choices = useCurrencyChoices()
   const list = usePagedApi<SwapRow>(LIST, { channel: 'direct', limit: query.limit, page: query.page, userId: query.userId, currency: cur.currency })
 
+  // The earnings strip: every direct user's swap fees (or the one user typed in), in USDT.
+  const summary = useApi<SwapSummary>('admin/user/swap/summary', { channel: 'direct', userId: query.userId })
+  const s = summary.data
+
   return (
     <div>
-      <PageHeader title='Swap history' description='Currency swaps users made in the wallet, newest first, with the fee taken — out of or into the selected currency.' />
+      <PageHeader title='Swap history' description='Currency swaps direct users made in the wallet, newest first, with the fee taken — out of or into the selected currency.' />
+      <div className='mb-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4'>
+        <StatCard label='Fee earned' value={<Money value={s?.feeUsdt ?? '0'} currency='USDT' />} hint='all swaps, in USDT' loading={summary.isLoading} />
+        <StatCard label='This month' value={<Money value={s?.monthUsdt ?? '0'} currency='USDT' />} hint='fees since the 1st' loading={summary.isLoading} />
+        <StatCard label='Today' value={<Money value={s?.todayUsdt ?? '0'} currency='USDT' />} hint='fees since midnight' loading={summary.isLoading} />
+        <StatCard label='Swaps' value={formatNumber(s?.swaps ?? 0)} hint={query.userId ? `user #${query.userId}` : 'by direct users'} loading={summary.isLoading} />
+      </div>
       <DataTable
         columns={columns}
         rows={list.data?.rows}

@@ -36,6 +36,10 @@ function createControllers({ service }) {
       return response.paginated(res, result, { page: Math.floor(offset / limit) + 1, limit });
     }),
 
+    adminSummary: asyncHandler(async (req, res) =>
+      response.ok(res, await service.feeSummary({ staff: req.staff, userId: req.query.userId, channel: req.query.channel }))
+    ),
+
     adminUserHistory: asyncHandler(async (req, res) => {
       const { limit, offset } = req.query;
       const result = await service.listUserHistoryForStaff({ staff: req.staff, userId: req.params.userId, limit, offset });
