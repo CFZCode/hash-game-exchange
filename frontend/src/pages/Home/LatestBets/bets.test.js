@@ -22,12 +22,10 @@ describe('Latest Bets rows print in the viewer currency', () => {
 });
 
 describe('Latest Bets table currency', () => {
-  it('prints a coin viewer in INR money, a fiat viewer in their own fiat', () => {
-    expect(tableCurrency('USDT')).toBe('INRFIAT');
-    expect(tableCurrency('btc')).toBe('INRFIAT');
+  it('follows the header currency', () => {
+    expect(tableCurrency('btc')).toBe('BTC');
     expect(tableCurrency('INRFIAT')).toBe('INRFIAT');
-    expect(tableCurrency('USDFIAT')).toBe('USDFIAT');
-    const row = toTableRow({ betId: '2', gameUnique: 'x', fullName: 'Aviator', currencyName: 'USDT', throwAmount: '1', profitAmount: '1.55', payout: 255 }, tableCurrency('USDT'));
+    const row = toTableRow({ betId: '2', gameUnique: 'x', fullName: 'Aviator', currencyName: 'USDT', throwAmount: '1', profitAmount: '1.55', payout: 255 }, tableCurrency('INRFIAT'));
     expect(row.bet).toMatch(/^₹\d/);
     expect(row.profit).toMatch(/^\+₹\d/);
   });
