@@ -306,6 +306,12 @@ test('casino bet history', async (t) => {
       stats.totals.wins + stats.totals.losses + stats.totals.pushes,
       'the three add up to the total — which is what legacy could not guarantee'
     );
+
+    // The USDT view: every converted day adds up to its totals, and nothing is lost unless named.
+    const { usdt } = stats;
+    const sum = usdt.days.reduce((n, d) => n + d.bets, 0);
+    assert.equal(sum, usdt.totals.bets, 'the days add up to the USDT totals');
+    if (!usdt.unconverted.length) assert.equal(usdt.totals.bets, stats.totals.bets, 'every bet is in the USDT view');
   });
 
   await t.test('wins, losses and pushes always sum to the total', async () => {

@@ -1,6 +1,6 @@
 'use strict';
 
-const { Op, fn, col, literal } = require('sequelize');
+const { Op, fn, col, literal, QueryTypes } = require('sequelize');
 const { money } = require('@ibitplay/common');
 
 const errors = require('./betHistory.errors');
@@ -434,6 +434,7 @@ class BetHistoryService {
     const bySource = {};
     /** The same figures per wallet: money in two coins does not add up raw. */
     const currencies = new Map();
+    const dayRows = [];
     const add = (into, entry) => {
       for (const field of ['total', 'bets', 'wins', 'paidWins', 'pushes', 'losses', 'refunds']) into[field] += entry[field];
       for (const field of ['wagered', 'payouts', 'refunded', 'net']) {
@@ -458,10 +459,11 @@ class BetHistoryService {
       const currency = `CASE UPPER(${source.currencyColumn}::text) WHEN 'PKR' THEN 'INR' WHEN 'USD' THEN 'USDT'
                           ELSE UPPER(COALESCE(${source.currencyColumn}::text, '?')) END`;
 
+      const day = `TO_CHAR(DATE_TRUNC('day', ${source.timeColumn}), 'YYYY-MM-DD')`;
       const rows = await model.findAll({
         where,
-        attributes: [[literal(currency), 'currency'], ...Object.entries(stat).map(([name, sql]) => [literal(sql), name])],
-        group: [literal('1')],
+        attributes: [[literal(currency), 'currency'], [literal(day), 'day'], ...Object.entries(stat).map(([name, sql]) => [literal(sql), name])],
+        group: [literal('1'), literal('2')],
         raw: true,
       });
 
@@ -471,8 +473,10 @@ class BetHistoryService {
         add(entry, one);
         if (!currencies.has(row.currency)) currencies.set(row.currency, { totals: this.#emptyTotals(), bySource: {} });
         const wallet = currencies.get(row.currency);
-        wallet.bySource[source.label] = one;
+        wallet.bySource[source.label] ??= this.#emptyTotals();
+        add(wallet.bySource[source.label], one);
         add(wallet.totals, one);
+        dayRows.push({ ...one, currency: row.currency, day: row.day });
       }
 
       bySource[source.label] = entry;
@@ -482,7 +486,38 @@ class BetHistoryService {
     const byCurrency = [...currencies.entries()]
       .map(([currency, figures]) => ({ currency, ...figures }))
       .sort((a, b) => b.totals.bets - a.totals.bets);
-    return { totals, bySource, byType: this.#byType(totals), byCurrency };
+    return { totals, bySource, byType: this.#byType(totals), byCurrency, usdt: await this.#inUsdt(dayRows) };
+  }
+
+  /**
+   * Every wallet's figures valued in USDT at the site's current rates (exchangerate.usd_rate;
+   * USDT is 1 USD), in total and per day. A coin with no rate is left out and named in `unconverted`.
+   */
+  async #inUsdt(dayRows) {
+    const rates = new Map(
+      (await this.models.Users.sequelize.query('SELECT UPPER(currency) AS currency, usd_rate FROM exchangerate', { type: QueryTypes.SELECT }))
+        .map((r) => [r.currency, String(r.usd_rate)])
+    );
+    rates.set('USDT', '1');
+    const blank = () => ({ bets: 0, wagered: '0', payouts: '0', ggr: '0' });
+    const add = (into, r, rate) => {
+      const usd = (v) => money.multiply(v, rate);
+      into.bets += r.bets;
+      into.wagered = money.toDecimalString(money.add(into.wagered, money.toDecimalString(usd(r.wagered))));
+      into.payouts = money.toDecimalString(money.add(into.payouts, money.toDecimalString(usd(r.payouts))));
+      into.ggr = money.toDecimalString(money.subtract(into.wagered, into.payouts));
+    };
+    const totals = blank();
+    const days = new Map();
+    const unconverted = new Set();
+    for (const r of dayRows) {
+      const rate = rates.get(r.currency);
+      if (!rate) { unconverted.add(r.currency); continue; }
+      if (!days.has(r.day)) days.set(r.day, { day: r.day, ...blank() });
+      add(days.get(r.day), r, rate);
+      add(totals, r, rate);
+    }
+    return { totals, days: [...days.values()].sort((a, b) => a.day.localeCompare(b.day)), unconverted: [...unconverted] };
   }
 
   /** One grouped `statExpressions` row as the totals shape. */
@@ -1582,7 +1617,7 @@ class BetHistoryService {
   }
 
   #emptyStats() {
-    return { totals: this.#emptyTotals(), bySource: {}, byType: [] };
+    return { totals: this.#emptyTotals(), bySource: {}, byType: [], byCurrency: [], usdt: { totals: { bets: 0, wagered: '0', payouts: '0', ggr: '0' }, days: [], unconverted: [] } };
   }
 }
 
