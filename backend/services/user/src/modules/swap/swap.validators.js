@@ -68,4 +68,9 @@ const feeHistory = {
   }).strict(),
 };
 
-module.exports = { estimate, swap, listHistory, adminHistory, adminSummary, feeHistory, userParam };
+/** The swap fee as a fraction, 0 to 0.5 (0% to 50%), at most 4 decimals ("0.0125" is 1.25%). */
+const setFee = {
+  body: z.object({ fee: z.string().regex(/^0(\.\d{1,4})?$/).refine(f => Number(f) <= 0.5, 'At most 0.5 (50%)') }).strict(),
+};
+
+module.exports = { estimate, swap, listHistory, adminHistory, adminSummary, feeHistory, setFee, userParam };

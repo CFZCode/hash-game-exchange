@@ -143,6 +143,23 @@ test('swap', async (t) => {
     assert.equal(feeRateFor('unknown'), '0.01');
   });
 
+  await t.test('the Super Admin sets the swap fee; the quote uses it, a retired coin stays free', async () => {
+    const key = "DELETE FROM admin_configurations WHERE config_key = 'swap_fee'";
+    await connection.sequelize.query(key);
+    try {
+      assert.equal((await service.getFee()).fee, '0.01', 'no setting is the 1% default');
+      assert.equal((await service.setFee({ fee: '0.025' })).fee, '0.025');
+      const est = await service.estimate({ fromCurrency: 'INR', toCurrency: 'USDT', amount: '1000' });
+      assert.equal(est.feeAmount, '25.00000000');
+      assert.equal((await service.setFee({ fee: '0' })).fee, '0', 'a second set overwrites');
+      assert.ok(!v.setFee.body.safeParse({ fee: '0.6' }).success, 'over 50% is refused');
+      assert.ok(!v.setFee.body.safeParse({ fee: '-0.1' }).success);
+      assert.ok(v.setFee.body.safeParse({ fee: '0.0125' }).success);
+    } finally {
+      await connection.sequelize.query(key);
+    }
+  });
+
   await t.test('an insufficient balance leaves both currencies untouched', async () => {
     const uid = newUid();
     await seed(uid, { inr: '100', usdt: '5' });

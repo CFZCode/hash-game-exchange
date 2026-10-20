@@ -23,6 +23,9 @@ const FEE_BY_CURRENCY = Object.freeze({
 
 const DEFAULT_FEE = '0.01';
 
+/** admin_configurations key holding the Super Admin's swap fee (a fraction string); none means DEFAULT_FEE. */
+const FEE_CONFIG_KEY = 'swap_fee';
+
 /** Fee rate for swapping OUT of a currency, as a decimal fraction string. */
 function feeRateFor(currency) {
   const code = String(currency || '').toUpperCase();
@@ -37,4 +40,4 @@ const SWAP_REASON = Object.freeze({
   IN: REASON.TRANSFER_IN,
 });
 
-module.exports = { FEE_BY_CURRENCY, DEFAULT_FEE, feeRateFor, SWAP_REASON };
+module.exports = { FEE_BY_CURRENCY, DEFAULT_FEE, FEE_CONFIG_KEY, feeRateFor, SWAP_REASON };

@@ -24,6 +24,8 @@ module.exports = function adminRoutes(deps) {
   router.get('/history', auth.requirePermission(PERMISSIONS.WALLET_READ), validate(v.adminHistory), ctrl.adminHistory);
   router.get('/fee-history', auth.requirePermission(PERMISSIONS.WALLET_READ), validate(v.feeHistory), ctrl.feeHistory);
   router.get('/summary', auth.requirePermission(PERMISSIONS.WALLET_READ), validate(v.adminSummary), ctrl.adminSummary);
+  router.get('/fee', auth.requirePermission(PERMISSIONS.WALLET_READ), ctrl.getFee);
+  router.put('/fee', auth.requirePermission(PERMISSIONS.CONFIG_WRITE), validate(v.setFee), ctrl.setFee);
   router.get('/history/:userId', auth.requirePermission(PERMISSIONS.WALLET_READ), validate({ ...v.userParam, ...v.listHistory }), ctrl.adminUserHistory);
 
   return router;

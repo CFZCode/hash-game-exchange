@@ -1,11 +1,11 @@
 'use strict';
 
-const { Op, literal } = require('sequelize');
+const { Op, literal, QueryTypes } = require('sequelize');
 const { money, currencyRegistry, directLedger } = require('@ibitplay/common');
 const { assertPlayerCapability } = require('@ibitplay/auth');
 
 const errors = require('./swap.errors');
-const { feeRateFor } = require('./swap.constants');
+const { FEE_BY_CURRENCY, DEFAULT_FEE, FEE_CONFIG_KEY } = require('./swap.constants');
 const { WalletRepository } = require('../wallet/wallet.repository');
 const { ExchangeRateService } = require('../exchange-rate/exchangeRate.service');
 const { REASON, CURRENCY_COLUMN } = require('../wallet/wallet.constants');
@@ -236,6 +236,25 @@ class SwapService {
    * Scoped to the caller's tree — this listed every player's swaps to any
    * staff member with `wallet:read`, agents included.
    */
+  /** The swap fee every live coin pays, as a fraction ("0.01" is 1%): the Super Admin's, or the default. */
+  async getFee() {
+    const [row] = await this.db.sequelize.query('SELECT config_value FROM admin_configurations WHERE config_key = :key', {
+      replacements: { key: FEE_CONFIG_KEY },
+      type: QueryTypes.SELECT,
+    });
+    return { fee: row?.config_value ?? DEFAULT_FEE };
+  }
+
+  /** Sets the swap fee for every swap from now on; past swaps keep the fee stored on their row. */
+  async setFee({ fee }) {
+    await this.db.sequelize.query(
+      `INSERT INTO admin_configurations (config_key, config_value, last_updated) VALUES (:key, :fee, NOW())
+       ON CONFLICT (config_key) DO UPDATE SET config_value = EXCLUDED.config_value, last_updated = NOW()`,
+      { replacements: { key: FEE_CONFIG_KEY, fee } },
+    );
+    return this.getFee();
+  }
+
   /**
    * What the swap fees earned, in USDT: each fee at the USD rate its own swap used (USDT is 1 USD).
    * The caller's tree, direct users by default (agent-tree players cannot swap).
@@ -321,7 +340,7 @@ class SwapService {
    * source currency.
    */
   async #quote({ fromCurrency, toCurrency, amount }) {
-    const feeRate = feeRateFor(fromCurrency);
+    const feeRate = FEE_BY_CURRENCY[String(fromCurrency).toUpperCase()] ?? (await this.getFee()).fee;
 
     // percentOf works at scale 8, so a 0.15 rate is exact rather than 0.1499999.
     const feeAmount = money.percentOf(amount, money.toDecimalString(money.multiply(feeRate, '100')));

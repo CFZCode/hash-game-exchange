@@ -1,5 +1,7 @@
 'use client'
 
+import { useState } from 'react'
+
 import Link from 'next/link'
 
 import { parseAsString, useQueryState } from 'nuqs'
@@ -9,9 +11,13 @@ import DateTime from '@/components/shared/DateTime'
 import Money from '@/components/shared/Money'
 import PageHeader from '@/components/shared/PageHeader'
 import StatCard from '@/components/shared/StatCard'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { useSession } from '@/contexts/SessionContext'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { useApi, useListState, usePagedApi } from '@/hooks/use-api'
+import { useApi, useApiMutation, useListState, usePagedApi } from '@/hooks/use-api'
+import { api } from '@/lib/api/client'
 import { formatNumber } from '@/lib/format'
 import { CurrencySelect, useCurrencyChoices, useCurrencyParam } from './currencyFilter'
 
@@ -120,6 +126,53 @@ const feeColumns: Column<SwapRow>[] = [
   { key: 'feeUsdt', header: 'Fee (USDT)', align: 'right', cell: r => <span className='font-medium'><Money value={feeUsdt(r)} currency='USDT' /></span> }
 ]
 
+const FEE = 'admin/user/swap/fee'
+
+/** The swap fee every direct user pays from now on, in %; only the Super Admin (config:write) changes it. */
+const SwapFee = () => {
+  const { can, actor } = useSession()
+  const canEdit = actor?.direct === true && can('config:write')
+  const current = useApi<{ fee: string }>(FEE)
+  const percent = current.data ? +(Number(current.data.fee) * 100).toFixed(2) : null
+  const [draft, setDraft] = useState('')
+  const value = Number(draft)
+  const valid = draft !== '' && value >= 0 && value <= 50
+
+  const save = useApiMutation({
+    fn: (p: number) => api.put(FEE, { fee: (p / 100).toFixed(4) }),
+    invalidate: [['api', FEE]],
+    success: (_r, p) => `Swap fee set to ${p}%`,
+    onSuccess: () => setDraft('')
+  })
+
+  return (
+    <Card className='mb-4 py-4 shadow-none'>
+      <CardContent className='flex flex-wrap items-center gap-3'>
+        <div className='mr-auto'>
+          <div className='font-medium'>Swap fee: {percent === null ? '…' : `${percent}%`}</div>
+          <div className='text-muted-foreground text-xs'>Taken from every swap a direct user makes, in the coin swapped out. Past swaps keep their fee.</div>
+        </div>
+        {canEdit && (
+          <>
+            <Input
+              aria-label='New swap fee in percent'
+              inputMode='decimal'
+              placeholder='e.g. 1.5'
+              value={draft}
+              onChange={e => setDraft(e.target.value.replace(/[^\d.]/g, ''))}
+              className='w-24'
+            />
+            <span className='text-muted-foreground text-sm'>%</span>
+            <Button size='sm' disabled={!valid || save.isPending} onClick={() => save.mutate(value)}>
+              Save
+            </Button>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
 const SwapHistory = () => {
   const [tab, setTab] = useQueryState('tab', parseAsString.withDefault('swaps').withOptions({ history: 'replace', scroll: false }))
   const { state, set, query } = useListState(['userId'])
@@ -137,6 +190,7 @@ const SwapHistory = () => {
   return (
     <div>
       <PageHeader title='Swap history' description='Currency swaps direct users made in the wallet, newest first, with the fee taken — out of or into the selected currency.' />
+      <SwapFee />
       <div className='mb-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4'>
         <StatCard label='Fee earned' value={<Money value={s?.feeUsdt ?? '0'} currency='USDT' />} hint='all swaps, in USDT' loading={summary.isLoading} />
         <StatCard label='This month' value={<Money value={s?.monthUsdt ?? '0'} currency='USDT' />} hint='fees since the 1st' loading={summary.isLoading} />
