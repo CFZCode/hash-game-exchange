@@ -681,15 +681,19 @@ test('slotegrator (gis)', async (t) => {
     assert.match(result.error_description, /Unsupported currency/);
   });
 
-  await t.test('PKR is not a settlement currency any more', async () => {
-    const uid = await seedPlayer(newUid());
-    const { service } = build(new Map([[String(uid), '900']]));
+  await t.test('INR and PKR swap: a PKR callback moves the INR wallet, an INR callback the PKR wallet', async () => {
+    for (const [sent, wallet] of [['PKR', 'INR'], ['INR', 'PKR']]) {
+      const uid = await seedPlayer(newUid());
+      const { service } = build(new Map([[String(uid), '900']]));
 
-    const result = await service.handleTransaction(
-      callback({ action: 'bet', player_id: String(uid), currency: 'PKR', amount: '100', transaction_id: newTxId() })
-    );
+      const result = await service.handleTransaction(
+        callback({ action: 'bet', player_id: String(uid), currency: sent, amount: '100', transaction_id: newTxId() })
+      );
 
-    assert.match(result.error_description, /Unsupported currency/);
+      assert.equal(result.error_code, undefined, `${sent} bet settles`);
+      const row = await models.GisTransactions.findOne({ where: { user_id: uid }, order: [['id', 'DESC']], raw: true });
+      assert.equal(row.currency, wallet);
+    }
   });
 
   // ══════════════════════════════════════════════════════════════════════

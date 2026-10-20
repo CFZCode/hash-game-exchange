@@ -130,8 +130,8 @@ const launch = {
   body: z
     .object({
       gameUuid,
-      // The currencies BOTH aggregators settle in (JSGames V2_CURRENCIES, GIS SETTLEMENT_CURRENCY).
-      currencyCode: z.enum(['INR', 'USDT', 'USD']),
+      // GIS SETTLEMENT_CURRENCY; JSGames V2 refuses PKR itself (V2_CURRENCIES).
+      currencyCode: z.enum(['INR', 'PKR', 'USDT', 'USD']),
       device: z.enum(['desktop', 'mobile']).default('desktop'),
       language: z.string().trim().max(10).optional(),
     })

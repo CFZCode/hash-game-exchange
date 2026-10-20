@@ -21,19 +21,25 @@ const MONEY_ACTIONS = Object.freeze(new Set([ACTION.BET, ACTION.WIN, ACTION.REFU
  * Currencies the integration accepts from the provider, and the wallet currency
  * each settles against.
  *
- * INR settles in INR and USD/USDT in USDT, one unit for one unit, no conversion.
- * PKR is not on our Slotegrator contract (checked 2026-10-20), so it is not accepted.
+ * The player's wallet a launch plays from: INR, PKR and USDT (USD is USDT). One unit for one unit, no conversion.
  */
 const SETTLEMENT_CURRENCY = Object.freeze({
   USDT: 'USDT',
   USD: 'USDT',
   INR: 'INR',
+  PKR: 'PKR',
 });
 
 const SUPPORTED_CURRENCIES = Object.freeze(Object.keys(SETTLEMENT_CURRENCY));
 
-/** What the provider is told a currency is called: the contract has USD, not USDT. INR goes as INR. */
-const OUTBOUND_CURRENCY = Object.freeze({ USDT: 'USD' });
+/**
+ * What the provider is told a wallet's currency is called. INR and PKR swap on purpose (user,
+ * 2026-10-20): an INR player launches in PKR and a PKR player in INR; the wallet stays the player's.
+ */
+const OUTBOUND_CURRENCY = Object.freeze({ USDT: 'USD', INR: 'PKR', PKR: 'INR' });
+
+/** A callback's currency → the wallet it moves: the reverse of OUTBOUND_CURRENCY. */
+const CALLBACK_CURRENCY = Object.freeze({ USD: 'USDT', USDT: 'USDT', PKR: 'INR', INR: 'PKR' });
 
 /**
  * The uuid-v5 namespace used to derive the transaction id we hand back.
@@ -58,6 +64,7 @@ module.exports = {
   SETTLEMENT_CURRENCY,
   SUPPORTED_CURRENCIES,
   OUTBOUND_CURRENCY,
+  CALLBACK_CURRENCY,
   RESPONSE_ID_NAMESPACE,
   BALANCE_SCALE,
   DEVICES,

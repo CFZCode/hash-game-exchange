@@ -15,6 +15,7 @@ const {
   MONEY_ACTIONS,
   SETTLEMENT_CURRENCY,
   OUTBOUND_CURRENCY,
+  CALLBACK_CURRENCY,
   BALANCE_SCALE,
 } = require('./gis.constants');
 
@@ -131,7 +132,7 @@ class GisService {
       // then went on to query `credits` with it anyway, one branch later.
       if (!/^\d+$/.test(playerId)) return this.#fail('Player not found');
 
-      const settlement = SETTLEMENT_CURRENCY[currency];
+      const settlement = CALLBACK_CURRENCY[currency];
       if (!settlement) return this.#fail('Unsupported currency');
 
       const userId = Number(playerId);
