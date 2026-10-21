@@ -15,7 +15,6 @@ import { cleanCoin, coinProblem, diffCoins, droppedCoins } from './coins'
 import { cleanRegion, regionProblem, type RegionSetting } from './region'
 import { cleanWithdrawalCap, withdrawalCapProblem, type WithdrawalCap } from './withdrawalCap'
 import { cleanWithdrawalDailyLimit, withdrawalDailyLimitProblem, type WithdrawalDailyLimit } from './withdrawalDailyLimit'
-import { cashierLimitsProblem, cleanCashierLimits, DEFAULT_CASHIER_LIMITS, type CashierLimits } from './cashierLimits'
 import { diffDocs, type AuditEntry, type Change, type CoinDefinition, type EditableDoc, type EntitlementsDoc, type VariantsSeed } from './types'
 
 /**
@@ -153,9 +152,6 @@ export async function readEntitlements(): Promise<EntitlementsDoc> {
     // Daily withdrawal limit per currency; absent = off.
     ...(stored.withdrawalDailyLimit !== undefined ? { withdrawalDailyLimit: cleanWithdrawalDailyLimit(stored.withdrawalDailyLimit) } : {}),
 
-    // Cashier limits per currency; absent = the site's own (older) limits.
-    ...(stored.cashierLimits !== undefined ? { cashierLimits: cleanCashierLimits(stored.cashierLimits) } : {}),
-
     // Player withdrawals on every rail; absent = on.
     ...(stored.withdrawalsEnabled !== undefined ? { withdrawalsEnabled: stored.withdrawalsEnabled !== false } : {}),
 
@@ -211,13 +207,10 @@ export async function readForEdit(): Promise<EditableDoc> {
   const region = cleanRegion(doc.region)
   const withdrawalCap = cleanWithdrawalCap(doc.withdrawalCap)
   const withdrawalDailyLimit = cleanWithdrawalDailyLimit(doc.withdrawalDailyLimit)
-
-  // Never saved: the defaults the backend already enforces, so the screen matches the site.
-  const cashierLimits = cleanCashierLimits(doc.cashierLimits === undefined ? DEFAULT_CASHIER_LIMITS : doc.cashierLimits)
   const withdrawalsEnabled = doc.withdrawalsEnabled !== false
   const branding = cleanBranding(doc.branding)
 
-  if (FEATURE_KEYS.every(key => key in stored)) return { ...doc, variants: { ...stored }, options, region, withdrawalCap, withdrawalDailyLimit, cashierLimits, withdrawalsEnabled, branding, seededFrom: null }
+  if (FEATURE_KEYS.every(key => key in stored)) return { ...doc, variants: { ...stored }, options, region, withdrawalCap, withdrawalDailyLimit, withdrawalsEnabled, branding, seededFrom: null }
 
   const live = await liveVariants()
   const template = templateByKey(doc.template)
@@ -241,7 +234,7 @@ export async function readForEdit(): Promise<EditableDoc> {
     }
   }
 
-  return { ...doc, features: normalise(features, variants), variants, options, region, withdrawalCap, withdrawalDailyLimit, cashierLimits, withdrawalsEnabled, branding, seededFrom }
+  return { ...doc, features: normalise(features, variants), variants, options, region, withdrawalCap, withdrawalDailyLimit, withdrawalsEnabled, branding, seededFrom }
 }
 
 // One save at a time inside this process; the version check guards against a stale screen.
@@ -259,7 +252,6 @@ export function saveEntitlements(
     region?: RegionSetting
     withdrawalCap?: WithdrawalCap
     withdrawalDailyLimit?: WithdrawalDailyLimit
-    cashierLimits?: CashierLimits
     withdrawalsEnabled?: boolean
     branding?: Partial<Branding>
   },
@@ -329,15 +321,6 @@ export function saveEntitlements(
     const withdrawalDailyLimit =
       input.withdrawalDailyLimit !== undefined ? cleanWithdrawalDailyLimit(input.withdrawalDailyLimit) : current.withdrawalDailyLimit
 
-    // Cashier limits per currency: amounts above 0 (8 dp) or empty, min ≤ max, exact.
-    if (input.cashierLimits !== undefined) {
-      const problem = cashierLimitsProblem(input.cashierLimits)
-
-      if (problem) throw new HttpError(422, 'VALIDATION_ERROR', problem)
-    }
-
-    const cashierLimits = input.cashierLimits !== undefined ? cleanCashierLimits(input.cashierLimits) : current.cashierLimits
-
     // Player withdrawals master switch: true or false, exact.
     if (input.withdrawalsEnabled !== undefined && typeof input.withdrawalsEnabled !== 'boolean') {
       throw new HttpError(422, 'VALIDATION_ERROR', 'withdrawalsEnabled must be true or false')
@@ -391,7 +374,6 @@ export function saveEntitlements(
       region,
       withdrawalCap,
       withdrawalDailyLimit,
-      cashierLimits,
       withdrawalsEnabled,
       branding
     }

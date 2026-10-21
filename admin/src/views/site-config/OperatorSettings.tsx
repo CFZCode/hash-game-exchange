@@ -7,8 +7,6 @@ import { Loader2Icon } from 'lucide-react'
 import { toast } from 'sonner'
 
 import ErrorState from '@/components/shared/ErrorState'
-import FormDialog from '@/components/shared/FormDialog'
-import { TextField } from '@/components/shared/FormField'
 import PageHeader from '@/components/shared/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -18,7 +16,6 @@ import { useSession } from '@/contexts/SessionContext'
 import { useApi, useApiMutation } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
 import { check, cleanErrors, firstError } from '@/lib/validate'
-import { TxnPasswordLabel } from '@/views/finance/StaffFloat'
 
 /**
  * Limits, policy and schedule — the values that used to be environment
@@ -36,8 +33,7 @@ import { TxnPasswordLabel } from '@/views/finance/StaffFloat'
  * deployment's business, not an operator's.
  *
  * A row with nothing stored runs on the default; saving sets it, and `Reset to
- * default` hands it back. Cashier limits are per currency and the Super Admin's
- * alone (`CashierLimitsCard`).
+ * default` hands it back.
  */
 
 type Setting = {
@@ -263,172 +259,8 @@ const OperatorSettings = () => {
             </CardContent>
           </Card>
         ))}
-        <CashierLimitsCard />
       </div>
     </div>
-  )
-}
-
-type CashierField = 'depositMin' | 'depositMax' | 'withdrawMin' | 'withdrawMax'
-type CashierRow = { code: string; name: string | null } & Record<CashierField, string | null>
-
-const CASHIER_COLUMNS: { field: CashierField; label: string }[] = [
-  { field: 'depositMin', label: 'Min deposit' },
-  { field: 'depositMax', label: 'Max deposit' },
-  { field: 'withdrawMin', label: 'Min withdrawal' },
-  { field: 'withdrawMax', label: 'Max withdrawal' }
-]
-
-const AMOUNT = /^\d{1,15}(\.\d{1,8})?$/
-
-/** The first problem with the edited limits, or null (the server checks the same). */
-const cashierProblem = (rows: CashierRow[]) => {
-  for (const r of rows) {
-    for (const c of CASHIER_COLUMNS) {
-      const v = r[c.field]
-
-      if (v !== null && (!AMOUNT.test(v) || Number(v) <= 0)) return `${r.code} ${c.label}: enter an amount above 0, or leave it empty`
-    }
-
-    if (r.depositMin && r.depositMax && Number(r.depositMin) > Number(r.depositMax)) return `${r.code}: min deposit is above max deposit`
-    if (r.withdrawMin && r.withdrawMax && Number(r.withdrawMin) > Number(r.withdrawMax)) return `${r.code}: min withdrawal is above max withdrawal`
-  }
-
-  return null
-}
-
-/**
- * Deposit / withdrawal limits per currency. With an owner panel they are the owner's (owner panel →
- * Features & plan → Policies → Cashier limits) and read-only here; otherwise the Super Admin edits
- * them (transaction password). Every deposit and withdrawal rail checks them.
- */
-const CashierLimitsCard = () => {
-  const { actor, can } = useSession()
-  const isSuperAdmin = actor?.level === 1 && can('config:write')
-  const q = useApi<{ currencies: CashierRow[]; managedBy?: 'owner' | 'admin' }>('admin/site-config/cashier-limits')
-  const ownerManaged = q.data?.managedBy === 'owner'
-  const editable = isSuperAdmin && !ownerManaged
-  const [draft, setDraft] = useState<Record<string, Partial<Record<CashierField, string | null>>>>({})
-  const [confirming, setConfirming] = useState(false)
-  const [password, setPassword] = useState('')
-
-  const saved = q.data?.currencies ?? []
-  const rows: CashierRow[] = saved.map(r => ({ ...r, ...draft[r.code] }))
-  const dirty = Object.keys(draft).length > 0
-  const problem = dirty ? cashierProblem(rows) : null
-
-  const save = useApiMutation({
-    fn: () =>
-      api.put('admin/site-config/cashier-limits', {
-        limits: Object.fromEntries(rows.map(r => [r.code, Object.fromEntries(CASHIER_COLUMNS.map(c => [c.field, r[c.field]]))])),
-        transactionPassword: password
-      }),
-    invalidate: [['api', 'admin/site-config/cashier-limits']],
-    success: 'Cashier limits saved — they apply to the next deposit or withdrawal',
-    onSuccess: () => {
-      setDraft({})
-      setConfirming(false)
-      setPassword('')
-    }
-  })
-
-  const set = (code: string, field: CashierField, raw: string) => {
-    const value = raw.trim() === '' ? null : raw.trim()
-
-    setDraft(d => ({ ...d, [code]: { ...d[code], [field]: value } }))
-  }
-
-  const show = (v: string | null) => (v === null ? <span className='text-muted-foreground'>No limit</span> : <span className='tabular-nums'>{Number(v).toLocaleString('en-IN', { maximumFractionDigits: 8 })}</span>)
-
-  return (
-    <Card className='shadow-none'>
-      <CardHeader>
-        <CardTitle className='text-base'>Cashier</CardTitle>
-        <CardDescription>
-          Deposit and withdrawal limits for each currency, in that currency.{' '}
-          {ownerManaged
-            ? 'Set by the owner (owner panel → Features & plan → Policies → Cashier limits); shown here read-only.'
-            : isSuperAdmin
-              ? 'Leave a box empty for no limit. Saving asks for your transaction password.'
-              : 'Only the Super Admin can change them.'}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className='grid gap-3'>
-        {q.error ? (
-          <ErrorState error={q.error} />
-        ) : q.isLoading ? (
-          <Loader2Icon className='text-muted-foreground animate-spin' />
-        ) : rows.length === 0 ? (
-          <p className='text-muted-foreground text-sm'>No currencies are switched on.</p>
-        ) : (
-          <div className='overflow-x-auto'>
-            <table className='w-full text-sm'>
-              <thead>
-                <tr className='text-muted-foreground border-b text-left text-xs'>
-                  <th className='py-2 pr-4 font-medium'>Currency</th>
-                  {CASHIER_COLUMNS.map(c => (
-                    <th key={c.field} className='px-3 py-2 text-right font-medium'>
-                      {c.label}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className='divide-y'>
-                {rows.map(r => (
-                  <tr key={r.code}>
-                    <td className='py-2.5 pr-4'>
-                      <span className='font-mono font-semibold'>{r.code}</span>
-                      {r.name && <span className='text-muted-foreground ml-2 text-xs'>{r.name}</span>}
-                    </td>
-                    {CASHIER_COLUMNS.map(c => (
-                      <td key={c.field} className='px-3 py-2 text-right'>
-                        {editable ? (
-                          <Input
-                            inputMode='decimal'
-                            aria-label={`${r.code} ${c.label}`}
-                            placeholder='No limit'
-                            className='ml-auto h-8 w-32 text-right font-mono text-xs'
-                            value={r[c.field] ?? ''}
-                            onChange={e => set(r.code, c.field, e.target.value.replace(/[^0-9.]/g, ''))}
-                          />
-                        ) : (
-                          show(r[c.field])
-                        )}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-        {editable && dirty && (
-          <div className='flex flex-wrap items-center gap-2'>
-            <Button disabled={!!problem || save.isPending} onClick={() => setConfirming(true)}>
-              Save cashier limits
-            </Button>
-            <Button variant='outline' disabled={save.isPending} onClick={() => setDraft({})}>
-              Discard
-            </Button>
-            {problem && <span className='text-destructive text-sm'>{problem}</span>}
-          </div>
-        )}
-      </CardContent>
-      <FormDialog
-        open={confirming}
-        onOpenChange={o => {
-          setConfirming(o)
-          if (!o) setPassword('')
-        }}
-        trigger={null}
-        title='Save cashier limits?'
-        description='They apply to the next deposit and withdrawal in each currency.'
-        submitLabel='Save'
-        onSubmit={() => save.mutateAsync()}
-      >
-        <TextField id='cl-tp' label={<TxnPasswordLabel />} type='password' required value={password} onChange={e => setPassword(e.target.value)} />
-      </FormDialog>
-    </Card>
   )
 }
 

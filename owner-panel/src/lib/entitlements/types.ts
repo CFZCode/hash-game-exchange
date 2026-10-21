@@ -2,7 +2,6 @@ import { resolveOptions } from '@/configs/entitlementCatalogue'
 import { cleanRegion, type RegionSetting } from './region'
 import { diffWithdrawalCap, type WithdrawalCap } from './withdrawalCap'
 import { diffWithdrawalDailyLimit, type WithdrawalDailyLimit } from './withdrawalDailyLimit'
-import { diffCashierLimits, type CashierLimit, type CashierLimits } from './cashierLimits'
 import { diffBranding, type Branding, type BrandingChange } from './branding'
 
 /** Shapes shared by the routes and the screens — contract §2. */
@@ -57,9 +56,6 @@ export type EntitlementsDoc = {
    */
   withdrawalDailyLimit?: WithdrawalDailyLimit
 
-  /** Deposit / withdrawal min and max per currency (./cashierLimits). Absent = the site's own (older) limits. */
-  cashierLimits?: CashierLimits
-
   /**
    * Master switch for player withdrawals on every rail (bank, crypto, gateway payouts, P2P sell).
    * Absent in an older document = on.
@@ -110,7 +106,7 @@ export type SiteCoin = {
 export type VariantsSeed = 'backend' | 'template' | null
 
 /** What the owner screen edits: the document with a full `variants` map. */
-export type EditableDoc = EntitlementsDoc & { variants: Record<string, string>; options: Record<string, Record<string, boolean>>; region: RegionSetting; withdrawalCap: WithdrawalCap; withdrawalDailyLimit: WithdrawalDailyLimit; cashierLimits: CashierLimits; withdrawalsEnabled: boolean; branding: Branding; seededFrom: VariantsSeed }
+export type EditableDoc = EntitlementsDoc & { variants: Record<string, string>; options: Record<string, Record<string, boolean>>; region: RegionSetting; withdrawalCap: WithdrawalCap; withdrawalDailyLimit: WithdrawalDailyLimit; withdrawalsEnabled: boolean; branding: Branding; seededFrom: VariantsSeed }
 
 export type ToggleChange = { kind: 'feature' | 'flag'; key: string; from: boolean; to: boolean }
 export type TemplateChange = { kind: 'template'; key: 'template'; from: string | null; to: string }
@@ -137,10 +133,8 @@ export type WithdrawalDailyLimitChange = { kind: 'withdrawal_daily_limit'; key: 
 /** Player withdrawals switched on or off on every rail (audit kind `withdrawals_enabled`). */
 export type WithdrawalsEnabledChange = { kind: 'withdrawals_enabled'; key: 'withdrawalsEnabled'; from: boolean; to: boolean }
 
-/** One currency's cashier limits changed (audit kind `cashier_limits`); `key` is the currency code. */
-export type CashierLimitsChange = { kind: 'cashier_limits'; key: string; from: CashierLimit; to: CashierLimit }
 export type { BrandingChange }
-export type Change = ToggleChange | TemplateChange | VariantChange | CoinsChange | CoinChange | OptionChange | RegionChange | WithdrawalCapChange | WithdrawalDailyLimitChange | WithdrawalsEnabledChange | CashierLimitsChange | BrandingChange
+export type Change = ToggleChange | TemplateChange | VariantChange | CoinsChange | CoinChange | OptionChange | RegionChange | WithdrawalCapChange | WithdrawalDailyLimitChange | WithdrawalsEnabledChange | BrandingChange
 
 export type AuditEntry = { at: string; user: string; version: number; changes: Change[]; seededFrom?: Exclude<VariantsSeed, null> }
 
@@ -159,7 +153,6 @@ type Diffable = Pick<EntitlementsDoc, 'features' | 'flags'> & {
   region?: RegionSetting
   withdrawalCap?: WithdrawalCap
   withdrawalDailyLimit?: WithdrawalDailyLimit
-  cashierLimits?: CashierLimits
   withdrawalsEnabled?: boolean
   branding?: Branding
 }
@@ -219,9 +212,6 @@ export function diffDocs(before: Diffable, after: Diffable) {
   const dailyChange = after.withdrawalDailyLimit ? diffWithdrawalDailyLimit(before.withdrawalDailyLimit, after.withdrawalDailyLimit) : null
 
   if (dailyChange) changes.push(dailyChange)
-
-  // Cashier limits: one change per currency, compared cleaned (an older document = no limits).
-  if (after.cashierLimits) changes.push(...diffCashierLimits(before.cashierLimits, after.cashierLimits))
 
   // Withdrawals master switch: an older document (no key) equals on.
   if (after.withdrawalsEnabled !== undefined && (before.withdrawalsEnabled !== false) !== after.withdrawalsEnabled) {

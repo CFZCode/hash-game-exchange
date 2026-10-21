@@ -4,7 +4,7 @@ const path = require('path');
 const fs = require('fs/promises');
 const crypto = require('crypto');
 
-const { money, sitePolicy, currencyRegistry, manualPayments, cashierLimits } = require('@ibitplay/common');
+const { money, sitePolicy, currencyRegistry, manualPayments } = require('@ibitplay/common');
 const { Op: SequelizeOp } = require('@ibitplay/db');
 const { assertPlayerCapability } = require('@ibitplay/auth');
 
@@ -93,8 +93,6 @@ class FiatDepositService {
     await manualPayments.assertManualAllowed(this.models.Users?.sequelize, 'deposit');
     // The coin registry (061): no deposit in a coin the owner or the site switched off.
     await currencyRegistry.assertCurrencyEnabled(details.currency);
-    // The deposit min / max for this currency (set by the Super Admin: Limits and policy → Cashier).
-    await cashierLimits.assertCashierLimits(this.models.Users?.sequelize ?? this.db?.sequelize, { currency: details.currency, amount: details.amount, flow: 'deposit' });
     // A crypto coin is a manual on-chain transfer: the network is required and the tx hash
     // (`transactionId`) is the proof, so a screenshot is optional.
     const isCrypto = (await currencyRegistry.describe(details.currency))?.kind === 'crypto';

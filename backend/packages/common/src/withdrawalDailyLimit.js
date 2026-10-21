@@ -19,7 +19,7 @@ const QueryTypes = Object.freeze({ SELECT: 'SELECT' });
  *   The deposit cap's own "withdrawn" rule (withdrawalCapFigures.js): pending and paid count,
  *   rejected / declined / cancelled and failed-and-refunded do not — so a player cannot queue
  *   several requests past the limit. Plus P2P sell orders, which are payouts too (the operator's
- *   withdrawal block and the cashier limits already treat them so): PENDING, RELEASED and
+ *   withdrawal block already treats them so): PENDING, RELEASED and
  *   DISPUTED count, CANCELLED / EXPIRED do not. Agent collections (staff_transfers) are not a
  *   player's withdrawal and are not counted; agent-tree players never reach a rail anyway.
  *

@@ -18,7 +18,6 @@ import {
   submitFiatWithdraw,
   withdrawErrorMessage,
 } from '../../../services/withdraw';
-import { cashierRangeError, getCashierLimits } from '../../../services/cashierLimits';
 import { AmountField, AvailableRow } from './index';
 
 /* THE FIAT ARM — `Wa` -> `oa` -> `ca` -> `qe` -> `ua` in index-B3pypdyg.js, with the field
@@ -146,8 +145,6 @@ export default function FiatForm({ currencyName }) {
   );
   const { data: accountsData } = useResource(readAccounts);
   const { data: requirements } = useResource(readRequirements);
-  const readLimits = React.useCallback(() => getCashierLimits(bareCurrency), [bareCurrency]);
-  const { data: limits } = useResource(readLimits);
 
   const accounts = (accountsData ?? []).filter((row) => row.method === method);
   const selected = choice ?? (accounts[0]?.id ?? NEW);
@@ -158,11 +155,8 @@ export default function FiatForm({ currencyName }) {
   // Open sports bets' stakes have already left `credits.inr` (sports-service walletUpdate), so the
   // wallet balance is what can be withdrawn — subtracting the exposure again would count it twice.
   const balance = Math.max(0, total);
-  // The owner's withdraw min / max for this currency (none = no limit); the rail's own minimum still holds.
-  const min = Math.max(FIAT_WITHDRAW_MINIMUM, Number(limits?.withdrawMin ?? 0));
-  const max = limits?.withdrawMax != null ? Number(limits.withdrawMax) : null;
+  const min = FIAT_WITHDRAW_MINIMUM;
   const shownAmount = amount ?? min;
-  const rangeError = cashierRangeError(shownAmount, { min: limits?.withdrawMin, max: limits?.withdrawMax, currency: bareCurrency });
 
   const pickMethod = (next) => {
     setMethod(next);
@@ -347,16 +341,15 @@ export default function FiatForm({ currencyName }) {
           amount={shownAmount}
           onAmount={setAmount}
           min={min}
-          max={max}
           balance={balance}
           currency={currencyName}
           precision={2}
         />
         <AvailableRow currencyName={currencyName} unlocked={balance} className="mt-5" />
 
-        {(error || rangeError) && (
+        {error && (
           <Notice type="error" className="mt-5 font-normal">
-            {error?.message ?? rangeError}
+            {error.message}
           </Notice>
         )}
         {canForfeit && (
@@ -372,7 +365,7 @@ export default function FiatForm({ currencyName }) {
 
         <button
           type="submit"
-          disabled={busy || balance < min || wagerBlocked || !!rangeError}
+          disabled={busy || balance < min || wagerBlocked}
           className="button button-brand button-m my-4 w-full"
         >
           Withdraw

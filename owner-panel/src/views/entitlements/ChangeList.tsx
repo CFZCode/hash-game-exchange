@@ -8,7 +8,6 @@ import type { Change, CoinChange, CoinDefinition, ToggleChange } from '@/lib/ent
 import { regionLabel } from '@/lib/entitlements/region'
 import { withdrawalCapLabel } from '@/lib/entitlements/withdrawalCap'
 import { withdrawalDailyLimitLabel } from '@/lib/entitlements/withdrawalDailyLimit'
-import { cashierLimitLabel } from '@/lib/entitlements/cashierLimits'
 import { BRANDING_LABELS } from '@/lib/entitlements/branding'
 
 /** An image change shows its content hash, shortened; text shows quoted. */
@@ -111,14 +110,6 @@ const ChangeList = ({ changes, labelOf }: { changes: Change[]; labelOf: (c: Togg
           <span className='font-medium'>Withdrawals</span>
           <span className='text-muted-foreground font-mono text-xs'>
             {c.from ? 'on' : 'off'} → {c.to ? 'on' : 'off'}
-          </span>
-        </li>
-      ) : c.kind === 'cashier_limits' ? (
-        <li key={`cashier:${c.key}`} className='flex flex-wrap items-center gap-2 text-sm'>
-          <span className='text-muted-foreground w-14 text-xs uppercase'>cashier</span>
-          <span className='font-medium'>{c.key} limits</span>
-          <span className='text-muted-foreground font-mono text-xs'>
-            {cashierLimitLabel(c.from)} → {cashierLimitLabel(c.to)}
           </span>
         </li>
       ) : c.kind === 'branding' ? (
