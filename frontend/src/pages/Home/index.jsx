@@ -26,6 +26,7 @@ export default function Home() {
      section's skeleton will go when it is transcribed. */
   const { data: sections } = useResource(getHomeSections);
   const gates = useGates();
+  const casino = gates.on('casino');
 
   /* Each card below the hero plays the site's own entrance as it reaches the fold — the
      trigger is this build's addition, the motion is `.game-tile-animate`'s; the rules and the
@@ -126,22 +127,23 @@ export default function Home() {
           child of the page body, before the category cards and the ordered game rows. So the
           signed-in order is hero, this, big wins, categories, BC Originals. Renders nothing at
           all when signed out or when both its lists are empty. */}
-      <RecentFavorites />
-      {gates.flag('home_latestwins') && <RecentBigWins />}
+      {/* Casino switched off (owner or Super Admin): no casino row anywhere on the page. */}
+      {casino && <RecentFavorites />}
+      {casino && gates.flag('home_latestwins') && <RecentBigWins />}
       {gates.flag('home_gamingcards') && <CategoryCards />}
       {gates.on('originals') && <GameSection title={brandLabel('BC Originals')} {...section('originals')} />}
-      <GameSection title="Hot Games" {...section('hotGames')} />
-      {gates.flag('home_livesports') && <Highlights />}
+      {casino && <GameSection title="Hot Games" {...section('hotGames')} />}
+      {gates.on('sports') && gates.flag('home_livesports') && <Highlights />}
       {/* BC.GAME's exclusive tables have no Parker567 equivalent; the live feed answers []. Drawn
           only when it has games, so an empty "Exclusive" heading never shows. */}
-      {section('exclusive').games?.length !== 0 && <GameSection title={brandLabel('BC Exclusive')} {...section('exclusive')} />}
-      {gates.flag('home_popularslots') && <GameSection title="Slots" {...section('slots')} />}
-      {gates.flag('home_livecasino') && <GameSection title="Live Casino" {...section('liveCasino')} />}
+      {casino && section('exclusive').games?.length !== 0 && <GameSection title={brandLabel('BC Exclusive')} {...section('exclusive')} />}
+      {casino && gates.flag('home_popularslots') && <GameSection title="Slots" {...section('slots')} />}
+      {casino && gates.flag('home_livecasino') && <GameSection title="Live Casino" {...section('liveCasino')} />}
       {/* Admin ka home_paymentbanner, aur agent ke player ko nahi (wo deposit nahi kar sakta). */}
       {gates.flag('home_paymentbanner') && gates.on('deposit') && <PayYourWay />}
       {/* compact: this row sits under Pay Your Way's fixed-height panel, which leaves empty
           space below its content on mobile — see the note in GameSection. */}
-      <GameSection title="All Bingo Games" compact {...section('bingo')} />
+      {casino && <GameSection title="All Bingo Games" compact {...section('bingo')} />}
       {gates.flag('home_leaderboard') && <LatestBets />}
     </div>
   );

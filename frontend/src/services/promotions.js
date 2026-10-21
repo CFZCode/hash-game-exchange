@@ -1,4 +1,5 @@
 import { request, API_BASE, USE_FIXTURES } from './client';
+import { publicGates } from './gates';
 import ENDPOINTS from './endpoints';
 import { PROMOTIONS, TABS, TABS_H5, SPORTS_TAB, PAGE_SIZE } from '../pages/Promotions/promotions';
 
@@ -84,14 +85,20 @@ export const isEnded = (row, now = Date.now()) =>
 
 function livePromotions({ page, tab, archived }) {
   const now = Date.now();
-  return request(ENDPOINTS_LIVE.promotions, {
-    live: true,
-    params: { page: 1, limit: 100, ...(LIVE_SEGMENTS.has(tab) ? { segment: tab } : null) },
-  }).then((rows) => {
-    const matching = (rows ?? []).filter((row) => isEnded(row, now) === Boolean(archived));
+  return Promise.all([
+    request(ENDPOINTS_LIVE.promotions, {
+      live: true,
+      params: { page: 1, limit: 100, ...(LIVE_SEGMENTS.has(tab) ? { segment: tab } : null) },
+    }),
+    publicGates(),
+  ]).then(([rows, gates]) => {
+    // A casino / sports offer goes with its section when the owner or Super Admin switches it off.
+    const matching = (rows ?? []).filter(
+      (row) => isEnded(row, now) === Boolean(archived) && gates.routeOn(promotionHref(row.segment, row.slug)),
+    );
     const start = (page - 1) * PAGE_SIZE;
     return {
-      tabs: LIVE_TABS,
+      tabs: LIVE_TABS.filter((t) => !LIVE_SEGMENTS.has(t.id) || gates.routeOn(`/promotion/${t.id}`)),
       promotions: matching.slice(start, start + PAGE_SIZE).map((row) => toPromotionCard(row, now)),
       page,
       pageSize: PAGE_SIZE,

@@ -1,10 +1,12 @@
 import { CHAT_AVAILABLE } from '../../../services/availability';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useGates } from '../../../context/gates';
 import './Tabbar.css';
 
 export default function Tabbar({ onToggleSidebar, isMenuOpen }) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  const { routeOn } = useGates();
 
   /* `mn(e)` in Enter-MsmOuq5R.js is the tabbar's own data, and Explore's entry is
      `{ label: "Explore", icon: "explore", link: "/explore", buttonName: "tabbar_explore" }`.
@@ -69,6 +71,8 @@ export default function Tabbar({ onToggleSidebar, isMenuOpen }) {
 
       {/* `{ label: "Casino", icon: "casino", link: "/casino", buttonName: "tabbar_casino" }` —
           the third entry in `mn()`, and the page it points at is built, tabs and all. */}
+      {/* Casino / Sports switched off by the owner or Super Admin: no tab. */}
+      {routeOn('/casino') && (
       <button
         className={`button flex h-full w-1/5 flex-1 flex-col items-center justify-center px-1 py-2 ${casinoActive ? 'text-brand' : ''}`}
         type="button"
@@ -79,8 +83,10 @@ export default function Tabbar({ onToggleSidebar, isMenuOpen }) {
         </div>
         <p className={`mt-0.5 text-xs font-extrabold ${casinoActive ? 'text-brand' : 'text-tertiary'}`}>Casino</p>
       </button>
+      )}
 
       {/* Was a button with no handler; `/sports` is the exchange lobby now, so it goes there. */}
+      {routeOn('/sports') && (
       <button
         className={`button flex h-full w-1/5 flex-1 flex-col items-center justify-center px-1 py-2 ${sportsActive ? 'text-brand' : ''}`}
         type="button"
@@ -91,6 +97,7 @@ export default function Tabbar({ onToggleSidebar, isMenuOpen }) {
         </div>
         <p className={`mt-0.5 text-xs font-extrabold ${sportsActive ? 'text-brand' : 'text-tertiary'}`}>Sports</p>
       </button>
+      )}
 
       {/* `{ label: "Chat", icon: "chat", link: "/chat-public", buttonName: "tabbar_chat" }` — the
           fifth and last entry in `mn()`, and it is a LINK like the three above rather than a

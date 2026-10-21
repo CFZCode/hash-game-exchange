@@ -8,6 +8,7 @@ import { readHistory, remember } from './history';
 import { Empty } from './GameGrid';
 import { SearchIcon, CloseIcon, ArrowIcon } from './icons';
 import { useSettings } from '../../context/settings';
+import { useGates } from '../../context/gates';
 import './Explore.css';
 
 /* Explore — what the header's search button opens.
@@ -68,9 +69,14 @@ export function ExplorePanel({ initialType, autoFocus = false }) {
      Casino rather than rendering nothing, which is what `|| "casino"` above it already
      guarantees for the common case. Lazy initialiser: the query string is read once on
      arrival, and changing the dropdown afterwards must not be undone by a re-render. */
-  const [type, setType] = React.useState(
+  const [picked, setType] = React.useState(
     () => TYPES.find((option) => option.value === initialType) ?? TYPES[0],
   );
+  /* Casino / Sports switched off by the owner or Super Admin: not offered. Derived during render
+     because the gates may answer after the first one. */
+  const gates = useGates();
+  const types = TYPES.filter((option) => gates.on(option.value));
+  const type = types.includes(picked) ? picked : (types[0] ?? { value: '' });
   const [query, setQuery] = React.useState('');
   const [focused, setFocused] = React.useState(false);
   const [history, setHistory] = React.useState(() => readHistory());
@@ -162,7 +168,7 @@ export function ExplorePanel({ initialType, autoFocus = false }) {
               size="s"
               className="-my-1.5 -ml-2 h-11 border-none bg-transparent px-0"
               value={type}
-              options={TYPES}
+              options={types}
               onChange={changeType}
               labelRender={(option) => (
                 <div className="flex h-8 items-center border-r border-solid border-third px-2">

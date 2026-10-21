@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSettings } from '../../../context/settings';
+import { useGates } from '../../../context/gates';
 import casinoImg from '../../../assets/casino.png';
 import casinoLightImg from '../../../assets/casino_w.png';
 import sportsImg from '../../../assets/sports.png';
@@ -146,6 +147,10 @@ export default function CategoryCards() {
   const containerRef = React.useRef(null);
   const isWide = useIsWide(containerRef);
   const { darken } = useSettings();
+  // A card into a section the owner or Super Admin switched off is not drawn.
+  const { routeOn } = useGates();
+  const categories = CATEGORIES.filter((c) => routeOn(c.href));
+  if (!routeOn('/casino') && !routeOn('/sports') && !categories.length) return null;
 
   /* NO SCROLL REVEAL ON THIS BLOCK, DELIBERATELY — it used to ramp its seven cards row by row,
      15ms apart, the same entrance a game row's tiles get, and it is the one block on the page
@@ -180,7 +185,7 @@ export default function CategoryCards() {
           resolves to content and both rows are sized by their cards (176 and 120 at sm).
           Kept because the original carries them. */}
       <div className="flex flex-3 gap-2 lg:!gap-3">
-        <FeatureCard src={darken ? casinoImg : casinoLightImg} href="/casino">
+        {routeOn('/casino') && <FeatureCard src={darken ? casinoImg : casinoLightImg} href="/casino">
           <div className="flex items-center">
             <SpriteIcon name="casino" />
             <h2 className="ml-0.5 text-sm sm:text-[22px]">CASINO</h2>
@@ -188,9 +193,9 @@ export default function CategoryCards() {
           <FeatureCopy isWide={isWide}>
             Dive into our in-house games, live casino and slots
           </FeatureCopy>
-        </FeatureCard>
+        </FeatureCard>}
 
-        <FeatureCard src={sportsImg} href="/sports">
+        {routeOn('/sports') && <FeatureCard src={sportsImg} href="/sports">
           {/* A <span> where Casino uses an <h2>. That asymmetry is the original's; both are
               blockified as flex items, so it changes nothing visually. */}
           <div className="flex items-center">
@@ -200,11 +205,11 @@ export default function CategoryCards() {
           <FeatureCopy isWide={isWide}>
             Bet on Football, Cricket, NFL, eSports &amp; over 80 sports!
           </FeatureCopy>
-        </FeatureCard>
+        </FeatureCard>}
       </div>
 
       <div className="flex flex-4 flex-wrap gap-2 lg:!gap-3">
-        {CATEGORIES.map((c) => (
+        {categories.map((c) => (
           <CategoryCard
             key={c.key}
             src={darken ? c.src : CATEGORY_LIGHT[c.key] ?? c.src}

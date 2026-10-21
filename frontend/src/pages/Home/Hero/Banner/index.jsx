@@ -8,6 +8,7 @@ import DepositSlide from './DepositSlide';
 import { artFor, ARROW_PATH, SLIDE_PAD, CARD, CARD_BODY, CARD_TAG, CARD_BUTTON } from './card';
 import Skeleton from '../../../../components/shared/Skeleton';
 import { useGates } from '../../../../context/gates';
+import { isHouseGame } from '../../../../services/game';
 import './Banner.css';
 
 /* The hero carousel the home page shows to a signed-in visitor.
@@ -445,6 +446,9 @@ const bannerAllowed = (gates, banner) => {
   if (gates.agentPlayer) return false;
   const link = String(banner?.linkUrl ?? '');
   if (PROMO_LINK.test(link) && !gates.on('promotions')) return false;
+  // A slide into one game goes with that game's section (Originals or the casino).
+  const game = link.match(/^\/game\/([^/?#]+)/)?.[1];
+  if (game) return gates.on(isHouseGame(game) ? 'originals' : 'casino');
   return gates.routeOn(link);
 };
 

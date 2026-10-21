@@ -62,6 +62,11 @@ export const GATES = {
   rewards: { capability: 'promotions' },
   // `sports` is the site admin's kill switch.
   sports: { flag: 'sports' },
+  // The third-party casino lobby: owner Site flags → Casino AND the Super Admin's Features → Casino.
+  casino: { flag: 'casino' },
+  // One promotion's page is its section's AND the promotions' (a sports offer goes with sports).
+  sportsPromo: { flag: 'sports', feature: 'promotions', capability: 'promotions' },
+  casinoPromo: { flag: 'casino', feature: 'promotions', capability: 'promotions' },
   notifications: { feature: 'notifications' },
   // KYC: the owner's feature, and never for an agent's player — the agent vouches for them
   // (addaplay's `useAgentUser` rule: their personal-verification section is hidden).
@@ -99,6 +104,8 @@ export const ROUTES = [
   ['/promotions/weekly-raffle', 'raffle'],
   ['/promotions', 'promotions'],
   // One promotion's page (`/promotion/:segment/:slug`) — the same section as the list.
+  ['/promotion/sports', 'sportsPromo'],
+  ['/promotion/casino', 'casinoPromo'],
   ['/promotion', 'promotions'],
   ['/deposit-offer', 'promotions'],
   ['/blog', 'blog'],
@@ -115,6 +122,11 @@ export const ROUTES = [
   ['/section/originals', 'originals'],
   ['/tagname/BC%20Originals', 'originals'],
   ['/tagname/BC Originals', 'originals'],
+  // The rest of the lobby — after the Originals paths above, which `find` must reach first.
+  ['/casino', 'casino'],
+  ['/gamelist', 'casino'],
+  ['/tagname', 'casino'],
+  ['/section', 'casino'],
 ];
 
 /** The section an href belongs to, if any (`/wallet/swap?x=1` → swap). */
@@ -127,7 +139,7 @@ export function gateOf(href) {
    off for EVERYONE — guests, direct players and agent players alike — and the backend refuses them
    the same way (PROMOTIONS_DISABLED_B2B). hybrid and b2c keep the per-player rule (the
    `promotions` capability). */
-const PROMO_GATES = new Set(['bonus', 'vip', 'affiliate', 'promotions', 'contest', 'raffle', 'quests', 'rewards', 'giftcards']);
+const PROMO_GATES = new Set(['bonus', 'vip', 'affiliate', 'promotions', 'sportsPromo', 'casinoPromo', 'contest', 'raffle', 'quests', 'rewards', 'giftcards']);
 
 /* The owner's policies when the site never chose one — the backend's own `POLICY_DEFAULTS`
    (packages/common/src/sitePolicy.js). */

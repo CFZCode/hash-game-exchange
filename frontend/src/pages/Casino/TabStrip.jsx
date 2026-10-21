@@ -263,7 +263,8 @@ export default function CasinoTabStrip({ active, compact = false, tight = false,
          strip back to `useDragScroll`. The two are mutually exclusive there by construction —
          see the note at the top of that component. */
     >
-      {TABS.filter(({ tab }) => tab !== 'brand' || gates.on('originals')).map(({ label, tab }) => {
+      {/* A tab into a switched-off section (Originals, or the whole casino) is not drawn. */}
+      {TABS.filter(({ tab }) => gates.routeOn(tab ? `/casino/${tab}` : '/casino')).map(({ label, tab }) => {
         const selected = tab === active;
         return (
           <NavLink

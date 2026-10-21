@@ -47,7 +47,8 @@ async function readLiveGame(gameUnique) {
   /* BC Originals switched off: an in-house game's page (a bookmark, an old link) is "not in the
      catalogue", never a lookup elsewhere that could dress it up as another game. The backend
      refuses its launch too. */
-  if (!(await publicGates()).on('originals') && isHouseGame(gameUnique)) return null;
+  const gates = await publicGates();
+  if (!gates.on('originals') && isHouseGame(gameUnique)) return null;
   const originals = await Promise.resolve(getOriginals()).catch(() => []);
   const house = (originals ?? []).find((game) => game.slug === gameUnique || game.uid === gameUnique);
   /* An in-house game the aggregator does not offer: not in the catalogue either. */
@@ -55,6 +56,8 @@ async function readLiveGame(gameUnique) {
   if (house) {
     return { ...house, provider: 'BC Originals', ref: house.uid ?? gameUnique, source: 'in-house', launch: 'in-house' };
   }
+  /* Casino switched off (owner or Super Admin): a catalogue game's page is not in it either. */
+  if (!gates.on('casino')) return null;
   const game = await getLiveGame(gameUnique);
   return game ? { ...game, ref: game.uuid ?? gameUnique, launch: 'aggregator' } : null;
 }
