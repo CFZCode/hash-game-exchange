@@ -256,12 +256,8 @@ export function useMatchSlip({ sid, gmid, match, getMarkets, signedIn, currency 
           reject(token, early.message, stakeStr);
           return;
         }
-        let wallet = null;
-        try {
-          wallet = (await fetchBalanceRest()).balance;
-        } catch {
-          wallet = null; // unknown: the server's own wallet check decides
-        }
+        // Unknown balance (read failed): the server's own wallet check decides.
+        const wallet = await fetchBalanceRest().then((b) => b.balance, () => null);
         if (wallet != null && moneyNeeded(s, inrFirst, odds, market, book) > wallet) {
           reject(token, BET_TOAST.CHECK_BALANCE, stakeStr);
           return;
