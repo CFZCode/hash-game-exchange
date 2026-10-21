@@ -844,7 +844,8 @@ class RaceService {
 
     const { rows, count } = await this.models.RaceReward.findAndCountAll({
       where,
-      order: [['created_at', 'DESC']],
+      // Newest race first (ids are issued as races open), then its ranks in order.
+      order: [['race_id', 'DESC'], ['rank', 'ASC']],
       limit,
       offset,
       raw: true,
@@ -855,12 +856,54 @@ class RaceService {
 
     return {
       total: count,
+      summary: await this.#rewardSummary(where),
       rows: rows.map((r) => ({
         ...this.#shapeReward(r, races.get(String(r.race_id))),
         userId: String(r.user_id),
         // A rewards list keyed only by numeric id cannot be read by a person.
         username: names.get(String(r.user_id)) ?? null,
       })),
+    };
+  }
+
+  /**
+   * Claimed / not claimed totals for the same filters as the list, every page.
+   * Amounts are the stored prize amounts, in the rows' own currency (what the
+   * table prints). shortcut: rows in another currency than the first are not
+   * summed in; every row this module writes is USDT.
+   */
+  async #rewardSummary(where) {
+    const { fn, col } = this.models.RaceReward.sequelize;
+    const [groups, winners] = await Promise.all([
+      this.models.RaceReward.findAll({
+        where,
+        attributes: ['claimed', 'currency', [fn('COUNT', col('id')), 'count'], [fn('SUM', col('amount')), 'amount']],
+        group: ['claimed', 'currency'],
+        raw: true,
+      }),
+      this.models.RaceReward.count({ where, distinct: true, col: 'user_id' }),
+    ]);
+
+    const currency = groups[0]?.currency || PRIZE_CURRENCY;
+    const bucket = (claimed) => {
+      const mine = groups.filter((g) => Boolean(g.claimed) === claimed && (g.currency || PRIZE_CURRENCY) === currency);
+      return {
+        count: mine.reduce((n, g) => n + Number(g.count), 0),
+        amount: money.toDecimalString(mine.reduce((sum, g) => money.add(sum, String(g.amount ?? '0')), 0n)),
+      };
+    };
+    const claimed = bucket(true);
+    const unclaimed = bucket(false);
+
+    return {
+      winners,
+      claimed,
+      unclaimed,
+      total: {
+        count: claimed.count + unclaimed.count,
+        amount: money.toDecimalString(money.add(claimed.amount, unclaimed.amount)),
+      },
+      currency,
     };
   }
 

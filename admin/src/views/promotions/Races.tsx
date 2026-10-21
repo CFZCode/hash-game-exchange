@@ -16,16 +16,19 @@ import { SwitchField, TextAreaField, TextField } from '@/components/shared/FormF
 import Money from '@/components/shared/Money'
 import PageHeader from '@/components/shared/PageHeader'
 import { RewardCurrencyNotice } from '@/components/shared/RewardCurrency'
+import StatCard from '@/components/shared/StatCard'
 import StatusBadge from '@/components/shared/StatusBadge'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useApi, useApiMutation, useListState, usePagedApi } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
+import { formatDate, formatNumber } from '@/lib/format'
 import { check, cleanErrors, firstError } from '@/lib/validate'
 
 /**
@@ -67,7 +70,10 @@ type BoardRow = { rank: number; userId: string | null; name: string | null; poin
 type Board = { raceId: number; startsAt: string; endsAt: string; winnerCount: number; payoutCurrency?: string; currency: string; leaderboard: BoardRow[] }
 
 type Race = { id: number; type: RaceType; status?: string; startsAt?: string; endsAt?: string; starts_at?: string; ends_at?: string; participants?: number; prizePool?: string; settledAt?: string | null; totalAwarded?: string; winnerCount?: number; cancelReason?: string | null }
-type Reward = { id: number; raceId?: number; userId?: number | string; username?: string; rank?: number; points?: string; amount?: string; currency?: string; claimed?: boolean; createdAt?: string }
+type Reward = { id: number; raceId?: number; type?: RaceType; raceStartsAt?: string | null; userId?: number | string; username?: string; rank?: number; points?: string; amount?: string; currency?: string; claimed?: boolean; claimedAt?: string | null; createdAt?: string }
+
+/** `meta.summary` of GET admin/user/race/rewards: every page of the same filters. */
+type RewardSummary = { winners: number; claimed: { count: number; amount: string }; unclaimed: { count: number; amount: string }; total: { count: number; amount: string }; currency: string }
 type Boat = { id: number; name: string; isActive?: boolean }
 
 /** Bounds from race.validators.js `updateConfig` (MAX_WINNERS = 500). */
@@ -432,22 +438,24 @@ const RacesTab = () => {
 /** A settled race's prize rows (rank, player, points, prize, claimed). */
 const WinnersDialog = ({ raceId, onClose }: { raceId: number; onClose: () => void }) => {
   const list = usePagedApi<Reward>('admin/user/race/rewards', { raceId, limit: 100, page: 1 })
-  const rows = [...(list.data?.rows ?? [])].sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0))
+  const rows = list.data?.rows
 
   return (
     <Dialog open onOpenChange={o => (!o ? onClose() : undefined)}>
-      <DialogContent className='sm:max-w-xl'>
+      <DialogContent className='sm:max-w-2xl'>
         <DialogHeader>
           <DialogTitle>Race #{raceId} — winners</DialogTitle>
           <DialogDescription>The prizes this race wrote. Players claim them into their wallet.</DialogDescription>
         </DialogHeader>
+        <RewardStats summary={list.data?.meta?.summary as RewardSummary | undefined} loading={list.isLoading} compact />
         <DataTable
           columns={[
             { key: 'rank', header: 'Rank', cell: r => <span className='tabular-nums'>{r.rank}</span> },
             { key: 'user', header: 'User', cell: r => r.username ?? `#${r.userId}` },
             { key: 'points', header: 'Points', align: 'right', cell: r => <span className='font-mono tabular-nums'>{r.points}</span> },
             { key: 'amount', header: 'Prize', align: 'right', cell: r => <Money value={r.amount} currency={r.currency} /> },
-            { key: 'claimed', header: 'Claimed', cell: r => <StatusBadge value={r.claimed ? 'completed' : 'pending'} /> }
+            { key: 'claimed', header: 'Claimed', cell: r => <StatusBadge value={r.claimed ? 'completed' : 'pending'} /> },
+            { key: 'claimedAt', header: 'Claimed at', cell: r => (r.claimedAt ? <DateTime value={r.claimedAt} /> : '—') }
           ]}
           rows={rows}
           rowKey={r => r.id}
@@ -500,26 +508,54 @@ const BoardTab = () => {
   )
 }
 
+/** Winners, claimed, not claimed and the total, from the list's `meta.summary`. */
+const RewardStats = ({ summary, loading, compact }: { summary?: RewardSummary; loading?: boolean; compact?: boolean }) => {
+  const money = (v?: string) => <Money value={v ?? '0'} currency={summary?.currency} />
+  const count = (n?: number) => `${formatNumber(n ?? 0)} ${n === 1 ? 'prize' : 'prizes'}`
+
+  return (
+    <div className={compact ? 'grid grid-cols-2 gap-2 sm:grid-cols-4' : 'mb-4 grid grid-cols-2 gap-4 lg:grid-cols-4'}>
+      <StatCard label='Winners' value={formatNumber(summary?.winners ?? 0)} hint={count(summary?.total.count)} loading={loading} />
+      <StatCard label='Claimed' value={money(summary?.claimed.amount)} hint={count(summary?.claimed.count)} loading={loading} />
+      <StatCard label='Not claimed' value={money(summary?.unclaimed.amount)} hint={count(summary?.unclaimed.count)} loading={loading} />
+      <StatCard label='Total' value={money(summary?.total.amount)} hint={count(summary?.total.count)} loading={loading} />
+    </div>
+  )
+}
+
 const RewardsTab = () => {
-  const { state, set, query } = useListState(['type', 'claimed'])
+  const { state, set, query } = useListState(['type', 'claimed', 'raceId'])
 
   const list = usePagedApi<Reward>('admin/user/race/rewards', {
     limit: query.limit,
     page: query.page,
     type: query.type || undefined,
-    claimed: query.claimed || undefined
+    claimed: query.claimed || undefined,
+    raceId: /^\d+$/.test(String(query.raceId ?? '')) ? query.raceId : undefined
   })
 
   const columns: Column<Reward>[] = [
+    {
+      key: 'race',
+      header: 'Race',
+      cell: r => (
+        <span className='whitespace-nowrap'>
+          #{r.raceId} · {r.type === 'weekly' ? 'Weekly' : 'Daily'} · {formatDate(r.raceStartsAt, false)}
+        </span>
+      )
+    },
     { key: 'rank', header: 'Rank', cell: r => <span className='tabular-nums'>{r.rank ?? '—'}</span> },
     { key: 'user', header: 'User', cell: r => <span>{r.username ?? `#${r.userId}`}</span> },
     { key: 'points', header: 'Points', align: 'right', cell: r => <span className='font-mono tabular-nums'>{r.points ?? '—'}</span> },
     { key: 'amount', header: 'Reward', align: 'right', cell: r => <Money value={r.amount} currency={r.currency} /> },
     { key: 'claimed', header: 'Claimed', cell: r => <StatusBadge value={r.claimed ? 'completed' : 'pending'} /> },
-    { key: 'at', header: 'When', cell: r => <DateTime value={r.createdAt} relative /> }
+    { key: 'claimedAt', header: 'Claimed at', cell: r => (r.claimedAt ? <DateTime value={r.claimedAt} /> : '—') },
+    { key: 'at', header: 'Won', cell: r => <DateTime value={r.createdAt} relative /> }
   ]
 
   return (
+    <>
+    {list.error ? null : <RewardStats summary={list.data?.meta?.summary as RewardSummary | undefined} loading={list.isLoading} />}
     <DataTable
       columns={columns}
       rows={list.data?.rows}
@@ -552,9 +588,18 @@ const RewardsTab = () => {
               <SelectItem value='false'>Unclaimed</SelectItem>
             </SelectContent>
           </Select>
+          <Input
+            className='w-28'
+            inputMode='numeric'
+            placeholder='Race #'
+            aria-label='Race id'
+            value={String(state.raceId ?? '')}
+            onChange={e => set({ raceId: e.target.value.replace(/\D/g, '') })}
+          />
         </>
       }
     />
+    </>
   )
 }
 

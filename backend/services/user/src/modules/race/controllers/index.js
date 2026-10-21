@@ -67,7 +67,7 @@ function createControllers({ service }) {
 
     listRewards: asyncHandler(async (req, res) => {
       const result = await service.listRewards(req.query);
-      return response.paginated(res, result.rows, { ...page(req.query), total: result.total });
+      return response.paginated(res, result.rows, { ...page(req.query), total: result.total }, { summary: result.summary });
     }),
 
     /**

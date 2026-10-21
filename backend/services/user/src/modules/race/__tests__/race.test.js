@@ -376,6 +376,47 @@ test('race rewards', async (t) => {
     );
   });
 
+  await t.test('the admin rewards list sums claimed and unclaimed for its filters, ranks in order', async () => {
+    const other = await models.Race.create({
+      type: 'daily', starts_at: new Date('2026-01-03T00:00:00Z'), ends_at: new Date('2026-01-04T00:00:00Z'),
+      status: 'settled', settled_at: new Date(),
+    });
+    created.races.push(other.id);
+    for (const id of [userId + 2, userId + 3]) {
+      await models.Users.findOrCreate({ where: { id }, defaults: { id, name: `race-test-${id}`, password: 'x', status: 'active' } });
+    }
+    await models.RaceReward.bulkCreate([
+      { race_id: other.id, user_id: userId + 3, type: 'daily', rank: 3, points: '10', currency: 'USDT', amount: '1.5' },
+      { race_id: other.id, user_id: userId, type: 'daily', rank: 1, points: '30', currency: 'USDT', amount: '4', claimed: true, claimed_at: new Date() },
+      { race_id: other.id, user_id: userId + 2, type: 'daily', rank: 2, points: '20', currency: 'USDT', amount: '2.25' },
+    ]);
+
+    const { rows, total, summary } = await service.listRewards({ raceId: other.id, limit: 2, offset: 0 });
+    assert.strictEqual(total, 3);
+    assert.deepStrictEqual(rows.map((r) => r.rank), [1, 2]);
+    assert.ok(rows[0].claimedAt);
+    assert.strictEqual(rows[1].claimedAt, null);
+    // Every page's totals, not just the two rows on this one.
+    assert.deepStrictEqual(summary, {
+      winners: 3,
+      claimed: { count: 1, amount: '4.00000000' },
+      unclaimed: { count: 2, amount: '3.75000000' },
+      total: { count: 3, amount: '7.75000000' },
+      currency: 'USDT',
+    });
+
+    const pending = await service.listRewards({ raceId: other.id, claimed: 'false' });
+    assert.strictEqual(pending.summary.claimed.count, 0);
+    assert.strictEqual(pending.summary.claimed.amount, '0.00000000');
+    assert.strictEqual(pending.summary.unclaimed.amount, '3.75000000');
+
+    const none = await service.listRewards({ raceId: other.id + 1_000_000 });
+    assert.strictEqual(none.summary.total.amount, '0.00000000');
+
+    await models.RaceReward.destroy({ where: { race_id: other.id } });
+    await models.Users.destroy({ where: { id: [userId + 2, userId + 3] } });
+  });
+
   await t.test('finished races list their podium and the caller\'s own placing', async () => {
     await models.Race.update({ prize_pool: '50', winner_count: 10, total_awarded: '5' }, { where: { id: race.id } });
     const rows = await service.history({ type: 'daily', limit: 30, userId });

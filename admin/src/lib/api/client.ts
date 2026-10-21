@@ -172,7 +172,7 @@ export const api = {
       hasPrev: total === undefined ? false : page > 1
     }
 
-    return { rows, pagination }
+    return { rows, pagination, meta }
   },
 
   /** Binary routes (CSV, PDF, images) — returns the Blob. */
