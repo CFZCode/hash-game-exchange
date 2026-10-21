@@ -54,7 +54,7 @@ const raceSilk = (market, s) =>
 // TENEXCH formatOdd: the feed value as-is (3.6, not 3.60).
 const price = (v) => formatOdd(v);
 
-function RunnerMarket({ market, book, projected, slip, slipNode, disabled, signedIn, onCell, onCashout, formatAmount, formatLimit }) {
+function RunnerMarket({ market, book, projected, slip, slipNode, disabled, signedIn, racing, onCell, onCashout, formatAmount, formatLimit }) {
   const mine = slip && String(slip.mid) === String(market.mid);
   const g = gt(market);
   const sections = market.section || [];
@@ -80,7 +80,8 @@ function RunnerMarket({ market, book, projected, slip, slipNode, disabled, signe
   return (
     <MatchOddsBlock
       market={block}
-      depth={g === 'match' && hasDepth(market) ? 3 : 1}
+      // A racecard shows ONE back and ONE lay per runner, like TENEXCH; other match markets the 3×3 ladder.
+      depth={!racing && g === 'match' && hasDepth(market) ? 3 : 1}
       showSize
       formatPrice={price}
       formatSize={formatSize}
@@ -252,7 +253,7 @@ function LineMarkets({ markets, book, slip, slipNode, disabled, onCell, formatAm
 
 /* Khado (one Yes price, the band width in the name) and cricket-casino Number grids (one Back
    price per row) — no kit block of their own, so the kit's MarketCard + RunnerRow `cells`. */
-function SingleMarket({ market, book, slip, slipNode, disabled, onCell, formatAmount, formatLimit }) {
+function SingleMarket({ market, book, projected, slip, slipNode, disabled, onCell, formatAmount, formatLimit }) {
   const mine = slip && String(slip.mid) === String(market.mid);
   const sections = market.section || [];
   const khado = gt(market) === 'khado';
@@ -278,6 +279,7 @@ function SingleMarket({ market, book, slip, slipNode, disabled, onCell, formatAm
             status={rowStatus(market, s)}
             disabled={disabled}
             pnl={bookFor(book, market.mid, s.nat)}
+            projected={mine && projected ? (projected[s.nat] ?? null) : null}
             formatPrice={khado ? (v) => String(v ?? '') : price}
             formatSize={formatSize}
             formatAmount={formatAmount}
@@ -311,6 +313,7 @@ function SingleMarket({ market, book, slip, slipNode, disabled, onCell, formatAm
  * @param {object|null} props.slip       useMatchSlip().slip
  * @param {React.ReactNode} props.slipNode  The <BetSlipInline/> for the open slip.
  * @param {object|null} props.projected  Runner name → projected book for the slip's market.
+ * @param {boolean}  [props.racing]     Horse / greyhound card: best back + lay only (TENEXCH).
  * @param {boolean}  props.disabled      A bet is in flight.
  * @param {boolean}  props.signedIn
  * @param {(spec)=>void} props.onCell
@@ -319,7 +322,7 @@ function SingleMarket({ market, book, slip, slipNode, disabled, onCell, formatAm
  * @param {(n)=>string} [props.formatAmount]  INR book / limits → the player's coin (undefined = kit default)
  * @param {(n)=>string} [props.formatLimit]   Fancy rows' Min/Max (undefined = kit default)
  */
-export default function MarketBlocks({ markets, book, slip, slipNode, projected, disabled, signedIn, onCell, onCashout, onBadlo, formatAmount, formatLimit }) {
+export default function MarketBlocks({ markets, book, slip, slipNode, projected, disabled, signedIn, racing = false, onCell, onCashout, onBadlo, formatAmount, formatLimit }) {
   const common = { book, slip, slipNode, disabled, onCell, formatAmount };
   const lines = markets.filter((m) => marketKind(m) === 'line');
   let linesDrawn = false;
@@ -335,12 +338,12 @@ export default function MarketBlocks({ markets, book, slip, slipNode, projected,
     }
     if (kind === 'runner') {
       out.push(
-        <RunnerMarket key={m.mid} market={m} projected={projected} signedIn={signedIn} onCashout={onCashout} formatLimit={formatLimit} {...common} />,
+        <RunnerMarket key={m.mid} market={m} projected={projected} signedIn={signedIn} racing={racing} onCashout={onCashout} formatLimit={formatLimit} {...common} />,
       );
     } else if (kind === 'oddeven') {
       out.push(<OddEvenMarket key={m.mid} market={m} formatLimit={formatLimit} {...common} />);
     } else if (kind === 'single') {
-      out.push(<SingleMarket key={m.mid} market={m} formatLimit={formatLimit} {...common} />);
+      out.push(<SingleMarket key={m.mid} market={m} projected={projected} formatLimit={formatLimit} {...common} />);
     } else {
       out.push(<FancyMarket key={m.mid} market={m} onBadlo={onBadlo} formatLimit={formatLimit} {...common} />);
     }

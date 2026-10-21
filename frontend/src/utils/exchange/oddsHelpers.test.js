@@ -200,11 +200,13 @@ describe('applyMatchOddsLimits (TENEXCH: in-play maxb||max, pre-match umaxbof)',
   });
 });
 
-describe('feedMaxStake', () => {
-  it('max first, then maxb, then umaxbof; values of 1 or less never cap', () => {
-    expect(feedMaxStake({ max: 2000, maxb: 25000 })).toBe(2000);
-    expect(feedMaxStake({ max: 0, maxb: 1, umaxbof: 10000 })).toBe(10000);
-    expect(feedMaxStake({ max: 0, maxb: 1, umaxbof: 1 })).toBe(0);
+describe('feedMaxStake (mirror of the server feedStakeLimit.mjs)', () => {
+  it('in-play maxb (else max), pre-match umaxbof, other markets their own max', () => {
+    expect(feedMaxStake({ gtype: 'match', max: 2000, maxb: 1, umaxbof: 1, iplay: false })).toBe(1);
+    expect(feedMaxStake({ gtype: 'match', max: 2000, maxb: 10000, umaxbof: 1, iplay: true })).toBe(10000);
+    expect(feedMaxStake({ gtype: 'match', max: 2000, maxb: 1, umaxbof: 10000, iplay: false })).toBe(10000);
+    expect(feedMaxStake({ gtype: 'match1', max: 100000, maxb: 0, umaxbof: 0 })).toBe(100000);
+    expect(feedMaxStake({ gtype: 'fancy2', max: 0, maxb: 1, umaxbof: 1 })).toBe(0);
     expect(feedMaxStake(null)).toBe(0);
   });
 });

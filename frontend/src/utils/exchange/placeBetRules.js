@@ -403,12 +403,13 @@ export function getBetValidationError({ stakeNum, minStake, maxStake, suspended,
   return null;
 }
 
-/* ── Racing betting window (horse 10, greyhound 65) ─────────────────────────────────────────
-   A race takes bets only in the last RACE_BET_WINDOW_MINUTES before the off — the server
-   (sportbetscontroller placeBet) refuses earlier bets with the same sentence. The feed's
-   "M/D/YYYY h:mm:ss AM" start is IST wall time, so it is read as IST for every viewer.
-   Unreadable start → open (the server is authoritative). TENEXCH racingUtils. */
-export const RACING_SIDS = new Set(['10', '65']);
+/* ── Racing betting window (HORSE only, sid 10) ─────────────────────────────────────────────
+   A horse race takes bets only in the last RACE_BET_WINDOW_MINUTES before the off — the server
+   (sportbetscontroller placeBet) refuses earlier bets with the same sentence. Greyhound (65) is
+   open until the off: TENEXCH's server gates sid 10 only, and the live reference took a sid 65
+   bet 2h11m before the off (BC games sports issues #9). The feed's "M/D/YYYY h:mm:ss AM" start
+   is IST wall time, read as IST for every viewer. Unreadable start → open. TENEXCH racingUtils. */
+export const RACING_SIDS = new Set(['10']);
 export const RACE_BET_WINDOW_MINUTES = 5;
 export const RACE_WINDOW_TOAST = `Bet will be accepted ${RACE_BET_WINDOW_MINUTES} minutes before the market starts, Thanks.`;
 

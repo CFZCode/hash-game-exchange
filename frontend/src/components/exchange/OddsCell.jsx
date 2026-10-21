@@ -1,5 +1,6 @@
 import React from 'react';
 import { cx, formatSize as defaultFormatSize, formatPrice as defaultFormatPrice } from './utils';
+import { IconLock } from './icons';
 import './exchange.css';
 
 /**
@@ -86,9 +87,16 @@ export default function OddsCell({
         className,
       )}
     >
-      <span className={cx('font-extrabold', cellSize === 'sm' ? 'text-[0.8125rem]' : 'text-sm sm:text-base')}>
-        {locked ? '—' : formatPrice(price)}
-      </span>
+      {/* A side with no price is a dark box with a lock (TENEXCH `suspended no-val`); the rest of
+          the row stays live. A whole suspended row keeps "—" under its own overlay; lobby cells
+          (`sm`) keep "—" for an absent price (the draw of a two-way match). */}
+      {empty && !suspended && cellSize !== 'sm' ? (
+        <IconLock className="size-4 fill-tertiary" aria-hidden="true" />
+      ) : (
+        <span className={cx('font-extrabold', cellSize === 'sm' ? 'text-[0.8125rem]' : 'text-sm sm:text-base')}>
+          {locked ? '—' : formatPrice(price)}
+        </span>
+      )}
       {/* Rendered (invisibly) whenever the market carries sizes, so a cell whose size blinks
           out keeps its text position; `size={null}` (bookmaker style) drops the line. A locked
           cell drops it too, so its "—" sits in the vertical centre. */}

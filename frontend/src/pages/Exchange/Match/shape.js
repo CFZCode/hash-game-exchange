@@ -123,3 +123,16 @@ export function singleRow(market, section) {
   }
   return { name: section.nat || '—', cell: { key: 'back', side: 'back', ...back }, betType: 'back' };
 }
+
+/** "2 Hours 11 Minutes" far out, "4 Minutes 12 Seconds" inside the last hour — TENEXCH RaceTimer:
+ *  hours only when non-zero, seconds only in the final hour. null at / after the off. */
+export function raceCountdownText(startMs, now) {
+  const diff = startMs - now;
+  if (!(diff > 0)) return null;
+  const total = Math.floor(diff / 1000);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  return `${h > 0 ? `${h} Hours ` : ''}${m} Minutes${h === 0 ? ` ${s} Seconds` : ''}`;
+}
+

@@ -8,7 +8,7 @@ import {
   betMarketKey,
   buildPlaceRequest,
   classifyMarket,
-  slipExposureRows,
+  calculateRunnerPL,
   calcPL,
   showsZeroProfit,
   getOddsFieldMode,
@@ -98,34 +98,36 @@ export function slipFigures(slip, stake, odds) {
   const fancyFamily = ['fancy', 'fancy1', 'fancy2', 'khado', 'meter', 'normal', 'oddeven'].includes(g);
   const mt = fancyFamily ? 'FANCY' : g === 'cricketcasino' ? 'CRICKET_CASINO' : classifyMarket(bv);
   const stakeNum = Number(stake) || 0;
+  const horse = String(bv.sid) === '10';
+  const zero = showsZeroProfit(bv.mname, mt, bv.gtype, { isHorseRacing: horse });
   // Session fancy (YES 55 @ 100): `odds` is the run line; it pays on the rate, bv.size.
   // YES wins stake x size/100 and risks the stake, NO the other way round (server placeBet).
+  // The PROFIT shown is TENEXCH's: a fixed 0 on Normal / Ball By Ball / Over By Over (user,
+  // 2026-10-21, overriding c6aab7ae); the liability stays the real amount the server blocks.
   if (g === 'fancy' && slip.kind !== 'line' && Number(bv.size) > 0) {
     const atRate = Math.round(stakeNum * Number(bv.size)) / 100;
     const yes = bv.betType === 'yes' || bv.betType === 'back';
-    return { profit: yes ? atRate : stakeNum, liability: yes ? stakeNum : atRate };
+    return { profit: zero ? 0 : yes ? atRate : stakeNum, liability: yes ? stakeNum : atRate };
   }
   const { profit, loss } = calcPL(stake, odds, bv.betType, mt);
-  const horse = String(bv.sid) === '10';
-  const shown = slip.kind === 'line' ? stakeNum : showsZeroProfit(bv.mname, mt, bv.gtype, { isHorseRacing: horse }) ? 0 : profit;
+  const shown = slip.kind === 'line' ? stakeNum : zero ? 0 : profit;
   return { profit: shown, liability: loss };
 }
 
-/** Per-runner projection for the open slip's market: current book + this bet (Addaplay rows). */
+/** Per-runner projection for the open slip's market: current book + this bet — TENEXCH
+ *  GameDetails `runnerPL`: every market classifyMarket calls MATCH_ODDS (all gtype 'match',
+ *  racecards included), BOOKMAKER (match1, percent) or CRICKET_CASINO (the Number grids);
+ *  never a fancy. Same maths as the server's exposure walk (calculateRunnerPL). */
 export function projectedBook(slip, stake, odds, market, book) {
-  if (!slip || slip.kind !== 'runner' || String(market?.mid) !== String(slip.bv.market_id)) return null;
-  if (!(Number(stake) > 0) || !(Number(odds) > 0)) return null;
-  const rows = slipExposureRows({
-    odds,
-    stake,
-    betType: slip.bv.betType,
-    mname: slip.bv.mname,
-    runners: (market.section || []).map((s) => s.nat || ''),
-    runnerName: slip.bv.runnerName,
-  });
-  if (!rows.length) return null;
+  if (!slip || String(market?.mid) !== String(slip.bv.market_id)) return null;
+  const mt = classifyMarket(market);
+  if (mt !== 'MATCH_ODDS' && mt !== 'BOOKMAKER' && mt !== 'CRICKET_CASINO') return null;
+  const names = (market.section || []).map((s) => s.nat || '');
+  const side = slip.bv.betType === 'yes' ? 'back' : slip.bv.betType === 'no' ? 'lay' : slip.bv.betType;
+  const pending = calculateRunnerPL({ stake, odds, betType: side, teamName: slip.bv.runnerName, marketType: mt }, names);
+  if (!Object.keys(pending).length) return null;
   const out = {};
-  for (const r of rows) out[r.name] = (bookFor(book, market.mid, r.name) ?? 0) + r.exposure;
+  for (const name of names) out[name] = Number(((bookFor(book, market.mid, name) ?? 0) + (pending[name] || 0)).toFixed(2));
   return out;
 }
 

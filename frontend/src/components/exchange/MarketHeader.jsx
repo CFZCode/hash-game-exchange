@@ -44,13 +44,17 @@ export default function MarketHeader({
         </span>
         {hasLimits && (
           <span className="mt-0.5 text-xs text-tertiary">
-            {showMin && (
+            {/* TENEXCH's own spacing: "Min:100 Max:1L" with a min, "Max: 10K" alone. */}
+            {showMin ? (
               <>
-                Min: <span className="text-secondary">{fmt(min)}</span>
-                {max != null && <span className="mx-1.5">·</span>}
+                Min:<span className="text-secondary">{fmt(min)}</span>
+                {max != null && (
+                  <>
+                    {' '}Max:<span className="text-secondary">{fmt(max)}</span>
+                  </>
+                )}
               </>
-            )}
-            {max != null && (
+            ) : (
               <>
                 Max: <span className="text-secondary">{fmt(max)}</span>
               </>

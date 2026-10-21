@@ -1,13 +1,17 @@
 import { describe, it, expect } from 'vitest';
-import { slipFigures } from './useMatchSlip';
+import { slipFigures, projectedBook } from './useMatchSlip';
+import { formatBook } from '../../../components/exchange/utils';
 
-describe('slipFigures — session fancy pays on the rate (size), not the run line', () => {
-  const slip = (betType, size) => ({ kind: 'runner', bv: { betType, size, gtype: 'fancy', mname: 'Normal' } });
-  it('YES 55 @ 100, ₹100 → profit ₹100, liability ₹100', () => {
-    expect(slipFigures(slip('yes', 100), 100, 55)).toEqual({ profit: 100, liability: 100 });
+describe('slipFigures — session fancy: TENEXCH profit 0 on Normal, liability on the rate', () => {
+  const slip = (betType, size, mname = 'Normal') => ({ kind: 'runner', bv: { betType, size, gtype: 'fancy', mname } });
+  it('Normal YES 55 @ 100, ₹100 → profit 0 (TENEXCH), liability ₹100', () => {
+    expect(slipFigures(slip('yes', 100), 100, 55)).toEqual({ profit: 0, liability: 100 });
   });
-  it('NO 55 @ 90, ₹100 → profit ₹100, liability ₹90', () => {
-    expect(slipFigures(slip('no', 90), 100, 55)).toEqual({ profit: 100, liability: 90 });
+  it('Normal NO 55 @ 90, ₹100 → profit 0, liability ₹90', () => {
+    expect(slipFigures(slip('no', 90), 100, 55)).toEqual({ profit: 0, liability: 90 });
+  });
+  it('a fancy market not in the zero list still pays on the rate', () => {
+    expect(slipFigures(slip('yes', 120, 'Wicket Lost'), 100, 3)).toEqual({ profit: 120, liability: 100 });
   });
 });
 
@@ -26,5 +30,33 @@ describe('slipFigures — TENEXCH calcPL on runner markets', () => {
   it('a horse racecard prints profit 0 (TENEXCH horse slip); greyhound computes it', () => {
     expect(slipFigures(slip('back', 'match', 'MATCH_ODDS', '10'), 100, 5).profit).toBe(0);
     expect(slipFigures(slip('back', 'match', 'MATCH_ODDS', '65'), 100, 5).profit).toBe(400);
+  });
+});
+
+describe('projectedBook — TENEXCH runnerPL on every MATCH_ODDS / BOOKMAKER / CRICKET_CASINO market', () => {
+  const section = [{ nat: 'A' }, { nat: 'B' }, { nat: 'C' }];
+  const slip = (gtype, betType = 'back') => ({ kind: 'runner', bv: { market_id: 1, betType, runnerName: 'A', gtype } });
+  it('Over/Under (gtype match) back 100 @ 2.5 adds to the existing book', () => {
+    const market = { mid: 1, gtype: 'match', mname: 'OVER_UNDER_25', section };
+    expect(projectedBook(slip('match'), 100, 2.5, market, { '1:a': 20 })).toEqual({ A: 170, B: -100, C: -100 });
+  });
+  it('Bookmaker lay 100 @ 40 is a percent', () => {
+    const market = { mid: 1, gtype: 'match1', mname: 'Bookmaker', section };
+    expect(projectedBook(slip('match1', 'lay'), 100, 40, market, {})).toEqual({ A: -40, B: 100, C: 100 });
+  });
+  it('cricket casino grid books too; a fancy never', () => {
+    expect(projectedBook(slip('cricketcasino'), 100, 9.5, { mid: 1, gtype: 'cricketcasino', section }, {}).A).toBe(850);
+    expect(projectedBook(slip('fancy'), 100, 55, { mid: 1, gtype: 'fancy', section }, {})).toBeNull();
+  });
+});
+
+describe('formatBook — TENEXCH book text', () => {
+  it('no "+", no ".00", en-IN grouping from 1,000', () => {
+    expect(formatBook(-11)).toBe('-11');
+    expect(formatBook(20)).toBe('20');
+    expect(formatBook(4500)).toBe('4,500');
+    expect(formatBook(200000)).toBe('2,00,000');
+    expect(formatBook(-120.5)).toBe('-120.5');
+    expect(formatBook(0)).toBe('0');
   });
 });

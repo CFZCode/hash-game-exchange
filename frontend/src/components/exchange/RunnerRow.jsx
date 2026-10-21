@@ -1,5 +1,5 @@
 import OddsCell from './OddsCell';
-import { cx, formatAmount as defaultFormatAmount, formatSigned, statusLabel } from './utils';
+import { cx, formatBook, statusLabel } from './utils';
 import './exchange.css';
 
 const PnlButton = ({ className, ...rest }) => (
@@ -59,7 +59,7 @@ export default function RunnerRow({
   onSelect,
   formatSize,
   formatPrice,
-  formatAmount = defaultFormatAmount,
+  formatAmount,
   showSize = true,
   onPnlClick,
   cells: customCells,
@@ -121,6 +121,8 @@ export default function RunnerRow({
   const hasProjected = projected != null;
   const PnlTag = onPnlClick ? PnlButton : 'p';
   const tone = (n) => (Number(n) < 0 ? 'text-error' : Number(n) > 0 ? 'text-success' : 'text-tertiary');
+  /* TENEXCH book text: no "+", "-" on a loss; a caller's formatter (the player's coin) prints the size. */
+  const book = (n) => (formatAmount ? `${Number(n) < 0 ? '-' : ''}${formatAmount(Math.abs(Number(n)))}` : formatBook(n));
 
   return (
     <div className="border-t border-third first:border-t-0">
@@ -136,11 +138,11 @@ export default function RunnerRow({
               onClick={onPnlClick}
               className="mt-0.5 flex items-center gap-1 text-xs font-semibold leading-4"
             >
-              {hasPnl && <span className={tone(pnl)}>{formatSigned(pnl, formatAmount)}</span>}
+              {hasPnl && <span className={tone(pnl)}>{book(pnl)}</span>}
               {hasProjected && (
                 <>
                   {hasPnl && <span className="text-tertiary">»</span>}
-                  <span className={tone(projected)}>{formatSigned(projected, formatAmount)}</span>
+                  <span className={tone(projected)}>{book(projected)}</span>
                 </>
               )}
             </PnlTag>

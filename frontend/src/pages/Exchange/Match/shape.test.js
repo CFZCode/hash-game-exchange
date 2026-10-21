@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { marketTitle, rowStatus } from './shape';
+import { marketTitle, rowStatus, raceCountdownText } from './shape';
 
 describe('marketTitle', () => {
   it('reads feed codes, keeps named markets as they are', () => {
@@ -21,5 +21,14 @@ describe('rowStatus — racecard (dtype 12) ignores the market SUSPENDED (doc bu
   it('any other market (cricket MO dtype 4, MATCH_BET dtype 15) still follows the market status', () => {
     expect(rowStatus({ dtype: 4, gtype: 'match', status: 'SUSPENDED' }, runner)).toBe('SUSPENDED');
     expect(rowStatus({ dtype: 15, gtype: 'match', status: 'SUSPENDED' }, runner)).toBe('SUSPENDED');
+  });
+});
+
+describe('raceCountdownText — TENEXCH RaceTimer wording', () => {
+  const t0 = Date.UTC(2026, 9, 21, 8, 0, 0);
+  it('hours + minutes far out, minutes + seconds inside the last hour, null at the off', () => {
+    expect(raceCountdownText(t0 + (2 * 3600 + 11 * 60 + 5) * 1000, t0)).toBe('2 Hours 11 Minutes');
+    expect(raceCountdownText(t0 + (22 * 60 + 13) * 1000, t0)).toBe('22 Minutes 13 Seconds');
+    expect(raceCountdownText(t0, t0)).toBeNull();
   });
 });

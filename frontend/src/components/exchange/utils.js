@@ -121,5 +121,15 @@ export function compactAmount(value) {
   return String(n);
 }
 
-/** A row's stake range as TENEXCH prints it beside a fancy / khado / odd-even row: "Min: 100 · Max: 2L". */
-export const limitsText = (min, max, fmt = compactAmount) => `Min: ${fmt(min || 0)} · Max: ${fmt(max || 0)}`;
+/** A row's stake range as TENEXCH prints it beside a fancy / khado / odd-even row: "Min:100 Max:2L". */
+export const limitsText = (min, max, fmt = compactAmount) => `Min:${fmt(min || 0)} Max:${fmt(max || 0)}`;
+
+/** A runner's book as TENEXCH prints it under the name (formatBookValue): en-IN grouping from
+ *  1,000, else up to 2 dp, "-" for a loss and no "+" — "-11", "20", "4,500", "-120". */
+export function formatBook(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return '';
+  const a = Math.abs(n);
+  const text = a >= 1000 ? a.toLocaleString('en-IN', { maximumFractionDigits: 2 }) : String(Math.round(a * 100) / 100);
+  return n < 0 && text !== '0' ? `-${text}` : text;
+}

@@ -303,9 +303,9 @@ describe('racing betting window', () => {
   it('reads the feed time as IST', () => {
     expect(parseFeedIstTime('10/17/2026 12:40:00 PM')).toBe(start);
   });
-  it('refuses a horse or greyhound bet more than 5 minutes before the off', () => {
+  it('refuses a horse bet more than 5 minutes before the off; greyhound stays open (TENEXCH server)', () => {
     expect(isRaceBettingOpen(10, '10/17/2026 12:40:00 PM', start - 6 * 60000)).toBe(false);
-    expect(isRaceBettingOpen('65', '10/17/2026 12:40:00 PM', start - 6 * 60000)).toBe(false);
+    expect(isRaceBettingOpen('65', '10/17/2026 12:40:00 PM', start - 131 * 60000)).toBe(true);
   });
   it('accepts inside the last 5 minutes and after the off', () => {
     expect(isRaceBettingOpen(10, '10/17/2026 12:40:00 PM', start - 4 * 60000)).toBe(true);

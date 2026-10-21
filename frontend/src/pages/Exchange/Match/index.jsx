@@ -35,7 +35,8 @@ import { BET_TOAST, ODDS_FIELD, stakeLimits } from '../../../utils/exchange';
 import MarketBlocks from './MarketBlocks';
 import { useMatchSlip, placementOdds, slipFigures, projectedBook, slipStakeInr } from './useMatchSlip';
 import { TAB_LABELS, marketTab, marketKind, ladder, rowStatus, marketTitle } from './shape';
-import { sportIconOf } from '../model';
+import { sportIconOf, RACING_SIDS } from '../model';
+import RaceStatus from './RaceStatus';
 import { marketLabel } from '../../Wallet/BetHistory/sportsBets';
 import { markMatchGone, reviveMatch } from '../../../services/exchange/deadMatches';
 import CricketScorecard from '../../../components/exchange/CricketScorecard';
@@ -449,6 +450,7 @@ export default function ExchangeMatchPage() {
   } else {
     board = (
       <>
+        {RACING_SIDS.has(Number(sid)) && <RaceStatus status={visible[0]?.status} stime={match?.stime} iplay={Boolean(match?.iplay)} />}
         {tabs.length > 1 && <MarketFilterTabs tabs={tabs} active={activeTab} onChange={setFilter} />}
         <MarketBlocks
           markets={shown}
@@ -456,6 +458,7 @@ export default function ExchangeMatchPage() {
           slip={slip}
           slipNode={slipNode}
           projected={projected}
+          racing={RACING_SIDS.has(Number(sid))}
           formatAmount={fmtInr}
           formatLimit={fmtInr}
           disabled={loading}

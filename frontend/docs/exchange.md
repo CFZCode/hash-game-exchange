@@ -130,6 +130,10 @@ id from the access token's `sub` (`currentUserId()`), which is the id mssports k
 - Ball running is read from the row's status text only (`section.br` is true on every live fancy row), as TENEXCH does.
 - A horse racecard (dtype 12) ignores the market's SUSPENDED status and locks per runner; sid 10 shows only dtype 12 / 15 markets (TENEXCH RacingDetails).
 - Market headers print `Min` only when the market quotes one; khado and odd/even rows print their own `Min · Max` like fancy rows.
+- Racing: horse (sid 10) bets only in the last 5 minutes (server + slip); greyhound until the off (TENEXCH server). Racecards show best back + lay only, and an OPEN/SUSPENDED + countdown strip (`Match/RaceStatus.jsx`).
+- A side with no price is a lock box (TENEXCH `suspended no-val`); a whole suspended row keeps its overlay.
+- The server caps a stake by the same `feedMaxStake` as the page (`backend/services/sports/src/lib/helper/feedStakeLimit.mjs`).
+- Score iframe: the scorecard host whitelists by Referer; the server sends `SCORECARD_REFERER` (default https://parker567.com/) so `score-url` returns a provider URL.
 - Parity with TENEXCH is tracked in `.claude/skills/exchange-tenexch-parity/` (checklist + issues.md).
 - Back/lay colours: `bg-back`, `bg-back-hover`, `bg-lay`, `bg-lay-hover`, `bg-back-muted`,
   `bg-lay-muted`, `text-exchange-ink` (both themes; templates inherit).
@@ -142,11 +146,11 @@ id from the access token's `sub` (`currentUserId()`), which is the id mssports k
 | Stake min/max | `runner.min \|\| market.min`, `runner.max \|\| market.max`, max 0 = no ceiling | `max(100, min_stake\|\|section.min\|\|market.min)` (meter: its own min); `maxb>0 ? maxb : max`, else 100000 | **TENEXCH** (`stakeLimits`), on markets shaped by TENEXCH `applyMatchOddsLimits`: in-play `maxb\|\|max`, pre-match `umaxbof`. Pre-match MO at cap ≤1 → `Game Not Active2.`; toasts `Check Minimum Bet Limit.` / `Check Maximum Bet Limit1.` (racing at 1: `Check Maximum Bet Limit.`). ⚠ server `feedStakeLimit.mjs` still caps on `max` first |
 | Absurd stake (≥1e12 / ≥1e16) | — | `Bet Not Valid..` / `Server Error` | TENEXCH (no Addaplay equivalent) |
 | Virtual events | refused (`Betting not allowed on virtual events`) | allowed, floor 200 | **Addaplay** |
-| Slip profit | MO `s(o−1)`, BM `s·o/100`, TIED_MATCH `o/100·s`, else `s` | decimal `(o−1)s`, BM `o/100·s`, FANCY/TIED `s·o/100` | **TENEXCH** `calcPL` (`slipFigures`, market type by gtype like `classifyMarket`; horse racecard prints 0). Session fancy still pays on the rate (c6aab7ae), not TENEXCH's fixed 0 |
+| Slip profit | MO `s(o−1)`, BM `s·o/100`, TIED_MATCH `o/100·s`, else `s` | decimal `(o−1)s`, BM `o/100·s`, FANCY/TIED `s·o/100` | **TENEXCH** `calcPL` (`slipFigures`, market type by gtype like `classifyMarket`; horse racecard prints 0). Normal / Ball By Ball / Over By Over print TENEXCH's fixed 0 (overrides c6aab7ae, user 2026-10-21); their liability stays on the rate |
 | Slip loss on LAY | `loss = profit` (e.g. lay 1000@2.5 → profit 1500, loss 1500) | profit = stake, loss = `(o−1)s` | **TENEXCH** since 2026-10-21 (lay 1000@2.5 → profit 1000, liability 1500) |
 | Feed "Tied Match" scale | `'tied match'` → MATCH_ODDS (decimal); only `'tied_match'` is percent | percent (`o/100`) | **Addaplay** — ⚠ mssports books "Tied Match" as percent, so a Tied slip preview (e.g. 0.75 → negative profit) will not match the booked exposure |
-| P/L row visibility | only mname `MATCH_ODDS` / `BOOKMAKER` | all markets (Normal/BBB/OBO/oddeven/horse show 0) | **Addaplay** (`slipProfitLoss().show`) |
-| Runner exposure preview | `calculateExposurePerSelection` (unrounded), hidden on FANCY | `calculateRunnerPL` (2 dp) | **Addaplay** (`slipExposureRows`); same maths otherwise |
+| P/L row visibility | only mname `MATCH_ODDS` / `BOOKMAKER` | all markets (Normal/BBB/OBO/oddeven/horse show 0) | **TENEXCH** (every slip shows Profit) |
+| Runner exposure preview | `calculateExposurePerSelection` (unrounded), hidden on FANCY | `calculateRunnerPL` (2 dp) on every MATCH_ODDS / BOOKMAKER / CRICKET_CASINO market | **TENEXCH** (`projectedBook`); book text `formatBook` (-11 · 20 · 4,500, no +, no .00) |
 | Bookie favour eligibility | every market except gtype `fancy`/`fancy1` | MO / Bookmaker / Bookmaker 2 / Tied only | **Addaplay** (`isFavourEligible`) — server decides anyway |
 | Bookie favour, no live price | accept at X | `blocked` (Game Not Active) | **Addaplay** (`evaluateBookieFavour`) |
 | Fancy drift | any tier, either side, ±0.01 | closest tier on the bet's side, ±0.01 | **Addaplay** (`isFancyDriftAcceptable`) |
