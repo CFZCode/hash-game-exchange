@@ -9,7 +9,7 @@ import { useGates } from '../../../context/gates';
 import { useSelectedCurrency } from '../../../hooks/useSelectedCurrency';
 import { vipTier } from '../../../data/vipConfig';
 import { getUserProfile } from '../../../services/profile';
-import { orderMedals, visibleMedals, medalIcon } from './catalogue';
+import { orderVisible, medalIcon } from './catalogue';
 import LevelName from './LevelName';
 import {
   IconMedal,
@@ -123,7 +123,7 @@ function MedalsCard({ profile, userId }) {
 
   /* `o` counts only the UNLOCKED ones, so the heading's figure is not the strip's length. */
   const unlocked = profile.achievements.filter((row) => row.status === '1').length;
-  const strip = visibleMedals(orderMedals(profile.achievements));
+  const strip = orderVisible(profile.achievements);
 
   return (
     <div className="w-full rounded-lg bg-layer4 p-3">

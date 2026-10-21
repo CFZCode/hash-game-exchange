@@ -75,11 +75,19 @@ export function orderMedals(rows) {
    (19-21) medals — no such feature on this site — and the ETH/DOGE/EOS "TOP 1" rows, coins it
    does not carry (BTC stays). */
 const HIDDEN_TYPES = new Set([9, 6, 7, 11, 19, 20, 21]);
+/* The signed-in reference feed carries no Puzzle rows (hash.game, 2026-10-21), so its `ss` pops
+   Contest Master (18) to index 8, between Invincible Lucky Dog and Roll King. Dropping them
+   BEFORE ordering reproduces that; the other hidden rows are dropped after, as the reference shows them. */
+const PUZZLE_TYPES = new Set([19, 20, 21]);
 const HIDDEN_COINS = new Set(['ETH', 'DOGE', 'EOS']);
 export const visibleMedals = (rows) =>
   rows.filter(
     (row) => !HIDDEN_TYPES.has(Number(row.type)) && !(String(row.type) === '17' && HIDDEN_COINS.has(row.subType)),
   );
+
+/* What both medal lists render: the reference's order over its signed-in feed, then this site's hides. */
+export const orderVisible = (rows) =>
+  visibleMedals(orderMedals(rows.filter((row) => !PUZZLE_TYPES.has(Number(row.type)))));
 
 /* `Xc` — 25 keys (21 types plus 17_BTC/DOGE/EOS/ETH), each a `[locked, achieved]` pair. `cs`
  * appends the coin to the key only for ETH/BTC/DOGE/EOS, so a `subType` of "0" resolves to the

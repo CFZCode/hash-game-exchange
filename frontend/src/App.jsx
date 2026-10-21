@@ -481,7 +481,7 @@ function AppShell() {
    * All four live in the `account` federated remote (`w = zt(vo)` in Enter-MsmOuq5R.js), inside a
    * group whose entries carry no `info` at all beyond `keepAlive` — so no size, no guard, and the
    * manager's own 30rem x 40rem default, as `/free-plays` takes. `/user/medals/item` is the fourth
-   * and is not built.
+   * and is drawn by the Medals component.
    *
    * The back arrow is the DIALOG STACK's depth on the original (`FS` shows it when
    * `stacks.index() !== 1`). This build has no stack, but all three are real routes, so one step of
@@ -490,7 +490,8 @@ function AppShell() {
    * Note `/user/statistics` takes its account from the QUERY STRING, not from the path. That is the
    * route's own shape, and it is why it needs no `:userId` segment here. */
   const profileRoute = pathname.startsWith('/user/profile/');
-  const medalsRoute = pathname.startsWith('/user/medals/') && pathname !== '/user/medals/item';
+  /* `/user/medals/item/` (the single-medal detail) is drawn by the same component. */
+  const medalsRoute = pathname.startsWith('/user/medals/');
   const statisticsRoute = pathname === '/user/statistics' || pathname === '/user/statistics/';
 
   /* THE PAGE UNDER A DIALOG ROUTE HAS TO BE THE PAGE YOU CAME FROM, and getting that right

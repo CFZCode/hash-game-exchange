@@ -76,6 +76,8 @@ const toAchievement = (medal) => ({
   progress: medal.progress
     ? { total: Number(medal.progress.target), current: Number(medal.progress.current) }
     : null,
+  /* This platform's own unlock condition, for the medal detail dialog ('' when it has no rule here). */
+  description: medal.rule?.description ?? '',
 });
 
 const medalKey = (row) => `${row.type}_${row.subType}`;

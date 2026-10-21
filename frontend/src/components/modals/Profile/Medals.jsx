@@ -5,7 +5,7 @@ import DialogShell from '../../shared/DialogShell';
 import useResource from '../../../hooks/useResource';
 import { useSession } from '../../../context/session';
 import { getAllAchievements } from '../../../services/profile';
-import { orderMedals, visibleMedals, medalTitle, medalIcon } from './catalogue';
+import { orderVisible, medalTitle, medalIcon } from './catalogue';
 import { IconMedal, IconQuestion, IconMedalCount } from './icons';
 import startFlag from '../../../assets/profile/start.png';
 import boxGeneric from '../../../assets/profile/achieve_box.png';
@@ -106,7 +106,8 @@ function RewardsTooltip() {
           Achieve
           <span className="mx-1">{line.number}</span>
           medals: Get
-          <span className="ml-1 text-brand">{cur.show(line.amount, 'USDFIAT', { precision: 2 })}</span>
+          {/* The reference prints the full figure ("₹1,887.05"); `precision: 2` compacted it to "₹1.90K". */}
+          <span className="ml-1 text-brand">{cur.show(line.amount, 'USDFIAT')}</span>
         </p>
       ))}
     </>
@@ -232,6 +233,12 @@ function MedalTile({ row, locked }) {
 
 export default function Medals({ onClose, enter }) {
   const { pathname } = useLocation();
+  if (pathname.startsWith('/user/medals/item')) return <MedalDetail onClose={onClose} enter={enter} />;
+  return <MasterMedals onClose={onClose} enter={enter} />;
+}
+
+function MasterMedals({ onClose, enter }) {
+  const { pathname } = useLocation();
   const navigate = useNavigate();
   const { session } = useSession();
   const [expanded, setExpanded] = React.useState(false);
@@ -247,7 +254,7 @@ export default function Medals({ onClose, enter }) {
   const all = data?.achievements ?? [];
   /* `fe(Le(all))` — `orderMedals` over a lodash `cloneDeep`, then split by status. The clone is
      there because `orderMedals` mutates its input on the original; ours copies, so it is a no-op. */
-  const ordered = visibleMedals(orderMedals(all));
+  const ordered = orderVisible(all);
   const unlocked = ordered.filter((row) => String(row.status) === '1');
   const awaiting = ordered.filter((row) => String(row.status) === '0');
   const shown = expanded ? unlocked : unlocked.slice(0, 3);
@@ -330,8 +337,80 @@ export default function Medals({ onClose, enter }) {
         </div>
 
         <p className="mb-6 mt-3 w-full px-6 text-center text-xs font-semibold text-brand">
-          Medal progression stats updated every 24 hours.
+          {FOOTER}
         </p>
+      </div>
+    </DialogShell>
+  );
+}
+
+/* The reference's current footer on both dialogs (hash.game, 2026-10-21). */
+const FOOTER = 'Medal progress and rewards may take up to 24 hours to update.';
+
+/* `/user/medals/item/?type&subType&status[&time]` — Medal details (`Medal-DUbmmSLY.js`), for the
+   viewer's own medals. The condition is this platform's (the server's rule), not the reference's
+   flavour text, because several rules differ here. */
+function MedalDetail({ onClose, enter }) {
+  const navigate = useNavigate();
+  const { search } = useLocation();
+  const { session } = useSession();
+  const query = new URLSearchParams(search);
+  const type = Number(query.get('type'));
+  const subType = query.get('subType') ?? '0';
+  const read = React.useCallback(() => getAllAchievements(session.userId, session), [session]);
+  const { data } = useResource(read);
+  const row = (data?.achievements ?? []).find((r) => r.type === type && String(r.subType) === subType);
+  const locked = row ? String(row.status) !== '1' : query.get('status') !== '1';
+  const progress = row?.progress;
+  const facts = [
+    ['Quantity', 'Unlimited'],
+    ['Duration', 'Unlimited'],
+    ['Numbers of Achievements', row?.count || '-'],
+  ];
+
+  return (
+    <DialogShell title="Medal details" onClose={onClose} onBack={() => navigate(-1)} enter={enter}>
+      <div className="pt-4">
+        <div className="w-full rounded-lg bg-layer4 p-4">
+          <div className="flex w-full flex-col items-center justify-center px-2">
+            <img className="h-[7.5rem] w-auto" alt="" src={medalIcon(type, subType, locked)} />
+            {locked && progress && (
+              <>
+                <div className="mt-4 h-1.5 w-40 rounded-md bg-layer4">
+                  <div className="h-full rounded-md bg-brand" style={{ width: `${(progress.current / progress.total) * 100}%` }} />
+                </div>
+                <p className="mt-2 text-center text-xs text-secondary">{progress.current}/{progress.total}</p>
+              </>
+            )}
+            <p className="mt-3 text-center text-lg font-extrabold">{medalTitle({ type, subType })}</p>
+            {row?.description ? (
+              <p className="mt-2 text-center font-semibold text-secondary">{row.description}</p>
+            ) : (
+              row && (
+                <p className="mt-2 text-center font-semibold text-error">
+                  {type === 10
+                    ? '* This medal is no longer available. We will add a new medal to replace this one soon.'
+                    : "* This medal can't be earned on this site yet."}
+                </p>
+              )
+            )}
+            {!locked && row?.createTime > 0 && (
+              <p className="mt-4 font-semibold text-secondary">
+                <span>Earned on</span>
+                <span className="mx-1">{new Date(row.createTime).toLocaleString()}</span>
+              </p>
+            )}
+          </div>
+          <div className="mb-6 mt-6 w-full">
+            {facts.map(([label, value]) => (
+              <div key={label} className="flex h-8 w-full items-center">
+                <span className="font-extrabold text-secondary">{label}</span>
+                <span className="ml-auto font-extrabold">{value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <p className="mb-6 mt-3 w-full px-6 text-center text-xs font-semibold text-brand">{FOOTER}</p>
       </div>
     </DialogShell>
   );
