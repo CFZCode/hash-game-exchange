@@ -191,4 +191,20 @@ test('per-player admin views count in-house, v2 and seamless rounds', async (t) 
     assert.equal(rows.find((r) => r.source === 'jsgamesv2').stakeAmount, '10.00000000');
     assert.equal(rows.find((r) => r.source === 'inhouse' && r.result === 'open').profit, null);
   });
+
+  await t.test('player Stats: an Original Games round is casino, though its ledger rows carry a bet_id', async () => {
+    const before = await stats.forPlayer({ staff: asAgent, userId: player, ...window, currency: 'INR' });
+    await sql(
+      `INSERT INTO credits_ledger (user_id, currency, amount, reason, source_service, meta, bet_id, created_at)
+       VALUES (:p, 'INR', -11, 'BET_STAKE', 'casino-service', '{"refType":"OG","refId":"pcr-og"}', 987654, :t)`,
+      { p: String(player), t: at(5) }
+    );
+    try {
+      const after = await stats.forPlayer({ staff: asAgent, userId: player, ...window, currency: 'INR' });
+      assert.equal(after.kpis.sportsWagered, before.kpis.sportsWagered, 'not Sports');
+      assert.equal(Number(after.kpis.casinoWagered) - Number(before.kpis.casinoWagered), 11);
+    } finally {
+      await sql(`DELETE FROM credits_ledger WHERE user_id = :p AND meta->>'refId' = 'pcr-og'`, { p: String(player) });
+    }
+  });
 });

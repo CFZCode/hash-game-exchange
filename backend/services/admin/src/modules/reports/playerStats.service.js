@@ -655,9 +655,14 @@ class PlayerStatsService {
     return { ...user, id: Number(user.id) };
   }
 
-  /** Sports rows carry a bet/match/sport id or come from sports-service; everything else is casino. */
+  /**
+   * casino-service rows (Original Games, in-house, aggregators) are casino even with a `bet_id` — Original
+   * Games writes the round's og_transactions id there. Otherwise sports rows carry a bet/match/sport id or
+   * come from sports-service; everything else is casino.
+   */
   #productSql(alias) {
-    return `CASE WHEN ${alias}.bet_id IS NOT NULL OR ${alias}.sport_id IS NOT NULL OR ${alias}.match_id IS NOT NULL
+    return `CASE WHEN ${alias}.source_service ILIKE '%casino%' OR ${alias}.meta->>'refType' = 'OG' THEN 'casino'
+                 WHEN ${alias}.bet_id IS NOT NULL OR ${alias}.sport_id IS NOT NULL OR ${alias}.match_id IS NOT NULL
                    OR ${alias}.source_service ILIKE '%sport%' THEN 'sports' ELSE 'casino' END`;
   }
 
