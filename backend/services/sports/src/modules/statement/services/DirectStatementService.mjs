@@ -41,6 +41,42 @@ const groupRows = (rows, sportsBetMap) => {
   return out;
 };
 
+/**
+ * TENEXCH's statement shows the cash that moved (closing − previous closing) and drops a row that
+ * moved nothing. A sports settlement here is two kinds of row: the wallet's own move(s) (trigger
+ * rows, unlabelled BALANCE_CHANGE: a payout, or a fancy's exposure release + result) and then the
+ * P/L row `settle:bet:SPORTS:<id>` (not a move). So the P/L row takes the cash of the unlabelled
+ * moves right before it in its currency (they fold into it), and a settlement that moved nothing
+ * (a lost Match Odds bet: the stake left at placement) is dropped instead of reading as a second debit.
+ * shortcut: folds by adjacency in the user's own ledger; a stray unlabelled move landing between a
+ * settlement's wallet write and its P/L row would fold in too — label settlement writes to upgrade.
+ */
+const isUnlabelledMove = (r) => r.event_type === "BALANCE_CHANGE" && r.bet_id == null && !r.remark;
+const isSportsSettlement = (r) => r.category === "SPORTS" && r.event_type === "BET_SETTLEMENT" && String(r.entry_ref || "").startsWith("settle:");
+
+function foldSettlementMoves(rows) {
+  const out = [];
+  const pending = {};
+  for (const row of rows) {
+    const cur = row.currency;
+    if (isUnlabelledMove(row)) {
+      (pending[cur] ??= []).push(out.length);
+      out.push(row);
+      continue;
+    }
+    if (isSportsSettlement(row)) {
+      const moved = (pending[cur] ?? []).map((i) => out[i]);
+      for (const m of moved) m.folded = true;
+      const delta = Math.round(moved.reduce((acc, m) => acc + Number(m.delta || 0), 0) * 100) / 100;
+      if (delta !== 0) out.push({ ...row, delta });
+    } else {
+      out.push(row);
+    }
+    pending[cur] = [];
+  }
+  return out.filter((r) => !r.folded);
+}
+
 const OG_REMARK = /^original-games (bet|win|rollback) (\S+)/;
 
 /**
@@ -104,22 +140,19 @@ const DirectStatementService = {
       where.push("created_at <= :to");
       replacements.to = end;
     }
-    if (reportType === "TRANSACTION") {
-      where.push("category NOT IN ('SPORTS', 'CASINO', 'ORIGINAL_GAME')");
-    } else if (reportType !== "ALL") {
-      where.push("category = :category");
-      replacements.category = reportType;
-    }
+    const needle = search && String(search).trim() ? String(search).trim().toLowerCase() : null;
+    // The category and search filters run after `foldSettlementMoves`, which needs the unlabelled
+    // (OTHER) wallet moves beside the SPORTS settlement rows.
+    const keep = (r) =>
+      (reportType === "ALL" ||
+        (reportType === "TRANSACTION" ? !["SPORTS", "CASINO", "ORIGINAL_GAME"].includes(r.category) : r.category === reportType)) &&
+      (!needle || String(r.remark || "").toLowerCase().includes(needle));
     if (currency) {
       where.push("currency = :currency");
       replacements.currency = String(currency).toUpperCase();
     }
-    if (search && String(search).trim()) {
-      where.push("remark ILIKE :search");
-      replacements.search = `%${String(search).trim()}%`;
-    }
     // v2 ke column naam me (closing_inr_balance) — grouping aur mapping wahi rehti hai.
-    const raw = await target.db.query(
+    let raw = await target.db.query(
       `SELECT id, entry_ref, event_type, category, currency, delta, balance_after AS closing_inr_balance,
               bet_id, sport_id, game_type, remark, created_at
          FROM mssports.point_ledger_direct
@@ -129,6 +162,7 @@ const DirectStatementService = {
     );
 
     await nameOldRows(target, raw);
+    raw = foldSettlementMoves(raw).filter(keep);
 
     const sportsBetIds = [...new Set(raw.filter((r) => r.category === "SPORTS" && r.bet_id).map((r) => Number(r.bet_id)))];
     const sportsBetMap = {};
@@ -175,4 +209,4 @@ const DirectStatementService = {
   }
 };
 
-export { DirectStatementService };
+export { DirectStatementService, foldSettlementMoves };
