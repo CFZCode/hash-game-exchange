@@ -194,9 +194,9 @@ function Turnover({ item }) {
   const pct = target > 0 ? Math.min(100, (wagered / target) * 100) : 100;
   return (
     <div className="flex w-full flex-col items-center gap-1">
-      <div className="flex max-w-full flex-wrap items-center justify-center gap-x-1 text-sm">
-        <span className="text-primary">{usd(wagered, cur)}</span>
-        <span className="text-secondary">/ {usd(target, cur)}</span>
+      <div className="flex max-w-full flex-wrap items-center justify-center gap-x-1 text-xs sm:text-sm">
+        <span className="text-primary">{short(usd(wagered, cur))}</span>
+        <span className="text-secondary">/ {short(usd(target, cur))}</span>
       </div>
       <div className="h-1 w-full max-w-28 overflow-hidden rounded-full bg-layer6">
         <div className="h-full rounded-full bg-brand" style={{ width: `${pct}%` }} />
@@ -209,6 +209,20 @@ function Turnover({ item }) {
    figures are USD (`userwager` is kept in USD, user-service wager module); they are printed in the
    player's SELECTED currency (`useSelectedCurrency`, the selected-currency skill). */
 const usd = (amount, cur) => cur.show(Number(amount) || 0, 'USDFIAT');
+
+/* "31.58055 USDT" with the coin code hidden on a phone, where the Turnover column has no room
+   for it (the Required figure above the table names the currency). */
+const short = (text) => {
+  const [num, ...code] = String(text).split(' ');
+  return code.length ? (
+    <>
+      {num}
+      <span className="max-sm:hidden"> {code.join(' ')}</span>
+    </>
+  ) : (
+    text
+  );
+};
 
 /* The account's turnover at a glance (user's request, 2026-10-16), above the table and shown even
    before a deposit: wagered so far, the required turnover (deposits x multiplier) and what is left. */
@@ -274,7 +288,7 @@ function RolloverList() {
             onClick={() => navigate(`/wallet/roll-detail?taskId=${item.taskId}`, { state: item })}
           >
             <div className={`${CELL_START} min-w-0`}>
-              <span className="w-full truncate">{rolloverTypeLabel(false, item.taskType, item.taskTypeDesc)}</span>
+              <span className="line-clamp-2 w-full whitespace-normal break-words">{rolloverTypeLabel(false, item.taskType, item.taskTypeDesc)}</span>
             </div>
             {/* Date over time, so the cell fits a phone column instead of running into its neighbours. */}
             <div className={`${CELL_CENTER} min-w-0 flex-col text-sm text-secondary`}>

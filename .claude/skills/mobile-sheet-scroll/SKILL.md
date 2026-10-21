@@ -63,6 +63,21 @@ Other helpers:
   - `/deposit` (Crypto and Fiat), `/wallet/withdraw`, `/bonus`, `/vip-level`, `/vip-detail` and `/user/enter`.
   - The `/settings/*` and `/referral/*` routes, `/recent`, `/favorite` and `/login/*`.
 
+## Wallet tables (Transaction, Bet history, Rollover)
+
+To check a table fits a phone, open `/wallet/transaction` or `/wallet/bet-history` at 360 and 390px. Then run `table-check.js` (evaluate_script sourcePath). It does two things:
+- It picks the widest time range, then switches through every option of the first filter (Bill / Deposit / Withdraw / Swap / Bonus, or All / Original / …).
+- It reports the rows, any page side-scroll, and every cell whose text is cut.
+
+Fixed on 21 Oct 2026. The shared `Table` CELL is compact below sm (`px-2`, `text-sm`, `min-w-0`), and the other fixes are:
+
+| Problem | Fix |
+| --- | --- |
+| The long timestamp didn't fit | `CellTime` shows the date over the time |
+| `CurrencyAmount` crowded the cell on a phone | It drops " USDT" (the icon names the coin) and the fiat icon (₹ is in the text) |
+| Long type names were cut | They wrap to two lines |
+| The Rollover turnover didn't fit | It hides the coin code on a phone |
+
 ## Not covered
 
 - A real iPhone or Safari. CDP emulates Chrome only, so check iOS by hand.

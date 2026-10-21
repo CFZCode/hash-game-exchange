@@ -291,7 +291,8 @@ function BillList({ settings }) {
               className="flex items-center justify-between border-b border-third"
             >
               <div className={`${CELL} flex-col !items-start`}>
-                <div>{item.changeTypeDesc}</div>
+                {/* A long description wraps to two lines rather than being cut mid-word. */}
+                <div className="line-clamp-2 whitespace-normal break-words">{item.changeTypeDesc}</div>
                 {item.changeTypeDetail && (
                   <div className="ml-1 mt-0.5 flex items-center text-xs text-secondary">
                     ({item.changeTypeDetail})
