@@ -2,7 +2,7 @@
 
 const crypto = require('crypto');
 
-const { PROVIDER_CALLBACK_PREFIXES } = require('@ibitplay/common');
+const { isCallback } = require('./encryptionRule');
 
 /**
  * API encryption — the owner's `api_encryption` policy (featureCatalogue.js).
@@ -11,12 +11,10 @@ const { PROVIDER_CALLBACK_PREFIXES } = require('@ibitplay/common');
  * player site's client.js) leaves as `{ "enc": base64(iv ‖ ciphertext ‖ tag) }`, AES-256-GCM under
  * API_ENCRYPTION_KEY. The site holds the same key, so this keeps the data out of plain sight in
  * the network tab; it is not a secret from someone who reads the site's code — TLS is the protection.
- * Provider callbacks and callers that do not ask are never touched.
+ * Game / payment callbacks (encryptionRule.js) and callers that do not ask are never touched.
  */
 const ACCEPT = 'application/vnd.enc+json';
 const POLL_MS = 15_000;
-/** Any callback or webhook (casino wallets, PSP / crypto deposit and payout callbacks, OAuth). */
-const CALLBACK_PATH = /callback|webhook/i;
 
 function createApiEncryption({ config, logger }) {
   const key = config.API_ENCRYPTION_KEY ? Buffer.from(config.API_ENCRYPTION_KEY, 'base64') : null;
@@ -47,8 +45,8 @@ function createApiEncryption({ config, logger }) {
       if (!on || !key || req.method === 'HEAD') return false;
       if (!String(req.headers.accept ?? '').includes(ACCEPT)) return false;
       const path = String(req.originalUrl ?? '').split('?')[0];
-      // Machine callers stay plain even if one ever sends the Accept: game wallets and payment callbacks.
-      return !CALLBACK_PATH.test(path) && !PROVIDER_CALLBACK_PREFIXES.some((p) => path.startsWith(p));
+      // Machine callers stay plain even if one ever sends the Accept — see encryptionRule.js.
+      return !isCallback(path);
     },
     encrypt(plain) {
       const iv = crypto.randomBytes(12);

@@ -50,4 +50,6 @@ test('api encryption through the proxy', async (t) => {
   assert.ok((await get('/api/v1/user/psp/upi/callback', ACCEPT)).data, 'payment callbacks stay plain');
   assert.ok((await get('/api/v1/casino/js-games/v2/bet-callback', ACCEPT)).data, 'game callbacks stay plain');
   assert.ok((await get('/api/v1/user/crypto/ccpayment/callback', ACCEPT)).data, 'crypto webhooks stay plain');
+  assert.ok((await get('/api/v1/casino/original-games/wallet/bet', ACCEPT)).data, 'original games wallet stays plain');
+  assert.ok((await get('/api/v1/user/psp/upi/payout-callback', ACCEPT)).data, 'payout callbacks stay plain');
 });

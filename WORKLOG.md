@@ -15,6 +15,14 @@ Format:
 
 ---
 
+## 2026-10-21 — Encryption rule file: callbacks / webhooks hamesha bypass
+**Kya kiya:** Naya `backend/gateway/src/encryptionRule.js` (`isCallback`): game callbacks (GIS, Original games wallet, JSGames v1/v2, seamless, aggregators, x-casino) aur payment gateway callbacks / webhooks (PSP callback + payout-callback, ccpayment, OAuth) kabhi encrypt nahi hote — list aur naya provider jodne ka tareeka file ke upar likha hai. `apiEncryption.js` ab yahi file use karta hai. Test me Original games wallet + payout-callback ki line add.
+**Kyun:** User: koi bhi payment gateway / game callback ya webhook aaye to encryption bypass ho, ye rule ek file me likho taaki aage yaad rahe.
+**Files / jagah:** `backend/gateway/src/encryptionRule.js`, `backend/gateway/src/apiEncryption.js`, `backend/gateway/src/__tests__/apiEncryption.test.js`.
+**Notes / pending:** Test pass. parker-gateway restart. Live: 5 callback routes encryption header ke saath bhi plain, player API `{"enc":...}`. Owner audit: aaj api_encryption owner ne khud kai baar off/on kiya (10:18, 10:32 off) — us waqt plain dikhna sahi tha.
+
+---
+
 ## 2026-10-21 — API encryption: sports calls bhi encrypted
 **Kya kiya:** Sports exchange ka apna fetch (`exchange/api.js`) ab bhi `ENC_ACCEPT` header bhejta hai aur `openSealed` se answer kholta hai, baaki `request()` jaisa.
 **Kyun:** User: owner panel se encryption on kiya par chal nahi rahi. Gateway + baaki API pehle se encrypted the; sirf sports (`/sports/user/...all-data`, tree, latest events) plain JSON aa rahe the kyunki wo `client.js` se nahi jaate.
