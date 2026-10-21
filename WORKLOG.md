@@ -15,6 +15,14 @@ Format:
 
 ---
 
+## 2026-10-21 — Owner panel: Rate limit on/off
+**Kya kiya:** Naya owner policy `rate_limit` (On default / Off), owner panel me "Rate limit" row (business, sirf owner — site admin me chhupa). Har service (user, admin, casino, sports, gateway) `createApp` se `watchOwnerRateLimit` chalati hai: har 15 sec admin-service ka `/admin/features/public` padhti hai. Off pe har rate limiter counting band karta hai, sirf login, password reset, OTP, 2FA, staff sign-in / 2FA aur txn-code verify wale guards hamesha on (account hack se bachav). Limits ki values abhi bhi `backend/.env` se.
+**Kyun:** User: owner me rate limit ka section, owner on/off kare tabhi chale.
+**Files / jagah:** `backend/packages/common/src/middleware/rateLimit.js`, `createApp.js`, `featureCatalogue.js`, `sitePolicy.js`, test `rateLimit.test.js`; `owner-panel/src/configs/entitlementCatalogue.ts`; `admin/src/views/site-config/Features.tsx`.
+**Notes / pending:** rateLimit tests 18/18 pass (naya switch test bhi). entitlements.test ke 7 fail pehle se (bina change ke bhi same 7). Restart: parker-user/admin/casino/sports-svc + gateway; owner-panel + admin build + restart, /owner/login 200. Live: services har 15 sec features/public padh rahi hain (200), limit on (`ratelimit: limit=300`). Owner panel me Off karke live test nahi kiya — owner khud kare.
+
+---
+
 ## 2026-10-21 — Wallet → Transaction: Slotegrator game ka naam, transaction id nahi
 **Kya kiya:** Player ledger (`GET /user/wallet/ledger`) me Slotegrator rows "bet <txid>" / "win <txid>" / "refund rf:<txid>" ab `gis_transactions.game_uuid → gisgamesnew` (ya `gisgamesnew_parked`) se game ka naam padhte hain: "Aviator bet", "Aviator win". Game na mile to "Casino game". `#nameOriginalGames` ke bagal me `#nameGisGames`, read-time — purani rows bhi theek. Test me ek GIS row.
 **Kyun:** User: /wallet/transaction pe Aviator khela to game ki jagah id aa rahi thi.
