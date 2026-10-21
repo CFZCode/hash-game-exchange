@@ -40,7 +40,8 @@ const SUPPORTED_COINS = Object.freeze(Object.keys(COIN_COLUMNS));
  * here. A coin listed here is offered only on these keys.
  */
 const COIN_NETWORKS = Object.freeze({
-  USDT: Object.freeze(['TRC20', 'ERC20', 'BEP20']),
+  // + every network CCPayment takes USDT on (migration 148).
+  USDT: Object.freeze(['TRC20', 'ERC20', 'BEP20', 'SOL', 'POLYGON', 'TON', 'ARETH', 'OPTIMISM', 'OPBNB']),
   BTC: Object.freeze(['BTC']),
   ETH: Object.freeze(['ERC20']),
   LTC: Object.freeze(['LTC']),

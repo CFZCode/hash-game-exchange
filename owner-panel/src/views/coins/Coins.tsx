@@ -32,6 +32,9 @@ const MASTER = 'cryptocoin'
 
 const flagOf = (code: string) => code.toLowerCase()
 
+/** A built-in coin's network in the plan: `flags["usdt:bep20"]`, missing = on (the site reads the same key). */
+const networkFlagOf = (code: string, key: string) => `${code}:${key}`.toLowerCase()
+
 const CoinImage = ({ coin }: { coin: SiteCoin }) =>
   coin.imageUrl ? (
      
@@ -383,7 +386,17 @@ const Coins = () => {
   }
 
   const nameOf = (key: string) => coins.find(c => flagOf(c.code) === key)?.name ?? flagLabel(key)
-  const labelOf = (c: ToggleChange) => (c.key === MASTER ? flagLabel(MASTER) : `${nameOf(c.key)} (${c.key.toUpperCase()})`)
+
+  const networkLabel = (key: string) => {
+    const [code, net] = key.split(':')
+    const coin = coins.find(c => flagOf(c.code) === code)
+
+    return `${coin?.code ?? code.toUpperCase()} · ${coin?.networks.find(n => n.key.toLowerCase() === net)?.name ?? net.toUpperCase()} network`
+  }
+
+  const labelOf = (c: ToggleChange) =>
+    c.key === MASTER ? flagLabel(MASTER) : c.key.includes(':') ? networkLabel(c.key) : `${nameOf(c.key)} (${c.key.toUpperCase()})`
+
   const on = (key: string) => flags[key] !== false
   const set = (key: string, value: boolean) => setEdits(prev => ({ ...prev, [key]: value }))
 
@@ -413,7 +426,7 @@ const Coins = () => {
     <div className={cn(changes.length > 0 && 'pb-20')}>
       <PageHeader
         title='Coins'
-        description="Which of the site's coins are in the client's plan, and the site's own coins you create. Names, images, network names and the site's own switch are set in the site admin."
+        description="Which of the site's coins, and which of their networks, are in the client's plan, and the site's own coins you create. Names, images, network names and the site's own switches are set in the site admin."
         actions={
           <Button variant='outline' disabled={!doc} onClick={() => setDialog({ editing: false, form: emptyForm(), key: Date.now() })}>
             <PlusIcon /> Add coin
@@ -477,7 +490,7 @@ const Coins = () => {
                     const key = flagOf(coin.code)
                     const masterOff = coin.kind === 'crypto' && !on(MASTER)
                     const def = coin.builtin ? undefined : definitionFor(coin.code)
-                    const changed = changedKeys.has(key) || changedKeys.has(coin.code)
+                    const changed = changedKeys.has(key) || changedKeys.has(coin.code) || [...changedKeys].some(k => k.startsWith(`${key}:`))
 
                     return (
                       <TableRow key={coin.code} data-row={key} className={cn(changed && 'bg-muted/40')}>
@@ -502,11 +515,25 @@ const Coins = () => {
                         <TableCell>
                           <div className='flex flex-wrap gap-1'>
                             {coin.networks.length ? (
-                              coin.networks.map(n => (
-                                <Badge key={n.key} variant='secondary' title={n.key}>
-                                  {n.name}
-                                </Badge>
-                              ))
+                              coin.networks.map(n =>
+                                coin.builtin && coin.kind === 'crypto' ? (
+
+                                  // A built-in coin's network: in the plan or not. Off hides it from players and the site admin.
+                                  <label key={n.key} title={n.key} data-network={networkFlagOf(coin.code, n.key)} className='flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs'>
+                                    <Switch
+                                      size='sm'
+                                      checked={on(networkFlagOf(coin.code, n.key))}
+                                      onCheckedChange={v => set(networkFlagOf(coin.code, n.key), v)}
+                                      aria-label={`${coin.code} ${n.name} network in the plan`}
+                                    />
+                                    {n.name}
+                                  </label>
+                                ) : (
+                                  <Badge key={n.key} variant='secondary' title={n.key}>
+                                    {n.name}
+                                  </Badge>
+                                )
+                              )
                             ) : (
                               <span className='text-muted-foreground text-xs'>—</span>
                             )}

@@ -126,7 +126,8 @@ export function enabledTokens(currencyName, list = listed) {
   const networks = Array.isArray(coin?.networks) ? coin.networks : [];
   if (networks.length === 0) return rows;
   const chains = new Set(networks.map((network) => chainOfNetworkKey(network?.key)));
-  const kept = rows.filter((row) => chains.has(String(row.chain).toUpperCase()));
+  // One row per chain: the capture lists OPTIMISM twice (bridged USDT and USD₮0), and a select keys on the chain.
+  const kept = rows.filter((row, i) => chains.has(String(row.chain).toUpperCase()) && rows.findIndex((r) => r.chain === row.chain) === i);
   return kept.length ? kept : rows;
 }
 

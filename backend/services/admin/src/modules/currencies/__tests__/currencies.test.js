@@ -158,7 +158,8 @@ test('coin registry (currencies)', async (t) => {
     assert.strictEqual(byCode.BJB.retired, true);
     assert.ok(snapshot.filter((r) => r.code !== 'BJB').every((r) => r.retired === false));
     assert.ok(snapshot.every((r) => r.builtin === true));
-    assert.deepStrictEqual(byCode.USDT.networks.map((n) => n.key), ['TRC20', 'ERC20', 'BEP20']);
+    // 061's three, then every network CCPayment takes USDT on (148).
+    assert.deepStrictEqual(byCode.USDT.networks.map((n) => n.key), ['TRC20', 'ERC20', 'BEP20', 'SOL', 'POLYGON', 'TON', 'ARETH', 'OPTIMISM', 'OPBNB']);
     assert.strictEqual(byCode.BTC.name, 'Bitcoin');
     assert.strictEqual(byCode.INR.kind, 'fiat');
     assert.strictEqual(byCode.BTC.image_content_type, 'image/svg+xml');
@@ -190,14 +191,14 @@ test('coin registry (currencies)', async (t) => {
     });
     assert.strictEqual(ok.status, 200);
     assert.strictEqual(ok.body.data.name, 'Tether USD');
-    assert.deepStrictEqual(ok.body.data.networks, [
+    assert.deepStrictEqual(ok.body.data.networks.slice(0, 3), [
       { key: 'TRC20', name: 'Tron (TRC20)', enabled: true },
       { key: 'ERC20', name: 'ERC20', enabled: false },
       { key: 'BEP20', name: 'BEP20', enabled: true },
     ]);
     assert.ok(pushes.some((p) => Array.isArray(p.body.currencies)), 'currenciesUpdated pushed');
 
-    const unknown = await call('PUT', '/currencies/USDT', { body: { networks: [{ key: 'SOL', name: 'Solana' }] } });
+    const unknown = await call('PUT', '/currencies/USDT', { body: { networks: [{ key: 'FAKE', name: 'Fake' }] } });
     assert.strictEqual(unknown.status, 400);
     assert.strictEqual(unknown.body.error.code, 'CURRENCIES_UNKNOWN_NETWORK');
   });
@@ -206,7 +207,8 @@ test('coin registry (currencies)', async (t) => {
     const res = await call('GET', '/currencies/public');
     assert.strictEqual(res.status, 200);
     const usdt = res.body.data.find((c) => c.code === 'USDT');
-    assert.deepStrictEqual(usdt.networks, [{ key: 'TRC20', name: 'Tron (TRC20)' }, { key: 'BEP20', name: 'BEP20' }]);
+    assert.deepStrictEqual(usdt.networks.map((n) => n.key), ['TRC20', 'BEP20', 'SOL', 'POLYGON', 'TON', 'ARETH', 'OPTIMISM', 'OPBNB']);
+    assert.deepStrictEqual(usdt.networks[0], { key: 'TRC20', name: 'Tron (TRC20)' });
     assert.strictEqual(Object.prototype.hasOwnProperty.call(usdt, 'ownerEnabled'), false);
     assert.ok(!res.body.data.some((c) => c.code === 'BJB'), 'retired coin hidden');
 
@@ -338,10 +340,8 @@ test('coin registry (currencies)', async (t) => {
 
   await t.test('crypto network list follows the registry, keys stay the contract', async () => {
     // From the PUT above: TRC20 renamed, ERC20 off.
-    assert.deepStrictEqual(await networksFor('USDT'), [
-      { key: 'TRC20', name: 'Tron (TRC20)' },
-      { key: 'BEP20', name: 'BEP20' },
-    ]);
+    assert.deepStrictEqual((await networksFor('USDT')).map((n) => n.key), ['TRC20', 'BEP20', 'SOL', 'POLYGON', 'TON', 'ARETH', 'OPTIMISM', 'OPBNB']);
+    assert.deepStrictEqual((await networksFor('USDT'))[0], { key: 'TRC20', name: 'Tron (TRC20)' });
     // A key outside the contract is never offered, whatever the registry says.
     await models.Currency.update({ networks: [{ key: 'ERC20', name: 'Ethereum', enabled: true }, { key: 'FAKE', name: 'Fake', enabled: true }] }, { where: { code: 'ETH' } });
     assert.deepStrictEqual(await networksFor('ETH'), [{ key: 'ERC20', name: 'Ethereum' }]);
@@ -350,10 +350,26 @@ test('coin registry (currencies)', async (t) => {
     assert.deepStrictEqual(await networksFor('DOGE'), []);
     // No registry: the contract keys, named by their keys.
     resetCurrencyRegistry();
-    assert.deepStrictEqual(await networksFor('USDT'), [
-      { key: 'TRC20', name: 'TRC20' },
-      { key: 'ERC20', name: 'ERC20' },
-      { key: 'BEP20', name: 'BEP20' },
-    ]);
+    assert.deepStrictEqual(await networksFor('USDT'), ['TRC20', 'ERC20', 'BEP20', 'SOL', 'POLYGON', 'TON', 'ARETH', 'OPTIMISM', 'OPBNB'].map((key) => ({ key, name: key })));
+    configureCurrencyRegistry({ read: () => service.list(), config: { CURRENCY_REGISTRY_TTL_MS: 0 } });
+  });
+
+  await t.test('the owner switches a network off: gone for players, staff and the rails; the owner still sees it', async () => {
+    plan = { flags: { 'usdt:bep20': false }, features: {}, version: 5, source: 'owner' };
+    pushes.length = 0;
+    await service.applyOwnerDocument(plan);
+    assert.ok(pushes.some((p) => Array.isArray(p.body.currencies)), 'the new coin list is pushed to the players');
+
+    const usdtPublic = (await call('GET', '/currencies/public')).body.data.find((c) => c.code === 'USDT');
+    assert.ok(!usdtPublic.networks.some((n) => n.key === 'BEP20'));
+    const usdtStaff = (await call('GET', '/currencies')).body.data.find((c) => c.code === 'USDT');
+    assert.ok(!usdtStaff.networks.some((n) => n.key === 'BEP20'), 'the site admin cannot see it');
+    assert.ok(!(await networksFor('USDT')).some((n) => n.key === 'BEP20'), 'no deposit or withdrawal on it');
+    const owner = (await call('GET', '/currencies/owner', { headers: { 'x-owner-key': 'owner-test-key' } })).body.data.find((c) => c.code === 'USDT');
+    assert.ok(owner.networks.some((n) => n.key === 'BEP20'), 'the owner can switch it back');
+
+    plan = { flags: {}, features: {}, version: 6, source: 'owner' };
+    await service.applyOwnerDocument(plan);
+    assert.ok((await networksFor('USDT')).some((n) => n.key === 'BEP20'), 'back on');
   });
 });

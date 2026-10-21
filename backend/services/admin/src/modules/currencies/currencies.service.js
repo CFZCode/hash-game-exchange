@@ -38,6 +38,19 @@ function ownerAllows(plan, code, kind) {
   return true;
 }
 
+/**
+ * Whether the owner's plan keeps one network of a coin: `flags["usdt:bep20"]` (lower-case
+ * `<code>:<key>`), missing = on. Off hides it from players, the site admin and the deposit /
+ * withdraw rails; the site admin's own switch only applies to the ones the owner kept.
+ */
+const ownerNetworkFlag = (code, key) => `${code}:${key}`.toLowerCase();
+const ownerKeepsNetwork = (plan, code, key) => plan?.flags?.[ownerNetworkFlag(code, key)] !== false;
+/** The owner's network switches in a document, as a comparable string. */
+const networkFlagsOf = (doc) =>
+  JSON.stringify(Object.entries(doc?.flags ?? {}).filter(([k]) => k.includes(':')).sort());
+// The last applied set, per process (each apply builds a new service).
+let appliedNetworkFlags = null;
+
 const CODE = /^[A-Z][A-Z0-9]{1,9}$/;
 const KINDS = new Set(['fiat', 'crypto', 'points']);
 const NETWORK_KEY = /^[A-Za-z0-9_-]{1,20}$/;
@@ -129,7 +142,7 @@ class CurrenciesService {
       name: row.name,
       symbol: row.symbol,
       sortOrder: Number(row.sort_order),
-      networks: networksOf(row),
+      networks: networksOf(row).filter((n) => ownerKeepsNetwork(plan, row.code, n.key)),
       // The owner's fixed USD rate (custom coins, migration 065); null for built-in coins.
       usdRate: row.usd_rate != null ? money.fromStored(row.usd_rate) : null,
       ownerEnabled,
@@ -180,7 +193,9 @@ class CurrenciesService {
    * called on the site and whether the site has it on. Never a secret.
    */
   async ownerList() {
-    return (await this.list()).map((c) => ({
+    const [rows, plan] = await Promise.all([this.#rows(), entitlements.getEntitlements()]);
+    // Every network, the ones the owner switched off included — the owner panel switches them back on.
+    return rows.map((row) => ({ c: this.#serialise(row, plan), networks: networksOf(row) })).map(({ c, networks }) => ({
       code: c.code,
       kind: c.kind,
       name: c.name,
@@ -192,7 +207,7 @@ class CurrenciesService {
       image: c.image,
       ownerEnabled: c.ownerEnabled,
       siteEnabled: c.siteEnabled,
-      networks: c.networks.map(({ key, name }) => ({ key, name })),
+      networks: networks.map(({ key, name }) => ({ key, name })),
     }));
   }
 
@@ -332,8 +347,12 @@ class CurrenciesService {
       await this.models.Currency.update({ owner_enabled: want, managed_by: managedBy }, { where: { code: row.code } });
       if (Boolean(row.owner_enabled) !== want) switched.push({ code: row.code, ownerEnabled: want });
     }
-    if (switched.length || custom.created.length || custom.updated.length) {
-      this.logger?.warn({ version: doc?.version, switched, created: custom.created, updated: custom.updated }, 'Owner document applied to coins');
+    // A network switch moves no row (it is read from the plan), so it is noticed here.
+    const networkFlags = networkFlagsOf(doc);
+    const networksMoved = networkFlags !== appliedNetworkFlags;
+    appliedNetworkFlags = networkFlags;
+    if (switched.length || custom.created.length || custom.updated.length || networksMoved) {
+      this.logger?.warn({ version: doc?.version, switched, created: custom.created, updated: custom.updated, networksMoved }, 'Owner document applied to coins');
       await this.changed();
     }
     return { switched, created: custom.created, updated: custom.updated };
@@ -473,4 +492,4 @@ class CurrenciesService {
   }
 }
 
-module.exports = { CurrenciesService, ownerAllows, cleanCoinDefinition };
+module.exports = { CurrenciesService, ownerAllows, ownerKeepsNetwork, cleanCoinDefinition };

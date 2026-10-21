@@ -76,6 +76,12 @@ describe('enabled networks', () => {
     expect(enabledTokens('ETH', odd)).toBe(capturedTokensFor('ETH'));
   });
 
+  it("USDT on every CCPayment network shows each chain once (user, 2026-10-21)", () => {
+    const keys = ['TRC20', 'ERC20', 'BEP20', 'SOL', 'POLYGON', 'TON', 'ARETH', 'OPTIMISM', 'OPBNB'];
+    const rows = enabledTokens('USDT', [{ code: 'USDT', networks: keys.map((key) => ({ key, name: key })) }]);
+    expect(chains(rows)).toEqual(['TRON', 'BSC', 'ETHEREUM', 'SOLANA', 'POLYGON', 'TON', 'OPTIMISM', 'ARETH', 'OPBNB']);
+  });
+
   it('tokensFor reads the store and keeps one array per coin', () => {
     expect(tokensFor('USDT')).toBe(capturedTokensFor('USDT'));
     setEnabledCurrencies(LISTED);
