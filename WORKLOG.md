@@ -15,6 +15,14 @@ Format:
 
 ---
 
+## 2026-10-22 — Check: GIS (Slotegrator) callback ka race condition
+**Kya kiya:** User ka reference code (harman wala atomic `UPDATE credits SET col = col + $1 WHERE uid AND col >= amount`) hamare `backend/services/casino/src/modules/gis/gis.service.js` se milaya. Hamare me: `gis_transactions` row paise se PEHLE usi DB transaction me (unique `transaction_id` → retry ek hi baar), paisa user-service wallet se (`FOR UPDATE` lock, debit SQL me `>= amount`, credit `col + amount`, idempotency key `credits_ledger_idempotency_key_uq` unique), refund `rf:<bet id>` aur rollback `rb:<id>` derived key, rollback hamara stored amount. Live par dono unique index maujood. GIS tests 32 / 32 pass (concurrent bets, ek saath 3 win, fresh id wala refund / rollback). Live: 440 gis_transactions (20–21 Oct) — wallet move missing 0, double 0, amount mismatch 0.
+**Kyun:** User: reference me race condition solve kiya tha, apne GIS callback me bhi waise handle hai na.
+**Files / jagah:** sirf WORKLOG (code nahi badla).
+**Notes / pending:** Do gap (dono reference me bhi): (1) bet aane se pehle / beech me rollback aaye to "never applied" skip hota hai aur koi nishaan nahi rehta — baad me aayi wahi bet paisa kaat leti hai; (2) refund ka rollback: refund `rf:<bet id>` se save hai, rollback provider ki refund id bhejta hai → row nahi milti → refund wapas nahi hota (test bhi nahi). Refund ka amount request se aata hai (stake se bada bhi ho sakta hai).
+
+---
+
 ## 2026-10-22 — Check: har balance move ki point_ledger_direct entry banti hai ya nahi
 **Kya kiya:** Live pe check kiya (sirf padha). Trigger `direct_ledger_credits` (credits) aur `direct_ledger_wallet_balances` (wallet_balances) dono enabled; code me koi bypass (session_replication_role / DISABLE TRIGGER) nahi. Har direct user ki har currency: wallet = point_ledger_direct ki `bal:` + `opening:` rows ka jod — 100 me 97 exact, 3 me 0.0000000000001 ka float noise (credits me 867.4999999999999). Balance sheet ki 17 Oct ke baad ki 2876 non-sports rows me se har ek ki trigger row mili (1 deposit request 19 Oct / approve 20 Oct, 24h window se bahar tha, entry `bal:2434` maujood).
 **Kyun:** User: balance sheet ki tables me jab bhi data update hota hai to point_ledger_direct me entry banti hai kya.
