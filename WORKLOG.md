@@ -15,6 +15,14 @@ Format:
 
 ---
 
+## 2026-10-22 — Check: har balance move ki point_ledger_direct entry banti hai ya nahi
+**Kya kiya:** Live pe check kiya (sirf padha). Trigger `direct_ledger_credits` (credits) aur `direct_ledger_wallet_balances` (wallet_balances) dono enabled; code me koi bypass (session_replication_role / DISABLE TRIGGER) nahi. Har direct user ki har currency: wallet = point_ledger_direct ki `bal:` + `opening:` rows ka jod — 100 me 97 exact, 3 me 0.0000000000001 ka float noise (credits me 867.4999999999999). Balance sheet ki 17 Oct ke baad ki 2876 non-sports rows me se har ek ki trigger row mili (1 deposit request 19 Oct / approve 20 Oct, 24h window se bahar tha, entry `bal:2434` maujood).
+**Kyun:** User: balance sheet ki tables me jab bhi data update hota hai to point_ledger_direct me entry banti hai kya.
+**Files / jagah:** sirf WORKLOG (code nahi badla).
+**Notes / pending:** Entry hamesha banti hai (wallet pe trigger), par naam (label) har jagah nahi: aaj bhi bina label (`BALANCE_CHANGE` / `OTHER`) sirf sports settlement ki wallet move aati hai (87 rows, aakhri 21 Oct 20:18). Original Games (1106, 18–19 Oct) aur baaki (117, aakhri 19 Oct 05:36) purani rows hain, ab label lagta hai. point_ledger_direct me `settle:` / `og:` / `void:` rows P/L hain, wallet move nahi — wallet se milana ho to sirf `bal:` + `opening:` jodo. Balance sheet deposit ko request ke time dikhata hai, wallet approve pe badalta hai.
+
+---
+
 ## 2026-10-21 — Saare players ki balance sheet ka live audit
 **Kya kiya:** Live admin API (`/reports/balance-sheet`, agent ke liye `/reports/client-balance-sheet`) se har player ki sheet nikaali: 64 users, 110 sheets (59 direct users ki har currency jisme paisa / ledger hai = 105, 5 agent users). HTTP error 0, 108 sheets ka `unexplained` 0. Sports P/L ka cross-check settlement record se (`mssports.credits_ledger` profit + loss, settlement + settlement_void): 57 / 59 direct users exact; agent user userx11 ki dono bets (+15, +100) `point_ledger` se sahi.
 **Kyun:** User: test karo, sabki balance sheet sahi chal rahi hai ya nahi; aur jo bhi hai pull leke deploy.
