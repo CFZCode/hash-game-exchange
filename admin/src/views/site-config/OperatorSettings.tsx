@@ -338,7 +338,7 @@ const CashierLimitsCard = () => {
     setDraft(d => ({ ...d, [code]: { ...d[code], [field]: value } }))
   }
 
-  const show = (v: string | null) => (v === null ? <span className='text-muted-foreground'>No limit</span> : <span className='tabular-nums'>{Number(v).toLocaleString('en-IN')}</span>)
+  const show = (v: string | null) => (v === null ? <span className='text-muted-foreground'>No limit</span> : <span className='tabular-nums'>{Number(v).toLocaleString('en-IN', { maximumFractionDigits: 8 })}</span>)
 
   return (
     <Card className='shadow-none'>
