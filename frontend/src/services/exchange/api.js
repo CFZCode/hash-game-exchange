@@ -1,3 +1,4 @@
+import { ENC_ACCEPT, openSealed } from '../apiCrypto';
 import { API_BASE, refreshSession } from '../client';
 import { getAccessToken, isAccountLockedCode, notifyAuthExpired } from '../tokens';
 
@@ -88,7 +89,7 @@ async function attempt(path, { method, params, json, signal, timeout, auth }, re
     res = await fetch(EXCHANGE_BASE + withQuery(path, params), {
       method,
       headers: {
-        Accept: 'application/json',
+        Accept: ENC_ACCEPT ?? 'application/json',
         ...(json === undefined ? null : { 'Content-Type': 'application/json' }),
         ...(token ? { Authorization: `Bearer ${token}` } : null),
       },
@@ -107,7 +108,7 @@ async function attempt(path, { method, params, json, signal, timeout, auth }, re
 
   const text = await res.text().catch(() => '');
   let body;
-  try { body = text ? JSON.parse(text) : null; } catch { body = { error: text.slice(0, 200) }; }
+  try { body = text ? await openSealed(JSON.parse(text)) : null; } catch { body = { error: text.slice(0, 200) }; }
 
   if (res.status === 401 && token && !retried) {
     const ok = await refreshSession();

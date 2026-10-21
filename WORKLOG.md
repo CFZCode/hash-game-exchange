@@ -15,6 +15,14 @@ Format:
 
 ---
 
+## 2026-10-21 — API encryption: sports calls bhi encrypted
+**Kya kiya:** Sports exchange ka apna fetch (`exchange/api.js`) ab bhi `ENC_ACCEPT` header bhejta hai aur `openSealed` se answer kholta hai, baaki `request()` jaisa.
+**Kyun:** User: owner panel se encryption on kiya par chal nahi rahi. Gateway + baaki API pehle se encrypted the; sirf sports (`/sports/user/...all-data`, tree, latest events) plain JSON aa rahe the kyunki wo `client.js` se nahi jaate.
+**Files / jagah:** `frontend/src/services/exchange/api.js`.
+**Notes / pending:** Live check (headless Chrome): home + /sports pe har JSON answer `{"enc":...}`, sports odds sahi dikhe. Socket frames pehle se scrambled (encrypted nahi). `siteFeatures.js` bina header ke fetch karta hai — plain hi rahega.
+
+---
+
 ## 2026-10-20 — Admin Casino bets: provider naam hataye, Stats me USDT graph, Raw tab hata
 **Kya kiya:** `/casino/bets`: Transactions me game ke neeche studio/vendor ki jagah sirf "Casino feed" label. Stats tab: sab wallets USDT me (site ke current rate, USDT = 1), cards Bets / Wagered / Paid out / GGR + "Casino by day" bar graph (wagered, paid out, GGR); currency select aur source table (jisme "slotegrator"/"jsgames" raw dikh raha tha) hataya. "Raw provider tables" tab aur chhupa Analytics tab code se hataye. Backend `stats` ab din + currency group karke `usdt: { totals, days, unconverted }` deta hai.
 **Kyun:** User: is section me koi provider naam na aaye, stats me graph, USDT me; Slotegrator admin me kahin na dikhe.
