@@ -1264,6 +1264,14 @@ body {
     overscroll-behavior: contain;
   }
 
+  /* A `.scroll-y` inside another one (a panel's own `scroll-y h-full` inside a dialog or sheet
+     body) hands its overscroll on to the outer one. With `contain` Chrome stopped the swipe at
+     the inner box even when it had nothing to scroll, so the sheet body never moved on a phone
+     (/notification below lg). The outermost one still contains, so the page behind stays put. */
+  .scroll-y .scroll-y {
+    overscroll-behavior-y: auto;
+  }
+
 }
 
 /* UNLAYERED, and that is not a style choice. `.grid-col-3 > div > *` sets
