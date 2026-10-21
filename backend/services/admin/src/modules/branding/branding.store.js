@@ -3,10 +3,16 @@
 const crypto = require('crypto');
 const { ValidationError, imageUpload } = require('@ibitplay/common');
 
-const { SLOTS, ASSET_FILE_RE, CONTENT_TYPES, imageProblem } = require('./branding.rules');
+const { SLOTS, ASSET_FILE_RE, CONTENT_TYPES, imageProblem, cleanBranding } = require('./branding.rules');
 
 /** The slots the Super Admin may set (site admin → Branding). */
 const SITE_SLOTS = Object.freeze(['logo', 'mark']);
+
+/** The name and metadata fields the Super Admin may set too (site admin → Branding). */
+const META_KEYS = Object.freeze(['siteName', 'title', 'titleTemplate', 'description', 'keywords', 'ogTitle', 'ogDescription', 'themeColor']);
+
+/** The owner's metadata as one string, to tell whether the owner changed it since the Super Admin saved. */
+const metaOf = (branding) => JSON.stringify(META_KEYS.map((k) => branding?.[k] ?? (k === 'keywords' ? [] : '')));
 
 /**
  * The branding images, kept in `owner_branding_assets` (migration 142), one row per content hash.
@@ -33,6 +39,8 @@ function createBrandingStore({ logger, models }) {
 
   // slot → the Super Admin's image (`site_branding`, migration 145).
   let overrides = new Map();
+  // The Super Admin's name and metadata (`site_branding_meta`, migration 149): { meta, owner_meta } or null.
+  let metaOverride = null;
   const query = (sql, replacements) =>
     models.OwnerBrandingAsset.sequelize.query(sql, { replacements, type: models.OwnerBrandingAsset.sequelize.QueryTypes.SELECT });
 
@@ -43,7 +51,16 @@ function createBrandingStore({ logger, models }) {
     } catch (error) {
       logger?.warn({ err: error.message }, 'site_branding not readable — the owner branding stands');
     }
+    try {
+      const [row] = await query('SELECT meta, owner_meta FROM site_branding_meta WHERE id = 1');
+      metaOverride = row ?? null;
+    } catch (error) {
+      logger?.warn({ err: error.message }, 'site_branding_meta not readable — the owner metadata stands');
+    }
   }
+
+  /** Does the Super Admin's name and metadata show over this owner branding (set after the owner's)? */
+  const metaBySite = (branding) => Boolean(metaOverride && metaOverride.owner_meta === metaOf(branding));
 
   /**
    * The branding players get: the owner's, with each Super Admin image laid over it while it is
@@ -55,6 +72,7 @@ function createBrandingStore({ logger, models }) {
       if ((o.owner_file ?? null) !== (branding?.[slot]?.file ?? null)) continue;
       out = { ...(out ?? { siteName: '', keywords: [] }), [slot]: { file: o.file, type: o.content_type, bytes: o.byte_size } };
     }
+    if (metaBySite(branding)) out = { ...out, ...metaOverride.meta };
     return out;
   }
 
@@ -197,7 +215,28 @@ function createBrandingStore({ logger, models }) {
     return { slot };
   }
 
-  return { sync, read, view, put, stored, setSite, clearSite };
+  /** The Super Admin sets the name and metadata: shown until the owner changes theirs. */
+  async function setMeta(input, { staff, ownerBranding }) {
+    const clean = cleanBranding(input);
+    const meta = Object.fromEntries(META_KEYS.map((k) => [k, clean[k]]));
+    const ownerMeta = metaOf(ownerBranding);
+    await query(
+      `INSERT INTO site_branding_meta (id, meta, owner_meta, updated_by, updated_at)
+       VALUES (1, CAST(:meta AS jsonb), :ownerMeta, :staffId, CURRENT_TIMESTAMP)
+       ON CONFLICT (id) DO UPDATE SET meta = EXCLUDED.meta, owner_meta = EXCLUDED.owner_meta, updated_by = EXCLUDED.updated_by, updated_at = EXCLUDED.updated_at`,
+      { meta: JSON.stringify(meta), ownerMeta, staffId: staff?.id ?? null }
+    );
+    metaOverride = { meta, owner_meta: ownerMeta };
+    return meta;
+  }
+
+  /** Back to the owner's name and metadata (or the site's own). */
+  async function clearMeta() {
+    await query('DELETE FROM site_branding_meta WHERE id = 1');
+    metaOverride = null;
+  }
+
+  return { sync, read, view, put, stored, setSite, clearSite, setMeta, clearMeta, metaBySite };
 }
 
 let shared = null;

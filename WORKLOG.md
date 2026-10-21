@@ -15,6 +15,14 @@ Format:
 
 ---
 
+## 2026-10-22 — Super Admin bhi site ka naam aur metadata badal sakta hai (Branding)
+**Kya kiya:** Admin → Site config → Branding me "Name and metadata" ab Super Admin ke liye form hai: Site name, Page title, Title template, Meta description, Meta keywords, Open Graph title / description, Theme colour — Save, aur "Reset" (platform wala wapas). Rule logo jaisa: jo baad me badle wahi players ko dikhe — Super Admin save kare to uska; owner baad me apna metadata badle to owner ka (owner ka koi aur save, jaise flags, Super Admin ka nahi hatata). Backend: migration 149 `site_branding_meta` (ek row: meta + us waqt owner ka metadata), `PUT / DELETE /api/v1/admin/branding/meta` (config:write, agent accounts nahi), owner panel jaisi limits (naam 40, title 70, description 300, keywords 20, `<` `>` nahi, template me `%s` ek baar, colour #RRGGBB). `GET admin/branding` me `metaBy: site | platform`. Players ko public branding + socket sync + page HTML sab isi se milta hai.
+**Kyun:** User: jaise owner metadata badal sakta hai, waise Super Admin bhi badal sake.
+**Files / jagah:** `backend/packages/db/migrations/149-site-branding-meta.js`; `backend/services/admin/src/modules/branding/` (`branding.store.js`, `branding.validators.js`, `branding.rules.js`, `routes/admin.routes.js`, test); `admin/src/views/site-config/Branding.tsx`.
+**Notes / pending:** Live: migration 149 chala, admin-svc restart, admin build + restart. Abhi kisi ne Super Admin metadata save nahi kiya, site wahi (Parker567). Tests: branding 14/14 (2 naye); entitlements ke 8 fail pehle se (saaf HEAD pe bhi wahi 8). Admin login nahi tha, isliye form live pe khol ke save nahi kiya. Owner panel me owner ko apni value dikhti hai, Super Admin ki nahi (logo jaisa).
+
+---
+
 ## 2026-10-22 — Race sirf direct users ke liye, claim ki entry BONUS
 **Kya kiya:** Race (daily + weekly, ek hi code) se agent system hataya: board pe ab sirf direct users (`users.parent_staff_id IS NULL`) aate hain — `race.service.js` `#standings` ka naam wala lookup direct-only, agent-tree player ka wager ho tab bhi board pe nahi (pehle board pe dikhta tha, sirf prize nahi milta tha). Admin → Races ke Live board aur Rewards se Direct Users | Agent Users tab hataye; backend se `adminLeaderboard` channel filter aur rewards ka `channel` param hataya. Claim pe `point_ledger_direct` entry pehle se banti thi (wallet trigger; live: `bal:3021` "Weekly race — rank 18"), ab uski category `OTHER` ki jagah `BONUS` (`packages/common/src/directLedger.js` `categoryFor`).
 **Kyun:** User: daily race me agent system hatao, claim pe point ledger entry bane, ye sirf direct user ke liye hai.

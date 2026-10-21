@@ -11,9 +11,10 @@ const { MAX_IMAGE_BYTES } = require('../branding.rules');
 
 /**
  * `GET /api/v1/admin/branding` (config:read) — the site admin's read-only view: the same block
- * players get, plus `managedBy: 'owner'` (null when no owner panel manages this site). There is
- * The Super Admin may also set the logo and the icon (PUT / DELETE `/:slot`): the newer of the
- * Super Admin's and the owner's image shows (branding.store.js `effective`).
+ * players get, plus `managedBy: 'owner'` (null when no owner panel manages this site) and `metaBy`.
+ * The Super Admin may also set the logo and the icon (PUT / DELETE `/:slot`) and the name and
+ * metadata (PUT / DELETE `/meta`): the newer of the Super Admin's and the owner's shows
+ * (branding.store.js `effective`).
  */
 module.exports = function adminRoutes(deps) {
   const { auth } = deps;
@@ -34,8 +35,30 @@ module.exports = function adminRoutes(deps) {
       return response.ok(res, {
         ...store.view(current.branding ?? null, current.version ?? 0),
         managedBy: deps.config.OWNER_SHARED_SECRET ? 'owner' : null,
+        metaBy: store.metaBySite(current.branding ?? null) ? 'site' : 'platform',
         source: current.source ?? 'default',
       });
+    })
+  );
+
+  // Before '/:slot', which would take 'meta' as a slot.
+  router.put(
+    '/meta',
+    houseOnly,
+    canWrite,
+    validate({ body: v.siteMeta }),
+    withActivity({ action: 'branding.meta.set', describe: () => ({ targetType: 'BRANDING', targetId: 'meta' }) }),
+    asyncHandler(async (req, res) => response.ok(res, await store.setMeta(req.body, { staff: req.staff, ownerBranding: ownerBranding() })))
+  );
+
+  router.delete(
+    '/meta',
+    houseOnly,
+    canWrite,
+    withActivity({ action: 'branding.meta.reset', describe: () => ({ targetType: 'BRANDING', targetId: 'meta' }) }),
+    asyncHandler(async (_req, res) => {
+      await store.clearMeta();
+      return response.ok(res, { reset: true });
     })
   );
 

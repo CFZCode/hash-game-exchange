@@ -76,6 +76,7 @@ test('rules: image checks by bytes', () => {
 function assetTable() {
   const rows = new Map();
   const site = new Map();
+  const meta = { row: null };
   return {
     rows,
     OwnerBrandingAsset: {
@@ -84,10 +85,15 @@ function assetTable() {
         return [rows.get(where.file), true];
       },
       findByPk: async (file) => (rows.has(file) ? { ...rows.get(file) } : null),
-      // `site_branding` (the Super Admin's images) as a Map, for the three statements the store runs.
+      // `site_branding` (the Super Admin's images) as a Map, `site_branding_meta` as one value.
       sequelize: {
         QueryTypes: { SELECT: 'SELECT' },
         query: async (sql, { replacements: r = {} } = {}) => {
+          if (sql.includes('site_branding_meta')) {
+            if (sql.startsWith('SELECT')) return meta.row ? [meta.row] : [];
+            meta.row = sql.startsWith('DELETE') ? null : { meta: JSON.parse(r.meta), owner_meta: r.ownerMeta };
+            return [];
+          }
           if (sql.startsWith('SELECT')) return [...site.values()];
           if (sql.startsWith('DELETE')) site.delete(r.slot);
           else site.set(r.slot, { slot: r.slot, file: r.file, content_type: r.type, byte_size: r.bytes, owner_file: r.ownerFile });
@@ -223,4 +229,50 @@ test('the Super Admin logo: the newer of the owner\'s and the Super Admin\'s sho
   await store.clearSite('mark', { ownerBranding: null });
   assert.equal(store.view(null, 0).markUrl, null);
   await assert.rejects(() => store.setSite('ogImage', PNG, { ownerBranding: null }));
+});
+
+test("the Super Admin's name and metadata: the newer of the owner's and the Super Admin's shows", async () => {
+  const table = assetTable();
+  const store = createBrandingStore({ logger, models: table });
+  const owner = cleanBranding(branding({ logo: null, mark: null }));
+  assert.equal(store.view(owner, 1).title, 'Parker567 — Casino & Sports');
+
+  const saved = await store.setMeta({ siteName: 'Parker', title: 'Parker — Play', titleTemplate: '%s | Parker', description: 'New text', keywords: ['bet', 'Bet', 'win'], ogTitle: '', ogDescription: '', themeColor: '#abcdef' }, { staff: { id: 1 }, ownerBranding: owner });
+  assert.deepEqual(saved.keywords, ['bet', 'win']);
+  let seen = store.view(owner, 1);
+  assert.equal(seen.siteName, 'Parker');
+  assert.equal(seen.title, 'Parker — Play', 'the Super Admin set it last');
+  assert.equal(seen.themeColor, '#ABCDEF');
+  assert.equal(store.metaBySite(owner), true);
+
+  // A restart reads it back from the table.
+  const again = createBrandingStore({ logger, models: table });
+  await again.sync(owner);
+  assert.equal(again.view(owner, 1).title, 'Parker — Play');
+
+  // The owner saves an unrelated change: still the Super Admin's. The owner changes the metadata: the owner's.
+  assert.equal(store.view({ ...owner, ogImage: null }, 2).title, 'Parker — Play');
+  const owner2 = { ...owner, description: 'Owner wrote this later' };
+  seen = store.view(owner2, 3);
+  assert.equal(seen.title, 'Parker567 — Casino & Sports');
+  assert.equal(seen.description, 'Owner wrote this later');
+  assert.equal(store.metaBySite(owner2), false);
+
+  // No owner branding at all: the Super Admin's shows; reset brings back the site's own.
+  await store.setMeta({ siteName: 'Solo', title: 'Solo site', titleTemplate: '', description: '', keywords: [], ogTitle: '', ogDescription: '', themeColor: '' }, { staff: { id: 1 }, ownerBranding: null });
+  assert.equal(store.view(null, 0).siteName, 'Solo');
+  assert.equal(store.view(null, 0).branded, true);
+  await store.clearMeta();
+  assert.equal(store.view(null, 0).branded, false);
+});
+
+test('the Super Admin metadata body: limits, no markup, a template with %s once', () => {
+  const { siteMeta } = require('../branding.validators');
+  assert.equal(siteMeta.safeParse({ title: 'Fine' }).success, true);
+  assert.equal(siteMeta.safeParse({ title: '<script>x</script>' }).success, false);
+  assert.equal(siteMeta.safeParse({ titleTemplate: 'no placeholder' }).success, false);
+  assert.equal(siteMeta.safeParse({ themeColor: 'red' }).success, false);
+  assert.equal(siteMeta.safeParse({ siteName: 'x'.repeat(41) }).success, false);
+  assert.equal(siteMeta.safeParse({ keywords: Array(21).fill('k') }).success, false);
+  assert.equal(siteMeta.safeParse({ extra: 1 }).success, false);
 });

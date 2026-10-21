@@ -81,4 +81,4 @@ function imageProblem(buffer, file, slot) {
   return verdict.ok ? null : `unsafe SVG (${verdict.reason})`;
 }
 
-module.exports = { TEXT_LIMITS, SLOTS, MAX_IMAGE_BYTES, ASSET_FILE_RE, CONTENT_TYPES, cleanBranding, imageProblem };
+module.exports = { TEXT_LIMITS, SLOTS, MAX_IMAGE_BYTES, MAX_KEYWORDS, MAX_KEYWORD_LENGTH, ASSET_FILE_RE, CONTENT_TYPES, BAD_TEXT, cleanBranding, imageProblem };
