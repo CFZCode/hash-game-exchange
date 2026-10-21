@@ -170,19 +170,31 @@ describe('formatPL', () => {
   });
 });
 
-describe('applyMatchOddsLimits', () => {
-  it('leaves a racing market untouched — its maxb is a flag, not a cap', () => {
-    const racing = { mname: 'MATCH_ODDS', gtype: 'match', maxb: 1, max: 2000 };
-    expect(applyMatchOddsLimits({ ...racing }, '10')).toEqual(racing);
+describe('applyMatchOddsLimits (TENEXCH: in-play maxb||max, pre-match umaxbof)', () => {
+  it('leaves a market without umaxbof, and Bookmaker, untouched', () => {
+    const summary = { mname: 'MATCH_ODDS', gtype: 'match', maxb: 1, max: 2000 };
+    expect(applyMatchOddsLimits({ ...summary }, '10')).toEqual(summary);
+    const bm = { mname: 'Bookmaker', gtype: 'match1', max: 100000, maxb: 0, umaxbof: 0 };
+    expect(applyMatchOddsLimits({ ...bm }, '4')).toEqual(bm);
   });
 
-  it('takes the feed max; maxb / umaxbof of 1 is "no cap", not a cap of 1 — pre-match and in-play', () => {
-    const mo = { mname: 'MATCH_ODDS', gtype: 'match', min: 0, max: 2000, maxb: 1, umaxbof: 10000 };
-    expect(applyMatchOddsLimits({ ...mo, iplay: false }, '4')).toMatchObject({ max: 2000, maxb: 0 });
-    expect(applyMatchOddsLimits({ ...mo, iplay: true }, '1')).toMatchObject({ max: 2000, maxb: 0 });
+  it('pre-match cricket MO reads umaxbof 1 → Max: 1 (the reference refuses it)', () => {
+    const mo = { mname: 'MATCH_ODDS', gtype: 'match', min: 0, max: 2000, maxb: 1, umaxbof: 1, iplay: false };
+    expect(applyMatchOddsLimits(mo, '4')).toMatchObject({ max: 1, maxb: 0 });
   });
 
-  it('falls back to maxb when the feed max is missing (live football)', () => {
+  it('in-play takes maxb (10K), not the feed max (2K)', () => {
+    const mo = { mname: 'MATCH_ODDS', gtype: 'match', max: 2000, maxb: 10000, umaxbof: 1, iplay: true };
+    expect(applyMatchOddsLimits(mo, '4').max).toBe(10000);
+  });
+
+  it('a race pre-off reads umaxbof 10000 → 10K; in-play its maxb flag 1', () => {
+    const race = { mname: 'MATCH_ODDS', gtype: 'match', max: 2000, maxb: 1, umaxbof: 10000 };
+    expect(applyMatchOddsLimits({ ...race, iplay: false }, '10').max).toBe(10000);
+    expect(applyMatchOddsLimits({ ...race, iplay: true }, '10').max).toBe(1);
+  });
+
+  it('live football with max 0 falls back to maxb', () => {
     const fb = { mname: 'OVER_UNDER_15', gtype: 'match', max: 0, maxb: 100000, umaxbof: 1, iplay: true };
     expect(applyMatchOddsLimits(fb, '1').max).toBe(100000);
   });

@@ -1,13 +1,14 @@
 import MarketCard from './MarketCard';
 import RunnerRow from './RunnerRow';
-import { statusLabel } from './utils';
+import { limitsText, statusLabel } from './utils';
 
 /**
  * OddEvenBlock — Odd | Even markets (both columns are BACK prices).
  *
  * @param {object}   props
  * @param {string}   [props.title='Odd / Even']
- * @param {Array<{id, name, odd:{price,size}, even:{price,size}, status?, pnl?, projected?}>} props.rows
+ * @param {Array<{id, name, odd:{price,size}, even:{price,size}, min?, max?, status?, pnl?, projected?}>} props.rows
+ * @param {(n)=>string} [props.formatLimit]  Each row's Min/Max (default: compact INR, 10 · 1L).
  * @param {string}   [props.status]                     Block-wide status (overrides rows).
  * @param {{rowId, pick:'odd'|'even'}|null} [props.selected]
  * @param {(sel:{rowId, rowName, pick:'odd'|'even', side:'back', price, size})=>void} [props.onSelect]
@@ -34,6 +35,7 @@ export default function OddEvenBlock({
   formatSize,
   formatPrice,
   formatAmount,
+  formatLimit,
 }) {
   const blockLabel = statusLabel(status);
 
@@ -46,12 +48,17 @@ export default function OddEvenBlock({
       onToggleCollapse={onToggleCollapse}
       columns={['Odd', 'Even']}
       columnTones={['back', 'back']}
+      trailingHeader={rows.some((r) => r.min != null || r.max != null) ? 'Min / Max' : undefined}
       formatAmount={formatAmount}
     >
-      {rows.map((row) => (
+      {rows.map((row) => {
+        const lim = row.min != null || row.max != null ? limitsText(row.min, row.max, formatLimit) : null;
+        return (
         <RunnerRow
           key={row.id}
           name={row.name}
+          subline={lim ? <p className="mt-0.5 text-[0.6875rem] leading-4 text-tertiary lg:hidden">{lim}</p> : undefined}
+          trailing={lim ? <span className="text-xs leading-4 text-secondary">{lim}</span> : undefined}
           status={blockLabel ?? row.status}
           disabled={disabled}
           pnl={row.pnl ?? null}
@@ -73,7 +80,8 @@ export default function OddEvenBlock({
         >
           {activeRowId != null && activeRowId === row.id ? betSlip : null}
         </RunnerRow>
-      ))}
+        );
+      })}
     </MarketCard>
   );
 }

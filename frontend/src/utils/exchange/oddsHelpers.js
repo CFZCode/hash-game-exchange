@@ -40,15 +40,19 @@ export function formatMax(val) {
 export const feedMaxStake = (market) =>
   [market?.max, market?.maxb, market?.umaxbof].map(Number).find((v) => v > 1) || 0;
 
-// gtype 'match' markets (Match Odds, Over/Under, …): fold the feed cap into
-// `max` so the header shows one Max and stake validation reads the same number;
-// maxb is zeroed so nothing downstream picks it up again. Markets that never
-// quote umaxbof (all-data summaries) and Bookmaker (match1) are untouched.
+// gtype 'match' markets (Match Odds, Over/Under, racing …): fold the feed cap into `max` with
+// TENEXCH's rule, the reference's own line — in-play `maxb` (>0, else `max`), pre-match `umaxbof`
+// (TENEXCH utils/oddsHelpers.js applyMatchOddsLimits). Pre-match cricket MO ships umaxbof 1, so
+// the header reads "Max: 1" and the slip answers "Game Not Active2." (prevalidateBet); a race
+// pre-off reads umaxbof 10000 → "Max: 10K". maxb is zeroed so nothing downstream picks it up
+// again. Markets that never quote umaxbof (all-data summaries) and Bookmaker (match1) are
+// untouched. NOTE: the server (feedStakeLimit.mjs) still caps on feedMaxStake — see issues.md.
 // eslint-disable-next-line no-unused-vars -- `sid` kept in the TENEXCH signature
 export function applyMatchOddsLimits(market, sid) {
   if (market?.gtype !== 'match') return market;
   if (market?.umaxbof === undefined) return market;
-  return { ...market, max: feedMaxStake(market), maxb: 0 };
+  const inPlayMax = Number(market.maxb) > 0 ? market.maxb : market.max;
+  return { ...market, max: Number(market.iplay ? inPlayMax : market.umaxbof) || 0, maxb: 0 };
 }
 
 // Book/exposure display — en-IN comma grouping (99800 → "99,800",

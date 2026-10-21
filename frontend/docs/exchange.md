@@ -127,7 +127,10 @@ id from the access token's `sub` (`currentUserId()`), which is the id mssports k
   inline slip error. One-click goes through the same submit. Stake-button saves toast TENEXCH's
   `Update Button Value` / `Failed to update button values`; cancels toast `BET_CANCELLED` /
   `CANCEL_FAILED` (or the server's message).
-- Ball running (`section.br`) suspends a runner — an improvement over TENEXCH, which never read it.
+- Ball running is read from the row's status text only (`section.br` is true on every live fancy row), as TENEXCH does.
+- A horse racecard (dtype 12) ignores the market's SUSPENDED status and locks per runner; sid 10 shows only dtype 12 / 15 markets (TENEXCH RacingDetails).
+- Market headers print `Min` only when the market quotes one; khado and odd/even rows print their own `Min · Max` like fancy rows.
+- Parity with TENEXCH is tracked in `.claude/skills/exchange-tenexch-parity/` (checklist + issues.md).
 - Back/lay colours: `bg-back`, `bg-back-hover`, `bg-lay`, `bg-lay-hover`, `bg-back-muted`,
   `bg-lay-muted`, `text-exchange-ink` (both themes; templates inherit).
 
@@ -135,12 +138,12 @@ id from the access token's `sub` (`currentUserId()`), which is the id mssports k
 
 | Calculation | Addaplay | TENEXCH | Used |
 |---|---|---|---|
-| Global min stake | 50 (`betValidation.js:17`) | 100 (virtual 200) | **Addaplay** (`MIN_BET_AMOUNT = 50`); virtual 200 kept but unreachable |
-| Stake min/max | `runner.min \|\| market.min`, `runner.max \|\| market.max`, max 0 = no ceiling | `max(100, min_stake\|\|section.min\|\|market.min)`; `maxb>0 ? maxb : max`, else 100000 | **Addaplay** — on markets already shaped by TENEXCH `applyMatchOddsLimits` (maxb folded into `max`) |
+| Global min stake | 50 (`betValidation.js:17`) | 100 (virtual 200) | **TENEXCH** since 2026-10-21 (`MIN_BET_AMOUNT = 100`, `stakeLimits` in betFlow.js); virtual 200 kept but unreachable |
+| Stake min/max | `runner.min \|\| market.min`, `runner.max \|\| market.max`, max 0 = no ceiling | `max(100, min_stake\|\|section.min\|\|market.min)` (meter: its own min); `maxb>0 ? maxb : max`, else 100000 | **TENEXCH** (`stakeLimits`), on markets shaped by TENEXCH `applyMatchOddsLimits`: in-play `maxb\|\|max`, pre-match `umaxbof`. Pre-match MO at cap ≤1 → `Game Not Active2.`; toasts `Check Minimum Bet Limit.` / `Check Maximum Bet Limit1.` (racing at 1: `Check Maximum Bet Limit.`). ⚠ server `feedStakeLimit.mjs` still caps on `max` first |
 | Absurd stake (≥1e12 / ≥1e16) | — | `Bet Not Valid..` / `Server Error` | TENEXCH (no Addaplay equivalent) |
 | Virtual events | refused (`Betting not allowed on virtual events`) | allowed, floor 200 | **Addaplay** |
-| Slip profit | MO `s(o−1)`, BM `s·o/100`, TIED_MATCH `o/100·s`, else `s` | decimal `(o−1)s`, BM `o/100·s`, FANCY/TIED `s·o/100` | **Addaplay** (`slipProfitLoss`) |
-| Slip loss on LAY | `loss = profit` (e.g. lay 1000@2.5 → profit 1500, loss 1500) | profit = stake, loss = `(o−1)s` | **Addaplay** — ⚠ shows the liability as the profit too; TENEXCH `calcPL` stays exported |
+| Slip profit | MO `s(o−1)`, BM `s·o/100`, TIED_MATCH `o/100·s`, else `s` | decimal `(o−1)s`, BM `o/100·s`, FANCY/TIED `s·o/100` | **TENEXCH** `calcPL` (`slipFigures`, market type by gtype like `classifyMarket`; horse racecard prints 0). Session fancy still pays on the rate (c6aab7ae), not TENEXCH's fixed 0 |
+| Slip loss on LAY | `loss = profit` (e.g. lay 1000@2.5 → profit 1500, loss 1500) | profit = stake, loss = `(o−1)s` | **TENEXCH** since 2026-10-21 (lay 1000@2.5 → profit 1000, liability 1500) |
 | Feed "Tied Match" scale | `'tied match'` → MATCH_ODDS (decimal); only `'tied_match'` is percent | percent (`o/100`) | **Addaplay** — ⚠ mssports books "Tied Match" as percent, so a Tied slip preview (e.g. 0.75 → negative profit) will not match the booked exposure |
 | P/L row visibility | only mname `MATCH_ODDS` / `BOOKMAKER` | all markets (Normal/BBB/OBO/oddeven/horse show 0) | **Addaplay** (`slipProfitLoss().show`) |
 | Runner exposure preview | `calculateExposurePerSelection` (unrounded), hidden on FANCY | `calculateRunnerPL` (2 dp) | **Addaplay** (`slipExposureRows`); same maths otherwise |
@@ -151,7 +154,7 @@ id from the access token's `sub` (`currentUserId()`), which is the id mssports k
 | Rate cap | fixed 4.00, cricket MATCH_ODDS, cname contains "test" exempt | owner `max_odds` from betting-config, Test/Ashes/first-class… regex | **Addaplay** (`violatesRateCap`); TENEXCH `maxOddsBlockScope` kept, server enforces owner caps |
 | Anti-spam | one in-flight submit per `marketId\|runner` | 7 attempts / 60s per selection | **Addaplay** (`beginBetSubmit`/`endBetSubmit`); TENEXCH `registerBetAttempt` kept |
 | Buffer | client countdown, default 3s | server-side, owner grid | **TENEXCH** for this backend (server buffer); Addaplay `getBufferSeconds` exported for a countdown |
-| Odds display | integers bare, else 2 dp (`formatOddAddaplay`) | value as-is | **Addaplay** for cells |
+| Odds display | integers bare, else 2 dp (`formatOddAddaplay`) | value as-is | **TENEXCH** `formatOdd` for cells (3.6, not 3.60) |
 | Settled bet profit | `betProfit` (fancy per 100) | — | Addaplay |
 | `/place` payload | legacy body for another server (`game_type` MO/BM/FAN, no `selection_id`) | `prepareBetPayload` + `server_buffer` | **TENEXCH** — it is mssports' contract |
 | Cashout, exposure mapping, fancy/tied books, liability, toss, tick ladder, classifier | — | full | TENEXCH (no Addaplay equivalent) |

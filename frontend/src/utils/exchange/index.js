@@ -44,6 +44,7 @@ export {
   buildBetValue,
   isOddsEditable,
   prevalidateBet,
+  stakeLimits,
   newClientRef,
   buildPlaceRequest,
 } from './betFlow';

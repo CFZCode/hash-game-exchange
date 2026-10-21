@@ -75,7 +75,7 @@ describe('getBetValidationError', () => {
   });
 
   it('keeps the two bet floors apart', () => {
-    expect(MIN_BET_AMOUNT).toBe(50); // Addaplay betValidation.js:17 (TENEXCH had 100)
+    expect(MIN_BET_AMOUNT).toBe(100); // TENEXCH (Addaplay had 50) — user's call 2026-10-21
     expect(VIRTUAL_MIN_BET_AMOUNT).toBe(200);
   });
 });

@@ -31,7 +31,7 @@ import {
   DEFAULT_STAKE_BUTTONS,
   DEFAULT_ONE_CLICK_BUTTONS,
 } from '../../../services/exchange';
-import { BET_TOAST, ODDS_FIELD, ADDAPLAY_MIN_BET } from '../../../utils/exchange';
+import { BET_TOAST, ODDS_FIELD, stakeLimits } from '../../../utils/exchange';
 import MarketBlocks from './MarketBlocks';
 import { useMatchSlip, placementOdds, slipFigures, projectedBook, slipStakeInr } from './useMatchSlip';
 import { TAB_LABELS, marketTab, marketKind, ladder, rowStatus, marketTitle } from './shape';
@@ -183,8 +183,10 @@ export default function ExchangeMatchPage() {
     () => (mk.markets || [])
       .filter((m) => (m.section || []).length > 0)
       // Line markets are signed-in only (TENEXCH).
-      .filter((m) => signedIn || gtypeOf(m) !== 'fancy2'),
-    [mk.markets, signedIn],
+      .filter((m) => signedIn || gtypeOf(m) !== 'fancy2')
+      // A horse racecard shows only the race (dtype 12) and MATCH_BET (15) — TENEXCH RacingDetails.
+      .filter((m) => String(sid) !== '10' || [12, 15].includes(Number(m.dtype))),
+    [mk.markets, signedIn, sid],
   );
   const tabs = React.useMemo(() => {
     const present = new Set(visible.map(marketTab));
@@ -297,9 +299,8 @@ export default function ExchangeMatchPage() {
     const side = oddEven ? 'back' : bv.betType;
     const pick = oddEven ? (bv.betType === 'yes' ? 'Odd' : 'Even') : null;
     const lineLike = kind === 'fancy' || kind === 'line' || gtypeOf(bv) === 'khado';
-    const maxInr = Number(bv.max) > 0 ? Number(bv.max) : null;
-    const minInr = bv.is_cashout ? 0 : Math.max(ADDAPLAY_MIN_BET, Number(bv.min) || 0);
-    const { min, max } = cur.limits(minInr, maxInr);
+    const lim = stakeLimits(bv);
+    const { min, max } = cur.limits(lim.min, lim.max);
     slipNode = (
       <BetSlipInline
         side={side}

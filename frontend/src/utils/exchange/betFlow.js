@@ -19,8 +19,6 @@
 import {
   addaplayMarketTitle,
   isVirtualEvent,
-  validateMinBetAmount,
-  validateStakeRange,
   validateUnmatchedOdds,
   readLiveSide,
   violatesRateCap,
@@ -29,7 +27,7 @@ import {
 } from './addaplay';
 import { prepareBetPayload } from './betHelpers';
 import { isBallRunning, feedMaxStake } from './oddsHelpers';
-import { isBookmakerStyle, isOddsLockedByType, isLaySide, namesOwnLine } from './placeBetRules';
+import { isBookmakerStyle, isOddsLockedByType, isLaySide, namesOwnLine, MIN_BET_AMOUNT } from './placeBetRules';
 import { isBookieFavourMarket } from './bookieFavour';
 import { BET_TOAST } from './betToastMessages';
 
@@ -107,14 +105,31 @@ export function isOddsEditable(bv) {
 }
 
 /**
+ * The stake range a slip enforces — TENEXCH usePlaceBetPanel.js:258-281. Min: the ₹100 floor or
+ * the feed's own min when higher (meter: its feed min as-is, the floor only when it quotes none;
+ * a cashout hedge: none). Max: the shaped cap (`bv.max`, applyMatchOddsLimits already folded maxb
+ * in), and 0 there means TENEXCH's 100000 default rather than "no ceiling".
+ */
+export function stakeLimits(bv) {
+  const feedMin = Number(bv?.min) || 0;
+  const meter = String(bv?.gtype || '').toLowerCase() === 'meter';
+  const min = bv?.is_cashout ? 0 : meter ? (feedMin > 0 ? feedMin : MIN_BET_AMOUNT) : Math.max(MIN_BET_AMOUNT, feedMin);
+  const rawMax = Number(bv?.max) || 0;
+  return { min, max: rawMax > 0 ? rawMax : 100000 };
+}
+
+const isRacingSid = (sid) => String(sid) === '10' || String(sid) === '65';
+
+/**
  * Pre-submit checks, Addaplay's order (BetSlip.jsx:478-510) with the TENEXCH checks Addaplay
  * lacks appended. Returns null when the bet may go, else `{ code, message }`.
  *
  *   1 signed in                      Addaplay   'Please log in to place bets'
  *   2 virtual event                  Addaplay   'Betting not allowed on virtual events'
- *   3 stake ≥ 50                     Addaplay   'Minimum bet amount is ₹50'
- *   4 stake within runner/market min/max   Addaplay
- *   5 absurd stake (≥1e16 / ≥1e12)   TENEXCH (no Addaplay equivalent)
+ *   3 pre-match MO cap 0/1 (not racing)   TENEXCH   'Game Not Active2.'
+ *   4 absurd stake (≥1e16 / ≥1e12)   TENEXCH
+ *   5 stake within stakeLimits       TENEXCH    'Check Minimum Bet Limit.' / 'Check Maximum Bet Limit1.'
+ *                                               (racing at a cap of 1: 'Check Maximum Bet Limit.')
  *   6 manual odds edit               Addaplay   'Unmatched bet not allowed'
  *   7 odds sanity (decimal >1.01 ≤1000, BM >0 ≤100000)   TENEXCH (no Addaplay equivalent)
  *   8 runner still active            Addaplay (+ ball running, this layer's improvement)
@@ -126,14 +141,21 @@ export function prevalidateBet({ bv, stake, odds, originalOdds, isUserModifiedOd
   if (!signedIn) return fail('NOT_SIGNED_IN', 'Please log in to place bets');
   if (isVirtualEvent(match)) return fail('VIRTUAL', 'Betting not allowed on virtual events');
 
-  const minErr = validateMinBetAmount(stake);
-  if (minErr) return fail('BELOW_MIN', minErr);
-  const rangeErr = validateStakeRange(stake, bv?.min, bv?.max);
-  if (rangeErr) return fail('OUT_OF_RANGE', rangeErr);
+  const racing = isRacingSid(bv?.sid);
+  const mkt = bv?.market;
+  // TENEXCH usePlaceBetPanel.js:580-608: the feed's pre-match cap (umaxbof 0/1, folded into max)
+  // means MATCH_ODDS is not open yet — the reference answers this, not a limit message.
+  if (!racing && String(bv?.gtype || '').toLowerCase() === 'match' && String(bv?.mname || '').toUpperCase() === 'MATCH_ODDS'
+    && (Number(mkt?.maxb) === 1 || (mkt?.umaxbof !== undefined && (Number(mkt?.max) || 0) <= 1))) {
+    return fail('GAME_NOT_ACTIVE_2', BET_TOAST.GAME_NOT_ACTIVE_2);
+  }
 
   const stakeNum = Number(stake) || 0;
   if (stakeNum >= 1e16) return fail('ABSURD_SERVER', BET_TOAST.SERVER_ERROR);
   if (stakeNum >= 1e12) return fail('ABSURD_INVALID', BET_TOAST.BET_NOT_VALID);
+  const { min, max } = stakeLimits(bv);
+  if (stakeNum < min) return fail('BELOW_MIN', BET_TOAST.MIN_BET_LIMIT);
+  if (stakeNum > max) return fail('ABOVE_MAX', racing && max <= 1 ? BET_TOAST.MAX_BET_LIMIT_RACING : BET_TOAST.MAX_BET_LIMIT);
 
   const side = bv?.betType === 'yes' ? 'back' : bv?.betType === 'no' ? 'lay' : bv?.betType;
   const unmatchedErr = validateUnmatchedOdds(odds, originalOdds, side, isUserModifiedOdds);

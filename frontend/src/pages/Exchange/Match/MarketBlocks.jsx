@@ -7,7 +7,8 @@ import {
   RunnerRow,
   CashoutButton,
 } from '../../../components/exchange';
-import { formatOddAddaplay, formatSize, marketHasCashoutPosition } from '../../../utils/exchange';
+import { limitsText } from '../../../components/exchange/utils';
+import { formatOdd, formatSize, marketHasCashoutPosition } from '../../../utils/exchange';
 import {
   ladder,
   bestPrice,
@@ -50,9 +51,10 @@ const raceSilk = (market, s) =>
       }}
     />
   ) : undefined;
-const price = (v) => formatOddAddaplay(v);
+// TENEXCH formatOdd: the feed value as-is (3.6, not 3.60).
+const price = (v) => formatOdd(v);
 
-function RunnerMarket({ market, book, projected, slip, slipNode, disabled, signedIn, onCell, onCashout, formatAmount }) {
+function RunnerMarket({ market, book, projected, slip, slipNode, disabled, signedIn, onCell, onCashout, formatAmount, formatLimit }) {
   const mine = slip && String(slip.mid) === String(market.mid);
   const g = gt(market);
   const sections = market.section || [];
@@ -64,7 +66,8 @@ function RunnerMarket({ market, book, projected, slip, slipNode, disabled, signe
     runners: sections.map((s) => ({
       id: s.sid,
       name: s.nat,
-      subline: raceInfo(s),
+      // fancy1 rows carry their own stake range (TENEXCH "Min:100 Max:25K" under each row).
+      subline: g === 'fancy1' && (s.min || s.max) ? <p className="mt-0.5 text-[0.6875rem] leading-4 text-tertiary">{limitsText(s.min, s.max, formatLimit)}</p> : raceInfo(s),
       leading: raceSilk(market, s),
       back: ladder(s, 'back'),
       lay: ladder(s, 'lay'),
@@ -153,7 +156,7 @@ function FancyMarket({ market, book, slip, slipNode, disabled, onCell, onBadlo, 
   );
 }
 
-function OddEvenMarket({ market, book, slip, slipNode, disabled, onCell, formatAmount }) {
+function OddEvenMarket({ market, book, slip, slipNode, disabled, onCell, formatAmount, formatLimit }) {
   const mine = slip && String(slip.mid) === String(market.mid);
   const sections = market.section || [];
   const rows = sections.map((s) => ({
@@ -161,6 +164,8 @@ function OddEvenMarket({ market, book, slip, slipNode, disabled, onCell, formatA
     name: s.nat,
     odd: ladder(s, 'back')[0] || { price: null, size: null },
     even: ladder(s, 'lay')[0] || { price: null, size: null },
+    min: s.min,
+    max: s.max,
     status: rowStatus(market, s),
     pnl: bookFor(book, market.mid, s.nat),
   }));
@@ -171,6 +176,7 @@ function OddEvenMarket({ market, book, slip, slipNode, disabled, onCell, formatA
       formatPrice={price}
       formatSize={formatSize}
       formatAmount={formatAmount}
+      formatLimit={formatLimit}
       selected={mine ? slip.kitSel : null}
       activeRowId={mine ? slip.rowId : null}
       betSlip={mine ? slipNode : null}
@@ -246,18 +252,28 @@ function LineMarkets({ markets, book, slip, slipNode, disabled, onCell, formatAm
 
 /* Khado (one Yes price, the band width in the name) and cricket-casino Number grids (one Back
    price per row) — no kit block of their own, so the kit's MarketCard + RunnerRow `cells`. */
-function SingleMarket({ market, book, slip, slipNode, disabled, onCell, formatAmount }) {
+function SingleMarket({ market, book, slip, slipNode, disabled, onCell, formatAmount, formatLimit }) {
   const mine = slip && String(slip.mid) === String(market.mid);
   const sections = market.section || [];
   const khado = gt(market) === 'khado';
   return (
-    <MarketCard name={marketTitle(market)} columns={[khado ? 'Yes' : 'Back']} columnTones={['back']} formatAmount={formatAmount}>
+    <MarketCard
+      name={marketTitle(market)}
+      columns={[khado ? 'Yes' : 'Back']}
+      columnTones={['back']}
+      trailingHeader={khado ? 'Min / Max' : undefined}
+      formatAmount={formatAmount}
+    >
       {sections.map((s) => {
         const row = singleRow(market, s);
+        // Khado rows print their stake range like a fancy row (TENEXCH "Min:100 Max:1L").
+        const lim = khado && (s.min != null || s.max != null) ? limitsText(s.min, s.max, formatLimit) : null;
         return (
           <RunnerRow
             key={s.sid}
             name={row.name}
+            subline={lim ? <p className="mt-0.5 text-[0.6875rem] leading-4 text-tertiary lg:hidden">{lim}</p> : undefined}
+            trailing={lim ? <span className="text-xs leading-4 text-secondary">{lim}</span> : undefined}
             cells={[row.cell]}
             status={rowStatus(market, s)}
             disabled={disabled}
@@ -319,12 +335,12 @@ export default function MarketBlocks({ markets, book, slip, slipNode, projected,
     }
     if (kind === 'runner') {
       out.push(
-        <RunnerMarket key={m.mid} market={m} projected={projected} signedIn={signedIn} onCashout={onCashout} {...common} />,
+        <RunnerMarket key={m.mid} market={m} projected={projected} signedIn={signedIn} onCashout={onCashout} formatLimit={formatLimit} {...common} />,
       );
     } else if (kind === 'oddeven') {
-      out.push(<OddEvenMarket key={m.mid} market={m} {...common} />);
+      out.push(<OddEvenMarket key={m.mid} market={m} formatLimit={formatLimit} {...common} />);
     } else if (kind === 'single') {
-      out.push(<SingleMarket key={m.mid} market={m} {...common} />);
+      out.push(<SingleMarket key={m.mid} market={m} formatLimit={formatLimit} {...common} />);
     } else {
       out.push(<FancyMarket key={m.mid} market={m} onBadlo={onBadlo} formatLimit={formatLimit} {...common} />);
     }

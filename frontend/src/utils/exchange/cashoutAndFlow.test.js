@@ -3,7 +3,7 @@
 // payload contract (§3.1) and Addaplay's validation order (BetSlip.jsx:478-510).
 import { describe, it, expect } from 'vitest';
 import { buildMarketCashout, computeCashoutClick, marketHasCashoutPosition } from './cashoutUtil';
-import { buildBetValue, prevalidateBet, buildPlaceRequest } from './betFlow';
+import { buildBetValue, prevalidateBet, buildPlaceRequest, stakeLimits } from './betFlow';
 import { isSectionSuspended } from './oddsHelpers';
 import { mapMatchExposures } from './exposureMapping';
 
@@ -99,18 +99,36 @@ describe('bet flow', () => {
   const match = { gmid: 640154297, ename: 'Afghanistan v Bangladesh', cname: 'ODI Series', stime: '10/9/2026 10:30:00 AM' };
   const bv = buildBetValue({ market, section: market.section[0], betType: 'back', odds: 1.98, match, sid: 4 });
 
-  it('prevalidateBet follows Addaplay order', () => {
+  it('prevalidateBet: Addaplay sign-in/virtual gates, then TENEXCH stake limits', () => {
     const base = { bv, stake: 100, odds: 1.98, originalOdds: 1.98, match, markets: [market], signedIn: true };
     expect(prevalidateBet({ ...base, signedIn: false }).code).toBe('NOT_SIGNED_IN');
     expect(prevalidateBet({ ...base, match: { ...match, cname: 'T5 XI' } }).code).toBe('VIRTUAL');
-    expect(prevalidateBet({ ...base, stake: 40 }).code).toBe('BELOW_MIN');
-    expect(prevalidateBet({ ...base, stake: 2500 }).code).toBe('OUT_OF_RANGE');
+    // TENEXCH floor is 100 (doc bug #6: a min of 0 shown, 50 enforced)
+    expect(prevalidateBet({ ...base, stake: 99 })).toEqual({ code: 'BELOW_MIN', message: 'Check Minimum Bet Limit.' });
+    expect(prevalidateBet({ ...base, stake: 2500 })).toEqual({ code: 'ABOVE_MAX', message: 'Check Maximum Bet Limit1.' });
     expect(prevalidateBet({ ...base, odds: 2.1, isUserModifiedOdds: true }).code).toBe('UNMATCHED');
     expect(prevalidateBet(base)).toBeNull();
     const ballRunning = { ...market, section: [{ ...market.section[0], gstatus: 'BALL RUNNING' }, market.section[1]] };
     expect(prevalidateBet({ ...base, markets: [ballRunning] }).code).toBe('BALL_RUNNING');
     const hi = { ...bv, odds: 4.5 };
     expect(prevalidateBet({ ...base, bv: hi, odds: 4.5, originalOdds: 4.5 }).code).toBe('RATE_CAP');
+  });
+
+  it('pre-match Match Odds at the feed cap of 1 answers "Game Not Active2." (doc bug #4), racing a limit toast', () => {
+    const pre = { ...market, max: 1, maxb: 0, umaxbof: 1, iplay: false };
+    const preBv = buildBetValue({ market: pre, section: pre.section[0], betType: 'back', odds: 1.98, match, sid: 4 });
+    const base = { bv: preBv, stake: 500, odds: 1.98, originalOdds: 1.98, match, markets: [pre], signedIn: true };
+    expect(prevalidateBet(base)).toEqual({ code: 'GAME_NOT_ACTIVE_2', message: 'Game Not Active2.' });
+    const raceBv = buildBetValue({ market: pre, section: pre.section[0], betType: 'back', odds: 1.98, match, sid: 10 });
+    expect(prevalidateBet({ ...base, bv: raceBv }).message).toBe('Check Maximum Bet Limit.');
+  });
+
+  it('stakeLimits: ₹100 floor or a higher feed min, meter keeps its own min, 0 max means 100000', () => {
+    expect(stakeLimits({ min: 0, max: 2000, gtype: 'match' })).toEqual({ min: 100, max: 2000 });
+    expect(stakeLimits({ min: 500, max: 0, gtype: 'fancy' })).toEqual({ min: 500, max: 100000 });
+    expect(stakeLimits({ min: 10, max: 2000, gtype: 'meter' })).toEqual({ min: 10, max: 2000 });
+    expect(stakeLimits({ min: 10, max: 100000, gtype: 'oddeven' })).toEqual({ min: 100, max: 100000 });
+    expect(stakeLimits({ min: 100, max: 5000, is_cashout: true }).min).toBe(0);
   });
 
   it('buildPlaceRequest carries the mssports contract + server_buffer', () => {

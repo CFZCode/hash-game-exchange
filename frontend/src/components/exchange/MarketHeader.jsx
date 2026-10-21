@@ -25,7 +25,9 @@ export default function MarketHeader({
   onToggle,
 }) {
   const fmt = (n) => formatAmount(n);
-  const hasLimits = min != null || max != null;
+  // TENEXCH prints a Min only when the market quotes one ("Max: 50K" on Match Odds, "Min:100 Max:1L" on Bookmaker).
+  const showMin = Number(min) > 0;
+  const hasLimits = showMin || max != null;
 
   return (
     <div className="flex min-h-12 items-center gap-2 px-3 sm:px-4">
@@ -42,9 +44,17 @@ export default function MarketHeader({
         </span>
         {hasLimits && (
           <span className="mt-0.5 text-xs text-tertiary">
-            Min: <span className="text-secondary">{fmt(min ?? 0)}</span>
-            <span className="mx-1.5">·</span>
-            Max: <span className="text-secondary">{fmt(max ?? 0)}</span>
+            {showMin && (
+              <>
+                Min: <span className="text-secondary">{fmt(min)}</span>
+                {max != null && <span className="mx-1.5">·</span>}
+              </>
+            )}
+            {max != null && (
+              <>
+                Max: <span className="text-secondary">{fmt(max)}</span>
+              </>
+            )}
           </span>
         )}
       </button>

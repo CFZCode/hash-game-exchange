@@ -37,7 +37,9 @@ export const hasDepth = (market) => (market?.section || []).some((s) => (s.odds 
  * status (isSectionSuspended, which also reads `br`).
  */
 export function rowStatus(market, section) {
-  if (isMarketSuspended(market)) return String(market.gstatus || market.status || 'SUSPENDED').toUpperCase();
+  // A racecard (dtype 12) ignores the market's own SUSPENDED: the feed reports it for a race that
+  // is still trading, and TENEXCH RacingDetails locks only per runner (gstatus) and per 0 price.
+  if (Number(market?.dtype) !== 12 && isMarketSuspended(market)) return String(market.gstatus || market.status || 'SUSPENDED').toUpperCase();
   if (isBallRunning(section)) return 'BALL RUNNING';
   if (isSectionSuspended(section)) {
     const s = String(section?.gstatus || section?.status || '').toUpperCase();

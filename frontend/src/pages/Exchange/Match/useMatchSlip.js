@@ -7,7 +7,7 @@ import {
   endBetSubmit,
   betMarketKey,
   buildPlaceRequest,
-  slipProfitLoss,
+  classifyMarket,
   slipExposureRows,
   calcPL,
   showsZeroProfit,
@@ -18,7 +18,7 @@ import {
   stepKhadoLine,
   computeCashoutClick,
   BET_TOAST,
-  ADDAPLAY_MIN_BET,
+  stakeLimits,
   makeStakeCurrency,
 } from '../../../utils/exchange';
 import {
@@ -87,16 +87,16 @@ function isEditedSlip(slip) {
   return Math.abs(Number(slip.display) - Number(slip.bv.odds)) > 0.001;
 }
 
-/** Profit / liability the slip prints. Addaplay's pair where it shows one (MATCH_ODDS /
- *  BOOKMAKER), TENEXCH's displayProfit everywhere else (line pays evens, session rows print 0). */
+/** Profit / liability the slip prints — TENEXCH calcPL + displayProfit everywhere: a LAY wins the
+ *  stake and risks stake × (odds − 1) (Addaplay printed the liability as the profit too), line
+ *  pays evens, session rows / oddeven / a horse racecard print 0. Market type as TENEXCH
+ *  classifyMarket reads it (gtype first), so every match1 market prices as a percent. */
 export function slipFigures(slip, stake, odds) {
   if (!slip) return { profit: 0, liability: 0 };
   const { bv } = slip;
-  const pl = slipProfitLoss({ odds, stake, betType: bv.betType, mname: bv.mname });
-  if (pl.show) return { profit: pl.profit, liability: pl.loss };
   const g = lc(bv.gtype);
   const fancyFamily = ['fancy', 'fancy1', 'fancy2', 'khado', 'meter', 'normal', 'oddeven'].includes(g);
-  const mt = fancyFamily ? 'FANCY' : g === 'cricketcasino' ? 'CRICKET_CASINO' : bv.marketType;
+  const mt = fancyFamily ? 'FANCY' : g === 'cricketcasino' ? 'CRICKET_CASINO' : classifyMarket(bv);
   const stakeNum = Number(stake) || 0;
   // Session fancy (YES 55 @ 100): `odds` is the run line; it pays on the rate, bv.size.
   // YES wins stake x size/100 and risks the stake, NO the other way round (server placeBet).
@@ -106,7 +106,8 @@ export function slipFigures(slip, stake, odds) {
     return { profit: yes ? atRate : stakeNum, liability: yes ? stakeNum : atRate };
   }
   const { profit, loss } = calcPL(stake, odds, bv.betType, mt);
-  const shown = slip.kind === 'line' ? stakeNum : showsZeroProfit(bv.mname, mt, bv.gtype) ? 0 : profit;
+  const horse = String(bv.sid) === '10';
+  const shown = slip.kind === 'line' ? stakeNum : showsZeroProfit(bv.mname, mt, bv.gtype, { isHorseRacing: horse }) ? 0 : profit;
   return { profit: shown, liability: loss };
 }
 
@@ -145,10 +146,8 @@ const INR = makeStakeCurrency({ currencyName: 'INR', usdPrice: 1, inrUsdPrice: 1
 /** The INR limits the slip enforces (a cashout has no minimum — see the header). */
 export function slipLimitsInr(bv) {
   if (!bv) return {};
-  return {
-    minInr: bv.is_cashout ? undefined : Math.max(ADDAPLAY_MIN_BET, Number(bv.min) || 0),
-    maxInr: Number(bv.max) > 0 ? Number(bv.max) : undefined,
-  };
+  const { min, max } = stakeLimits(bv);
+  return { minInr: bv.is_cashout ? undefined : min, maxInr: max };
 }
 
 /**

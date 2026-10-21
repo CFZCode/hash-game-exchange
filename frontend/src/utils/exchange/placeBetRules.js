@@ -1,5 +1,5 @@
-/* Ported from TENEXCH components/betting/placeBet/placeBetRules.js. One change: MIN_BET_AMOUNT is
- * Addaplay's 50. Rate cap: the slip uses Addaplay's fixed 4.00 (addaplay.violatesRateCap);
+/* Ported from TENEXCH components/betting/placeBet/placeBetRules.js. MIN_BET_AMOUNT is TENEXCH's 100
+ * (was Addaplay's 50). Rate cap: the slip uses Addaplay's fixed 4.00 (addaplay.violatesRateCap);
  * maxOddsBlockScope (owner max-odds from betting-config) is TENEXCH and also enforced by the server. */
 
 // ─── Pure betting rules for PlaceBetPanel ────────────────────────────────────
@@ -369,9 +369,8 @@ export function suspensionToastMessage(gs) {
 // Global minimum bet floor — no manual bet may be placed below this amount,
 // regardless of the market's own (often 0) min. Cashout hedges are exempt
 // (their stake is computed, not chosen). Applied in usePlaceBetPanel.
-// ADDAPLAY WINS: its global floor is 50 (Addaplay src/utils/betValidation.js:15-19,
-// "Minimum bet amount is ₹50"); TENEXCH's was 100. See docs/exchange.md, differences table.
-export const MIN_BET_AMOUNT = 50;
+// TENEXCH's floor, ₹100 (the user chose TENEXCH over Addaplay's 50 on 2026-10-21; docs/exchange.md).
+export const MIN_BET_AMOUNT = 100;
 
 // Virtual cricket (Dim "(e)" / T5 XI / T10 XI / Virtual Cricket League) carries
 // its own, higher floor — the reference refuses anything below 200 with the

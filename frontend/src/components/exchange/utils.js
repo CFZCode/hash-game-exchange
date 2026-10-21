@@ -120,3 +120,6 @@ export function compactAmount(value) {
   if (a >= 1e3) return unit(n / 1e3, 'K');
   return String(n);
 }
+
+/** A row's stake range as TENEXCH prints it beside a fancy / khado / odd-even row: "Min: 100 · Max: 2L". */
+export const limitsText = (min, max, fmt = compactAmount) => `Min: ${fmt(min || 0)} · Max: ${fmt(max || 0)}`;
