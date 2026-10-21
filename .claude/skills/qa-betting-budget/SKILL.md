@@ -58,3 +58,10 @@ Callbacks you sign and send to our own backend (a test harness that simulates a 
   - **Deposits / withdrawals:** manual, approved in the site admin.
   - Scope: this run and these players only.
 - **2026-10-21 — sports exchange bet-verify run (players parkertest02, parkertest03).** The owner asked for real bets on every live market type to check book / exposure / liability / settlement against TENEXCH (skill `exchange-bet-verify`). Limits: every bet at the slip minimum (₹100), no max-amount bets; total stake ≤ ₹1,500 per player; each player's open exposure (lay liability included) ≤ ₹1,200 at any time; prefer low-odds lays; INR only; no deposits, withdrawals, admin config or other live writes. Scope: this run and these players only.
+
+- **2026-10-21 (run h2, players parkertest11–15)**, set by the owner in chat:
+  - **Slotegrator casino:** at most 20 USDT staked across the whole run, 1 USDT per bet.
+  - **Original games:** at most 50 USDT staked across the whole run (INR stakes count at the day's rate).
+  - **Sports exchange:** INR stakes without a cap, including big single bets.
+  - Every bet is placed from the main session, which the owner approves one action at a time; a sub-agent's bet is refused by the safety classifier.
+  - Log every stake in `logs/qa/live-e2e-h2/`.
