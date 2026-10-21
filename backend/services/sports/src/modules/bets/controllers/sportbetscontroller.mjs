@@ -702,8 +702,10 @@ var placeBet = async (req, res, opts) => {
         }
       }
     }
-    // Racing (horse 10, greyhound 65): bets only in the last RACE_BET_WINDOW_MINUTES before the off.
-    if (String(sid) === "10" || String(sid) === "65") {
+    // Horse racing (sid 10) only: bets only in the last RACE_BET_WINDOW_MINUTES before the off.
+    // Greyhound (65) is open until the off, as TENEXCH's server (sportbetscontroller.js STEP 4.55) and
+    // the live reference (a sid 65 bet 2h11m before the off was accepted — BC games sports issues #9).
+    if (String(sid) === "10") {
       let raceStartMs = null;
       try {
         raceStartMs = await resolveRaceStartMs(eventid, sid);

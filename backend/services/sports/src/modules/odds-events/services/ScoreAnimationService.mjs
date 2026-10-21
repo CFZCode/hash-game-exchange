@@ -4,13 +4,17 @@ import dotenv4 from "dotenv";
 import axios2 from "axios";
 dotenv4.config();
 var HOST_URL = process.env.SCORECARD_HOST_URL || "https://scorecard.daimond-api.site/";
+// The host whitelists by Referer: without one (a bare server request) it answers "Domain Not
+// Whitelisted" and no provider url — which is why every score-url answered 502 and the page fell
+// back to the host's 404 image (BC games sports issues #12). parker567.com is whitelisted.
+var HOST_HEADERS = { Referer: process.env.SCORECARD_REFERER || "https://parker567.com/" };
 var MAX_ATTEMPTS = 5;
 var TIMEOUT_MS = 8e3;
 var PROVIDER_RE = /https?:\/\/[a-z0-9.-]*animationprovider\.com\/[^"'\s]+/i;
 var isNotFoundPage = (html) => !html || html.length < 4e3 || /<title>\s*Page Not Found/i.test(html);
 async function fetchOnce(etid, gmid) {
   const hostUrl = `${HOST_URL.replace(/\/+$/, "")}/?etid=${encodeURIComponent(etid)}&gmid=${encodeURIComponent(gmid)}`;
-  const host = await axios2.get(hostUrl, { timeout: TIMEOUT_MS, responseType: "text" });
+  const host = await axios2.get(hostUrl, { timeout: TIMEOUT_MS, responseType: "text", headers: HOST_HEADERS });
   const match = PROVIDER_RE.exec(String(host.data || ""));
   if (!match) return { ok: false, reason: "no provider url in host page" };
   const providerUrl = match[0];
@@ -32,7 +36,7 @@ function withBase(html, providerUrl) {
 }
 async function getScoreUrl(etid, gmid) {
   const hostUrl = `${HOST_URL.replace(/\/+$/, "")}/?etid=${encodeURIComponent(etid)}&gmid=${encodeURIComponent(gmid)}`;
-  const host = await axios2.get(hostUrl, { timeout: TIMEOUT_MS, responseType: "text" });
+  const host = await axios2.get(hostUrl, { timeout: TIMEOUT_MS, responseType: "text", headers: HOST_HEADERS });
   const match = PROVIDER_RE.exec(String(host.data || ""));
   return match ? match[0] : null;
 }
