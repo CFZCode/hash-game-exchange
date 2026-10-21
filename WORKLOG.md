@@ -15,6 +15,14 @@ Format:
 
 ---
 
+## 2026-10-21 — Saare players ki balance sheet ka live audit
+**Kya kiya:** Live admin API (`/reports/balance-sheet`, agent ke liye `/reports/client-balance-sheet`) se har player ki sheet nikaali: 64 users, 110 sheets (59 direct users ki har currency jisme paisa / ledger hai = 105, 5 agent users). HTTP error 0, 108 sheets ka `unexplained` 0. Sports P/L ka cross-check settlement record se (`mssports.credits_ledger` profit + loss, settlement + settlement_void): 57 / 59 direct users exact; agent user userx11 ki dono bets (+15, +100) `point_ledger` se sahi.
+**Kyun:** User: test karo, sabki balance sheet sahi chal rahi hai ya nahi; aur jo bhi hai pull leke deploy.
+**Files / jagah:** sirf WORKLOG (code nahi badla).
+**Notes / pending:** Pull me kuch naya nahi tha; har pm2 proc apne aakhri commit ke baad restart / build hua tha, migrations 147 applied / 0 pending — deploy me kuch nahi karna pada. Bache 2: parkertester01 (−2040) aur parkertester02 (−200), dono QA users — 17 Oct 21:53 (migration 117) se pehle settle hui bets ka P/L, jinki point ledger row nahi hai. Admin UI me dialog khol ke nahi dekha (API ka shape same hai).
+
+---
+
 ## 2026-10-21 — Balance sheet: sports sirf bet ka P/L, point ledger se
 **Kya kiya:** Admin → player → Balance sheet (INR) me sports ab simple: pehle user ki saari bets (`mssports."SportsBet"` ki ids), fir un bet ids ki `category = 'SPORTS'` rows point ledger se — direct user ho to `mssports.point_ledger_direct`, agent user ho to `mssports.point_ledger` (player ka apna wallet). Har row = us bet ka P/L (`delta`), description = ledger ka remark, delta 0 (void) wali row nahi. Bet placed / exposure released / settlement wali cash rows hata di (`debit_ledger`, `mssports.credits_ledger`, `post − running` sab gaya). Khuli bet ka paisa `openExposure` me (ab `mssports.total_exposures` se, pehle open stake ka jod tha) aur `unexplained` = live + openExposure − ledger.
 **Kyun:** User: sports bet sirf point ledger se dikhao, usme delta = profit / loss hai, jaise user side dikhta hai; direct user → point_ledger_direct, agent user → point_ledger; pehle bets nikalo fir unse point ledger; sirf zaroori columns.
