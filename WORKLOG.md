@@ -15,6 +15,14 @@ Format:
 
 ---
 
+## 2026-10-22 — Race sirf direct users ke liye, claim ki entry BONUS
+**Kya kiya:** Race (daily + weekly, ek hi code) se agent system hataya: board pe ab sirf direct users (`users.parent_staff_id IS NULL`) aate hain — `race.service.js` `#standings` ka naam wala lookup direct-only, agent-tree player ka wager ho tab bhi board pe nahi (pehle board pe dikhta tha, sirf prize nahi milta tha). Admin → Races ke Live board aur Rewards se Direct Users | Agent Users tab hataye; backend se `adminLeaderboard` channel filter aur rewards ka `channel` param hataya. Claim pe `point_ledger_direct` entry pehle se banti thi (wallet trigger; live: `bal:3021` "Weekly race — rank 18"), ab uski category `OTHER` ki jagah `BONUS` (`packages/common/src/directLedger.js` `categoryFor`).
+**Kyun:** User: daily race me agent system hatao, claim pe point ledger entry bane, ye sirf direct user ke liye hai.
+**Files / jagah:** `backend/services/user/src/modules/race/{race.service.js, race.validators.js, controllers/index.js, routes/admin.routes.js, __tests__/race.test.js}`; `backend/packages/common/src/directLedger.js` (+ test); `admin/src/views/promotions/Races.tsx`.
+**Notes / pending:** Live: admin build, parker-user-svc + parker-user-worker + parker-admin restart. Tests: race 40 / 40 (naya: agent player board pe nahi), directLedger 2 / 2; wallet 74 / 81 — 7 purane fail (tips / rain), same baseline. Live API: public board + admin board + rewards ok, board pe sirf direct user. Admin ka purana khula tab Rewards pe `channel` bhejega → 422, ek refresh. Purani claim row (1) ki category `OTHER` hi rahi. Admin menu me Races pehle se `direct: true` (agent staff ko dikhta hi nahi). Pichle 2 din me kisi agent user ka wager nahi tha, isliye live pe agent ka hatna sirf test se dikha.
+
+---
+
 ## 2026-10-22 — Check: GIS (Slotegrator) callback ka race condition
 **Kya kiya:** User ka reference code (harman wala atomic `UPDATE credits SET col = col + $1 WHERE uid AND col >= amount`) hamare `backend/services/casino/src/modules/gis/gis.service.js` se milaya. Hamare me: `gis_transactions` row paise se PEHLE usi DB transaction me (unique `transaction_id` → retry ek hi baar), paisa user-service wallet se (`FOR UPDATE` lock, debit SQL me `>= amount`, credit `col + amount`, idempotency key `credits_ledger_idempotency_key_uq` unique), refund `rf:<bet id>` aur rollback `rb:<id>` derived key, rollback hamara stored amount. Live par dono unique index maujood. GIS tests 32 / 32 pass (concurrent bets, ek saath 3 win, fresh id wala refund / rollback). Live: 440 gis_transactions (20–21 Oct) — wallet move missing 0, double 0, amount mismatch 0.
 **Kyun:** User: reference me race condition solve kiya tha, apne GIS callback me bhi waise handle hai na.

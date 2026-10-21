@@ -10,7 +10,6 @@ const { WalletService } = require('../wallet/wallet.service');
 const errors = require('./race.errors');
 const { buildRankPrizes, buildCustomLadder } = require('./race.prizes');
 const { windowFor } = require('./race.window');
-const { withChannel, CHANNEL_SQL } = require('../directory/playerScope');
 const {
   RACE_TYPES,
   RACE_STATUS,
@@ -566,7 +565,7 @@ class RaceService {
      * the real players in order, and rank N's prize goes to the Nth real
      * player.
      */
-    // Races sirf direct users ke: child user (koi parent) board pe dikh sakta hai par prize nahi — agla direct player le.
+    // Races sirf direct users ke (board pe child user aata hi nahi); B2B site par koi prize nahi.
     const payable = [];
     for (const e of entries) {
       if (payable.length >= config.winnerCount) break;
@@ -838,28 +837,9 @@ class RaceService {
     };
   }
 
-  /**
-   * Admin board: wahi standings, Direct Users | Agent Users tab ke hisaab se chhaanti. Rank wahi
-   * rehta hai jo poore board me hai (prize rank se milta hai). Boats (dikhawati entries) sirf
-   * Direct tab me — wo site ke public board pe hoti hain.
-   */
-  async adminLeaderboard({ type, channel }) {
-    const board = await this.leaderboard({ type });
-    if (!CHANNEL_SQL[channel]) return board;
-
-    const ids = board.leaderboard.filter((r) => !r.isBoat).map((r) => r.userId);
-    const keep = ids.length
-      ? new Set((await this.models.Users.findAll({ where: withChannel({ id: ids }, 'id', channel), attributes: ['id'], raw: true })).map((u) => String(u.id)))
-      : new Set();
-    return {
-      ...board,
-      leaderboard: board.leaderboard.filter((r) => (r.isBoat ? channel === 'direct' : keep.has(String(r.userId)))),
-    };
-  }
-
   /** Every prize, for the operator's console. */
-  async listRewards({ type, userId, raceId, claimed, channel, limit = 50, offset = 0 }) {
-    const where = withChannel({}, 'user_id', channel);
+  async listRewards({ type, userId, raceId, claimed, limit = 50, offset = 0 }) {
+    const where = {};
     if (type) where.type = type;
     if (raceId) where.race_id = raceId;
     if (userId) where.user_id = userId;
@@ -1165,9 +1145,11 @@ class RaceService {
     // placed the bet. See its `racePoints`.
     for (const row of sports?.rows ?? []) add(row.userId, row.usd, 'sports', row.bets);
 
-    const names = await this.#namesFor([...totals.keys()]);
+    // Races are for direct users only: an agent-tree player is not on the board at all.
+    const names = await this.#namesFor([...totals.keys()], { direct: true });
 
     const entries = [...totals.values()]
+      .filter((t) => names.has(t.userId))
       .map((t) => ({
         userId: t.userId,
         name: names.get(t.userId) ?? null,
@@ -1268,12 +1250,12 @@ class RaceService {
     return money.toDecimalString(real + (margin > 0n ? margin : 1n));
   }
 
-  async #namesFor(userIds) {
+  async #namesFor(userIds, { direct = false } = {}) {
     const ids = [...new Set(userIds.map(String))].filter(Boolean);
     if (!ids.length) return new Map();
 
     const users = await this.models.Users.findAll({
-      where: { id: ids },
+      where: { id: ids, ...(direct ? { parent_staff_id: null } : {}) },
       attributes: ['id', 'name'],
       raw: true,
     });

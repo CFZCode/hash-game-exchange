@@ -553,6 +553,35 @@ test('a switched-off race still ranks today with no prizes', async () => {
   assert.strictEqual(board.me.usdWagered, '34.80000000');
 });
 
+test('an agent-tree player is not on the board at all, only direct users are', async () => {
+  const row = {
+    type: 'daily', enabled: false, prize_pool: '0', platform_fee_percent: '0', winner_count: 3,
+    top3_percentage: '60', min_points: '0', currency: 'USDT', rank_percentage: [],
+    sports_points: '1', casino_points: '1', slot_points: '1', crash_points: '1', other_points: '1',
+  };
+  const users = [{ id: 7, name: 'direct', parent_staff_id: null }, { id: 9, name: 'agent player', parent_staff_id: 42 }];
+  const service = new RaceService({
+    models: {
+      RaceConfig: { findOne: async () => row },
+      Race: { findOne: async () => null },
+      Exchangerate: { findAll: async () => [] },
+      Users: { findAll: async ({ where }) => users.filter((u) => !('parent_staff_id' in where) || u.parent_staff_id === where.parent_staff_id) },
+    },
+    logger: createLogger({ name: 'race-test', level: 'silent' }),
+    config: { RACE_TIMEZONE: IST },
+    clients: {
+      casino: { get: async () => ({ rows: [{ userId: '7', bucket: 'slot', currency: 'USDT', amount: '5', bets: 1 }, { userId: '9', bucket: 'slot', currency: 'USDT', amount: '900', bets: 3 }] }) },
+      sports: { get: async () => ({ rows: [{ userId: '9', usd: '50', bets: 1 }] }) },
+    },
+    wallet: {},
+    rewardMoney: { fromUsd: async (usd) => ({ currency: 'USDT', amount: usd, usd }), toUsd: async (a) => a },
+  });
+
+  const board = await service.leaderboard({ type: 'daily', userId: '9' });
+  assert.deepStrictEqual(board.leaderboard.map((r) => [r.rank, r.userId]), [[1, '7']]);
+  assert.strictEqual(board.me?.rank ?? null, null);
+});
+
 test("the board prints each rank's share on a 0 pool; Last Champion is the last settled race", async () => {
   const row = {
     type: 'daily', enabled: false, prize_pool: '0', platform_fee_percent: '0', winner_count: 10,

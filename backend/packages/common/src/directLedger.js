@@ -42,7 +42,7 @@ function categoryFor(reason, refType) {
   if (r === 'DEPOSIT') return CATEGORY.DEPOSIT;
   if (r.startsWith('WITHDRAWAL')) return CATEGORY.WITHDRAW;
   if (r === 'ADMIN_CREDIT' || r === 'ADMIN_DEBIT') return CATEGORY.ADMIN;
-  if (['BONUS', 'BONUS_REVERSAL', 'CLAIM'].includes(r)) return CATEGORY.BONUS;
+  if (['BONUS', 'BONUS_REVERSAL', 'CLAIM', 'RACE_REWARD_CLAIM'].includes(r)) return CATEGORY.BONUS;
   if (r.startsWith('TRANSFER') || r.startsWith('TIP_') || ['SELL_HOLD', 'SELL_REFUND', 'BUY_RELEASE'].includes(r)) return CATEGORY.TRANSFER;
   return CATEGORY.OTHER;
 }

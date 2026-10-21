@@ -9,6 +9,7 @@ test('direct ledger category from the wallet reason + ref type', () => {
   assert.equal(categoryFor('BET_PAYOUT', 'GIS'), 'CASINO');
   assert.equal(categoryFor('DEPOSIT', null), 'DEPOSIT');
   assert.equal(categoryFor('ADMIN_CREDIT'), 'ADMIN');
+  assert.equal(categoryFor('race_reward_claim'), 'BONUS');
   assert.equal(categoryFor('SOMETHING_NEW'), 'OTHER');
 });
 
