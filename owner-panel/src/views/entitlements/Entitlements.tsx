@@ -381,16 +381,18 @@ const RequirementSwitch = ({
   description,
   checked,
   onChecked,
-  name
+  name,
+  disabled
 }: {
   label: string
   description: string
   checked: boolean
   onChecked: (v: boolean) => void
   name: string
+  disabled?: boolean
 }) => (
   <label className='flex items-start gap-3' data-requirement={name}>
-    <Switch size='sm' checked={checked} onCheckedChange={onChecked} aria-label={label} />
+    <Switch size='sm' checked={checked} onCheckedChange={onChecked} disabled={disabled} aria-label={label} />
     <span className='min-w-0'>
       <span className='block text-xs font-medium'>{label}</span>
       <span className='text-muted-foreground block text-xs'>{description}</span>
@@ -547,12 +549,14 @@ const WithdrawalRequirementsEditor = ({
           checked={sw.kyc}
           onChecked={v => onVariant(variantOfSwitches({ ...sw, kyc: v }))}
         />
+        {/* The backend enforces the rollover under every variant, so this switch is fixed ON; the stored variant's wager half is left as is. */}
         <RequirementSwitch
           name='wager'
           label='Wagering complete required'
-          description='The deposit rollover and every active bonus must be wagered (forfeiting a bonus clears its part).'
-          checked={sw.wager}
-          onChecked={v => onVariant(variantOfSwitches({ ...sw, wager: v }))}
+          description='Always on: the deposit rollover must be met before any withdrawal (since 21 Oct 2026, under every setting). Every active bonus must be wagered too; forfeiting a bonus clears its part.'
+          checked
+          disabled
+          onChecked={() => {}}
         />
       </div>
       <div
