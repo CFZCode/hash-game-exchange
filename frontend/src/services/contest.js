@@ -28,7 +28,7 @@ import { CONTEST as DAILY_CONTEST, STANDINGS as DAILY_STANDINGS } from '../pages
  *                                       the per-rank payout ladder (`payout.ranks`)
  *   GET /user/race/daily/leaderboard    the running race: window, pool, paid rows and, with a
  *                                       token, `me` — the caller's own rank
- *   GET /user/race/daily/last           the PREVIOUS window's board (hash.game's `<type>/last/`):
+ *   GET /user/race/daily/last           the last SETTLED race (hash.game's `<type>/last/`):
  *                                       its rank 1 is the Last Champion card and the whole list
  *                                       is the History dialog — it answers for a switched-off
  *                                       race too, ranked from the same wagers as the live board
@@ -45,6 +45,8 @@ const RACE = {
   configs: '/api/v1/user/race',
   leaderboard: (type) => `/api/v1/user/race/${type}/leaderboard`,
   last: (type) => `/api/v1/user/race/${type}/last`,
+  rewards: '/api/v1/user/race/rewards?limit=10',
+  claim: (id) => `/api/v1/user/race/rewards/${id}/claim`,
 };
 
 const IDLE_CODES = ['RACE_NOT_RUNNING', 'RACE_NO_ACTIVE_RACE', 'RACE_NOT_CONFIGURED'];
@@ -75,6 +77,9 @@ export function toContest({ title, config, board, last }) {
   /* hash.game's Last Champion is `prevList[0]`: the previous window's #1, whoever is viewing. */
   const champ = prev[0];
 
+  /* A window staff closed early (End & pay) is `settled`: ended, clock at zero, until the next opens. */
+  const running = Boolean(board) && !board.settled;
+
   const contest = {
     title,
     currency: board?.payoutCurrency ?? config?.payout?.currency ?? config?.currency ?? '',
@@ -84,10 +89,10 @@ export function toContest({ title, config, board, last }) {
     userBonusRate: ranks.length
       ? ranks.map((r) => num(r.percentage) / 100)
       : Array.from({ length: num(board?.winnerCount ?? config?.winnerCount) }, () => 0),
-    active: Boolean(board),
+    active: running,
     /* The instant the window closes; the widget ticks its countdown off it. */
-    endsAt: board?.endsAt ?? null,
-    ...(board ? remaining(board.endsAt) : { hours: 0, minutes: 0, seconds: 0 }),
+    endsAt: running ? board.endsAt : null,
+    ...(running ? remaining(board.endsAt) : { hours: 0, minutes: 0, seconds: 0 }),
     start: day(board?.startsAt ?? last?.startsAt),
     end: day(board?.endsAt ?? last?.endsAt),
     champion: champ
@@ -168,5 +173,14 @@ export const getContestRank = () =>
         rank: Number(board?.me?.rank) || 0,
         wager: num(board?.me?.usdWagered),
       }));
+
+/* The signed-in player's race prizes (`GET /user/race/rewards`): a settled race writes each
+   winner a claimable row, and nothing reaches the wallet until `claimRacePrize` takes it. */
+export const getRacePrizes = () =>
+  USE_FIXTURES
+    ? request(RACE.rewards, { fixture: [] })
+    : Promise.resolve(request(RACE.rewards, { live: true })).catch(emptyIfAgentBlocked([]));
+
+export const claimRacePrize = (id) => request(RACE.claim(id), { live: true, method: 'POST', fixture: null });
 
 export default getDailyContest;

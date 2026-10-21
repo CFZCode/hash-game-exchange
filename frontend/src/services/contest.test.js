@@ -27,4 +27,25 @@ describe('daily contest board', () => {
     ]);
     expect(contest.prev.start).toBe('10/18/2026');
   });
+
+  it('a window closed by End & pay reads Ended, its clock at zero, with its pool and paid rows', () => {
+    const board = {
+      settled: true, payoutCurrency: 'USDT', payoutPrizePool: '10', winnerCount: 3,
+      startsAt: '2026-10-20T18:30:00.000Z', endsAt: '2099-10-21T18:30:00.000Z',
+      leaderboard: [{ rank: 1, name: 'testz11', usdWagered: '10.4216', payout: '5.71428571', percentage: 57.1429 }],
+    };
+    const { contest, standings } = toContest({ title: 'Daily Contest', config: null, board, last: null });
+    expect(contest.active).toBe(false);
+    expect(contest.endsAt).toBe(null);
+    expect([contest.hours, contest.minutes, contest.seconds]).toEqual([0, 0, 0]);
+    expect(contest.prizePool).toBe(10);
+    expect(standings[0]).toMatchObject({ player: 'testz11', bonus: 5.71428571 });
+  });
+
+  it('no settled race: no champion and an empty History', () => {
+    const last = { raceId: null, startsAt: null, endsAt: null, leaderboard: [] };
+    const { contest } = toContest({ title: 'Daily Contest', config: null, board: null, last });
+    expect(contest.champion.player).toBe('');
+    expect(contest.prev.standings).toEqual([]);
+  });
 });

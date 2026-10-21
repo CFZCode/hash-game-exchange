@@ -13,7 +13,9 @@ import { useSelectedCurrency } from '../../../hooks/useSelectedCurrency';
 import { isFiatCode } from '../../../utils/currency';
 import { useResource } from '../../../hooks/useResource';
 import React from 'react';
-import { getContestRank, remaining } from '../../../services/contest';
+import { claimRacePrize, getContestRank, getRacePrizes, remaining } from '../../../services/contest';
+import { toast, toastError } from '../Toast/toast';
+import EmptyPlaceholder from '../EmptyPlaceholder';
 import { avatarSrc } from '../../../services/avatars';
 import DialogShell from '../DialogShell';
 import './Contest.css';
@@ -385,6 +387,10 @@ export default function Contest({ contest, standings = [] }) {
               <img className="absolute -top-3 left-1 w-8" alt="crown" src={crownImg} />
               <img className="h-10 w-10 rounded-full" alt="user avatar" src={championAvatar} />
             </div>
+            {/* No settled race yet: the site's own empty line, not "Profit(0%) 0 USDT". */}
+            {!contest.champion.player ? (
+              <div className="text-xs font-semibold text-quarterary">Stay tuned-something's coming!</div>
+            ) : (
             <div className="text-xs font-semibold">
               <div className="text-primary">{contest.champion.player}</div>
               <div className="profit-name">
@@ -394,6 +400,7 @@ export default function Contest({ contest, standings = [] }) {
                 <span className="text-brand">{show(contest.champion.totalBonus)}</span>
               </div>
             </div>
+            )}
           </div>
         </div>
       </div>
@@ -404,6 +411,7 @@ export default function Contest({ contest, standings = [] }) {
       {session.login && (
         <MyPosition contest={contest} standings={standings} show={show} />
       )}
+      {session.login && <RacePrizes />}
 
       {/* overflow-hidden is what makes the rounded-xl read at the BOTTOM. The zebra stripe
           is `even:` and the header row is child 1, so rank 1 lands on child 2 and every odd
@@ -454,7 +462,8 @@ export default function Contest({ contest, standings = [] }) {
       {historyOpen && (
         /* `bt` in the chunk: a `w-[30rem]` dialog titled with the previous window's dates over
            the same rows, `isHistory` striping odd rows instead of even. */
-        <DialogShell title={`${contest.prev?.start ?? ''} ~ ${contest.prev?.end ?? ''}`} onClose={() => setHistoryOpen(false)} size="lg:!w-[30rem]">
+        <DialogShell title={contest.prev?.start ? `${contest.prev.start} ~ ${contest.prev.end}` : 'History'} onClose={() => setHistoryOpen(false)} size="lg:!w-[30rem]">
+          {!contest.prev?.standings?.length ? <EmptyPlaceholder /> : (
           <table className="table text-xs [&_td]:px-2 [&_td]:py-3">
             <tbody>
               <tr className="list-head item">
@@ -466,8 +475,66 @@ export default function Contest({ contest, standings = [] }) {
               <StandingRows standings={contest.prev?.standings ?? []} show={show} history />
             </tbody>
           </table>
+          )}
         </DialogShell>
       )}
+    </div>
+  );
+}
+
+/* The player's own race prizes: a settled race writes each winner a claimable row and pays
+   nothing until it is claimed (`POST /user/race/rewards/:id/claim`). Drawn only when there is
+   at least one, so a player who never placed sees no extra card. */
+function RacePrizes() {
+  const { refreshBalances } = useSession();
+  const [reloads, setReloads] = React.useState(0);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- reloads is the re-read trigger
+  const read = React.useCallback(() => getRacePrizes(), [reloads]);
+  const { data } = useResource(read);
+  const [pending, setPending] = React.useState(null);
+  const rows = Array.isArray(data) ? data : [];
+  const show = useContestMoney(rows[0]?.currency ?? 'USDT');
+  if (!rows.length) return null;
+
+  const claim = async (row) => {
+    if (pending) return;
+    setPending(row.id);
+    try {
+      const paid = await claimRacePrize(row.id);
+      toast.success(`Claimed ${show(Number(paid?.amount ?? row.amount))}`);
+      refreshBalances?.();
+    } catch (failure) {
+      toastError(failure, 'That prize could not be claimed.');
+    } finally {
+      setPending(null);
+      setReloads((n) => n + 1);
+    }
+  };
+
+  return (
+    <div className="rounded-xl bg-layer4 p-4">
+      <div className="mb-2 text-base font-extrabold text-primary">My Prizes</div>
+      {rows.map((row, i) => (
+        <div key={row.id} className={`flex items-center gap-3 py-2${i ? ' border-t border-third' : ''}`}>
+          <div className="flex-1 text-xs">
+            <div className="font-semibold text-primary">Rank {row.rank}</div>
+            <div>{row.raceStartsAt ? new Date(row.raceStartsAt).toLocaleDateString('en-US') : ''}</div>
+          </div>
+          <div className="whitespace-nowrap font-extrabold text-brand">{show(Number(row.amount))}</div>
+          {row.claimed ? (
+            <div className="w-20 text-center text-xs font-semibold text-tertiary">Claimed</div>
+          ) : (
+            <button
+              type="button"
+              disabled={pending != null}
+              onClick={() => claim(row)}
+              className="button button-brand h-8 w-20 rounded-md !font-extrabold"
+            >
+              Claim
+            </button>
+          )}
+        </div>
+      ))}
     </div>
   );
 }

@@ -279,8 +279,10 @@ class RaceService {
    * @param {number|null} [options.userId]  when present, the caller's own row is
    *   resolved even if it falls below the payout line — a player wants to know
    *   where they are, not only whether they are winning.
+   * @param {boolean} [options.live]  the window's own wagers even after End & pay (the daily
+   *   quests count today's turnover, not the paid rows).
    */
-  async leaderboard({ type, userId = null }) {
+  async leaderboard({ type, userId = null, live = false }) {
     const config = await this.getConfig({ type });
     if (!config) throw errors.NOT_CONFIGURED({ type });
 
@@ -288,7 +290,22 @@ class RaceService {
        has not opened yet, ranks the current window's wagers with no prizes and a 0 pool rather than
        answering "not running". Only an enabled race with an open row is ever settled and paid. */
     const open = config.enabled ? await this.#activeRace(type) : null;
-    const race = open ?? (({ startsAt, endsAt }) => ({ id: null, starts_at: startsAt, ends_at: endsAt }))(windowFor(type, new Date(), this.timeZone));
+    const window = windowFor(type, new Date(), this.timeZone);
+
+    /* Staff closed this window early (End & pay): it stays ended, with what it paid, until the
+       next window opens — not an "Active" recount with a running clock and a 0 pool. */
+    const closed = open || live ? null : await this.models.Race.findOne({ where: { type, starts_at: window.startsAt, status: RACE_STATUS.SETTLED }, raw: true });
+    if (closed) {
+      const board = await this.#settledBoard(closed, config);
+      const mine = userId ? board.leaderboard.find((r) => String(r.userId) === String(userId)) : null;
+      return {
+        ...board,
+        settled: true,
+        me: mine ? { rank: mine.rank, points: mine.points, usdWagered: mine.usdWagered, inPrizes: true, payout: mine.payout } : null,
+      };
+    }
+
+    const race = open ?? { id: null, starts_at: window.startsAt, ends_at: window.endsAt };
     const official = Boolean(open);
 
     const { entries, unrated } = await this.#standings(race, config);
@@ -378,53 +395,63 @@ class RaceService {
   }
 
   /**
-   * The PREVIOUS window's standings — hash.game's `<type>/last/`: its #1 is the Last Champion
-   * and the whole list is the History dialog. Ranked from the same turnover as the live board,
-   * so it answers for a switched-off race too; a settled race adds what each player was paid.
+   * The last SETTLED race — hash.game's `<type>/last/`: its #1 is the Last Champion and its paid
+   * rows are the History dialog. Read from the race's own reward rows, so an early End & pay shows
+   * at once with what was actually paid, and a window where no race ran is an empty board rather
+   * than a live recount of that day priced on today's ladder.
    */
   async lastLeaderboard({ type }) {
     const config = await this.getConfig({ type });
     if (!config) throw errors.NOT_CONFIGURED({ type });
 
-    const current = windowFor(type, new Date(), this.timeZone);
-    const { startsAt, endsAt } = windowFor(type, new Date(new Date(current.startsAt).getTime() - 1), this.timeZone);
-    const race = await this.models.Race.findOne({ where: { type, starts_at: startsAt }, raw: true });
-    const settled = race?.status === RACE_STATUS.SETTLED;
+    const race = await this.models.Race.findOne({
+      where: { type, status: RACE_STATUS.SETTLED },
+      order: [['ends_at', 'DESC']],
+      raw: true,
+    });
+    if (!race) {
+      const payout = await this.#payoutPricer(config.currency);
+      return {
+        raceId: null, type, startsAt: null, endsAt: null, official: false,
+        payoutCurrency: payout.currency, payoutPrizePool: payout.price('0'), winnerCount: 0, leaderboard: [],
+      };
+    }
+    return this.#settledBoard(race, config);
+  }
 
-    const { entries } = await this.#standings({ starts_at: startsAt, ends_at: endsAt }, config);
-    const rewards = settled ? await this.models.RaceReward.findAll({ where: { race_id: race.id }, raw: true }) : [];
-    const paidTo = new Map(rewards.map((r) => [String(r.user_id), r]));
+  /** A settled race as a board: its paid rows in rank order, priced as the claim pays them. */
+  async #settledBoard(race, config) {
+    const rewards = await this.models.RaceReward.findAll({ where: { race_id: race.id }, order: [['rank', 'ASC']], raw: true });
+    const names = await this.#namesFor(rewards.map((r) => r.user_id));
     // A settled race keeps the ladder it paid by.
-    const shares = this.#shares(settled && race.snapshot?.rankPrizes?.length ? { ...config, rankPrizes: race.snapshot.rankPrizes } : config);
-    const winnerCount = (settled && Number(race.winner_count)) || config.winnerCount;
+    const shares = this.#shares(race.snapshot?.rankPrizes?.length ? { ...config, rankPrizes: race.snapshot.rankPrizes } : config);
     const payout = await this.#payoutPricer(config.currency);
 
     const rows = [];
-    for (const [index, entry] of entries.slice(0, winnerCount).entries()) {
-      const reward = paidTo.get(entry.userId);
-      const quote = reward ? await this.#priced(reward.amount, reward.currency) : null;
+    for (const r of rewards) {
+      const points = money.toDecimalString(money.toMinor(r.points ?? '0'));
       rows.push({
-        rank: index + 1,
-        userId: entry.userId,
-        name: entry.name,
-        points: entry.points,
-        usdWagered: entry.usdWagered,
-        bets: entry.bets,
+        rank: Number(r.rank),
+        userId: r.user_id,
+        name: names.get(String(r.user_id)) ?? null,
+        points,
+        usdWagered: points,
         isBoat: false,
-        payout: quote?.amount ?? payout.price('0'),
-        percentage: shares.get(reward?.rank ?? index + 1) ?? 0,
+        payout: (await this.#priced(r.amount, r.currency)).amount,
+        percentage: shares.get(Number(r.rank)) ?? 0,
       });
     }
 
     return {
-      raceId: race?.id ?? null,
-      type,
-      startsAt,
-      endsAt,
-      official: settled,
+      raceId: race.id,
+      type: race.type,
+      startsAt: race.starts_at,
+      endsAt: race.ends_at,
+      settledAt: race.settled_at,
+      official: true,
       payoutCurrency: payout.currency,
-      payoutPrizePool: payout.price(settled ? race.prize_pool ?? '0' : '0'),
-      winnerCount,
+      payoutPrizePool: payout.price(race.prize_pool ?? '0'),
+      winnerCount: Number(race.winner_count) || rows.length,
       leaderboard: rows,
     };
   }

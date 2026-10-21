@@ -17,7 +17,7 @@ class QuestsService {
 
   /** Today's quests with the caller's progress, and when today ends. */
   async forPlayer(userId) {
-    const board = await this.race.leaderboard({ type: 'daily', userId });
+    const board = await this.race.leaderboard({ type: 'daily', userId, live: true });
     const done = { usd: board.me?.usdWagered ?? '0', count: String(board.me?.bets ?? 0) };
     return {
       dailyQuest: {

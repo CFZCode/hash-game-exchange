@@ -259,7 +259,7 @@ would put something untrue on the screen.
 | `/bonus` rows, Total Claimable, Claim, Redeem | `GET /user/bonus`, `/user/rakeback`, `POST /user/bonus/claim/:type`, `/user/rakeback/claim`, `/user/bonus/redeem` | Already wired (see above). Level-up and other bc.game reward types have no platform route and keep the declared default |
 | `/bonus` level card | `GET /user/vip` | **Wired.** Name, percentage and "… XP to <next>" now come off the PLATFORM ladder (41 levels, Wood to Diamond); before, the level number was looked up in bc.game's captured ladder and printed bc.game's tier name. `services/vip.js` `getVipStanding` |
 | `/vip-detail` | — | Marketing copy, no data to wire. `GET /user/vip/levels` still has no screen |
-| `/promotions/daily-contest`, Home → Wager Contest | `GET /user/race`, `/user/race/daily/leaderboard`, `/user/race/history` | **Wired** (`services/contest.js`). Since 2026-10-19 the board always answers: a switched-off race (or one whose window is not open) ranks the current race day (`race_timezone`) with `official: false`, pool 0 and no prizes; the widget ticks down to `endsAt`. Original Games (`og_transactions`) count in race turnover |
+| `/promotions/daily-contest`, Home → Wager Contest | `GET /user/race`, `/user/race/daily/leaderboard`, `/user/race/history` | **Wired** (`services/contest.js`). Since 2026-10-19 the board always answers: a switched-off race (or one whose window is not open) ranks the current race day (`race_timezone`) with `official: false`, pool 0 and no prizes; the widget ticks down to `endsAt`. Original Games (`og_transactions`) count in race turnover. Since 2026-10-21: Last Champion and History read `/:type/last` = the last SETTLED race's paid rows (empty when none settled, so the card shows the empty line); a window closed by End & pay reads `settled: true` (Ended, 00:00:00, its pool and paid rows) until the next opens; signed-in winners get a My Prizes card with Claim (`GET /user/race/rewards`, `POST /user/race/rewards/:id/claim`) |
 | `/promotions` + Archived | `GET /admin/promotions` (public) | **Wired** (`services/promotions.js`). Feed is empty on this delivery, so the page's Empty state renders. Tabs cut to All + Casino (`segment`); archived = `promoStatus: ended` or past `endsAt` |
 | `/deposit-offer`, fiat tab bonus chips | `GET /user/bonus/first-deposit` | **Wired** (`services/bonus.js`). `enabled: false` here, so no offer and no chip bonus |
 | `/free-plays` | `GET /casino/gis/freespins/mine` | Already wired; free bets have no provider |
@@ -267,7 +267,7 @@ would put something untrue on the screen.
 | `/promotions/weekly-raffle` | — | No backend (gap 6). Live mode keeps the copy but empties the ticker, tickets-sent count and past draws |
 | Spin wheel | `/user/spin-wheel/*` | Backend complete, no screen in this UI |
 
-Note: `GET /user/race/rewards` answers 403 `PROMOTIONS_NOT_FOR_AGENT_USERS` for agent-tree players such as `demo_player01`. That is by design and is not read by any screen.
+Note: `GET /user/race/rewards` answers 403 `PROMOTIONS_NOT_FOR_AGENT_USERS` for agent-tree players such as `demo_player01`. That is by design; the contest widget's My Prizes card reads it and draws nothing on that refusal.
 
 ## Part 1c — Account area on SmartBet, 2026-10-12
 

@@ -395,6 +395,34 @@ test('race rewards', async (t) => {
     assert.ok(weekly.every((r) => r.type === 'weekly'));
   });
 
+  await t.test("End & pay on today's window: the board shows it ended with its prizes, and it is the Last Champion", async () => {
+    const today = windowFor('daily', new Date(), IST);
+    if (await models.Race.findOne({ where: { type: 'daily', starts_at: today.startsAt } })) return;
+    const ended = await models.Race.create({
+      type: 'daily', starts_at: today.startsAt, ends_at: today.endsAt,
+      status: 'settled', settled_at: new Date(), prize_pool: '10', winner_count: 3, total_awarded: '7',
+    });
+    created.races.push(ended.id);
+    await models.RaceReward.create({
+      race_id: ended.id, user_id: userId, type: 'daily', rank: 1, points: '10.4216', currency: 'USDT', amount: '7',
+    });
+
+    const board = await service.leaderboard({ type: 'daily', userId });
+    assert.strictEqual(board.settled, true);
+    assert.strictEqual(String(board.raceId), String(ended.id));
+    assert.strictEqual(board.leaderboard[0].name, `race-test-${userId}`);
+    assert.strictEqual(Number(board.leaderboard[0].payout), 7);
+    assert.strictEqual(board.me.rank, 1);
+
+    const last = await service.lastLeaderboard({ type: 'daily' });
+    assert.strictEqual(String(last.raceId), String(ended.id));
+    assert.strictEqual(last.leaderboard[0].usdWagered, '10.42160000');
+
+    // The winner sees it unclaimed, and can claim it.
+    const mine = await service.myRewards({ userId, claimed: 'false' });
+    assert.ok(mine.rows.some((r) => String(r.raceId) === String(ended.id)));
+  });
+
   await t.test("staff can set their own ladder, it survives a pool change, and resets to the curve", async () => {
     const before = await models.RaceConfig.findOne({ where: { type: 'weekly' }, raw: true });
     if (!before) return;
@@ -490,6 +518,7 @@ test('a switched-off race still ranks today with no prizes', async () => {
   const service = new RaceService({
     models: {
       RaceConfig: { findOne: async () => row },
+      Race: { findOne: async () => null },
       Exchangerate: { findAll: async () => [{ currency: 'INR', usd_rate: '0.012' }] },
       Users: { findAll: async () => [{ id: 7, name: 'p7' }, { id: 8, name: 'p8' }] },
     },
@@ -524,7 +553,7 @@ test('a switched-off race still ranks today with no prizes', async () => {
   assert.strictEqual(board.me.usdWagered, '34.80000000');
 });
 
-test("the board prints each rank's share on a 0 pool, and last window's board names the champion", async () => {
+test("the board prints each rank's share on a 0 pool; Last Champion is the last settled race", async () => {
   const row = {
     type: 'daily', enabled: false, prize_pool: '0', platform_fee_percent: '0', winner_count: 10,
     top3_percentage: '60', min_points: '0', currency: 'USDT', rank_percentage: [],
@@ -536,7 +565,7 @@ test("the board prints each rank's share on a 0 pool, and last window's board na
     models: {
       RaceConfig: { findOne: async () => row },
       Race: { findOne: async () => settledRace },
-      RaceReward: { findAll: async () => (settledRace ? [{ user_id: '8', rank: 1, amount: '5', currency: 'USDT' }] : []) },
+      RaceReward: { findAll: async () => (settledRace ? [{ user_id: '8', rank: 1, points: '9', amount: '5', currency: 'USDT' }] : []) },
       Exchangerate: { findAll: async () => [] },
       Users: { findAll: async () => [{ id: 7, name: 'p7' }, { id: 8, name: 'p8' }] },
     },
@@ -568,18 +597,31 @@ test("the board prints each rank's share on a 0 pool, and last window's board na
   ]);
   assert.ok(curve[0].percentage > curve[1].percentage && curve[1].percentage > 0);
 
-  const today = windowFor('daily', new Date(), IST);
-  const last = await service.lastLeaderboard({ type: 'daily' });
-  assert.strictEqual(new Date(last.endsAt).getTime(), today.startsAt.getTime(), 'the window that ended when today began');
-  assert.strictEqual(seen.at(-1).to, today.startsAt.toISOString());
-  assert.strictEqual(last.official, false);
-  assert.deepStrictEqual(last.leaderboard.map((r) => [r.rank, r.name, r.payout]), [[1, 'p8', '0.00000000'], [2, 'p7', '0.00000000']]);
+  // No race has ever settled: an empty board (the page's empty state), not a live recount of
+  // yesterday priced on today's ladder ("Profit(57.1429%) 0 USDT").
+  const none = await service.lastLeaderboard({ type: 'daily' });
+  assert.strictEqual(none.raceId, null);
+  assert.deepStrictEqual(none.leaderboard, []);
 
-  // Settled: the paid amount rides beside the player who was paid it.
-  settledRace = { id: 1, status: 'settled', prize_pool: '10', winner_count: 10, snapshot: {} };
+  // Settled: the race's own paid rows, whatever window it was, with what each was paid.
+  settledRace = {
+    id: 1, type: 'daily', status: 'settled', prize_pool: '10', winner_count: 3, snapshot: {},
+    starts_at: new Date('2026-10-20T18:30:00Z'), ends_at: new Date('2026-10-21T18:30:00Z'), settled_at: new Date(),
+  };
   const paid = await service.lastLeaderboard({ type: 'daily' });
   assert.strictEqual(paid.official, true);
-  assert.strictEqual(Number(paid.leaderboard[0].payout), 5);
-  assert.strictEqual(paid.leaderboard[1].payout, '0.00000000');
+  assert.strictEqual(paid.raceId, 1);
+  assert.deepStrictEqual(paid.leaderboard.map((r) => [r.rank, r.name, Number(r.payout)]), [[1, 'p8', 5]]);
   assert.strictEqual(paid.payoutPrizePool, '10.00000000');
+
+  // End & pay closed today's window: the board says so (settled, its prizes) until the next opens.
+  const ended = await service.leaderboard({ type: 'daily', userId: '8' });
+  assert.strictEqual(ended.settled, true);
+  assert.strictEqual(ended.payoutPrizePool, '10.00000000');
+  assert.deepStrictEqual(ended.leaderboard.map((r) => [r.rank, r.name, Number(r.payout)]), [[1, 'p8', 5]]);
+  assert.strictEqual(ended.me.rank, 1);
+  // The daily quests still count today's own wagers after End & pay.
+  const live = await service.leaderboard({ type: 'daily', userId: '8', live: true });
+  assert.strictEqual(live.settled, undefined);
+  assert.strictEqual(live.me.usdWagered, '9.00000000');
 });
