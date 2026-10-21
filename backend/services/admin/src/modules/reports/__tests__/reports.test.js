@@ -385,6 +385,20 @@ test('reports against a database', async (t) => {
     }
   });
 
+  await t.test('race-prize and rakeback claims are on the sheet, not unexplained', async () => {
+    const claim = (reason, amount) => ({
+      user_id: String(playerA), currency: 'USDT', amount, netamount: 0, reason, source_service: 'user-service', description: reason,
+    });
+    await models.CreditsLedger.bulkCreate([claim('race_reward_claim', '0.0105556'), claim('rakeback_claim', '0.25')]);
+    try {
+      const sheet = await service.balanceSheet({ staff: asA, userId: playerA, currency: 'USDT' });
+      const rows = sheet.rows.filter((r) => r.category === 'Race' || r.category === 'Rakeback').map((r) => [r.category, r.type, r.amount]).sort();
+      assert.deepEqual(rows, [['Race', 'CREDIT', '0.01055560'], ['Rakeback', 'CREDIT', '0.25000000']]);
+    } finally {
+      await models.CreditsLedger.destroy({ where: { user_id: String(playerA) } });
+    }
+  });
+
   await t.test('the balance sheet page reaches past 200 rows', () => {
     assert.equal(v.balanceSheet.query.parse({ limit: '1000' }).limit, 1000);
   });

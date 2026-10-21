@@ -60,10 +60,14 @@ const ratioOf = (deposited, withdrawn) =>
  */
 
 /** `credits_ledger` reasons the balance sheet reads in section 6d, with the category shown. */
+/** Every user-service claim credits BONUS except the race prize and rakeback, which have their own reason. */
 const OTHER_LEDGER = Object.freeze({
-  credit: ['BONUS', 'TIP_RECEIVED', 'ADMIN_CREDIT'],
+  credit: ['BONUS', 'TIP_RECEIVED', 'ADMIN_CREDIT', 'race_reward_claim', 'rakeback_claim'],
   debit: ['BONUS_REVERSAL', 'TIP_SENT', 'ADMIN_DEBIT'],
-  category: { BONUS: 'Bonus', BONUS_REVERSAL: 'Bonus', TIP_RECEIVED: 'Tip', TIP_SENT: 'Tip', ADMIN_CREDIT: 'Adjustment', ADMIN_DEBIT: 'Adjustment' },
+  category: {
+    BONUS: 'Bonus', BONUS_REVERSAL: 'Bonus', TIP_RECEIVED: 'Tip', TIP_SENT: 'Tip', ADMIN_CREDIT: 'Adjustment', ADMIN_DEBIT: 'Adjustment',
+    race_reward_claim: 'Race', rakeback_claim: 'Rakeback',
+  },
 });
 
 const safeJson = (v) => {
