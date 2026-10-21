@@ -15,6 +15,14 @@ Format:
 
 ---
 
+## 2026-10-21 — Doc: Original games ko naye project me lagane ka guide
+**Kya kiya:** `backend/docs/original-games-new-project.md` banaya — Original Games Aggregator (seamless wallet) ko kisi doosre project me (bina owner panel, simple admin + website) lagane ka guide: provider se kya milta / kya dena hai, env keys (`OG_*`), tables ka SQL (`og_games`, `og_sessions`, `og_transactions`, `og_nonces`), signing (Node code), game sync, launch flow, wallet callbacks ke rules (verify, dedupe, bet / win / rollback, minor units, error codes), admin ki listing / stats / bet history ki SQL, website lobby + iframe, go-live checklist, aam galtiyan, aur Parker567 me code kahan hai.
+**Kyun:** User: jo original game abhi backend / admin / website pe chal raha hai uska md doc chahiye, doosre project me sirf integration karna hai (keys unke paas hain).
+**Files / jagah:** `backend/docs/original-games-new-project.md`.
+**Notes / pending:** Sirf doc, code nahi badla — deploy / restart nahi. Rules hamare `originalGames.service.js` aur provider guide (`backend/docs/original-games-integration-guide.md`) se mila ke likhe.
+
+---
+
 ## 2026-10-21 — USDT ke saare CCPayment networks + owner aur Super Admin dono ka network switch
 **Kya kiya:** Migration 148: USDT me CCPayment ke baaki networks jode — SOL (Solana), POLYGON, TON, ARETH (Arbitrum One), OPTIMISM (OP Mainnet), OPBNB — chalu; TRC20 / ERC20 / BEP20 pehle se the (purane ka naam / switch nahi chheda). Crypto contract (`COIN_NETWORKS.USDT`) me bhi ye keys, taaki deposit / withdraw dono me chalein. Owner panel → Coins: har built-in crypto coin ke har network ka switch (owner document `flags["usdt:bep20"]`, khaali = on). Owner off kare to wo network players, Super Admin ke Coins page aur deposit / withdraw rails se hat jaata hai; owner ko dikhta rehta hai taaki wapas on kar sake. Super Admin → Coins → coin edit → Networks ka apna on/off pehle se tha, ab owner ke andar chalta hai. Site pe network select me ek chain ek hi baar (capture me OPTIMISM do baar tha).
 **Kyun:** User: CCPayment jitne network deposit ke liye allow karta hai sab dikhne chahiye, owner me daal ke enable karo, aur ye option Super Admin me bhi ho — dono control kar saken.
