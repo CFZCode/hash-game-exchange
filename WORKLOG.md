@@ -15,6 +15,12 @@ Format:
 
 ---
 
+## 2026-10-21 — Wallet → Transaction: Slotegrator game ka naam, transaction id nahi
+**Kya kiya:** Player ledger (`GET /user/wallet/ledger`) me Slotegrator rows "bet <txid>" / "win <txid>" / "refund rf:<txid>" ab `gis_transactions.game_uuid → gisgamesnew` (ya `gisgamesnew_parked`) se game ka naam padhte hain: "Aviator bet", "Aviator win". Game na mile to "Casino game". `#nameOriginalGames` ke bagal me `#nameGisGames`, read-time — purani rows bhi theek. Test me ek GIS row.
+**Kyun:** User: /wallet/transaction pe Aviator khela to game ki jagah id aa rahi thi.
+**Files / jagah:** `backend/services/user/src/modules/wallet/wallet.repository.js`, `backend/services/user/src/modules/wallet/__tests__/playerLedger.test.js`.
+**Notes / pending:** Test pass (ibitplay_test). parker-user-svc restart; live DB pe us player ki rows "Aviator bet/win/refund" aa rahi. JSGames rows "jsGames bet <id>" likhti hain — live pe abhi 0 rows, isliye nahi chheda.
+
 ## 2026-10-21 — Encryption rule file: callbacks / webhooks hamesha bypass
 **Kya kiya:** Naya `backend/gateway/src/encryptionRule.js` (`isCallback`): game callbacks (GIS, Original games wallet, JSGames v1/v2, seamless, aggregators, x-casino) aur payment gateway callbacks / webhooks (PSP callback + payout-callback, ccpayment, OAuth) kabhi encrypt nahi hote — list aur naya provider jodne ka tareeka file ke upar likha hai. `apiEncryption.js` ab yahi file use karta hai. Test me Original games wallet + payout-callback ki line add.
 **Kyun:** User: koi bhi payment gateway / game callback ya webhook aaye to encryption bypass ho, ye rule ek file me likho taaki aage yaad rahe.

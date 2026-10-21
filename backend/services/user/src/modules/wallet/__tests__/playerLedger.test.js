@@ -61,6 +61,8 @@ test('player ledger against PostgreSQL', async (t) => {
     await q('DELETE FROM mssports.credits_ledger WHERE user_id = :uid RETURNING id', { uid: UID });
     await q('DELETE FROM og_transactions WHERE user_id = :uid RETURNING id', { uid: UID });
     await q("DELETE FROM og_games WHERE code = 'test-bow' RETURNING code");
+    await q('DELETE FROM gis_transactions WHERE user_id = :uid RETURNING id', { uid: UID });
+    await q("DELETE FROM gisgamesnew WHERE uuid = 'test-aviator' RETURNING id");
   };
   t.after(async () => {
     await cleanup();
@@ -83,6 +85,11 @@ test('player ledger against PostgreSQL', async (t) => {
   await q(`INSERT INTO og_games (code, name, position, data, synced_at) VALUES ('test-bow', 'Arrow Bow', 999, '{}'::jsonb, NOW())
            ON CONFLICT (code) DO NOTHING RETURNING code`);
   await q(`INSERT INTO og_transactions (transaction_id, kind, user_id, game_code, currency, amount) VALUES (:tx, 'bet', :uid, 'test-bow', 'USDT', 1) RETURNING id`, { tx: `og-${UID}`, uid: UID });
+  // A Slotegrator row reads "win <tx>": named from gis_transactions → gisgamesnew.
+  await row('BET_PAYOUT', 'INR', '20', { refType: 'GIS' }, '2026-10-19T06:04:30Z');
+  await q(`UPDATE public.credits_ledger SET description = :d WHERE user_id = :uid AND reason = 'BET_PAYOUT' RETURNING id`, { uid: UID, d: `win gis-${UID}` });
+  await q(`INSERT INTO gisgamesnew (uuid, name) VALUES ('test-aviator', 'Aviator') RETURNING id`);
+  await q(`INSERT INTO gis_transactions (user_id, transaction_id, action, game_uuid, balance_after) VALUES (:uid, :tx, 'win', 'test-aviator', 0) RETURNING id`, { uid: UID, tx: `gis-${UID}` });
   await q(`INSERT INTO mssports.debit_ledger (user_id, currency, amount, reason, description, balance, created_at)
            VALUES (:uid, 'INR', 100, 'bet_placed', 'Ind v Aus Australia', 2375, '2026-10-19T06:05:00Z') RETURNING id`, { uid: UID });
   await q(`INSERT INTO mssports.credits_ledger (user_id, currency, amount, reason, description, closing, created_at)
@@ -93,13 +100,14 @@ test('player ledger against PostgreSQL', async (t) => {
   const reasons = (r) => r.rows.map((x) => x.reason);
 
   const all = await list({});
-  assert.equal(all.count, 8);
+  assert.equal(all.count, 9);
   assert.deepEqual(reasons(all).slice(0, 2), ['SPORTS_SETTLEMENT', 'SPORTS_STAKE'], 'newest first, sports rows merged');
   assert.equal(Number(all.rows[1].amount), -100, 'a stake hold is a debit');
   assert.equal(all.rows.find((x) => x.reason === 'ADMIN_CREDIT').description, 'Credit by admin');
   assert.equal(all.rows.find((x) => x.reason === 'BET_STAKE').description, 'Arrow Bow bet');
+  assert.equal(all.rows.find((x) => x.reason === 'BET_PAYOUT').description, 'Aviator win', 'game name, never the transaction id');
 
-  assert.deepEqual(reasons(await list({ category: 'game' })).sort(), ['BET_STAKE', 'SPORTS_SETTLEMENT', 'SPORTS_STAKE']);
+  assert.deepEqual(reasons(await list({ category: 'game' })).sort(), ['BET_PAYOUT', 'BET_STAKE', 'SPORTS_SETTLEMENT', 'SPORTS_STAKE']);
   assert.deepEqual(reasons(await list({ category: 'swap' })).sort(), ['TRANSFER_IN', 'TRANSFER_OUT']);
   assert.deepEqual(reasons(await list({ category: 'vault' })), ['TRANSFER_OUT']);
   assert.deepEqual(reasons(await list({ category: 'bonus' })), ['BONUS']);

@@ -463,7 +463,31 @@ class WalletRepository {
     );
     const [{ count }] = await this.sequelize.query(`SELECT COUNT(*)::int AS count FROM (${union}) l`, { replacements, type: 'SELECT' });
     await this.#nameOriginalGames(rows);
+    await this.#nameGisGames(rows);
     return { rows: rows.map(({ seq, ...row }) => row), count };
+  }
+
+  /**
+   * A Slotegrator row reads "bet <tx>": the game is read back from gis_transactions →
+   * gisgamesnew (or its parked copy) as "Aviator bet". Never the transaction id on screen.
+   */
+  async #nameGisGames(rows) {
+    const GIS = /^(bet|win|refund|rollback) (\S+)$/;
+    const gis = rows.filter((r) => r.meta?.refType === 'GIS' && GIS.test(r.description || ''));
+    if (!gis.length) return;
+    const found = await this.sequelize.query(
+      `SELECT t.transaction_id AS tx, COALESCE(g.name, p.name) AS name
+         FROM gis_transactions t
+         LEFT JOIN gisgamesnew g ON g.uuid = t.game_uuid
+         LEFT JOIN gisgamesnew_parked p ON p.uuid = t.game_uuid
+        WHERE t.transaction_id IN (:refs)`,
+      { replacements: { refs: gis.map((r) => r.description.match(GIS)[2]) }, type: 'SELECT' }
+    ).catch(() => []);
+    const names = new Map(found.map((f) => [String(f.tx), f.name]));
+    for (const r of gis) {
+      const [, kind, tx] = r.description.match(GIS);
+      r.description = `${names.get(tx) || 'Casino game'} ${kind}`;
+    }
   }
 
   /**
