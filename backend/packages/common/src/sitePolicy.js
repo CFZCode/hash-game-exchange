@@ -48,6 +48,8 @@ const POLICY_DEFAULTS = Object.freeze({
   slotegrator_inr_as_pkr: 'off',
   // Not a channel switch: the gateway encrypts the player site's API answers (gateway apiEncryption.js).
   api_encryption: 'off',
+  // Not a channel switch: whether the rate limiters count (common middleware/rateLimit.js).
+  rate_limit: 'on',
 });
 
 /** For each policy, which stored variants allow each channel. */

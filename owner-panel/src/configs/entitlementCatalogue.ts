@@ -247,6 +247,20 @@ const CATALOGUE: FeatureEntry[] = [
     ]
   },
   {
+    // Rate limit: a policy (always on, owner-only). Mirrors backend featureCatalogue.js.
+    key: 'rate_limit',
+    label: 'Rate limit',
+    category: 'business',
+    flag: null,
+    policy: true,
+    defaultVariant: 'on',
+    note: 'On: too many requests from one player or address are refused for a while (limits in the server .env). Off: no limits, except login, password reset, OTP and 2FA, which always stay on. Takes effect within about 15 seconds.',
+    variants: [
+      { key: 'on', label: 'On', description: 'Too many requests from one player or address are refused for a while. The default.' },
+      { key: 'off', label: 'Off', description: 'No request limits, except the login, password reset, OTP and 2FA guards.' }
+    ]
+  },
+  {
     key: 'vip',
     label: 'VIP club',
     category: 'engagement',

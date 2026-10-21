@@ -7,6 +7,7 @@ const express = require('express');
 
 const {
   createRateLimiter,
+  watchOwnerRateLimit,
   configureRateLimitStore,
   closeRateLimitStore,
   SharedStore,
@@ -384,4 +385,37 @@ test('shared store wiring (bug #10)', async (t) => {
       delete process.env.REDIS_URL;
     }
   });
+});
+
+test('owner rate_limit switch: off stops counting, except the login / code guards', async (t) => {
+  delete process.env.REDIS_URL;
+  configureRateLimitStore(null);
+
+  let variant = 'off';
+  const admin = http.createServer((_req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({ success: true, data: [{ feature: 'rate_limit', kind: 'policy', variant }] }));
+  });
+  await new Promise((resolve) => admin.listen(0, '127.0.0.1', resolve));
+  const poll = watchOwnerRateLimit({ config: { ADMIN_SERVICE_URL: `http://127.0.0.1:${admin.address().port}` }, logger: silent });
+  await poll();
+
+  const api = await serve(createRateLimiter({ name: `owner-${process.pid}`, max: 1, logger: silent }));
+  const login = await serve(createRateLimiter({ name: 'auth:login', max: 1, logger: silent }));
+  t.after(async () => {
+    await api.close();
+    await login.close();
+    await new Promise((resolve) => admin.close(resolve));
+    await closeRateLimitStore();
+  });
+
+  assert.equal((await api.get()).status, 200);
+  assert.equal((await api.get()).status, 200, 'off: a plain bucket does not count');
+  assert.equal((await login.get()).status, 200);
+  assert.equal((await login.get()).status, 429, 'off: the login guard still counts');
+
+  variant = 'on';
+  await poll();
+  assert.equal((await api.get()).status, 200);
+  assert.equal((await api.get()).status, 429, 'on: the bucket counts again');
 });

@@ -11,7 +11,7 @@ const pinoHttp = require('pino-http');
 const { requestContext, REQUEST_ID_HEADER } = require('./middleware/requestContext');
 const { errorHandler, stackExposure } = require('./middleware/errorHandler');
 const { notFound } = require('./middleware/notFound');
-const { createRateLimiter } = require('./middleware/rateLimit');
+const { createRateLimiter, watchOwnerRateLimit } = require('./middleware/rateLimit');
 const { collectServiceKeys, INTERNAL_KEY_HEADER } = require('./middleware/internalAuth');
 
 /**
@@ -238,6 +238,8 @@ function createApp({
 
   // ── 6. Rate limiting ─────────────────────────────────────────────────
   if (enableRateLimit) {
+    // The owner's on/off switch for every limiter in this process (not under `node --test`).
+    if (config.RATE_LIMIT_ENABLED !== false && !process.env.NODE_TEST_CONTEXT) watchOwnerRateLimit({ config, logger });
     app.use(
       createRateLimiter({
         name: `${serviceName}:global`,

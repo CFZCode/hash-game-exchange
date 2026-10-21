@@ -71,6 +71,38 @@ const DECREMENT_SCRIPT = `
   return 0
 `;
 
+/**
+ * The owner's `rate_limit` policy (featureCatalogue.js), read like the gateway's API encryption:
+ * admin-service's public features list every 15 s. `off` stops every bucket counting except
+ * ALWAYS_ON — the password and code guards, which stop account takeover and never switch off.
+ * Starts on, and an answer that cannot be read keeps the last state.
+ */
+const ALWAYS_ON = new Set(['auth:login', 'auth:reset', 'otp-issue', 'otp-verify', 'twofa:code', 'staff-auth:signin', 'staff-2fa:code', 'exchange-lookup:txn-verify']);
+const OWNER_POLL_MS = 15_000;
+let ownerOff = false;
+let watching = false;
+
+/** Start following the owner's switch (once per process, from createApp). Returns the poll, for tests. */
+function watchOwnerRateLimit({ config, logger } = {}) {
+  if (watching || !config?.ADMIN_SERVICE_URL) return null;
+  watching = true;
+  const poll = async () => {
+    try {
+      const res = await fetch(`${config.ADMIN_SERVICE_URL}/api/v1/admin/features/public`);
+      if (!res.ok) return;
+      const list = (await res.json())?.data ?? [];
+      const off = list.some((f) => f.feature === 'rate_limit' && f.variant === 'off');
+      if (off !== ownerOff) loggerFor(logger).info({ on: !off }, 'Rate limit switched by the owner');
+      ownerOff = off;
+    } catch (error) {
+      loggerFor(logger).warn({ err: error?.message }, 'Rate limit: could not read the owner policy');
+    }
+  };
+  void poll();
+  setInterval(poll, OWNER_POLL_MS).unref();
+  return poll;
+}
+
 /** Resolved once, on first use. `null` means "no Redis configured". */
 let sharedClient;
 let warnedNoRedis = false;
@@ -365,6 +397,7 @@ function createRateLimiter({
     // handler in @ibitplay/socket), which is where that traffic is metered.
     skip: (req) =>
       req.path === '/health' || req.path === '/health/live' || req.path === '/health/ready' || req.path.startsWith('/socket.io') ||
+      (ownerOff && !ALWAYS_ON.has(name)) ||
       Boolean(skipIf?.(req)),
 
     handler: (req, res) => {
@@ -376,4 +409,4 @@ function createRateLimiter({
   });
 }
 
-module.exports = { createRateLimiter, configureRateLimitStore, closeRateLimitStore, SharedStore, resolveRedisUrl };
+module.exports = { createRateLimiter, watchOwnerRateLimit, configureRateLimitStore, closeRateLimitStore, SharedStore, resolveRedisUrl };

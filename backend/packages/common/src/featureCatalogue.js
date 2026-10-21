@@ -866,7 +866,25 @@ const API_ENCRYPTION_POLICY = {
   ],
 };
 
-const FEATURES = Object.freeze([...POLICIES, REWARD_CURRENCY_POLICY, DEFAULT_CURRENCY_POLICY, REGION_RESTRICTION_POLICY, WITHDRAWAL_REQUIREMENTS_POLICY, CASINO_AGGREGATOR_POLICY, THEME_MODE_POLICY, SLOTEGRATOR_INR_AS_PKR_POLICY, API_ENCRYPTION_POLICY, ...GENERATED, TIPS, P2P, PUSH_NOTIFICATIONS, ANALYTICS]);
+/**
+ * Rate limit — a policy (owner-only). `on` (the default): every service's rate limits count;
+ * `off`: they stop, except the login / password reset / OTP / 2FA guards, which never switch off
+ * (packages/common/src/middleware/rateLimit.js).
+ */
+const RATE_LIMIT_POLICY = {
+  key: 'rate_limit',
+  label: 'Rate limit',
+  category: 'business',
+  kind: 'policy',
+  flag: null,
+  defaultVariant: 'on',
+  variants: [
+    { key: 'on', label: 'On', description: 'Too many requests from one player or address are refused for a while. The default.' },
+    { key: 'off', label: 'Off', description: 'No request limits, except the login, password reset, OTP and 2FA guards.' },
+  ],
+};
+
+const FEATURES = Object.freeze([...POLICIES, REWARD_CURRENCY_POLICY, DEFAULT_CURRENCY_POLICY, REGION_RESTRICTION_POLICY, WITHDRAWAL_REQUIREMENTS_POLICY, CASINO_AGGREGATOR_POLICY, THEME_MODE_POLICY, SLOTEGRATOR_INR_AS_PKR_POLICY, API_ENCRYPTION_POLICY, RATE_LIMIT_POLICY, ...GENERATED, TIPS, P2P, PUSH_NOTIFICATIONS, ANALYTICS]);
 
 /**
  * Site templates — the bundles the OWNER picks for a site (docs/OWNER-PANEL.md
