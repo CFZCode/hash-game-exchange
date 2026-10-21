@@ -1646,13 +1646,24 @@ class ReportsService {
      *     NOT the wallet move — the exchange nets back and lay on one market (a hedged bet debits
      *     nothing, a settlement can credit with amount 0) — so each row carries `post`, the wallet
      *     after it, and balanceSheet() takes the move as post − running. INR only.
+     *     A direct user's placements come from `point_ledger_direct` (trigger-written, `balance_after`
+     *     exact, not debit_ledger's 2 dp), with the release a bet that lowers exposure (BACK after LAY)
+     *     writes there and never in debit_ledger. debit_ledger keeps only bets that ledger has no row
+     *     for (agent users, bets before migration 117).
      */
     if (column === 'inr') {
       const { sequelize } = this.models.Users;
-      const [stakes, settles] = await Promise.all([
+      const [stakes, placements, settles] = await Promise.all([
         sequelize.query(
-          `SELECT id, amount, balance AS post, description, created_at FROM mssports.debit_ledger
-            WHERE user_id = :uid AND reason = 'bet_placed' AND upper(currency) = 'INR'`,
+          `SELECT id, amount, balance AS post, description, created_at FROM mssports.debit_ledger d
+            WHERE user_id = :uid AND reason = 'bet_placed' AND upper(currency) = 'INR'
+              AND NOT EXISTS (SELECT 1 FROM mssports.point_ledger_direct p
+                               WHERE p.bet_id::text = d.meta->>'bet_id' AND p.event_type = 'BET_PLACED' AND p.source = 'sports-service')`,
+          { replacements: { uid }, type: QueryTypes.SELECT }
+        ),
+        sequelize.query(
+          `SELECT id, event_type, delta AS amount, balance_after AS post, remark AS description, created_at FROM mssports.point_ledger_direct
+            WHERE user_id = :uid AND source = 'sports-service' AND event_type IN ('BET_PLACED', 'BET_RELEASED') AND currency = 'INR'`,
           { replacements: { uid }, type: QueryTypes.SELECT }
         ),
         sequelize.query(
@@ -1664,6 +1675,10 @@ class ReportsService {
       const label = { settlement: 'Settlement', refund: 'Refund', settlement_void: 'Void' };
       for (const row of stakes) {
         push(row.created_at, 'Sports', 'DEBIT', `Bet placed — ${row.description || ''}`.trim(), `-${money.fromStored(row.amount ?? '0')}`, Number(row.id) || 0, row.post);
+      }
+      for (const row of placements) {
+        const placed = row.event_type === 'BET_PLACED';
+        push(row.created_at, 'Sports', placed ? 'DEBIT' : 'CREDIT', `${placed ? 'Bet placed' : 'Exposure released'} — ${row.description || ''}`.trim(), money.fromStored(row.amount ?? '0'), Number(row.id) || 0, row.post);
       }
       for (const row of settles) {
         push(row.created_at, 'Sports', 'CREDIT', `${label[row.reason]} — ${row.description || ''}`.trim(), money.fromStored(row.amount ?? '0'), Number(row.id) || 0, row.post);

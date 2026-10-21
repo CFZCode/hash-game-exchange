@@ -399,6 +399,35 @@ test('reports against a database', async (t) => {
     }
   });
 
+  await t.test('sports placements and exposure releases come from point_ledger_direct, once each', async () => {
+    const q = (sql, replacements) => models.Users.sequelize.query(sql, { replacements });
+    const opening = Number((await service.balanceSheet({ staff: asA, userId: playerA, limit: 500 })).balance.ledger);
+    const at = (min) => new Date(Date.now() + min * 60_000);
+    // Bet 1 is placed before point_ledger_direct existed (debit_ledger only); bet 2 is in both, its
+    // debit_ledger balance off by a paisa (2 dp), so a doubled row would show up as a −0.01 line.
+    await q(`INSERT INTO mssports.debit_ledger (user_id, currency, amount, reason, description, balance, meta, created_at) VALUES
+      (:uid, 'INR', 10, 'bet_placed', 'old bet', :b1, '{"bet_id": 990000001}', :t1),
+      (:uid, 'INR', 36, 'bet_placed', 'lay', :b2, '{"bet_id": 990000002}', :t2)`,
+    { uid: String(playerA), b1: opening - 10, b2: opening - 45.99, t1: at(60), t2: at(61) });
+    await q(`INSERT INTO mssports.point_ledger_direct (entry_ref, source, event_type, category, user_id, currency, delta, balance_after, bet_id, remark, created_at) VALUES
+      ('t-sheet-p2', 'sports-service', 'BET_PLACED', 'OTHER', :uid, 'INR', -36, :b2, 990000002, 'lay', :t2),
+      ('t-sheet-r3', 'sports-service', 'BET_RELEASED', 'OTHER', :uid, 'INR', 35, :b3, 990000003, 'back', :t3)`,
+    { uid: playerA, b2: opening - 46, b3: opening - 11, t2: at(61), t3: at(62) });
+    try {
+      const sheet = await service.balanceSheet({ staff: asA, userId: playerA, limit: 500 });
+      const sports = sheet.rows.filter((r) => r.category === 'Sports').reverse().map((r) => [r.type, r.amount, r.description]);
+      assert.deepEqual(sports, [
+        ['DEBIT', '-10.00000000', 'Bet placed — old bet'],
+        ['DEBIT', '-36.00000000', 'Bet placed — lay'],
+        ['CREDIT', '35.00000000', 'Exposure released — back'],
+      ]);
+      assert.equal(Number(sheet.balance.ledger), opening - 11);
+    } finally {
+      await q(`DELETE FROM mssports.debit_ledger WHERE user_id = :uid`, { uid: String(playerA) });
+      await q(`DELETE FROM mssports.point_ledger_direct WHERE entry_ref IN ('t-sheet-p2', 't-sheet-r3')`);
+    }
+  });
+
   await t.test('the balance sheet page reaches past 200 rows', () => {
     assert.equal(v.balanceSheet.query.parse({ limit: '1000' }).limit, 1000);
   });

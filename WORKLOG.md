@@ -15,6 +15,14 @@ Format:
 
 ---
 
+## 2026-10-21 — Balance sheet: sports bet placed + exposure release point_ledger_direct se
+**Kya kiya:** Admin → player → Balance sheet (direct user, INR) me sports "Bet placed" ab `mssports.point_ledger_direct` ki BET_PLACED row se aata hai, aur naya "Exposure released" row BET_RELEASED se (BACK after LAY jaisi bet jo exposure ghatati hai). `debit_ledger` se sirf wahi bet placed aate hain jinki point_ledger_direct me row nahi hai (migration 117 se pehle ki bets). Settlement / refund / void pehle jaise `mssports.credits_ledger` se.
+**Kyun:** Issue doc `backend/docs/issue-balance-sheet-exposure-release.md`: release ki `debit_ledger` row nahi banti thi, to agla row (jaise haari fancy ka settlement) uska paisa apne naam se dikhata tha (+35) aur beech me `unexplained` non-zero rehta tha. User: sports bets point ledger direct se dikhao; agent user ki sheet pehle se `point_ledger` se (`clientBalanceSheet`), wo nahi badli.
+**Files / jagah:** `backend/services/admin/src/modules/reports/reports.service.js` (section 6b) + `__tests__/reports.test.js`; issue doc ka status.
+**Notes / pending:** Live: parker-admin-svc restart. Live DB pe 24 sports users ki sheet purane vs naye code se mila ke dekhi: sabka `unexplained` 0 (parkertest12 ka pehle 23.00090881 tha), 4 hedge wale users me release rows aayi, baaki ki sheet same. 17 Oct se pehle ki releases kahin record nahi hain, wo jaisi thi waisi. debit_ledger ka balance 2 dp hai, isliye point_ledger_direct wali rows ab exact hain. Pending (wahi gap): admin User statement (`statements.service.js`), admin Ledger tab + player site Wallet → Transaction (`wallet.repository.js`) abhi bhi debit_ledger padhte hain, release nahi dikhta. Settlement ka wallet move point_ledger_direct me bina label (`BALANCE_CHANGE`) aata hai. Admin tests: reports 32/32; poore admin suite me 20 purane fail, same baseline.
+
+---
+
 ## 2026-10-21 — Owner panel me payment gateway on/off switch
 **Kya kiya:** Owner panel → Features & plan → Site flags me naya group "Payment gateways": CCPayment, A-Pay, WayPay, CricPay, UPI (EkQR) — har gateway ka switch (owner document `flags.gateway_<naam>`, khaali = on). Backend (user-service `paymentOrders.service.js`): owner ne gateway off kiya to us gateway pe naya deposit, naya withdrawal aur methods list `503 PAYORDER_PROVIDER_DISABLED` — paisa hold hone se pehle, gateway ko call kiye bina. Jo order pehle se khule hain unke callback / status pehle jaise chalte hain. Site pe CCPayment off = crypto tab me CCPayment ka form nahi aata (methods khaali), purana manual address wala form dikhta hai.
 **Kyun:** User: owner panel me ye setting honi chahiye ki site pe kaunsa payment gateway enable / disable ho — nahi thi.

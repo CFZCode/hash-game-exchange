@@ -1,6 +1,6 @@
 # Issue: admin balance sheet misses sports exposure releases
 
-**Status:** open, not fixed. Found on live, 22 Oct 2026 (run h2, player `parkertest12`, id 9596657868).
+**Status:** admin balance sheet fixed 21 Oct 2026: a direct user's bet placed and exposure released rows now come from `mssports.point_ledger_direct` (section 6b), whose `balance_after` is the full wallet value, so those rows no longer leak the 2-decimal remainder (settlement rows still read `credits_ledger.closing`, 2 dp). `debit_ledger` still gets no release row, so the admin user statement, the admin Ledger tab and the player Wallet → Transaction pane still miss it. Found on live, 21 Oct 2026 (run h2, player `parkertest12`, id 9596657868).
 **Severity:** reporting only. Wallet balances and totals are right; no money is lost or created.
 
 ## Symptom
