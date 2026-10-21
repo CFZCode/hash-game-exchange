@@ -55,6 +55,14 @@ Format:
 
 ---
 
+## 2026-10-22 — Users → Financial se "Withdrawal rules" box hataya
+**Kya kiya:** Admin → Users → Financial tab (`/users?tab=financial`) se "Withdrawal rules" card (Withdrawal limit, Wagering bonus, Daily withdrawal limit — owner ki read-only setting) hata diya. Upar ke 4 cards aur "Per-user withdrawal lock" table waise hi hain.
+**Kyun:** User: is section se Withdrawal rules box remove kar do.
+**Files / jagah:** `admin/src/views/players/users/FinancialTab.tsx`.
+**Notes / pending:** Sirf UI; backend / owner ki setting nahi chhui, rules waise hi lagte hain. Admin build + `parker-admin` restart. eslint + tsc saaf; build me "Withdrawal rules" text nahi bacha.
+
+---
+
 ## 2026-10-22 — Balance sheet: Original Games ki transaction id hata di
 **Kya kiya:** Admin → player → Balance sheet me Original Games ki line ab sirf game + type dikhati hai ("Plinko bet", "Plinko win"), aage ka `· <transaction id>` hata diya.
 **Kyun:** User: balance sheet me original game ki id mat dikhao, baaki sab theek hai.

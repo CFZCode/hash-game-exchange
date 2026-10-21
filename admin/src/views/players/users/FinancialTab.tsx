@@ -1,28 +1,23 @@
 'use client'
 
-import type { ReactNode } from 'react'
-
 import Link from 'next/link'
 
-import { BanIcon, CalendarClockIcon, CircleCheckIcon, DicesIcon, GaugeIcon, LockIcon, UsersIcon, WalletIcon } from 'lucide-react'
+import { BanIcon, CircleCheckIcon, GaugeIcon, LockIcon, UsersIcon, WalletIcon } from 'lucide-react'
 
 import useReportMoney from '@/components/shared/ReportMoney'
 import DataTable, { type Column } from '@/components/shared/DataTable'
-import { Card } from '@/components/ui/card'
-import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
 import { useSession } from '@/contexts/SessionContext'
 import { useApi, useApiMutation, useListState, usePagedApi } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
 import { cn } from '@/lib/utils'
-import { Chip, PlayerAvatar, StatCard, TONES, inr, type Tone } from './shared'
+import { Chip, PlayerAvatar, StatCard } from './shared'
 
 /**
  * Users → Financial → Withdrawal — reference admin (admin-structure.zip →
  * components/users/FinancialTab.tsx `WithdrawalControl`) jaisa:
  *
  *   Overview cards      withdrawals ON/OFF, direct users, locked, limit
- *   Withdrawal rules    limit + wagering bonus, read-only — owner panel → Features & plan → Withdrawals
  *   Per-user withdrawal lock table                         GET admin/withdrawal-control/users + POST admin/locks
  *
  * Global withdrawals ON / OFF sirf owner panel (Features & plan → Withdrawals) se; yahan sirf status.
@@ -61,34 +56,6 @@ type LockUser = {
 const fmtMult = (n: number) => `${Number(n)}×`
 const fmtDate = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : '—')
 
-const OnOff = ({ on, tone }: { on: boolean; tone: Tone }) => (
-  <Chip tone={tone} className={cn('min-w-12 text-center tracking-widest', !on && 'bg-muted text-muted-foreground')}>
-    {on ? 'ON' : 'OFF'}
-  </Chip>
-)
-
-/** Owner panel se aane wali setting ka badge — admin yahan badal nahi sakta. */
-const OwnerBadge = () => (
-  <span className='text-muted-foreground bg-muted inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium whitespace-nowrap'>
-    <LockIcon className='size-3' /> Read-only
-  </span>
-)
-
-/** Withdrawal rules card ki ek line: icon + naam + ON/OFF, bada value, chhota text. */
-const Rule = ({ icon, tone, on, name, value, children, loading }: { icon: ReactNode; tone: Tone; on: boolean; name: string; value: ReactNode; children: ReactNode; loading?: boolean }) => (
-  <div className='flex min-w-0 gap-4 p-5'>
-    <span className={cn('flex size-11 shrink-0 items-center justify-center rounded-xl [&_svg]:size-5', on ? TONES[tone] : 'bg-muted text-muted-foreground')}>{icon}</span>
-    <div className='min-w-0 flex-1'>
-      <div className='flex flex-wrap items-center justify-between gap-2'>
-        <p className='text-muted-foreground text-xs font-semibold tracking-wide uppercase'>{name}</p>
-        {!loading && <OnOff on={on} tone={tone} />}
-      </div>
-      {loading ? <Skeleton className='mt-2 h-7 w-32' /> : <p className={cn('mt-1 text-2xl font-bold tabular-nums', !on && 'text-muted-foreground')}>{value}</p>}
-      <div className='text-muted-foreground mt-2 text-sm'>{children}</div>
-    </div>
-  </div>
-)
-
 const WithdrawalControl = () => {
   const summary = useApi<Summary>(API, undefined, { retry: false })
   const s = summary.data
@@ -97,12 +64,7 @@ const WithdrawalControl = () => {
   const enabled = s?.enabled ?? true
   const limit = s?.limit
   const limitOn = Boolean(limit?.enabled)
-  const wagerOn = Boolean(limit?.wagerBonus)
   const m = limit?.depositMultiplier ?? 3
-  const w = limit?.wagerMultiplier ?? 5
-  const daily = s?.dailyLimit
-  const dailyRows = Object.entries(daily?.limits ?? {})
-  const dailyOn = Boolean(daily?.enabled && dailyRows.length)
 
   return (
     <div className='flex flex-col gap-4'>
@@ -120,45 +82,6 @@ const WithdrawalControl = () => {
           Withdrawals are OFF in the owner panel. No player can withdraw by any method until the owner switches them back on.
         </p>
       )}
-
-      {/* Limit + wagering bonus — owner panel ki setting, yahan read-only */}
-      <Card className='gap-0 p-0'>
-        <div className='flex flex-wrap items-center justify-between gap-2 border-b px-5 py-3'>
-          <h2 className='font-bold'>Withdrawal rules</h2>
-          <OwnerBadge />
-        </div>
-        <div className='grid divide-y lg:grid-cols-2 lg:divide-x lg:divide-y-0'>
-          <Rule icon={<GaugeIcon />} tone='warning' on={limitOn} name='Withdrawal limit' value={limitOn ? `${fmtMult(m)} deposits` : 'No limit'} loading={loading}>
-            Every player can withdraw at most this many times what they have deposited, in each currency, plus the wagering bonus. Agent transfers count as INR deposits, and pending
-            withdrawals count toward the limit.
-          </Rule>
-          <Rule icon={<DicesIcon />} tone='info' on={limitOn && wagerOn} name='Wagering bonus' value={wagerOn ? `+ up to ${fmtMult(w)}` : 'Off'} loading={loading}>
-            Extra room earned by playing: every rupee bet (casino and settled sports bets, refunds excluded) adds a rupee to the limit, up to this many times deposits.
-            {s && (
-              <p className='bg-muted/50 mt-2 rounded-md px-2.5 py-1.5 text-xs'>
-                {!limitOn
-                  ? 'No effect while the withdrawal limit is off.'
-                  : wagerOn
-                    ? `Example: ₹1,000 deposited and ₹1,000 wagered → ${inr(1000 * m)} + ${inr(Math.min(1000, 1000 * w))} = ${inr(1000 * m + Math.min(1000, 1000 * w))}.`
-                    : `Example: ₹1,000 deposited → max ${inr(1000 * m)}, however much is wagered.`}
-              </p>
-            )}
-          </Rule>
-        </div>
-        <div className='border-t'>
-          <Rule
-            icon={<CalendarClockIcon />}
-            tone='primary'
-            on={dailyOn}
-            name='Daily withdrawal limit'
-            value={dailyOn ? dailyRows.map(([c, a]) => `${c} ${Number(a).toLocaleString('en-IN', { maximumFractionDigits: 8 })}`).join(' · ') : 'No limit'}
-            loading={loading}
-          >
-            The most a player can withdraw of each listed currency in any rolling 24 hours, pending withdrawals included, on every method (bank / UPI, gateway, crypto, P2P sell). A
-            currency that is not listed has no daily limit.
-          </Rule>
-        </div>
-      </Card>
 
       <LockTable locked={s?.lockedDirectUsers} />
 
