@@ -2,7 +2,7 @@ import { brandName } from '../../../services/siteBranding';
 import React from 'react';
 import { Link } from 'react-router-dom';
 import Select from '../../../components/shared/Select';
-import Table, { HEAD, HEAD_CENTER, HEAD_END } from '../../../components/shared/Table';
+import Table, { CELL, CELL_CENTER, CellTime, HEAD, HEAD_CENTER, HEAD_END } from '../../../components/shared/Table';
 import CurrencyAmount from '../../../components/shared/CurrencyAmount';
 import { AssetsFilter, TimeFilter } from '../../../components/shared/WalletFilters';
 import Notice from '../../../components/shared/Notice';
@@ -290,7 +290,7 @@ function BillList({ settings }) {
               key={item.amountLogId}
               className="flex items-center justify-between border-b border-third"
             >
-              <div className="ellipsis flex flex-1 flex-col items-start p-4 text-base font-extrabold">
+              <div className={`${CELL} flex-col !items-start`}>
                 <div>{item.changeTypeDesc}</div>
                 {item.changeTypeDetail && (
                   <div className="ml-1 mt-0.5 flex items-center text-xs text-secondary">
@@ -298,10 +298,10 @@ function BillList({ settings }) {
                   </div>
                 )}
               </div>
-              <div className="ellipsis flex flex-1 items-center justify-center p-4 text-base font-extrabold text-secondary">
-                {new Date(Number(item.createTime)).toLocaleString()}
+              <div className={`${CELL_CENTER} flex-col text-secondary`}>
+                <CellTime at={item.createTime} />
               </div>
-              <div className="ellipsis flex flex-1 items-center justify-center p-4 text-base font-extrabold">
+              <div className={CELL_CENTER}>
                 <CurrencyAmount
                   amount={change}
                   currency={item.currencyName}
@@ -310,7 +310,7 @@ function BillList({ settings }) {
                   settings={settings}
                 />
               </div>
-              <div className="ellipsis flex flex-1 items-center justify-end p-4 text-base font-extrabold">
+              <div className={`${CELL} justify-end`}>
                 <CurrencyAmount
                   amount={balance}
                   currency={item.currencyName}
@@ -423,13 +423,13 @@ function DepositList({ settings }) {
             className="flex flex-none cursor-pointer items-center justify-between border-third hover:rounded-sm hover:bg-white_alpha5"
             to={`/wallet/deposit-detail?orderId=${item.orderId}`}
           >
-            <div className="ellipsis flex flex-1 flex-col items-start p-4 text-base font-extrabold">
+            <div className={`${CELL} flex-col !items-start`}>
               Deposit
             </div>
-            <div className="ellipsis flex flex-1 items-center justify-center p-4 text-base font-extrabold text-secondary">
-              {new Date(Number(item.createTime)).toLocaleString()}
+            <div className={`${CELL_CENTER} flex-col text-secondary`}>
+              <CellTime at={item.createTime} />
             </div>
-            <div className="ellipsis flex flex-1 items-center justify-center p-4 text-base font-extrabold">
+            <div className={CELL_CENTER}>
               <CurrencyAmount
                 amount={state.isSuccess ? item.receiveAmount : item.amount}
                 currency={item.currencyName}
@@ -438,7 +438,7 @@ function DepositList({ settings }) {
                 settings={settings}
               />
             </div>
-            <div className="ellipsis flex flex-1 items-center justify-end p-4 text-base font-extrabold">
+            <div className={`${CELL} justify-end`}>
               <StatusCell orderClass={state.orderClass} txt={state.txt} />
             </div>
           </Link>
@@ -465,13 +465,13 @@ function WithdrawList({ settings }) {
              `id`, so an orderId alone is ambiguous. See services/transaction.js. */
           to={`/wallet/withdraw-detail?orderId=${item.orderId}&rail=${item.method || ''}`}
         >
-          <div className="ellipsis flex flex-1 flex-col items-start p-4 text-base font-extrabold">
+          <div className={`${CELL} flex-col !items-start`}>
             Withdraw
           </div>
-          <div className="ellipsis flex flex-1 items-center justify-center p-4 text-base font-extrabold">
-            {new Date(Number(item.createTime)).toLocaleString()}
+          <div className={`${CELL_CENTER} flex-col`}>
+            <CellTime at={item.createTime} />
           </div>
-          <div className="ellipsis flex flex-1 items-center justify-center p-4 text-base font-extrabold">
+          <div className={CELL_CENTER}>
             <CurrencyAmount
               amount={item.amount}
               currency={item.currencyName}
@@ -480,7 +480,7 @@ function WithdrawList({ settings }) {
               settings={settings}
             />
           </div>
-          <div className="ellipsis flex flex-1 items-center justify-end p-4 text-base font-extrabold">
+          <div className={`${CELL} justify-end`}>
             <StatusCell orderClass={state.orderClass} txt={state.txt} textClass="text-secondary" />
           </div>
         </Link>

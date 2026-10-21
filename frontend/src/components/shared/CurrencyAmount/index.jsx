@@ -37,12 +37,20 @@ export default function CurrencyAmount({
           ? 'text-error'
           : '';
   const prefix = sign === 'auto' ? (positive ? '+' : '') : (sign ?? '');
+  const bare = printCurrency(amount, currency, { settings, hasAlias: false });
+  /* The " USDT" a crypto amount ends on; the coin icon beside it already names the coin, so a
+     phone drops it — four wallet-table columns had no room for both. */
+  const alias = printCurrency(amount, currency, { settings }).slice(bare.length);
 
   return (
-    <span className={`inline-flex items-center ${tone} ${className}`}>
-      {prefix}
-      {printCurrency(amount, currency, { settings })}
-      <img className={`ml-1 size-4 ${iconClass}`} alt="coin icon" src={coinIcon(currency)} />
+    <span className={`inline-flex max-w-full items-center ${tone} ${className}`}>
+      <span className="truncate">
+        {prefix}
+        {bare}
+        {alias && <span className="max-sm:hidden">{alias}</span>}
+      </span>
+      {/* A fiat amount already carries its symbol (₹2,000.00), so a phone drops the icon instead. */}
+      <img className={`ml-1 size-4 flex-none ${alias ? '' : 'max-sm:hidden'} ${iconClass}`} alt="coin icon" src={coinIcon(currency)} />
     </span>
   );
 }

@@ -6,6 +6,7 @@ import Table, {
   HEAD_END,
   CELL,
   CELL_CENTER,
+  CellTime,
 } from '../../../components/shared/Table';
 import CurrencyAmount from '../../../components/shared/CurrencyAmount';
 import EmptyPlaceholder from '../../../components/shared/EmptyPlaceholder';
@@ -154,8 +155,8 @@ function BetList({ settings }) {
             }`}
           >
             <div className={CELL}>{item.type}</div>
-            <div className={`${CELL_CENTER} text-secondary`}>
-              {new Date(Number(item.time)).toLocaleString()}
+            <div className={`${CELL_CENTER} flex-col text-secondary`}>
+              <CellTime at={item.time} />
             </div>
             {/* `payout / 1e4` then a literal "x" — a multiplier, not an amount. */}
             <div className={CELL_CENTER}>{Number(item.payout ?? 0) / 1e4}x</div>

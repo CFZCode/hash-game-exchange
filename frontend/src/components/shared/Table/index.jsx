@@ -26,7 +26,10 @@ import Loading from '../Loading';
 /* `d`, `d.Start`, `d.End`, `d.Center` — one cell, and the four variants are the original's own
    compositions rather than free-form classes. `Start`/`End` add `flex-col` because a cell that
    stacks two lines (a type over its timestamp) has to align them as a column. */
-export const CELL = 'ellipsis flex flex-1 items-center p-4 text-base font-extrabold';
+/* Below sm four `p-4` cells leave a phone ~40px of text each, so the Time column was cut at both
+   edges and Balance ran off the right; tighter padding, a smaller size and `min-w-0` (so
+   `ellipsis` can shrink the cell) keep the row inside the screen. */
+export const CELL = 'ellipsis flex min-w-0 flex-1 items-center px-2 py-3 text-sm font-extrabold sm:p-4 sm:text-base';
 export const CELL_START = `${CELL} flex-col !items-start`;
 export const CELL_END = `${CELL} flex-col !items-end`;
 export const CELL_CENTER = `${CELL} justify-center`;
@@ -38,13 +41,25 @@ export const HEAD = 'flex-1';
 export const HEAD_CENTER = 'flex-1 text-center';
 export const HEAD_END = 'flex-1 text-right';
 
+/* A row's timestamp as date over time, so it fits a phone column; same as the Rollover pane's. */
+export function CellTime({ at }) {
+  if (!at) return null;
+  const d = new Date(Number(at));
+  return (
+    <>
+      <span>{d.toLocaleDateString()}</span>
+      <span className="text-xs">{d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+    </>
+  );
+}
+
 export default function Table({ columns, headerClass, loading, children }) {
   return (
     <>
       <div
         className={
           headerClass ??
-          'mt-3 flex flex-none justify-between rounded-xl bg-layer2 px-4 py-3'
+          'mt-3 flex flex-none justify-between rounded-xl bg-layer2 px-2 py-3 text-sm sm:px-4 sm:text-base'
         }
       >
         {columns.map(([label, cls]) => (
