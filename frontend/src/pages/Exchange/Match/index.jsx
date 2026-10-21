@@ -40,6 +40,7 @@ import RaceStatus from './RaceStatus';
 import { marketLabel } from '../../Wallet/BetHistory/sportsBets';
 import { markMatchGone, reviveMatch } from '../../../services/exchange/deadMatches';
 import CricketScorecard from '../../../components/exchange/CricketScorecard';
+import CricketScoreEmbed from '../../../components/exchange/CricketScoreEmbed';
 
 const SPORTS_STREAM_BASE = process.env.NEXT_PUBLIC_SPORTS_STREAM_BASE || '';
 const SCORECARD_BASE = process.env.NEXT_PUBLIC_SCORECARD_BASE || '';
@@ -147,7 +148,8 @@ export default function ExchangeMatchPage() {
 
   /* Scorecard + stream, gated as TENEXCH's GameDetails gates them, except the scorecard shows
      signed out too (owner's call); the stream stays signed-in only:
-     - cricket: the socket card, once the match has started (iplay, or stime has passed);
+     - cricket: the scoreboard embed when score-url returns one (pre-match too: it shows status and
+       venue), else the socket card once the match has started (iplay, or stime has passed);
      - other sports: the score iframe only when the feed assigns a graphic (gtv > 0). Sticky per
        match: a poll without gtv must not unmount it, since a remount spends another single-use
        token. Fetched once per match; the scorecard host is the fallback when score-url fails;
@@ -165,19 +167,21 @@ export default function ExchangeMatchPage() {
   })();
 
   const scoreKey = `${gmid}|${sid}`;
-  const wantScoreUrl = !isCricket && scoreCovered && Boolean(gmid && sid);
+  const wantScoreUrl = scoreCovered && Boolean(gmid && sid);
   React.useEffect(() => {
     if (!wantScoreUrl) return undefined;
     let alive = true;
-    const fallback = SCORECARD_BASE ? `${SCORECARD_BASE}?etid=${sid}&gmid=${gmid}` : null;
+    const fallback = !isCricket && SCORECARD_BASE ? `${SCORECARD_BASE}?etid=${sid}&gmid=${gmid}` : null;
     getScoreUrl(gmid, sid).then((url) => {
       if (alive) setScore({ key: scoreKey, url: url || fallback });
     });
     return () => {
       alive = false;
     };
-  }, [wantScoreUrl, gmid, sid, scoreKey]);
+  }, [wantScoreUrl, isCricket, gmid, sid, scoreKey]);
   const scoreUrl = score.key === scoreKey ? score.url : null;
+  // The socket card only once score-url has answered without an embed (no flash before the iframe).
+  const cricketSocket = isCricket && matchStarted && score.key === scoreKey && !scoreUrl;
 
   /* ── markets ── */
   const visible = React.useMemo(
@@ -350,9 +354,10 @@ export default function ExchangeMatchPage() {
       showTv={tvOn}
       onToggleTv={setShowTv}
       scoreSlot={
-        isTournament ? null : (isCricket && matchStarted) || tvOn || scoreUrl ? (
+        isTournament ? null : cricketSocket || tvOn || scoreUrl ? (
           <>
-            {isCricket && matchStarted && <CricketScorecard gmid={gmid} started />}
+            {cricketSocket && <CricketScorecard gmid={gmid} started />}
+            {isCricket && scoreUrl && <CricketScoreEmbed url={scoreUrl} />}
             {tvOn ? (
               <iframe
                 key={gmid}

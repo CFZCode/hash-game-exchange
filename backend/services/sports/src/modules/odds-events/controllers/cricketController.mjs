@@ -204,7 +204,8 @@ var CricketController = {
       });
     }
     try {
-      const url = await ScoreAnimationService_default.getScoreUrl(etid, gmid);
+      // Cricket: the scoreboard embed or nothing — the page falls back to its socket card.
+      const url = String(etid) === "4" ? await ScoreAnimationService_default.getCricketEmbedUrl(gmid) : await ScoreAnimationService_default.getScoreUrl(etid, gmid);
       if (!url) {
         return res.status(502).json({
           success: false,

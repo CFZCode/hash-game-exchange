@@ -55,6 +55,29 @@ async function getScoreAnimation(etid, gmid) {
   }
   return { ok: false, attempts: MAX_ATTEMPTS, reason: lastReason };
 }
-var ScoreAnimationService_default = { getScoreAnimation, getScoreUrl };
+// Cricket scoreboard embed: a 200 page means the provider has the match, a 404 that it has not.
+// The browser cannot read the status (no CORS), so the check is done here and cached per gmid.
+// Empty CRICKET_SCORE_EMBED_URL switches it off (cricket then gets null → the socket card).
+var EMBED_URL = process.env.CRICKET_SCORE_EMBED_URL ?? "https://dzfytm4o128av.cloudfront.net/embed/{gmid}?theme=dark";
+var EMBED_TIMEOUT_MS = 4e3;
+var EMBED_TTL_MS = 3 * 60e3;
+var embedCache = /* @__PURE__ */ new Map();
+async function getCricketEmbedUrl(gmid, { template = EMBED_URL, get = axios2.get, now = Date.now } = {}) {
+  if (!template) return null;
+  const hit = embedCache.get(String(gmid));
+  if (hit && hit.until > now()) return hit.url;
+  const url = template.replace("{gmid}", encodeURIComponent(gmid));
+  let ok = false;
+  try {
+    const res = await get(url, { timeout: EMBED_TIMEOUT_MS, responseType: "text", validateStatus: () => true });
+    ok = res.status === 200;
+  } catch {
+    ok = false;
+  }
+  // shortcut: unbounded Map, one entry per cricket gmid ever asked; prune if it ever grows large.
+  embedCache.set(String(gmid), { url: ok ? url : null, until: now() + EMBED_TTL_MS });
+  return ok ? url : null;
+}
+var ScoreAnimationService_default = { getScoreAnimation, getScoreUrl, getCricketEmbedUrl, _embedCache: embedCache };
 
 export { ScoreAnimationService_default };
