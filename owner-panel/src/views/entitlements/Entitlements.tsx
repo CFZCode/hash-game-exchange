@@ -668,6 +668,28 @@ const CashierLimitsEditor = ({
   changed: (code: string) => boolean
   onChange: (next: CashierLimits) => void
 }) => {
+  // Rows switched to limited but not filled yet; a row with any amount is limited by itself.
+  const [opened, setOpened] = useState<Set<string>>(() => new Set())
+  const unlimited = (code: string) => !limits[code] && !opened.has(code)
+
+  const setUnlimited = (code: string, on: boolean) => {
+    setOpened(prev => {
+      const next = new Set(prev)
+
+      if (on) next.delete(code)
+      else next.add(code)
+
+      return next
+    })
+
+    if (on && limits[code]) {
+      const next = { ...limits }
+
+      delete next[code]
+      onChange(next)
+    }
+  }
+
   const set = (code: string, field: CashierField, raw: string) => {
     const row = { ...EMPTY_LIMIT, ...limits[code], [field]: raw.trim() === '' ? null : raw.trim() }
     const next = { ...limits, [code]: row }
@@ -686,6 +708,7 @@ const CashierLimitsEditor = ({
         <thead>
           <tr className='text-muted-foreground text-left text-xs'>
             <th className='py-2 pr-4 font-medium'>Currency</th>
+            <th className='px-2 py-2 font-medium'>Unlimited</th>
             {CASHIER_COLUMNS.map(c => (
               <th key={c.field} className='px-2 py-2 font-medium'>
                 {c.label}
@@ -697,13 +720,17 @@ const CashierLimitsEditor = ({
           {coins.map(code => (
             <tr key={code} data-currency={code} className={cn(changed(code) && 'bg-primary/5')}>
               <td className='py-2 pr-4 font-mono font-semibold'>{code}</td>
+              <td className='px-2 py-2'>
+                <Switch size='sm' checked={unlimited(code)} onCheckedChange={on => setUnlimited(code, on)} aria-label={`${code} unlimited`} />
+              </td>
               {CASHIER_COLUMNS.map(c => (
                 <td key={c.field} className='px-2 py-2'>
                   <Input
                     inputMode='decimal'
                     autoComplete='off'
                     aria-label={`${code} ${c.label}`}
-                    placeholder='No limit'
+                    placeholder={unlimited(code) ? 'Unlimited' : 'No limit'}
+                    disabled={unlimited(code)}
                     className='w-36'
                     value={limits[code]?.[c.field] ?? ''}
                     onChange={e => set(code, c.field, e.target.value.replace(/[^0-9.]/g, ''))}
@@ -1254,8 +1281,8 @@ const Entitlements = () => {
                       <CardHeader>
                         <CardTitle>Cashier limits</CardTitle>
                         <CardDescription>
-                          Deposit and withdrawal limits for each currency, in that currency. Set here only: the site admin shows them read-only. Leave a box
-                          empty for no limit on that side.
+                          Deposit and withdrawal limits for each currency, in that currency. Set here only: the site admin shows them read-only. Unlimited on
+                          clears that currency&apos;s limits; switch it off to set them. Leave a box empty for no limit on that side.
                         </CardDescription>
                       </CardHeader>
                       <CardContent>
