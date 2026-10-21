@@ -64,7 +64,6 @@ import {
   MAX_DAILY_LIMIT,
   type WithdrawalDailyLimit
 } from '@/lib/entitlements/withdrawalDailyLimit'
-import { CASHIER_FIELDS, cashierLimitsProblem, DEFAULT_CASHIER_LIMITS, EMPTY_LIMIT, type CashierField, type CashierLimits } from '@/lib/entitlements/cashierLimits'
 import {
   diffDocs,
   type Change,
@@ -175,7 +174,7 @@ const tabOf = (c: Change): Tab => {
   if (c.kind === 'template') return 'template'
   if (c.kind === 'withdrawal_cap' || c.kind === 'withdrawal_daily_limit' || c.kind === 'withdrawals_enabled' || c.key === WITHDRAWAL_REQUIREMENTS) return 'withdrawals'
   if (c.kind === 'flag') return 'flags'
-  if (c.kind === 'cashier_limits' || ((c.kind === 'variant' || c.kind === 'feature') && POLICY_KEYS.has(c.key))) return 'policies'
+  if ((c.kind === 'variant' || c.kind === 'feature') && POLICY_KEYS.has(c.key)) return 'policies'
 
   return 'features'
 }
@@ -650,109 +649,6 @@ const WithdrawalRequirementsEditor = ({
   )
 }
 
-const CASHIER_COLUMNS: { field: CashierField; label: string }[] = [
-  { field: 'depositMin', label: 'Min deposit' },
-  { field: 'depositMax', label: 'Max deposit' },
-  { field: 'withdrawMin', label: 'Min withdrawal' },
-  { field: 'withdrawMax', label: 'Max withdrawal' }
-]
-
-/**
- * Cashier limits per currency: one row per coin entitled under Site flags, four amounts each, in
- * that currency. Empty = no limit on that side (the payment rail's own minimum still applies).
- */
-const CashierLimitsEditor = ({
-  coins,
-  limits,
-  changed,
-  onChange
-}: {
-  coins: string[]
-  limits: CashierLimits
-  changed: (code: string) => boolean
-  onChange: (next: CashierLimits) => void
-}) => {
-  // Rows switched to limited but not filled yet; a row with any amount is limited by itself.
-  const [opened, setOpened] = useState<Set<string>>(() => new Set())
-  const unlimited = (code: string) => !limits[code] && !opened.has(code)
-
-  const setUnlimited = (code: string, on: boolean) => {
-    setOpened(prev => {
-      const next = new Set(prev)
-
-      if (on) next.delete(code)
-      else next.add(code)
-
-      return next
-    })
-
-    if (on && limits[code]) {
-      const next = { ...limits }
-
-      delete next[code]
-      onChange(next)
-    }
-
-    // Off refills the currency's default limits; a coin without defaults opens empty.
-    if (!on && DEFAULT_CASHIER_LIMITS[code]) onChange({ ...limits, [code]: { ...DEFAULT_CASHIER_LIMITS[code] } })
-  }
-
-  const set = (code: string, field: CashierField, raw: string) => {
-    const row = { ...EMPTY_LIMIT, ...limits[code], [field]: raw.trim() === '' ? null : raw.trim() }
-    const next = { ...limits, [code]: row }
-
-    if (CASHIER_FIELDS.every(f => row[f] === null)) delete next[code]
-    onChange(next)
-  }
-
-  if (!coins.length) return <p className='text-muted-foreground text-sm'>No currency is switched on under Site flags.</p>
-
-  const problem = cashierLimitsProblem(limits)
-
-  return (
-    <div className='overflow-x-auto'>
-      <table className='w-full text-sm' data-cashier-limits>
-        <thead>
-          <tr className='text-muted-foreground text-left text-xs'>
-            <th className='py-2 pr-4 font-medium'>Currency</th>
-            <th className='px-2 py-2 font-medium'>Unlimited</th>
-            {CASHIER_COLUMNS.map(c => (
-              <th key={c.field} className='px-2 py-2 font-medium'>
-                {c.label}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className='divide-y'>
-          {coins.map(code => (
-            <tr key={code} data-currency={code} className={cn(changed(code) && 'bg-primary/5')}>
-              <td className='py-2 pr-4 font-mono font-semibold'>{code}</td>
-              <td className='px-2 py-2'>
-                <Switch size='sm' checked={unlimited(code)} onCheckedChange={on => setUnlimited(code, on)} aria-label={`${code} unlimited`} />
-              </td>
-              {CASHIER_COLUMNS.map(c => (
-                <td key={c.field} className='px-2 py-2'>
-                  <Input
-                    inputMode='decimal'
-                    autoComplete='off'
-                    aria-label={`${code} ${c.label}`}
-                    placeholder={unlimited(code) ? 'Unlimited' : 'No limit'}
-                    disabled={unlimited(code)}
-                    className='w-36'
-                    value={limits[code]?.[c.field] ?? ''}
-                    onChange={e => set(code, c.field, e.target.value.replace(/[^0-9.]/g, ''))}
-                  />
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {problem && <p className='text-destructive mt-2 text-sm'>{problem}</p>}
-    </div>
-  )
-}
-
 const TemplateCard = ({
   template,
   selected,
@@ -854,7 +750,6 @@ const Entitlements = () => {
         ...(prev?.withdrawalDailyLimit
           ? { withdrawalDailyLimit: { ...prev.withdrawalDailyLimit, limits: { ...prev.withdrawalDailyLimit.limits } } }
           : {}),
-        ...(prev?.cashierLimits ? { cashierLimits: Object.fromEntries(Object.entries(prev.cashierLimits).map(([c, l]) => [c, { ...l }])) } : {}),
         ...(prev?.withdrawalsEnabled !== undefined ? { withdrawalsEnabled: prev.withdrawalsEnabled } : {})
       }
 
@@ -915,7 +810,6 @@ const Entitlements = () => {
         region: draft!.region,
         withdrawalCap: draft!.withdrawalCap,
         withdrawalDailyLimit: draft!.withdrawalDailyLimit,
-        cashierLimits: draft!.cashierLimits,
         withdrawalsEnabled: draft!.withdrawalsEnabled
       }),
     invalidate: [['api']],
@@ -1122,9 +1016,6 @@ const Entitlements = () => {
     return entitled || c.code in (draft?.withdrawalDailyLimit?.limits ?? {})
   })
 
-  // Cashier limit rows: the entitled wallet coins, plus any currency that already has limits.
-  const cashierCoins = [...new Set([...dailyCoins.map(c => c.code), ...Object.keys(draft?.cashierLimits ?? {})])]
-
 
   return (
     <div className={cn(changes.length > 0 && 'pb-20')}>
@@ -1283,28 +1174,6 @@ const Entitlements = () => {
               {GROUPS.map(sec => (
                 <TabsContent key={sec.id} value={sec.id} className='mt-4'>
                   {renderSection(sec)}
-                  {sec.id === 'policies' && (
-                    <Card className='mt-4 gap-4 shadow-none' data-section='cashier-limits'>
-                      <CardHeader>
-                        <CardTitle>Cashier limits</CardTitle>
-                        <CardDescription>
-                          Deposit and withdrawal limits for each currency, in that currency. Set here only: the site admin shows them read-only. Unlimited on
-                          clears that currency&apos;s limits; switch it off to get its default limits back and edit them. Leave a box empty for no limit on that side.
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <CashierLimitsEditor
-                          coins={cashierCoins}
-                          limits={draft.cashierLimits ?? {}}
-                          changed={code => changed.has(`cashier_limits:${code}`)}
-                          onChange={cashierLimits => {
-                            report('cashierLimits', cashierLimitsProblem(cashierLimits))
-                            edit(next => void (next.cashierLimits = cashierLimits))
-                          }}
-                        />
-                      </CardContent>
-                    </Card>
-                  )}
                 </TabsContent>
               ))}
             </Tabs>
