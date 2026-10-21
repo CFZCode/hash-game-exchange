@@ -78,6 +78,16 @@ Fixed on 21 Oct 2026. The shared `Table` CELL is compact below sm (`px-2`, `text
 | Long type names were cut | They wrap to two lines |
 | The Rollover turnover didn't fit | It hides the coin code on a phone |
 
+Use `fit-audit.mjs` to check many pages at both widths in one run:
+
+```bash
+node fit-audit.mjs localhost:5190 http://localhost:5190 '/wallet/transaction*' '/wallet/bet-history*' /wallet/rollover /sports/my-bets /sports/statement
+```
+
+It runs every route at 360×640 (touch) and again at 1280×900, and reports any page side-scroll and any cut text. A `*` after a route also runs `table-check.js` there.
+
+Run on 21 Oct 2026 as parkertest01: bet history (every filter), rollover, `/sports/my-bets` and `/sports/statement` were all clean at both widths. The one flag was desktop bet history → Sports, where the time and match name are deliberately shortened with "…" and the row's chevron opens the full detail. That is intended, not a bug.
+
 ## Not covered
 
 - A real iPhone or Safari. CDP emulates Chrome only, so check iOS by hand.
