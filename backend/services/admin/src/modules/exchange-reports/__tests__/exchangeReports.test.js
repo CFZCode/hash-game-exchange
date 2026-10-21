@@ -337,17 +337,19 @@ test('exchange reports', async (t) => {
   });
 
   await t.test('direct user win loss: bets + mssports.credits_ledger, direct users only, owner only', async () => {
-    // Direct user (point entry nahi): jeeta (stake 100, payout 152, commission 2), haara (stake 30, payout 0), void (gina nahi).
-    const directBet = async (stake, result) =>
+    // Direct user (point entry nahi): jeeta (stake 100, payout 152, commission 2), haara (stake 30, payout 0), void (gina nahi),
+    // aur ek haari fancy (FAN: netamount pehle se P/L = −50, stake dobara nahi ghatta).
+    const directBet = async (stake, result, gameType = 'BM') =>
       (await one(
         `INSERT INTO mssports."SportsBet" (user_id, game_type, bet_type, odds, stake_amount, result_status, created_at, updated_at)
-         VALUES (:uid, 'BM', 'back', 1.52, :stake, :result, NOW(), NOW()) RETURNING id`,
-        { uid: direct, stake, result }
+         VALUES (:uid, :gameType, 'back', 1.52, :stake, :result, NOW(), NOW()) RETURNING id`,
+        { uid: direct, stake, result, gameType }
       )).id;
     const won = await directBet(100, 'won');
     const lost = await directBet(30, 'loss');
     await directBet(999, 'void');
-    for (const [betId, reason, net] of [[won, 'settlement', 152], [won, 'commission', -2], [lost, 'settlement', 0]]) {
+    const fancyLost = await directBet(50, 'loss', 'FAN');
+    for (const [betId, reason, net] of [[won, 'settlement', 152], [won, 'commission', -2], [lost, 'settlement', 0], [fancyLost, 'settlement', -50]]) {
       await run(
         `INSERT INTO mssports.credits_ledger (user_id, bet_id, amount, reason, netamount, created_at)
          VALUES (:uid, :betId, 0, :reason, :net, NOW())`,
@@ -357,12 +359,12 @@ test('exchange reports', async (t) => {
 
     const res = await reports.directUserWinLoss({ actor: owner, ...range });
     const mine = res.rows.find((r) => r.username === `rep-direct-${base}`);
-    assert.deepStrictEqual(mine, { user_id: direct, username: `rep-direct-${base}`, sports_pts: 20, casino_pts: 0, original_pts: 0, total: 20 });
+    assert.deepStrictEqual(mine, { user_id: direct, username: `rep-direct-${base}`, sports_pts: -30, casino_pts: 0, original_pts: 0, total: -30 });
     assert.ok(!res.rows.some((r) => r.username === `rep-playerA-${base}` || r.username === `rep-playerB-${base}`), 'agent players nahi');
 
     const one1 = await reports.directUserWinLoss({ actor: owner, clientType: 'user', clientId: direct, ...range });
-    assert.deepStrictEqual(one1.rows.map((r) => r.total), [20]);
-    assert.strictEqual(one1.totals.total, 20);
+    assert.deepStrictEqual(one1.rows.map((r) => r.total), [-30]);
+    assert.strictEqual(one1.totals.total, -30);
 
     assert.deepStrictEqual(await reports.directUserWinLoss({ actor: agent, ...range }), { rows: [], totals: { sports_pts: 0, casino_pts: 0, original_pts: 0, total: 0 } });
     await assert.rejects(reports.directUserWinLoss({ actor: owner, clientType: 'user', clientId: playerA, ...range }));

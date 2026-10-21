@@ -14,6 +14,8 @@ const { DashboardStatsService, SPORTS_LEDGER_REASONS, SPORTS_NOT_TURNOVER } = re
  * Σ `mssports.credits_ledger.netamount` (settlement = jo wapas diya, settlement_void ulta, commission).
  */
 const SETTLED_BET = (a) => `LOWER(COALESCE(${a}.result_status, '')) IN ('won', 'loss', 'lost')`;
+/** FAN (fancy / session) netamount is already the signed P/L, so its stake is left out of the house side. */
+const NOT_FAN = (a) => `UPPER(COALESCE(${a}.game_type, '')) <> 'FAN'`;
 const dashboardConstants = require('../dashboard/dashboard.constants');
 const { gisKindSql, gisSideAmountSql, gisBetCountSql, gisPlayFilterSql } = require('../statements/statements.constants');
 const { playerScope, statsWindow, bucketSql, rangeSql, select, loadRates, createValuer, minor, decimal } = require('./audienceStats.helpers');
@@ -547,7 +549,7 @@ class PnlStatsService {
                COALESCE(NULLIF(s.event_name, ''), NULLIF(s.match_title, ''), NULLIF(s.match_id, ''), 'Unknown event'),
                ${SPORTS_CURRENCY('s')}, s.stake_amount, 0
           FROM mssports."SportsBet" s
-         WHERE s.stake_amount > 0 AND ${SETTLED_BET('s')} AND ${rangeSql('s.created_at')}${ctx.currency ? ` AND ${SPORTS_CURRENCY('s')} = :currency` : ''}${owned('s.user_id')}
+         WHERE s.stake_amount > 0 AND ${SETTLED_BET('s')} AND ${NOT_FAN('s')} AND ${rangeSql('s.created_at')}${ctx.currency ? ` AND ${SPORTS_CURRENCY('s')} = :currency` : ''}${owned('s.user_id')}
         UNION ALL
         SELECT 'house', 'house', COALESCE(NULLIF(b.sport_id, ''), NULLIF(l.sport_id, ''), 'other'),
                COALESCE(NULLIF(UPPER(b.game_type), ''), NULLIF(UPPER(l.market_type), ''), 'OTHER'),
@@ -625,7 +627,7 @@ class PnlStatsService {
         UNION ALL
         SELECT s.user_id, 'sports', 'house', 'house', ${SPORTS_CURRENCY('s')}, s.stake_amount, 0
           FROM mssports."SportsBet" s
-         WHERE s.stake_amount > 0 AND ${SETTLED_BET('s')} AND ${rangeSql('s.created_at')}${ctx.currency ? ` AND ${SPORTS_CURRENCY('s')} = :currency` : ''}${owned('s.user_id')}
+         WHERE s.stake_amount > 0 AND ${SETTLED_BET('s')} AND ${NOT_FAN('s')} AND ${rangeSql('s.created_at')}${ctx.currency ? ` AND ${SPORTS_CURRENCY('s')} = :currency` : ''}${owned('s.user_id')}
         UNION ALL
         SELECT CASE WHEN l.user_id ~ '^[0-9]{1,18}$' THEN l.user_id::bigint END, 'sports', 'house', 'house',
                UPPER(l.currency), -l.netamount, 0

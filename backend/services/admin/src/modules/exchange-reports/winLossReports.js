@@ -128,12 +128,16 @@ async function userWinLoss(sequelize, tree, f) {
 
 /** Settled bet: in result_status wali bets ka P/L hota hai (void / refund / cancelled nahi). */
 const SETTLED_RESULTS = ['won', 'win', 'loss', 'lost'];
-/** mssports.credits_ledger ke settlement reasons — netamount = payout (stake samet), commission minus. */
+/**
+ * mssports.credits_ledger ke settlement reasons. netamount: MO / BM / BO me payout (stake samet, stake
+ * placement pe kata), FAN (fancy / session) me signed P/L (stake exposure se lauta, phir +jeet / −haar).
+ */
 const LEDGER_REASONS = ['settlement', 'settlement_void', 'commission', 'commission_void'];
 
 /**
  * Direct users ka P/L, bets se: har settled bet (window = settle time, `updated_at`) ka
- * Σnetamount (settlement + settlement_void + commission + commission_void) − stake.
+ * Σnetamount (settlement + settlement_void + commission + commission_void) − stake; FAN bets ka
+ * netamount pehle se P/L hai, unka stake nahi ghatta.
  * Wahi row shape jo userWinLoss deta hai; `sports_pts` yahan INR hai (1 pt = 1 INR).
  * Sirf owner (tree.withDirectUsers) ko dikhta hai; baaki ko khaali.
  */
@@ -146,7 +150,8 @@ async function directUserWinLoss(sequelize, tree, f) {
   const sums = await sequelize.query(
     `SELECT u.id, u.name AS username,
             SUM(COALESCE((SELECT SUM(l.netamount) FROM mssports.credits_ledger l
-                           WHERE l.bet_id = b.id AND l.reason IN (:reasons)), 0) - b.stake_amount) AS total
+                           WHERE l.bet_id = b.id AND l.reason IN (:reasons)), 0)
+                - CASE WHEN UPPER(b.game_type) = 'FAN' THEN 0 ELSE b.stake_amount END) AS total
        FROM mssports."SportsBet" b
        JOIN users u ON u.id = b.user_id
       WHERE b.user_id IN (:players) AND u.parent_staff_id IS NULL

@@ -109,6 +109,12 @@ const NOT_FAKE = `(b.result->>'fake') IS DISTINCT FROM 'true'`;
  * after settlement). `netamount` = jo player ko wapas gaya; GGR = settled stakes (SportsBet) − SUM(netamount). Bets bhi
  * `mssports."SportsBet"` me hain — `public."SportsBet"` purana, khaali table hai.
  */
+/**
+ * A fancy / session (FAN) settlement row's netamount is already the signed P/L (its stake was only
+ * held as exposure and is released at settlement), so its stake is not part of the house's take.
+ */
+const NOT_FAN = (a) => `UPPER(COALESCE(${a}.game_type, '')) <> 'FAN'`;
+
 const SPORTS_LEDGER_REASONS = Object.freeze(['settlement', 'settlement_void', 'commission', 'commission_void']);
 
 /** A sports bet in one of these never took a stake that stayed taken. */
@@ -426,7 +432,7 @@ class DashboardStatsService {
                UPPER(COALESCE(NULLIF(s.original_currency, ''), 'INR')), SUM(s.stake_amount), 0
           FROM mssports."SportsBet" s
          WHERE s.stake_amount > 0 AND LOWER(COALESCE(s.result_status, '')) IN ('won', 'loss', 'lost')
-           AND ${this.#window('s.created_at')}
+           AND ${NOT_FAN('s')} AND ${this.#window('s.created_at')}
            ${ctx.currency ? `AND UPPER(COALESCE(NULLIF(s.original_currency, ''), 'INR')) = :currency` : ''}
            ${this.#owned(ctx, 's.user_id')}
          GROUP BY 1, 5

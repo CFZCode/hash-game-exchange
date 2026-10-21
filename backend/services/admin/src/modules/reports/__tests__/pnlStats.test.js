@@ -168,6 +168,17 @@ test('P&L against a database', async (t) => {
        VALUES (:a, :coin, 30, 'settlement', 30, :bet, :d6)`,
       { a: String(playerA), coin: COIN, bet: bet.id, d6: day(6) }
     );
+    // A: a lost fancy (FAN) of 5 — its settlement netamount is already the P/L (−5), so house +5, not +10.
+    const [[fan]] = await run(
+      `INSERT INTO mssports."SportsBet" (user_id, game_type, bet_type, odds, sport_id, event_name, stake_amount, original_currency, status, result_status, created_at, updated_at)
+       VALUES (:a, 'FAN', 'yes', 2, '4', 'Test v Test', 5, :coin, 'closed', 'loss', :d5, :d5) RETURNING id`,
+      { a: playerA, coin: COIN, d5: day(5) }
+    );
+    await run(
+      `INSERT INTO mssports.credits_ledger (user_id, currency, amount, reason, netamount, bet_id, created_at)
+       VALUES (:a, :coin, 0, 'settlement', -5, :bet, :d6)`,
+      { a: String(playerA), coin: COIN, bet: fan.id, d6: day(6) }
+    );
 
     // Costs: A a VIP level-up 7, a redeem code 4 that was reversed; B rakeback 3 and vault interest 1.
     await run(
@@ -201,13 +212,13 @@ test('P&L against a database', async (t) => {
   await t.test('GGR − costs = net, and every view of it adds up', async () => {
     const s = await pnl.summary({ staff: house, ...inCoin });
     const k = s.kpis;
-    // Casino: A −5 + B +20 + Slotegrator +30 = 45. Sports: +40 − 30 = 10.
+    // Casino: A −5 + B +20 + Slotegrator +30 = 45. Sports: +40 − 30, + the fancy's 5 = 15.
     assert.equal(m(k.casinoGgr), m('45'));
-    assert.equal(m(k.sportsGgr), m('10'));
-    assert.equal(m(k.ggr), m('55'));
+    assert.equal(m(k.sportsGgr), m('15'));
+    assert.equal(m(k.ggr), m('60'));
     // Costs: VIP 7 + rakeback 3 + redeem (4 − 4) + vault 1 = 11.
     assert.equal(m(k.costs), m('11'));
-    assert.equal(m(k.netProfit), m('44'));
+    assert.equal(m(k.netProfit), m('49'));
     assert.equal(m(k.ggr) - m(k.costs), m(k.netProfit));
 
     const line = (key) => m(s.costLines.find((l) => l.key === key).value);
@@ -270,9 +281,9 @@ test('P&L against a database', async (t) => {
     assert.equal(b.sports.bySport[0].label, 'Cricket');
     assert.equal(b.sports.byMarket[0].label, 'Match Odds');
     assert.equal(b.sports.topEvents[0].label, 'Test v Test');
-    // A: casino 25 + sports 10 = 35 to the house; B: 20.
+    // A: casino 25 + sports 15 = 40 to the house; B: 20.
     assert.deepEqual(b.players.houseWon.map((p) => p.id), [String(playerA), String(playerB)]);
-    assert.equal(m(b.players.houseWon[0].ggr), m('35'));
+    assert.equal(m(b.players.houseWon[0].ggr), m('40'));
     assert.equal(b.players.houseLost.length, 0);
   });
 
@@ -280,7 +291,7 @@ test('P&L against a database', async (t) => {
     const s = await pnl.summary({ staff: agent, ...inCoin });
     assert.equal(s.house, false);
     assert.equal(m(s.kpis.casinoGgr), m('25'), 'player A only: −5 + 30');
-    assert.equal(m(s.kpis.sportsGgr), m('10'));
+    assert.equal(m(s.kpis.sportsGgr), m('15'));
     assert.equal(s.kpis.costs, null);
     assert.equal(s.kpis.netProfit, null);
     assert.equal(s.costLines, null);
