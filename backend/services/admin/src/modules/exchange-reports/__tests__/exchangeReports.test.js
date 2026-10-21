@@ -349,11 +349,14 @@ test('exchange reports', async (t) => {
     const lost = await directBet(30, 'loss');
     await directBet(999, 'void');
     const fancyLost = await directBet(50, 'loss', 'FAN');
-    for (const [betId, reason, net] of [[won, 'settlement', 152], [won, 'commission', -2], [lost, 'settlement', 0], [fancyLost, 'settlement', -50]]) {
+    // profit / loss as settlement writes them (loss negative); netamount is the wallet credit, not P/L.
+    for (const [betId, reason, net, profit, loss] of [
+      [won, 'settlement', 152, 52, null], [won, 'commission', -2, null, -2], [lost, 'settlement', 0, 0, -30], [fancyLost, 'settlement', -50, null, -50],
+    ]) {
       await run(
-        `INSERT INTO mssports.credits_ledger (user_id, bet_id, amount, reason, netamount, created_at)
-         VALUES (:uid, :betId, 0, :reason, :net, NOW())`,
-        { uid: direct, betId, reason, net }
+        `INSERT INTO mssports.credits_ledger (user_id, bet_id, amount, reason, netamount, profit, loss, created_at)
+         VALUES (:uid, :betId, 0, :reason, :net, :profit, :loss, NOW())`,
+        { uid: direct, betId, reason, net, profit, loss }
       );
     }
 
@@ -371,6 +374,27 @@ test('exchange reports', async (t) => {
 
     assert.strictEqual(v.directUserWinLoss.body.safeParse({ ...range, channel: 'agent' }).success, false, 'strict — no channel');
     assert.ok(v.directUserWinLoss.body.safeParse(range).success);
+  });
+
+  await t.test('direct user win loss: a winning lay and a losing back on one market net to the market P/L', async () => {
+    const before = (await reports.directUserWinLoss({ actor: owner, clientType: 'user', clientId: direct, ...range })).totals.total;
+    // MO, runners A / B / Draw: back A 100 @ 2, lay B 50 @ 3; the Draw wins → back −100, lay +50 = −50.
+    // Settlement marks the group won (the lay pays) and writes ONE row, on the first bet: netamount 150 (200 exposure released − 50), loss −50.
+    const bet = async (betType, selection, odds, stake, liability) =>
+      (await one(
+        `INSERT INTO mssports."SportsBet" (user_id, game_type, bet_type, selection_name, odds, stake_amount, liability, result_status, created_at, updated_at)
+         VALUES (:uid, 'MO', :betType, :selection, :odds, :stake, :liability, 'won', NOW(), NOW()) RETURNING id`,
+        { uid: direct, betType, selection, odds, stake, liability }
+      )).id;
+    const back = await bet('back', 'A', 2, 100, 100);
+    await bet('lay', 'B', 3, 50, 100);
+    await run(
+      `INSERT INTO mssports.credits_ledger (user_id, bet_id, amount, reason, netamount, profit, loss, created_at)
+       VALUES (:uid, :back, 150, 'settlement', 150, 0, -50, NOW())`,
+      { uid: direct, back }
+    );
+    const after = (await reports.directUserWinLoss({ actor: owner, clientType: 'user', clientId: direct, ...range })).totals.total;
+    assert.strictEqual(after - before, -50, 'the market lost 50, not stake − payout per bet (0)');
   });
 
   await t.test('validators: date windows like the zip', () => {

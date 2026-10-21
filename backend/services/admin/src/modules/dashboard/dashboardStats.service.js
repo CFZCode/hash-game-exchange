@@ -45,7 +45,7 @@ const { gisKindSql, gisSideAmountSql, gisBetCountSql, gisPlayFilterSql } = requi
  *   sports       turnover: `SportsBet.stake_amount` by placement time, voided
  *                and refunded bets excluded (by `status` AND `result_status`) (+ the partner sportsbook's
  *                stakes). GGR: the house side of the sports settlement ledger
- *                (−SUM(credits_ledger.netamount) over the settlement reasons,
+ *                (−SUM(profit + loss) over the settlement reasons,
  *                by ledger time — the statements module's P&L) + the partner
  *                sportsbook's stakes − wins.
  *
@@ -106,14 +106,12 @@ const NOT_FAKE = `(b.result->>'fake') IS DISTINCT FROM 'true'`;
 
 /**
  * Sports Exchange settlement reasons in `mssports.credits_ledger` (settlementv2, commission, void
- * after settlement). `netamount` = jo player ko wapas gaya; GGR = settled stakes (SportsBet) − SUM(netamount). Bets bhi
- * `mssports."SportsBet"` me hain — `public."SportsBet"` purana, khaali table hai.
+ * after settlement). Each row's `profit + loss` (loss stored negative) is the player's P/L — the
+ * settlement ledger's "Total P/L". `netamount` is NOT: MO / BM settle back and lay of one market in one
+ * row (on the first bet) as exposure released + P/L, so stake − netamount per bet booked a winning lay
+ * as a loss. GGR = −Σ(profit + loss). Bets bhi `mssports."SportsBet"` me hain — `public."SportsBet"` purana, khaali table hai.
  */
-/**
- * A fancy / session (FAN) settlement row's netamount is already the signed P/L (its stake was only
- * held as exposure and is released at settlement), so its stake is not part of the house's take.
- */
-const NOT_FAN = (a) => `UPPER(COALESCE(${a}.game_type, '')) <> 'FAN'`;
+const LEDGER_PNL = (a) => `(COALESCE(${a}.profit, 0) + COALESCE(${a}.loss, 0))`;
 
 const SPORTS_LEDGER_REASONS = Object.freeze(['settlement', 'settlement_void', 'commission', 'commission_void']);
 
@@ -427,17 +425,8 @@ class DashboardStatsService {
            ${this.#owned(ctx, 's.user_id')}
          GROUP BY 1, 5
         UNION ALL
-        -- House side of the Sports Exchange: settled (won / loss) stakes taken, minus what the ledger paid back.
-        SELECT ${this.#bucket('s.created_at')}, 'sports', 'house', 'house',
-               UPPER(COALESCE(NULLIF(s.original_currency, ''), 'INR')), SUM(s.stake_amount), 0
-          FROM mssports."SportsBet" s
-         WHERE s.stake_amount > 0 AND LOWER(COALESCE(s.result_status, '')) IN ('won', 'loss', 'lost')
-           AND ${NOT_FAN('s')} AND ${this.#window('s.created_at')}
-           ${ctx.currency ? `AND UPPER(COALESCE(NULLIF(s.original_currency, ''), 'INR')) = :currency` : ''}
-           ${this.#owned(ctx, 's.user_id')}
-         GROUP BY 1, 5
-        UNION ALL
-        SELECT ${this.#bucket('l.created_at')}, 'sports', 'house', 'house', UPPER(l.currency), -SUM(l.netamount), 0
+        -- House side of the Sports Exchange: minus the player's P/L on the settlement ledger.
+        SELECT ${this.#bucket('l.created_at')}, 'sports', 'house', 'house', UPPER(l.currency), -SUM(${LEDGER_PNL('l')}), 0
           FROM mssports.credits_ledger l
          WHERE l.reason IN (:ledgerReasons)
            AND ${this.#window('l.created_at')} ${cur('l.currency')} ${this.#owned(ctx, 'l.user_id', true)}
@@ -643,4 +632,4 @@ class DashboardStatsService {
   }
 }
 
-module.exports = { DashboardStatsService, SPORTS_LEDGER_REASONS, SPORTS_NOT_TURNOVER };
+module.exports = { DashboardStatsService, SPORTS_LEDGER_REASONS, SPORTS_NOT_TURNOVER, LEDGER_PNL };

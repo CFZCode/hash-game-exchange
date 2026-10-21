@@ -152,20 +152,22 @@ test('P&L against a database', async (t) => {
        VALUES (:a, :t1, 'bet', -50, :coin, 'p-slot', 0, :d4), (:a, :t2, 'win', 20, :coin, 'p-slot', 0, :d4)`,
       { a: playerA, coin: COIN, d4: day(4), t1: `pnl-${playerA}-1`, t2: `pnl-${playerA}-2` }
     );
-    // Sports (mssports — the Sports Exchange tables), A: a settled 40 stake (house +40), settlement pays 30 back (house −30).
+    // Sports (mssports — the Sports Exchange tables), A: one market, back 40 + lay 30 (lay won, back lost) settles at −10 (house +10).
     await run(
       `INSERT INTO mssports.users (user_id, username, password, role_id, "createdAt", "updatedAt") VALUES (:a, :n, 'x', 4, now(), now()) ON CONFLICT (user_id) DO NOTHING`,
       { a: playerA, n: `pa-${playerA}` }
     );
     await run(
       `INSERT INTO mssports."SportsBet" (user_id, game_type, bet_type, odds, sport_id, event_name, stake_amount, original_currency, status, result_status, created_at, updated_at)
-       VALUES (:a, 'MO', 'back', 1.75, '4', 'Test v Test', 40, :coin, 'closed', 'loss', :d5, :d5)`,
+       VALUES (:a, 'MO', 'back', 1.75, '4', 'Test v Test', 40, :coin, 'closed', 'won', :d5, :d5),
+              (:a, 'MO', 'lay', 2, '4', 'Test v Test', 30, :coin, 'closed', 'won', :d5, :d5)`,
       { a: playerA, coin: COIN, d5: day(5) }
     );
-    const [[bet]] = await run('SELECT id FROM mssports."SportsBet" WHERE user_id = :a', { a: playerA });
+    const [[bet]] = await run('SELECT MIN(id) AS id FROM mssports."SportsBet" WHERE user_id = :a', { a: playerA });
+    // One row for the market, on its first bet: netamount = exposure released + P/L, loss = the P/L.
     await run(
-      `INSERT INTO mssports.credits_ledger (user_id, currency, amount, reason, netamount, bet_id, created_at)
-       VALUES (:a, :coin, 30, 'settlement', 30, :bet, :d6)`,
+      `INSERT INTO mssports.credits_ledger (user_id, currency, amount, reason, netamount, loss, bet_id, created_at)
+       VALUES (:a, :coin, 30, 'settlement', 30, -10, :bet, :d6)`,
       { a: String(playerA), coin: COIN, bet: bet.id, d6: day(6) }
     );
     // A: a lost fancy (FAN) of 5 — its settlement netamount is already the P/L (−5), so house +5, not +10.
@@ -175,8 +177,8 @@ test('P&L against a database', async (t) => {
       { a: playerA, coin: COIN, d5: day(5) }
     );
     await run(
-      `INSERT INTO mssports.credits_ledger (user_id, currency, amount, reason, netamount, bet_id, created_at)
-       VALUES (:a, :coin, 0, 'settlement', -5, :bet, :d6)`,
+      `INSERT INTO mssports.credits_ledger (user_id, currency, amount, reason, netamount, loss, bet_id, created_at)
+       VALUES (:a, :coin, 0, 'settlement', -5, -5, :bet, :d6)`,
       { a: String(playerA), coin: COIN, bet: fan.id, d6: day(6) }
     );
 
@@ -212,7 +214,7 @@ test('P&L against a database', async (t) => {
   await t.test('GGR − costs = net, and every view of it adds up', async () => {
     const s = await pnl.summary({ staff: house, ...inCoin });
     const k = s.kpis;
-    // Casino: A −5 + B +20 + Slotegrator +30 = 45. Sports: +40 − 30, + the fancy's 5 = 15.
+    // Casino: A −5 + B +20 + Slotegrator +30 = 45. Sports: the market's −10 and the fancy's −5 → house 15.
     assert.equal(m(k.casinoGgr), m('45'));
     assert.equal(m(k.sportsGgr), m('15'));
     assert.equal(m(k.ggr), m('60'));

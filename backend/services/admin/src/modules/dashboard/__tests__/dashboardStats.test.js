@@ -171,8 +171,9 @@ test('dashboard stats against a database', async (t) => {
     );
     // Sports Exchange settlement (mssports.credits_ledger): player ne 12 jeete, 3 commission diya → GGR −9.
     await sequelize.query(
-      `INSERT INTO mssports.credits_ledger (user_id, amount, reason, netamount, currency, created_at)
-       VALUES (:a, 12, 'settlement', 12, :coin, :at), (:a, 3, 'commission', -3, :coin, :at), (:b, 50, 'settlement', 50, :coin, :at)`,
+      `INSERT INTO mssports.credits_ledger (user_id, amount, reason, netamount, profit, loss, currency, created_at)
+       VALUES (:a, 12, 'settlement', 12, 12, NULL, :coin, :at), (:a, 3, 'commission', -3, NULL, -3, :coin, :at),
+              (:b, 50, 'settlement', 50, 50, NULL, :coin, :at)`,
       { replacements: { a: String(playerA), b: String(playerB), coin: COIN, at: day('05') } }
     );
     await sequelize.query(

@@ -6,16 +6,11 @@ const { marketLabel } = require('../exchange-market/betLabels');
 const { canManagePromotions } = require('@ibitplay/auth');
 const { INHOUSE_PAYOUT, V2_STAKE, V2_PAYOUT, OG_PLAYED } = require('../statements/casinoRounds');
 
-const { DashboardStatsService, SPORTS_LEDGER_REASONS, SPORTS_NOT_TURNOVER } = require('../dashboard/dashboardStats.service');
-
 /**
- * Sports Exchange ka house side (mssports), dashboard jaisa: stake bet lagte waqt `credits.inr` se katta
- * hai aur sirf `mssports."SportsBet"` me hai (ledger me nahi). GGR = settled (won/loss) bets ka stake −
- * Σ `mssports.credits_ledger.netamount` (settlement = jo wapas diya, settlement_void ulta, commission).
+ * Sports Exchange ka house side (mssports), dashboard jaisa: GGR = −Σ (profit + loss) of the settlement
+ * ledger (`LEDGER_PNL`, settlement / void / commission) — the market's P/L, back and lay netted.
  */
-const SETTLED_BET = (a) => `LOWER(COALESCE(${a}.result_status, '')) IN ('won', 'loss', 'lost')`;
-/** FAN (fancy / session) netamount is already the signed P/L, so its stake is left out of the house side. */
-const NOT_FAN = (a) => `UPPER(COALESCE(${a}.game_type, '')) <> 'FAN'`;
+const { DashboardStatsService, SPORTS_LEDGER_REASONS, SPORTS_NOT_TURNOVER, LEDGER_PNL } = require('../dashboard/dashboardStats.service');
 const dashboardConstants = require('../dashboard/dashboard.constants');
 const { gisKindSql, gisSideAmountSql, gisBetCountSql, gisPlayFilterSql } = require('../statements/statements.constants');
 const { playerScope, statsWindow, bucketSql, rangeSql, select, loadRates, createValuer, minor, decimal } = require('./audienceStats.helpers');
@@ -39,7 +34,7 @@ const { playerScope, statsWindow, bucketSql, rangeSql, select, loadRates, create
  *                   game whose catalogue type says "sport" is the partner
  *                   sportsbook and counts under SPORTS.
  *   Sports GGR      the dashboard's figure too: the house side of the sports
- *                   settlement ledger (−SUM(netamount) over the statements
+ *                   settlement ledger (−SUM(profit + loss) over the statements
  *                   module's reasons, by ledger time) + the partner sportsbook's
  *                   stakes − wins.
  *                   Plus the Original Games aggregator (`og_transactions`). The
@@ -544,17 +539,10 @@ class PnlStatsService {
            AND LOWER(COALESCE(s.result_status, '')) NOT IN (:refundedResults)
            AND ${rangeSql('s.created_at')}${ctx.currency ? ` AND ${SPORTS_CURRENCY('s')} = :currency` : ''}${owned('s.user_id')}
         UNION ALL
-        SELECT 'house', 'house', COALESCE(NULLIF(s.sport_id, ''), 'other'),
-               COALESCE(NULLIF(UPPER(s.game_type), ''), NULLIF(UPPER(s.market_type), ''), 'OTHER'),
-               COALESCE(NULLIF(s.event_name, ''), NULLIF(s.match_title, ''), NULLIF(s.match_id, ''), 'Unknown event'),
-               ${SPORTS_CURRENCY('s')}, s.stake_amount, 0
-          FROM mssports."SportsBet" s
-         WHERE s.stake_amount > 0 AND ${SETTLED_BET('s')} AND ${NOT_FAN('s')} AND ${rangeSql('s.created_at')}${ctx.currency ? ` AND ${SPORTS_CURRENCY('s')} = :currency` : ''}${owned('s.user_id')}
-        UNION ALL
         SELECT 'house', 'house', COALESCE(NULLIF(b.sport_id, ''), NULLIF(l.sport_id, ''), 'other'),
                COALESCE(NULLIF(UPPER(b.game_type), ''), NULLIF(UPPER(l.market_type), ''), 'OTHER'),
                COALESCE(NULLIF(b.event_name, ''), NULLIF(b.match_title, ''), NULLIF(b.match_id, ''), NULLIF(l.match_id, ''), 'Unknown event'),
-               UPPER(l.currency), -l.netamount, 0
+               UPPER(l.currency), -${LEDGER_PNL('l')}, 0
           FROM mssports.credits_ledger l
           LEFT JOIN mssports."SportsBet" b ON b.id = l.bet_id
          WHERE l.reason IN (:ledgerReasons)
@@ -625,12 +613,8 @@ class PnlStatsService {
            AND LOWER(COALESCE(s.result_status, '')) NOT IN (:refundedResults)
            AND ${rangeSql('s.created_at')}${ctx.currency ? ` AND ${SPORTS_CURRENCY('s')} = :currency` : ''}${owned('s.user_id')}
         UNION ALL
-        SELECT s.user_id, 'sports', 'house', 'house', ${SPORTS_CURRENCY('s')}, s.stake_amount, 0
-          FROM mssports."SportsBet" s
-         WHERE s.stake_amount > 0 AND ${SETTLED_BET('s')} AND ${NOT_FAN('s')} AND ${rangeSql('s.created_at')}${ctx.currency ? ` AND ${SPORTS_CURRENCY('s')} = :currency` : ''}${owned('s.user_id')}
-        UNION ALL
         SELECT CASE WHEN l.user_id ~ '^[0-9]{1,18}$' THEN l.user_id::bigint END, 'sports', 'house', 'house',
-               UPPER(l.currency), -l.netamount, 0
+               UPPER(l.currency), -${LEDGER_PNL('l')}, 0
           FROM mssports.credits_ledger l
          WHERE l.reason IN (:ledgerReasons) AND ${rangeSql('l.created_at')}${cur('l.currency')}${ledgerOwned('l.user_id')}
       ),
