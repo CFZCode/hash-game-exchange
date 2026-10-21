@@ -60,6 +60,10 @@ import { useEffect } from 'react';
 
 const SETTLE_MS = 160;
 
+/* Fired on window each time a dialog mounts, so a page-level dropdown can close instead of
+   floating over it (components/shared/Select). */
+export const DIALOG_OPEN_EVENT = 'parker:dialog-open';
+
 const openDialogs = new Set();
 let settleTimer = null;
 let locked = false;
@@ -87,6 +91,7 @@ export default function useDialogScrollLock(active) {
        mount does the same job and keeps two instances of one dialog from colliding. */
     const token = {};
     openDialogs.add(token);
+    window.dispatchEvent(new Event(DIALOG_OPEN_EVENT));
     settle();
     return () => {
       openDialogs.delete(token);

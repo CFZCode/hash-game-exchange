@@ -1,5 +1,6 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
+import { DIALOG_OPEN_EVENT } from '../../../hooks/useDialogScrollLock';
 import { layerPosition, scrollParent } from './position';
 import PopCenter from '../PopCenter';
 import { IconSearch } from '../icons';
@@ -155,11 +156,17 @@ function Dropdown({
     const scroller = scrollParent(triggerRef.current);
     const onScroll = () => setOpen(false);
     const onResize = () => place();
+    /* A dialog opening over the page closes the layer too: at `.dropdown-layer`'s z-index it
+       would otherwise sit ON the new pop (the withdraw "submitted" pop was covered by a still-open
+       account dropdown). useDialogScrollLock announces every dialog that mounts. */
+    const onDialog = () => setOpen(false);
     scroller.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('resize', onResize, { passive: true });
+    window.addEventListener(DIALOG_OPEN_EVENT, onDialog);
     return () => {
       scroller.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', onResize);
+      window.removeEventListener(DIALOG_OPEN_EVENT, onDialog);
     };
   }, [open, place, sheet]);
 
