@@ -74,7 +74,8 @@ module.exports = function internalRoutes(deps) {
     '/settings',
     asyncHandler(async (_req, res) => {
       const rows = await service.operatorSettings();
-      return response.ok(res, Object.fromEntries(rows.map((r) => [r.key, r.value])));
+      // + the Super Admin's payment-gateway switch, for user-service's deposit / withdrawal guard.
+      return response.ok(res, { ...Object.fromEntries(rows.map((r) => [r.key, r.value])), payment_gateways_off: await service.paymentGatewaysOff() });
     })
   );
 

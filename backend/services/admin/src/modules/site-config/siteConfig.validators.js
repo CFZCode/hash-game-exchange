@@ -1,6 +1,7 @@
 'use strict';
 
 const { z, REWARD_CURRENCY_CHOICES } = require('@ibitplay/common');
+const { PAYMENT_GATEWAYS } = require('./siteConfig.service');
 
 /**
  * Wallet currency codes an operator may pick for reward payouts.
@@ -238,6 +239,11 @@ const setSportsEnabled = {
   body: z.object({ enabled: z.boolean() }).strict(),
 };
 
+const setPaymentGateway = {
+  params: z.object({ name: z.enum(PAYMENT_GATEWAYS.map((g) => g.name)) }),
+  body: z.object({ enabled: z.boolean() }).strict(),
+};
+
 /**
  * The site's reward currency (one coin for every reward). On an owner-managed
  * site a change is `403 OWNER_MANAGED` (the owner panel sets it); the old
@@ -397,6 +403,7 @@ module.exports = {
   updateTipSettings,
   updateReferralUnlockSettings,
   setSportsEnabled,
+  setPaymentGateway,
   setCashierLimits,
   updateRewardCurrencies,
   updateEmailSettings,

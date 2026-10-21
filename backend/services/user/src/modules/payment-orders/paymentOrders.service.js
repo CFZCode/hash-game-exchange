@@ -536,9 +536,15 @@ class PaymentOrdersService {
     return gateway;
   }
 
-  /** The owner panel's gateway switch (`flags.gateway_<name>`, missing = on). New orders only: open ones and callbacks still settle. */
+  /**
+   * The owner panel's gateway switch (`flags.gateway_<name>`, missing = on) AND the Super Admin's
+   * (Settings → Payment Methods, `payment_gateways_off`). New orders only: open ones and callbacks still settle.
+   */
   async #assertOwnerAllows(name) {
-    if (!(await entitlements.isFlagEntitled(`gateway_${name}`))) throw errors.PROVIDER_DISABLED({ provider: name });
+    const off = await this.settings.read('payment_gateways_off', []);
+    if (!(await entitlements.isFlagEntitled(`gateway_${name}`)) || (Array.isArray(off) && off.includes(name))) {
+      throw errors.PROVIDER_DISABLED({ provider: name });
+    }
   }
 
   /**

@@ -15,6 +15,12 @@ Format:
 
 ---
 
+## 2026-10-22 — Super Admin ka payment gateway switch (Settings → Payment Methods)
+**Kya kiya:** Admin → Settings → Payment Methods par owner ke on kiye gateways (CCPayment, A-Pay, WayPay, CricPay, UPI) dikhte hain, har ek ka Super Admin wala on/off switch. Dono on hon tabhi gateway chalta hai; Super Admin off kare to user-service naye deposit / withdrawal order `PROVIDER_DISABLED` se rok deta hai (khule orders aur callbacks settle hote rehte hain). Backend: `GET / PUT /api/v1/admin/site-config/payment-gateways[/:name]` (config:read / config:write, activity log), `siteconfig.settings.payment_gateways_off`, internal `/settings` me `payment_gateways_off`. Agent tree ko page nahi dikhta (direct + PROMOTION_ROUTES).
+**Kyun:** User: "pull leke sab kuch commit karke deploy kar de" — doosre session ka ye kaam server pe bina commit pada tha, use commit karke 7224a2d (cashier limits hataye) ke saath merge kiya.
+**Files / jagah:** backend/services/admin/src/modules/site-config/{siteConfig.service.js,siteConfig.validators.js,routes/admin.routes.js,routes/internal.routes.js}, backend/services/user/src/modules/payment-orders/paymentOrders.service.js, admin/src/views/settings/PaymentMethods.tsx, admin/src/configs/navConfig.tsx, tests.
+**Notes / pending:** —
+
 ## 2026-10-22 — Super Admin bhi site ka naam aur metadata badal sakta hai (Branding)
 **Kya kiya:** Admin → Site config → Branding me "Name and metadata" ab Super Admin ke liye form hai: Site name, Page title, Title template, Meta description, Meta keywords, Open Graph title / description, Theme colour — Save, aur "Reset" (platform wala wapas). Rule logo jaisa: jo baad me badle wahi players ko dikhe — Super Admin save kare to uska; owner baad me apna metadata badle to owner ka (owner ka koi aur save, jaise flags, Super Admin ka nahi hatata). Backend: migration 149 `site_branding_meta` (ek row: meta + us waqt owner ka metadata), `PUT / DELETE /api/v1/admin/branding/meta` (config:write, agent accounts nahi), owner panel jaisi limits (naam 40, title 70, description 300, keywords 20, `<` `>` nahi, template me `%s` ek baar, colour #RRGGBB). `GET admin/branding` me `metaBy: site | platform`. Players ko public branding + socket sync + page HTML sab isi se milta hai.
 **Kyun:** User: jaise owner metadata badal sakta hai, waise Super Admin bhi badal sake.

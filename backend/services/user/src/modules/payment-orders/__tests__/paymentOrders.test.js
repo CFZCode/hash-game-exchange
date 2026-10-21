@@ -88,13 +88,14 @@ test('payment orders', async (t) => {
   };
 
   /** A service whose gateway answers however the test needs. */
-  const build = (respond, config = {}) => {
+  const build = (respond, config = {}, deps = {}) => {
     const calls = [];
     const handler = async (url, body) => {
       calls.push({ url, body });
       return respond(url, body);
     };
     const service = new PaymentOrdersService({
+      ...deps,
       models: connection.models,
       db: connection,
       logger,
@@ -471,6 +472,24 @@ test('payment orders', async (t) => {
     } finally {
       entitlements.resetEntitlements();
     }
+  });
+
+  await t.test('a gateway the Super Admin switched off (Payment Methods) takes no new deposit or withdrawal', async () => {
+    const uid = newUid();
+    await seed(uid, '1000');
+    const admin = { get: async () => ({ payment_gateways_off: ['apay'] }) };
+    const { service, calls } = build(ok, {}, { clients: { admin } });
+    const disabled = (err) => err.code === 'PAYORDER_PROVIDER_DISABLED' && err.status === 503;
+
+    await assert.rejects(() => service.getAvailableMethods({ provider: 'apay' }), disabled);
+    await assert.rejects(() => service.createDeposit({ userId: uid, provider: 'apay', currency: 'INR', amount: '100' }), disabled);
+    await assert.rejects(() => service.createWithdrawal({ userId: uid, provider: 'apay', currency: 'INR', amount: '400', details: BANK }), disabled);
+    assert.equal(await balanceOf(uid), '1000.00000000', 'nothing is held');
+    assert.equal(calls.length, 0, 'the gateway is never called');
+
+    // One the Super Admin left on still works.
+    const order = await service.createDeposit({ userId: uid, provider: 'waypay', currency: 'INR', amount: '100' });
+    assert.ok(order.reference);
   });
 
   // ══════════════════════════════════════════════════════════════════════

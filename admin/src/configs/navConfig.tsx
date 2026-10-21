@@ -516,7 +516,7 @@ export const navItems: NavItem[] = [
     groupIcon: 'Settings',
     collapsible: true,
     items: [
-      { icon: 'CreditCard', label: 'Payment Methods', href: '/payment-methods', permission: 'config:read' },
+      { icon: 'CreditCard', label: 'Payment Methods', href: '/payment-methods', permission: 'config:read', direct: true },
       { icon: 'CircleUserRound', label: 'My account', href: '/account' }
     ]
   }
@@ -540,8 +540,9 @@ export const PROMOTION_ROUTES = [
   '/site-config/affiliate',
   '/site-config/welcome-bonuses',
 
-  // Not a promotion: the coin registry is house configuration, refused to the agent tree the same way.
+  // Not a promotion: the coin registry and the payment gateways are house configuration, refused to the agent tree the same way.
   '/coins',
+  '/payment-methods',
 
   // Transactions (and the old cashier screens behind it): house only — an agent's player has none.
   '/transactions',

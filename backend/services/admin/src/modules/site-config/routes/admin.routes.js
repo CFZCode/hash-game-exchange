@@ -270,6 +270,28 @@ module.exports = function adminRoutes(deps) {
     )
   );
 
+  /** Settings → Payment Methods: the owner's enabled gateways, each with the Super Admin's switch. */
+  router.get(
+    '/payment-gateways',
+    auth.requirePermission(PERMISSIONS.CONFIG_READ),
+    asyncHandler(async (_req, res) => response.ok(res, await service.paymentGateways()))
+  );
+
+  router.put(
+    '/payment-gateways/:name',
+    auth.requirePermission(PERMISSIONS.CONFIG_WRITE),
+    validate(v.setPaymentGateway),
+    withActivity({
+      action: 'site-config.payment-gateway.toggle',
+      describe: (req) => ({
+        targetType: 'SITE_CONFIG', targetId: `gateway_${req.params.name}`, details: { enabled: req.body.enabled },
+      }),
+    }),
+    asyncHandler(async (req, res) =>
+      response.ok(res, await service.setPaymentGateway({ name: req.params.name, enabled: req.body.enabled, staffId: req.staff?.id ?? null }))
+    )
+  );
+
   // ── Reward payout currencies ────────────────────────────────────────
 
   router.get(

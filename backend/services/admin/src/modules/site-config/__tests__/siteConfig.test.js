@@ -4,7 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 
 const db = require('@ibitplay/db');
-const { createLogger } = require('@ibitplay/common');
+const { createLogger, entitlements } = require('@ibitplay/common');
 
 const { SiteConfigService, OPERATOR_FLAGS } = require('../siteConfig.service');
 const v = require('../siteConfig.validators');
@@ -464,6 +464,27 @@ test('site-config', async (t) => {
       assert.equal(read.rakebackCurrency, 'USDT', code);
     }
     await setRewardCurrency(null);
+  });
+
+  await t.test('payment gateways: only the ones the owner has on, each with the Super Admin switch', async () => {
+    await seedConfig();
+    entitlements.configureEntitlements({ read: () => ({ features: {}, flags: { gateway_cricpay: false } }) });
+    const states = (list) => list.map((g) => [g.name, g.enabled]);
+    try {
+      assert.deepEqual(states(await service.paymentGateways()), [['ccpayment', true], ['apay', true], ['waypay', true], ['upi', true]]);
+
+      const after = await service.setPaymentGateway({ name: 'apay', enabled: false });
+      assert.deepEqual(states(after), [['ccpayment', true], ['apay', false], ['waypay', true], ['upi', true]]);
+      assert.deepEqual(await service.paymentGatewaysOff(), ['apay'], 'what user-service reads');
+
+      await service.setPaymentGateway({ name: 'apay', enabled: true });
+      assert.deepEqual(await service.paymentGatewaysOff(), []);
+
+      // A gateway the owner has off is not the Super Admin's to switch.
+      await assert.rejects(() => service.setPaymentGateway({ name: 'cricpay', enabled: true }), (err) => err.status === 403);
+    } finally {
+      entitlements.resetEntitlements();
+    }
   });
 
   await t.test('updating with no config row is a 409, not a silent success', async () => {

@@ -15,6 +15,15 @@ const REWARD_CURRENCY_FEATURE = 'reward_currency';
 const DEFAULT_CURRENCY_FEATURE = 'default_currency';
 const { visibleStaffIds } = require('../staff-directory/staffDirectory.service');
 
+/** user-service's payment gateways, as the owner panel names them (its flag is `gateway_<name>`). */
+const PAYMENT_GATEWAYS = Object.freeze([
+  { name: 'ccpayment', label: 'CCPayment (crypto deposits)' },
+  { name: 'apay', label: 'A-Pay' },
+  { name: 'waypay', label: 'WayPay' },
+  { name: 'cricpay', label: 'CricPay' },
+  { name: 'upi', label: 'UPI (EkQR)' },
+]);
+
 /**
  * The affiliate programme's payout rates, as stored on `siteconfig`.
  *
@@ -764,6 +773,44 @@ class SiteConfigService {
   }
 
   /**
+   * Settings → Payment Methods: the gateways the owner has on (owner panel → Site flags →
+   * Payment gateways, missing = on), each with the Super Admin's own switch. Effective = both on;
+   * user-service reads the Super Admin's side as `payment_gateways_off` (internal `/settings`).
+   */
+  async paymentGateways() {
+    const off = await this.paymentGatewaysOff();
+    const shown = [];
+    for (const gateway of PAYMENT_GATEWAYS) {
+      if (await entitlements.isFlagEntitled(`gateway_${gateway.name}`)) shown.push({ ...gateway, enabled: !off.includes(gateway.name) });
+    }
+    return shown;
+  }
+
+  /** The gateways the Super Admin switched off (`siteconfig.settings.payment_gateways_off`). */
+  async paymentGatewaysOff() {
+    const row = await this.#configRow(['id', 'settings']);
+    return Array.isArray(row?.settings?.payment_gateways_off) ? row.settings.payment_gateways_off : [];
+  }
+
+  /** The Super Admin's switch for one gateway. One the owner has off cannot be touched (NOT_ENTITLED). */
+  async setPaymentGateway({ name, enabled, staffId = null }) {
+    await this.#assertFlagsEntitled([`gateway_${name}`]);
+    const row = await this.#configRow(['id', 'settings']);
+    if (!row) throw errors.NOT_CONFIGURED();
+
+    const off = new Set(Array.isArray(row.settings?.payment_gateways_off) ? row.settings.payment_gateways_off : []);
+    if (enabled) off.delete(name);
+    else off.add(name);
+    await this.models.Siteconfig.update(
+      { settings: { ...(row.settings ?? {}), payment_gateways_off: [...off] }, updatedat: new Date() },
+      { where: { id: row.id } }
+    );
+
+    this.logger?.warn({ staffId, gateway: name, enabled }, `Payment gateway ${name} switched ${enabled ? 'ON' : 'OFF'} by the Super Admin`);
+    return this.paymentGateways();
+  }
+
+  /**
    * THE reward currency — the one coin every reward is calculated and paid in
    * (VIP, periodic bonuses, rakeback, affiliate, spin wheel, races, welcome
    * bonuses, redeem codes). The platform owner sets it in the owner panel
@@ -1455,5 +1502,5 @@ function coerceSetting(key, spec, raw) {
 
 module.exports = {
   SiteConfigService, AFFILIATE_FIELDS, OPERATOR_FLAGS, USER_PREFS, OPERATOR_SETTINGS, TIP_LIMIT_FIELDS, TIP_LIMIT_DEFAULTS,
-  REFERRAL_UNLOCK_DEFAULTS, REFERRAL_UNLOCK_MAX,
+  REFERRAL_UNLOCK_DEFAULTS, REFERRAL_UNLOCK_MAX, PAYMENT_GATEWAYS,
 };
