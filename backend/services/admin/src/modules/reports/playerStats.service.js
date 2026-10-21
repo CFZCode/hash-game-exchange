@@ -26,6 +26,7 @@ const {
   decimal,
 } = require('./audienceStats.helpers');
 const { CASINO_SOURCES, SPORTS_TURNOVER } = require('./wagerStats.service');
+const { SPORTS_LEDGER_REASONS, LEDGER_PNL } = require('../dashboard/dashboardStats.service');
 const { realDepositsSql } = require('./depositRails');
 const { INHOUSE_UNLEDGERED, INHOUSE_PAYOUT } = require('../statements/casinoRounds');
 
@@ -301,21 +302,28 @@ class PlayerStatsService {
           GROUP BY 1, 4
          UNION ALL
          /* Sports Exchange (mssports): settled stakes from the bets (wager report rule, SPORTS_TURNOVER),
-            what settlement paid back (stake + profit), and a void-after-settlement taking it back. */
+            and won = those stakes back plus the player's P/L on the settlement ledger (LEDGER_PNL:
+            settlement / void / commission), so GGR = −P/L. The cash a settlement credits is not a
+            payout here: on a hedged market it is the exposure released, far below the stakes. */
          SELECT ${bucketSql('created_at')}, 'sports', 'SPORTS_EXCHANGE', ${SPORTS_TURNOVER.currency}, 'BET_STAKE',
                 ROUND(-SUM(${SPORTS_TURNOVER.stake}), 8)::text, COUNT(*)::int
            FROM mssports."SportsBet"
           WHERE user_id = :uidNum AND ${rangeSql('created_at')} AND ${SPORTS_TURNOVER.settled}${cur(SPORTS_TURNOVER.currency)}
           GROUP BY 1, 4
          UNION ALL
-         SELECT ${bucketSql('sl.created_at')}, 'sports', 'SPORTS_EXCHANGE', UPPER(sl.currency),
-                CASE WHEN sl.reason = 'settlement' THEN 'BET_PAYOUT' ELSE 'BET_ROLLBACK' END,
-                ROUND(SUM(sl.amount), 8)::text, COUNT(*)::int
+         SELECT ${bucketSql('created_at')}, 'sports', 'SPORTS_EXCHANGE', ${SPORTS_TURNOVER.currency}, 'BET_PAYOUT',
+                ROUND(SUM(${SPORTS_TURNOVER.stake}), 8)::text, 0
+           FROM mssports."SportsBet"
+          WHERE user_id = :uidNum AND ${rangeSql('created_at')} AND ${SPORTS_TURNOVER.settled}${cur(SPORTS_TURNOVER.currency)}
+          GROUP BY 1, 4
+         UNION ALL
+         SELECT ${bucketSql('sl.created_at')}, 'sports', 'SPORTS_EXCHANGE', UPPER(sl.currency), 'BET_PAYOUT',
+                ROUND(SUM(${LEDGER_PNL('sl')}), 8)::text, 0
            FROM mssports.credits_ledger sl
-          WHERE sl.user_id = :uid AND sl.reason IN ('settlement', 'settlement_void') AND sl.amount <> 0
+          WHERE sl.user_id = :uid AND sl.reason IN (:ledgerReasons)
             AND ${rangeSql('sl.created_at')}${cur('sl.currency')}
-          GROUP BY 1, 4, 5`,
-        { ...base, playReasons: PLAY_REASONS }
+          GROUP BY 1, 4`,
+        { ...base, playReasons: PLAY_REASONS, ledgerReasons: SPORTS_LEDGER_REASONS }
       ),
       select(
         this.models,
