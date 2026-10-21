@@ -9,7 +9,6 @@ import { useSelectedCurrency } from '../../hooks/useSelectedCurrency';
 import QrCode from './QrCode';
 import useResource from '../../hooks/useResource';
 import { getRechargeBonusConfig } from '../../services/bonus';
-import { cashierRangeError, getCashierLimits } from '../../services/cashierLimits';
 import { coinIcon } from '../../utils/coinArt';
 
 /* The manual (bank transfer) deposit — THIS BUILD'S, not bc.game's (the original's fiat tab is a
@@ -109,16 +108,11 @@ export default function ManualDeposit({ currency, crypto = false }) {
   const site = useSelectedCurrency();
   const fiat = (value) => printCurrency(value, walletCode, { target: walletCode });
 
-  // The owner's deposit min / max for this coin: refused here, before the transfer and its proof.
-  const readLimits = React.useCallback(() => getCashierLimits(coin), [coin]);
-  const { data: limits } = useResource(readLimits);
-  const rangeError = amount ? cashierRangeError(amount, { min: limits?.depositMin, max: limits?.depositMax, currency: coin }) : null;
-
   const account = matching[picked];
-  const ready = account && Number(amount) > 0 && !rangeError && reference.trim() && (file || crypto) && !busy;
+  const ready = account && Number(amount) > 0 && reference.trim() && (file || crypto) && !busy;
 
   const toAccounts = async () => {
-    if (!(Number(amount) > 0) || rangeError || busy) return;
+    if (!(Number(amount) > 0) || busy) return;
     setBusy(true);
     const rows = await getBankDetails(coin, amount);
     setBusy(false);
@@ -203,33 +197,20 @@ export default function ManualDeposit({ currency, crypto = false }) {
             </div>
           )}
 
-          <div className="mb-1 mt-5 flex justify-between text-secondary">
-            <div>Deposit Amount ({coin})</div>
-            {(limits?.depositMin || limits?.depositMax) && (
-              <div>
-                {[limits.depositMin && `Min ${fiat(limits.depositMin)}`, limits.depositMax && `Max ${fiat(limits.depositMax)}`].filter(Boolean).join(' / ')}
-              </div>
-            )}
-          </div>
+          <div className="mb-1 mt-5 text-secondary">Deposit Amount ({coin})</div>
           <div className="input bg-input_bright text-base">
             <input inputMode="decimal" name="amount" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))} />
             {/* FiatTab's `iC` line: zero below the bonus minimum, so it disappears rather than shrinking. */}
             {extra > 0 && <div className="px-2 font-extrabold text-success">Extra +{fiat(extra)}</div>}
           </div>
 
-          {rangeError && (
-            <div className="mt-3 flex rounded-xl bg-warning/10 p-2 text-secondary">
-              <IconInform className="icon -mt-0.5 mr-1.5 size-6 flex-none fill-warning" />
-              <div>{rangeError}</div>
-            </div>
-          )}
           {noMatch && (
             <div className="mt-3 flex rounded-xl bg-warning/10 p-2 text-secondary">
               <IconInform className="icon -mt-0.5 mr-1.5 size-6 flex-none fill-warning" />
               <div>No account takes a deposit of {fiat(amount)} right now. Please try a different amount.</div>
             </div>
           )}
-          <button type="button" className="button button-brand button-m my-5 w-full" disabled={!(Number(amount) > 0) || !!rangeError || busy} onClick={toAccounts}>
+          <button type="button" className="button button-brand button-m my-5 w-full" disabled={!(Number(amount) > 0) || busy} onClick={toAccounts}>
             {busy ? 'Loading…' : 'Next'}
           </button>
         </>

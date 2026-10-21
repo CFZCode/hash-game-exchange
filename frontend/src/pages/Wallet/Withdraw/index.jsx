@@ -352,11 +352,10 @@ function MemoField({ currencyName, tagName, value, onChange }) {
  *                                                    and collapsing it hides the intent.
  *   25% / 50%  never go below `lowest`, so on a short balance all four buttons agree.
  */
-export function AmountField({ amount, onAmount, min, max = null, balance, currency, precision }) {
+export function AmountField({ amount, onAmount, min, balance, currency, precision }) {
   const below = balance < min;
   const lowest = below ? balance : min;
-  // `max` — the owner's cashier maximum (fiat only); null = none.
-  const highest = Math.min(below ? balance : Math.min(balance, Math.max(balance, min)), max ?? Infinity);
+  const highest = below ? balance : Math.min(balance, Math.max(balance, min));
 
   const round = (value) => {
     const factor = 10 ** (precision ?? 8);
@@ -379,7 +378,6 @@ export function AmountField({ amount, onAmount, min, max = null, balance, curren
           <span className={`${below ? 'text-error ' : ''}ml-1`}>
             {printCurrency(min, currency, { target: currency })}
           </span>
-          {max != null && <> / Max:<span className="ml-1">{printCurrency(max, currency, { target: currency })}</span></>}
         </div>
       </div>
 
