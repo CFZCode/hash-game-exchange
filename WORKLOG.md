@@ -18,8 +18,8 @@ Format:
 ## 2026-10-21 — API encryption: sports calls bhi encrypted
 **Kya kiya:** Sports exchange ka apna fetch (`exchange/api.js`) ab bhi `ENC_ACCEPT` header bhejta hai aur `openSealed` se answer kholta hai, baaki `request()` jaisa.
 **Kyun:** User: owner panel se encryption on kiya par chal nahi rahi. Gateway + baaki API pehle se encrypted the; sirf sports (`/sports/user/...all-data`, tree, latest events) plain JSON aa rahe the kyunki wo `client.js` se nahi jaate.
-**Files / jagah:** `frontend/src/services/exchange/api.js`.
-**Notes / pending:** Live check (headless Chrome): home + /sports pe har JSON answer `{"enc":...}`, sports odds sahi dikhe. Socket frames pehle se scrambled (encrypted nahi). `siteFeatures.js` bina header ke fetch karta hai — plain hi rahega.
+**Files / jagah:** `frontend/src/services/exchange/api.js`, `frontend/src/services/client.js` (token refresh `/user/auth/refresh` bhi plain jaata tha — ab encrypted).
+**Notes / pending:** Live check (headless Chrome): home, casino, sports, promotions, VIP, referral pe har JSON answer `{"enc":...}`, sports odds sahi dikhe. Socket frames pehle se scrambled (encrypted nahi). `siteFeatures.js` bina header ke fetch karta hai — plain hi rahega.
 
 ---
 

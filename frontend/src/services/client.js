@@ -226,11 +226,11 @@ export function refreshSession() {
 
   refreshing = fetch(BASE + REFRESH_PATH, {
     method: 'POST',
-    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    headers: { Accept: ENC_ACCEPT ?? 'application/json', 'Content-Type': 'application/json' },
     body: JSON.stringify({ refreshToken: token }),
   })
     .then(async (res) => {
-      const body = await res.json().catch(() => null);
+      const body = await openSealed(await res.json().catch(() => null));
       /* A refresh refused because the account is LOCKED ends the session with that reason, so
          the visitor is told why rather than being silently signed out. The caller's own
          `notifyAuthExpired()` that follows is then a no-op re-run of the same sign-out. */
