@@ -51,6 +51,13 @@ Use any direct player (no agent parent), INR balance ≥ ₹300, one open Match 
 
 Step 4's non-zero `unexplained` is the clearest check.
 
+**Reproduced on live, 22 Oct 2026 02:27 IST** (parkertest12, Sporting Lisbon v LASK Linz, Match Odds): LAY LASK ₹1,150 @1.03 (−34.50), then BACK LASK ₹1,150 @1.02 (exposure 34.50 → 11.50, wallet +23). Admin sheet right after: `live 1251.68090881`, `ledger 1228.68`, **`unexplained 23.00090881`**; the newest row is the LAY's "Bet placed −34.50", with no row for the +23.
+
+## Two smaller findings from the same check
+
+- **`openExposure` is the open stake, not the exposure.** The sheet showed `openExposure 2300.00` (the two ₹1,150 stakes) while the player's real exposure was ₹11.50. Section "Stakes on unsettled bets" sums `stake_amount`; for a hedged book it should read the exposure (the exchange's exposure table), or be renamed "Open stake".
+- **Sports rows round the wallet to 2 decimals.** `debit_ledger.balance` / `credits_ledger.closing` store 1228.68 while `credits.inr` is 1228.68090881 (a swap left 8-decimal INR). `post − running` then leaks the sub-paisa remainder (0.00090881) into `unexplained` and into the next row's amount. Either store the full wallet value or quantise `credits.inr` writes to 2 decimals.
+
 ## Suggested fix
 
 1. In `walletUpdate`, when `balanceChange < 0`, write a `mssports.debit_ledger` row (e.g. `reason: 'bet_released'`, `amount` = the release, `balance` = `newBalance`, same `description`, `match_id`, `event_id`, `meta.bet_id`).
