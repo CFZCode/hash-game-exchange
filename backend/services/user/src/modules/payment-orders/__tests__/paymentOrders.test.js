@@ -4,7 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 
 const db = require('@ibitplay/db');
-const { createLogger, money } = require('@ibitplay/common');
+const { createLogger, money, entitlements } = require('@ibitplay/common');
 
 const { PaymentOrdersService } = require('../paymentOrders.service');
 const { validatePayoutDetails } = require('../payoutDetails');
@@ -449,6 +449,28 @@ test('payment orders', async (t) => {
       () => service.createDeposit({ userId: uid, provider: 'apay', currency: 'INR', amount: '100' }),
       (err) => err.code === 'PAYORDER_PROVIDER_DISABLED' && err.status === 503
     );
+  });
+
+  await t.test('a gateway the owner switched off takes no new deposit or withdrawal', async () => {
+    const uid = newUid();
+    await seed(uid, '1000');
+    const { service, calls } = build(ok);
+    const disabled = (err) => err.code === 'PAYORDER_PROVIDER_DISABLED' && err.status === 503;
+    entitlements.configureEntitlements({ read: () => ({ features: {}, flags: { gateway_ccpayment: false, gateway_apay: false } }) });
+
+    try {
+      await assert.rejects(() => service.getAvailableMethods({ provider: 'ccpayment' }), disabled);
+      await assert.rejects(() => service.createDeposit({ userId: uid, provider: 'ccpayment', currency: 'USDT', amount: '25', chain: 'TRON' }), disabled);
+      await assert.rejects(() => service.createWithdrawal({ userId: uid, provider: 'apay', currency: 'INR', amount: '400', details: BANK }), disabled);
+      assert.equal(await balanceOf(uid), '1000.00000000', 'nothing is held');
+      assert.equal(calls.length, 0, 'the gateway is never called');
+
+      // A gateway the owner left alone (missing flag) still works.
+      const order = await service.createDeposit({ userId: uid, provider: 'waypay', currency: 'INR', amount: '100' });
+      assert.ok(order.reference);
+    } finally {
+      entitlements.resetEntitlements();
+    }
   });
 
   // ══════════════════════════════════════════════════════════════════════

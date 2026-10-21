@@ -556,6 +556,11 @@ export const FLAG_GROUPS: FlagGroup[] = [
     keys: ['cryptocoin', 'btc', 'eth', 'ltc', 'bch', 'usdt', 'trx', 'doge', 'ada', 'xrp', 'bnb', 'usdp', 'nexo', 'mkr', 'tusd', 'usdc', 'busd', 'shib', 'matic', 'nc', 'sc']
   },
   {
+    title: 'Payment gateways',
+    description: 'Off: the gateway takes no new deposits or withdrawals and leaves the site. Orders already open still settle.',
+    keys: ['gateway_ccpayment', 'gateway_apay', 'gateway_waypay', 'gateway_cricpay', 'gateway_upi']
+  },
+  {
     title: 'Home page sections',
     description: 'Blocks on the landing page, top to bottom.',
     keys: [
@@ -604,6 +609,11 @@ export const FLAG_LABELS: Record<string, string> = {
   hacksawgaming: 'Hacksaw Gaming',
   pgsoft: 'PG Soft',
   cryptocoin: 'Crypto wallets (master)',
+  gateway_ccpayment: 'CCPayment (crypto deposits)',
+  gateway_apay: 'A-Pay',
+  gateway_waypay: 'WayPay',
+  gateway_cricpay: 'CricPay',
+  gateway_upi: 'UPI (EkQR)',
   home_heroSection: 'Hero carousel',
   home_welcomebanner: 'Welcome banner',
   home_latestwins: 'Latest wins ticker',

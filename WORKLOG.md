@@ -15,6 +15,14 @@ Format:
 
 ---
 
+## 2026-10-21 — Owner panel me payment gateway on/off switch
+**Kya kiya:** Owner panel → Features & plan → Site flags me naya group "Payment gateways": CCPayment, A-Pay, WayPay, CricPay, UPI (EkQR) — har gateway ka switch (owner document `flags.gateway_<naam>`, khaali = on). Backend (user-service `paymentOrders.service.js`): owner ne gateway off kiya to us gateway pe naya deposit, naya withdrawal aur methods list `503 PAYORDER_PROVIDER_DISABLED` — paisa hold hone se pehle, gateway ko call kiye bina. Jo order pehle se khule hain unke callback / status pehle jaise chalte hain. Site pe CCPayment off = crypto tab me CCPayment ka form nahi aata (methods khaali), purana manual address wala form dikhta hai.
+**Kyun:** User: owner panel me ye setting honi chahiye ki site pe kaunsa payment gateway enable / disable ho — nahi thi.
+**Files / jagah:** `backend/services/user/src/modules/payment-orders/paymentOrders.service.js` (+ test); `owner-panel/src/configs/entitlementCatalogue.ts`.
+**Notes / pending:** Live: owner panel build + restart, user-svc restart. Owner doc me abhi koi `gateway_*` flag nahi = sab on, live pe kuch nahi badla. Test: naya test pass (off = deposit / withdraw / methods refuse, balance same, gateway call 0; flag na ho to chalta hai); payment-orders 35/37 (2 purane fail). Owner panel tsc + eslint saaf. Owner login nahi tha, isliye panel me switch daba ke live nahi dekha. Super Admin me ye switch nahi daala (sirf owner). Admin ka Payment Methods page (A-Pay status) owner-off nahi dikhata.
+
+---
+
 ## 2026-10-21 — Doc: Original games ko naye project me lagane ka guide
 **Kya kiya:** `backend/docs/original-games-new-project.md` banaya — Original Games Aggregator (seamless wallet) ko kisi doosre project me (bina owner panel, simple admin + website) lagane ka guide: provider se kya milta / kya dena hai, env keys (`OG_*`), tables ka SQL (`og_games`, `og_sessions`, `og_transactions`, `og_nonces`), signing (Node code), game sync, launch flow, wallet callbacks ke rules (verify, dedupe, bet / win / rollback, minor units, error codes), admin ki listing / stats / bet history ki SQL, website lobby + iframe, go-live checklist, aam galtiyan, aur Parker567 me code kahan hai.
 **Kyun:** User: jo original game abhi backend / admin / website pe chal raha hai uska md doc chahiye, doosre project me sirf integration karna hai (keys unke paas hain).

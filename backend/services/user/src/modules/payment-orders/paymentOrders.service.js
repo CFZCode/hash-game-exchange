@@ -2,7 +2,7 @@
 
 const crypto = require('crypto');
 
-const { money, sitePolicy, operatorSettings, withdrawBlock, currencyRegistry, cashierLimits } = require('@ibitplay/common');
+const { money, sitePolicy, operatorSettings, withdrawBlock, currencyRegistry, cashierLimits, entitlements } = require('@ibitplay/common');
 
 const errors = require('./paymentOrders.errors');
 const { FLOW, userIdFor, APAY_DEPOSIT_SYSTEMS, APAY_WITHDRAWAL_SYSTEMS, APAY_SYSTEM_LABELS } = require('./paymentOrders.constants');
@@ -117,6 +117,7 @@ class PaymentOrdersService {
     // no new deposits (CURRENCY_DISABLED). A registry outage fails open.
     await currencyRegistry.assertCurrencyEnabled(currency);
     const gateway = this.#gateway(providerName);
+    await this.#assertOwnerAllows(providerName);
     // CCPayment's coin ids come from its live coin list (cached) — see `ccpaymentCoinId`.
     if (providerName === 'ccpayment') await refreshCcpaymentCoinIds(this.config, this.http);
 
@@ -219,6 +220,7 @@ class PaymentOrdersService {
     await currencyRegistry.assertCurrencyEnabled(currency);
 
     const gateway = this.#gateway(providerName);
+    await this.#assertOwnerAllows(providerName);
 
     if (!gateway.supports(currency, FLOW.PAY_OUT, this.config)) {
       throw errors.CURRENCY_NOT_SUPPORTED({ provider: providerName, currency });
@@ -402,6 +404,7 @@ class PaymentOrdersService {
   /** Which rails a provider currently has switched on. */
   async getAvailableMethods({ provider: providerName }) {
     const gateway = this.#gateway(providerName);
+    await this.#assertOwnerAllows(providerName);
     if (!gateway.getAvailableMethods) return { provider: providerName, methods: null };
     return {
       provider: providerName,
@@ -531,6 +534,11 @@ class PaymentOrdersService {
       }
     }
     return gateway;
+  }
+
+  /** The owner panel's gateway switch (`flags.gateway_<name>`, missing = on). New orders only: open ones and callbacks still settle. */
+  async #assertOwnerAllows(name) {
+    if (!(await entitlements.isFlagEntitled(`gateway_${name}`))) throw errors.PROVIDER_DISABLED({ provider: name });
   }
 
   /**
