@@ -506,6 +506,41 @@ test('race rewards', async (t) => {
 
     await assert.rejects(() => settler.settle({ raceId: open.id }), (error) => error.code === 'RACE_NOT_OPEN');
   });
+
+  await t.test("a booked seat holds its rank: the player under it is paid the rank they see, the seat's prize is the house's", async () => {
+    const open = await models.Race.create({
+      type: 'weekly', starts_at: new Date('2026-02-02T00:00:00Z'),
+      ends_at: new Date('2026-02-09T00:00:00Z'), status: 'open',
+    });
+    created.races.push(open.id);
+    const boat = await models.RaceBoat.create({ name: `qa-boat-${userId}`, is_active: true, weekly_points: '100', weekly_rank: 1 });
+    try {
+      const settler = new RaceService({
+        models, db: connection, logger,
+        config: { SERVICE_NAME: 'user-service', RACE_TIMEZONE: IST },
+        clients: {
+          casino: { get: async () => ({ rows: [{ userId: String(userId), bucket: 'slot', currency: 'USDT', amount: '50', bets: 1 }] }) },
+          sports: { get: async () => ({ rows: [] }) },
+        },
+      });
+      const base = (await settler.getConfig({ type: 'weekly' })) ?? {};
+      settler.getConfig = async () => ({
+        ...base, type: 'weekly', enabled: true, currency: 'USDT', minPoints: '0', winnerCount: 3,
+        multipliers: { sports: '1', casino: '1', slot: '1', crash: '1', other: '1' },
+        bookedSeatsEnabled: true, bookedSeats: [1],
+        rankPrizes: [{ rank: 1, amount: '5', percentage: 50 }, { rank: 2, amount: '3', percentage: 30 }, { rank: 3, amount: '2', percentage: 20 }],
+      });
+
+      await settler.settle({ raceId: open.id });
+      const rows = await models.RaceReward.findAll({ where: { race_id: open.id }, raw: true });
+      // Nothing for the seat's rank 1; the real player (50 points, under the 100-point seat) gets rank 2's 3 —
+      // unless this database's site is B2B (no promotions), which writes no prizes at all.
+      assert.ok(!rows.some((r) => r.rank === 1));
+      if (rows.length) assert.deepStrictEqual(rows.map((r) => [String(r.user_id), r.rank, Number(r.amount)]), [[String(userId), 2, 3]]);
+    } finally {
+      await models.RaceBoat.destroy({ where: { id: boat.id } });
+    }
+  });
 });
 
 test('a switched-off race still ranks today with no prizes', async () => {

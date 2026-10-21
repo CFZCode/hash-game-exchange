@@ -236,7 +236,7 @@ const ConfigEditor = ({ type }: { type: RaceType }) => {
           <SwitchField
             id='r-seats'
             label='Booked seats'
-            hint='Decorative entries shown on the board alongside real users.'
+            hint='Decorative entries shown on the board alongside real users. A booked rank is held by one, and its prize stays with the house; real players are paid the rank they see.'
             checked={!!c.bookedSeatsEnabled}
             onChange={bookedSeatsEnabled => setDraft(d => ({ ...d, bookedSeatsEnabled }))}
           />
@@ -244,7 +244,7 @@ const ConfigEditor = ({ type }: { type: RaceType }) => {
             <TextField
               id='r-seats-ranks'
               label='Booked ranks'
-              hint='The ranks a decorative entry takes, e.g. 2, 5, 8. Only ranks up to "Ranks paid" are kept.'
+              hint='The ranks a decorative entry takes, e.g. 2, 5, 8 (each sits just above the player at that rank, re-placed every few minutes). Only ranks up to "Ranks paid" are kept.'
               error={errors['r-seats-ranks']}
               value={seatsText ?? (c.bookedSeats ?? []).join(', ')}
               onChange={e => {
@@ -473,7 +473,7 @@ const BoardTab = () => {
     { key: 'wagered', header: 'Wagered (USD)', align: 'right', cell: r => <Money value={r.usdWagered} /> },
     { key: 'bets', header: 'Bets', align: 'right', cell: r => <span className='tabular-nums'>{r.bets}</span> },
     { key: 'points', header: 'Points', align: 'right', cell: r => <span className='font-mono tabular-nums'>{r.points}</span> },
-    { key: 'prize', header: 'Prize now', align: 'right', cell: r => (r.isBoat ? '—' : <Money value={r.payout ?? r.reward} currency={currency} />) }
+    { key: 'prize', header: 'Prize now', align: 'right', cell: r => (r.isBoat /* not paid: the house keeps a booked seat's prize */ ? <span className='text-muted-foreground'><Money value={r.payout ?? r.reward} currency={currency} /> (house)</span> : <Money value={r.payout ?? r.reward} currency={currency} />) }
   ]
 
   return (

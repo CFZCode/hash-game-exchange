@@ -337,9 +337,10 @@ class RaceService {
          * told the difference even if it wanted to.
          */
         isBoat: Boolean(entry.isBoat),
-        reward: entry.isBoat ? '0' : (prize?.amount ?? '0'),
+        // A booked seat shows its rank's prize like any player (the reference race); settle() keeps it for the house.
+        reward: prize?.amount ?? '0',
         /** `reward` in the reward currency (`payoutCurrency`): what this rank is paid. */
-        payout: entry.isBoat ? payout.price('0') : payout.price(prize?.amount ?? '0'),
+        payout: payout.price(prize?.amount ?? '0'),
         /* The rank's share of the pool, as hash.game prints it beside every prize — also on a
            0 pool or a switched-off race, where the amount is 0 but the ladder still applies. */
         percentage: shares.get(rank) ?? 0,
@@ -556,21 +557,16 @@ class RaceService {
     const { entries } = await this.#standings(race, config);
 
     /**
-     * The board is ranked WITH decorative entries and paid WITHOUT them.
-     *
-     * A booked seat displaces a real player on the board, which is its whole
-     * purpose. It must not displace them in the prizes — that is what produced
-     * unclaimable reward rows against non-existent accounts in the reference,
-     * with a large share of every pool written to them. So the payout list is
-     * the real players in order, and rank N's prize goes to the Nth real
-     * player.
+     * Paid as the board shows it, booked seats included (the reference race, playbro racePramotion):
+     * a booked seat holds its rank and that rank's prize is kept by the house, and every real
+     * player is paid the rank they see. Placed before the boats reset below.
      */
+    const board = await this.#applyBookedSeats(entries, config, race.type);
     // Races sirf direct users ke (board pe child user aata hi nahi); B2B site par koi prize nahi.
     const payable = [];
-    for (const e of entries) {
+    for (const e of board) {
       if (payable.length >= config.winnerCount) break;
-      if (e.isBoat || !money.gte(e.points, config.minPoints)) continue;
-      if (await promotionsBlocked(e.userId)) continue;
+      if (!e.isBoat && (!money.gte(e.points, config.minPoints) || (await promotionsBlocked(e.userId)))) continue;
       payable.push(e);
     }
 
@@ -587,6 +583,7 @@ class RaceService {
       // A taper across hundreds of ranks reaches amounts below a cent. Those
       // rows cost a claim each and credit nothing.
       if (!prize || money.lt(prize.amount, MIN_REWARD)) break;
+      if (payable[i].isBoat) continue; // the house keeps a booked seat's prize
 
       rewards.push({
         race_id: race.id,
@@ -1197,9 +1194,8 @@ class RaceService {
         boatId: boat.id,
         name: boat.name,
         points: boat.points,
-        // A decorative entry has no bets behind it. Reporting its points as
-        // turnover — which the reference did — invents a wagering figure.
-        usdWagered: '0',
+        // Wager = points, as the reference race shows a booked seat (it has no bets behind it).
+        usdWagered: boat.points,
         bets: 0,
         isBoat: true,
       });
