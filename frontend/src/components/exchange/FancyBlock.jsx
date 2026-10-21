@@ -16,13 +16,11 @@ const asIs = (v) => (v == null ? '' : String(v));
  *   yes:{line:number|null, rate:number|null},
  *   min?:number, max?:number,
  *   status?:string,            // 'ACTIVE' | 'SUSPENDED' | 'BALL RUNNING' …
- *   badlo?:boolean,            // show the Badlo chip
  *   pnl?:number|null, projected?:number|null
  * }>} props.rows
  * @param {string}   [props.status]              Whole-block status (overrides each row's).
  * @param {{rowId, side:'no'|'yes'}|null} [props.selected]
  * @param {(sel:{rowId, rowName, side:'no'|'yes', line:number, rate:number})=>void} [props.onSelect]
- * @param {(row)=>void} [props.onBadlo]          Badlo chip click (chip hidden when omitted or row.badlo falsy).
  * @param {(row)=>void} [props.onBook]           Click on the P&L line → run ladder ("book") for that row.
  * @param {string|number|null} [props.activeRowId]
  * @param {React.ReactNode} [props.betSlip]
@@ -38,7 +36,6 @@ export default function FancyBlock({
   status,
   selected = null,
   onSelect,
-  onBadlo,
   onBook,
   activeRowId = null,
   betSlip = null,
@@ -93,17 +90,6 @@ export default function FancyBlock({
                       rate: size,
                     })
                 : undefined
-            }
-            nameExtra={
-              row.badlo && onBadlo ? (
-                <button
-                  type="button"
-                  onClick={() => onBadlo(row)}
-                  className="flex-none rounded-full bg-warning px-2 py-0.5 text-[0.625rem] font-extrabold leading-none text-alw_dark"
-                >
-                  Badlo
-                </button>
-              ) : null
             }
             subline={
               row.min != null || row.max != null ? (

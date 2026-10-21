@@ -281,7 +281,6 @@ export default function ExchangeKitPreview() {
                 max={50000}
                 selected={sel?.kind === 'fancy' ? { rowId: sel.rowId, side: sel.side } : null}
                 onSelect={openFancy}
-                onBadlo={() => {}}
                 onBook={() => {}}
                 activeRowId={sel?.kind === 'fancy' ? sel.rowId : null}
                 betSlip={slip}

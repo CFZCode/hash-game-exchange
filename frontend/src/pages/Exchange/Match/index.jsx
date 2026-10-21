@@ -253,8 +253,6 @@ export default function ExchangeMatchPage() {
     if (err) toast.error(err);
   };
 
-  const onBadlo = () => toast.warning('Badlo bets are not available here yet.');
-
   /* ── open bets ── */
   const toRow = (b) => ({
     id: b.id,
@@ -470,7 +468,6 @@ export default function ExchangeMatchPage() {
           signedIn={signedIn}
           onCell={onCell}
           onCashout={onCashout}
-          onBadlo={onBadlo}
         />
       </>
     );

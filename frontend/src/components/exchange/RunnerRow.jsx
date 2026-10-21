@@ -38,7 +38,7 @@ export const CELL_W = 'w-[4.25rem] sm:w-16';
  * @param {Array<{key, side:'back'|'lay', price, size}>} [props.cells]  Custom cell list instead of the back/lay ladder
  *        (e.g. Odd|Even, both back). Always all visible; `onSelect` gets `{ side, price, size, key }`;
  *        `selected` then matches on `{ key }`.
- * @param {React.ReactNode} [props.nameExtra] Inline after the name (e.g. Badlo chip).
+ * @param {React.ReactNode} [props.nameExtra] Inline after the name.
  * @param {React.ReactNode} [props.subline]   Extra small line under the name (e.g. fancy min/max on phones).
  * @param {React.ReactNode} [props.leading]   Before the name block (e.g. a racing runner's jockey silks).
  * @param {React.ReactNode} [props.trailing]  Column after the cells, desktop only (e.g. fancy min/max).

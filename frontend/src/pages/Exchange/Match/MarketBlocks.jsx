@@ -110,7 +110,7 @@ function RunnerMarket({ market, book, projected, slip, slipNode, disabled, signe
   );
 }
 
-function FancyMarket({ market, book, slip, slipNode, disabled, onCell, onBadlo, formatAmount, formatLimit }) {
+function FancyMarket({ market, book, slip, slipNode, disabled, onCell, formatAmount, formatLimit }) {
   const mine = slip && String(slip.mid) === String(market.mid);
   const sections = market.section || [];
   const rows = sections.map((s) => {
@@ -124,7 +124,6 @@ function FancyMarket({ market, book, slip, slipNode, disabled, onCell, onBadlo, 
       min: s.min,
       max: s.max,
       status: rowStatus(market, s),
-      badlo: Number(s.ik) > 0,
       pnl: bookFor(book, market.mid, s.nat),
     };
   });
@@ -138,7 +137,6 @@ function FancyMarket({ market, book, slip, slipNode, disabled, onCell, onBadlo, 
       activeRowId={mine ? slip.rowId : null}
       betSlip={mine ? slipNode : null}
       disabled={disabled}
-      onBadlo={onBadlo}
       onSelect={(sel) => {
         const section = sections.find((s) => s.sid === sel.rowId);
         if (!section) return;
@@ -318,11 +316,10 @@ function SingleMarket({ market, book, projected, slip, slipNode, disabled, onCel
  * @param {boolean}  props.signedIn
  * @param {(spec)=>void} props.onCell
  * @param {(market)=>void} props.onCashout
- * @param {(row)=>void} props.onBadlo
  * @param {(n)=>string} [props.formatAmount]  INR book / limits → the player's coin (undefined = kit default)
  * @param {(n)=>string} [props.formatLimit]   Fancy rows' Min/Max (undefined = kit default)
  */
-export default function MarketBlocks({ markets, book, slip, slipNode, projected, disabled, signedIn, racing = false, onCell, onCashout, onBadlo, formatAmount, formatLimit }) {
+export default function MarketBlocks({ markets, book, slip, slipNode, projected, disabled, signedIn, racing = false, onCell, onCashout, formatAmount, formatLimit }) {
   const common = { book, slip, slipNode, disabled, onCell, formatAmount };
   const lines = markets.filter((m) => marketKind(m) === 'line');
   let linesDrawn = false;
@@ -345,7 +342,7 @@ export default function MarketBlocks({ markets, book, slip, slipNode, projected,
     } else if (kind === 'single') {
       out.push(<SingleMarket key={m.mid} market={m} projected={projected} formatLimit={formatLimit} {...common} />);
     } else {
-      out.push(<FancyMarket key={m.mid} market={m} onBadlo={onBadlo} formatLimit={formatLimit} {...common} />);
+      out.push(<FancyMarket key={m.mid} market={m} formatLimit={formatLimit} {...common} />);
     }
   }
   return <div className="flex flex-col gap-3">{out}</div>;

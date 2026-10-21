@@ -67,7 +67,7 @@ export const TIED = {
 
 export const FANCY = [
   { id: 'f1', name: '6 over runs IND', no: { line: 52, rate: 100 }, yes: { line: 54, rate: 100 }, min: 100, max: 50000, pnl: 400 },
-  { id: 'f2', name: '10 over runs IND', no: { line: 84, rate: 110 }, yes: { line: 84, rate: 90 }, min: 100, max: 50000, badlo: true },
+  { id: 'f2', name: '10 over runs IND', no: { line: 84, rate: 110 }, yes: { line: 84, rate: 90 }, min: 100, max: 50000 },
   { id: 'f3', name: 'V Kohli runs', no: { line: 31, rate: 100 }, yes: { line: 32, rate: 100 }, min: 100, max: 25000, status: 'SUSPENDED' },
   { id: 'f4', name: 'Fall of 3rd wkt IND', no: { line: 118, rate: 100 }, yes: { line: 120, rate: 100 }, min: 100, max: 25000, status: 'BALL RUNNING', pnl: -250 },
 ];
