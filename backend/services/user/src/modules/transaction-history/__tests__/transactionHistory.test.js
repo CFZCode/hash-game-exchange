@@ -297,3 +297,12 @@ test('transaction history: every rail', async (t) => {
     assert.ok(Array.isArray(result.deposits.rows), 'rows is an ARRAY — the client maps it');
   });
 });
+
+test('a UPI fiat withdrawal names its UPI id, not "Bank: N/A, Acc: null"', () => {
+  const { WITHDRAWAL_SOURCES } = require('../transactionHistory.constants');
+  const manual = WITHDRAWAL_SOURCES.find((s) => s.method === 'manual');
+  const upi = manual.present({ id: 7, amount: '200', currency: 'INR', status: 'paid', upi_id: 'p10@testupi', date: new Date() });
+  assert.equal(upi.details, 'UPI: p10@testupi');
+  const bank = manual.present({ id: 8, amount: '200', currency: 'INR', status: 'paid', bank_name: 'SBI', account_number: '12349393', date: new Date() });
+  assert.equal(bank.details, 'Bank: SBI, Acc: ••••9393');
+});

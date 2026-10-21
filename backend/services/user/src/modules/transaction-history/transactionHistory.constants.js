@@ -243,7 +243,8 @@ const WITHDRAWAL_SOURCES = Object.freeze([
        * which account they used; the full number adds nothing on a history
        * screen and is the part worth not repeating back over the wire.
        */
-      details: `Bank: ${row.bank_name ?? 'N/A'}, Acc: ${maskTail(row.account_number)}`,
+      // A UPI payout has no bank or account number — name its UPI id instead.
+      details: row.upi_id && !row.account_number ? `UPI: ${row.upi_id}` : `Bank: ${row.bank_name ?? 'N/A'}, Acc: ${maskTail(row.account_number)}`,
       destination: {
         bankName: row.bank_name ?? null,
         accountNumber: maskTail(row.account_number),
