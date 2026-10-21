@@ -23,6 +23,20 @@ const AMOUNT = /^\d{1,15}(\.\d{1,8})?$/;
 
 const EMPTY = Object.freeze({ depositMin: null, depositMax: null, withdrawMin: null, withdrawMax: null });
 
+/**
+ * The limits a site starts with, until the owner saves the block (owner's figures, 22 Oct 2026:
+ * about $10–$10,000 in, $10–$5,000 out). Mirrors owner-panel/src/lib/entitlements/cashierLimits.ts.
+ */
+const DEFAULT_CASHIER_LIMITS = Object.freeze({
+  USDT: Object.freeze({ depositMin: '10', depositMax: '10000', withdrawMin: '10', withdrawMax: '5000' }),
+  INR: Object.freeze({ depositMin: '100', depositMax: '100000', withdrawMin: '200', withdrawMax: '50000' }),
+  BTC: Object.freeze({ depositMin: '0.0001', depositMax: '1', withdrawMin: '0.0002', withdrawMax: '0.5' }),
+  ETH: Object.freeze({ depositMin: '0.004', depositMax: '4', withdrawMin: '0.004', withdrawMax: '2' }),
+  LTC: Object.freeze({ depositMin: '0.2', depositMax: '160', withdrawMin: '0.2', withdrawMax: '80' }),
+  TRX: Object.freeze({ depositMin: '30', depositMax: '30000', withdrawMin: '30', withdrawMax: '15000' }),
+  DOGE: Object.freeze({ depositMin: '120', depositMax: '120000', withdrawMin: '120', withdrawMax: '60000' }),
+});
+
 /** A positive decimal string (a finite positive number is accepted and written as a string). */
 const amountOf = (v) => {
   const s = typeof v === 'number' && Number.isFinite(v) ? String(v) : typeof v === 'string' ? v.trim() : null;
@@ -89,15 +103,17 @@ function assertWithinCashierLimits(all, { currency, amount, flow }) {
 const COLUMN = { depositMin: 'deposit_min', depositMax: 'deposit_max', withdrawMin: 'withdraw_min', withdrawMax: 'withdraw_max' };
 
 /**
- * The limits in force: the owner document's block when it has one, else every stored row of the
- * table. An older database without the table reads as no limits.
+ * The limits in force: the owner document's block when it has one (an empty block = the owner
+ * chose no limits), else every stored row of the table, else DEFAULT_CASHIER_LIMITS.
  */
 async function readCashierLimits(sequelize, { transaction } = {}) {
   const doc = await getEntitlements();
   if (doc.cashierLimits && typeof doc.cashierLimits === 'object') return cleanCashierLimits(doc.cashierLimits);
-  if (!sequelize?.query) return {};
+  const defaults = cleanCashierLimits(DEFAULT_CASHIER_LIMITS);
+  if (!sequelize?.query) return defaults;
   try {
     const [rows] = await sequelize.query('SELECT currency, deposit_min, deposit_max, withdraw_min, withdraw_max FROM cashier_limits', { transaction });
+    if (!rows.length) return defaults;
     const block = {};
     for (const r of rows) {
       block[r.currency] = Object.fromEntries(FIELDS.map((f) => [f, r[COLUMN[f]] == null ? null : String(r[COLUMN[f]]).replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '')]));
@@ -105,7 +121,7 @@ async function readCashierLimits(sequelize, { transaction } = {}) {
     return cleanCashierLimits(block);
   } catch (error) {
     const code = error?.original?.code ?? error?.parent?.code;
-    if (code === '42P01') return {};
+    if (code === '42P01') return defaults;
     throw error;
   }
 }
@@ -130,6 +146,6 @@ async function assertCashierLimits(sequelize, { currency, amount, flow }) {
 }
 
 module.exports = {
-  FIELDS, cleanCashierLimits, cashierLimitsProblem, limitsFor, assertWithinCashierLimits, codeOf,
+  FIELDS, DEFAULT_CASHIER_LIMITS, cleanCashierLimits, cashierLimitsProblem, limitsFor, assertWithinCashierLimits, codeOf,
   readCashierLimits, writeCashierLimits, assertCashierLimits,
 };

@@ -19,6 +19,21 @@ const AMOUNT = /^\d{1,15}(\.\d{1,8})?$/
 
 export const EMPTY_LIMIT: CashierLimit = { depositMin: null, depositMax: null, withdrawMin: null, withdrawMax: null }
 
+/**
+ * What a document that never saved the block starts with, and what a currency's row refills with
+ * when Unlimited is switched off (owner's figures, 22 Oct 2026). Mirrors DEFAULT_CASHIER_LIMITS in
+ * backend/packages/common/src/cashierLimits.js, which enforces them until the block is saved.
+ */
+export const DEFAULT_CASHIER_LIMITS: CashierLimits = {
+  USDT: { depositMin: '10', depositMax: '10000', withdrawMin: '10', withdrawMax: '5000' },
+  INR: { depositMin: '100', depositMax: '100000', withdrawMin: '200', withdrawMax: '50000' },
+  BTC: { depositMin: '0.0001', depositMax: '1', withdrawMin: '0.0002', withdrawMax: '0.5' },
+  ETH: { depositMin: '0.004', depositMax: '4', withdrawMin: '0.004', withdrawMax: '2' },
+  LTC: { depositMin: '0.2', depositMax: '160', withdrawMin: '0.2', withdrawMax: '80' },
+  TRX: { depositMin: '30', depositMax: '30000', withdrawMin: '30', withdrawMax: '15000' },
+  DOGE: { depositMin: '120', depositMax: '120000', withdrawMin: '120', withdrawMax: '60000' }
+}
+
 /** A positive decimal string, or null. */
 export const amountOf = (v: unknown): string | null => {
   const s = typeof v === 'number' && Number.isFinite(v) ? String(v) : typeof v === 'string' ? v.trim() : null

@@ -15,7 +15,7 @@ import { cleanCoin, coinProblem, diffCoins, droppedCoins } from './coins'
 import { cleanRegion, regionProblem, type RegionSetting } from './region'
 import { cleanWithdrawalCap, withdrawalCapProblem, type WithdrawalCap } from './withdrawalCap'
 import { cleanWithdrawalDailyLimit, withdrawalDailyLimitProblem, type WithdrawalDailyLimit } from './withdrawalDailyLimit'
-import { cashierLimitsProblem, cleanCashierLimits, type CashierLimits } from './cashierLimits'
+import { cashierLimitsProblem, cleanCashierLimits, DEFAULT_CASHIER_LIMITS, type CashierLimits } from './cashierLimits'
 import { diffDocs, type AuditEntry, type Change, type CoinDefinition, type EditableDoc, type EntitlementsDoc, type VariantsSeed } from './types'
 
 /**
@@ -211,7 +211,9 @@ export async function readForEdit(): Promise<EditableDoc> {
   const region = cleanRegion(doc.region)
   const withdrawalCap = cleanWithdrawalCap(doc.withdrawalCap)
   const withdrawalDailyLimit = cleanWithdrawalDailyLimit(doc.withdrawalDailyLimit)
-  const cashierLimits = cleanCashierLimits(doc.cashierLimits)
+
+  // Never saved: the defaults the backend already enforces, so the screen matches the site.
+  const cashierLimits = cleanCashierLimits(doc.cashierLimits === undefined ? DEFAULT_CASHIER_LIMITS : doc.cashierLimits)
   const withdrawalsEnabled = doc.withdrawalsEnabled !== false
   const branding = cleanBranding(doc.branding)
 

@@ -64,7 +64,7 @@ import {
   MAX_DAILY_LIMIT,
   type WithdrawalDailyLimit
 } from '@/lib/entitlements/withdrawalDailyLimit'
-import { CASHIER_FIELDS, cashierLimitsProblem, EMPTY_LIMIT, type CashierField, type CashierLimits } from '@/lib/entitlements/cashierLimits'
+import { CASHIER_FIELDS, cashierLimitsProblem, DEFAULT_CASHIER_LIMITS, EMPTY_LIMIT, type CashierField, type CashierLimits } from '@/lib/entitlements/cashierLimits'
 import {
   diffDocs,
   type Change,
@@ -688,6 +688,9 @@ const CashierLimitsEditor = ({
       delete next[code]
       onChange(next)
     }
+
+    // Off refills the currency's default limits; a coin without defaults opens empty.
+    if (!on && DEFAULT_CASHIER_LIMITS[code]) onChange({ ...limits, [code]: { ...DEFAULT_CASHIER_LIMITS[code] } })
   }
 
   const set = (code: string, field: CashierField, raw: string) => {
@@ -1282,7 +1285,7 @@ const Entitlements = () => {
                         <CardTitle>Cashier limits</CardTitle>
                         <CardDescription>
                           Deposit and withdrawal limits for each currency, in that currency. Set here only: the site admin shows them read-only. Unlimited on
-                          clears that currency&apos;s limits; switch it off to set them. Leave a box empty for no limit on that side.
+                          clears that currency&apos;s limits; switch it off to get its default limits back and edit them. Leave a box empty for no limit on that side.
                         </CardDescription>
                       </CardHeader>
                       <CardContent>

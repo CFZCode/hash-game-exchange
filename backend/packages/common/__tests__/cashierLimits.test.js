@@ -27,3 +27,12 @@ test("the owner's block wins over the table, an empty block = no limits", async 
   configureEntitlements({ read: async () => ({ cashierLimits: {} }) });
   assert.deepEqual(await readCashierLimits(sequelize), {});
 });
+
+test('no owner block and an empty table: the default limits apply', async () => {
+  configureEntitlements({ read: async () => ({ features: {}, flags: {} }) });
+  const empty = { query: async () => [[]] };
+  const limits = await readCashierLimits(empty);
+  assert.deepEqual(limits.INR, { depositMin: '100', depositMax: '100000', withdrawMin: '200', withdrawMax: '50000' });
+  assert.deepEqual(Object.keys(limits).sort(), ['BTC', 'DOGE', 'ETH', 'INR', 'LTC', 'TRX', 'USDT']);
+  await assert.rejects(assertCashierLimits(empty, { currency: 'INR', amount: '99', flow: 'deposit' }), (e) => e.code === 'CASHIER_BELOW_MINIMUM');
+});
