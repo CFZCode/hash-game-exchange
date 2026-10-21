@@ -57,3 +57,4 @@ Callbacks you sign and send to our own backend (a test harness that simulates a 
   - **Sports exchange:** the slip minimum.
   - **Deposits / withdrawals:** manual, approved in the site admin.
   - Scope: this run and these players only.
+- **2026-10-21 — sports exchange bet-verify run (players parkertest02, parkertest03).** The owner asked for real bets on every live market type to check book / exposure / liability / settlement against TENEXCH (skill `exchange-bet-verify`). Limits: every bet at the slip minimum (₹100), no max-amount bets; total stake ≤ ₹1,500 per player; each player's open exposure (lay liability included) ≤ ₹1,200 at any time; prefer low-odds lays; INR only; no deposits, withdrawals, admin config or other live writes. Scope: this run and these players only.

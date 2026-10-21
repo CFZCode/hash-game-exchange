@@ -5,7 +5,7 @@
 import { readFileSync } from 'node:fs';
 const [, , urlPart, base, ...routes] = process.argv;
 const port = process.env.CDP_PORT || 9333;
-const t = (await (await fetch(`http://127.0.0.1:${port}/json/list`)).json()).find((x) => x.type === 'page' && x.url.includes(urlPart));
+const t = (await (await fetch(`http://127.0.0.1:${port}/json/list`)).json()).find((x) => x.type === 'page' && (x.id === urlPart || x.url.includes(urlPart)));
 if (!t) throw new Error(`no page matching ${urlPart}`);
 const ws = new WebSocket(t.webSocketDebuggerUrl);
 await new Promise((r) => ws.addEventListener('open', r, { once: true }));
