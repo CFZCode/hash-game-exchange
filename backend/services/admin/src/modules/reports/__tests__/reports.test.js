@@ -357,7 +357,7 @@ test('reports against a database', async (t) => {
       const by = (c) => sheet.rows.filter((r) => r.category === c).map((r) => r.amount).sort();
       assert.deepEqual(by('Original Games'), ['-1000.00000000', '1000.00000000']);
       const stake = sheet.rows.find((r) => r.category === 'Original Games' && r.amount === '-1000.00000000');
-      assert.equal(stake.description, 'Sheet Test Game bet · t5-sheet-tx', 'the game is named, not just the transaction id');
+      assert.equal(stake.description, 'Sheet Test Game bet', 'the game is named, and the transaction id is not shown');
       assert.deepEqual(by('Casino'), ['-20.00000000']);
       assert.deepEqual(by('Sports'), ['30.00000000']);
       assert.equal(sheet.balance.debited, '-1020.00000000');

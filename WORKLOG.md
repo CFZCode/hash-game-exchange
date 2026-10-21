@@ -55,6 +55,14 @@ Format:
 
 ---
 
+## 2026-10-22 — Balance sheet: Original Games ki transaction id hata di
+**Kya kiya:** Admin → player → Balance sheet me Original Games ki line ab sirf game + type dikhati hai ("Plinko bet", "Plinko win"), aage ka `· <transaction id>` hata diya.
+**Kyun:** User: balance sheet me original game ki id mat dikhao, baaki sab theek hai.
+**Files / jagah:** `backend/services/admin/src/modules/reports/reports.service.js` (`#originalGameNames`) + `__tests__/reports.test.js`.
+**Notes / pending:** admin-svc restart (admin UI nahi badla, build nahi). Live pe saari 1714 Original Games ledger rows ka `og_transactions` me match hai, to har line ko game naam milta hai. Reports tests 32/32.
+
+---
+
 ## 2026-10-21 — Owner panel me payment gateway on/off switch
 **Kya kiya:** Owner panel → Features & plan → Site flags me naya group "Payment gateways": CCPayment, A-Pay, WayPay, CricPay, UPI (EkQR) — har gateway ka switch (owner document `flags.gateway_<naam>`, khaali = on). Backend (user-service `paymentOrders.service.js`): owner ne gateway off kiya to us gateway pe naya deposit, naya withdrawal aur methods list `503 PAYORDER_PROVIDER_DISABLED` — paisa hold hone se pehle, gateway ko call kiye bina. Jo order pehle se khule hain unke callback / status pehle jaise chalte hain. Site pe CCPayment off = crypto tab me CCPayment ka form nahi aata (methods khaali), purana manual address wala form dikhta hai.
 **Kyun:** User: owner panel me ye setting honi chahiye ki site pe kaunsa payment gateway enable / disable ho — nahi thi.

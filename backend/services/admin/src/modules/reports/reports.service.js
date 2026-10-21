@@ -259,7 +259,7 @@ class ReportsService {
   }
 
   /**
-   * "Arrow Bow bet · <tx>" for an Original Games ledger row, keyed by its ref id (the aggregator's
+   * "Arrow Bow bet" for an Original Games ledger row (no transaction id: user, 2026-10-22), keyed by its ref id (the aggregator's
    * transaction id). The ledger only stores "original-games bet <tx>", so the game is read back
    * from og_transactions → og_games in one query.
    */
@@ -276,7 +276,7 @@ class ReportsService {
         WHERE o.transaction_id IN (:refs)`,
       { replacements: { refs }, type: QueryTypes.SELECT }
     ).catch(() => []); // no og tables in this deployment: keep the stored description
-    return new Map(found.map((r) => [String(r.tx), `${r.name} ${r.kind} · ${r.tx}`]));
+    return new Map(found.map((r) => [String(r.tx), `${r.name} ${r.kind}`]));
   }
 
   /** Parent staff ka naam / email (Agent System table). */
