@@ -101,11 +101,12 @@ export function CashoutButton({ value, disabled, loading, formatAmount = default
       type="button"
       onClick={onClick}
       disabled={disabled || loading}
-      className="button button-s button-second h-8 flex-none gap-1 px-3 text-xs disabled:cursor-not-allowed disabled:opacity-50"
+      className="button button-s button-brand h-8 flex-none gap-1 px-3 text-xs disabled:cursor-not-allowed disabled:opacity-50"
     >
       <span>Cashout</span>
+      {/* On the brand fill a positive figure keeps the button's own ink; green on green is unreadable. */}
       {value != null && Number.isFinite(n) && (
-        <span className={n < 0 ? 'text-error' : 'text-brand'}>{formatAmount(n)}</span>
+        <span className={n < 0 ? 'text-error' : ''}>{formatAmount(n)}</span>
       )}
     </button>
   );
