@@ -6,12 +6,6 @@ module.exports = Object.freeze({
   /** A flag the owner has not put in the site's plan — details `{ kind: 'flag', key }`. */
   NOT_ENTITLED: entitlements.entitlementErrors.ENTITLED,
   ...defineErrors('SITE_CONFIG', {
-  /** Cashier limits are set by the Super Admin only. */
-  CASHIER_LIMITS_SUPER_ADMIN_ONLY: { status: 403, message: 'Only the Super Admin can change cashier limits' },
-
-  /** A submitted cashier-limits block failed validation; details `{ problem }`. */
-  CASHIER_LIMITS_INVALID: { status: 400, message: 'The cashier limits are not valid' },
-
   NOT_CONFIGURED: {
     status: 409,
     /**

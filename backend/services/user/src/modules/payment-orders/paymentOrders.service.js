@@ -2,7 +2,7 @@
 
 const crypto = require('crypto');
 
-const { money, sitePolicy, operatorSettings, withdrawBlock, currencyRegistry, cashierLimits, entitlements } = require('@ibitplay/common');
+const { money, sitePolicy, operatorSettings, withdrawBlock, currencyRegistry, entitlements } = require('@ibitplay/common');
 
 const errors = require('./paymentOrders.errors');
 const { FLOW, userIdFor, APAY_DEPOSIT_SYSTEMS, APAY_WITHDRAWAL_SYSTEMS, APAY_SYSTEM_LABELS } = require('./paymentOrders.constants');
@@ -125,13 +125,8 @@ class PaymentOrdersService {
       throw errors.CURRENCY_NOT_SUPPORTED({ provider: providerName, currency });
     }
 
-    // The deployment's fallback min / max is an INR figure (1 / 10L) — a coin takes only the
-    // Super Admin's own per-coin limits, as on the manual crypto rail.
-    if (providerName === 'ccpayment') {
-      await cashierLimits.assertCashierLimits(this.models.Users?.sequelize ?? this.db?.sequelize, { currency, amount, flow: 'deposit' });
-    } else {
-      await this.#assertWithinLimits(amount, currency, FLOW.PAY_IN);
-    }
+    // The deployment's min / max is an INR figure (1 / 10L), so a ccpayment coin deposit has none.
+    if (providerName !== 'ccpayment') await this.#assertWithinLimits(amount, currency, FLOW.PAY_IN);
 
     const reference = this.#reference('DEP');
 
@@ -580,11 +575,9 @@ class PaymentOrdersService {
   }
 
   async #assertWithinLimits(amount, currency, flow) {
-    // The Super Admin's min / max for this currency (Limits and policy → Cashier); where none is
-    // set, the deployment's default.
-    const owner = cashierLimits.limitsFor(await cashierLimits.readCashierLimits(this.models.Users?.sequelize ?? this.db?.sequelize), currency);
-    const min = flow === FLOW.PAY_OUT ? (owner.withdrawMin ?? this.config.WITHDRAW_MINIMUM) : (owner.depositMin ?? this.config.DEPOSIT_MINIMUM);
-    const max = flow === FLOW.PAY_OUT ? (owner.withdrawMax ?? this.config.WITHDRAW_MAXIMUM) : (owner.depositMax ?? this.config.DEPOSIT_MAXIMUM);
+    // The deployment's min / max for this rail.
+    const min = flow === FLOW.PAY_OUT ? this.config.WITHDRAW_MINIMUM : this.config.DEPOSIT_MINIMUM;
+    const max = flow === FLOW.PAY_OUT ? this.config.WITHDRAW_MAXIMUM : this.config.DEPOSIT_MAXIMUM;
 
     if (min && money.lt(amount, String(min))) throw errors.BELOW_MINIMUM({ minimum: String(min), currency });
     if (max && money.gt(amount, String(max))) throw errors.ABOVE_MAXIMUM({ maximum: String(max), currency });

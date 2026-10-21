@@ -3,7 +3,7 @@
 const crypto = require('node:crypto');
 
 const { Op } = require('sequelize');
-const { money, withdrawBlock, cashierLimits } = require('@ibitplay/common');
+const { money, withdrawBlock } = require('@ibitplay/common');
 
 const { WalletService } = require('../wallet/wallet.service');
 const { createWithdrawRequirements } = require('../withdraw-requirements/withdrawRequirements');
@@ -227,7 +227,6 @@ class P2pService {
    * right is the offer's remaining amount, which legacy never touched at all.
    */
   async createOrder({ userId, offerId, cryptoAmount, paymentAccountId }) {
-    const limits = await cashierLimits.readCashierLimits(this.models.Users?.sequelize ?? this.db?.sequelize);
     return this.db.transaction(async (transaction) => {
       const offer = await this.models.P2pOffer.findByPk(offerId, {
         transaction,
@@ -240,8 +239,6 @@ class P2pService {
       if (offer.status !== OFFER_STATUS.ACTIVE) throw errors.OFFER_INACTIVE({ offerId });
 
       this.#checkLimits(offer, cryptoAmount);
-      // A P2P buy is a deposit of the offer's coin: the Super Admin's deposit min / max apply (Super Admin → Limits and policy → Cashier).
-      cashierLimits.assertWithinCashierLimits(limits, { currency: offer.coin, amount: cryptoAmount, flow: 'deposit' });
 
       if (money.lt(offer.available_amount ?? '0', cryptoAmount)) {
         throw errors.OFFER_EXHAUSTED({ offerId, available: String(offer.available_amount ?? '0') });
@@ -408,7 +405,6 @@ class P2pService {
     const qr = file ? inspect(file, errors) : null;
     // A sell order is a payout: the operator's withdrawal block refuses it (migration 091).
     await withdrawBlock.assertWithdrawAllowed(this.models, { userId });
-    const limits = await cashierLimits.readCashierLimits(this.models.Users?.sequelize ?? this.db?.sequelize);
 
     return this.db.transaction(async (transaction) => {
       const offer = await this.models.P2pOffer.findByPk(offerId, {
@@ -420,9 +416,7 @@ class P2pService {
       if (offer.status !== OFFER_STATUS.ACTIVE) throw errors.OFFER_INACTIVE({ offerId });
 
       this.#checkLimits(offer, cryptoAmount);
-      // A P2P sell is a payout of the offer's coin: the Super Admin's withdrawal min / max apply.
-      cashierLimits.assertWithinCashierLimits(limits, { currency: offer.coin, amount: cryptoAmount, flow: 'withdraw' });
-      // …and so does the owner's daily withdrawal limit for that coin (WITHDRAW_DAILY_LIMIT),
+      // A P2P sell is a payout: the owner's daily withdrawal limit for that coin (WITHDRAW_DAILY_LIMIT),
       // under the same per-player lock the other withdrawal rails take.
       await this.#requirements().assertDailyInTransaction(userId, { amount: cryptoAmount, currency: offer.coin, transaction });
 

@@ -2,7 +2,7 @@
 
 const crypto = require('node:crypto');
 const { Op, fn, col } = require('sequelize');
-const { money, sitePolicy, currencyRegistry, assertCurrencySupportedFor, withdrawBlock, cashierLimits } = require('@ibitplay/common');
+const { money, sitePolicy, currencyRegistry, assertCurrencySupportedFor, withdrawBlock } = require('@ibitplay/common');
 const { assertPlayerCapability } = require('@ibitplay/auth');
 
 const errors = require('./cryptoWithdraw.errors');
@@ -109,8 +109,6 @@ class CryptoWithdrawService {
     if (requested <= 0n) throw errors.INVALID_AMOUNT({ amount });
     const decimal = money.toDecimalString(requested);
     if (money.lt(decimal, this.minimum)) throw errors.BELOW_MINIMUM({ minimum: this.minimum, amount: decimal });
-    // The withdrawal min / max for this coin (set by the Super Admin: Limits and policy → Cashier).
-    await cashierLimits.assertCashierLimits(this.models.Users?.sequelize ?? this.db?.sequelize, { currency, amount: decimal, flow: 'withdraw' });
 
     const address = String(wallet ?? '').trim();
     if (!address) throw errors.INVALID_ADDRESS();

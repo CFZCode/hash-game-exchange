@@ -1,11 +1,10 @@
 'use strict';
 
 const {
-  money, Mailer, entitlements, currencyRegistry, cashierLimits: cashierLimitsLib, rewardCurrencyOf, defaultCurrencyOf, isDefaultCurrencyChoice, REWARD_CURRENCY_NAMES,
+  money, Mailer, entitlements, currencyRegistry, rewardCurrencyOf, defaultCurrencyOf, isDefaultCurrencyChoice, REWARD_CURRENCY_NAMES,
 } = require('@ibitplay/common');
 
 const errors = require('./siteConfig.errors');
-const { assertTransactionPassword } = require('../staff-auth/transactionPassword');
 const ownerErrors = require('../features/owner.errors');
 
 /** The `site_features` row holding the owner's reward currency (a catalogue policy). */
@@ -114,9 +113,7 @@ const OPERATOR_SETTINGS = Object.freeze({
   casino_max_bet: { env: 'CASINO_MAX_BET', kind: 'decimal', min: 0, label: 'Maximum bet' },
   casino_seed_rotate_after: { env: 'CASINO_SEED_ROTATE_AFTER', kind: 'number', min: 0, max: 1e6, label: 'Rotate the fair seed after N rounds' },
 
-  // The old sportsbook's stake / payout / drift settings are gone (nothing read them), and the
-  // cashier's deposit / withdrawal limits are the owner's now, per currency (`cashierLimits`,
-  // owner panel → Cashier); `cashierLimits()` below shows them read-only.
+  // The old sportsbook's stake / payout / drift settings are gone (nothing read them).
   race_timezone: { env: 'RACE_TIMEZONE', kind: 'timezone', label: 'Race week resets in' },
 
   login_max_attempts: { env: 'LOGIN_MAX_ATTEMPTS', kind: 'number', min: 1, max: 50, label: 'Failed logins before a lock' },
@@ -1080,49 +1077,6 @@ class SiteConfigService {
     return Object.fromEntries(
       OPERATOR_FLAGS.map((name) => [name, row ? Boolean(row[name]) : true])
     );
-  }
-
-  get #sequelize() {
-    return this.models.Staff?.sequelize ?? this.db?.sequelize;
-  }
-
-  /**
-   * Cashier limits per currency — the owner's `cashierLimits` (the `cashier_limits` table only
-   * while the owner document has no block):
-   * `{ currencies: [{ code, name, depositMin, depositMax, withdrawMin, withdrawMax }], managedBy }` —
-   * one row per coin the site has switched on, null = no limit on that side. Every rail checks them.
-   */
-  async cashierLimits() {
-    const [limits, coins] = await Promise.all([cashierLimitsLib.readCashierLimits(this.#sequelize), currencyRegistry.listCurrencies()]);
-    const enabled = (coins ?? []).filter((c) => c && c.enabled !== false);
-    const codes = enabled.length ? enabled.map((c) => cashierLimitsLib.codeOf(c.code)) : Object.keys(limits);
-    const nameOf = new Map(enabled.map((c) => [cashierLimitsLib.codeOf(c.code), c.name ?? null]));
-    return {
-      currencies: [...new Set(codes)].map((code) => ({
-        code,
-        name: nameOf.get(code) ?? null,
-        ...cashierLimitsLib.limitsFor(limits, code),
-      })),
-      managedBy: this.#ownerManaged() ? 'owner' : 'admin',
-    };
-  }
-
-  /**
-   * Replace the cashier limits — only on a site without an owner panel (else `403 OWNER_MANAGED`),
-   * the Super Admin only, with the transaction password.
-   * `limits` is `{ [CODE]: { depositMin, depositMax, withdrawMin, withdrawMax } }`, each an amount
-   * above 0 or null; a currency left out has no limits.
-   */
-  async setCashierLimits({ actor, limits, transactionPassword }) {
-    // With an owner panel the limits are the owner's (Features & plan → Policies → Cashier limits).
-    if (this.#ownerManaged()) throw ownerErrors.MANAGED({ feature: 'cashier_limits' });
-    if (!actor?.isSuperAdmin) throw errors.CASHIER_LIMITS_SUPER_ADMIN_ONLY();
-    const problem = cashierLimitsLib.cashierLimitsProblem(limits);
-    if (problem) throw errors.CASHIER_LIMITS_INVALID({ problem });
-    await assertTransactionPassword(this.models, actor.id, transactionPassword, { required: true });
-    await this.#sequelize.transaction((transaction) => cashierLimitsLib.writeCashierLimits(this.#sequelize, limits, { staffId: actor.id, transaction }));
-    this.logger?.warn({ actorStaffId: actor.id, limits }, 'Cashier limits changed');
-    return this.cashierLimits();
   }
 
   /**

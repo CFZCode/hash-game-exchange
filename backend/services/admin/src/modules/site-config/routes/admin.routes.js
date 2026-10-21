@@ -2,7 +2,7 @@
 
 const { Router } = require('express');
 const { validate, response, asyncHandler, createActivityRecorder, noBody } = require('@ibitplay/common');
-const { PERMISSIONS, denyAgentTree, canIssueFunds } = require('@ibitplay/auth');
+const { PERMISSIONS, denyAgentTree } = require('@ibitplay/auth');
 
 const v = require('../siteConfig.validators');
 const { SiteConfigService } = require('../siteConfig.service');
@@ -39,34 +39,6 @@ module.exports = function adminRoutes(deps) {
     '/settings',
     auth.requirePermission(PERMISSIONS.CONFIG_READ),
     asyncHandler(async (_req, res) => response.ok(res, await service.operatorSettings()))
-  );
-
-  /** Per-currency deposit / withdrawal limits: every staff may read them. */
-  router.get(
-    '/cashier-limits',
-    auth.requirePermission(PERMISSIONS.CONFIG_READ),
-    asyncHandler(async (_req, res) => response.ok(res, await service.cashierLimits()))
-  );
-
-  /** Replace them — Super Admin only (checked in the service), transaction password, audited. */
-  router.put(
-    '/cashier-limits',
-    auth.requirePermission(PERMISSIONS.CONFIG_WRITE),
-    validate(v.setCashierLimits),
-    withActivity({
-      action: 'site-config.cashier-limits.update',
-      describe: (req) => ({ targetType: 'SITE_CONFIG', targetId: 'cashier-limits', details: { limits: req.body.limits } }),
-    }),
-    asyncHandler(async (req, res) =>
-      response.ok(
-        res,
-        await service.setCashierLimits({
-          actor: { id: req.staff.id, isSuperAdmin: canIssueFunds(req.staff) },
-          limits: req.body.limits,
-          transactionPassword: req.body.transactionPassword,
-        })
-      )
-    )
   );
 
   /**
