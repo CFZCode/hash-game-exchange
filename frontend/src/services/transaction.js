@@ -111,7 +111,7 @@ const REASON_LABEL = {
   DEPOSIT: 'Deposit', WITHDRAWAL: 'Withdrawal', WITHDRAWAL_REVERSAL: 'Withdrawal reversed',
   ADMIN_CREDIT: 'Credit by admin', ADMIN_DEBIT: 'Debit by admin', TRANSFER_IN: 'Transfer in', TRANSFER_OUT: 'Transfer out',
   BONUS: 'Bonus', BONUS_REVERSAL: 'Bonus reversed', rakeback_claim: 'Rakeback', TIP_SENT: 'Tip sent', TIP_RECEIVED: 'Tip received',
-  SPORTS_STAKE: 'Sports bet', SPORTS_SETTLEMENT: 'Sports settlement', SPORTS_REFUND: 'Sports refund', SPORTS_VOID: 'Sports void',
+  SPORTS_STAKE: 'Sports bet', SPORTS_RELEASE: 'Sports bet released', SPORTS_SETTLEMENT: 'Sports settlement', SPORTS_REFUND: 'Sports refund', SPORTS_VOID: 'Sports void',
 };
 
 function toBillPage({ rows, pagination }) {

@@ -41,6 +41,17 @@ const LEDGER_CATEGORY_SQL = Object.freeze({
   swap: "meta->>'swap' = 'true'",
 });
 
+/**
+ * A direct user's sports stake holds and exposure releases (a BACK after a LAY on one runner), as
+ * the `point_ledger_direct` trigger wrote them: the real move (`delta`) and the exact wallet after
+ * it. A release has no `debit_ledger` row, so that ledger alone loses it and the next row looks off.
+ * `debit_ledger` keeps only the bets this ledger has no row for (agent users, before migration 117).
+ */
+const DIRECT_SPORTS_MOVES = `mssports.point_ledger_direct
+  WHERE user_id = :uid AND source = 'sports-service' AND event_type IN ('BET_PLACED', 'BET_RELEASED') AND currency = 'INR'`;
+const NOT_IN_DIRECT_LEDGER = `NOT EXISTS (SELECT 1 FROM mssports.point_ledger_direct p
+  WHERE p.bet_id::text = d.meta->>'bet_id' AND p.event_type = 'BET_PLACED' AND p.source = 'sports-service')`;
+
 class WalletRepository {
   constructor({ models, db }) {
     this.models = models;
@@ -428,7 +439,7 @@ class WalletRepository {
   /**
    * The player's statement. `category` is the Transaction pane's Bill type (LEDGER_CATEGORY_SQL).
    * Unless a reason or another category narrows it, the sports exchange's own INR rows are merged
-   * in: its stake holds (`mssports.debit_ledger`) and settlements (`mssports.credits_ledger`) never
+   * in: its stake holds and exposure releases (DIRECT_SPORTS_MOVES) and settlements (`mssports.credits_ledger`) never
    * reach this wallet's `credits_ledger`, and the player still has to see where the money went.
    */
   async listLedger({ userId, currency, reason, category, limit, offset }) {
@@ -449,7 +460,11 @@ class WalletRepository {
     if (!reason && (!category || category === 'game') && (!currency || currency === 'INR')) {
       parts.push(
         `SELECT 'sd' || id, id, user_id, currency, -amount, 'SPORTS_STAKE', description, balance, created_at::timestamptz, NULL::jsonb
-           FROM mssports.debit_ledger WHERE user_id = :uid AND reason = 'bet_placed'`,
+           FROM mssports.debit_ledger d WHERE user_id = :uid AND reason = 'bet_placed' AND ${NOT_IN_DIRECT_LEDGER}`,
+        `SELECT 'sp' || id, id, user_id::text, currency, delta,
+                CASE event_type WHEN 'BET_PLACED' THEN 'SPORTS_STAKE' ELSE 'SPORTS_RELEASE' END,
+                remark, balance_after, created_at, NULL::jsonb
+           FROM ${DIRECT_SPORTS_MOVES}`,
         `SELECT 'sc' || id, id, user_id, currency, amount,
                 CASE reason WHEN 'refund' THEN 'SPORTS_REFUND' WHEN 'settlement_void' THEN 'SPORTS_VOID' ELSE 'SPORTS_SETTLEMENT' END,
                 description, closing, created_at::timestamptz, NULL::jsonb
@@ -528,7 +543,7 @@ class WalletRepository {
   /**
    * The staff Ledger tab: `wallet_history` plus the moves that never write it — a swap's two
    * `credits_ledger` legs (`meta.swap`) and the Sports Exchange's own ledgers (mssports bet placed /
-   * settlement / refund / void, INR) — newest first, one page. Same row shape as `listHistory`.
+   * exposure released / settlement / refund / void, INR) — newest first, one page. Same row shape as `listHistory`.
    */
   async listStaffHistory({ userId, currency, limit, offset }) {
     const { sequelize } = this;
@@ -548,7 +563,11 @@ class WalletRepository {
             `SELECT 'sports-bet-' || d.id, d.created_at, 'INR', 'debit', ABS(d.amount)::text, NULL, d.balance::text,
                     TRIM('Sports bet placed — ' || COALESCE(d.description, ''))
                FROM mssports.debit_ledger d
-              WHERE d.user_id = :uid AND d.reason = 'bet_placed' AND UPPER(COALESCE(d.currency, 'INR')) = 'INR'`,
+              WHERE d.user_id = :uid AND d.reason = 'bet_placed' AND UPPER(COALESCE(d.currency, 'INR')) = 'INR' AND ${NOT_IN_DIRECT_LEDGER}`,
+            `SELECT 'sports-move-' || id, created_at, 'INR', CASE WHEN delta < 0 THEN 'debit' ELSE 'credit' END, ABS(delta)::text,
+                    (balance_after - delta)::text, balance_after::text,
+                    TRIM(CASE event_type WHEN 'BET_PLACED' THEN 'Sports bet placed — ' ELSE 'Sports exposure released — ' END || COALESCE(remark, ''))
+               FROM ${DIRECT_SPORTS_MOVES}`,
             `SELECT 'sports-' || c.id, c.created_at, 'INR', 'credit', ABS(c.amount)::text, NULL, c.closing::text,
                     TRIM('Sports ' || REPLACE(c.reason, '_', ' ') || ' — ' || COALESCE(c.description, ''))
                FROM mssports.credits_ledger c

@@ -59,6 +59,7 @@ test('player ledger against PostgreSQL', async (t) => {
     await q('DELETE FROM public.credits_ledger WHERE user_id = :uid RETURNING id', { uid: UID });
     await q('DELETE FROM mssports.debit_ledger WHERE user_id = :uid RETURNING id', { uid: UID });
     await q('DELETE FROM mssports.credits_ledger WHERE user_id = :uid RETURNING id', { uid: UID });
+    await q('DELETE FROM mssports.point_ledger_direct WHERE user_id = :uid RETURNING id', { uid: UID });
     await q('DELETE FROM og_transactions WHERE user_id = :uid RETURNING id', { uid: UID });
     await q("DELETE FROM og_games WHERE code = 'test-bow' RETURNING code");
     await q('DELETE FROM gis_transactions WHERE user_id = :uid RETURNING id', { uid: UID });
@@ -115,4 +116,46 @@ test('player ledger against PostgreSQL', async (t) => {
   assert.equal((await list({ currency: 'USDT' })).count, 5, 'a non-INR coin has no sports rows');
   assert.equal((await list({ reason: ['BONUS'] })).count, 1, 'a reason filter is the wallet ledger alone');
   assert.equal((await list({ limit: 2, offset: 2 })).rows.length, 2);
+
+  // A LAY (hold −34.50) then a BACK on the same runner (exposure 34.50 → 11.50, +23), then the
+  // settlement. The release is in point_ledger_direct only; the LAY's debit_ledger twin is not listed twice.
+  const sportsMove = (ref, event, delta, after, betId, at) =>
+    q(`INSERT INTO mssports.point_ledger_direct (entry_ref, source, event_type, category, user_id, currency, delta, balance_after, bet_id, remark, created_at)
+       VALUES (:ref, 'sports-service', :event, 'OTHER', :uid, 'INR', :delta, :after, :betId, 'Lisbon v LASK LASK', :at) RETURNING id`,
+    { ref: `test:${UID}:${ref}`, event, uid: UID, delta, after, betId, at });
+  const lay = Number(UID) * 10;
+  await sportsMove('lay', 'BET_PLACED', '-34.50', '2530.50', lay, '2026-10-19T08:00:00Z');
+  await q(`INSERT INTO mssports.debit_ledger (user_id, currency, amount, reason, description, balance, meta, created_at)
+           VALUES (:uid, 'INR', 34.50, 'bet_placed', 'Lisbon v LASK LASK', 2530.50, CAST(:meta AS jsonb), '2026-10-19T08:00:00Z') RETURNING id`,
+  { uid: UID, meta: JSON.stringify({ bet_id: lay }) });
+  await sportsMove('back', 'BET_RELEASED', '23', '2553.50', lay + 1, '2026-10-19T08:01:00Z');
+  await q(`INSERT INTO mssports.credits_ledger (user_id, currency, amount, reason, description, closing, created_at)
+           VALUES (:uid, 'INR', 11.50, 'settlement', 'Lisbon v LASK / LASK', 2565, '2026-10-19T09:00:00Z') RETURNING id`, { uid: UID });
+
+  const sports = (await list({ category: 'game' })).rows.filter((x) => x.reason.startsWith('SPORTS_')).reverse();
+  assert.deepEqual(sports.map((x) => [x.reason, Number(x.amount), Number(x.balance)]), [
+    ['SPORTS_STAKE', -100, 2375],
+    ['SPORTS_SETTLEMENT', 190, 2565],
+    ['SPORTS_STAKE', -34.5, 2530.5],
+    ['SPORTS_RELEASE', 23, 2553.5],
+    ['SPORTS_SETTLEMENT', 11.5, 2565],
+  ]);
+  for (let i = 1; i < sports.length; i += 1) {
+    assert.equal(Number(sports[i - 1].balance) + Number(sports[i].amount), Number(sports[i].balance), `player row ${i} chains`);
+  }
+
+  const staff = (await wallet.listStaffHistory({ userId: UID, currency: 'INR', limit: 25, offset: 0 })).rows
+    .filter((x) => x.id.startsWith('sports-')).reverse();
+  assert.deepEqual(staff.map((x) => [x.operation, Number(x.amount), Number(x.new_balance)]), [
+    ['debit', 100, 2375],
+    ['credit', 190, 2565],
+    ['debit', 34.5, 2530.5],
+    ['credit', 23, 2553.5],
+    ['credit', 11.5, 2565],
+  ]);
+  assert.match(staff[3].description, /^Sports exposure released — Lisbon v LASK LASK$/);
+  for (let i = 1; i < staff.length; i += 1) {
+    const signed = staff[i].operation === 'debit' ? -Number(staff[i].amount) : Number(staff[i].amount);
+    assert.equal(Number(staff[i - 1].new_balance) + signed, Number(staff[i].new_balance), `staff row ${i} chains`);
+  }
 });
