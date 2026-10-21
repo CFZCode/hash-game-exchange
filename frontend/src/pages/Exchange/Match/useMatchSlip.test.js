@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { slipFigures, projectedBook } from './useMatchSlip';
+import { slipFigures, projectedBook, moneyNeeded } from './useMatchSlip';
 import { formatBook } from '../../../components/exchange/utils';
 
 describe('slipFigures — session fancy: TENEXCH profit 0 on Normal, liability on the rate', () => {
@@ -58,5 +58,26 @@ describe('formatBook — TENEXCH book text', () => {
     expect(formatBook(200000)).toBe('2,00,000');
     expect(formatBook(-120.5)).toBe('-120.5');
     expect(formatBook(0)).toBe('0');
+  });
+});
+
+describe('moneyNeeded — TENEXCH Step 0a wallet gate', () => {
+  const market = { mid: 'm1', gtype: 'match', mname: 'MATCH_ODDS', section: [{ nat: 'A' }, { nat: 'B' }] };
+  const slip = (betType) => ({ bv: { market_id: 'm1', betType, runnerName: 'A', gtype: 'match', mname: 'MATCH_ODDS' } });
+  it('a fresh back needs its stake', () => {
+    expect(moneyNeeded(slip('back'), 100, 1.32, market, {})).toBe(100);
+  });
+  it('a fresh lay needs its liability', () => {
+    expect(moneyNeeded(slip('lay'), 100, 1.5, market, {})).toBe(50);
+  });
+  it('a lay that hedges an existing back needs less than its stake', () => {
+    // existing book: A +32, B -100 (back A 100 @ 1.32); lay A 100 @ 1.33 → A -1, B 0 → worst 1, before 100
+    const book = { 'm1:a': 32, 'm1:b': -100 };
+    expect(moneyNeeded(slip('lay'), 100, 1.33, market, book)).toBeLessThanOrEqual(0);
+  });
+  it('a fancy (no runner book) needs the stake', () => {
+    const fancy = { mid: 'f1', gtype: 'fancy', mname: 'Normal', section: [{ nat: '6 over run' }] };
+    const s = { bv: { market_id: 'f1', betType: 'no', runnerName: '6 over run', gtype: 'fancy', mname: 'Normal' } };
+    expect(moneyNeeded(s, 100, 73, fancy, {})).toBe(100);
   });
 });

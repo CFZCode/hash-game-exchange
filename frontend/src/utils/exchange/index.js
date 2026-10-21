@@ -44,6 +44,7 @@ export {
   buildBetValue,
   isOddsEditable,
   prevalidateBet,
+  isRacingSid,
   stakeLimits,
   newClientRef,
   buildPlaceRequest,

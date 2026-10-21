@@ -118,7 +118,7 @@ export function stakeLimits(bv) {
   return { min, max: rawMax > 0 ? rawMax : 100000 };
 }
 
-const isRacingSid = (sid) => String(sid) === '10' || String(sid) === '65';
+export const isRacingSid = (sid) => String(sid) === '10' || String(sid) === '65';
 
 /**
  * Pre-submit checks, Addaplay's order (BetSlip.jsx:478-510) with the TENEXCH checks Addaplay

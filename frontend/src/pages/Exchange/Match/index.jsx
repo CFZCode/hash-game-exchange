@@ -113,7 +113,7 @@ export default function ExchangeMatchPage() {
      coin (utils/exchange/stakeCurrency.js). INR is the identity: the kit's own formatters. */
   const cur = useExchangeCurrency();
   const fmtInr = cur.isInr ? undefined : cur.formatInr;
-  const slipApi = useMatchSlip({ sid, gmid, match, getMarkets: mk.getMarkets, signedIn, currency: cur });
+  const slipApi = useMatchSlip({ sid, gmid, match, getMarkets: mk.getMarkets, signedIn, currency: cur, book });
   const { slip, stake, loading } = slipApi;
 
   const [filter, setFilter] = React.useState('all');

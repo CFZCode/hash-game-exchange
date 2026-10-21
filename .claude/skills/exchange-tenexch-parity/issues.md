@@ -43,3 +43,10 @@ badminton 764090418 / 737345854.
 | D | Header / row limit text | **Fixed pass 2**: "Min:100 Max:1L", "Max: 1", "Max: 10K", rows "Min:100 Max:2L"; no "Min: 0" (verified on 787917680, 600716118, 885202128) |
 | E | Racecard banner OPEN / SUSPENDED + "N Hours M Minutes Remaining" | **Fixed pass 2** (`Match/RaceStatus.jsx`, TENEXCH RaceTimer wording; verified "OPEN · 34 Minutes 26 Seconds Remaining") |
 | F | Badminton live scoreboard | Same as #12 |
+
+## Found by the 21 Oct non-cricket preview run
+
+| # | Issue | Status |
+|---|---|---|
+| G | No wallet check in the page: an over-balance stake got a limit message (or went to the server); TENEXCH answers "Bet Not Confirm Check Balance." first (usePlaceBetPanel Step 0a, money needed = worst-after − worst-before on runner books, stake elsewhere) | Fixed — `useMatchSlip` submit: racing over-max → wallet (`moneyNeeded`, live INR balance) → race window, all before min/max; cashout exempt |
+| H | Horse race-window message came after min/max (stake 50 five+ minutes out said "Check Minimum Bet Limit.") | Fixed — same reorder |

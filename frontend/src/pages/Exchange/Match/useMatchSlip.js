@@ -3,6 +3,7 @@ import {
   buildBetValue,
   isOddsEditable,
   prevalidateBet,
+  isRacingSid,
   beginBetSubmit,
   endBetSubmit,
   betMarketKey,
@@ -30,6 +31,7 @@ import {
 } from '../../../services/exchange';
 import { toast } from '../../../components/shared/Toast/toast';
 import { isRaceBettingOpen, RACE_WINDOW_TOAST } from '../../../utils/exchange/placeBetRules';
+import { fetchBalanceRest } from '../../../services/exchange/balanceSocket';
 import { bestPrice, bookFor } from './shape';
 
 /* ─── The match page's one open bet slip ──────────────────────────────────────────────────
@@ -131,6 +133,17 @@ export function projectedBook(slip, stake, odds, market, book) {
   return out;
 }
 
+/** Money this bet needs from the wallet — TENEXCH usePlaceBetPanel Step 0a. On a runner-book market
+ *  (MO / BM / cricket-casino) it is the worst-case loss after the bet minus the worst before, so a lay
+ *  that hedges a back can need less than its stake; on every other market it is the stake. */
+export function moneyNeeded(slip, stake, odds, market, book) {
+  const after = projectedBook(slip, stake, odds, market, book);
+  if (!after) return Number(stake) || 0;
+  const worst = (vals) => Math.max(0, -Math.min(0, ...vals));
+  const before = Object.keys(after).map((name) => bookFor(book, market.mid, name) ?? 0);
+  return Number((worst(Object.values(after)) - worst(before)).toFixed(2));
+}
+
 /* The rupee as this site prints it. The exchange's messages spell it "Rs." / "Rs" ("Min stake
    Rs.50"); the rest of the site says ₹. DISPLAY ONLY — nothing parses these strings. */
 export const rupeeText = (text) => String(text ?? '').replace(/\bRs\.?\s?(?=[\d₹])/g, '₹');
@@ -173,7 +186,7 @@ export function slipStakeInr(slip, stakeStr, currency = INR) {
  * @param {boolean} p.signedIn
  * @param {object} [p.currency]  useExchangeCurrency(): the coin the stake is typed in
  */
-export function useMatchSlip({ sid, gmid, match, getMarkets, signedIn, currency = INR }) {
+export function useMatchSlip({ sid, gmid, match, getMarkets, signedIn, currency = INR, book = null }) {
   const [slip, setSlip] = React.useState(null);
   const [stake, setStake] = React.useState('');
   const [loading, setLoading] = React.useState(false);
@@ -228,6 +241,36 @@ export function useMatchSlip({ sid, gmid, match, getMarkets, signedIn, currency 
       const odds = placementOdds(s, live);
       const isEdited = isEditedSlip(s);
       const bv = { ...s.bv };
+      /* TENEXCH's order before the limits (usePlaceBetPanel Step 0a / 0a2): a racing stake over
+         the max, then the WALLET (what the bet needs against the INR balance, so a funds problem is
+         not answered with a limit message), then the race window — all before min/max. A cashout
+         hedge is exempt from the wallet gate, as there. */
+      if (!bv.is_cashout) {
+        const inrFirst = slipStakeInr(s, stakeStr, currency);
+        const market = live.find((m) => String(m.mid) === String(bv.market_id));
+        const early = prevalidateBet({
+          bv, stake: inrFirst, odds, originalOdds: s.kind === 'line' ? odds : bv.odds,
+          isUserModifiedOdds: isEdited, match: matchInfo, markets: live, signedIn,
+        });
+        if (early?.code === 'ABOVE_MAX' && isRacingSid(bv.sid)) {
+          reject(token, early.message, stakeStr);
+          return;
+        }
+        let wallet = null;
+        try {
+          wallet = (await fetchBalanceRest()).balance;
+        } catch {
+          wallet = null; // unknown: the server's own wallet check decides
+        }
+        if (wallet != null && moneyNeeded(s, inrFirst, odds, market, book) > wallet) {
+          reject(token, BET_TOAST.CHECK_BALANCE, stakeStr);
+          return;
+        }
+        if (!isRaceBettingOpen(sid, matchInfo.stime)) {
+          reject(token, RACE_WINDOW_TOAST, stakeStr);
+          return;
+        }
+      }
       // Limits first in the player's own coin, so the message names what they typed.
       const coinErr = bv.is_cashout ? null : currency.checkStake(stakeStr, slipLimitsInr(bv));
       if (coinErr) {
@@ -299,7 +342,7 @@ export function useMatchSlip({ sid, gmid, match, getMarkets, signedIn, currency 
         if (aliveRef.current) setLoading(false);
       }
     },
-    [getMarkets, matchInfo, signedIn, sid, reject, currency],
+    [getMarkets, matchInfo, signedIn, sid, reject, currency, book],
   );
 
   /**
