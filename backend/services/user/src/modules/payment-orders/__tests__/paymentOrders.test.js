@@ -682,4 +682,49 @@ test('payment orders', async (t) => {
     assert.equal(cc.status, 'pending');
     assert.equal(cc.rawStatus, 'Processing');
   });
+
+  await t.test('the site’s network name reaches CCPayment as its chain symbol', async () => {
+    // The Crypto tab sends bc.game's TRON / BITCOIN; CCPayment only knows TRX / BTC.
+    const uid = newUid();
+    await seed(uid, '0');
+    const { service, calls } = build(ok);
+
+    await service.createDeposit({ userId: uid, provider: 'ccpayment', currency: 'USDT', amount: '25', chain: 'TRON' });
+    await service.createDeposit({ userId: uid, provider: 'ccpayment', currency: 'USDT', amount: '25', chain: 'BSC' });
+
+    assert.deepEqual(calls.map((c) => JSON.parse(c.body).chain), ['TRX', 'BSC']);
+  });
+
+  await t.test('a small coin deposit is not held to the INR fallback minimum', async () => {
+    // DEPOSIT_MINIMUM ('1') is an INR figure: 1 BTC would be the floor.
+    const uid = newUid();
+    await seed(uid, '0');
+    const { service } = build(ok);
+
+    const order = await service.createDeposit({ userId: uid, provider: 'ccpayment', currency: 'BTC', amount: '0.0005', chain: 'BITCOIN' });
+    assert.equal(order.amount, '0.00050000');
+  });
+
+  await t.test('the coins CCPayment is offered for are the configured ones', async () => {
+    const { service } = build(ok);
+    const { methods } = await service.getAvailableMethods({ provider: 'ccpayment' });
+    assert.deepEqual(methods, ['USDT', 'BTC', 'ETH']);
+  });
+
+  await t.test('with no CCPAYMENT_COIN_IDS the coin ids come from CCPayment’s live coin list', async () => {
+    const uid = newUid();
+    await seed(uid, '0');
+    const live = (url) => (url.endsWith('/getCoinList')
+      ? { code: 10000, data: { coins: [{ coinId: 1280, symbol: 'USDT' }, { coinId: 4242, symbol: 'NEWCOIN' }] } }
+      : ok(url));
+    const { service, calls } = build(live, { CCPAYMENT_COIN_IDS: undefined });
+
+    const { methods } = await service.getAvailableMethods({ provider: 'ccpayment' });
+    assert.deepEqual(methods, ['USDT', 'NEWCOIN']);
+
+    await service.createDeposit({ userId: uid, provider: 'ccpayment', currency: 'USDT', amount: '25', chain: 'TRON' });
+    const sent = calls.find((c) => c.url.endsWith('/createAppOrderDepositAddress'));
+    assert.equal(JSON.parse(sent.body).coinId, 1280);
+    assert.equal(calls.filter((c) => c.url.endsWith('/getCoinList')).length, 1, 'the list is cached, not asked per deposit');
+  });
 });

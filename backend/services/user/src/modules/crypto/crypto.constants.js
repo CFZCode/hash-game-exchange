@@ -54,20 +54,10 @@ const CCPAYMENT_STATUS = Object.freeze({
   PROCESSING: 'Processing',
   FAILED: 'Failed',
   REJECTED: 'Rejected',
+  // Ours, not CCPayment's: paid, but flagged as risky — held for staff, not credited.
+  RISKY: 'Risky',
 });
-
-/**
- * States a deposit can no longer move out of.
- *
- * The callback is retried by the provider, so the check that a row is already
- * final is what stops a second credit — legacy had this and it is kept.
- */
-const FINAL_STATUSES = Object.freeze([
-  CCPAYMENT_STATUS.SUCCESS,
-  CCPAYMENT_STATUS.FAILED,
-  CCPAYMENT_STATUS.REJECTED,
-]);
 
 const CCPAYMENT_OK = 10000;
 
-module.exports = { COIN_COLUMNS, SUPPORTED_COINS, COIN_NETWORKS, CCPAYMENT_STATUS, FINAL_STATUSES, CCPAYMENT_OK };
+module.exports = { COIN_COLUMNS, SUPPORTED_COINS, COIN_NETWORKS, CCPAYMENT_STATUS, CCPAYMENT_OK };

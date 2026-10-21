@@ -228,14 +228,15 @@ test('player notifications', async (t) => {
   await t.test('crypto deposit credited → one notification, a webhook retry adds none', async () => {
     const APP_ID = 'notify-app';
     const APP_SECRET = 'notify-secret';
+    const orderId = `ntf-cc-${process.pid}-${(seq += 1)}`;
     const crypto = new CryptoService({
       ...baseDeps,
       config: { ...baseDeps.config, CCPAYMENT_APP_ID: APP_ID, CCPAYMENT_APP_SECRET: APP_SECRET, CCPAYMENT_BASE_URL: 'https://ccpayment.test' },
-      http: { raw: async () => ({ code: 10000, data: { coins: [] } }) },
+      // getAppOrderInfo — the order record the webhook is confirmed against.
+      http: { raw: async () => ({ code: 10000, data: { coinSymbol: 'USDT', paidList: [{ recordId: `ntf-rec-${orderId}`, amount: '100', status: 'Success', isFlaggedAsRisky: false }] } }) },
       firstDepositBonus: noBonus,
     });
     const uid = await seed(newUid());
-    const orderId = `ntf-cc-${process.pid}-${(seq += 1)}`;
     await models.Ccdeposit.destroy({ where: { orderid: orderId } });
     await models.Ccdeposit.create({
       userid: String(uid), coinid: 1280, price: '100', orderid: orderId, chain: 'TRC20', status: 'Processing',

@@ -2,6 +2,7 @@
 
 const crypto = require('crypto');
 
+const { CCPAYMENT_COINS } = require('@ibitplay/common').withdrawalCapFigures;
 const {
   WAYPAY_MERCHANT_IDS,
   APAY_DEPOSIT_SYSTEMS,
@@ -413,6 +414,13 @@ const ccpayment = {
     return flow !== 'payout' && ccpaymentCoinId(currency, config) != null;
   },
 
+  /** The coins CCPayment offers this account (or CCPAYMENT_COIN_IDS) — the Crypto tab offers CCPayment for these only. */
+  async getAvailableMethods(config, { http }) {
+    await refreshCcpaymentCoinIds(config, http);
+    const fixed = configuredCoinIds(config);
+    return Object.keys(Object.keys(fixed).length ? fixed : liveCoinIds);
+  },
+
   /**
    * CCPayment signs `appId + timestamp + body` with HMAC-SHA256.
    *
@@ -448,7 +456,7 @@ const ccpayment = {
       coinId: ccpaymentCoinId(currency, config),
       price: String(amount),
       orderId: reference,
-      chain,
+      chain: ccpaymentChain(chain),
       generateCheckoutURL: true,
       returnUrl: returnUrl || config.CCPAYMENT_RETURN_URL,
     });
@@ -501,39 +509,71 @@ const CCPAYMENT_OK = 10000;
 /**
  * Ticker → CCPayment's numeric coin id.
  *
- * ── WHY THIS IS CONFIGURATION AND NOT A CONSTANT ─────────────────────────
+ * CCPayment identifies coins by ITS number (USDT 1280, BTC 1155), the same on every account, and
+ * hands the list out itself (`getCoinList`). So nothing has to be stored: the ids come from that
+ * live list (`refreshCcpaymentCoinIds`, cached 10 min), then from the table the reports already
+ * read (`CCPAYMENT_COINS`). `CCPAYMENT_COIN_IDS` (JSON `{"USDT":1280}`) is an optional override
+ * that replaces both. Legacy had no map at all: the caller put a number in the request body.
  *
- * The ids are CCPayment's, they differ per account's enabled coin set, and
- * they are not derivable from the ticker. Hardcoding a guessed number would
- * mean a deposit issued against the wrong coin — the player sends USDT to an
- * address minted for something else, and it is gone.
- *
- * So the map comes from `CCPAYMENT_COIN_IDS`, a JSON object of
- * `{"USDT": 1280, ...}` taken from the provider's coin list, and an unmapped
- * ticker is refused before anything is sent. Legacy had no map at all: the
- * caller put a number in the request body and it was forwarded as given.
- *
- * @returns the numeric id, or `null` if this deployment has not configured one.
+ * @returns the numeric id, or `null` for a coin none of them knows.
  */
 function ccpaymentCoinId(currency, config) {
   const ticker = String(currency ?? '').toUpperCase();
   if (!ticker) return null;
 
+  const id = Number(coinIdMap(config)[ticker]);
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+/** `CCPAYMENT_COIN_IDS` as an object — a string is JSON; malformed or absent is `{}`. */
+function configuredCoinIds(config) {
   let map = config?.CCPAYMENT_COIN_IDS;
   if (typeof map === 'string') {
     try {
       map = JSON.parse(map);
     } catch {
-      // A malformed map means no coin is supported, which surfaces as
-      // "currency not supported" rather than as a wrong coin id being sent.
-      return null;
+      return {};
     }
   }
-  if (!map || typeof map !== 'object') return null;
-
-  const id = Number(map[ticker]);
-  return Number.isInteger(id) && id > 0 ? id : null;
+  return map && typeof map === 'object' ? map : {};
 }
+
+const KNOWN_COIN_IDS = Object.fromEntries(Object.entries(CCPAYMENT_COINS).map(([id, ticker]) => [ticker, Number(id)]));
+let liveCoinIds = {};
+let liveCoinIdsAt = 0;
+
+function coinIdMap(config) {
+  const fixed = configuredCoinIds(config);
+  return Object.keys(fixed).length ? fixed : { ...KNOWN_COIN_IDS, ...liveCoinIds };
+}
+
+/** CCPayment's own coin list → `liveCoinIds`. Skipped while the override is set or the list is under 10 min old. */
+async function refreshCcpaymentCoinIds(config, http) {
+  if (Object.keys(configuredCoinIds(config)).length || Date.now() - liveCoinIdsAt < 600_000) return;
+  const response = await http.raw(`${config.CCPAYMENT_BASE_URL}/ccpayment/v2/getCoinList`, {
+    method: 'POST',
+    headers: ccpayment.headers('', config),
+    body: '',
+  });
+  if (response?.code !== CCPAYMENT_OK) throw new Error(response?.msg ?? 'CCPayment coin list failed');
+  liveCoinIds = Object.fromEntries(
+    (response.data?.coins ?? []).filter((coin) => Number(coin.coinId) > 0).map((coin) => [String(coin.symbol).toUpperCase(), Number(coin.coinId)])
+  );
+  liveCoinIdsAt = Date.now();
+}
+
+/**
+ * The site's network name → CCPayment's chain symbol. The Crypto tab sends bc.game's names
+ * (TRON, ETHEREUM, BITCOIN…) and older callers the token standard (TRC20…); CCPayment knows
+ * the chain (TRX, ETH, BTC…). Anything else is already CCPayment's (BSC, POLYGON, TON…).
+ */
+const CCPAYMENT_CHAINS = Object.freeze({
+  TRON: 'TRX', TRC20: 'TRX', ETHEREUM: 'ETH', ERC20: 'ETH', BEP20: 'BSC', BITCOIN: 'BTC', SOLANA: 'SOL',
+});
+const ccpaymentChain = (chain) => {
+  const name = String(chain ?? '').toUpperCase();
+  return CCPAYMENT_CHAINS[name] ?? name;
+};
 
 const GATEWAYS = { waypay, apay, cricpay, upi, ccpayment };
 
@@ -543,17 +583,7 @@ function getGateway(name) {
 
 /** The reverse of `ccpaymentCoinId`, for reading a stored `coinid` back. */
 function ccpaymentTicker(coinId, config) {
-  let map = config?.CCPAYMENT_COIN_IDS;
-  if (typeof map === 'string') {
-    try {
-      map = JSON.parse(map);
-    } catch {
-      return null;
-    }
-  }
-  if (!map || typeof map !== 'object') return null;
-
-  const hit = Object.entries(map).find(([, id]) => Number(id) === Number(coinId));
+  const hit = Object.entries(coinIdMap(config)).find(([, id]) => Number(id) === Number(coinId));
   return hit ? hit[0] : null;
 }
 
@@ -563,5 +593,7 @@ module.exports = {
   canonicalQuery,
   ccpaymentCoinId,
   ccpaymentTicker,
+  ccpaymentChain,
+  refreshCcpaymentCoinIds,
   formatEkqrDate,
 };

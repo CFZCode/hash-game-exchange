@@ -14,7 +14,7 @@ let paymentSystemsCache = null;
 const { getGateway } = require('./gateways');
 const { validatePayoutDetails } = require('./payoutDetails');
 const { createHttpClient } = require('../psp/providers/http');
-const { ccpaymentCoinId, ccpaymentTicker, formatEkqrDate } = require('./gateways');
+const { ccpaymentCoinId, ccpaymentTicker, refreshCcpaymentCoinIds, formatEkqrDate } = require('./gateways');
 const { WalletService } = require('../wallet/wallet.service');
 const { REASON } = require('../wallet/wallet.constants');
 const { PlayerBonusService } = require('../player-bonuses/playerBonus.service');
@@ -117,12 +117,20 @@ class PaymentOrdersService {
     // no new deposits (CURRENCY_DISABLED). A registry outage fails open.
     await currencyRegistry.assertCurrencyEnabled(currency);
     const gateway = this.#gateway(providerName);
+    // CCPayment's coin ids come from its live coin list (cached) — see `ccpaymentCoinId`.
+    if (providerName === 'ccpayment') await refreshCcpaymentCoinIds(this.config, this.http);
 
     if (!gateway.supports(currency, FLOW.PAY_IN, this.config)) {
       throw errors.CURRENCY_NOT_SUPPORTED({ provider: providerName, currency });
     }
 
-    await this.#assertWithinLimits(amount, currency, FLOW.PAY_IN);
+    // The deployment's fallback min / max is an INR figure (1 / 10L) — a coin takes only the
+    // Super Admin's own per-coin limits, as on the manual crypto rail.
+    if (providerName === 'ccpayment') {
+      await cashierLimits.assertCashierLimits(this.models.Users?.sequelize ?? this.db?.sequelize, { currency, amount, flow: 'deposit' });
+    } else {
+      await this.#assertWithinLimits(amount, currency, FLOW.PAY_IN);
+    }
 
     const reference = this.#reference('DEP');
 

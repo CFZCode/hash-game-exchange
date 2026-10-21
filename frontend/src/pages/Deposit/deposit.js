@@ -134,24 +134,30 @@ export const placeholderAddress = (currencyName, chain) =>
 
 /* ── LIVE MODE NEVER PRINTS AN ADDRESS IT DID NOT RECEIVE ──────────────────────────────────
  *
- * The placeholder above is a fixture-mode device only. With fixtures off, the tab asks the
- * platform's crypto provider for its chain list first — `GET /api/v1/user/crypto/chains`, which
- * answers `503 CRYPTO_NOT_CONFIGURED` while CCPayment has no credentials — and any failure there
- * means there is no address to show. And even when the chain list does answer, the platform has
- * no HTTP route that issues a per-account deposit address (bc.game's is the `GET_ADDRESS` socket
- * event), so there is still nothing real to print. Either way this resolves to `null`, and the
- * tab shows its "not available" notice instead of an address and QR.
- *
- * Fixture mode answers `undefined` synchronously and the tab keeps its placeholder as before. */
-export const CRYPTO_CHAINS_PATH = '/api/v1/user/crypto/chains';
+ * The placeholder above is a fixture-mode device only. Live, the address comes from CCPayment,
+ * one per deposit ORDER: the player enters the amount, `POST /user/payments/deposits` (provider
+ * `ccpayment`) has CCPayment mint an address for that order, and its webhook credits what
+ * actually arrived. `readCcpaymentCoins` is the coins that is offered for (the deployment's
+ * CCPAYMENT_COIN_IDS); anything else — or CCPayment not configured — reads `[]`, and the tab
+ * falls back to the manual transfer. Fixture mode answers `[]` and keeps its placeholder. */
+const CCPAYMENT_COINS_PATH = '/api/v1/user/payments/methods/ccpayment';
+const DEPOSIT_ORDER_PATH = '/api/v1/user/payments/deposits';
 
-export const readCryptoDepositAddress = () =>
+export const readCcpaymentCoins = () =>
   USE_FIXTURES
-    ? undefined
-    : Promise.resolve(request(CRYPTO_CHAINS_PATH, { live: true })).then(
-        () => null,
-        () => null,
+    ? []
+    : Promise.resolve(request(CCPAYMENT_COINS_PATH, { live: true })).then(
+        (data) => (Array.isArray(data?.methods) ? data.methods : []),
+        () => [],
       );
+
+/** The order: `{ reference, amount, details: { address, memo, amount, confirmsNeeded } }`. Throws the API error. */
+export const createCcpaymentDeposit = ({ currency, amount, chain }) =>
+  request(DEPOSIT_ORDER_PATH, {
+    live: true,
+    method: 'POST',
+    json: { provider: 'ccpayment', currency, amount, chain },
+  });
 
 /* ══ THE FIAT TAB ══════════════════════════════════════════════════════════════════════════
  *

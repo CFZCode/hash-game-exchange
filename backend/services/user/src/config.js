@@ -123,6 +123,9 @@ const config = loadEnv(
     CCPAYMENT_APP_ID: coercers.optionalStr(),
     CCPAYMENT_APP_SECRET: coercers.optionalStr(),
     CCPAYMENT_BASE_URL: coercers.optionalStr(),
+    // Optional override of CCPayment's live coin list, as JSON: {"USDT":1280,"BTC":1155}. Unset = live list.
+    CCPAYMENT_COIN_IDS: coercers.optionalStr(),
+    CCPAYMENT_RETURN_URL: coercers.optionalStr(),
 
     // Where providers should send their callbacks. Ours, always — legacy read
     // this from the request body, which let the caller redirect the result of

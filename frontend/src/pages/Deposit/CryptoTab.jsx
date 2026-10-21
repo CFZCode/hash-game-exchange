@@ -17,10 +17,13 @@ import {
   networksFor,
   placeholderAddress,
   depositNotice,
-  readCryptoDepositAddress,
+  readCcpaymentCoins,
+  createCcpaymentDeposit,
 } from './deposit';
 import { copyWithToast } from '../../utils/clipboard';
 import ManualDeposit from './ManualDeposit';
+import { useGates } from '../../context/gates';
+import { toastError } from '../../components/shared/Toast/toast';
 
 /* `Ew` / `DepositCryptoPage` in index-C1xohM7W.js. Its body is four blocks in one card:
  *
@@ -146,6 +149,79 @@ function AddressBox({ address }) {
    became its second consumer; `mt-4` was baked into it here and is a prop there, because the
    withdraw form needs `mt-2` on one of its two notices and no margin at all on the other. */
 
+/* The CCPayment deposit — THIS BUILD'S: amount first, then the address CCPayment minted for that
+   order, with the QR and the exact amount to send. The balance is credited by CCPayment's webhook
+   (what arrived, once confirmed), so nothing is submitted after paying. Classes are the manual
+   form's and this tab's own. Keyed on coin + network, so changing either starts a new order. */
+function CcpayDeposit({ currency, network }) {
+  const alias = getAlias(currency);
+  const [amount, setAmount] = React.useState('');
+  const [order, setOrder] = React.useState(null);
+  const [busy, setBusy] = React.useState(false);
+
+  const create = async (event) => {
+    event.preventDefault();
+    if (!(Number(amount) > 0) || busy) return;
+    setBusy(true);
+    try {
+      setOrder(await createCcpaymentDeposit({ currency, amount, chain: network.chain }));
+    } catch (failure) {
+      toastError(failure, 'Could not create the deposit address');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!order?.details?.address) {
+    return (
+      <form onSubmit={create}>
+        <div className="mb-1 mt-5 text-secondary">Deposit Amount ({alias})</div>
+        <div className="input bg-input_bright text-base">
+          <input inputMode="decimal" name="amount" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))} />
+        </div>
+        <button type="submit" className="button button-brand button-m my-5 w-full" disabled={!(Number(amount) > 0) || busy}>
+          {busy ? 'Loading…' : 'Get Deposit Address'}
+        </button>
+      </form>
+    );
+  }
+
+  const { address, memo, amount: toSend, confirmsNeeded } = order.details;
+  return (
+    <>
+      <div className="mt-4 @container">
+        <div className="flex flex-col items-center @2xl:flex-row @2xl:items-center @2xl:gap-6">
+          <div className="flex-none rounded-xl bg-layer3_alt p-2">
+            <QrCode value={address} logo={coinIcon(currency)} className="block" />
+          </div>
+          <div className="mt-4 w-full @2xl:mt-0 @2xl:flex-1">
+            <div className="flex items-center justify-between text-secondary">
+              <span>
+                Send exactly: <span className="font-extrabold text-primary">{toSend ?? order.amount} {alias}</span>
+              </span>
+              <button type="button" className="text-brand" onClick={() => setOrder(null)}>
+                Change
+              </button>
+            </div>
+            <div className="mt-3 text-secondary">Deposit address</div>
+            <AddressBox address={address} />
+            {memo && (
+              <>
+                <div className="mt-3 text-secondary">Memo</div>
+                <AddressBox address={memo} />
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+      <Notice className="mt-4">
+        {depositNotice(alias, network.minDeposit)} Use the {network.label} network. Your balance is credited automatically
+        {confirmsNeeded ? ` after ${confirmsNeeded} confirmation${confirmsNeeded === 1 ? '' : 's'}` : ' once the transfer is confirmed'}.
+      </Notice>
+    </>
+  );
+}
+
 export default function CryptoTab() {
   const { session, balances } = useSession();
   const dialog = useIsDialog();
@@ -181,13 +257,14 @@ export default function CryptoTab() {
 
   const network = networks.find((item) => item.chain === chain) || networks[0];
   /* Fixture mode keeps its deliberately-fake placeholder. Live mode only ever shows an address
-     the platform issued — and it issues none yet, so the read settles to `null` and the tab
-     shows the unavailable notice instead (see `readCryptoDepositAddress`). */
-  const { data: liveAddress, loading: addressLoading } = useResource(readCryptoDepositAddress);
-  const address = USE_FIXTURES ? placeholderAddress(currency, network.chain) : liveAddress;
-  /* No automatic address (no crypto gateway configured): the manual transfer to the house's own
-     addresses (admin → Bank details), whose networks replace the captured Network select. */
-  const manual = !USE_FIXTURES && !addressLoading && !address;
+     CCPayment issued for an order (`CcpayDeposit`), for the coins it is set up for. */
+  const gates = useGates();
+  const { data: ccpayCoins, loading: ccpayLoading } = useResource(readCcpaymentCoins);
+  const ccpay = !USE_FIXTURES && gates.autoDeposit() && (ccpayCoins ?? []).includes(currency);
+  const address = USE_FIXTURES ? placeholderAddress(currency, network.chain) : null;
+  /* No CCPayment for this coin: the manual transfer to the house's own addresses
+     (admin → Bank details), whose networks replace the captured Network select. */
+  const manual = !USE_FIXTURES && !ccpayLoading && !ccpay;
   const alias = getAlias(currency);
 
   /* Every depositable coin in the wallet, which is what the Currency select lists —
@@ -335,7 +412,9 @@ export default function CryptoTab() {
       {/* `k8` verbatim. The `@container` pair puts the QR beside the address from `@2xl` (672px)
           up — the dialog is 480 wide, so it never fires and the code stays centred above. Kept
           because the same component renders full-width on the wallet page. */}
-      {!address ? (
+      {ccpay ? (
+        <CcpayDeposit key={`${currency}-${network.chain}`} currency={currency} network={network} />
+      ) : !address ? (
         manual && <ManualDeposit key={currency} currency={currency} crypto />
       ) : (
         <div className="mt-4 @container">

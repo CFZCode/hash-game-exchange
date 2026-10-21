@@ -35,3 +35,13 @@ describe('owner / Super Admin section switches (user, 2026-10-21)', () => {
     for (const href of ['/casino', '/promotion/casino/x']) expect(g.routeOn(href)).toBe(true);
   });
 });
+
+describe('CCPayment deposit (user, 2026-10-21)', () => {
+  const mode = (variant) => [{ feature: 'deposit_mode', variant }];
+  it('the gateway deposit follows deposit_mode, and an agent player never gets it', () => {
+    expect(makeGates({ features: mode('both') }).autoDeposit()).toBe(true);
+    expect(makeGates({ features: mode('automatic') }).autoDeposit()).toBe(true);
+    expect(makeGates({ features: mode('manual') }).autoDeposit()).toBe(false);
+    expect(makeGates({ features: mode('both'), capabilities: AGENT }).autoDeposit()).toBe(false);
+  });
+});

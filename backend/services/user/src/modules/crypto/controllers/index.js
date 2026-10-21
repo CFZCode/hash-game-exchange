@@ -25,7 +25,7 @@ function createControllers({ service }) {
       });
 
       req.log?.info({ result }, 'CCPayment webhook handled');
-      return res.status(200).send('success');
+      return res.status(200).send('Success');
     }),
 
     /** @legacy POST /getCoinDetails */
