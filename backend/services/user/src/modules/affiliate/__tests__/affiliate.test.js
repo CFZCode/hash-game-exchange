@@ -117,6 +117,19 @@ test('affiliate', async (t) => {
     assert.equal(rewards, 0);
   });
 
+  await t.test("the admin's total wager pays, even on a row named after a VIP level", async () => {
+    // Bronze I's ladder floor is 1,000; the admin saved 50, and /referral/rules prints 50.
+    const admin = new AffiliateService({ models: connection.models, db: connection, logger, config: { SERVICE_NAME: 'user-service' } });
+    admin.settings = { read: async () => ({ unlockTiers: [{ level: 'Bronze I', wager: '50', reward: '0.50' }] }) };
+    const owner = await seed(newUid());
+    const member = await seed(newUid(), { wager: '60' });
+    await service.joinTeam({ userId: member.uid, referralCode: owner.code });
+
+    const result = await admin.unlockFor({ memberName: member.name });
+    assert.equal(result.unlocked, true);
+    assert.equal(result.tier, '50');
+  });
+
   await t.test('the same tier cannot be unlocked twice', async () => {
     const owner = await seed(newUid());
     const member = await seed(newUid(), { wager: '6000' });

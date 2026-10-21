@@ -3,7 +3,7 @@
 /* The referrer lookup (which needs `where(fn(...), value)`) now lives in
    `referrerResolver.js`, shared with signup and the public code check. */
 const { Op, fn, col, QueryTypes } = require('sequelize');
-const { money, creditableCurrency, resolveVipLadder, wagerCategory } = require('@ibitplay/common');
+const { money, creditableCurrency, wagerCategory } = require('@ibitplay/common');
 const { promotionsBlocked, assertPlayerCapability } = require('@ibitplay/auth');
 
 const errors = require('./affiliate.errors');
@@ -857,23 +857,14 @@ class AffiliateService {
 
   /**
    * The referral unlock table that PAYS: the site admin's (`siteconfig.referral_unlock_tiers`,
-   * read through affiliate settings), else `UNLOCK_TIERS`. A row named after a VIP level
-   * ("Bronze I") takes that level's threshold from the live ladder, so the admin's VIP XP edits
-   * move it too — hash.game: "Your friend's VIP level will unlock your awards". USD both sides.
+   * read through affiliate settings), else `UNLOCK_TIERS`. Each row pays at its OWN total wager,
+   * the figure the admin saves and /referral/rules prints; the level name is only a label (taking
+   * the VIP ladder's threshold for it silently ignored the admin's edit). USD both sides.
    */
   async unlockTiers() {
     const settings = await this.settings.read();
     const table = settings.unlockTiers ?? UNLOCK_TIERS;
-    let ladder = null;
-    try {
-      ladder = await resolveVipLadder(this.models, { logger: this.logger });
-    } catch {
-      ladder = null;
-    }
-    const floorOf = new Map((ladder?.levels ?? []).map((b) => [String(b.name).toLowerCase(), String(b.minXp)]));
-    return table
-      .map((t) => ({ ...t, wager: floorOf.get(String(t.level).toLowerCase()) ?? t.wager }))
-      .sort((a, b) => Number(a.wager) - Number(b.wager));
+    return [...table].sort((a, b) => Number(a.wager) - Number(b.wager));
   }
 
   /**
