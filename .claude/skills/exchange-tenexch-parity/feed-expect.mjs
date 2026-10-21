@@ -24,15 +24,15 @@ if (!Array.isArray(markets)) {
 const shown = String(sid) === '10' ? markets.filter((m) => [12, 15].includes(Number(m.dtype))) : markets;
 for (const raw of shown) {
   const m = applyMatchOddsLimits(raw, sid);
-  const head = [Number(m.min) > 0 && `Min: ${compactAmount(m.min)}`, Number(m.max) > 0 && `Max: ${compactAmount(m.max)}`]
-    .filter(Boolean)
-    .join(' · ');
+  const head = Number(m.min) > 0
+    ? `Min:${compactAmount(m.min)}${Number(m.max) > 0 ? ` Max:${compactAmount(m.max)}` : ''}`
+    : Number(m.max) > 0 ? `Max: ${compactAmount(m.max)}` : '';
   const racecard = Number(m.dtype) === 12;
   console.log(`\n${m.mname}  [gtype ${m.gtype}, dtype ${m.dtype}, status ${m.status}${racecard ? ' — racecard: status ignored' : ''}]  header: ${head || '(none)'}`);
   for (const s of (m.section || []).slice(0, 4)) {
     const best = (side) => (s.odds || []).filter((o) => o.otype === side).sort((a, b) => a.tno - b.tno)[0];
-    const cell = (o) => (o && o.odds > 0 ? `${o.odds}/${o.size ? compactAmount(o.size) : ''}` : '—');
-    const lim = s.min || s.max ? `  Min: ${compactAmount(s.min)} · Max: ${compactAmount(s.max)}` : '';
+    const cell = (o) => (o && o.odds > 0 ? `${o.odds}/${o.size ? compactAmount(o.size) : ''}` : 'LOCK');
+    const lim = s.min || s.max ? `  Min:${compactAmount(s.min)} Max:${compactAmount(s.max)}` : '';
     console.log(`  ${s.nat}  [${s.gstatus || '""'}]  back ${cell(best('back'))}  lay ${cell(best('lay'))}${lim}`);
   }
 }

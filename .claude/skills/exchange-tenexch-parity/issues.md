@@ -1,28 +1,45 @@
 # TENEXCH parity — issue tracker
 
 Source doc: "BC games Sports issues" (Google Doc 196pz43bVWQRtBUdT8J8gcpEkMwJydcxbj9j5Cv9Oo2A,
-readable without sign-in via `/export?format=txt`; screenshots via `/export?format=zip`). Its
-screenshots predate commit 17ef1b7e for #1–#3, so those were re-checked on the current code.
-Checked 2026-10-21 on live feed: cricket 787917680 (pre-match) / 600716118 (in-play), horse
-838641327, badminton 764090418.
+readable without sign-in via `/export?format=txt`; screenshots via `/export?format=zip` →
+images/: #1 image4, #2 image8, #3 image11, #4 image6, #5 image13 + image3, #6 image2, #7 image7,
+#8 image5, #9 image1, #10 image9, #11 image12, #12 image10). The screenshots for #1–#3 predate
+commit 17ef1b7e, so those were re-checked on the current code. Checked 2026-10-21 on the live
+feed: cricket 787917680 / 600716118 / 740918504, horse 838641327, greyhound 885202128,
+badminton 764090418 / 737345854.
 
-| # | Issue | Source | Status |
-|---|---|---|---|
-| 1 | Bhav / limits print 100,000 instead of 1L | doc | **Fixed before this pass** (17ef1b7e: `compactAmount`). Verified: Bookmaker "Min: 100 · Max: 1L", fancy rows "Max: 2L" |
-| 2 | Bookmaker has no bhav (size) under its prices | doc | **Fixed before this pass**. Verified: BM 57 / 1L, 163 / 25K |
-| 3 | Normal and fancy1 always BALL RUNNING / suspended while the reference is open | doc | **Fixed before this pass** (`section.br` no longer read; feed sends `br:true` on every live fancy row). Verified open |
-| 4 | Pre-match MO shows Min 0 Max 1 and the bet fails with "exceeds maximum range" | doc | **Fixed 41f24bc0**: header "Max: 1" (TENEXCH reads umaxbof pre-match) and the slip answers `Game Not Active2.` like the reference |
-| 5 | Khado and odd/even rows have no Min / Max | doc | **Fixed 41f24bc0**: "Min: 100 · Max: 1L" / "Min: 10 · Max: 1L" per row (also fancy1 rows "Max: 25K", found by comparison) |
-| 6 | Header shows Min 0, a stake of 10 says min 50 | doc | **Fixed 41f24bc0**: Min hidden unless the market quotes one; floor is TENEXCH's ₹100 (`Check Minimum Bet Limit.`) |
-| 7 | Max differs; the reference refuses a bet ours accepts | doc | **Fixed 41f24bc0 (client)**: TENEXCH cap (in-play maxb, pre-match umaxbof) for header and slip. ⚠ server `backend/services/sports/src/lib/helper/feedStakeLimit.mjs` still caps on `max` first (2000) — OPEN, needs the owner's OK to change a live stake cap |
-| 8 | Odds delayed / still suspended when the reference is open | doc | **Fixed 41f24bc0 for racecards** (the screenshot is a horse race: market SUSPENDED, runners trading). Cricket uses TENEXCH's market rule already; the 1s poll (gateway 429 limit) is the only remaining delay — OPEN by design |
-| 9 | Greyhound bet 2h before the off refused ("Bet will be accepted 5 minutes before…"); the reference took it | doc | **OPEN**: the 5-minute window is TENEXCH-rebuild code (racingUtils `isRaceBettingOpen`) AND our server (`sportbetscontroller.mjs:705`, `RACE_BET_WINDOW_MINUTES`). The live reference accepting it means the window should be dropped or the env raised — owner decision + backend change, not done here |
-| 10 | Horse racing odds always suspended | doc | **Fixed 41f24bc0**: dtype 12 racecard ignores the market status, locks per runner only |
-| 11 | Horse racing Max mismatched (ours 2K, reference 10K / 25K) | doc | **Fixed 41f24bc0 (client)**: pre-off umaxbof (10K), in-play maxb flag (1) as the reference. Same server caveat as #7 |
-| 12 | Badminton scoreboard shows the vendor's 404 | doc | **OPEN (backend / vendor)**: `GET cricket/score-url` answers 502 "Scorecard host did not return an animation url" for badminton, and the `scorecard.daimond-api.site` fallback renders the provider's 404. Client already mounts once per match (sticky gtv). Needs a score source for sid 22 |
-| 13 | Odds printed 2-dp (3.60) where the reference prints the feed value (3.6) | comparison | **Fixed 41f24bc0** (`formatOdd`) |
-| 14 | Lay slip showed the liability as the profit (Addaplay) | comparison / user | **Fixed 41f24bc0**: TENEXCH `calcPL` — lay profit = stake, liability = (odds−1)×stake; any match1 market prices as a percent |
-| 15 | Horse racecard listed "Top N Finish" markets the reference hides | comparison | **Fixed 41f24bc0**: sid 10 shows dtype 12 / 15 only |
-| 16 | Horse racecard slip computes a profit; TENEXCH's horse slip prints 0 | comparison | **Fixed 41f24bc0** (greyhound still computes, as TENEXCH) |
-| 17 | Session fancy (Normal) slip prints a profit on the rate; TENEXCH prints a fixed 0 | comparison | **OPEN by choice**: c6aab7ae made it pay on the rate deliberately; flip `slipFigures` only if the user asks |
-| 18 | Slip P/L preview rows (projected book) only on MO/BM (Addaplay) vs all markets (TENEXCH) | comparison | **OPEN, low**: display-only, kept |
+"Pass 1" = 41f24bc0. "Pass 2" = the follow-up commit (git log -- .claude/skills/exchange-tenexch-parity).
+
+## The doc's 12
+
+| # | Issue | Status |
+|---|---|---|
+| 1 | Bhav / limits print 100,000 instead of 1L | **Fixed** (17ef1b7e `compactAmount`; verified BM "Min:100 Max:1L", rows "Max:2L") |
+| 2 | Bookmaker has no bhav under its prices | **Fixed** before this pass (verified 57/1L, 163/25K) |
+| 3 | Normal / fancy1 always BALL RUNNING | **Fixed** before this pass (`section.br` no longer read; verified open) |
+| 4 | Pre-match MO "Min 0 Max 1" then "exceeds maximum range" | **Fixed pass 1**: "Max: 1" + `Game Not Active2.`; pass 2: server caps at the same 1 |
+| 5 | Khado / odd-even rows have no Min / Max | **Fixed pass 1** (+ fancy1 rows); pass 2 text is TENEXCH's "Min:100 Max:1L" |
+| 6 | Header Min 0, a stake of 10 says min 50 | **Fixed pass 1**: no "Min: 0" anywhere; ₹100 floor, `Check Minimum Bet Limit.` |
+| 7 | Max differs; reference refuses a bet ours took | **Fixed pass 1 (page) + pass 2 (server)**: `feedStakeLimit.mjs` now uses the page's rule (in-play maxb‖max, pre-match umaxbof), so a pre-match MO is refused server-side too. Needs a sports-service deploy to reach api.parker567.com |
+| 8 | Racecard odds suspended while the reference trades | **Fixed pass 1**: dtype 12 ignores the market SUSPENDED; per-runner/per-side locks only. The 1 s poll is the only delay left (gateway 429 floor) |
+| 9 | Greyhound bet 2h before the off refused | **Fixed pass 2**: TENEXCH's server gates HORSE (sid 10) only (`tenexch-new/server/sportsbet/sportbetscontroller.js` STEP 4.55, "Greyhound (sid=65) is not affected"); ours now does the same in `sportbetscontroller.mjs` and `placeBetRules.isRaceBettingOpen`. Horse keeps the 5-minute window. Deploy needed for the server half |
+| 10 | Horse racing odds always suspended | **Fixed pass 1** (same as #8) |
+| 11 | Horse racing Max mismatched (2K vs 10K / 25K) | **Fixed pass 1 (page) + pass 2 (server)**: pre-off umaxbof (10K), in-play maxb flag (1) on both |
+| 12 | Badminton scoreboard shows a 404 | **Fixed pass 2 (server, needs deploy)**. Root cause, proven: the scorecard host whitelists by Referer. `curl 'https://scorecard.daimond-api.site/?etid=2&gmid=782895154'` → `<title>Domain Not Whitelisted` (also with Referer example.com); with `Referer: https://parker567.com/` (or tenexch.codefactory.games / localhost:5190) → `<title>Live Cricket Scorecard` + `play.animationprovider.com/scoreanimationgraphic/<token>/6837434/5`. Our server sent no Referer, so every `score-url` answered 502 "Scorecard host did not return an animation url" (verified on soccer, tennis gtv 6837434, badminton), and the page fell back to loading the host in the browser, which shows its 404 image (`test.uhdmovies.online/5/404.webp`, the cones) for a match without coverage or a spent token. `ScoreAnimationService.mjs` now sends `SCORECARD_REFERER` (default https://parker567.com/); run locally, `getScoreUrl(22, 737345854)` returned `https://play.animationprovider.com/scoreanimationgraphic/7F29DE33-…/6843550/5` (badminton, gtv 6843550), and a first fetch of such a URL is `<title>Score Animation`. A badminton match with `gtv: 0` (e.g. 764090418) has no coverage on the host at all (it serves the 404 image) — TENEXCH hides the box for gtv 0 and so do we. The doc's gmid 652445510 is finished, so it cannot be re-run |
+
+## Found by comparison (screenshots + TENEXCH source)
+
+| # | Issue | Status |
+|---|---|---|
+| 13 | Odds printed 2-dp (3.60) vs the feed value (3.6) | **Fixed pass 1** (`formatOdd`) |
+| 14 | Lay slip printed the liability as the profit (Addaplay) | **Fixed pass 1**: TENEXCH `calcPL` |
+| 15 | Horse card listed "Top N Finish" markets the reference hides | **Fixed pass 1**: sid 10 shows dtype 12 / 15 |
+| 16 | Horse slip computed a profit; TENEXCH's horse slip prints 0 | **Fixed pass 1** |
+| 17 | Session fancy (Normal / BBB / OBO) slip profit on the rate vs TENEXCH's fixed 0 | **Fixed pass 2** (user's call, overrides c6aab7ae; liability still the real rate amount) |
+| 18 | Projected P/L only on MO / BM (Addaplay) | **Fixed pass 2**: TENEXCH `runnerPL` on every MATCH_ODDS (all gtype match: Over/Under, racecards …), BOOKMAKER and CRICKET_CASINO market (the Number grids now show it too) |
+| A | Racecards drew a 3-deep ladder (6 cells); TENEXCH one back + one lay | **Fixed pass 2** (`MarketBlocks racing`, verified greyhound 885202128) |
+| B | Missing side drew "—"; TENEXCH a dark box with a lock, row still live | **Fixed pass 2** (`OddsCell` `IconLock` on market rows; lobby keeps "—"; a whole suspended row keeps its overlay, as TENEXCH). No one-sided live row was on the board at check time, so the lock was not seen live |
+| C | Book under runner "+20.00", "-11.00", "+9,400.00" vs TENEXCH "20", "-11", "9,400" | **Fixed pass 2** (`formatBook`, en-IN grouping, green/red kept). Seen only signed in — covered by vitest, not seen live |
+| D | Header / row limit text | **Fixed pass 2**: "Min:100 Max:1L", "Max: 1", "Max: 10K", rows "Min:100 Max:2L"; no "Min: 0" (verified on 787917680, 600716118, 885202128) |
+| E | Racecard banner OPEN / SUSPENDED + "N Hours M Minutes Remaining" | **Fixed pass 2** (`Match/RaceStatus.jsx`, TENEXCH RaceTimer wording; verified "OPEN · 34 Minutes 26 Seconds Remaining") |
+| F | Badminton live scoreboard | Same as #12 |
