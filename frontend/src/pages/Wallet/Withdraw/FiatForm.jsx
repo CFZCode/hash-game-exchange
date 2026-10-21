@@ -18,6 +18,7 @@ import {
   submitFiatWithdraw,
   withdrawErrorMessage,
 } from '../../../services/withdraw';
+import { cashierRangeError, getCashierLimits } from '../../../services/cashierLimits';
 import { AmountField, AvailableRow } from './index';
 
 /* THE FIAT ARM — `Wa` -> `oa` -> `ca` -> `qe` -> `ua` in index-B3pypdyg.js, with the field
@@ -145,6 +146,8 @@ export default function FiatForm({ currencyName }) {
   );
   const { data: accountsData } = useResource(readAccounts);
   const { data: requirements } = useResource(readRequirements);
+  const readLimits = React.useCallback(() => getCashierLimits(bareCurrency), [bareCurrency]);
+  const { data: limits } = useResource(readLimits);
 
   const accounts = (accountsData ?? []).filter((row) => row.method === method);
   const selected = choice ?? (accounts[0]?.id ?? NEW);
@@ -155,8 +158,11 @@ export default function FiatForm({ currencyName }) {
   // Open sports bets' stakes have already left `credits.inr` (sports-service walletUpdate), so the
   // wallet balance is what can be withdrawn — subtracting the exposure again would count it twice.
   const balance = Math.max(0, total);
-  const min = FIAT_WITHDRAW_MINIMUM;
+  // The owner's withdraw min / max for this currency (none = no limit); the rail's own minimum still holds.
+  const min = Math.max(FIAT_WITHDRAW_MINIMUM, Number(limits?.withdrawMin ?? 0));
+  const max = limits?.withdrawMax != null ? Number(limits.withdrawMax) : null;
   const shownAmount = amount ?? min;
+  const rangeError = cashierRangeError(shownAmount, { min: limits?.withdrawMin, max: limits?.withdrawMax, currency: bareCurrency });
 
   const pickMethod = (next) => {
     setMethod(next);
@@ -202,6 +208,10 @@ export default function FiatForm({ currencyName }) {
   const methodRow = FIAT_METHODS.find((item) => item.method === method);
   const methodIcon = (value) => (value === 'upi' ? channelIcon('upi') : BANK_ICON);
   const missing = requirements?.ok === false ? (requirements.missing ?? []) : [];
+  // An open deposit rollover blocks every withdrawal (WITHDRAW_WAGER_REQUIRED); bonus-only wagering
+  // is cleared by the forfeit, so it does not block the button.
+  const rollover = requirements?.wager?.deposit;
+  const wagerBlocked = missing.includes('wager') && Number(requirements?.wager?.remainingAfterForfeit ?? 0) > 0;
   const canForfeit =
     error?.code === 'BONUS_FORFEIT_REQUIRED' || (!!requirements?.bonusForfeitRequired && !!error);
 
@@ -244,8 +254,9 @@ export default function FiatForm({ currencyName }) {
       )}
       {missing.includes('wager') && (
         <RequirementNotice>
-          Wager {Number(requirements?.wager?.remaining ?? 0).toFixed(2)}{' '}
-          {requirements?.wager?.currency ?? 'USD'} more to withdraw.
+          {wagerBlocked
+            ? `Complete your wagering requirement before withdrawing — ${Number(rollover?.wagered ?? 0).toFixed(2)} of ${Number(rollover?.target ?? 0).toFixed(2)} ${rollover?.currency ?? 'USD'} wagered.`
+            : `Wager ${Number(requirements?.wager?.remaining ?? 0).toFixed(2)} ${requirements?.wager?.currency ?? 'USD'} more to withdraw.`}
         </RequirementNotice>
       )}
 
@@ -336,15 +347,16 @@ export default function FiatForm({ currencyName }) {
           amount={shownAmount}
           onAmount={setAmount}
           min={min}
+          max={max}
           balance={balance}
           currency={currencyName}
           precision={2}
         />
         <AvailableRow currencyName={currencyName} unlocked={balance} className="mt-5" />
 
-        {error && (
+        {(error || rangeError) && (
           <Notice type="error" className="mt-5 font-normal">
-            {error.message}
+            {error?.message ?? rangeError}
           </Notice>
         )}
         {canForfeit && (
@@ -360,7 +372,7 @@ export default function FiatForm({ currencyName }) {
 
         <button
           type="submit"
-          disabled={busy || balance < min}
+          disabled={busy || balance < min || wagerBlocked || !!rangeError}
           className="button button-brand button-m my-4 w-full"
         >
           Withdraw

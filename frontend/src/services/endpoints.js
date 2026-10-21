@@ -1019,6 +1019,10 @@ export const PLATFORM = {
        "Withdraw With" select; `id` goes back as `bankAccountId`. */
     bankAccounts: '/api/v1/user/bank-accounts',
 
+    /* `?currency=INR` → `{currency, depositMin, depositMax, withdrawMin, withdrawMax}`: the owner's
+       cashier limits (decimal strings, null = no limit), the figures every rail enforces. */
+    cashierLimits: '/api/v1/user/cashier-limits',
+
     fiatDeposits: {
       list: '/api/v1/user/deposits/fiat',
       one: (depositId) => `/api/v1/user/deposits/fiat/${depositId}`,

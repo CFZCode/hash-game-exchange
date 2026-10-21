@@ -18,6 +18,9 @@ const { createCapFigures } = require('./withdrawCap');
  *   wager          every open wagering requirement complete
  *   kyc_and_wager  both
  *
+ * Since 2026-10-21 the wagering check is in force under EVERY variant (the user's rule: no
+ * withdrawal before the deposit rollover is complete), so the policy now only switches KYC.
+ *
  * KYC also needs `WITHDRAW_REQUIRE_KYC` on (the deployment's switch, default on): an env that
  * turns KYC off turns it off whatever the policy says, as it always did.
  *
@@ -174,7 +177,9 @@ function createWithdrawRequirements(deps) {
     const requires = (what) => (sitePolicy.ALLOWS[POLICY][what] ?? []).includes(policy);
     // KYC is only demanded while the owner's KYC feature is in the plan: with it off the player
     // cannot submit documents, so requiring them would stop every withdrawal.
-    return { policy, kyc: requires('kyc') && kycSwitch && owner.kycFeature, wager: requires('wager'), cap: owner.cap, daily: owner.daily };
+    // The deposit rollover is required whatever the policy (user, 2026-10-21: no withdrawal before the
+    // rollover is complete). Multiplier 0 makes the target 0, which clears it.
+    return { policy, kyc: requires('kyc') && kycSwitch && owner.kycFeature, wager: true, cap: owner.cap, daily: owner.daily };
   }
 
   /**
@@ -407,13 +412,14 @@ function createWithdrawRequirements(deps) {
       if (money.gt(open.deposit.remaining, '0')) {
         const remaining = forfeitBonus ? open.deposit.remaining : sum([open.deposit.remaining, open.bonus.remaining]);
         logger?.info({ userId: String(userId), remaining, policy: r.policy }, 'Withdrawal refused: wagering incomplete');
+        const message = `Complete your wagering requirement before withdrawing — ${Number(open.deposit.wagered).toFixed(2)} of ${Number(open.deposit.target).toFixed(2)} ${UNIT} wagered`;
         throw errors.WAGER_REQUIRED({
           remaining,
           currency: UNIT,
           deposit: { remaining: open.deposit.remaining, target: open.deposit.target, wagered: open.deposit.wagered },
           bonus: { remaining: forfeitBonus ? ZERO : open.bonus.remaining, count: open.bonus.bonuses.length },
           forfeitable: !forfeitBonus && open.bonus.bonuses.length > 0,
-        });
+        }, { message });
       }
       // Only bonus wagering open: the rail's bonus check answers 409 BONUS_FORFEIT_REQUIRED,
       // and a confirmed forfeit clears it.

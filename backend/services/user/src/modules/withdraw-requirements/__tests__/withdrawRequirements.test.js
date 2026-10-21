@@ -141,7 +141,8 @@ test('withdrawal requirements', async (t) => {
     for (const p of POLICIES) {
       policy = p;
       const needKyc = p === 'kyc' || p === 'kyc_and_wager';
-      const needWager = p === 'wager' || p === 'kyc_and_wager';
+      // The deposit rollover is required under every policy (2026-10-21).
+      const needWager = true;
 
       for (const kyc of ['Verified', 'Pending']) {
         for (const done of [true, false]) {
@@ -176,7 +177,8 @@ test('withdrawal requirements', async (t) => {
               await assert.rejects(call(uid), (e) => {
                 if (expected === 'KYC') return e.code === kycCode && e.status === 403;
                 return e.code === 'WITHDRAW_WAGER_REQUIRED' && e.status === 403 &&
-                  e.details.remaining === '150.00000000' && e.details.currency === 'USD';
+                  e.details.remaining === '150.00000000' && e.details.currency === 'USD' &&
+                  e.message.endsWith('50.00 of 200.00 USD wagered');
               }, label);
               assert.equal(await balance(uid), before, `${label}: nothing held`);
             }
@@ -201,10 +203,22 @@ test('withdrawal requirements', async (t) => {
     const kycOnly = await socketWithdraw({ wallet: 'Taddr', amount: '10', coin: 'USDT', password: PASSWORD }, { userId: open });
     assert.equal(kycOnly.error.code, 'CRYPTO_WITHDRAW_KYC_REQUIRED');
 
+    // `none` no longer waives the rollover; completing it does.
     policy = 'none';
+    const still = await socketWithdraw({ wallet: 'Taddr', amount: '10', coin: 'USDT', password: PASSWORD }, { userId: open });
+    assert.equal(still.error.code, 'WITHDRAW_WAGER_REQUIRED');
+    await models.Userwager.update({ wager: '250' }, { where: { uid: open } });
     const ok = await socketWithdraw({ wallet: 'Taddr', amount: '10', coin: 'USDT', password: PASSWORD }, { userId: open });
     assert.equal(ok.status, true);
     assert.equal(await balance(open), '990.00000000');
+  });
+
+  await t.test('an operator multiplier of 0 clears the rollover', async () => {
+    policy = 'none';
+    const uid = await player({ kyc: 'Pending', wagered: '0' });
+    await assert.rejects(fiatRequest(uid), (e) => e.code === 'WITHDRAW_WAGER_REQUIRED');
+    await models.Users.update({ wager_multiplier: 0 }, { where: { id: uid } });
+    assert.ok((await fiatRequest(uid)).heldLedgerId);
   });
 
   await t.test('forfeiting a bonus clears the bonus part of the wager requirement', async () => {

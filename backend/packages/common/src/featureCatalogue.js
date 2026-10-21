@@ -774,6 +774,7 @@ const REGION_RESTRICTION_POLICY = {
  * The default `kyc` is the behaviour before this policy existed (KYC Verified on every rail).
  * "Wagering complete" = no active bonus with unmet wagering AND the deposit rollover
  * (`/user/wager/tasks`) complete. Enforced on fiat, crypto (HTTP + socket) and gateway payouts.
+ * Since 2026-10-21 the deposit rollover is required under every variant (withdrawRequirements.js).
  */
 const WITHDRAWAL_REQUIREMENTS_POLICY = {
   key: 'withdrawal_requirements',
@@ -783,8 +784,8 @@ const WITHDRAWAL_REQUIREMENTS_POLICY = {
   flag: null,
   defaultVariant: 'kyc',
   variants: [
-    { key: 'none', label: 'No requirements', description: 'Neither KYC nor wagering is required to withdraw. An active bonus still has to be forfeited (the player confirms).' },
-    { key: 'kyc', label: 'KYC verified', description: 'The player\'s KYC must be Verified. Wagering is not checked. The default.' },
+    { key: 'none', label: 'No KYC', description: 'KYC is not required to withdraw. The deposit rollover still has to be complete, and an active bonus forfeited (the player confirms).' },
+    { key: 'kyc', label: 'KYC verified', description: 'The player\'s KYC must be Verified, and the deposit rollover complete. The default.' },
     { key: 'wager', label: 'Wagering complete', description: 'Every open wagering requirement (deposit rollover and active bonuses) must be complete. KYC is not checked. Forfeiting a bonus clears its part.' },
     { key: 'kyc_and_wager', label: 'KYC and wagering', description: 'KYC must be Verified and every open wagering requirement complete.' },
   ],

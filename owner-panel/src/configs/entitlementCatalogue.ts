@@ -181,8 +181,8 @@ const CATALOGUE: FeatureEntry[] = [
     defaultVariant: 'kyc',
     note: 'What a player must have done before a withdrawal is accepted: any combination of the switches below. Wagering = the deposit rollover and every active bonus (forfeiting a bonus clears its part). Deposit cap = per currency, deposits × multiplier (+ wagering up to its own multiplier) minus what was already withdrawn. Refusals: *_KYC_REQUIRED, 403 WITHDRAW_WAGER_REQUIRED, 403 WITHDRAW_CAP_EXCEEDED.',
     variants: [
-      { key: 'none', label: 'No requirements', description: 'Neither KYC nor wagering is required to withdraw. An active bonus still has to be forfeited (the player confirms).' },
-      { key: 'kyc', label: 'KYC verified', description: "The player's KYC must be Verified. Wagering is not checked. The default." },
+      { key: 'none', label: 'No KYC', description: 'KYC is not required to withdraw. The deposit rollover still has to be complete, and an active bonus forfeited (the player confirms).' },
+      { key: 'kyc', label: 'KYC verified', description: "The player's KYC must be Verified, and the deposit rollover complete. The default." },
       { key: 'wager', label: 'Wagering complete', description: 'Every open wagering requirement (deposit rollover and active bonuses) must be complete. KYC is not checked. Forfeiting a bonus clears its part.' },
       { key: 'kyc_and_wager', label: 'KYC and wagering', description: 'KYC must be Verified and every open wagering requirement complete.' }
     ]
