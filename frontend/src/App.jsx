@@ -225,7 +225,19 @@ function AppShell() {
      The wallet LAYOUT carries the same flag, so on the original every pane is a dialog on a phone
      and the rail never renders there. Only Withdraw is lifted so far — it is what the account
      page's own button reaches. See pages/Wallet/Withdraw/Dialog.jsx. */
-  const withdrawDialog = pathname === '/wallet/withdraw' && !isDesktop;
+  const withdrawDialog = pathname === '/wallet/withdraw' && !isDesktop && session.login;
+
+  /* EVERY OTHER SIGNED-IN SCREEN, behind one guard rather than one flag per route: signed out,
+     these raise the sign-in dialog over the page you came from (the `ce` shape the routes below
+     take one by one) and their own page/dialog does not mount, so nothing private renders and no
+     player read fires a 401. Found by `.claude/skills/logged-out-guard` — the whole wallet, the
+     two transaction details, the profile editors, statistics, notifications, Free Plays, the VIP
+     level dialog, /bonus and /quests all rendered or fetched for a signed-out visitor. */
+  const privateNeedsAuth =
+    !session.login &&
+    /^\/(wallet(\/|$)|notification(\/|$)|free-plays\/?$|vip-level\/?$|bonus\/?$|quests\/?$|user\/statistics\/?$|settings\/edit-(profile|avatar)\/?$)/.test(
+      pathname,
+    );
 
   /* `/referral` carries the same `info.dialog = m.mobile` — see pages/Referral/Dialog.jsx. Its
      four children (`""`, `/my-rewards/:tab`, `/refer/:tab`, `/rules`) are tabs of the one page and
@@ -420,7 +432,7 @@ function AppShell() {
      right-hand drawer instead and the panel would otherwise be reachable two ways at once. See
      components/Notification/Dialog.jsx, which is the shell over the panel the drawer already
      renders. */
-  const notificationDialog = pathname.startsWith('/notification') && !isDesktop;
+  const notificationDialog = pathname.startsWith('/notification') && !isDesktop && session.login;
   /* `/vip-detail` is NOT in this list: it was already wired, with its own Dialog.jsx and at the
      640 line rather than 1024 — see the note beside `vipDialog` below, which records why that one
      route flips there. */
@@ -437,7 +449,7 @@ function AppShell() {
   const vipDialog = (pathname === '/vip-detail' || pathname === '/vip-detail/') && !isWide;
   /* `/vip-level` — Tiers & Benefits. No `info` of its own in the `{dialog: !0}` group, so a dialog
      at every width, and no guard. See pages/VipLevel. */
-  const vipLevelDialog = pathname === '/vip-level' || pathname === '/vip-level/';
+  const vipLevelDialog = (pathname === '/vip-level' || pathname === '/vip-level/') && session.login;
 
   /* `/help` and `/help/:helpId` — `{ component: h("Layout"), path: "/help",
      info: { dialog: m.mobile } }`. The flag is on the LAYOUT, so both children ride one sheet and
@@ -459,7 +471,7 @@ function AppShell() {
      behind the dialog simply does not fetch when logged out, which renders the same empty dialog
      either way. `dialog: !0` with no `size` means the manager's own 30rem x 40rem default; see
      Auth.css. */
-  const showFreePlay = FREE_PLAYS_ENABLED && pathname === '/free-plays';
+  const showFreePlay = FREE_PLAYS_ENABLED && pathname === '/free-plays' && session.login;
 
   /* THE PROFILE FAMILY — three dialog routes that STACK, which is new here. `/user/profile/:userId`
    * is what the account dropdown's My Profile row opens; its two Details links push
@@ -524,6 +536,7 @@ function AppShell() {
     collectionDialog ||
     collectionNeedsAuth ||
     sportsAccountNeedsAuth ||
+    privateNeedsAuth ||
     settingsDialog ||
     settingsNeedsAuth ||
     whitelistFormDialog ||
@@ -850,7 +863,7 @@ function AppShell() {
               reproduced inside the page, the device test is not: only the desktop page arm is
               built, as on /wallet/withdraw. `/quests/sendemail`, `/quests/bind2fa` and
               `/quests/bindemail` are dialog siblings there and are not built. */}
-          <Route path="/quests" element={questsDialog ? null : <Quests />} />
+          <Route path="/quests" element={questsDialog || privateNeedsAuth ? null : <Quests />} />
           {/* The Bonus page, the Quest Hub's sibling — the other sidebar row that only appears
               signed in. Same route shape: `guards: [() => b.login ? !1 : "/"]` reproduced inside
               the page, and `dialog: m.mobile ? {behavior: "no-title"} : !1` not, since only the
@@ -863,7 +876,7 @@ function AppShell() {
               desktop arm would then render underneath at phone width, where its two panels'
               `min-w-[22rem]` + `min-w-[18.75rem]` come to 664px and give the document a
               horizontal scrollbar behind a sheet that cannot use it. */}
-          <Route path="/bonus" element={bonusDialog ? null : <Bonus />} />
+          <Route path="/bonus" element={bonusDialog || privateNeedsAuth ? null : <Bonus />} />
           {/* The referral programme, and it is TWO PAGES that swap on sign-in. The router
               carries a matched pair of guards — `/referral` has
               `guards: [() => !b.login && "/referral-exhibition"]` and `/referral-exhibition` has
@@ -880,8 +893,11 @@ function AppShell() {
               the site's empty state. `/affiliate` is the original's own alias and still
               redirects onto `/referral`, one hop behind. */}
           <Route path="/referral-exhibition" element={referralExhibitionDialog ? null : <Referral />} />
-          <Route path="/referral" element={<ReferralDashboard />} />
-          <Route path="/referral/:section/*" element={<ReferralDashboard />} />
+          {/* Signed out the router sends `/referral*` to the exhibition page BEFORE the dashboard
+              mounts — the dashboard's own redirect ran after its four affiliate reads had already
+              gone out and come back 401. */}
+          <Route path="/referral" element={session.login ? <ReferralDashboard /> : <Navigate to="/referral-exhibition" replace />} />
+          <Route path="/referral/:section/*" element={session.login ? <ReferralDashboard /> : <Navigate to="/referral-exhibition" replace />} />
           <Route path="/affiliate" element={<Navigate to="/referral" replace />} />
           {/* The Help Center. `/help/:helpId` is the original's own shape, and bare `/help`
               redirects to `/help/provably-fair` there rather than rendering an index — the
@@ -968,7 +984,7 @@ function AppShell() {
             {/* Whitelist Management is off (owner, 2026-10-19); old links land on Account Info. */}
             <Route path="whitelist" element={<Navigate to="/settings/account-info" replace />} />
           </Route>
-          <Route path="/wallet" element={<WalletLayout />}>
+          <Route path="/wallet" element={privateNeedsAuth ? <></> : <WalletLayout />}>
             <Route index element={<Navigate to="/wallet/balance" replace />} />
             <Route path="balance" element={<Balance />} />
             {/* The SAME component as the `/deposit` dialog below — `DialogChannelDeposit` is
@@ -1044,6 +1060,7 @@ function AppShell() {
         userEnterNeedsAuth ||
         collectionNeedsAuth ||
         sportsAccountNeedsAuth ||
+        privateNeedsAuth ||
         settingsNeedsAuth ||
         whitelistFormNeedsAuth ||
         phishingNeedsAuth ||
@@ -1057,6 +1074,7 @@ function AppShell() {
               : userEnterNeedsAuth ||
                 collectionNeedsAuth ||
                 sportsAccountNeedsAuth ||
+                privateNeedsAuth ||
                 settingsNeedsAuth ||
                 whitelistFormNeedsAuth ||
                 phishingNeedsAuth ||
@@ -1125,7 +1143,7 @@ function AppShell() {
           there is none, so the two that take a `:userId` read it off the pathname themselves. */}
       {profileRoute && <Profile onClose={closeOverlay} enter={dialogEnter} />}
       {medalsRoute && <ProfileMedals onClose={closeOverlay} enter={dialogEnter} />}
-      {statisticsRoute && <ProfileStatistics onClose={closeOverlay} enter={dialogEnter} />}
+      {statisticsRoute && session.login && <ProfileStatistics onClose={closeOverlay} enter={dialogEnter} />}
       {/* Both of these draw a BACK arrow rather than a close cross — the phone arm of the
           title bar has no cross at all — so they take `onBack`. `onClose` is still threaded for
           Escape, which is a desktop affordance the shell keeps either way. */}
