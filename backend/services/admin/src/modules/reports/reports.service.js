@@ -11,7 +11,6 @@ const {
   CURRENCY_SYNONYMS,
   PROVIDER_CURRENCY_ALIASES,
   SPORTS_LEDGER_REASONS,
-  OPEN_BET_STATUSES,
   MAX_EXPORT_ROWS,
   RISK_LOGIN_ROWS,
   RISK_IP_ROWS,
@@ -1298,7 +1297,7 @@ class ReportsService {
 
     const live = money.fromStored(creditsRow?.[column] ?? '0');
 
-    const events = await this.#collectEvents(user.id, resolved, column);
+    const events = await this.#collectEvents(user.id, resolved, column, user.parent_staff_id == null);
 
     /**
      * Sort oldest-first, tie-broken on a source sequence.
@@ -1326,13 +1325,8 @@ class ReportsService {
 
     const moved = [];
     for (const event of events) {
-      // A row that records the wallet after it (mssports) moved exactly post − running.
-      const minor = event.post != null ? money.toMinorQuantised(String(event.post)) - running : money.toMinor(event.amount);
-      const hasPost = event.post != null;
+      const minor = money.toMinor(event.amount);
       delete event.seq;
-      delete event.post;
-      // A lost bet settles at 0 and a hedged bet takes nothing: nothing moved, nothing to list.
-      if (hasPost && minor === 0n) continue;
       running += minor;
       event.amount = money.toDecimalString(minor);
       event.type = minor >= 0n ? 'CREDIT' : 'DEBIT';
@@ -1343,18 +1337,16 @@ class ReportsService {
     }
 
     /**
-     * Stakes on unsettled bets — shown for reference. They are already in the
-     * ledger (the exchange's "Bet placed" row), so `unexplained` does not add
-     * them back. Sports betting is INR-only.
+     * What open bets hold out of the wallet (the exchange's exposure, stored negative). The sheet
+     * lists sports only as settled P/L, so `unexplained` adds it back. Sports betting is INR-only.
      */
     let openExposure = '0.00000000';
     if (column === 'inr') {
-      const [open] = await this.models.SportsBet.findAll({
-        where: { user_id: user.id, status: OPEN_BET_STATUSES },
-        attributes: [[fn('COALESCE', fn('SUM', col('stake_amount')), 0), 'total']],
-        raw: true,
-      });
-      openExposure = money.fromStored(open?.total ?? '0');
+      const [open] = await this.models.Users.sequelize.query(
+        'SELECT COALESCE(-SUM(total_exposure), 0) AS held FROM mssports.total_exposures WHERE user_id = :uid',
+        { replacements: { uid: user.id }, type: QueryTypes.SELECT }
+      );
+      openExposure = money.fromStored(open?.held ?? '0');
     }
 
     const ledgerClose = money.toDecimalString(running);
@@ -1378,14 +1370,12 @@ class ReportsService {
         /**
          * What the ledger cannot account for.
          *
-         * `live - ledger`. Non-zero means money moved through a path this sheet
+         * `live + openExposure - ledger`. Non-zero means money moved through a path this sheet
          * does not read — historical GT settlements, or a direct wallet write.
          * Surfacing it is the point: legacy showed a running balance that
          * silently disagreed with the wallet and gave the reader no way to tell.
-         * An open bet's stake is NOT added back: the exchange's "Bet placed"
-         * row already takes it (openExposure is shown for reference only).
          */
-        unexplained: money.toDecimalString(money.toMinor(live) - running),
+        unexplained: money.toDecimalString(money.toMinor(live) + money.toMinor(openExposure) - running),
         credited: money.toDecimalString(credited),
         debited: money.toDecimalString(debited),
       },
@@ -1507,11 +1497,10 @@ class ReportsService {
   // ══════════════════════════════════════════════════════════════════════
 
   /** Every source that moves a wallet, normalised to a signed amount. */
-  async #collectEvents(userId, currency, column) {
+  async #collectEvents(userId, currency, column, direct) {
     const events = [];
-    // `post` = the wallet balance right after the row, when the source records it (mssports does).
-    const push = (ts, category, type, description, amount, seq, post) =>
-      events.push({ ts: ts ?? new Date(), category, type, description, amount: String(amount ?? '0'), seq, post });
+    const push = (ts, category, type, description, amount, seq) =>
+      events.push({ ts: ts ?? new Date(), category, type, description, amount: String(amount ?? '0'), seq });
 
     const uid = String(userId);
 
@@ -1640,48 +1629,28 @@ class ReportsService {
     }
 
     /**
-     * 6b. Sports Exchange (mssports). It moves `credits.inr` itself and writes its OWN ledgers, never a
-     *     platform row: `debit_ledger` bet_placed (the market's exposure taken, `balance` after) and
-     *     `credits_ledger` settlement / refund / settlement_void (`closing` after). Their `amount` is
-     *     NOT the wallet move — the exchange nets back and lay on one market (a hedged bet debits
-     *     nothing, a settlement can credit with amount 0) — so each row carries `post`, the wallet
-     *     after it, and balanceSheet() takes the move as post − running. INR only.
-     *     A direct user's placements come from `point_ledger_direct` (trigger-written, `balance_after`
-     *     exact, not debit_ledger's 2 dp), with the release a bet that lowers exposure (BACK after LAY)
-     *     writes there and never in debit_ledger. debit_ledger keeps only bets that ledger has no row
-     *     for (agent users, bets before migration 117).
+     * 6b. Sports Exchange (mssports), INR: the user's bets, then each bet's P/L (`delta`) from the
+     *     point ledger — `point_ledger_direct` for a direct user, `point_ledger` (the player's own
+     *     wallet row) for an agent-tree user. One row per settlement / reversal, as the player's
+     *     statement shows it; the stake an open bet holds is `openExposure`, not a row.
      */
     if (column === 'inr') {
       const { sequelize } = this.models.Users;
-      const [stakes, placements, settles] = await Promise.all([
-        sequelize.query(
-          `SELECT id, amount, balance AS post, description, created_at FROM mssports.debit_ledger d
-            WHERE user_id = :uid AND reason = 'bet_placed' AND upper(currency) = 'INR'
-              AND NOT EXISTS (SELECT 1 FROM mssports.point_ledger_direct p
-                               WHERE p.bet_id::text = d.meta->>'bet_id' AND p.event_type = 'BET_PLACED' AND p.source = 'sports-service')`,
-          { replacements: { uid }, type: QueryTypes.SELECT }
-        ),
-        sequelize.query(
-          `SELECT id, event_type, delta AS amount, balance_after AS post, remark AS description, created_at FROM mssports.point_ledger_direct
-            WHERE user_id = :uid AND source = 'sports-service' AND event_type IN ('BET_PLACED', 'BET_RELEASED') AND currency = 'INR'`,
-          { replacements: { uid }, type: QueryTypes.SELECT }
-        ),
-        sequelize.query(
-          `SELECT id, reason, amount, closing AS post, description, created_at FROM mssports.credits_ledger
-            WHERE user_id = :uid AND reason IN ('settlement', 'refund', 'settlement_void') AND upper(currency) = 'INR'`,
-          { replacements: { uid }, type: QueryTypes.SELECT }
-        ),
-      ]);
-      const label = { settlement: 'Settlement', refund: 'Refund', settlement_void: 'Void' };
-      for (const row of stakes) {
-        push(row.created_at, 'Sports', 'DEBIT', `Bet placed — ${row.description || ''}`.trim(), `-${money.fromStored(row.amount ?? '0')}`, Number(row.id) || 0, row.post);
-      }
-      for (const row of placements) {
-        const placed = row.event_type === 'BET_PLACED';
-        push(row.created_at, 'Sports', placed ? 'DEBIT' : 'CREDIT', `${placed ? 'Bet placed' : 'Exposure released'} — ${row.description || ''}`.trim(), money.fromStored(row.amount ?? '0'), Number(row.id) || 0, row.post);
-      }
-      for (const row of settles) {
-        push(row.created_at, 'Sports', 'CREDIT', `${label[row.reason]} — ${row.description || ''}`.trim(), money.fromStored(row.amount ?? '0'), Number(row.id) || 0, row.post);
+      const select = (sql, replacements) => sequelize.query(sql, { replacements, type: QueryTypes.SELECT });
+      const betIds = (await select(`SELECT id FROM mssports."SportsBet" WHERE user_id = :uid`, { uid })).map((b) => b.id);
+      if (betIds.length) {
+        const ledger = direct
+          ? `mssports.point_ledger_direct WHERE user_id = :uid AND currency = 'INR'`
+          : `mssports.point_ledger WHERE wallet_id = (SELECT id FROM public.credits WHERE uid = :uid)`;
+        const rows = await select(
+          `SELECT id, delta, remark, event_type, created_at FROM ${ledger}
+              AND bet_id IN (:betIds) AND category = 'SPORTS' AND delta <> 0`,
+          { uid, betIds }
+        );
+        for (const row of rows) {
+          const signed = money.fromStored(row.delta);
+          push(row.created_at, 'Sports', money.toMinor(signed) >= 0n ? 'CREDIT' : 'DEBIT', row.remark || row.event_type, signed, Number(row.id) || 0);
+        }
       }
     }
 

@@ -15,6 +15,14 @@ Format:
 
 ---
 
+## 2026-10-21 — Balance sheet: sports sirf bet ka P/L, point ledger se
+**Kya kiya:** Admin → player → Balance sheet (INR) me sports ab simple: pehle user ki saari bets (`mssports."SportsBet"` ki ids), fir un bet ids ki `category = 'SPORTS'` rows point ledger se — direct user ho to `mssports.point_ledger_direct`, agent user ho to `mssports.point_ledger` (player ka apna wallet). Har row = us bet ka P/L (`delta`), description = ledger ka remark, delta 0 (void) wali row nahi. Bet placed / exposure released / settlement wali cash rows hata di (`debit_ledger`, `mssports.credits_ledger`, `post − running` sab gaya). Khuli bet ka paisa `openExposure` me (ab `mssports.total_exposures` se, pehle open stake ka jod tha) aur `unexplained` = live + openExposure − ledger.
+**Kyun:** User: sports bet sirf point ledger se dikhao, usme delta = profit / loss hai, jaise user side dikhta hai; direct user → point_ledger_direct, agent user → point_ledger; pehle bets nikalo fir unse point ledger; sirf zaroori columns.
+**Files / jagah:** `backend/services/admin/src/modules/reports/reports.service.js` (balanceSheet + section 6b) + `__tests__/reports.test.js`; issue doc ka status.
+**Notes / pending:** Live: parker-admin-svc restart. Live DB pe 24 sports users purane vs naye code se mila ke dekhe: 22 ka `unexplained` 0 (parkertest12 bhi). 2 QA users me farak: parkertester01 −2040, parkertester02 −200 — ye unki 17 Oct 21:53 (migration 117) se pehle settle hui bets ka P/L hai, jinki point ledger row migration ne hata di thi (har bet ka hisaab mila ke dekha). Exposure (parkertester02 1373.25) theek baitha. Balance column khuli bet ke exposure jitna wallet se upar dikhta hai (exposure row nahi hai). Admin tests: reports 32/32; poore suite me 20 purane fail, same baseline. Admin UI nahi badla, build nahi kiya.
+
+---
+
 ## 2026-10-21 — Balance sheet: sports bet placed + exposure release point_ledger_direct se
 **Kya kiya:** Admin → player → Balance sheet (direct user, INR) me sports "Bet placed" ab `mssports.point_ledger_direct` ki BET_PLACED row se aata hai, aur naya "Exposure released" row BET_RELEASED se (BACK after LAY jaisi bet jo exposure ghatati hai). `debit_ledger` se sirf wahi bet placed aate hain jinki point_ledger_direct me row nahi hai (migration 117 se pehle ki bets). Settlement / refund / void pehle jaise `mssports.credits_ledger` se.
 **Kyun:** Issue doc `backend/docs/issue-balance-sheet-exposure-release.md`: release ki `debit_ledger` row nahi banti thi, to agla row (jaise haari fancy ka settlement) uska paisa apne naam se dikhata tha (+35) aur beech me `unexplained` non-zero rehta tha. User: sports bets point ledger direct se dikhao; agent user ki sheet pehle se `point_ledger` se (`clientBalanceSheet`), wo nahi badli.

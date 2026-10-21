@@ -399,32 +399,46 @@ test('reports against a database', async (t) => {
     }
   });
 
-  await t.test('sports placements and exposure releases come from point_ledger_direct, once each', async () => {
-    const q = (sql, replacements) => models.Users.sequelize.query(sql, { replacements });
-    const opening = Number((await service.balanceSheet({ staff: asA, userId: playerA, limit: 500 })).balance.ledger);
-    const at = (min) => new Date(Date.now() + min * 60_000);
-    // Bet 1 is placed before point_ledger_direct existed (debit_ledger only); bet 2 is in both, its
-    // debit_ledger balance off by a paisa (2 dp), so a doubled row would show up as a −0.01 line.
-    await q(`INSERT INTO mssports.debit_ledger (user_id, currency, amount, reason, description, balance, meta, created_at) VALUES
-      (:uid, 'INR', 10, 'bet_placed', 'old bet', :b1, '{"bet_id": 990000001}', :t1),
-      (:uid, 'INR', 36, 'bet_placed', 'lay', :b2, '{"bet_id": 990000002}', :t2)`,
-    { uid: String(playerA), b1: opening - 10, b2: opening - 45.99, t1: at(60), t2: at(61) });
-    await q(`INSERT INTO mssports.point_ledger_direct (entry_ref, source, event_type, category, user_id, currency, delta, balance_after, bet_id, remark, created_at) VALUES
-      ('t-sheet-p2', 'sports-service', 'BET_PLACED', 'OTHER', :uid, 'INR', -36, :b2, 990000002, 'lay', :t2),
-      ('t-sheet-r3', 'sports-service', 'BET_RELEASED', 'OTHER', :uid, 'INR', 35, :b3, 990000003, 'back', :t3)`,
-    { uid: playerA, b2: opening - 46, b3: opening - 11, t2: at(61), t3: at(62) });
+  await t.test("sports rows are each bet's P/L from the point ledger: point_ledger (agent user), point_ledger_direct (direct user)", async () => {
+    const q = (sql, replacements) => models.Users.sequelize.query(sql, { replacements, type: 'SELECT' });
+    const directP = newId();
+    await models.Users.create({ id: directP, name: 'Direct P', password: 'x', status: 'active' });
+    const ids = [playerA, playerB, directP];
+    // sports service ka mirror (SportsBet.user_id ki FK isi par hai)
+    await q(`INSERT INTO mssports.users (user_id, username, password, role_id, "createdAt", "updatedAt")
+             SELECT id, 'sheet-' || id, 'x', 1, now(), now() FROM unnest(ARRAY[:ids]::bigint[]) id ON CONFLICT DO NOTHING`, { ids });
+    const bet = async (uid) =>
+      (await q(`INSERT INTO mssports."SportsBet" (user_id, game_type, bet_type, odds, stake_amount) VALUES (:uid, 'MO', 'back', 2, 100) RETURNING id`, { uid }))[0].id;
+    const betA = await bet(playerA);
+    const betB = await bet(playerB);
+    const betD = await bet(directP);
+    const [{ id: walletA }] = await q('SELECT id FROM public.credits WHERE uid = :uid', { uid: playerA });
+    await q(`INSERT INTO mssports.point_ledger (entry_ref, event_type, category, wallet_id, delta, bet_id, remark, created_at) VALUES
+      ('t-sheet-a1', 'BET_SETTLEMENT', 'SPORTS', :walletA, -550, :betA, 'fancy lost', now()),
+      ('t-sheet-a2', 'VOID', 'SPORTS', :walletA, 0, :betA, 'void', now()),
+      ('t-sheet-a3', 'BET_SETTLEMENT', 'CASINO', :walletA, 7, :betA, 'casino', now()),
+      ('t-sheet-a4', 'BET_SETTLEMENT', 'SPORTS', :walletA, 9, :betB, 'not her bet', now())`, { walletA, betA, betB });
+    await q(`INSERT INTO mssports.point_ledger_direct (entry_ref, source, event_type, category, user_id, currency, delta, bet_id, remark) VALUES
+      ('t-sheet-d1', NULL, 'BET_SETTLEMENT', 'SPORTS', :directP, 'INR', 40, :betD, 'match won'),
+      ('t-sheet-d2', 'sports-service', 'BET_PLACED', 'OTHER', :directP, 'INR', -100, :betD, 'stake hold')`, { directP, betD });
+    await q(`INSERT INTO mssports.total_exposures (user_id, total_exposure, "createdAt", "updatedAt") VALUES (:directP, -100, now(), now())`, { directP });
     try {
-      const sheet = await service.balanceSheet({ staff: asA, userId: playerA, limit: 500 });
-      const sports = sheet.rows.filter((r) => r.category === 'Sports').reverse().map((r) => [r.type, r.amount, r.description]);
-      assert.deepEqual(sports, [
-        ['DEBIT', '-10.00000000', 'Bet placed — old bet'],
-        ['DEBIT', '-36.00000000', 'Bet placed — lay'],
-        ['CREDIT', '35.00000000', 'Exposure released — back'],
-      ]);
-      assert.equal(Number(sheet.balance.ledger), opening - 11);
+      const sports = (sheet) => sheet.rows.filter((r) => r.category === 'Sports').map((r) => [r.type, r.amount, r.description]);
+      const agentSheet = await service.balanceSheet({ staff: asA, userId: playerA, limit: 500 });
+      assert.deepEqual(sports(agentSheet), [['DEBIT', '-550.00000000', 'fancy lost']]);
+      // Direct users are seen by staff 1, the platform owner.
+      const directSheet = await service.balanceSheet({ staff: { id: 1, level: 1, permissions: ['*'] }, userId: directP, limit: 500 });
+      assert.deepEqual(sports(directSheet), [['CREDIT', '40.00000000', 'match won']]);
+      // The stake an open bet holds is not a row; unexplained adds it back: live 0 + held 100 − ledger 40.
+      assert.equal(directSheet.balance.openExposure, '100.00000000');
+      assert.equal(directSheet.balance.unexplained, '60.00000000');
     } finally {
-      await q(`DELETE FROM mssports.debit_ledger WHERE user_id = :uid`, { uid: String(playerA) });
-      await q(`DELETE FROM mssports.point_ledger_direct WHERE entry_ref IN ('t-sheet-p2', 't-sheet-r3')`);
+      await q(`DELETE FROM mssports.point_ledger WHERE entry_ref LIKE 't-sheet-%'`);
+      await q(`DELETE FROM mssports.point_ledger_direct WHERE entry_ref LIKE 't-sheet-%'`);
+      await q('DELETE FROM mssports.total_exposures WHERE user_id = :directP', { directP });
+      await q('DELETE FROM mssports."SportsBet" WHERE id IN (:bets)', { bets: [betA, betB, betD] });
+      await q('DELETE FROM mssports.users WHERE user_id IN (:ids)', { ids });
+      await models.Users.destroy({ where: { id: directP } });
     }
   });
 
