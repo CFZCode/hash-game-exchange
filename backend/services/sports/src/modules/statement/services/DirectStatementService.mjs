@@ -54,6 +54,12 @@ const groupRows = (rows, sportsBetMap) => {
 const isUnlabelledMove = (r) => r.event_type === "BALANCE_CHANGE" && r.bet_id == null && !r.remark;
 const isSportsSettlement = (r) => r.category === "SPORTS" && r.event_type === "BET_SETTLEMENT" && String(r.entry_ref || "").startsWith("settle:");
 
+/** P/L view: a sports row is a settlement, its reversal or a void (each bet's result), never the stake
+ *  hold, release or the unlabelled cash a settlement moves. Other categories are kept as they are. */
+const PNL_EVENTS = new Set(["BET_SETTLEMENT", "REVERSAL", "VOID", "COMMISSION"]);
+const isPnlRow = (r) =>
+  !["BET_PLACED", "BET_RELEASED"].includes(r.event_type) && (r.category === "SPORTS" ? PNL_EVENTS.has(r.event_type) : !isUnlabelledMove(r));
+
 function foldSettlementMoves(rows) {
   const out = [];
   const pending = {};
@@ -125,7 +131,7 @@ const DirectStatementService = {
    * @param {{ fromDate?, toDate?, reportType?, currency?, search?, page?, limit? }} filters
    */
   getAccountStatement: async (target, filters) => {
-    const { fromDate, toDate, reportType = "ALL", currency, search } = filters;
+    const { fromDate, toDate, reportType = "ALL", currency, search, view = "cash" } = filters;
     const page = Math.max(parseInt(filters.page, 10) || 1, 1);
     const limit = Math.min(Math.max(parseInt(filters.limit, 10) || 25, 1), 500);
     const where = ["user_id = :userId"];
@@ -162,7 +168,9 @@ const DirectStatementService = {
     );
 
     await nameOldRows(target, raw);
-    raw = foldSettlementMoves(raw).filter(keep);
+    // "cash" (the statement page): rows are the money that moved. "pnl" (Bet History): each settlement
+    // keeps its own P/L row, so a lost bet reads −stake and a win its profit, not stake + profit.
+    raw = (view === "pnl" ? raw.filter(isPnlRow) : foldSettlementMoves(raw)).filter(keep);
 
     const sportsBetIds = [...new Set(raw.filter((r) => r.category === "SPORTS" && r.bet_id).map((r) => Number(r.bet_id)))];
     const sportsBetMap = {};
@@ -209,4 +217,4 @@ const DirectStatementService = {
   }
 };
 
-export { DirectStatementService, foldSettlementMoves };
+export { DirectStatementService, foldSettlementMoves, isPnlRow };

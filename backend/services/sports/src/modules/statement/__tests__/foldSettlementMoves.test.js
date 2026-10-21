@@ -25,3 +25,11 @@ test('statement rows show the cash that moved, as TENEXCH does', async () => {
   // An unlabelled move not followed by a settlement (e.g. a swap) stays as it is.
   assert.deepStrictEqual(foldSettlementMoves([move(1, 5, 5), stake(2, -5, 0)]).map((r) => r.id), [1, 2]);
 });
+
+test('the P/L view (Bet History) keeps each settlement result and drops the cash holds and moves', async () => {
+  const { isPnlRow } = await import('../services/DirectStatementService.mjs');
+  const release = (id, delta, bal) => ({ ...stake(id, delta, bal), event_type: 'BET_RELEASED' });
+  // LAY then BACK (hold −34.50, release +23), then a lost fancy (hold −550, its result −550), a won session (+450).
+  const rows = [stake(1, -34.5, 1228.68), release(2, 23, 1251.68), stake(3, -550, 701.68), move(4, 550, 1251.68), move(5, -550, 701.68), settle(6, 127, -550, 701.68), move(7, 950, 1651.68), settle(8, 124, 450, 1651.68)];
+  assert.deepStrictEqual(rows.filter(isPnlRow).map((r) => [r.id, r.delta]), [[6, -550], [8, 450]]);
+});

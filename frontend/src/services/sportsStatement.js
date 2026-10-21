@@ -82,6 +82,8 @@ export async function getSportsStatement({ kind, from, to, currency }) {
         page,
         limit: PAGE,
         ...(kind !== 'agent' && currency ? { currency } : {}),
+        // Bet History reads each settlement's P/L, not the cash the statement page shows.
+        ...(kind !== 'agent' ? { view: 'pnl' } : {}),
       },
     });
     const data = Array.isArray(body?.data) ? body.data : [];

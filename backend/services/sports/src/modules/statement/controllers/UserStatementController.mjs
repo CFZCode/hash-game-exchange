@@ -71,7 +71,7 @@ var UserStatementController = {
       if (user.parent_staff_id != null) {
         return res.status(403).json({ success: false, message: "Agent users use /account-statement-v2" });
       }
-      const { reportType, fromDate, toDate, currency, search, page, limit } = req.body || {};
+      const { reportType, fromDate, toDate, currency, search, page, limit, view } = req.body || {};
       const rt = String(reportType || "ALL").toUpperCase().trim();
       if (!DirectStatementService.REPORT_TYPES.includes(rt)) {
         return res.status(400).json({ success: false, message: "reportType must be ALL, SPORTS, CASINO or TRANSACTION" });
@@ -81,7 +81,7 @@ var UserStatementController = {
       }
       const result = await DirectStatementService.getAccountStatement(
         { id, db: User_default.sequelize },
-        { reportType: rt, fromDate, toDate, currency, search, page, limit }
+        { reportType: rt, fromDate, toDate, currency, search, page, limit, view: view === "pnl" ? "pnl" : "cash" }
       );
       return res.status(200).json(result);
     } catch (error) {
