@@ -18,7 +18,7 @@ async () => {
   }
   for (let n = 0; n < COUNT; n++) {
     let bal = Number((await g('/user/wallet/balances')).INR);
-    for (let i = 0; i < 60 && bal < MINBAL; i++) { await wait(5000); bal = Number((await g('/user/wallet/balances')).INR); }
+    for (let i = 0; i < 20 && bal < MINBAL; i++) { await wait(5000); bal = Number((await g('/user/wallet/balances')).INR); }
     const wp = await g('/user/wager/progress');
     if (wp.met) { log.push({ stop: 'rollover met', wager: wp.wagered }); break; }
     if (bal < MINBAL) { log.push({ stop: 'wallet still below ' + MINBAL, bal }); break; }
