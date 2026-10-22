@@ -23,12 +23,14 @@ const Toaster = ({ ...props }: ToasterProps) => {
           '--normal-bg': 'var(--popover)',
           '--normal-text': 'var(--popover-foreground)',
           '--normal-border': 'var(--border)',
-          '--border-radius': 'var(--radius)'
+
+          // Luno surfaces: 12px radius (rounded-xl)
+          '--border-radius': 'calc(var(--radius) * 1.4)'
         } as React.CSSProperties
       }
       toastOptions={{
         classNames: {
-          toast: 'cn-toast'
+          toast: 'cn-toast border-dashed! font-sans shadow-[0_8px_16px_0_rgb(25_26_28/15%)]!'
         }
       }}
       {...props}

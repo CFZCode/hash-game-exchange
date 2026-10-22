@@ -409,7 +409,7 @@ export function DateRangePicker({
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <div className={cn('relative w-full sm:w-64', className)}>
+      <div className={cn('relative w-full max-w-full min-w-0 sm:w-64', className)}>
         <PickerTrigger {...rest} placeholder={placeholder} label={label} clearable={clearable} onClear={onClear} />
         <HiddenValue name={name} required={required} value={from && to ? `${from}/${to}` : ''} />
       </div>
@@ -467,7 +467,7 @@ function RangeBody({
               key={p.label}
               variant='ghost'
               size='sm'
-              className='justify-start font-normal'
+              className='h-7 justify-start rounded-[4px] text-xs font-normal'
               onClick={() => onCommit(p.range())}
             >
               {p.label}

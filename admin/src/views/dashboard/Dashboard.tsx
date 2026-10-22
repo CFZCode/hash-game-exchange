@@ -381,7 +381,6 @@ const DirectUserDashboard = () => {
             delta={delta('net')}
             spark={line.net}
             sparkColor='chart-4'
-            sparkKind='bar'
             sparkLabels={labels}
             sparkFormat='money'
             sparkCurrency={unit}

@@ -435,7 +435,6 @@ const ProfitLossView = ({ channel }: { channel: Channel }) => {
               delta={delta('netProfit')}
               spark={line.netProfit}
               sparkColor='chart-4'
-              sparkKind='bar'
               sparkLabels={labels}
               sparkFormat='money'
               sparkCurrency={unit}
@@ -452,7 +451,6 @@ const ProfitLossView = ({ channel }: { channel: Channel }) => {
             goodWhen='neutral'
             spark={line.netCashflow}
             sparkColor='chart-2'
-            sparkKind='bar'
             sparkLabels={labels}
             sparkFormat='money'
             sparkCurrency={unit}

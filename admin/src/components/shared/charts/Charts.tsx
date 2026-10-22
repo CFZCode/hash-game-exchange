@@ -31,6 +31,18 @@ const valueFormatter = (format: ValueFormat, currency: string | null | undefined
   formatValue(v, format, format === 'money' ? currency : undefined)
 
 /**
+ * One entrance for every chart: series ease in over 0.8s (points a touch staggered), and a data or theme
+ * update glides in 0.35s. Off for visitors who ask for reduced motion, like the rest of the admin's motion.
+ */
+const animations = (): NonNullable<ApexOptions['chart']>['animations'] => {
+  const reduce = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+  return reduce
+    ? { enabled: false }
+    : { enabled: true, easing: 'easeinout', speed: 800, animateGradually: { enabled: true, delay: 60 }, dynamicAnimation: { enabled: true, speed: 350 } }
+}
+
+/**
  * The Luno template's chart look: ApexCharts' own defaults (Luno sets only toolbar off, dataLabels off,
  * legend bottom-centre, solid fill), with the grid, axis text and tooltip taken from the admin tokens so
  * dark mode reads.
@@ -39,7 +51,7 @@ function lunoBase(theme: ChartTheme, colors: string[], format: ValueFormat): Ape
   const label = { colors: theme.color['muted-foreground'], fontSize: '12px' }
 
   return {
-    chart: { toolbar: { show: false }, zoom: { enabled: false }, background: 'transparent', parentHeightOffset: 0, redrawOnParentResize: true },
+    chart: { toolbar: { show: false }, zoom: { enabled: false }, background: 'transparent', parentHeightOffset: 0, redrawOnParentResize: true, animations: animations() },
     colors,
     dataLabels: { enabled: false },
     legend: { position: 'bottom', horizontalAlign: 'center', labels: { colors: theme.color.foreground } },
@@ -193,6 +205,9 @@ export const DonutChart = ({ labels, values, colors, totalLabel = 'Total', heigh
     const fmt = valueFormatter(format, currency)
     const text = (c: string) => ({ show: true, color: c })
 
+    // The hole fits about ten characters: past 10,000 the middle goes compact (1.2M USDT); hover and the table keep it exact.
+    const centre = (v: number) => (Math.abs(v) >= 10000 ? `${formatAxisValue(v, format)}${format === 'money' && currency ? ` ${currency}` : ''}` : fmt(v))
+
     return {
       ...base,
       chart: { ...base.chart, type: 'donut' },
@@ -201,11 +216,12 @@ export const DonutChart = ({ labels, values, colors, totalLabel = 'Total', heigh
       plotOptions: {
         pie: {
           donut: {
+            size: '72%',
             labels: {
               show: true,
-              name: text(theme.color['muted-foreground']),
-              value: { ...text(theme.color.foreground), formatter: (v: string) => fmt(Number(v)) },
-              total: { show: true, showAlways: true, label: totalLabel, color: theme.color['muted-foreground'], formatter: () => fmt(data.reduce((a, v) => a + v, 0)) }
+              name: { ...text(theme.color['muted-foreground']), fontSize: '13px', offsetY: -4 },
+              value: { ...text(theme.color.foreground), fontSize: '17px', fontWeight: 600, offsetY: 4, formatter: (v: string) => centre(Number(v)) },
+              total: { show: true, showAlways: true, label: totalLabel, fontSize: '13px', color: theme.color['muted-foreground'], formatter: () => centre(data.reduce((a, v) => a + v, 0)) }
             }
           }
         }
@@ -236,8 +252,14 @@ export type SparklineProps = {
   className?: string
 }
 
-export const Sparkline = ({ data, ariaLabel, color = 'chart-1', kind = 'area', height = 40, format = 'number', currency, labels, className }: SparklineProps) => {
+export const Sparkline = ({ data: raw, ariaLabel, color = 'chart-1', kind = 'area', height = 40, format = 'number', currency, labels: rawLabels, className }: SparklineProps) => {
   const theme = useChartTheme()
+
+  // A trend starts at the first bucket with activity (keeping one empty bucket before it), so a long
+  // range with everything at its end still draws a wave instead of a flat floor and one spike.
+  const start = Math.max(0, Math.min(raw.findIndex(v => v !== null && v !== 0), raw.length - 2) - 1)
+  const data = useMemo(() => (start > 0 ? raw.slice(start) : raw), [raw, start])
+  const labels = useMemo(() => (start > 0 ? rawLabels?.slice(start) : rawLabels), [rawLabels, start])
 
   const options = useMemo<ApexOptions>(() => {
     // The y range is the data's own range, so the trend uses the whole height. A flat-zero series has
@@ -251,11 +273,14 @@ export const Sparkline = ({ data, ariaLabel, color = 'chart-1', kind = 'area', h
     else if (lo === hi) [lo, hi] = [lo - Math.abs(lo || 1), hi + Math.abs(hi || 1)]
 
     return {
-      chart: { type: kind, sparkline: { enabled: true }, animations: { enabled: false }, background: 'transparent' },
+      chart: { type: kind, sparkline: { enabled: true }, animations: animations(), background: 'transparent' },
       colors: [theme.resolve(color, 0)],
       stroke: { curve: 'smooth', width: kind === 'bar' ? 0 : 2 },
-      fill: kind === 'area' ? { type: 'gradient', gradient: { opacityFrom: 0.3, opacityTo: 0.02 } } : { opacity: 1 },
-      yaxis: { min: lo, max: hi },
+      plotOptions: { bar: { columnWidth: data.length < 8 ? '18%' : '60%', borderRadius: 2 } },
+      fill: kind === 'area' ? { type: 'gradient', gradient: { opacityFrom: 0.55, opacityTo: 0.08 } } : { opacity: 1 },
+
+      // show: false again here: Apex's updateOptions (theme change) merges this over the sparkline defaults.
+      yaxis: { show: false, min: lo, max: hi },
       xaxis: { categories: labels ?? data.map((_, i) => String(i + 1)) },
       tooltip: {
         theme: theme.mode,

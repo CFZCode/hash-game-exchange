@@ -71,19 +71,20 @@ const KpiCard = ({
   const good = goodWhen === 'neutral' || flat ? null : goodWhen === 'up' ? up : !up
   const tone = good === null ? 'bg-muted text-muted-foreground' : good ? 'bg-success-soft text-success' : 'bg-danger-soft text-danger'
   const Arrow = flat ? MinusIcon : up ? ArrowUpRightIcon : ArrowDownRightIcon
+  const bleed = Boolean(spark) && sparkKind === 'area'
 
   return (
-    <Card className={cn('min-w-0 gap-0 py-4 shadow-none', className)}>
-      <CardContent className='flex flex-col gap-2 px-4'>
+    <Card className={cn('min-w-0 gap-0 overflow-hidden pt-6 shadow-none', bleed ? 'pb-0' : 'pb-6', className)}>
+      <CardContent className='flex flex-col gap-2 px-6'>
         <div className='flex items-start justify-between gap-3'>
-          <p className='text-muted-foreground text-xs font-medium'>{label}</p>
+          <p className='text-heading text-sm font-medium uppercase'>{label}</p>
           {icon && <span className='text-muted-foreground shrink-0 [&_svg]:size-4'>{icon}</span>}
         </div>
         {loading ? (
           <Skeleton className='h-8 w-28' />
         ) : (
           <div className='flex min-w-0 items-baseline gap-1.5'>
-            <span className='truncate text-2xl leading-tight font-semibold tracking-tight tabular-nums'>{value}</span>
+            <span className='text-heading truncate text-2xl leading-tight font-medium tracking-tight tabular-nums'>{value}</span>
             {unit && <span className='text-muted-foreground text-xs font-medium'>{unit}</span>}
           </div>
         )}
@@ -105,7 +106,7 @@ const KpiCard = ({
           )}
         </div>
         {hasDelta && hint && !loading && <p className='text-muted-foreground -mt-1 text-xs'>{hint}</p>}
-        {spark && (
+        {spark && !bleed && (
           <div className='-mx-1 h-10'>
             {loading ? (
               <Skeleton className='h-10 w-full' />
@@ -115,6 +116,16 @@ const KpiCard = ({
           </div>
         )}
       </CardContent>
+      {/* Luno's analytics card: the area trend runs edge to edge along the card's bottom. */}
+      {bleed && spark && (
+        <div className='mt-auto h-16 pt-2'>
+          {loading ? (
+            <Skeleton className='h-full w-full rounded-none' />
+          ) : (
+            <Sparkline data={spark} color={sparkColor} kind='area' height={56} labels={sparkLabels} format={sparkFormat} currency={sparkCurrency} ariaLabel={`${label} trend`} />
+          )}
+        </div>
+      )}
     </Card>
   )
 }

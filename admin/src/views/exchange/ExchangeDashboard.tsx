@@ -15,7 +15,7 @@ import {
   WalletIcon
 } from 'lucide-react'
 
-import { ChartCard, type ChartTableData } from '@/components/shared/charts'
+import { BarChart, ChartCard, type ChartTableData } from '@/components/shared/charts'
 import ErrorState from '@/components/shared/ErrorState'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -63,8 +63,6 @@ const toTable = (items: Item[], format: (v: number) => string): ChartTableData =
  * Plus wali primary rang me, minus wali laal; value aur % bar ke upar likhe hain.
  */
 const PointsBars = ({ items, centre }: { items: Item[]; centre: Item }) => {
-  const max = Math.max(...items.map(i => Math.abs(i.value)), 1)
-
   return (
     <div className='flex flex-col gap-6'>
       <div className='from-primary/15 to-primary/5 border-primary/20 flex items-center justify-between gap-4 rounded-xl border bg-gradient-to-r px-4 py-3'>
@@ -77,35 +75,16 @@ const PointsBars = ({ items, centre }: { items: Item[]; centre: Item }) => {
         </span>
       </div>
 
-      <ul className='flex flex-col gap-4'>
-        {items.map(item => {
-          const share = (Math.abs(item.value) / max) * 100
-
-          return (
-            <li key={item.label} className='flex flex-col gap-1.5' title={`${item.label}: ${fmt(item.value)}`}>
-              <div className='flex items-baseline justify-between gap-3 text-sm'>
-                <span className='text-muted-foreground'>{item.label}</span>
-                <span className='flex items-baseline gap-2'>
-                  <span className='text-foreground font-semibold tabular-nums'>{fmt(item.value)}</span>
-                  <span className='text-muted-foreground w-10 text-right text-xs tabular-nums'>{Math.round(share)}%</span>
-                </span>
-              </div>
-              <div className='bg-muted h-3 overflow-hidden rounded-full'>
-                {item.value !== 0 && (
-                  <span
-                    aria-hidden
-                    className={cn(
-                      'block h-full rounded-full bg-gradient-to-r transition-[width] duration-500',
-                      item.value > 0 ? 'from-primary/50 to-primary' : 'from-danger/50 to-danger'
-                    )}
-                    style={{ width: `max(${share}%, 6px)` }}
-                  />
-                )}
-              </div>
-            </li>
-          )
-        })}
-      </ul>
+      <BarChart
+        ariaLabel='Points by type'
+        height={300}
+        stacked
+        categories={items.map(i => i.label)}
+        series={[
+          { name: 'Points', data: items.map(i => (i.value >= 0 ? i.value : null)), color: 'chart-1' },
+          ...(items.some(i => i.value < 0) ? [{ name: 'Negative', data: items.map(i => (i.value < 0 ? i.value : null)), color: 'danger' as const }] : [])
+        ]}
+      />
     </div>
   )
 }
@@ -118,7 +97,6 @@ const plTone = (v: number) => (v > 0 ? 'success' : v < 0 ? 'danger' : 'muted-for
  * profit right (hara), loss left (laal), gradient ke saath.
  */
 const PLPanel = ({ items, total }: { items: Item[]; total: number }) => {
-  const max = Math.max(...items.map(i => Math.abs(i.value)), 1)
   const tone = plTone(total)
   const Icon = total > 0 ? TrendingUpIcon : total < 0 ? TrendingDownIcon : MinusIcon
 
@@ -142,40 +120,17 @@ const PLPanel = ({ items, total }: { items: Item[]; total: number }) => {
         </div>
       </div>
 
-      <ul className='flex flex-col gap-4'>
-        {items.map(item => {
-          const share = (Math.abs(item.value) / max) * 50
-          const t = plTone(item.value)
-
-          return (
-            <li key={item.label} className='flex flex-col gap-1.5' title={`${item.label}: ${fmtSigned(item.value)}`}>
-              <div className='flex items-baseline justify-between gap-3 text-sm'>
-                <span className='text-muted-foreground'>{item.label}</span>
-                <span className='text-foreground font-semibold tabular-nums'>{fmtSigned(item.value)}</span>
-              </div>
-              <div className='bg-muted relative h-3 overflow-hidden rounded-full'>
-                <span aria-hidden className='bg-border absolute inset-y-0 left-1/2 z-10 w-0.5 -translate-x-1/2' />
-                {item.value !== 0 && (
-                  <span
-                    aria-hidden
-                    className={cn(
-                      'absolute inset-y-0 rounded-full transition-[width,left] duration-500',
-                      t === 'success' && 'from-success/40 to-success bg-gradient-to-r',
-                      t === 'danger' && 'from-danger to-danger/40 bg-gradient-to-r'
-                    )}
-                    style={{ left: item.value < 0 ? `${50 - share}%` : '50%', width: `max(${share}%, 6px)` }}
-                  />
-                )}
-              </div>
-            </li>
-          )
-        })}
-        <li className='text-muted-foreground flex justify-between text-[11px]'>
-          <span>Loss</span>
-          <span>0</span>
-          <span>Profit</span>
-        </li>
-      </ul>
+      <BarChart
+        ariaLabel='Profit and loss by source'
+        height={260}
+        horizontal
+        stacked
+        categories={items.map(i => i.label)}
+        series={[
+          { name: 'Profit', data: items.map(i => (i.value > 0 ? i.value : null)), color: 'success' },
+          { name: 'Loss', data: items.map(i => (i.value < 0 ? i.value : null)), color: 'danger' }
+        ]}
+      />
     </div>
   )
 }
@@ -294,7 +249,7 @@ const ExchangeDashboard = () => {
             <ChartCard
               className={cn(showPL ? 'xl:col-span-3' : 'xl:col-span-5')}
               title='Points overview'
-              description='Each bar is one point type — the biggest is a full bar.'
+              description='Each column is one point type — hover for the exact value.'
               table={toTable(points, fmt)}
             >
               {isLoading ? <PanelSkeleton /> : <PointsBars items={points} centre={points[1]} />}
@@ -305,7 +260,7 @@ const ExchangeDashboard = () => {
             <ChartCard
               className={cn(showPoints ? 'xl:col-span-2' : 'xl:col-span-5')}
               title='P/L overview'
-              description='Profit to the right of zero, loss to the left.'
+              description='Profit in green to the right of zero, loss in red to the left.'
               table={toTable(pl, fmtSigned)}
             >
               {isLoading ? <PanelSkeleton /> : <PLPanel items={pl} total={totalPL} />}

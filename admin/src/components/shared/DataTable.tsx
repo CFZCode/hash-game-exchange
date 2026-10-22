@@ -109,7 +109,7 @@ export default function DataTable<T>({
   return (
     <Card className={cn('ring-border gap-0 overflow-hidden py-0', className)}>
       {showToolbar && (
-        <div className='border-border flex flex-wrap items-center gap-3 border-b px-4 py-3.5'>
+        <div className='border-border flex flex-wrap items-center gap-3 border-b border-dashed px-4 py-3.5'>
           {onSearchChange && (
             <div className='relative w-full sm:w-72'>
               <SearchIcon className='text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2' />
@@ -143,11 +143,11 @@ export default function DataTable<T>({
                     <TableHead
                       key={col.key}
                       className={cn(
-                        'text-muted-foreground bg-card sticky top-0 z-10 px-3 text-xs font-medium tracking-wide whitespace-nowrap uppercase shadow-[inset_0_-1px_0_var(--border)] first:pl-5 last:pr-5',
+                        'text-heading bg-card sticky top-0 z-10 px-3 text-xs font-bold tracking-wide whitespace-nowrap uppercase first:pl-5 last:pr-5',
                         col.align === 'right' && 'text-right tabular-nums',
                         col.align === 'center' && 'text-center',
-                        sortable && 'hover:text-foreground cursor-pointer transition-colors select-none',
-                        active && 'text-foreground',
+                        sortable && 'hover:text-primary cursor-pointer transition-colors select-none',
+                        active && 'text-primary',
                         col.headerClassName
                       )}
                       aria-sort={active ? (sort?.order === 'asc' ? 'ascending' : 'descending') : undefined}
@@ -234,7 +234,7 @@ export default function DataTable<T>({
       )}
 
       {pagination && (
-        <div className='border-border flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3'>
+        <div className='border-border flex flex-wrap items-center justify-between gap-3 border-t border-dashed px-4 py-3'>
           <p className='text-muted-foreground text-sm tabular-nums'>
             {total === 0 ? 'No entries' : `Showing ${from}–${to} of ${total}`}
           </p>

@@ -1,0 +1,110 @@
+# Every admin route (admin/src/app/(pages)/**/page.tsx), in the redesign's group order
+# (admin/docs/luno-redesign-plan.md step 6). One route per line; `#` starts a comment.
+# Dynamic routes use a real LIVE id; change it if that record is gone.
+
+## Dashboard
+/dashboard
+
+## Users / user detail / wallets / KYC
+/users
+/users/2894175891
+/wallets
+/direct-wallet
+/ip-tracker
+/kyc
+/bank-details
+/account
+
+## Transactions
+/transactions/deposit
+/transactions/withdraw
+/deposits/fiat
+/deposits/crypto
+/deposits/orders
+/withdrawals/fiat
+/withdrawals/crypto
+/reports/statements
+
+## Finance
+/exchange-rates
+/coins
+/vault
+/swap
+/tips
+/p2p
+/payment-methods
+
+## Reports
+/reports/players
+/reports/pnl
+/reports/risk
+/turnover-report
+/casino/wager-report
+/audit
+
+## Sports Exchange
+/exchange/dashboard
+/exchange/users
+/exchange/users/create
+/exchange/bank
+/exchange/reports/account-statement
+/exchange/reports/party-win-loss
+/exchange/reports/total-profit-loss
+/exchange/reports/user-win-loss
+/exchange/reports/general-lock
+/exchange/market-analysis
+/exchange/reports/current-bets
+/exchange/reports/turnover
+/exchange/settlement
+/exchange/settings
+/exchange/events
+# /exchange/events/<sportId>/<eventId>  — needs a live event id; open it from /exchange/events
+/exchange/sports-switch
+
+## Casino / Original Games
+/casino/games
+/casino/curation
+/casino/providers
+/casino/bets
+/providers-priority
+/vendor-priority
+/type-priority
+/casino/original-games
+/casino/original-games/turnover
+/casino/original-games/bets
+/casino/original-games/games
+
+## Promotions / Races / VIP / Bonus / Affiliate
+/promotions/campaigns
+/bonus
+/bonus-balances
+/gift-cards
+/spin-wheel
+/vip
+/affiliate
+/races
+/redeem-codes
+/marketing
+
+## Content / Push
+/content/banners
+/content/avatars
+/content/blogs
+/content/notifications
+/push
+/push/compose
+/push/campaigns
+/push/templates
+/push/settings
+
+## Site config
+/site-config/features
+/site-config/branding
+/site-config/flags
+/site-config/limits
+/site-config/email
+/site-config/affiliate
+/site-config/welcome-bonuses
+
+## Settings / Access
+/access/executives

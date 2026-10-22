@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 
-import { ActivityIcon, KeyRoundIcon, LockIcon, PencilIcon, PlusIcon, UnlockIcon } from 'lucide-react'
+import { ActivityIcon, KeyRoundIcon, LockIcon, PencilIcon, PlusIcon, ShieldCheckIcon, SlidersHorizontalIcon, UnlockIcon } from 'lucide-react'
 
 import Can from '@/components/shared/Can'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
@@ -18,7 +18,6 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useSession } from '@/contexts/SessionContext'
 import { useApiMutation, useListState, usePagedApi } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
@@ -135,10 +134,10 @@ const RowActions = ({ row, kind }: { row: ExecutiveRow; kind: Kind }) => {
   const locked = row.status === 'locked'
 
   return (
-    <div className='flex flex-wrap justify-end gap-1' onClick={e => e.stopPropagation()}>
+    <div className='flex justify-end gap-0.5' onClick={e => e.stopPropagation()}>
       <Can permission='audit:read'>
-        <Button variant='ghost' size='sm' onClick={() => setShowActivity(true)}>
-          <ActivityIcon /> Activity
+        <Button variant='ghost' size='icon-sm' aria-label='Activity' title='Activity' onClick={() => setShowActivity(true)}>
+          <ActivityIcon />
         </Button>
         <ActivityDialog row={row} open={showActivity} onOpenChange={setShowActivity} />
       </Can>
@@ -146,8 +145,8 @@ const RowActions = ({ row, kind }: { row: ExecutiveRow; kind: Kind }) => {
         {kind === 'executive' && (
           <FormDialog
             trigger={
-              <Button variant='ghost' size='sm'>
-                <PencilIcon /> Edit access
+              <Button variant='ghost' size='icon-sm' aria-label='Edit access' title='Edit access'>
+                <PencilIcon />
               </Button>
             }
             title={`Permissions for ${row.username}`}
@@ -161,8 +160,8 @@ const RowActions = ({ row, kind }: { row: ExecutiveRow; kind: Kind }) => {
         )}
         <FormDialog
           trigger={
-            <Button variant='ghost' size='sm'>
-              <KeyRoundIcon /> Reset password
+            <Button variant='ghost' size='icon-sm' aria-label='Reset password' title='Reset password'>
+              <KeyRoundIcon />
             </Button>
           }
           title={`Reset password for ${row.username}`}
@@ -175,8 +174,8 @@ const RowActions = ({ row, kind }: { row: ExecutiveRow; kind: Kind }) => {
         </FormDialog>
         <ConfirmDialog
           trigger={
-            <Button variant='ghost' size='sm' className={locked ? '' : 'text-destructive'}>
-              {locked ? <UnlockIcon /> : <LockIcon />} {locked ? 'Unlock' : 'Lock'}
+            <Button variant='ghost' size='icon-sm' aria-label={locked ? 'Unlock' : 'Lock'} title={locked ? 'Unlock' : 'Lock'} className={locked ? '' : 'text-destructive'}>
+              {locked ? <UnlockIcon /> : <LockIcon />}
             </Button>
           }
           title={locked ? `Unlock ${row.username}?` : `Lock ${row.username}?`}
@@ -187,8 +186,8 @@ const RowActions = ({ row, kind }: { row: ExecutiveRow; kind: Kind }) => {
         />
         <FormDialog
           trigger={
-            <Button variant='ghost' size='sm'>
-              Set status
+            <Button variant='ghost' size='icon-sm' aria-label='Set status' title='Set status'>
+              <SlidersHorizontalIcon />
             </Button>
           }
           title={`Status for ${row.username}`}
@@ -201,6 +200,48 @@ const RowActions = ({ row, kind }: { row: ExecutiveRow; kind: Kind }) => {
         </FormDialog>
       </Can>
     </div>
+  )
+}
+
+/** The grant as one button; the full list, grouped like the picker, opens in a dialog. */
+const PermissionsButton = ({ row }: { row: ExecutiveRow }) => {
+  const [open, setOpen] = useState(false)
+  const groups = PERMISSION_GROUPS.map(g => ({ ...g, permissions: g.permissions.filter(p => row.permissions.includes(p)) })).filter(g => g.permissions.length)
+  const known = new Set(groups.flatMap(g => g.permissions))
+  const other = row.permissions.filter(p => !known.has(p))
+
+  return (
+    <>
+      <Button variant='outline' size='sm' onClick={e => (e.stopPropagation(), setOpen(true))}>
+        <ShieldCheckIcon /> {row.permissions.length} {row.permissions.length === 1 ? 'permission' : 'permissions'}
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className='sm:max-w-2xl'>
+          <DialogHeader>
+            <DialogTitle>Permissions · {row.username}</DialogTitle>
+            <DialogDescription>What this executive may see and do.</DialogDescription>
+          </DialogHeader>
+          {row.permissions.length === 0 ? (
+            <p className='text-muted-foreground text-sm'>No permissions.</p>
+          ) : (
+            <div className='grid max-h-[60vh] gap-4 overflow-y-auto sm:grid-cols-2'>
+              {[...groups, ...(other.length ? [{ label: 'Other', permissions: other }] : [])].map(g => (
+                <div key={g.label}>
+                  <p className='text-muted-foreground mb-1.5 text-xs font-medium tracking-wide uppercase'>{g.label}</p>
+                  <div className='flex flex-wrap gap-1'>
+                    {g.permissions.map(p => (
+                      <Badge key={p} variant='secondary' className='font-mono font-normal'>
+                        {p}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
 
@@ -243,17 +284,7 @@ export const SubLoginTable = ({ kind }: { kind: Kind }) => {
     {
       key: 'perms',
       header: 'Permissions',
-      cell: r => (
-        <span className='flex max-w-md flex-wrap gap-1'>
-          <Badge variant='secondary'>{r.permissions.length}</Badge>
-          {r.permissions.slice(0, 4).map(p => (
-            <code key={p} className='bg-muted rounded px-1 text-xs'>
-              {p}
-            </code>
-          ))}
-          {r.permissions.length > 4 && <span className='text-muted-foreground text-xs'>+{r.permissions.length - 4}</span>}
-        </span>
-      )
+      cell: r => <PermissionsButton row={r} />
     },
     { key: 'actions', header: '', align: 'right', cell: r => <RowActions row={r} kind={kind} /> }
   ]
@@ -291,34 +322,20 @@ export const SubLoginTable = ({ kind }: { kind: Kind }) => {
   )
 }
 
-const ExecutivesList = () => {
-  const [tab, setTab] = useState<Kind>('executive')
-
-  return (
-    <div>
-      <PageHeader
-        title='Executives & marketing users'
-        description='Sub-logins under a staff account. Executives carry a subset of your permissions; marketing users only read the marketing analytics.'
-        actions={
-          <Can permission={GRANT[tab]}>
-            <CreateSubLogin key={tab} kind={tab} />
-          </Can>
-        }
-      />
-      <Tabs value={tab} onValueChange={v => setTab(v as Kind)}>
-        <TabsList className='mb-4'>
-          <TabsTrigger value='executive'>Executives</TabsTrigger>
-          <TabsTrigger value='marketing'>Marketing users</TabsTrigger>
-        </TabsList>
-        <TabsContent value='executive'>
-          <SubLoginTable kind='executive' />
-        </TabsContent>
-        <TabsContent value='marketing'>
-          <SubLoginTable kind='marketing' />
-        </TabsContent>
-      </Tabs>
-    </div>
-  )
-}
+// Marketing users are no longer offered here (owner's call); the platform routes stay.
+const ExecutivesList = () => (
+  <div>
+    <PageHeader
+      title='Executives'
+      description='Sub-logins under a staff account. Executives carry a subset of your permissions.'
+      actions={
+        <Can permission={GRANT.executive}>
+          <CreateSubLogin kind='executive' />
+        </Can>
+      }
+    />
+    <SubLoginTable kind='executive' />
+  </div>
+)
 
 export default ExecutivesList

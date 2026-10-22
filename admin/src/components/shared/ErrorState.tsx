@@ -5,9 +5,9 @@ import { errorMessage } from '@/lib/api/client'
 const ErrorState = ({ error, title = 'Could not load' }: { error: unknown; title?: string }) => (
   <div
     role='alert'
-    className='border-border bg-card flex w-full items-start gap-3 rounded-lg border px-4 py-3.5 text-left text-sm'
+    className='border-danger/30 bg-danger-soft flex w-full items-start gap-3 rounded-[6px] border border-dashed px-4 py-3.5 text-left text-sm'
   >
-    <span className='bg-danger-soft text-danger flex size-7 shrink-0 items-center justify-center rounded-md'>
+    <span className='bg-card text-danger flex size-7 shrink-0 items-center justify-center rounded-md'>
       <AlertTriangleIcon className='size-4' />
     </span>
     <div className='min-w-0 space-y-0.5'>

@@ -54,7 +54,6 @@ import {
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
-  SidebarTrigger,
   useSidebar
 } from '@/components/ui/sidebar'
 
@@ -679,7 +678,6 @@ const SidebarLayout = () => {
               <span className='text-muted-foreground truncate text-xs'>{siteConfig.tagline}</span>
             </span>
           </Link>
-          <SidebarTrigger className='bg-primary/10 text-primary hover:bg-primary size-7 shrink-0 rounded-full transition-colors duration-300 hover:text-white group-data-[collapsible=icon]:hidden [&_svg]:size-3.5!' />
         </div>
       </SidebarHeader>
       <SidebarContent className='gap-0 py-1 group-data-[collapsible=icon]:overflow-y-auto' onClick={closeOnNavigate}>
