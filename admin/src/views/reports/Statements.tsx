@@ -9,6 +9,7 @@ import { toast } from 'sonner'
 
 import DataTable, { type Column } from '@/components/shared/DataTable'
 import DateTime from '@/components/shared/DateTime'
+import { useDefaultCurrency } from '@/components/shared/DefaultCurrency'
 import ErrorState from '@/components/shared/ErrorState'
 import JsonView from '@/components/shared/JsonView'
 import Money from '@/components/shared/Money'
@@ -27,7 +28,6 @@ import { useSession } from '@/contexts/SessionContext'
 import { useApi, useListState, usePagedApi } from '@/hooks/use-api'
 import { api, errorMessage } from '@/lib/api/client'
 import { formatMoney, formatNumber } from '@/lib/format'
-import { useCurrencyCodes } from '@/views/finance/useCurrencyCodes'
 
 import { ACCOUNT_TYPES, STATEMENT_CATEGORIES, STATEMENT_CATEGORY_LABEL as CATEGORY_LABEL, STATEMENT_KIND_LABEL, daysAgo, downloadBlob, type Statement, type StatementRow, type TransferRow } from './types'
 
@@ -126,7 +126,7 @@ const statementColumns: Column<StatementRow>[] = [
 ]
 
 const StatementTab = () => {
-  const [form, setForm] = useState({ subject: 'user', id: '', from: daysAgo(30), to: daysAgo(0), category: 'all', currency: 'INR' })
+  const [form, setForm] = useState({ subject: 'user', id: '', from: daysAgo(30), to: daysAgo(0), category: 'all' })
   const [applied, setApplied] = useState<typeof form | null>(null)
   const [page, setPage] = useState(1)
   const [limit, setLimit] = useState(100)
@@ -135,15 +135,13 @@ const StatementTab = () => {
 
   const base = applied ? (applied.subject === 'user' ? `admin/statements/user/${applied.id}` : `admin/statements/${applied.id}`) : null
 
-  // A user's statement is per wallet (currency); a staff statement is INR points.
-  const range = applied ? { from: applied.from || undefined, to: applied.to || undefined, ...(applied.subject === 'user' ? { currency: applied.currency } : {}) } : {}
+  // A user's statement is per wallet: the site's default coin (no currency picker). A staff statement is INR points.
+  const wallet = useDefaultCurrency().code
+  const range = applied ? { from: applied.from || undefined, to: applied.to || undefined, ...(applied.subject === 'user' ? { currency: wallet } : {}) } : {}
   const stmt = useApi<Statement>(base ? `${base}/statement` : null, { ...range, category: applied?.category, page, limit })
   const bets = usePagedApi<Record<string, unknown>>(base ? `${base}/bets` : null, { ...range, kind: betKind, page: betPage, limit: 50 })
   const s = stmt.data
 
-  // Every coin the site runs (BTC too, at 0), beside the wallets the player holds or has moved.
-  const coins = useCurrencyCodes()
-  const walletCodes = [...new Set([...(s?.wallets?.map(w => w.currency) ?? []), ...coins])]
   const [downloading, setDownloading] = useState(false)
 
   const pdf = async () => {
@@ -226,28 +224,7 @@ const StatementTab = () => {
                 )}
                 <Badge variant='secondary'>{s.subject.role}</Badge>
                 {s.subject.parentName && <span className='text-muted-foreground text-sm font-normal'>under {s.subject.parentName}</span>}
-                {applied?.subject === 'user' && walletCodes.length > 0 && (
-                  <Select
-                    value={s.currency ?? applied.currency}
-                    onValueChange={v => {
-                      if (!v) return
-                      setForm({ ...form, currency: v })
-                      setApplied({ ...applied, currency: v })
-                      setPage(1)
-                    }}
-                  >
-                    <SelectTrigger className='w-28' aria-label='Wallet'>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {walletCodes.map(code => (
-                        <SelectItem key={code} value={code}>
-                          {code}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
+                {applied?.subject === 'user' && s.currency && <Badge variant='outline'>{s.currency}</Badge>}
                 <span className='text-muted-foreground ml-auto text-sm font-normal'>
                   {s.period.from ?? 'start'} → {s.period.to ?? 'now'} · {s.category}
                 </span>

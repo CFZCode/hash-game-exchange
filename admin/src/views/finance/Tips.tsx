@@ -24,8 +24,8 @@ import { api } from '@/lib/api/client'
 import type { Pagination } from '@/lib/api/types'
 import { formatNumber } from '@/lib/format'
 import RewardStats from '@/views/promotions/RewardStats'
+import { useStatsFilters } from '@/components/shared/charts'
 
-import { useFinanceFilters } from './currencyFilter'
 import type { TipList, TipParty, TipRow } from './types'
 
 /**
@@ -196,12 +196,11 @@ const columns: Column<TipRow>[] = [
 const TipsList = ({ channel }: { channel: Channel }) => {
   const { state, set, query } = useListState()
 
-  // The charts' filter bar drives the table too: its period (inclusive UTC days) and currency — the
-  // site's default coin until somebody picks another.
-  const f = useFinanceFilters({ defaultPreset: '30d' })
+  // The charts' filter bar drives the table too: its period (inclusive UTC days). Every currency.
+  const f = useStatsFilters({ defaultPreset: '30d' })
 
-  // A new period or currency starts the table again at page 1 (not on first load: keep a deep link).
-  const filterKey = `${f.from}|${f.to}|${f.currency}`
+  // A new period starts the table again at page 1 (not on first load: keep a deep link).
+  const filterKey = `${f.from}|${f.to}`
   const lastFilterKey = useRef(filterKey)
 
   useEffect(() => {
@@ -231,7 +230,6 @@ const TipsList = ({ channel }: { channel: Channel }) => {
       offset: (page - 1) * PAGE_SIZE,
       channel,
       search: query.search,
-      currency: f.currency || undefined,
       from: f.from,
       to: f.to
     },
@@ -245,13 +243,13 @@ const TipsList = ({ channel }: { channel: Channel }) => {
     ? { page, limit: PAGE_SIZE, total, totalPages, hasNext: page < totalPages, hasPrev: page > 1 }
     : undefined
 
-  const filtered = Boolean(query.search || f.currency !== f.defaultCurrency || f.preset !== '30d')
+  const filtered = Boolean(query.search || f.preset !== '30d')
   const summary = list.data?.summary
 
   const reset = () => {
     setTerm('')
     set({ search: '' })
-    f.set({ preset: '30d', currency: f.defaultCurrency })
+    f.set({ preset: '30d' })
   }
 
   return (
@@ -316,14 +314,14 @@ const TipsList = ({ channel }: { channel: Channel }) => {
 
 const Tips = () => {
   const { actor, can } = useSession()
-  const f = useFinanceFilters({ defaultPreset: '30d' })
+  const f = useStatsFilters({ defaultPreset: '30d' })
 
   // Same gate as the welcome-bonus settings: config:read to see, house staff only (not the agent tree).
   const showLimits = Boolean(actor?.promotions) && can('config:read')
 
   return (
     <div>
-      <PageHeader title='Tips' description='Player-to-player tips, newest first. The charts, totals and table all follow the period and currency below.' />
+      <PageHeader title='Tips' description='Player-to-player tips, newest first. The charts, totals and table all follow the period below; totals are in the site’s default coin.' />
 
       {showLimits && <LimitsCard />}
 

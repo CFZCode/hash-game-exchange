@@ -36,7 +36,6 @@ import { useApi, usePagedApi } from '@/hooks/use-api'
 import { formatMoney, formatNumber } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import ExchangeDashboard from '@/views/exchange/ExchangeDashboard'
-import { useCurrencyCodes } from '@/views/finance/useCurrencyCodes'
 
 /** One bucket of `admin/dashboard/stats/series`. Money keys are decimal strings, in `currency`. */
 type StatsBucket = {
@@ -246,19 +245,14 @@ const DirectUserDashboard = () => {
   // Agent-tree logins (no promotions) see their own network, not the whole site.
   const inNetwork = useSession().actor?.promotions === false
   const f = useStatsFilters({ defaultPreset: 'all' })
-  const currencies = useCurrencyCodes()
   const reportCoin = useDefaultCurrency().code
 
   const series = useApi<StatsSeries>(SERIES, f.query, { placeholderData: prev => prev })
 
   // The previous window only feeds the deltas, so one bucket per month is plenty.
-  const previous = useApi<StatsSeries>(SERIES, {
-    ...f.previous.apiRange,
-    granularity: 'month',
-    ...(f.currency ? { currency: f.currency } : {})
-  })
+  const previous = useApi<StatsSeries>(SERIES, { ...f.previous.apiRange, granularity: 'month' })
 
-  const top = useApi<StatsTop>(TOP, { ...f.apiRange, limit: 8, ...(f.currency ? { currency: f.currency } : {}) }, { placeholderData: prev => prev })
+  const top = useApi<StatsTop>(TOP, { ...f.apiRange, limit: 8 }, { placeholderData: prev => prev })
   const stats = useApi<UserStats>('admin/dashboard/user-stats', f.apiRange)
   const movements = usePagedApi<Movement>('admin/dashboard/movements', { limit: 8 })
   const registrations = usePagedApi<Registration>('admin/dashboard/registrations', { limit: 8 })
@@ -266,8 +260,8 @@ const DirectUserDashboard = () => {
   const s = series.data
   const p = previous.data
 
-  // The answer names its unit: the picked coin, or the site's default coin for "every currency".
-  const unit = f.currency || s?.currency || reportCoin
+  // Every currency, valued in the site's default coin; the answer names its unit.
+  const unit = s?.currency || reportCoin
   const loading = series.isLoading
   const labels = useMemo(() => f.buckets.map(b => bucketLabel(b, f.granularity)), [f.buckets, f.granularity])
 
@@ -343,7 +337,7 @@ const DirectUserDashboard = () => {
       </p>
 
       <div className='flex flex-col gap-6'>
-        <FilterBar filters={f} currencies={currencies} />
+        <FilterBar filters={f} />
 
         {series.error && <ErrorState error={series.error} />}
 

@@ -16,6 +16,7 @@ import {
   type ChartSeries,
   type StatsFilters
 } from '@/components/shared/charts'
+import { useDefaultCurrency } from '@/components/shared/DefaultCurrency'
 import ErrorState from '@/components/shared/ErrorState'
 import { useApi } from '@/hooks/use-api'
 import type { Query } from '@/lib/api/types'
@@ -127,17 +128,18 @@ type Props = {
 }
 
 const StatsPanel = ({ path, filters: f, extraQuery, config, compare = true, className, children }: Props) => {
+  const reportCoin = useDefaultCurrency().code
   const current = useApi<StatsResponse>(path, { ...f.query, ...extraQuery }, { placeholderData: prev => prev, retry: false })
 
   // Deltas only need the totals, so one bucket per month is plenty.
   const previous = useApi<StatsResponse>(
     compare ? path : null,
-    { ...f.previous.apiRange, granularity: 'month', ...(f.currency ? { currency: f.currency } : {}), ...extraQuery },
+    { ...f.previous.apiRange, granularity: 'month', ...extraQuery },
     { retry: false }
   )
 
   const s = current.data
-  const unit = s?.range?.currency ?? (f.currency || 'USD')
+  const unit = s?.range?.currency ?? reportCoin
   const unitOf = (format: StatFormat) => (format === 'money' ? unit : format === 'usd' ? 'USD' : undefined)
   const loading = current.isLoading
   const labels = useMemo(() => f.buckets.map(b => bucketLabel(b, f.granularity)), [f.buckets, f.granularity])

@@ -2,13 +2,12 @@
 
 import type { ReactNode } from 'react'
 
-import { CalendarDays, Clock3, Coins, RotateCcw } from 'lucide-react'
+import { CalendarDays, Clock3, RotateCcw } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { DateRangePicker } from '@/components/ui/date-picker'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { useDefaultCurrency } from '@/components/shared/DefaultCurrency'
 import { cn } from '@/lib/utils'
 
 import { bucketLabel, GRANULARITIES, type Granularity } from './format'
@@ -16,15 +15,6 @@ import { MAX_DAY_SPAN, MAX_RANGE_DAYS, PRESETS, type Preset, type StatsFilters }
 
 type Props = {
   filters: StatsFilters
-
-  /** Offer a currency filter with these codes. Omit to hide it. */
-  currencies?: string[]
-
-  /** Label of the "no currency" option. */
-  allCurrenciesLabel?: string
-
-  /** Offer the "every currency" option at all. Off on a screen with no converted totals. */
-  allowAll?: boolean
   showGranularity?: boolean
 
   /** Extra dimension controls (a sport select, a channel select), placed after the built-in ones. */
@@ -37,20 +27,11 @@ const GRANULARITY_LABEL: Record<Granularity, string> = { day: 'Day', week: 'Week
 const shortDay = (day: string) => `${bucketLabel(day, 'day')} ${day.slice(0, 4)}`
 
 /**
- * One row of filters above a stats screen: period, custom range, bucket size and currency.
+ * One row of filters above a stats screen: period, custom range and bucket size.
  * Everything it changes goes to the URL through `useStatsFilters`.
  */
-const FilterBar = ({ filters, currencies, allCurrenciesLabel, allowAll = true, showGranularity = true, children, className }: Props) => {
+const FilterBar = ({ filters, showGranularity = true, children, className }: Props) => {
   const today = new Date().toISOString().slice(0, 10)
-
-  // "Every currency" totals come back valued in the site's default coin (the owner's choice).
-  const reportCoin = useDefaultCurrency().code
-  const allLabel = allCurrenciesLabel ?? `All currencies (${reportCoin})`
-
-  // The default and the current pick are always offered, even when the caller's list lacks them.
-  const currencyOptions = currencies?.length
-    ? Array.from(new Set([...(filters.defaultCurrency ? [filters.defaultCurrency] : []), ...(filters.currency ? [filters.currency] : []), ...currencies]))
-    : []
 
   return (
     <div role='group' aria-label='Report filters' className={cn('bg-card flex flex-wrap items-center gap-2 rounded-xl border p-2.5 shadow-xs', className)}>
@@ -114,25 +95,6 @@ const FilterBar = ({ filters, currencies, allCurrenciesLabel, allowAll = true, s
         </ToggleGroup>
       )}
 
-      {currencyOptions.length > 0 && (
-        <Select value={filters.currency || 'ALL'} onValueChange={v => v && filters.set({ currency: v === 'ALL' ? '' : v })}>
-          <SelectTrigger className='w-full font-medium sm:w-56' aria-label='Currency'>
-            <span className='flex min-w-0 items-center gap-2'>
-              <Coins className='text-muted-foreground size-4' aria-hidden />
-              <SelectValue />
-            </span>
-          </SelectTrigger>
-          <SelectContent>
-            {(allowAll || !filters.currency) && <SelectItem value='ALL'>{allLabel}</SelectItem>}
-            {currencyOptions.map(c => (
-              <SelectItem key={c} value={c}>
-                {c}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      )}
-
       {children}
 
       {filters.preset === 'custom' && filters.days >= MAX_RANGE_DAYS && (
@@ -146,7 +108,7 @@ const FilterBar = ({ filters, currencies, allCurrenciesLabel, allowAll = true, s
         className='ml-auto h-9 gap-1.5'
         disabled={!filters.dirty}
         onClick={filters.reset}
-        title='Back to the default period, grouping and currency'
+        title='Back to the default period and grouping'
       >
         <RotateCcw className='size-3.5' aria-hidden />
         Reset

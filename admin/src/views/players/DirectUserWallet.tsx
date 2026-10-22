@@ -17,7 +17,6 @@ import StatCard from '@/components/shared/StatCard'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useApi, useInvalidate, useListState, usePagedApi } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
@@ -224,16 +223,14 @@ const AdjustDialog = ({
   )
 }
 
-/** Ek user ki Transaction History — currency filter ke saath. */
-const HistoryDialog = ({ user, codes, onClose }: { user: DirectUserRow | null; codes: string[]; onClose: () => void }) => {
-  const [coin, setCoin] = useState('all')
+/** Ek user ki Transaction History — har coin, har row apna coin dikhati hai. */
+const HistoryDialog = ({ user, onClose }: { user: DirectUserRow | null; onClose: () => void }) => {
   const [page, setPage] = useState(1)
   const [limit, setLimit] = useState(20)
 
   const list = usePagedApi<HistoryRow>(user ? `${BASE}/users/${user.id}/history` : null, {
     page,
-    limit,
-    currency: coin === 'all' ? undefined : coin
+    limit
   })
 
   const columns: Column<HistoryRow>[] = [
@@ -296,29 +293,7 @@ const HistoryDialog = ({ user, codes, onClose }: { user: DirectUserRow | null; c
             setLimit(l)
             setPage(1)
           }}
-          toolbar={
-            <Select
-              value={coin}
-              onValueChange={v => {
-                if (!v) return
-                setCoin(v)
-                setPage(1)
-              }}
-            >
-              <SelectTrigger className='w-44' aria-label='Filter by currency'>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value='all'>All currencies</SelectItem>
-                {codes.map(c => (
-                  <SelectItem key={c} value={c}>
-                    {c}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          }
-          emptyMessage={`No balance changes${coin !== 'all' ? ` in ${coin}` : ''} yet.`}
+          emptyMessage='No balance changes yet.'
           dense
         />
       </DialogContent>
@@ -498,7 +473,7 @@ const DirectUserWallet = () => {
       />
 
       <AdjustDialog row={adjusting} codes={codes} rateOf={rateOf} onClose={() => setAdjusting(null)} />
-      <HistoryDialog user={historyUser} codes={codes} onClose={() => setHistoryUser(null)} />
+      <HistoryDialog user={historyUser} onClose={() => setHistoryUser(null)} />
     </div>
   )
 }

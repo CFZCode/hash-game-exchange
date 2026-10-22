@@ -6,7 +6,6 @@ import { ActivityIcon, ArrowDownToLineIcon, BadgePercentIcon, DicesIcon, UserPlu
 
 import { FilterBar, useStatsFilters } from '@/components/shared/charts'
 import { formatNumber } from '@/lib/format'
-import { useCurrencyCodes } from '@/views/finance/useCurrencyCodes'
 
 import StatsPanel, { num, type StatsPanelConfig } from './StatsPanel'
 
@@ -121,11 +120,10 @@ const CONFIG: StatsPanelConfig = {
 /** The player-base charts above the users table; `channel` is the table's own filter. */
 const PlayerStatsOverview = ({ channel, children }: { channel?: string; children?: ReactNode }) => {
   const f = useStatsFilters({ defaultPreset: '30d' })
-  const currencies = useCurrencyCodes()
 
   return (
     <section aria-label='Player statistics' className='mb-6 flex flex-col gap-4'>
-      <FilterBar filters={f} currencies={currencies}>
+      <FilterBar filters={f}>
         {children}
       </FilterBar>
       <StatsPanel path={PATH} filters={f} extraQuery={channel ? { channel } : undefined} config={CONFIG} />

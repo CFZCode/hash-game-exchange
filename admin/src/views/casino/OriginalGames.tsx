@@ -20,6 +20,7 @@ import {
 import ChannelTabs, { type Channel } from '@/components/shared/ChannelTabs'
 import DataTable, { type Column } from '@/components/shared/DataTable'
 import DateTime from '@/components/shared/DateTime'
+import { useDefaultCurrency } from '@/components/shared/DefaultCurrency'
 import ErrorState from '@/components/shared/ErrorState'
 import Money from '@/components/shared/Money'
 import PageHeader from '@/components/shared/PageHeader'
@@ -85,7 +86,6 @@ type Games = { switches: { owner: boolean; site: boolean; live: boolean }; games
 
 const BASE = 'admin/original-games'
 const ALL = '__all__'
-const CURRENCIES = ['INR', 'USDT']
 const STATUSES = ['won', 'lost', 'open', 'refunded'] as const
 
 const pct = (v: number | null | undefined) => (v === null || v === undefined ? '—' : `${(v * 100).toFixed(2)}%`)
@@ -95,6 +95,7 @@ const pct = (v: number | null | undefined) => (v === null || v === undefined ? '
 /** `turnover` shows the turnover pieces (by game, by coin); otherwise the dashboard (KPIs, trend charts). One stats fetch serves both. */
 const DashboardTab = ({ channel, turnover = false }: { channel: Channel; turnover?: boolean }) => {
   const filters = useStatsFilters()
+  const reportCoin = useDefaultCurrency().code
   const query = { channel, ...filters.query }
   const stats = useApi<Stats>(`${BASE}/stats`, query)
   const prev = useApi<Stats>(`${BASE}/stats`, { ...query, ...filters.previous.apiRange })
@@ -102,7 +103,7 @@ const DashboardTab = ({ channel, turnover = false }: { channel: Channel; turnove
   const s = stats.data
   const t = s?.totals
   const p = prev.data?.totals
-  const currency = s?.currency ?? (filters.currency || 'USDT')
+  const currency = s?.currency ?? reportCoin
   const loading = stats.isLoading
 
   const charts = useMemo(() => {
@@ -135,12 +136,12 @@ const DashboardTab = ({ channel, turnover = false }: { channel: Channel; turnove
 
   return (
     <div>
-      <FilterBar filters={filters} currencies={CURRENCIES} className='mb-4' />
+      <FilterBar filters={filters} className='mb-4' />
 
       {s && s.unconverted.length > 0 && (
         <Alert className='mb-4'>
           <AlertDescription>
-            Not in the {currency} totals (no exchange rate): {s.unconverted.map(u => u.currency ?? 'unknown').join(', ')}. Pick that currency to see it.
+            Not in the {currency} totals (no exchange rate): {s.unconverted.map(u => u.currency ?? 'unknown').join(', ')}.
           </AlertDescription>
         </Alert>
       )}
@@ -362,7 +363,7 @@ const FilterSelect = ({ value, onChange, all, options }: { value: string; onChan
 )
 
 const BetsTab = ({ channel }: { channel: Channel }) => {
-  const { state, set } = useListState(['game', 'currency', 'status', 'from', 'to'])
+  const { state, set } = useListState(['game', 'status', 'from', 'to'])
   const games = useApi<Games>(`${BASE}/games`, { channel })
 
   // The picker's `to` is the last day shown, so the window ends at the start of the next day.
@@ -374,7 +375,6 @@ const BetsTab = ({ channel }: { channel: Channel }) => {
     limit: state.limit,
     search: state.search || undefined,
     game: state.game || undefined,
-    currency: state.currency || undefined,
     status: state.status || undefined,
     ...range
   })
@@ -399,7 +399,6 @@ const BetsTab = ({ channel }: { channel: Channel }) => {
         <>
           <FilterSelect value={String(state.game ?? '')} onChange={game => set({ game })} all='All games' options={(games.data?.games ?? []).map(g => ({ value: g.code, label: g.name }))} />
           <FilterSelect value={String(state.status ?? '')} onChange={status => set({ status })} all='All results' options={STATUSES.map(s => ({ value: s, label: s[0].toUpperCase() + s.slice(1) }))} />
-          <FilterSelect value={String(state.currency ?? '')} onChange={currency => set({ currency })} all='All currencies' options={CURRENCIES.map(c => ({ value: c, label: c }))} />
           <DateRangePicker aria-label='Date range' from={String(state.from ?? '')} to={String(state.to ?? '')} onChange={set} />
         </>
       }

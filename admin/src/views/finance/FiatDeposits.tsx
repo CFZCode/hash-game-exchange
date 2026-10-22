@@ -12,7 +12,7 @@ import DateTime from '@/components/shared/DateTime'
 import FormDialog from '@/components/shared/FormDialog'
 import { TextAreaField, TextField } from '@/components/shared/FormField'
 import Money from '@/components/shared/Money'
-import { FilterBar, PRESETS, toApiRange, type StatsFilters } from '@/components/shared/charts'
+import { FilterBar, PRESETS, toApiRange, useStatsFilters, type StatsFilters } from '@/components/shared/charts'
 import PageHeader from '@/components/shared/PageHeader'
 import StatCard from '@/components/shared/StatCard'
 import StatusBadge from '@/components/shared/StatusBadge'
@@ -23,14 +23,12 @@ import { useSession } from '@/contexts/SessionContext'
 import { useApi, useApiMutation, useListState, usePagedApi } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
 import { check } from '@/lib/validate'
-import { allConvertedLabel, useFinanceFilters } from './currencyFilter'
 import FinanceStatsPanel, { useStatsQuery, type FinanceStats } from './FinanceStatsPanel'
 import ListStatsTabs from './ListStatsTabs'
 import { CopyButton, Details, ImageDialog, ViewDialog, stop } from './shared'
 import { PlayerAvatar } from '@/views/players/users/shared'
 
-import { FIAT_CURRENCIES, type FiatDepositRow } from './types'
-import { useOwnerCoinFilter } from './useCurrencyCodes'
+import type { FiatDepositRow } from './types'
 
 const LIST = 'admin/user/deposits/fiat'
 const STATS = 'admin/reports/finance-stats'
@@ -196,9 +194,6 @@ const Detail = ({ row }: { row: FiatDepositRow }) => (
  * bank transfer; older rows carry both (the site used to send every receiving detail), so a row
  * with a UPI id and no account number is UPI, one with both shows both.
  */
-/** Crypto coins a manual deposit may arrive in (the owner filter keeps only the enabled ones). */
-const MANUAL_CRYPTO = ['USDT', 'BTC']
-
 const DepositMethod = ({ row }: { row: FiatDepositRow }) => {
   if (row.network)
     return (
@@ -329,10 +324,9 @@ const FiatDeposits = () => {
   const { can } = useSession()
   const { state, set, query } = useListState(['status', 'userId'], { status: 'pending' })
 
-  // Period, bucket size and currency for the charts. The currency (the site's default coin until
-  // somebody picks another) also filters the table; the review queue has no date filter.
-  const filters = useFinanceFilters({ fiat: true })
-  const ownerCoins = useOwnerCoinFilter()
+  // Period and bucket size for the charts (every currency, in the default coin). The review queue
+  // lists every currency and has no date filter.
+  const filters = useStatsFilters()
 
   const list = usePagedApi<FiatDepositRow>(LIST, {
     // Agent ke users ye use nahi kar sakte — sirf direct users.
@@ -340,7 +334,6 @@ const FiatDeposits = () => {
     limit: query.limit,
     page: query.page,
     status: query.status,
-    currency: filters.currency || undefined,
     userId: query.userId,
     search: query.search
   })
@@ -349,7 +342,7 @@ const FiatDeposits = () => {
     <div>
       <PageHeader title='Manual deposits' description='Manual bank-transfer deposits awaiting review. Approving credits the user; rejecting records a reason they can see.' />
       {can('reports:read') && <Summary filters={filters} />}
-      <FilterBar filters={filters} currencies={ownerCoins([...FIAT_CURRENCIES, ...MANUAL_CRYPTO])} allCurrenciesLabel={allConvertedLabel(filters.defaultCurrency)} className='mb-4'>
+      <FilterBar filters={filters} className='mb-4'>
         <Select value={String(state.status || 'all')} onValueChange={v => v && set({ status: v === 'all' ? '' : v })}>
           <SelectTrigger className='w-36' aria-label='Status'>
             <SelectValue />

@@ -22,7 +22,6 @@ import StatCard from '@/components/shared/StatCard'
 import { useSession } from '@/contexts/SessionContext'
 import { useApi } from '@/hooks/use-api'
 import { formatNumber } from '@/lib/format'
-import { useCurrencyCodes } from '@/views/finance/useCurrencyCodes'
 import StatsPanel, { formatStat, num, type StatsPanelConfig, type StatsResponse } from '@/views/reports/StatsPanel'
 
 import PlayerStatusSection from './PlayerStatusSection'
@@ -173,7 +172,6 @@ const CONFIG: StatsPanelConfig = {
 /** One player's own figures for the chosen period — the "Stats" tab of the user page. */
 const PlayerStatsTab = ({ userId }: { userId: string }) => {
   const f = useStatsFilters({ defaultPreset: '30d' })
-  const currencies = useCurrencyCodes()
   const path = pathFor(userId)
 
   // The same request the panel makes (same key, so one fetch): the standing that is not a flow.
@@ -187,7 +185,7 @@ const PlayerStatsTab = ({ userId }: { userId: string }) => {
 
   return (
     <div className='flex flex-col gap-4'>
-      <FilterBar filters={f} currencies={currencies} />
+      <FilterBar filters={f} />
       <PlayerStatusSection userId={userId} filters={f} />
       <StatsPanel path={path} filters={f} config={config}>
         {!house && (

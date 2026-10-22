@@ -25,11 +25,10 @@ import {
 import { FilterBar, type StatsFilters } from '@/components/shared/charts'
 import { useRewardCurrency } from '@/components/shared/RewardCurrency'
 import { formatNumber } from '@/lib/format'
-import { useCurrencyCodes } from '@/views/finance/useCurrencyCodes'
 import StatsPanel, { formatStat, num, type StatsPanelConfig } from '@/views/reports/StatsPanel'
 
 /**
- * `GET admin/reports/reward-stats/<section>` — `from`/`to` (instants), `granularity`, `currency`.
+ * `GET admin/reports/reward-stats/<section>` — `from`/`to` (instants), `granularity`; every currency, valued in the default coin.
  * Scoped to the caller's tree like the users report. `tips` and `bonus-balances` answer every staff
  * level; `vault`, `vip`, `bonus` and `affiliate` are house-only (403 for the agent tree), exactly as
  * the tables on those pages are.
@@ -278,18 +277,17 @@ type Props = {
 
 /** The filter bar and the charts for one Rewards page. The page's table can read the same `filters`. */
 const RewardStats = ({ section, filters, children, rewardNote = true, className }: Props) => {
-  const currencies = useCurrencyCodes()
   const reward = useRewardCurrency()
   const paidInRewardCurrency = rewardNote && section !== 'tips' && section !== 'vault'
 
   return (
     <section aria-label='Statistics' className={className ?? 'mb-6 flex flex-col gap-4'}>
-      <FilterBar filters={filters} currencies={currencies}>
+      <FilterBar filters={filters}>
         {children}
       </FilterBar>
       {paidInRewardCurrency && !reward.loading && (
         <p className='text-muted-foreground -mt-2 text-xs'>
-          Rewards are paid in {reward.code}. Pick it as the currency to see amounts as paid; “All currencies” values every coin in the site’s default coin at today’s rate.
+          Rewards are paid in {reward.code}. These figures value every coin in the site’s default coin at today’s rate.
         </p>
       )}
       <StatsPanel path={`admin/reports/reward-stats/${section}`} filters={filters} config={CONFIGS[section]} />

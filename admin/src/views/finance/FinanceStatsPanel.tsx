@@ -30,13 +30,12 @@ const STATS = 'admin/reports/finance-stats'
 
 /**
  * The finance-stats query of a screen: every currency, valued in the site's default coin (USDT
- * unless the owner set another), whatever coin the list below is filtered to.
+ * unless the owner set another).
  */
 export function useStatsQuery(kind: string, rail: string, filters: StatsFilters) {
   const site = useDefaultCurrency()
-  const rest = Object.fromEntries(Object.entries(filters.query).filter(([key]) => key !== 'currency'))
 
-  return { kind, rail, ...rest, convertTo: site.code || 'USDT' }
+  return { kind, rail, ...filters.query, convertTo: site.code || 'USDT' }
 }
 
 type StatusKey = 'success' | 'pending' | 'failed' | 'other'

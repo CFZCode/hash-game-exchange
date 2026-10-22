@@ -24,7 +24,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useApi } from '@/hooks/use-api'
 import { formatNumber } from '@/lib/format'
-import { useCurrencyCodes } from '@/views/finance/useCurrencyCodes'
+import { useDefaultCurrency } from '@/components/shared/DefaultCurrency'
 
 type Props = { area: 'casino' | 'sports' }
 
@@ -76,7 +76,7 @@ const pct = (v: number | null | undefined) => (v === null || v === undefined ? '
  */
 const WagerReportView = ({ area, channel }: Props & { channel: Channel }) => {
   const filters = useStatsFilters()
-  const currencies = useCurrencyCodes()
+  const reportCoin = useDefaultCurrency().code
   const [category, setCategory] = useState<Category>('all')
   const query = { area, channel, ...(area === 'casino' && category !== 'all' ? { category } : {}), ...filters.query }
   const stats = useApi<WagerStats>(STATS, query)
@@ -85,7 +85,7 @@ const WagerReportView = ({ area, channel }: Props & { channel: Channel }) => {
   const s = stats.data
   const p = prev.data
   const t = s?.totals
-  const currency = s?.currency ?? (filters.currency || 'USD')
+  const currency = s?.currency ?? reportCoin
   const loading = stats.isLoading
   const title = area === 'casino' ? 'Casino' : 'Sports'
   const dimension = (s?.breakdown.dimension ?? (area === 'casino' ? 'Provider' : 'Market')).toLowerCase()
@@ -134,7 +134,7 @@ const WagerReportView = ({ area, channel }: Props & { channel: Channel }) => {
 
   return (
     <div>
-      <FilterBar filters={filters} currencies={currencies} className='mb-4' />
+      <FilterBar filters={filters} className='mb-4' />
 
       {area === 'casino' && (
         <Tabs value={category} onValueChange={v => setCategory(v as Category)} className='mb-4'>

@@ -23,6 +23,7 @@ import {
   type ChartSeries,
   type ChartTableData
 } from '@/components/shared/charts'
+import { useDefaultCurrency } from '@/components/shared/DefaultCurrency'
 import ErrorState from '@/components/shared/ErrorState'
 import Money from '@/components/shared/Money'
 import ChannelTabs, { type Channel } from '@/components/shared/ChannelTabs'
@@ -30,7 +31,6 @@ import PageHeader from '@/components/shared/PageHeader'
 import { useSession } from '@/contexts/SessionContext'
 import { useApi } from '@/hooks/use-api'
 import { formatMoney, formatNumber } from '@/lib/format'
-import { useCurrencyCodes } from '@/views/finance/useCurrencyCodes'
 
 /**
  * Profit & loss: what the house made from play (GGR), what it handed back to players (bonuses,
@@ -206,7 +206,7 @@ const BreakdownChart = ({ title, description, rows, unit, loading, error, color 
 
 const ProfitLossView = ({ channel }: { channel: Channel }) => {
   const f = useStatsFilters({ defaultPreset: '30d' })
-  const currencies = useCurrencyCodes()
+  const reportCoin = useDefaultCurrency().code
 
   // Direct Users | Agent Users tab — har query me `channel`.
   const q = { ...f.query, channel }
@@ -215,7 +215,7 @@ const ProfitLossView = ({ channel }: { channel: Channel }) => {
   // The previous window only feeds the deltas, so one bucket per month is plenty.
   const previous = useApi<Summary>(
     SUMMARY,
-    { ...f.previous.apiRange, granularity: 'month', ...(f.currency ? { currency: f.currency } : {}), channel },
+    { ...f.previous.apiRange, granularity: 'month', channel },
     { retry: false }
   )
 
@@ -224,7 +224,7 @@ const ProfitLossView = ({ channel }: { channel: Channel }) => {
   const s = summary.data
   const p = previous.data
   const b = breakdown.data
-  const unit = s?.range.currency ?? (f.currency || 'USD')
+  const unit = s?.range.currency ?? reportCoin
   const house = s?.house ?? true
   const loading = summary.isLoading
   const bLoading = breakdown.isLoading
@@ -329,13 +329,11 @@ const ProfitLossView = ({ channel }: { channel: Channel }) => {
   return (
     <div>
       <p className='text-muted-foreground mb-4 text-sm'>
-        {s?.converted || !f.currency
-          ? (s?.valuation?.note ?? `All currencies, converted to ${unit} at current rates.`)
-          : `Figures in ${unit}, for rows in that currency only.`}
+        {s?.valuation?.note ?? `All currencies, converted to ${unit} at current rates.`}
       </p>
 
       <div className='flex flex-col gap-6'>
-        <FilterBar filters={f} currencies={currencies} />
+        <FilterBar filters={f} />
 
         {summary.error && !s && <ErrorState error={summary.error} title='Could not load the profit & loss' />}
 
@@ -742,9 +740,7 @@ const ProfitLossView = ({ channel }: { channel: Channel }) => {
             </li>
             <li>
               <strong className='text-foreground'>Currency.</strong>{' '}
-              {f.currency
-                ? `Only rows in ${f.currency}, unconverted.`
-                : `With "All currencies", every amount is converted to ${unit} at today’s exchange rates, so older periods move as rates move.`}{' '}
+              Every amount is converted to {unit} at today’s exchange rates, so older periods move as rates move.{' '}
               {unconverted.length > 0
                 ? `No rate for: ${unconverted.join(', ')}; those rows are not in the ${unit} figures.`
                 : 'Every currency in this period has a rate.'}

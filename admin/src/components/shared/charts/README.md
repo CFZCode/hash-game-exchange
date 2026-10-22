@@ -8,15 +8,16 @@ Import everything from `@/components/shared/charts`.
 
 ```tsx
 const f = useStatsFilters({ defaultPreset: '30d', defaultGranularity: 'day', extraKeys: ['sport'] })
-<FilterBar filters={f} currencies={useCurrencyCodes()}>{/* extra dimension selects */}</FilterBar>
+<FilterBar filters={f}>{/* extra dimension selects */}</FilterBar>
 ```
 
 URL params: `preset` (today|7d|30d|90d|mtd|custom), `from`/`to` (only with `custom`, `yyyy-MM-dd`),
-`granularity` (day|week|month), `currency` ('' = all, converted to USD), plus your `extraKeys`.
+`granularity` (day|week|month), plus your `extraKeys`. No currency filter: routes answer every
+currency, valued in the site's default coin.
 
-`f` gives: `from`/`to` (inclusive UTC days), `days`, `granularity`, `currency`, `buckets`
+`f` gives: `from`/`to` (inclusive UTC days), `days`, `granularity`, `buckets`
 (every bucket key in the window), `apiRange` (half-open ISO instants), `previous` (the same-length
-window right before, with its own `apiRange`, for deltas), `query` (`{from, to, granularity, currency?}`
+window right before, with its own `apiRange`, for deltas), `query` (`{from, to, granularity}`
 as instants — send only keys your route's `.strict()` validator accepts), `extra`, and `set(patch)`.
 
 Limits: windows longer than `MAX_RANGE_DAYS` (731) are clamped; day buckets over `MAX_DAY_SPAN`

@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { ChartColumnIcon, PencilIcon, PlusIcon, Trash2Icon } from 'lucide-react'
 
 import Can from '@/components/shared/Can'
-import { FilterBar } from '@/components/shared/charts'
+import { useStatsFilters } from '@/components/shared/charts'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import ErrorState from '@/components/shared/ErrorState'
 import DataTable, { type Column } from '@/components/shared/DataTable'
@@ -26,8 +26,6 @@ import { formatNumber } from '@/lib/format'
 import { check } from '@/lib/validate'
 import RewardStats from '@/views/promotions/RewardStats'
 
-import { useFinanceFilters } from './currencyFilter'
-import { useCurrencyCodes } from './useCurrencyCodes'
 import type { VaultDepositRow, VaultInterestRow, VaultLockPeriod, VaultStats } from './types'
 
 const BASE = 'admin/user/vault'
@@ -58,10 +56,10 @@ const interestColumns: Column<VaultInterestRow>[] = [
   { key: 'at', header: 'Paid', cell: r => <DateTime value={str(r.createdAt)} /> }
 ]
 
-/** `coin`: the page's currency filter ('' = every coin). */
-const Deposits = ({ coin }: { coin: string }) => {
+/** Every coin's open deposits; each row carries its coin. */
+const Deposits = () => {
   const { set, query } = useListState()
-  const list = usePagedApi<VaultDepositRow>(`${BASE}/users`, { channel: 'direct', limit: query.limit, page: query.page, coin: coin || undefined })
+  const list = usePagedApi<VaultDepositRow>(`${BASE}/users`, { channel: 'direct', limit: query.limit, page: query.page })
 
   return (
     <DataTable
@@ -74,14 +72,14 @@ const Deposits = ({ coin }: { coin: string }) => {
       pagination={list.data?.pagination}
       onPageChange={page => set({ page })}
       onLimitChange={limit => set({ limit })}
-      emptyMessage={coin ? `No open ${coin} vault deposits.` : 'No open vault deposits.'}
+      emptyMessage='No open vault deposits.'
     />
   )
 }
 
-const Interest = ({ coin }: { coin: string }) => {
+const Interest = () => {
   const { set, query } = useListState()
-  const list = usePagedApi<VaultInterestRow>(`${BASE}/interest`, { channel: 'direct', limit: query.limit, page: query.page, coin: coin || undefined })
+  const list = usePagedApi<VaultInterestRow>(`${BASE}/interest`, { channel: 'direct', limit: query.limit, page: query.page })
 
   return (
     <DataTable
@@ -94,7 +92,7 @@ const Interest = ({ coin }: { coin: string }) => {
       pagination={list.data?.pagination}
       onPageChange={page => set({ page })}
       onLimitChange={limit => set({ limit })}
-      emptyMessage={coin ? `No ${coin} interest paid yet.` : 'No interest paid yet.'}
+      emptyMessage='No interest paid yet.'
     />
   )
 }
@@ -225,11 +223,8 @@ const Vault = () => {
   const allRows = Array.isArray(data?.byCoin) ? data.byCoin : []
   const users = Number(data?.totalUsers ?? 0) || 0
 
-  // The page's currency — the site's default coin until somebody picks another (in the URL, set
-  // from the filter bar in the stats block). It drives the charts, the cards and both tables.
-  const f = useFinanceFilters({ defaultPreset: '30d' })
-  const currencies = useCurrencyCodes()
-  const rows = f.currency ? allRows.filter(r => r.coin === f.currency) : allRows
+  // The Stats tab's period; every coin, charts valued in the site's default coin.
+  const f = useStatsFilters({ defaultPreset: '30d' })
 
   return (
     <div>
@@ -258,12 +253,10 @@ const Vault = () => {
           </TabsTrigger>
         </TabsList>
         <TabsContent value='deposits'>
-          <FilterBar filters={f} currencies={currencies} className='mb-4' />
-          <Deposits coin={f.currency} />
+          <Deposits />
         </TabsContent>
         <TabsContent value='interest'>
-          <FilterBar filters={f} currencies={currencies} className='mb-4' />
-          <Interest coin={f.currency} />
+          <Interest />
         </TabsContent>
         <TabsContent value='periods'>
           <Periods />
@@ -271,10 +264,10 @@ const Vault = () => {
         <TabsContent value='stats'>
           <div className='mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4'>
             <StatCard label='Users in vault' value={formatNumber(users)} loading={stats.isLoading} hint={`${allRows.length} coin${allRows.length === 1 ? '' : 's'} · all coins`} />
-            {rows.slice(0, 2).map(r => (
+            {allRows.slice(0, 2).map(r => (
               <StatCard key={r.coin} label={`${r.coin} locked`} value={<Money value={r.totalBalance} currency={r.coin} />} loading={stats.isLoading} />
             ))}
-            {!stats.isLoading && rows.length === 0 && <StatCard label={f.currency ? `${f.currency} locked` : 'Locked balance'} value='—' hint='No open deposits' />}
+            {!stats.isLoading && allRows.length === 0 && <StatCard label='Locked balance' value='—' hint='No open deposits' />}
             <StatCard label='Interest paid today' value={formatNumber(Number(data?.todayInterest ?? 0) || 0)} loading={stats.isLoading} hint='All coins, credited today' />
           </div>
           <RewardStats section='vault' filters={f} />

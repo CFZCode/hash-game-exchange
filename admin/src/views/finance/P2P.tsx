@@ -24,8 +24,6 @@ import { useApi, useApiMutation, useListState } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
 import { truncateId } from '@/lib/format'
 import { check } from '@/lib/validate'
-import { ALL_CURRENCIES } from '@/components/shared/charts'
-import { useDefaultCurrency } from '@/components/shared/DefaultCurrency'
 import { Details, ImageDialog, ViewDialog, stop, usePageNumbered } from './shared'
 import { TxnPasswordLabel } from './StaffFloat'
 import {
@@ -249,24 +247,9 @@ const orderColumns = (kind: 'orders' | 'sell-orders'): Column<P2pOrderRow>[] => 
 /** The coins P2P trades that are in the owner's plan. */
 const useP2pCoins = () => useOwnerCoinFilter()(P2P_COINS)
 
-/**
- * The coin filter of the order and offer lists (`?coin=`): the site's default coin when P2P trades
- * it and nobody picked another, `?coin=ALL` for every coin.
- */
-const useP2pCoin = (picked: string | number | undefined, coins: string[]) => {
-  const def = useDefaultCurrency().code
-  const value = String(picked ?? '').toUpperCase()
-
-  if (value === ALL_CURRENCIES) return ''
-
-  return value || (coins.includes(def) ? def : '')
-}
-
 const Orders = ({ kind }: { kind: 'orders' | 'sell-orders' }) => {
-  const { state, set, query } = useListState(['status', 'userId', 'coin'])
-  const coins = useP2pCoins()
-  const coin = useP2pCoin(state.coin, coins)
-  const list = usePageNumbered<P2pOrderRow>(`${BASE}/${kind}`, { page: query.page, limit: query.limit, status: query.status, userId: query.userId, coin: coin || undefined })
+  const { state, set, query } = useListState(['status', 'userId'])
+  const list = usePageNumbered<P2pOrderRow>(`${BASE}/${kind}`, { page: query.page, limit: query.limit, status: query.status, userId: query.userId })
 
   return (
     <DataTable
@@ -283,19 +266,6 @@ const Orders = ({ kind }: { kind: 'orders' | 'sell-orders' }) => {
         <>
           <StatusFilter value={String(state.status ?? '')} onChange={status => set({ status })} options={kind === 'orders' ? P2P_ORDER_STATUSES : P2P_SELL_STATUSES} />
           <Input placeholder='User id' aria-label='User id' value={String(state.userId ?? '')} onChange={e => set({ userId: e.target.value })} className='w-32' />
-          <Select value={coin || 'all'} onValueChange={v => v && set({ coin: v === 'all' ? ALL_CURRENCIES : v })}>
-            <SelectTrigger className='w-28'>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value='all'>All coins</SelectItem>
-              {coins.map(c => (
-                <SelectItem key={c} value={c}>
-                  {c}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </>
       }
     />
@@ -516,10 +486,8 @@ const offerColumns: Column<P2pOfferRow>[] = [
 ]
 
 const Offers = ({ accounts }: { accounts: P2pPaymentAccount[] }) => {
-  const { state, set, query } = useListState(['coin'])
-  const coins = useP2pCoins()
-  const coin = useP2pCoin(state.coin, coins)
-  const list = usePageNumbered<P2pOfferRow>(`${BASE}/offers`, { page: query.page, limit: query.limit, coin: coin || undefined })
+  const { set, query } = useListState()
+  const list = usePageNumbered<P2pOfferRow>(`${BASE}/offers`, { page: query.page, limit: query.limit })
 
   return (
     <DataTable
@@ -534,19 +502,6 @@ const Offers = ({ accounts }: { accounts: P2pPaymentAccount[] }) => {
       onLimitChange={limit => set({ limit })}
       toolbar={
         <>
-          <Select value={coin || 'all'} onValueChange={v => v && set({ coin: v === 'all' ? ALL_CURRENCIES : v })}>
-            <SelectTrigger className='w-28'>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value='all'>All coins</SelectItem>
-              {coins.map(c => (
-                <SelectItem key={c} value={c}>
-                  {c}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
           <Can permission='config:write'>
             <CreateOffer accounts={accounts} />
           </Can>

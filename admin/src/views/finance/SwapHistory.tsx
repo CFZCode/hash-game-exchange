@@ -19,7 +19,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useApi, useApiMutation, useListState, usePagedApi } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
 import { formatNumber } from '@/lib/format'
-import { CurrencySelect, useCurrencyChoices, useCurrencyParam } from './currencyFilter'
 
 /** `GET admin/user/swap/history` — raw `swap_history` rows (snake_case, decimals as strings). */
 type SwapRow = {
@@ -177,11 +176,8 @@ const SwapHistory = () => {
   const [tab, setTab] = useQueryState('tab', parseAsString.withDefault('swaps').withOptions({ history: 'replace', scroll: false }))
   const { state, set, query } = useListState(['userId'])
 
-  // One currency at a time — a swap out of OR into it; the site's default coin until somebody picks
-  // another (in the URL). The validator is strict: `userId`, `currency`, `limit` and `offset` only.
-  const cur = useCurrencyParam({ allowAll: true })
-  const choices = useCurrencyChoices()
-  const list = usePagedApi<SwapRow>(LIST, { channel: 'direct', limit: query.limit, page: query.page, userId: query.userId, currency: cur.currency })
+  // Every currency's swaps; each row names its coins.
+  const list = usePagedApi<SwapRow>(LIST, { channel: 'direct', limit: query.limit, page: query.page, userId: query.userId })
 
   // The earnings strip: every direct user's swap fees (or the one user typed in), in USDT.
   const summary = useApi<SwapSummary>('admin/user/swap/summary', { channel: 'direct', userId: query.userId })
@@ -189,7 +185,7 @@ const SwapHistory = () => {
 
   return (
     <div>
-      <PageHeader title='Swap history' description='Currency swaps direct users made in the wallet, newest first, with the fee taken — out of or into the selected currency.' />
+      <PageHeader title='Swap history' description='Currency swaps direct users made in the wallet, newest first, with the fee taken.' />
       <SwapFee />
       <div className='mb-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4'>
         <StatCard label='Fee earned' value={<Money value={s?.feeUsdt ?? '0'} currency='USDT' />} hint='all swaps, in USDT' loading={summary.isLoading} />
@@ -215,10 +211,9 @@ const SwapHistory = () => {
         pagination={list.data?.pagination}
         onPageChange={page => set({ page })}
         onLimitChange={limit => set({ limit })}
-        emptyMessage={cur.currency ? `No swaps out of or into ${cur.currency}.` : 'No swaps yet.'}
+        emptyMessage='No swaps yet.'
         toolbar={
           <>
-          <CurrencySelect filter={cur} currencies={choices.all} />
           <Input
             placeholder='User id'
             aria-label='User id'

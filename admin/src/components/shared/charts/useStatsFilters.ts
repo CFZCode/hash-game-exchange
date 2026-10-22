@@ -7,9 +7,10 @@ import { parseAsString, useQueryStates } from 'nuqs'
 import { bucketKeys, GRANULARITIES, type Granularity } from './format'
 
 /**
- * The date range, granularity and currency of a stats screen, kept in the URL
- * (`?preset=30d&granularity=week&currency=INR`, or `?preset=custom&from=…&to=…`)
- * so a view survives a reload and can be shared as a link.
+ * The date range and granularity of a stats screen, kept in the URL
+ * (`?preset=30d&granularity=week`, or `?preset=custom&from=…&to=…`)
+ * so a view survives a reload and can be shared as a link. There is no currency filter: a screen
+ * shows every currency, totals valued in the site's default coin (a `?currency=` is ignored).
  *
  * Days are UTC days, matching the buckets the backend groups by
  * (`date_trunc` with the session in UTC). `from`/`to` are inclusive 'yyyy-MM-dd';
@@ -63,7 +64,7 @@ function presetRange(preset: Preset, today: string): { from: string; to: string 
   }
 }
 
-export type StatsFilterPatch = Partial<{ preset: Preset; from: string; to: string; granularity: Granularity; currency: string }> &
+export type StatsFilterPatch = Partial<{ preset: Preset; from: string; to: string; granularity: Granularity }> &
   Record<string, string | null | undefined>
 
 export type StatsFilters = {
@@ -75,12 +76,6 @@ export type StatsFilters = {
   days: number
   granularity: Granularity
 
-  /** '' = every currency (amounts converted to USD by the backend, or to `convertTo` where a route takes it). */
-  currency: string
-
-  /** The screen's default currency (`Options.defaultCurrency`), upper-cased; undefined when it has none. */
-  defaultCurrency?: string
-
   /** Every bucket in the window — feed to `fillBuckets` and the chart's `buckets`. */
   buckets: string[]
 
@@ -91,10 +86,10 @@ export type StatsFilters = {
   previous: { from: string; to: string; apiRange: { from: string; to: string } }
 
   /**
-   * Ready to pass as a query to a stats route that takes `from`/`to` instants, `granularity`
-   * and an optional `currency`. Only send the keys the route's validator accepts.
+   * Ready to pass as a query to a stats route that takes `from`/`to` instants and `granularity`.
+   * No `currency`: the route answers every currency, converted to the default coin.
    */
-  query: { from: string; to: string; granularity: Granularity; currency?: string }
+  query: { from: string; to: string; granularity: Granularity }
 
   /** Values of the caller's `extraKeys` ('' when unset). */
   extra: Record<string, string>
@@ -113,20 +108,9 @@ type Options = {
 
   /** More URL params this screen filters on (e.g. ['sport']). */
   extraKeys?: string[]
-
-  /**
-   * The currency the screen opens on when the URL names none — the site's default coin
-   * (`useDefaultCurrency()`). With it, "every currency" is an explicit pick kept in the URL as
-   * `?currency=ALL`, so a reload or a shared link shows exactly what was chosen. Without it, no
-   * currency in the URL means every currency (the original behaviour).
-   */
-  defaultCurrency?: string
 }
 
-/** URL value of an explicit "every currency" pick on a screen with a default currency. */
-export const ALL_CURRENCIES = 'ALL'
-
-export function useStatsFilters({ defaultPreset = '30d', defaultGranularity = 'day', extraKeys = [], defaultCurrency }: Options = {}): StatsFilters {
+export function useStatsFilters({ defaultPreset = '30d', defaultGranularity = 'day', extraKeys = [] }: Options = {}): StatsFilters {
   const extraSig = extraKeys.join('|')
 
   const parsers = useMemo(() => {
@@ -134,8 +118,7 @@ export function useStatsFilters({ defaultPreset = '30d', defaultGranularity = 'd
       preset: parseAsString.withDefault(defaultPreset),
       from: parseAsString.withDefault(''),
       to: parseAsString.withDefault(''),
-      granularity: parseAsString.withDefault(defaultGranularity),
-      currency: parseAsString.withDefault('')
+      granularity: parseAsString.withDefault(defaultGranularity)
     }
 
     for (const k of extraSig ? extraSig.split('|') : []) p[k] = parseAsString.withDefault('')
@@ -169,8 +152,6 @@ export function useStatsFilters({ defaultPreset = '30d', defaultGranularity = 'd
     const prevTo = addDays(from, -1)
     const prevFrom = addDays(prevTo, -(days - 1))
     const apiRange = toApiRange(from, to)
-    const picked = String(raw.currency ?? '').toUpperCase()
-    const currency = picked === ALL_CURRENCIES ? '' : picked || String(defaultCurrency ?? '').toUpperCase()
     const extra: Record<string, string> = {}
 
     for (const k of extraSig ? extraSig.split('|') : []) extra[k] = String(raw[k] ?? '')
@@ -181,25 +162,19 @@ export function useStatsFilters({ defaultPreset = '30d', defaultGranularity = 'd
       to,
       days,
       granularity,
-      currency,
       buckets: bucketKeys(from, to, granularity),
       apiRange,
       previous: { from: prevFrom, to: prevTo, apiRange: toApiRange(prevFrom, prevTo) },
-      query: { ...apiRange, granularity, ...(currency ? { currency } : {}) },
-      extra,
-      defaultCurrency: defaultCurrency ? String(defaultCurrency).toUpperCase() : undefined
+      query: { ...apiRange, granularity },
+      extra
     }
-  }, [raw, defaultPreset, defaultGranularity, extraSig, defaultCurrency])
+  }, [raw, defaultPreset, defaultGranularity, extraSig])
 
   const set = useCallback(
     (patch: StatsFilterPatch) => {
       const next: Record<string, string | null> = {}
 
       for (const [k, v] of Object.entries(patch)) next[k] = v === undefined || v === '' ? null : v
-
-      // With a default currency, "every currency" is a pick of its own (`?currency=ALL`); an empty
-      // URL value means the default.
-      if (defaultCurrency && 'currency' in patch && !patch.currency) next.currency = ALL_CURRENCIES
 
       // A preset owns its dates; only a custom range keeps from/to in the URL.
       if (patch.preset && patch.preset !== 'custom') {
@@ -210,18 +185,17 @@ export function useStatsFilters({ defaultPreset = '30d', defaultGranularity = 'd
       if ((patch.from || patch.to) && !patch.preset) next.preset = 'custom'
       void setRaw(next as never)
     },
-    [setRaw, defaultCurrency]
+    [setRaw]
   )
 
   const dirty =
     Boolean(raw.preset && raw.preset !== defaultPreset) ||
     Boolean(raw.from || raw.to) ||
     Boolean(raw.granularity && raw.granularity !== defaultGranularity) ||
-    Boolean(raw.currency) ||
     (extraSig ? extraSig.split('|').some(k => Boolean(raw[k])) : false)
 
   const reset = useCallback(() => {
-    const next: Record<string, null> = { preset: null, from: null, to: null, granularity: null, currency: null }
+    const next: Record<string, null> = { preset: null, from: null, to: null, granularity: null }
 
     for (const k of extraSig ? extraSig.split('|') : []) next[k] = null
     void setRaw(next as never)

@@ -6,7 +6,6 @@ import { HourglassIcon, ReceiptTextIcon, RefreshCwIcon, TrendingDownIcon, Trendi
 
 import { useQueries } from '@tanstack/react-query'
 
-import { SelectField } from '@/components/shared/FormField'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -41,8 +40,6 @@ type Sheet = {
 
 const LIMITS = [25, 50, 100, 200]
 
-/** The currency select's default: every coin, converted into the owner's default coin. */
-const ALL = 'ALL'
 
 /** The route's page ceiling (reports.validators BALANCE_SHEET_MAX_ROWS): the merged view reads at most this per coin. */
 const MAX_ROWS = 10_000
@@ -82,20 +79,17 @@ export const BalanceSheetView = ({
   const currencies = useCurrencyCodes()
   const money = useReportMoney()
 
-  // ALL = every coin the owner enabled, converted into the default coin (the default view).
-  const [currency, setCurrency] = useState(ALL)
   const [limit, setLimit] = useState(50)
   const [page, setPage] = useState(0)
   const [live, setLive] = useState(true)
 
-  const all = currency === ALL
   const path = active && userId ? `admin/reports/${client ? 'client-balance-sheet' : 'balance-sheet'}/${userId}` : null
   const refetchInterval = live ? 10_000 : false
 
-  // One currency (or a client user's INR point ledger): the page as the server cuts it.
+  // A client user's INR point ledger: the page as the server cuts it.
   const one = useApi<Sheet>(
-    path && (client || !all) ? path : null,
-    client ? { limit, offset: page * limit } : { currency, limit, offset: page * limit },
+    path && client ? path : null,
+    { limit, offset: page * limit },
     { retry: false, refetchInterval, placeholderData: prev => prev }
   )
 
@@ -104,7 +98,7 @@ export const BalanceSheetView = ({
   const span = Math.min(MAX_ROWS, (page + 1) * limit)
 
   const many = useQueries({
-    queries: (path && all && !client ? currencies : []).map(c => ({
+    queries: (path && !client ? currencies : []).map(c => ({
       queryKey: ['api', path, { currency: c, limit: span, offset: 0 }],
       queryFn: ({ signal }: { signal: AbortSignal }) => api.get<Sheet>(path as string, { currency: c, limit: span, offset: 0 }, signal),
       retry: false,
@@ -113,16 +107,15 @@ export const BalanceSheetView = ({
     }))
   })
 
-  const sheets: Sheet[] = client || !all ? (one.data ? [one.data] : []) : many.map(m => m.data).filter((x): x is Sheet => !!x)
-  const loading = client || !all ? !one.data : many.some(m => !m.data && !m.error)
-  const error = client || !all ? one.error : (many.find(m => m.error)?.error ?? null)
-  const fetching = client || !all ? one.isFetching : many.some(m => m.isFetching)
-  const refetch = () => (client || !all ? void one.refetch() : many.forEach(m => void m.refetch()))
+  const sheets: Sheet[] = client ? (one.data ? [one.data] : []) : many.map(m => m.data).filter((x): x is Sheet => !!x)
+  const loading = client ? !one.data : many.some(m => !m.data && !m.error)
+  const error = client ? one.error : (many.find(m => m.error)?.error ?? null)
+  const fetching = client ? one.isFetching : many.some(m => m.isFetching)
+  const refetch = () => (client ? void one.refetch() : many.forEach(m => void m.refetch()))
 
-  /** Converted (default view) or native (one currency) — figures shown on the cards and lines. */
-  // A client user's sheet is the agent system's: INR points, never converted.
-  const converted = all && !client
-  const curOf = (sh: Sheet) => (sh.currency || (client ? 'INR' : currency)).toUpperCase()
+  /** Every coin converted into the default coin; a client user's sheet is the agent system's INR points, never converted. */
+  const converted = !client
+  const curOf = (sh: Sheet) => (sh.currency || 'INR').toUpperCase()
 
   const total = (pick: (sh: Sheet) => string | number | undefined, abs = false) =>
     converted
@@ -131,7 +124,7 @@ export const BalanceSheetView = ({
         ? Math.abs(Number(sheets[0] ? pick(sheets[0]) : 0))
         : Number(sheets[0] ? pick(sheets[0]) : 0)
 
-  const cur = converted ? money.code : sheets[0] ? curOf(sheets[0]) : currency
+  const cur = converted ? money.code : sheets[0] ? curOf(sheets[0]) : 'INR'
   const show = (v: number) => (converted ? formatIn(v, money.code) : fmt(v, cur))
   const credited = total(sh => sh.balance.credited)
   const debited = total(sh => sh.balance.debited, true)
@@ -143,7 +136,7 @@ export const BalanceSheetView = ({
   const reconciled = unexplained === 0
 
   const rows = (
-    converted && !client
+    converted
       ? sheets
           .flatMap(sh => sh.rows.map(r => ({ ...r, cur: curOf(sh) })))
           .sort((a, b) => (a.ts < b.ts ? 1 : a.ts > b.ts ? -1 : 0))
@@ -186,21 +179,6 @@ export const BalanceSheetView = ({
               <label className='text-muted-foreground flex items-center gap-2 text-xs'>
                 <Switch checked={live} onCheckedChange={setLive} /> Live
               </label>
-              {/* Client user ki sheet point ledger se, sirf INR. */}
-              {!client && (
-                <div className='w-40'>
-                  <SelectField
-                    id='bs-currency'
-                    label=''
-                    value={currency}
-                    onChange={v => {
-                      setCurrency(v)
-                      setPage(0)
-                    }}
-                    options={[{ value: ALL, label: `All (in ${money.code})` }, ...currencies.map(c => ({ value: c, label: c }))]}
-                  />
-                </div>
-                )}
               <Button variant='ghost' size='icon-sm' title='Refresh' aria-label='Refresh' disabled={fetching} onClick={refetch}>
                 <RefreshCwIcon className={cn(fetching && 'animate-spin')} />
               </Button>
@@ -212,7 +190,7 @@ export const BalanceSheetView = ({
           {error && <p className='text-danger text-sm'>{errorMessage(error)}</p>}
           {converted && (
             <p className='text-muted-foreground text-xs'>
-              Every {client ? 'INR' : 'currency'} figure converted into {money.code} at today’s rate. Pick a currency to see its own figures.
+              Every currency figure converted into {money.code} at today’s rate.
             </p>
           )}
 
@@ -302,7 +280,7 @@ export const BalanceSheetView = ({
                 {!loading && rows.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={6} className='text-muted-foreground py-8 text-center'>
-                      {converted && !client ? 'No transactions for this user.' : `No transactions in ${cur} for this user.`}
+                      {converted ? 'No transactions for this user.' : `No transactions in ${cur} for this user.`}
                     </TableCell>
                   </TableRow>
                 )}
