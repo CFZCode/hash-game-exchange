@@ -287,7 +287,13 @@ class RaceService {
     });
 
     this.logger?.info({ type, changed: Object.keys(patch) }, 'Race configuration updated');
+    // Seats show at once, not at the boat job's next tick (staff save, then look at the board).
+    await this.#placeBoatsNow(type);
     return this.#shapeConfig(row);
+  }
+
+  async #placeBoatsNow(type) {
+    await this.syncBoats({ type }).catch((error) => this.logger?.warn({ err: error, type }, 'Booked seats could not be placed now; the boat job retries'));
   }
 
   // ══════════════════════════════════════════════════════════════════════
@@ -430,7 +436,8 @@ class RaceService {
 
     const race = await this.models.Race.findOne({
       where: { type, status: RACE_STATUS.SETTLED },
-      order: [['ends_at', 'DESC']],
+      // The latest PAID race: one ended early by End & pay keeps its window's later ends_at.
+      order: [['settled_at', 'DESC NULLS LAST'], ['ends_at', 'DESC']],
       raw: true,
     });
     if (!race) {
@@ -551,6 +558,7 @@ class RaceService {
         type, starts_at: start, ends_at: end, status: RACE_STATUS.OPEN, snapshot: { test: true },
       });
       this.logger?.info({ type, raceId: created.id, startsAt: start, endsAt: end }, 'Test race opened');
+      await this.#placeBoatsNow(type);
       return created.get({ plain: true });
     } catch (error) {
       // Lost to the roll job (or a second click) opening a race between the checks and the insert.
