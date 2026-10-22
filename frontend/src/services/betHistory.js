@@ -169,7 +169,7 @@ const isRefusedParam = (error) => error?.status === 422 || error?.status === 400
 
 /* `minDistributeId` is still PASSED by the pane and not destructured: the cursor is answered rather
    than consumed (see `toPage`). */
-export function getBetHistory({ beginTime, endTime, page = 1, type = '', currencyName = '' }) {
+export function getBetHistory({ beginTime, endTime, page = 1, type = '', currencyName = '', limit = PAGE_SIZE }) {
   /* Sports is not a casino read: the pane draws the exchange's bets itself (BetHistory/SportsBets). */
   if (String(type) === SPORTS_TYPE) return Promise.resolve({ ...EMPTY_PAGE, totalPage: 0, first: true });
 
@@ -183,7 +183,7 @@ export function getBetHistory({ beginTime, endTime, page = 1, type = '', currenc
       live: true,
       params: {
         page,
-        limit: PAGE_SIZE,
+        limit,
         /* ISO-8601; the pane holds epoch ms. NOTE the player route is `myHistory`, which carries
            the window but NOT the `to >= from` refine — that guard is on the STAFF listing only, so
            an inverted range is accepted here and simply matches nothing. Checked against the

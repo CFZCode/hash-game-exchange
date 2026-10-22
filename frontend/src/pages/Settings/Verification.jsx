@@ -308,19 +308,13 @@ export default function SettingsVerification() {
               </div>
             </div>
 
-            {/* `levelResults[0]` is Basic and `[1]` is Advanced, hard-coded by INDEX rather than
-                matched by name — the chunk's own, and why the service fills the first entry and
-                leaves the second alone. */}
+            {/* Basic only (`levelResults[0]`): the site does no face, address or video check, so the
+                Advanced card (`[1]`) is not drawn (owner's decision, 22 Oct 2026). */}
             <div className="w-full sm:flex sm:gap-2">
               <KycCard
                 isBasic
                 kycStatus={levels[0]?.kycStatus}
                 reason={levels[0]?.moderationComment}
-              />
-              <KycCard
-                isBasic={false}
-                kycStatus={levels[1]?.kycStatus}
-                reason={levels[1]?.moderationComment}
               />
             </div>
           </>

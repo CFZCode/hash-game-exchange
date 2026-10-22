@@ -10,6 +10,7 @@ import Table, {
 } from '../../../components/shared/Table';
 import CurrencyAmount from '../../../components/shared/CurrencyAmount';
 import EmptyPlaceholder from '../../../components/shared/EmptyPlaceholder';
+import Pagination from '../../../components/shared/Pagination';
 import { AssetsFilter, TimeFilter } from '../../../components/shared/WalletFilters';
 import { useSession } from '../../../context/session';
 import WalletFilterProvider from '../../../context/WalletFilterProvider';
@@ -18,7 +19,6 @@ import { useWalletFilter } from '../../../context/walletFilter';
 import { defaultRange, resolveRange } from '../../../services/transaction';
 import {
   getBetHistory,
-  truncateBetPage,
   BET_TYPE_OPTIONS,
   linksToGameDetail,
 } from '../../../services/betHistory';
@@ -111,6 +111,9 @@ const ArrowIcon = ({ className = '' }) => (
 );
 
 /* `de` — the list. */
+const CASINO_ROWS = 200;
+const ROWS_PER_PAGE = 20;
+
 function BetList({ settings }) {
   const { get } = useWalletFilter();
   const type = get('type');
@@ -125,7 +128,8 @@ function BetList({ settings }) {
      pair every render and the resource would never settle. Key on the filter string. */
   const read = React.useCallback(() => {
     const [beginTime, endTime] = resolveRange(time);
-    const casino = Promise.resolve(getBetHistory({ beginTime, endTime, currencyName: assets, type, page: 1 }));
+    // shortcut: the newest CASINO_ROWS rounds of the window, paged here; page the server instead if a window holds more.
+    const casino = Promise.resolve(getBetHistory({ beginTime, endTime, currencyName: assets, type, page: 1, limit: CASINO_ROWS }));
     if (type !== '') return casino;
     // All: the exchange's bets too (the Sports type's rows), which the casino feed does not carry.
     return Promise.all([casino, loadSportsHistory(time).catch(() => null)]).then(([casinoPage, sports]) => {
@@ -138,10 +142,18 @@ function BetList({ settings }) {
   }, [time, assets, type]);
   const { data: page, loading } = useResource(read);
 
-  const { rows } = truncateBetPage(page?.resList ?? [], 1);
+  const all = (page?.resList ?? []).filter((row) => !!row.time);
   const linkable = linksToGameDetail(type);
 
+  // Page by hand, 20 a page as the Sports tab; a new filter goes back to page 1.
+  const key = `${time}|${assets}|${type}`;
+  const [at, setAt] = React.useState({ key: '', n: 1 });
+  const pages = Math.max(1, Math.ceil(all.length / ROWS_PER_PAGE));
+  const current = at.key === key ? Math.min(at.n, pages) : 1;
+  const rows = all.slice((current - 1) * ROWS_PER_PAGE, current * ROWS_PER_PAGE);
+
   return (
+    <>
     <Table columns={COLUMNS} loading={loading}>
       {rows.length === 0 ? (
         <EmptyPlaceholder />
@@ -175,6 +187,12 @@ function BetList({ settings }) {
         ))
       )}
     </Table>
+    {all.length > ROWS_PER_PAGE && (
+      <div className="mt-4">
+        <Pagination page={current} pages={pages} onChange={(n) => setAt({ key, n })} />
+      </div>
+    )}
+    </>
   );
 }
 
