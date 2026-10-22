@@ -45,7 +45,7 @@ const Providers = ({ children, sidebarDefaultOpen }: Props) => {
   return (
     <QueryClientProvider client={queryClient}>
       <SessionProvider>
-        <ThemeProvider attribute='class' defaultTheme='dark' enableSystem={false}>
+        <ThemeProvider attribute='class' defaultTheme='light' enableSystem={false}>
           <TooltipProvider>
             <SidebarProvider defaultOpen={sidebarDefaultOpen}>{children}</SidebarProvider>
           </TooltipProvider>

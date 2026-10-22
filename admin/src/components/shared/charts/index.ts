@@ -1,5 +1,5 @@
 /**
- * The admin's chart kit (recharts, themed from the CSS tokens). See README.md in this folder.
+ * The admin's chart kit (ApexCharts with the Luno template's options, themed from the CSS tokens). See README.md in this folder.
  * Import from '@/components/shared/charts' only — the file layout behind this barrel may change.
  */
 export { TimeSeriesChart, BarChart, DonutChart, Sparkline } from './Charts'

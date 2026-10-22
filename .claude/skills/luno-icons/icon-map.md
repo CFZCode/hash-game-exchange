@@ -1,0 +1,86 @@
+# Admin nav icons: lucide → Luno
+
+The sidebar keys (`navIcons` in `admin/src/configs/navConfig.tsx`) and the Luno component each one now uses
+(`@/components/icons/luno`, drawn in `icons.spec.mjs`). Several lucide names share one drawing where the meaning is the same.
+
+| lucide | Luno component |
+|---|---|
+| Activity | LunoActivity |
+| ArrowBigUp | LunoArrowBigUp |
+| ArrowDownToLine | LunoArrowDownToLine |
+| ArrowLeftRight | LunoTransfer |
+| ArrowRightLeft | LunoTransfer |
+| ArrowUpFromLine | LunoArrowUpFromLine |
+| BadgeDollarSign | LunoBadgeDollar |
+| Banknote | LunoBanknote |
+| Bell | LunoBell |
+| BellRing | LunoBellRing |
+| Bitcoin | LunoBitcoin |
+| BookOpen | LunoBookOpen |
+| BookUser | LunoBookUser |
+| Building2 | LunoBuilding |
+| CalendarDays | LunoCalendar |
+| ChartColumn | LunoChartColumn |
+| ChartPie | LunoChartPie |
+| CircleUserRound | LunoCircleUser |
+| ClipboardList | LunoClipboardList |
+| Contact | LunoContact |
+| CreditCard | LunoCreditCard |
+| Crown | LunoCrown |
+| Dices | LunoDice |
+| Disc3 | LunoDisc |
+| FileSpreadsheet | LunoFileSpreadsheet |
+| Flag | LunoFlag |
+| Gamepad2 | LunoGamepad |
+| Gauge | LunoGauge |
+| Gavel | LunoGavel |
+| Gift | LunoGift |
+| Globe | LunoGlobe |
+| HandCoins | LunoHandCoins |
+| Handshake | LunoHandshake |
+| History | LunoHistory |
+| House | LunoHouse |
+| Image | LunoImage |
+| KeyRound | LunoKey |
+| Landmark | LunoLandmark |
+| LayoutDashboard | LunoLayoutDashboard |
+| LayoutGrid | LunoLayoutGrid |
+| LayoutTemplate | LunoLayoutTemplate |
+| Link | LunoLink |
+| ListOrdered | LunoListOrdered |
+| Lock | LunoLock |
+| LockKeyhole | LunoLockKeyhole |
+| Mail | LunoMail |
+| Megaphone | LunoMegaphone |
+| Network | LunoNetwork |
+| Newspaper | LunoNewspaper |
+| Palette | LunoPalette |
+| PartyPopper | LunoPartyPopper |
+| Percent | LunoPercent |
+| Power | LunoPower |
+| Radio | LunoRadio |
+| ReceiptText | LunoReceipt |
+| Repeat | LunoRepeat |
+| RotateCw | LunoRotateCw |
+| Scale | LunoScale |
+| ScrollText | LunoScroll |
+| Send | LunoSend |
+| Server | LunoServer |
+| Settings | LunoSettings |
+| Settings2 | LunoTune |
+| ShieldAlert | LunoShieldAlert |
+| ShieldCheck | LunoShield |
+| SlidersHorizontal | LunoSliders |
+| Spade | LunoSpade |
+| Sparkles | LunoSparkles |
+| SquarePen | LunoSquarePen |
+| Target | LunoTarget |
+| Ticket | LunoTicket |
+| ToggleRight | LunoToggle |
+| TrendingUp | LunoTrendingUp |
+| Trophy | LunoTrophy |
+| UserRoundCheck | LunoUserCheck |
+| Users | LunoUsers |
+| UsersRound | LunoTeam |
+| Vault | LunoVault |
+| Wallet | LunoWallet |

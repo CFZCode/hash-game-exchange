@@ -73,12 +73,16 @@ export function toRgb(value: string): string {
 const subscribe = (onChange: () => void) => {
   const obs = new MutationObserver(onChange)
 
-  obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'style', 'data-theme'] })
+  obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'style', 'data-theme', 'data-luno'] })
 
   return () => obs.disconnect()
 }
 
-const snapshot = () => `${document.documentElement.className}|${document.documentElement.getAttribute('style') ?? ''}`
+const snapshot = () => {
+  const el = document.documentElement
+
+  return `${el.className}|${el.getAttribute('style') ?? ''}|${el.getAttribute('data-theme') ?? ''}|${el.getAttribute('data-luno') ?? ''}`
+}
 
 /** Re-renders whenever the theme class on `<html>` changes. */
 export function useChartTheme(): ChartTheme {

@@ -1,40 +1,17 @@
 'use client'
 
-import { useId, useMemo, useState, type ReactNode } from 'react'
+import { useMemo } from 'react'
 
-import {
-  Area,
-  Bar,
-  BarChart as RBarChart,
-  CartesianGrid,
-  Cell,
-  ComposedChart,
-  Line,
-  Pie,
-  PieChart,
-  Rectangle,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-  type BarShapeProps,
-  type TooltipContentProps,
-  type YAxisTickContentProps
-} from 'recharts'
+import dynamic from 'next/dynamic'
 
-import {
-  ChartFrame,
-  ChartLegend,
-  isEmptySeries,
-  textPx,
-  TooltipBox,
-  truncate,
-  useBoxSize,
-  type CommonChartProps,
-  type TooltipRow
-} from './ChartFrame'
+import type { ApexOptions } from 'apexcharts'
+
+import { ChartFrame, isEmptySeries, useBoxSize, type CommonChartProps } from './ChartFrame'
 import { bucketLabel, formatAxisValue, formatValue, type Granularity, type ValueFormat } from './format'
 import { useChartTheme, type ChartColor, type ChartTheme } from './theme'
+
+// ApexCharts touches `window` on import, so it is loaded on the client only (ChartFrame shows a skeleton until then).
+const Apex = dynamic(() => import('react-apexcharts'), { ssr: false })
 
 export type ChartSeries = {
   name: string
@@ -47,75 +24,31 @@ export type ChartSeries = {
   kind?: 'line' | 'area' | 'bar'
 }
 
-type Row = Record<string, string | number | null>
-
 /** About how many px one x-axis label ("w/c 05 Oct") needs, gap included. */
 const X_LABEL_PX = 64
-
-/** How long a mark takes to draw in. */
-const ANIMATION_MS = 300
-
-// recharts' `barCategoryGap` is taken off BOTH sides of a band: 21% leaves the bars ~58% of it.
 
 const valueFormatter = (format: ValueFormat, currency: string | null | undefined) => (v: number | null | undefined) =>
   formatValue(v, format, format === 'money' ? currency : undefined)
 
-const axisTick = (theme: ChartTheme) => ({ fill: theme.color['muted-foreground'], fontSize: 11 })
-
-/** Series i is stored under `s<i>`, so a series name can never clash with the row's own keys. */
-const key = (i: number) => `s${i}`
-
-/** The hover box for a cartesian chart: the row's label plus every series that has a value there. */
-function seriesTooltip(series: ChartSeries[], colors: string[], fmt: (v: number | null | undefined) => string) {
-  const TooltipContent = ({ active, payload, label }: TooltipContentProps) => {
-    if (!active || !payload?.length) return null
-    const byKey = new Map(payload.map(p => [String(p.dataKey), p.value]))
-
-    const rows: TooltipRow[] = series.flatMap((s, i) => {
-      const v = byKey.get(key(i))
-
-      return v === null || v === undefined ? [] : [{ key: key(i), name: s.name, color: colors[i], value: Number(v) }]
-    })
-
-    return <TooltipBox label={label as ReactNode} rows={rows} format={fmt} />
-  }
-
-  return TooltipContent
-}
-
 /**
- * For stacked bars only the outer end of each stack is rounded (one end above zero, one below),
- * like a single bar. Marks which series ends the stack in each direction, per row.
+ * The Luno template's chart look: ApexCharts' own defaults (Luno sets only toolbar off, dataLabels off,
+ * legend bottom-centre, solid fill), with the grid, axis text and tooltip taken from the admin tokens so
+ * dark mode reads.
  */
-function markStackEnds(rows: Row[], count: number) {
-  for (const row of rows) {
-    let pos = -1
-    let neg = -1
+function lunoBase(theme: ChartTheme, colors: string[], format: ValueFormat): ApexOptions {
+  const label = { colors: theme.color['muted-foreground'], fontSize: '12px' }
 
-    for (let i = 0; i < count; i++) {
-      const v = Number(row[key(i)])
-
-      if (v > 0) pos = i
-      else if (v < 0) neg = i
-    }
-
-    row.__pos = pos
-    row.__neg = neg
+  return {
+    chart: { toolbar: { show: false }, zoom: { enabled: false }, background: 'transparent', parentHeightOffset: 0, redrawOnParentResize: true },
+    colors,
+    dataLabels: { enabled: false },
+    legend: { position: 'bottom', horizontalAlign: 'center', labels: { colors: theme.color.foreground } },
+    grid: { borderColor: theme.color.border, strokeDashArray: 0, padding: { left: 4, right: 8 } },
+    xaxis: { labels: { style: label }, axisBorder: { color: theme.color.border }, axisTicks: { color: theme.color.border } },
+    yaxis: { labels: { style: label, formatter: (v: number) => formatAxisValue(v, format) } },
+    tooltip: { theme: theme.mode },
+    states: { active: { filter: { type: 'none' } } }
   }
-}
-
-/** A bar shape that rounds its far end only when it is the outermost segment of its stack. */
-const stackedBarShape = (index: number, horizontal: boolean) => {
-  const StackedBar = (p: BarShapeProps) => {
-    const row = (p.payload ?? {}) as Row
-    const v = Number(row[key(index)])
-    const outer = v > 0 ? row.__pos === index : v < 0 ? row.__neg === index : false
-    const radius: [number, number, number, number] = horizontal ? [0, 4, 4, 0] : [4, 4, 0, 0]
-
-    return <Rectangle {...p} radius={outer ? radius : 0} />
-  }
-
-  return StackedBar
 }
 
 /** Line/area/bar over time buckets. One y-axis, always — two measures of different scale are two charts. */
@@ -141,120 +74,57 @@ export const TimeSeriesChart = ({
   ...frame
 }: TimeSeriesChartProps) => {
   const theme = useChartTheme()
-  const uid = useId().replace(/[^a-zA-Z0-9]/g, '')
   const [boxRef, { width }] = useBoxSize()
 
   // Show only as many bucket labels as the width holds; the rest stay in the tooltip.
   const labelPx = granularity === 'week' ? X_LABEL_PX + 16 : X_LABEL_PX
   const fit = width ? Math.max(2, Math.floor((width - 48) / labelPx)) : 8
-  const interval = buckets.length > fit ? Math.ceil(buckets.length / fit) - 1 : 0
+  const step = buckets.length > fit ? Math.ceil(buckets.length / fit) : 1
+  const categories = useMemo(() => buckets.map(b => bucketLabel(b, granularity)), [buckets, granularity])
 
-  const colors = useMemo(() => series.map((s, i) => theme.resolve(s.color, i)), [series, theme])
-  const kinds = series.map(s => s.kind ?? kind)
-  const hasBar = kinds.includes('bar')
-  const fmt = valueFormatter(format, currency)
+  const options = useMemo<ApexOptions>(() => {
+    const colors = series.map((s, i) => theme.resolve(s.color, i))
+    const kinds = series.map(s => s.kind ?? kind)
+    const mixed = new Set(kinds).size > 1
+    const base = lunoBase(theme, colors, format)
+    const fmt = valueFormatter(format, currency)
 
-  const data = useMemo(() => {
-    const rows: Row[] = buckets.map((b, i) => {
-      const row: Row = { label: bucketLabel(b, granularity) }
+    return {
+      ...base,
+      chart: { ...base.chart, type: mixed ? 'line' : kind, stacked: Boolean(stacked) },
+      stroke: { curve: 'smooth', width: kinds.map(k => (k === 'bar' ? 0 : 2)) },
 
-      series.forEach((s, j) => (row[key(j)] = s.data[i] ?? null))
+      // Mixed charts need the fill per series; a pure area keeps Apex's own area gradient.
+      ...(mixed ? { fill: { type: kinds.map(k => (k === 'area' ? 'gradient' : 'solid')), opacity: kinds.map(k => (k === 'area' ? 0.35 : 1)) } } : {}),
+      markers: { size: categories.length === 1 ? 4 : 0, strokeWidth: 0, hover: { size: 5 } },
+      legend: { ...base.legend, show: series.length > 1 },
+      xaxis: {
+        ...base.xaxis,
+        categories,
+        tooltip: { enabled: false },
 
-      return row
-    })
+        // Every `step`-th label only (Apex ignores tickAmount on a bar chart's category axis).
+        labels: {
+          ...base.xaxis?.labels,
+          rotate: 0,
+          hideOverlappingLabels: true,
+          formatter: (v: string, _ts?: number, opts?: { i?: number }) => {
+            const i = opts?.i ?? categories.indexOf(v)
 
-    if (stacked) markStackEnds(rows, series.length)
+            return i % step === 0 ? v : ''
+          }
+        }
+      },
+      tooltip: { ...base.tooltip, shared: true, intersect: false, x: { formatter: (_v: number, o?: { dataPointIndex?: number }) => categories[o?.dataPointIndex ?? 0] ?? '' }, y: { formatter: fmt } }
+    }
+  }, [series, kind, stacked, categories, step, theme, format, currency])
 
-    return rows
-  }, [buckets, granularity, series, stacked])
-
-  const single = buckets.length === 1
-  const activeDot = (color: string) => ({ r: 5, fill: color, stroke: theme.color.card, strokeWidth: 2 })
+  const apexSeries = useMemo(() => series.map(s => ({ name: s.name, type: s.kind ?? kind, data: s.data })), [series, kind])
 
   return (
     <ChartFrame {...frame} height={height} empty={buckets.length === 0 || isEmptySeries(series)}>
-      <div className='flex size-full flex-col gap-2'>
-        {series.length > 1 && <ChartLegend items={series.map((s, i) => ({ name: s.name, color: colors[i] }))} />}
-        <div ref={boxRef} className='min-h-0 flex-1'>
-          <ResponsiveContainer width='100%' height='100%' initialDimension={{ width: 320, height }}>
-            <ComposedChart
-              data={data}
-              margin={{ top: 6, right: 8, bottom: 0, left: 0 }}
-              stackOffset={stacked ? 'sign' : 'none'}
-              barCategoryGap={buckets.length > 40 ? '10%' : '21%'}
-              barGap={2}
-              accessibilityLayer={false}
-              style={{ fontFamily: theme.fontFamily }}
-            >
-              <defs>
-                {series.map((_, i) =>
-                  kinds[i] === 'area' ? (
-                    <linearGradient key={i} id={`${uid}-g${i}`} x1='0' y1='0' x2='0' y2='1'>
-                      <stop offset='0%' stopColor={colors[i]} stopOpacity={0.28} />
-                      <stop offset='95%' stopColor={colors[i]} stopOpacity={0.02} />
-                    </linearGradient>
-                  ) : null
-                )}
-              </defs>
-              <CartesianGrid vertical={false} stroke={theme.color.border} strokeDasharray='3 3' />
-              <XAxis dataKey='label' axisLine={false} tickLine={false} interval={interval} tick={axisTick(theme)} tickMargin={8} />
-              <YAxis width='auto' axisLine={false} tickLine={false} tick={axisTick(theme)} tickFormatter={(v: number) => formatAxisValue(v, format)} />
-              <Tooltip
-                content={seriesTooltip(series, colors, fmt)}
-                cursor={hasBar ? { fill: theme.color.muted, fillOpacity: 0.6 } : { stroke: theme.color.border, strokeWidth: 1 }}
-                isAnimationActive={false}
-                wrapperStyle={{ zIndex: 20, outline: 'none' }}
-              />
-              {series.map((s, i) => {
-                const k = kinds[i]
-                const common = { dataKey: key(i), name: s.name, isAnimationActive: true, animationDuration: ANIMATION_MS }
-
-                if (k === 'bar')
-                  return (
-                    <Bar
-                      key={i}
-                      {...common}
-                      fill={colors[i]}
-                      fillOpacity={0.95}
-                      maxBarSize={56}
-                      stackId={stacked ? 'stack' : undefined}
-                      radius={stacked ? undefined : [4, 4, 0, 0]}
-                      shape={stacked ? stackedBarShape(i, false) : undefined}
-                    />
-                  )
-
-                if (k === 'area')
-                  return (
-                    <Area
-                      key={i}
-                      {...common}
-                      type='monotone'
-                      stroke={colors[i]}
-                      strokeWidth={2}
-                      fill={`url(#${uid}-g${i})`}
-                      fillOpacity={1}
-                      stackId={stacked ? 'area' : undefined}
-                      dot={single ? { r: 4, fill: colors[i], strokeWidth: 0 } : false}
-                      activeDot={activeDot(colors[i])}
-                    />
-                  )
-
-                return (
-                  <Line
-                    key={i}
-                    {...common}
-                    type='monotone'
-                    stroke={colors[i]}
-                    strokeWidth={2}
-                    strokeLinecap='round'
-                    dot={single ? { r: 4, fill: colors[i], strokeWidth: 0 } : false}
-                    activeDot={activeDot(colors[i])}
-                  />
-                )
-              })}
-            </ComposedChart>
-          </ResponsiveContainer>
-        </div>
+      <div ref={boxRef} className='size-full'>
+        <Apex type={options.chart?.type} options={options} series={apexSeries} height='100%' width='100%' />
       </div>
     </ChartFrame>
   )
@@ -268,123 +138,38 @@ export type BarChartProps = CommonChartProps & {
   stacked?: boolean
 }
 
-/** Widest name column on a horizontal bar chart, and the longest name a tilted label shows. */
-const NAME_COL_PX = 160
-const TILT_MAX_CHARS = 22
-
 export const BarChart = ({ categories, series, horizontal, stacked, height = 280, format = 'number', currency, ...frame }: BarChartProps) => {
   const theme = useChartTheme()
-  const [boxRef, { width }] = useBoxSize()
-  const colors = useMemo(() => series.map((s, i) => theme.resolve(s.color, i)), [series, theme])
-  const fmt = valueFormatter(format, currency)
-  const longest = categories.reduce((m, c) => Math.max(m, c.length), 0)
 
-  const data = useMemo(() => {
-    const rows: Row[] = categories.map((c, i) => {
-      const row: Row = { label: c }
+  const options = useMemo<ApexOptions>(() => {
+    const colors = series.map((s, i) => theme.resolve(s.color, i))
+    const base = lunoBase(theme, colors, format)
+    const fmt = valueFormatter(format, currency)
+    const axisFmt = (v: string | number) => formatAxisValue(Number(v), format)
 
-      series.forEach((s, j) => (row[key(j)] = s.data[i] ?? null))
+    return {
+      ...base,
+      chart: { ...base.chart, type: 'bar', stacked: Boolean(stacked) },
+      plotOptions: { bar: { horizontal: Boolean(horizontal) } },
+      fill: { opacity: 1 },
+      legend: { ...base.legend, show: series.length > 1 },
 
-      return row
-    })
+      // Horizontal: the value axis is x and the names sit on y (Apex cuts them at 160px).
+      xaxis: {
+        ...base.xaxis,
+        categories,
+        labels: { ...base.xaxis?.labels, trim: true, ...(horizontal ? { formatter: axisFmt } : {}) }
+      },
+      yaxis: horizontal ? { labels: { style: { colors: theme.color.foreground, fontSize: '12px' }, maxWidth: 160 } } : base.yaxis,
+      tooltip: { ...base.tooltip, shared: true, intersect: false, y: { formatter: fmt } }
+    }
+  }, [series, categories, horizontal, stacked, theme, format, currency])
 
-    if (stacked) markStackEnds(rows, series.length)
-
-    return rows
-  }, [categories, series, stacked])
-
-  // Horizontal: the names sit in a column up to 160px wide, cut with an ellipsis past that.
-  const nameCol = Math.min(NAME_COL_PX, textPx(longest, 12) + 10)
-  const nameChars = Math.max(4, Math.floor((NAME_COL_PX - 14) / (12 * 0.6)))
-
-  // Vertical: every bar is a named thing, so no name is dropped. When the names collide they are
-  // tilted (and a very long one cut; the full name stays in the tooltip and the table).
-  const band = width ? (width - 56) / Math.max(1, categories.length) : Infinity
-  const tilt = !horizontal && textPx(longest) > band - 6
-  const tiltChars = Math.min(longest, TILT_MAX_CHARS)
-  const tiltHeight = Math.min(96, Math.ceil(textPx(tiltChars) * Math.sin((40 * Math.PI) / 180) + 18))
-
-  const radius: [number, number, number, number] = horizontal ? [0, 4, 4, 0] : [4, 4, 0, 0]
-  const valueAxis = { axisLine: false, tickLine: false, tick: axisTick(theme), tickFormatter: (v: number) => formatAxisValue(v, format) }
+  const apexSeries = useMemo(() => series.map(s => ({ name: s.name, data: s.data })), [series])
 
   return (
     <ChartFrame {...frame} height={height} empty={categories.length === 0 || isEmptySeries(series)}>
-      <div className='flex size-full flex-col gap-2'>
-        {series.length > 1 && <ChartLegend items={series.map((s, i) => ({ name: s.name, color: colors[i] }))} />}
-        <div ref={boxRef} className='min-h-0 flex-1'>
-          <ResponsiveContainer width='100%' height='100%' initialDimension={{ width: 320, height }}>
-            <RBarChart
-              data={data}
-              layout={horizontal ? 'vertical' : 'horizontal'}
-              margin={{ top: 6, right: 12, bottom: 0, left: 0 }}
-              stackOffset={stacked ? 'sign' : 'none'}
-              barCategoryGap={horizontal ? '19%' : '21%'}
-              barGap={2}
-              accessibilityLayer={false}
-              style={{ fontFamily: theme.fontFamily }}
-            >
-              <CartesianGrid horizontal={!horizontal} vertical={Boolean(horizontal)} stroke={theme.color.border} strokeDasharray='3 3' />
-              {horizontal ? (
-                <>
-                  <XAxis type='number' {...valueAxis} tickMargin={6} />
-                  <YAxis
-                    type='category'
-                    dataKey='label'
-                    width={nameCol}
-                    axisLine={false}
-                    tickLine={false}
-                    interval={0}
-                    tick={({ x, y, payload }: YAxisTickContentProps) => (
-
-                      // Plain <text>: recharts' own tick would wrap a long name onto two lines.
-                      <text x={x} y={y} dy={4} textAnchor='end' fill={theme.color.foreground} fontSize={12}>
-                        {truncate(String(payload?.value ?? ''), nameChars)}
-                      </text>
-                    )}
-                  />
-                </>
-              ) : (
-                <>
-                  <XAxis
-                    dataKey='label'
-                    axisLine={false}
-                    tickLine={false}
-                    interval={0}
-                    tick={axisTick(theme)}
-                    tickMargin={tilt ? 4 : 8}
-                    angle={tilt ? -40 : 0}
-                    textAnchor={tilt ? 'end' : 'middle'}
-                    height={tilt ? tiltHeight : 30}
-                    tickFormatter={(v: string) => (tilt ? truncate(String(v), TILT_MAX_CHARS) : String(v))}
-                  />
-                  <YAxis width='auto' {...valueAxis} />
-                </>
-              )}
-              <Tooltip
-                content={seriesTooltip(series, colors, fmt)}
-                cursor={{ fill: theme.color.muted, fillOpacity: 0.6 }}
-                isAnimationActive={false}
-                wrapperStyle={{ zIndex: 20, outline: 'none' }}
-              />
-              {series.map((s, i) => (
-                <Bar
-                  key={i}
-                  dataKey={key(i)}
-                  name={s.name}
-                  fill={colors[i]}
-                  fillOpacity={0.95}
-                  maxBarSize={horizontal ? 32 : 64}
-                  stackId={stacked ? 'stack' : undefined}
-                  radius={stacked ? undefined : radius}
-                  shape={stacked ? stackedBarShape(i, Boolean(horizontal)) : undefined}
-                  isAnimationActive
-                  animationDuration={ANIMATION_MS}
-                />
-              ))}
-            </RBarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
+      <Apex type='bar' options={options} series={apexSeries} height='100%' width='100%' />
     </ChartFrame>
   )
 }
@@ -401,77 +186,37 @@ export type DonutChartProps = CommonChartProps & {
 
 export const DonutChart = ({ labels, values, colors, totalLabel = 'Total', height = 260, format = 'number', currency, ...frame }: DonutChartProps) => {
   const theme = useChartTheme()
-  const [boxRef, box] = useBoxSize()
-  const [active, setActive] = useState<number | null>(null)
-  const fmt = valueFormatter(format, currency)
+  const data = useMemo(() => values.map(v => Math.max(0, Number(v) || 0)), [values])
 
-  const fills = useMemo(() => labels.map((_, i) => theme.resolve(colors?.[i], i)), [labels, colors, theme])
-  const data = useMemo(() => labels.map((name, i) => ({ name, value: Math.max(0, Number(values[i]) || 0) })), [labels, values])
-  const total = data.reduce((a, d) => a + d.value, 0)
+  const options = useMemo<ApexOptions>(() => {
+    const base = lunoBase(theme, labels.map((_, i) => theme.resolve(colors?.[i], i)), format)
+    const fmt = valueFormatter(format, currency)
+    const text = (c: string) => ({ show: true, color: c })
 
-  // The ring fills the box; the hole is 68% of it, and its text is sized to fit inside the hole.
-  const outer = Math.max(0, Math.min(box.width, box.height) / 2 - 4)
-  const inner = outer * 0.68
-  const shown = active !== null && data[active] ? data[active] : { name: totalLabel, value: total }
-  const valueText = fmt(shown.value)
-  const room = inner * 2 * 0.84
-  const valueSize = Math.max(9, Math.min(18, room / (valueText.length * 0.6)))
-  const nameSize = Math.max(9, Math.min(12, valueSize * 0.75))
-
-  const DonutTooltip = ({ active: on, payload }: TooltipContentProps) => {
-    const p = on ? payload?.[0] : undefined
-
-    if (!p) return null
-    const i = labels.indexOf(String(p.name))
-
-    return <TooltipBox rows={[{ key: String(p.name), name: String(p.name), color: fills[i] ?? theme.color.foreground, value: Number(p.value) }]} format={fmt} />
-  }
+    return {
+      ...base,
+      chart: { ...base.chart, type: 'donut' },
+      labels,
+      stroke: { colors: [theme.color.card] },
+      plotOptions: {
+        pie: {
+          donut: {
+            labels: {
+              show: true,
+              name: text(theme.color['muted-foreground']),
+              value: { ...text(theme.color.foreground), formatter: (v: string) => fmt(Number(v)) },
+              total: { show: true, showAlways: true, label: totalLabel, color: theme.color['muted-foreground'], formatter: () => fmt(data.reduce((a, v) => a + v, 0)) }
+            }
+          }
+        }
+      },
+      tooltip: { ...base.tooltip, y: { formatter: fmt } }
+    }
+  }, [labels, colors, totalLabel, data, theme, format, currency])
 
   return (
     <ChartFrame {...frame} height={height} empty={labels.length === 0 || values.every(v => !v)}>
-      <div className='flex size-full flex-col gap-2'>
-        <div ref={boxRef} className='relative min-h-0 flex-1'>
-          {outer > 0 && (
-            <ResponsiveContainer width='100%' height='100%' initialDimension={{ width: 320, height }}>
-              <PieChart accessibilityLayer={false} margin={{ top: 0, right: 0, bottom: 0, left: 0 }} style={{ fontFamily: theme.fontFamily }}>
-                <Tooltip content={DonutTooltip} isAnimationActive={false} wrapperStyle={{ zIndex: 20, outline: 'none' }} />
-                <Pie
-                  data={data}
-                  dataKey='value'
-                  nameKey='name'
-                  innerRadius={inner}
-                  outerRadius={outer}
-                  startAngle={90}
-                  endAngle={-270}
-
-                  // The gap between slices; a lone slice would only show it as a seam at 12 o'clock.
-                  stroke={theme.color.card}
-                  strokeWidth={data.filter(d => d.value).length > 1 ? 2 : 0}
-                  isAnimationActive
-                  animationDuration={ANIMATION_MS}
-                  onMouseEnter={(_, i) => setActive(i)}
-                  onMouseLeave={() => setActive(null)}
-                >
-                  {data.map((d, i) => (
-                    <Cell key={d.name + i} fill={fills[i]} />
-                  ))}
-                </Pie>
-              </PieChart>
-            </ResponsiveContainer>
-          )}
-          <div className='pointer-events-none absolute inset-0 flex items-center justify-center' aria-hidden>
-            <div className='flex flex-col items-center text-center leading-tight' style={{ maxWidth: room || undefined }}>
-              <span className='text-muted-foreground max-w-full truncate' style={{ fontSize: nameSize }}>
-                {shown.name}
-              </span>
-              <span className='text-foreground font-semibold whitespace-nowrap tabular-nums' style={{ fontSize: valueSize }}>
-                {valueText}
-              </span>
-            </div>
-          </div>
-        </div>
-        <ChartLegend align='center' items={labels.map((l, i) => ({ name: l, color: fills[i] }))} />
-      </div>
+      <Apex type='donut' options={options} series={data} height='100%' width='100%' />
     </ChartFrame>
   )
 }
@@ -493,82 +238,42 @@ export type SparklineProps = {
 
 export const Sparkline = ({ data, ariaLabel, color = 'chart-1', kind = 'area', height = 40, format = 'number', currency, labels, className }: SparklineProps) => {
   const theme = useChartTheme()
-  const uid = useId().replace(/[^a-zA-Z0-9]/g, '')
-  const stroke = theme.resolve(color, 0)
-  const fmt = valueFormatter(format, currency)
 
-  const rows = useMemo(() => data.map((v, i) => ({ label: labels?.[i] ?? '', v })), [data, labels])
-
-  // The y range is the data's own range, so the trend uses the whole height. A flat-zero series has
-  // no range: pin it to the floor rather than let it float. Bars always start from zero.
-  const domain = useMemo<[number, number]>(() => {
+  const options = useMemo<ApexOptions>(() => {
+    // The y range is the data's own range, so the trend uses the whole height. A flat-zero series has
+    // no range: pin it to the floor rather than let it float. Bars always start from zero.
     const nums = data.filter((v): v is number => typeof v === 'number' && Number.isFinite(v))
+    let lo = nums.length ? Math.min(...nums) : 0
+    let hi = nums.length ? Math.max(...nums) : 1
 
-    if (nums.every(v => v === 0)) return [0, 1]
-    let lo = Math.min(...nums)
-    let hi = Math.max(...nums)
+    if (kind === 'bar') [lo, hi] = [Math.min(0, lo), Math.max(0, hi)]
+    if (nums.every(v => v === 0)) [lo, hi] = [0, 1]
+    else if (lo === hi) [lo, hi] = [lo - Math.abs(lo || 1), hi + Math.abs(hi || 1)]
 
-    if (kind === 'bar') {
-      lo = Math.min(0, lo)
-      hi = Math.max(0, hi)
+    return {
+      chart: { type: kind, sparkline: { enabled: true }, animations: { enabled: false }, background: 'transparent' },
+      colors: [theme.resolve(color, 0)],
+      stroke: { curve: 'smooth', width: kind === 'bar' ? 0 : 2 },
+      fill: kind === 'area' ? { type: 'gradient', gradient: { opacityFrom: 0.3, opacityTo: 0.02 } } : { opacity: 1 },
+      yaxis: { min: lo, max: hi },
+      xaxis: { categories: labels ?? data.map((_, i) => String(i + 1)) },
+      tooltip: {
+        theme: theme.mode,
+        fixed: { enabled: false },
+        x: { show: Boolean(labels) },
+        y: { title: { formatter: () => '' }, formatter: valueFormatter(format, currency) },
+        marker: { show: false }
+      }
     }
+  }, [data, kind, color, labels, theme, format, currency])
 
-    if (lo === hi) return [lo - Math.abs(lo || 1), hi + Math.abs(hi || 1)]
-
-    return [lo, hi]
-  }, [data, kind])
-
-  const SparkTooltip = ({ active, payload, label }: TooltipContentProps) => {
-    const p = active ? payload?.[0] : undefined
-
-    if (!p || p.value === null || p.value === undefined) return null
-
-    return <TooltipBox label={labels ? (label as ReactNode) : undefined} rows={[{ key: 'v', name: '', color: stroke, value: Number(p.value) }]} format={fmt} />
-  }
+  const series = useMemo(() => [{ name: ariaLabel, data }], [ariaLabel, data])
 
   if (data.length < 2) return <div className={className} style={{ height }} aria-hidden />
 
   return (
     <ChartFrame ariaLabel={ariaLabel} height={height} className={className}>
-      <ResponsiveContainer width='100%' height='100%' initialDimension={{ width: 200, height }}>
-        <ComposedChart data={rows} margin={{ top: 3, right: 3, bottom: 3, left: 3 }} barCategoryGap='15%' accessibilityLayer={false}>
-          {kind === 'area' && (
-            <defs>
-              <linearGradient id={`${uid}-spark`} x1='0' y1='0' x2='0' y2='1'>
-                <stop offset='0%' stopColor={stroke} stopOpacity={0.3} />
-                <stop offset='100%' stopColor={stroke} stopOpacity={0.02} />
-              </linearGradient>
-            </defs>
-          )}
-          <XAxis dataKey='label' hide />
-          <YAxis hide domain={domain} allowDataOverflow />
-          <Tooltip
-            content={SparkTooltip}
-            cursor={kind === 'bar' ? { fill: theme.color.muted, fillOpacity: 0.6 } : { stroke: theme.color.border, strokeWidth: 1 }}
-            isAnimationActive={false}
-            allowEscapeViewBox={{ x: false, y: true }}
-            wrapperStyle={{ zIndex: 20, outline: 'none' }}
-          />
-          {kind === 'bar' ? (
-            <Bar dataKey='v' fill={stroke} fillOpacity={0.9} radius={2} isAnimationActive={false} />
-          ) : kind === 'area' ? (
-            <Area
-              dataKey='v'
-              type='monotone'
-              stroke={stroke}
-              strokeWidth={2}
-              fill={`url(#${uid}-spark)`}
-              fillOpacity={1}
-              baseValue={domain[0]}
-              dot={false}
-              activeDot={{ r: 3, fill: stroke, strokeWidth: 0 }}
-              isAnimationActive={false}
-            />
-          ) : (
-            <Line dataKey='v' type='monotone' stroke={stroke} strokeWidth={2} dot={false} activeDot={{ r: 3, fill: stroke, strokeWidth: 0 }} isAnimationActive={false} />
-          )}
-        </ComposedChart>
-      </ResponsiveContainer>
+      <Apex type={kind} options={options} series={series} height='100%' width='100%' />
     </ChartFrame>
   )
 }

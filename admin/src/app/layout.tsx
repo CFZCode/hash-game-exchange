@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 
 // Next Imports
 import type { Metadata } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
+import { Geist_Mono, Nunito } from 'next/font/google'
 
 // Third-party Imports
 import { NuqsAdapter } from 'nuqs/adapters/next/app'
@@ -21,7 +21,8 @@ import { cn } from '@/lib/utils'
 // Style Imports
 import './globals.css'
 
-const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] })
+// Luno's body font.
+const nunito = Nunito({ variable: '--font-nunito', subsets: ['latin'], weight: ['400', '600', '700', '800'] })
 const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] })
 
 export const metadata: Metadata = {
@@ -35,7 +36,7 @@ const RootLayout = ({ children }: Readonly<{ children: ReactNode }>) => {
   return (
     <html
       lang='en'
-      className={cn(geistSans.variable, geistMono.variable, 'flex min-h-full w-full antialiased')}
+      className={cn(nunito.variable, geistMono.variable, 'flex min-h-full w-full antialiased')}
       data-scroll-behavior='smooth'
       suppressHydrationWarning
     >

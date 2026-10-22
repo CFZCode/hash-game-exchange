@@ -1,7 +1,8 @@
 # Chart kit
 
-[recharts](https://recharts.org) (`recharts@3.8.0`, MIT), themed from the admin's CSS tokens. Charts are drawn on
-the client only (a skeleton holds the box until mount); legends and tooltips are HTML in the admin's tokens.
+[ApexCharts](https://apexcharts.com) (`apexcharts@3.53.0` + `react-apexcharts@1.5.0`, MIT — the version the Luno
+template ships) with Luno's chart options, coloured from the admin's CSS tokens. Charts are drawn on the client only
+(a skeleton holds the box until mount).
 Import everything from `@/components/shared/charts`.
 
 ## Filters (URL state)
