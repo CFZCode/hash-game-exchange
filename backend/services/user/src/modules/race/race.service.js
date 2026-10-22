@@ -473,6 +473,21 @@ class RaceService {
       });
     }
 
+    for (const b of race.snapshot?.boats ?? []) {
+      const points = money.toDecimalString(money.toMinor(b.points ?? '0'));
+      rows.push({
+        rank: Number(b.rank),
+        userId: null,
+        name: b.name,
+        points,
+        usdWagered: points,
+        isBoat: true,
+        payout: (await this.#priced(b.amount ?? '0', config.currency)).amount,
+        percentage: shares.get(Number(b.rank)) ?? 0,
+      });
+    }
+    rows.sort((a, b) => a.rank - b.rank);
+
     return {
       raceId: race.id,
       type: race.type,
@@ -668,6 +683,11 @@ class RaceService {
     }
 
     const totalAwarded = money.toDecimalString(money.sum(rewards.map((r) => r.amount)));
+    // The booked seats as they stood at the close, so a finished race's board and history show them
+    // where players saw them (the house keeps their prizes; no reward row is written for them).
+    const seatedBoats = noPromotions ? [] : payable
+      .map((e, i) => (e.isBoat ? { rank: i + 1, name: e.name, points: e.points, amount: prizeByRank.get(i + 1)?.amount ?? '0' } : null))
+      .filter(Boolean);
 
     await this.db.transaction(async (transaction) => {
       /* The close is the claim: `status = open` in the WHERE, first, so of two settlements racing
@@ -688,6 +708,7 @@ class RaceService {
             minPoints: config.minPoints,
             rankPrizes: config.rankPrizes,
             bookedSeats: config.bookedSeatsEnabled ? config.bookedSeats : [],
+            boats: seatedBoats,
             ...(race.snapshot?.test ? { test: true } : {}), // the TEST badge outlives settlement
           },
           prize_pool: config.prizePool,
@@ -1014,8 +1035,8 @@ class RaceService {
    * Public, like the board: what a race paid and who took the podium is the
    * same marketing as the live standings. Amounts are the stored prize rows
    * priced as `myRewards` prices them, so "rank 1 won $50" here and in the
-   * winner's own rewards list are the same figure. Decorative entries are
-   * never paid (see `settle`), so the podium here is real players only.
+   * winner's own rewards list are the same figure. A booked seat is never paid (see `settle`) but
+   * shows on the podium where it stood, from the race's snapshot.
    *
    * @param {number|null} [options.userId]  adds the caller's own placing, if any.
    */
@@ -1053,6 +1074,11 @@ class RaceService {
           currency: quote.currency,
         });
       }
+      for (const b of (race.snapshot?.boats ?? []).filter((x) => Number(x.rank) <= PODIUM_SIZE)) {
+        const quote = await this.#priced(b.amount ?? '0', PRIZE_CURRENCY);
+        winners.push({ rank: Number(b.rank), name: b.name, points: money.toDecimalString(money.toMinor(b.points ?? '0')), amount: quote.amount, currency: quote.currency });
+      }
+      winners.sort((a, b) => a.rank - b.rank);
       const own = mineBy.get(String(race.id));
       const pool = await this.#priced(race.prize_pool ?? '0', PRIZE_CURRENCY);
       const awarded = await this.#priced(race.total_awarded ?? '0', PRIZE_CURRENCY);

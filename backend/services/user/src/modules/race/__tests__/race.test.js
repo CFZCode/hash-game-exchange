@@ -579,7 +579,7 @@ test('race rewards', async (t) => {
       settler.getConfig = async () => ({
         ...base, type: 'weekly', enabled: true, currency: 'USDT', minPoints: '0', winnerCount: 3,
         multipliers: { sports: '1', casino: '1', slot: '1', crash: '1', other: '1' },
-        bookedSeatsEnabled: true, bookedSeats: [1],
+        bookedSeatsEnabled: true, bookedSeats: [{ rank: 1, boatId: boat.id }],
         rankPrizes: [{ rank: 1, amount: '5', percentage: 50 }, { rank: 2, amount: '3', percentage: 30 }, { rank: 3, amount: '2', percentage: 20 }],
       });
 
@@ -588,7 +588,12 @@ test('race rewards', async (t) => {
       // Nothing for the seat's rank 1; the real player (50 points, under the 100-point seat) gets rank 2's 3 —
       // unless this database's site is B2B (no promotions), which writes no prizes at all.
       assert.ok(!rows.some((r) => r.rank === 1));
-      if (rows.length) assert.deepStrictEqual(rows.map((r) => [String(r.user_id), r.rank, Number(r.amount)]), [[String(userId), 2, 3]]);
+      if (rows.length) {
+        assert.deepStrictEqual(rows.map((r) => [String(r.user_id), r.rank, Number(r.amount)]), [[String(userId), 2, 3]]);
+        // The finished board (Last Champion / history) still shows the seat where it stood.
+        const last = await settler.lastLeaderboard({ type: 'weekly' });
+        assert.deepStrictEqual(last.leaderboard.slice(0, 2).map((r) => [r.rank, r.isBoat, r.isBoat ? r.name : String(r.userId)]), [[1, true, `qa-boat-${userId}`], [2, false, String(userId)]]);
+      }
     } finally {
       await models.RaceBoat.destroy({ where: { id: boat.id } });
     }
