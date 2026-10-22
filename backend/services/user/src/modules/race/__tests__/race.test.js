@@ -857,4 +857,7 @@ test('booked seats on save: one boat per rank and a rank per boat, out-of-range 
 
   await assert.rejects(() => service.updateConfig({ type: 'daily', bookedSeats: [{ rank: 1, boatId: 4 }, { rank: 2, boatId: 4 }] }), (e) => e.code === 'RACE_INVALID_CONFIG');
   await assert.rejects(() => service.updateConfig({ type: 'daily', bookedSeats: [{ rank: 1, boatId: 4 }, { rank: 1, boatId: 5 }] }), (e) => e.code === 'RACE_INVALID_CONFIG');
+  // Seats are the top ranks with no gap, so no real player is paid more than a seat.
+  await assert.rejects(() => service.updateConfig({ type: 'daily', bookedSeats: [{ rank: 1, boatId: 4 }, { rank: 3, boatId: 5 }] }), (e) => e.code === 'RACE_INVALID_CONFIG');
+  await assert.rejects(() => service.updateConfig({ type: 'daily', bookedSeats: [2] }), (e) => e.code === 'RACE_INVALID_CONFIG');
 });

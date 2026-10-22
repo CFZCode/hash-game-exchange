@@ -85,7 +85,12 @@ function normaliseSeats(seats, winnerCount) {
     boats.add(String(boatId));
     byRank.set(rank, { rank, boatId: Number(boatId) });
   }
-  return [...byRank.values()].sort((a, b) => seatRank(a) - seatRank(b));
+  const out = [...byRank.values()].sort((a, b) => seatRank(a) - seatRank(b));
+  // Seats are the top ranks with no gap (#1…#n): every real player then ranks under every seat and,
+  // the ladder never rising, is paid no more than any seat (owner's rule, 22 Oct 2026).
+  const gap = out.findIndex((seat, i) => seatRank(seat) !== i + 1);
+  if (gap !== -1) throw errors.INVALID_CONFIG({ reason: `booked seats must be the top ranks with no gap: #1 to #${out.length} (got ${out.map(seatRank).map((r) => `#${r}`).join(', ')})` });
+  return out;
 }
 
 class RaceService {

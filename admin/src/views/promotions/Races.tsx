@@ -15,7 +15,6 @@ import FormDialog from '@/components/shared/FormDialog'
 import { SwitchField, TextField } from '@/components/shared/FormField'
 import Money from '@/components/shared/Money'
 import PageHeader from '@/components/shared/PageHeader'
-import { RewardCurrencyNotice } from '@/components/shared/RewardCurrency'
 import StatCard from '@/components/shared/StatCard'
 import StatusBadge from '@/components/shared/StatusBadge'
 import { Badge } from '@/components/ui/badge'
@@ -387,7 +386,7 @@ const ConfigEditor = ({ type }: { type: RaceType }) => {
           <SwitchField
             id='r-seats'
             label='Booked seats'
-            hint='Decorative entries shown on the board alongside real users. A booked rank is held by one, and its prize stays with the house; real players are paid the rank they see.'
+            hint='Decorative entries that hold the top ranks of the board (#1, #2 … with no gap), above every real player. Their prizes stay with the house; real players are paid the rank they see, always less than a booked seat.'
             checked={!!c.bookedSeatsEnabled}
             onChange={bookedSeatsEnabled => setDraft(d => ({ ...d, bookedSeatsEnabled }))}
           />
@@ -395,7 +394,7 @@ const ConfigEditor = ({ type }: { type: RaceType }) => {
             <TextField
               id='r-seats-ranks'
               label='Booked ranks'
-              hint={`The ranks any free decorative entry takes, e.g. 2, 5, 8 (each sits just above the player at that rank, re-placed every few minutes). Only ranks up to "Ranks paid" are kept. To put a particular entry on a rank, use the Booked seats tab${pinned.length ? ` (pinned now: ${pinned.map(p => `#${p.rank}`).join(', ')})` : ''}.`}
+              hint={`The ranks any free decorative entry takes, always the top ranks with no gap, e.g. 1, 2, 3 (each sits just above the player at that rank, re-placed every minute). Only ranks up to "Ranks paid" are kept. To put a particular entry on a rank, use the Booked seats tab${pinned.length ? ` (pinned now: ${pinned.map(p => `#${p.rank}`).join(', ')})` : ''}.`}
               error={errors['r-seats-ranks']}
               value={seatsText ?? (c.bookedSeats ?? []).filter(s => typeof s === 'number').join(', ')}
               onChange={e => {
@@ -985,7 +984,6 @@ const Races = () => {
   return (
     <div>
       <PageHeader title='Wagering races' />
-      <RewardCurrencyNotice className='mb-4' />
       <Tabs defaultValue='config'>
         <TabsList className='mb-4'>
           <TabsTrigger value='config'>Configuration</TabsTrigger>
