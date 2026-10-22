@@ -25,6 +25,7 @@ import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useApi, useApiMutation, useListState, usePagedApi } from '@/hooks/use-api'
@@ -269,6 +270,37 @@ const LadderDialog = ({ type, current, payout }: { type: RaceType; current: Race
         </DialogContent>
       </Dialog>
     </>
+  )
+}
+
+/** Daily and weekly side by side: each switch saves `enabled` at once, so both can run together. */
+const RaceSwitch = ({ type }: { type: RaceType }) => {
+  const q = useApi<RaceConfig>(`admin/user/race/config/${type}`, undefined, { retry: false })
+  const on = !!q.data?.enabled
+
+  const save = useApiMutation({
+    fn: (enabled: boolean) => api.put(`admin/user/race/config/${type}`, { enabled }),
+    invalidate: [['api', `admin/user/race/config/${type}`], ['api', 'user/race']],
+    success: `${type === 'daily' ? 'Daily' : 'Weekly'} race ${on ? 'stopped' : 'started'}`
+  })
+
+  return (
+    <Card className='py-4'>
+      <CardContent className='flex items-center justify-between gap-3'>
+        <div className='flex items-center gap-2'>
+          <span className='font-medium'>{type === 'daily' ? 'Daily race' : 'Weekly race'}</span>
+          <Badge variant={on ? 'default' : 'outline'}>{on ? 'Running' : 'Off'}</Badge>
+        </div>
+        <Can permission='config:write'>
+          <Switch
+            checked={on}
+            disabled={!q.data || save.isPending}
+            onCheckedChange={v => save.mutate(v)}
+            aria-label={`${type} race running`}
+          />
+        </Can>
+      </CardContent>
+    </Card>
   )
 }
 
@@ -963,6 +995,10 @@ const Races = () => {
           <TabsTrigger value='boats'>Booked seats</TabsTrigger>
         </TabsList>
         <TabsContent value='config'>
+          <div className='mb-4 grid gap-3 sm:grid-cols-2'>
+            <RaceSwitch type='daily' />
+            <RaceSwitch type='weekly' />
+          </div>
           <Tabs value={type} onValueChange={v => setType(v as RaceType)} className='mb-4'>
             <TabsList>
               <TabsTrigger value='daily'>Daily</TabsTrigger>
