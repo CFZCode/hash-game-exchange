@@ -952,10 +952,7 @@ const Races = () => {
 
   return (
     <div>
-      <PageHeader
-        title='Wagering races'
-        description='Turnover contests with a prize pool, shown to players as Tournaments. A daily race runs midnight to midnight and a weekly one Monday to Monday, in the race timezone (Site config → Operator settings). Points per product decide which games count (0 = excluded); a race pays when it is settled.'
-      />
+      <PageHeader title='Wagering races' />
       <RewardCurrencyNotice className='mb-4' />
       <Tabs defaultValue='config'>
         <TabsList className='mb-4'>
