@@ -1,7 +1,11 @@
+import React from 'react';
+import { useSearchParams } from 'react-router-dom';
 import Loading from '../../components/shared/Loading';
 import Contest from '../../components/shared/Contest';
-import { getDailyContest } from '../../services/contest';
+import EmptyPlaceholder from '../../components/shared/EmptyPlaceholder';
+import { getContest, RACE_TYPES, raceTitle } from '../../services/contest';
 import { useResource } from '../../hooks/useResource';
+import { useContestRace } from '../../hooks/useRaceFlags';
 import { useIsDialog } from '../../context/dialogRoute';
 import { useSession } from '../../context/session';
 
@@ -25,7 +29,21 @@ import { useSession } from '../../context/session';
 export default function DailyContest() {
   const isDialog = useIsDialog();
   const { session } = useSession();
-  const { data } = useResource(getDailyContest);
+  /* Daily and weekly are the same widget over `/user/race/<type>/*`; only a race the admin has on
+     is shown, and `?race=` picks between the two when both are. */
+  const { flags, type } = useContestRace();
+  const [, setParams] = useSearchParams();
+  const read = React.useCallback(() => (type ? getContest(type) : null), [type]);
+  const { data } = useResource(read);
+
+  /* Neither race on: the site's own empty state, not an idle "Ended" board. */
+  if (flags && !type) {
+    return (
+      <div className={`pb-4 px-4 sm:px-0${isDialog ? ' pt-4' : ''}`}>
+        <EmptyPlaceholder>No contest is running right now.</EmptyPlaceholder>
+      </div>
+    );
+  }
 
   /* The page is a heading over one widget fed by one read, so there is nothing to render around
      the spinner. 152px is the contest card's own measured height (`py-7` around a 24px title,
@@ -72,8 +90,27 @@ export default function DailyContest() {
           cause turns out to be the stale pathname, this is the line to change. */}
       {!isDialog && !session.login && (
         <header className="mb-4 text-base font-extrabold text-primary lg:text-lg">
-          Daily Contest
+          {raceTitle(type)}
         </header>
+      )}
+      {/* Both races on: a Daily | Weekly switch, the home page's own `.tabs-*` strip. */}
+      {flags?.daily && flags?.weekly && (
+        <div role="tablist" className="tabs-title hide-scroll mb-3 max-w-100">
+          <div className="tabs-btn-group">
+            {RACE_TYPES.map((t) => (
+              <button
+                key={t}
+                type="button"
+                role="tab"
+                className="tabs-btn btn-like"
+                aria-selected={type === t ? 'true' : undefined}
+                onClick={() => setParams({ race: t }, { replace: true })}
+              >
+                <span className="font-semibold">{t === 'daily' ? 'Daily' : 'Weekly'}</span>
+              </button>
+            ))}
+          </div>
+        </div>
       )}
       <Contest contest={data.contest} standings={data.standings} />
     </div>

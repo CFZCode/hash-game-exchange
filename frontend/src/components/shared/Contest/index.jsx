@@ -192,7 +192,9 @@ function MyPosition({ contest, standings, show }) {
      the store's own declared default — see services/contest.js. Read through the seam rather
      than off `contest`, because on the original it is a separate call that lands late: the
      store opens at zero/zero and `A(b)` overwrites the pair only once `api_rank` resolves. */
-  const { data } = useResource(getContestRank);
+  const type = contest.type ?? 'daily';
+  const read = React.useCallback(() => getContestRank(type), [type]);
+  const { data } = useResource(read);
   const rank = data?.rank ?? 0;
   const wager = data?.wager ?? 0;
 
@@ -517,7 +519,10 @@ function RacePrizes() {
       {rows.map((row, i) => (
         <div key={row.id} className={`flex items-center gap-3 py-2${i ? ' border-t border-third' : ''}`}>
           <div className="flex-1 text-xs">
-            <div className="font-semibold text-primary">Rank {row.rank}</div>
+            {/* The list holds both races' prizes, so each row names its race. */}
+            <div className="font-semibold text-primary">
+              {row.type === 'weekly' ? 'Weekly' : 'Daily'} · Rank {row.rank}
+            </div>
             <div>{row.raceStartsAt ? new Date(row.raceStartsAt).toLocaleDateString('en-US') : ''}</div>
           </div>
           <div className="whitespace-nowrap font-extrabold text-brand">{show(Number(row.amount))}</div>

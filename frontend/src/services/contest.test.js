@@ -1,5 +1,22 @@
 import { describe, expect, it } from 'vitest';
-import { toContest } from './contest';
+import { pickRace, raceFlags, toContest } from './contest';
+
+describe('race flags', () => {
+  it('reads on/off per type from the /user/race configs', () => {
+    expect(raceFlags([{ type: 'daily', enabled: true }, { type: 'weekly', enabled: false }])).toEqual({ daily: true, weekly: false, any: true });
+    expect(raceFlags([{ type: 'weekly' }])).toEqual({ daily: false, weekly: true, any: true });
+    expect(raceFlags([{ type: 'daily', enabled: false, configured: false }])).toEqual({ daily: false, weekly: false, any: false });
+    expect(raceFlags(null).any).toBe(false);
+  });
+
+  it('picks the asked race when on, else the other, else none', () => {
+    expect(pickRace({ daily: true, weekly: true }, 'weekly')).toBe('weekly');
+    expect(pickRace({ daily: false, weekly: true }, 'daily')).toBe('weekly');
+    expect(pickRace({ daily: true, weekly: false }, null)).toBe('daily');
+    expect(pickRace({ daily: false, weekly: false }, 'daily')).toBe(null);
+    expect(pickRace(undefined, 'daily')).toBe(null);
+  });
+});
 
 describe('daily contest board', () => {
   it('a 0-pool board still races for winnerCount places and keeps its end instant', () => {

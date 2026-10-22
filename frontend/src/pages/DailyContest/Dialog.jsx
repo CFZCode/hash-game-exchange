@@ -1,6 +1,8 @@
 import RouteDialog from '../../components/shared/RouteDialog';
 import { DialogRouteContext } from '../../context/dialogRoute';
 import DailyContest from './index';
+import { raceTitle } from '../../services/contest';
+import { useContestRace } from '../../hooks/useRaceFlags';
 
 /* `/promotions/daily-contest` ON A PHONE — the same component the desktop renders as a page, shown
  * as a full-screen dialog instead.
@@ -25,8 +27,10 @@ import DailyContest from './index';
  * prop; the shell gives up its own inset rather than the page giving up the original's.
  */
 export default function DailyContestDialog({ onClose, onBack, enter }) {
+  /* The bar names the race the page shows (Daily / Weekly Contest). */
+  const { type } = useContestRace();
   return (
-    <RouteDialog title="Daily Contest" onClose={onClose} onBack={onBack} enter={enter} pageGutter>
+    <RouteDialog title={raceTitle(type)} onClose={onClose} onBack={onBack} enter={enter} pageGutter>
       <DialogRouteContext.Provider value>
         <DailyContest />
       </DialogRouteContext.Provider>

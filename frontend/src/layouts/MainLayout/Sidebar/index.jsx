@@ -20,6 +20,7 @@ import { languageName } from '../../../components/modals/LanguageCurrencyModal/l
 import { getAlias } from '../../../utils/currency';
 import { coinIcon } from '../../../utils/coinArt';
 import { useSiteCurrency } from '../../../hooks/useSiteCurrency';
+import { useRaceFlags } from '../../../hooks/useRaceFlags';
 
 /* The Application card — see its call site for why it is off. */
 const SHOW_APP_CARD = false;
@@ -276,9 +277,12 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
   const gates = useGates();
   /* The owner's default currency, printed where "None" was (see hooks/useSiteCurrency). */
   const siteCurrency = useSiteCurrency();
+  /* The contest row goes when the admin has both races off (and while that is unknown). */
+  const races = useRaceFlags();
   const shown = (items) =>
     visibleItems(items, session.login).filter((i) =>
-      i.action === 'refer' ? gates.on('affiliate')
+      i.race ? Boolean(races?.any) && gates.routeOn(i.href)
+        : i.action === 'refer' ? gates.on('affiliate')
         : i.gate ? gates.on(i.gate)
         : !i.href || i.external || gates.routeOn(i.href),
     );
@@ -462,7 +466,7 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
       id: 'promotions', label: 'Promotions', colorIcon: 'promotion', hasArrow: true, href: '/promotions/promotion',
       subItems: [
         { label: 'Deposit Bonus', menuIcon: 'deposit_offer', href: '/deposit-offer' },
-        { label: 'Daily Contest', menuIcon: 'dailycontest', href: '/promotions/daily-contest' },
+        { label: races && !races.daily ? 'Weekly Contest' : 'Daily Contest', menuIcon: 'dailycontest', href: '/promotions/daily-contest', race: true },
         /* Weekly Raffle removed on the user's request (2026-10-16): the platform does not run one. */
         /* The one row in the whole menu whose `link` is NOT a path: `link: "refer"` with
            `label: () => ""`. It is a marker the row renderer special-cases, not a route — `le`

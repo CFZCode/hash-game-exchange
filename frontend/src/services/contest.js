@@ -19,16 +19,16 @@ import { CONTEST as DAILY_CONTEST, STANDINGS as DAILY_STANDINGS } from '../pages
  * split lives here, in the service, precisely so neither component knows about it.
  */
 
-/* ── LIVE: THE PLATFORM'S DAILY RACE ───────────────────────────────────────────────────────────
+/* ── LIVE: THE PLATFORM'S DAILY AND WEEKLY RACES ─────────────────────────────────────────────────
  *
  * The SmartBet backend's `race` module is the same product — a prize pool paid out down a rank
  * ladder for the most wagered in a window — so on the live path both call sites read it:
  *
  *   GET /user/race                      both races' configs, enabled or not, with the pool and
  *                                       the per-rank payout ladder (`payout.ranks`)
- *   GET /user/race/daily/leaderboard    the running race: window, pool, paid rows and, with a
+ *   GET /user/race/<type>/leaderboard   the running race (daily | weekly): window, pool, paid rows and, with a
  *                                       token, `me` — the caller's own rank
- *   GET /user/race/daily/last           the last SETTLED race (hash.game's `<type>/last/`):
+ *   GET /user/race/<type>/last          the last SETTLED race (hash.game's `<type>/last/`):
  *                                       its rank 1 is the Last Champion card and the whole list
  *                                       is the History dialog — it answers for a switched-off
  *                                       race too, ranked from the same wagers as the live board
@@ -112,38 +112,78 @@ function readBoard(type) {
   });
 }
 
-/* The board always answers now (backend race.service `leaderboard`, owner 2026-10-19): a
-   switched-off race still ranks the current day's wagers, with a 0 pool and no prizes. So the
-   board is read whenever the race is configured, and `enabled` (rides on the result so a call site
-   can hide a race that has no board) is "there is a board". */
-function liveContest(title, type = 'daily') {
-  return Promise.resolve(request(RACE.configs, { live: true }))
-    .catch(emptyIfAgentBlocked([]))
-    .then((configs) => {
-      const config = (configs ?? []).find((c) => c.type === type);
-      return Promise.all([
-        config?.configured === false ? null : readBoard(type),
-        config?.configured === false ? null : request(RACE.last(type), { live: true }).catch(() => null),
-      ]).then(([board, last]) => {
-        const out = toContest({ title, config, board, last });
-        return { ...out, contest: { ...out.contest, enabled: Boolean(board) } };
-      });
-    });
+/* `/user/race` is asked for by the sidebar, the home tab and the contest page on the same load:
+   one read shared for 10 s, so an admin switch reaches the site on the next read after that. */
+let configsRead = null;
+let configsAt = 0;
+function readConfigs() {
+  if (!configsRead || Date.now() - configsAt > 10_000) {
+    configsAt = Date.now();
+    configsRead = Promise.resolve(request(RACE.configs, { live: true })).catch(emptyIfAgentBlocked([]));
+  }
+  return configsRead;
 }
 
+export const RACE_TYPES = ['daily', 'weekly'];
+const TITLES = { daily: 'Daily Contest', weekly: 'Weekly Contest' };
+export const raceTitle = (type) => TITLES[type] ?? TITLES.daily;
+
+/** `/user/race` configs -> which races the admin has on. No config row is off; a row without
+ *  `enabled` is on (the backend's own rule); a `configured: false` row is off. */
+export function raceFlags(configs) {
+  const on = (type) => {
+    const config = (Array.isArray(configs) ? configs : []).find((c) => c?.type === type);
+    return Boolean(config) && config.enabled !== false && config.configured !== false;
+  };
+  const daily = on('daily');
+  const weekly = on('weekly');
+  return { daily, weekly, any: daily || weekly };
+}
+
+/* Fixtures (the pixel reference) carry the daily capture only. */
+const FIXTURE_FLAGS = raceFlags([{ type: 'daily' }]);
+
+/** Which races are on. A failed read is "none": a race nobody can confirm is not advertised. */
+export const getRaceFlags = () =>
+  USE_FIXTURES ? FIXTURE_FLAGS : readConfigs().then(raceFlags, () => raceFlags([]));
+
+/** The race to show: `wanted` if it is on, else the first one that is (daily first), else null. */
+export const pickRace = (flags, wanted) =>
+  (flags?.[wanted] ? wanted : RACE_TYPES.find((t) => flags?.[t])) ?? null;
+
+/* The board always answers (backend race.service `leaderboard`, owner 2026-10-19): a switched-off
+   race still ranks the current day's wagers, with a 0 pool and no prizes. So `enabled` is the
+   admin's own switch on the config, not "there is a board": a switched-off race is hidden, never
+   drawn as an Active 0-pool board. */
+function liveContest(type) {
+  return readConfigs().then((configs) => {
+    const config = (configs ?? []).find((c) => c.type === type);
+    return Promise.all([
+      config?.configured === false ? null : readBoard(type),
+      config?.configured === false ? null : request(RACE.last(type), { live: true }).catch(() => null),
+    ]).then(([board, last]) => {
+      const out = toContest({ title: raceTitle(type), config, board, last });
+      return { ...out, contest: { ...out.contest, type, enabled: raceFlags(configs)[type] } };
+    });
+  });
+}
+
+/* The home Wager Contest tab follows the race that is on: daily, else weekly. Neither on reads as
+   a disabled daily race, which hides the tab. */
 export const getHomeContest = () =>
   USE_FIXTURES
     ? request(ENDPOINTS.contestList(), {
         fixture: { contest: HOME_CONTEST, standings: HOME_STANDINGS },
       })
-    : liveContest(HOME_CONTEST.title);
+    : getRaceFlags().then((flags) => liveContest(pickRace(flags, 'daily') ?? 'daily'));
 
-export const getDailyContest = () =>
+/** One race's board for the contest page (`type`: daily | weekly). */
+export const getContest = (type = 'daily') =>
   USE_FIXTURES
     ? request(ENDPOINTS.contestList(), {
         fixture: { contest: DAILY_CONTEST, standings: DAILY_STANDINGS },
       })
-    : liveContest(DAILY_CONTEST.title);
+    : liveContest(type);
 
 /* THE VISITOR'S OWN POSITION — and the fixture is the store's own declared default, which is
  * the fourth time checking for one has supplied a login-gated payload (after `/bonus`'s reward
@@ -164,12 +204,12 @@ export const getDailyContest = () =>
  * `wager` is a bare number rather than the response's string, matching how the two fixtures
  * above already store theirs; `oe` in the chunk parseFloats every one of these on the way in.
  */
-export const getContestRank = () =>
+export const getContestRank = (type = 'daily') =>
   USE_FIXTURES
     ? request(ENDPOINTS.contestRank(), { fixture: { rank: 0, wager: 0 } })
     : /* Live: the same board read, signed — `me` is null when the caller has not wagered into
          this race, which is the store's own zero/zero ("50th+", "$0.00"). */
-      readBoard('daily').then((board) => ({
+      readBoard(type).then((board) => ({
         rank: Number(board?.me?.rank) || 0,
         wager: num(board?.me?.usdWagered),
       }));
@@ -183,4 +223,4 @@ export const getRacePrizes = () =>
 
 export const claimRacePrize = (id) => request(RACE.claim(id), { live: true, method: 'POST', fixture: null });
 
-export default getDailyContest;
+export default getContest;
