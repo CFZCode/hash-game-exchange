@@ -114,12 +114,10 @@ const BadgeCard = ({ card, url }: { card: string; url: string | null }) => {
 
   return (
     <div className='flex flex-col items-center gap-2 rounded-lg border p-3'>
-      {src ? (
-        <img src={src} alt={`${card} badge`} className='size-12 object-contain' />
-      ) : (
-        <div className={`flex size-12 items-center justify-center rounded-full text-xs capitalize ${CARD_TONE[card] ?? 'bg-muted'}`}>{card.slice(0, 2)}</div>
-      )}
+      {/* No upload: the player site's own tier glyph (frontend/src/pages/Bonus/icons.jsx, its colour), so this shows what players see. */}
+      <img src={src ?? `/images/vip-badges/${card}.svg`} alt={`${card} badge`} className='size-12 object-contain' />
       <span className='text-xs font-medium capitalize'>{card}</span>
+      {!src && <span className='text-muted-foreground -mt-1.5 text-[11px]'>Site default</span>}
       <Can permission='config:write'>
         <label className='text-primary flex cursor-pointer items-center gap-1 text-xs hover:underline'>
           <UploadIcon className='size-3' /> {src ? 'Replace' : 'Upload'}
