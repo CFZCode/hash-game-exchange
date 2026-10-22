@@ -15,6 +15,12 @@ Format:
 
 ---
 
+## 2026-10-22 — Balance sheet me Vault ki entries
+**Kya kiya:** Admin balance sheet (section 6e) ab swap ke saath vault ki `credits_ledger` rows bhi padhta hai: `TRANSFER_OUT` / `TRANSFER_IN` jinka `meta.refType = 'VAULT'`, category "Vault", description wahi jo vault ne likhi ("Vault deposit — 7 Days"), vault me daalna = DEBIT, vault se nikalna = CREDIT. Test: "vault deposits and withdrawals are on the sheet as Vault, with their sign".
+**Kyun:** User: "valut ka bhi data ana chaiye". Pehle sheet sirf swap wale TRANSFER rows padhti thi, isliye tonny (8623441393) ki sheet me vault ke ₹100 + ₹200 "unexplained −300" aate the. Ab live par uski sheet: ledger 786.30 = live 786.30, unexplained 0.
+**Files / jagah:** backend/services/admin/src/modules/reports/reports.service.js, backend/services/admin/src/modules/reports/__tests__/reports.test.js
+**Notes / pending:** parker-admin-svc restart kiya. Admin UI me badlaav nahi (dialog category seedha dikhata hai, tone default 'info'). Statements page (statements.service.js) me vault check nahi kiya.
+
 ## 2026-10-22 — Admin → Payment Methods: owner ke chalu gateways + Super Admin ka on/off
 **Kya kiya:** Settings → Payment Methods page ab sirf wo payment gateways dikhata hai jo owner ne owner panel (Site flags → Payment gateways, `flags.gateway_<naam>`, khaali = on) me chalu kiye hain — CCPayment, A-Pay, WayPay, CricPay, UPI (EkQR) me se — aur har ek ka Super Admin switch. Pehle wala A-Pay live status table is page se hataya (user: "bas itna dikha"). Backend: admin-service `GET /admin/site-config/payment-gateways`, `PUT /admin/site-config/payment-gateways/:name` (config:write, audit `site-config.payment-gateway.toggle`; owner-off gateway pe NOT_ENTITLED). SA ka off `siteconfig.settings.payment_gateways_off` me, user-service ko internal `/settings` ke jawab me jaata hai; user-service `#assertOwnerAllows` = owner flag AND SA switch → band gateway pe naya deposit, withdrawal, methods list 503 PAYORDER_PROVIDER_DISABLED (khule orders / callbacks pehle jaise). Menu item `direct: true` + `/payment-methods` PROMOTION_ROUTES me (agent tree ko nahi dikhta).
 **Kyun:** User: Super Admin ko is section me sirf owner ke enable kiye gateways dikhao, aur Super Admin bhi inhe enable / disable kar sake.

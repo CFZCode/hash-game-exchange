@@ -1697,20 +1697,23 @@ class ReportsService {
      *     TRANSFER_OUT / TRANSFER_IN with `meta.swap`, amount signed (out negative). Without them a
      *     player who swapped showed a mismatch on the coin swapped out, and the coin swapped in
      *     credited the next sports bet's balance jump as "Bet placed".
+     *     The vault writes the same two reasons with `meta.refType` VAULT (OUT = into the vault).
      */
     const swaps = await this.models.CreditsLedger.findAll({
       where: {
         user_id: uid,
         currency: { [Op.iLike]: currency },
         reason: { [Op.in]: ['TRANSFER_IN', 'TRANSFER_OUT'] },
-        [Op.and]: [sqlWhere(literal("meta->>'swap'"), 'true')],
+        [Op.or]: [sqlWhere(literal("meta->>'swap'"), 'true'), sqlWhere(literal("meta->>'refType'"), 'VAULT')],
       },
       raw: true,
     });
     for (const row of swaps) {
+      const meta = typeof row.meta === 'string' ? safeJson(row.meta) : row.meta;
+      const category = meta?.refType === 'VAULT' ? 'Vault' : 'Swap';
       const credit = row.reason === 'TRANSFER_IN';
       const abs = money.toDecimalString(money.toMinorQuantised(String(row.amount ?? '0').replace(/^-/, '')));
-      push(row.created_at, 'Swap', credit ? 'CREDIT' : 'DEBIT', row.description || 'Swap', credit ? abs : `-${abs}`, Number(row.id) || 0);
+      push(row.created_at, category, credit ? 'CREDIT' : 'DEBIT', row.description || category, credit ? abs : `-${abs}`, Number(row.id) || 0);
     }
 
     /**

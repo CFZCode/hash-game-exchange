@@ -385,6 +385,21 @@ test('reports against a database', async (t) => {
     }
   });
 
+  await t.test('vault deposits and withdrawals are on the sheet as Vault, with their sign', async () => {
+    const move = (amount, reason, description) => ({
+      user_id: String(playerA), currency: 'INR', amount, netamount: 0, reason, source_service: 'user-service',
+      description, meta: { refType: 'VAULT', refId: '7d' },
+    });
+    await models.CreditsLedger.bulkCreate([move('-100', 'TRANSFER_OUT', 'Vault deposit — 7 Days'), move('100.5', 'TRANSFER_IN', 'Vault withdraw')]);
+    try {
+      const sheet = await service.balanceSheet({ staff: asA, userId: playerA, currency: 'INR', limit: 500 });
+      const rows = sheet.rows.filter((r) => r.category === 'Vault').map((r) => [r.type, r.amount, r.description]).sort();
+      assert.deepEqual(rows, [['CREDIT', '100.50000000', 'Vault withdraw'], ['DEBIT', '-100.00000000', 'Vault deposit — 7 Days']]);
+    } finally {
+      await models.CreditsLedger.destroy({ where: { user_id: String(playerA) } });
+    }
+  });
+
   await t.test('race-prize and rakeback claims are on the sheet, not unexplained', async () => {
     const claim = (reason, amount) => ({
       user_id: String(playerA), currency: 'USDT', amount, netamount: 0, reason, source_service: 'user-service', description: reason,
