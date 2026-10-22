@@ -564,7 +564,8 @@ test('race rewards', async (t) => {
       ends_at: new Date('2026-02-09T00:00:00Z'), status: 'open',
     });
     created.races.push(open.id);
-    const boat = await models.RaceBoat.create({ name: `qa-boat-${userId}`, is_active: true, weekly_points: '100', weekly_rank: 1 });
+    // The boat's stored points (40) are stale: the player (50) overtook it after the last boat tick.
+    const boat = await models.RaceBoat.create({ name: `qa-boat-${userId}`, is_active: true, weekly_points: '40', weekly_rank: 1 });
     try {
       const settler = new RaceService({
         models, db: connection, logger,

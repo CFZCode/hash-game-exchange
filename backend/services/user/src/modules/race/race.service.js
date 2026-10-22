@@ -622,6 +622,9 @@ class RaceService {
     const config = await this.getConfig({ type: race.type });
     if (!config) throw errors.NOT_CONFIGURED({ type: race.type });
 
+    // Re-seat the boats on the final standings first, so a player who overtook one in the last
+    // minute before the close cannot take a booked rank (the boat job runs once a minute).
+    if (config.bookedSeatsEnabled) await this.#placeBoatsNow(race.type);
     const { entries } = await this.#standings(race, config);
 
     /**
