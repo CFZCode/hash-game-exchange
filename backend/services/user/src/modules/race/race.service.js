@@ -1044,7 +1044,8 @@ class RaceService {
     const where = { status: RACE_STATUS.SETTLED };
     if (type) where.type = type;
 
-    const races = await this.models.Race.findAll({ where, order: [['ends_at', 'DESC']], limit, raw: true });
+    // Newest PAID first, as Last Champion: an End & pay'd race keeps its window's later ends_at.
+    const races = await this.models.Race.findAll({ where, order: [['settled_at', 'DESC NULLS LAST'], ['ends_at', 'DESC']], limit, raw: true });
     if (!races.length) return [];
     const ids = races.map((r) => r.id);
 
