@@ -9,7 +9,7 @@ const { siteHasNoPromotions, promotionsBlocked } = require('@ibitplay/auth');
 const { WalletService } = require('../wallet/wallet.service');
 const errors = require('./race.errors');
 const { buildRankPrizes, buildCustomLadder } = require('./race.prizes');
-const { windowFor } = require('./race.window');
+const { windowFor, DAY_MS } = require('./race.window');
 const {
   RACE_TYPES,
   RACE_STATUS,
@@ -62,6 +62,32 @@ const {
  *   is excluded and counted, rather than silently winning the race.
  * ═════════════════════════════════════════════════════════════════════════
  */
+/** A booked seat is a rank (any free boat) or `{ rank, boatId }` (that boat). */
+const seatRank = (seat) => Number(seat?.rank ?? seat);
+
+/**
+ * Booked seats as saved: ranks 1..winnerCount, sorted, one entry per rank (a pinned boat beats a
+ * plain rank), and a boat pinned to one rank only. Two boats on a rank is refused, not guessed.
+ */
+function normaliseSeats(seats, winnerCount) {
+  const byRank = new Map();
+  const boats = new Set();
+  for (const seat of seats) {
+    const rank = seatRank(seat);
+    if (!Number.isInteger(rank) || rank < 1 || rank > winnerCount) continue;
+    const boatId = seat?.boatId ?? null;
+    if (boatId == null) {
+      if (!byRank.has(rank)) byRank.set(rank, rank);
+      continue;
+    }
+    if (boats.has(String(boatId))) throw errors.INVALID_CONFIG({ reason: `boat ${boatId} is booked on two ranks` });
+    if (byRank.get(rank)?.boatId != null) throw errors.INVALID_CONFIG({ reason: `rank ${rank} is booked for two boats` });
+    boats.add(String(boatId));
+    byRank.set(rank, { rank, boatId: Number(boatId) });
+  }
+  return [...byRank.values()].sort((a, b) => seatRank(a) - seatRank(b));
+}
+
 class RaceService {
   constructor(deps) {
     const { models, db, logger, config, clients } = deps;
@@ -213,9 +239,7 @@ class RaceService {
      * parsers for this field, in two languages, that had to be kept in step).
      */
     if (input.bookedSeats !== undefined) {
-      patch.booked_seats = [...new Set(input.bookedSeats)]
-        .filter((r) => Number.isInteger(r) && r >= 1 && r <= Number(merged.winner_count))
-        .sort((a, b) => a - b);
+      patch.booked_seats = normaliseSeats(input.bookedSeats, Number(merged.winner_count));
       merged.booked_seats = patch.booked_seats;
     }
 
@@ -236,7 +260,7 @@ class RaceService {
       patch.winner_count = ladder.ranks.length;
       merged.winner_count = ladder.ranks.length;
       if (Array.isArray(merged.booked_seats)) {
-        patch.booked_seats = merged.booked_seats.filter((r) => r <= ladder.ranks.length);
+        patch.booked_seats = merged.booked_seats.filter((seat) => seatRank(seat) <= ladder.ranks.length);
       }
     } else {
       const { ranks } = buildRankPrizes({
@@ -500,6 +524,42 @@ class RaceService {
   }
 
   /**
+   * A staff test race: the window staff pick instead of `windowFor`'s, marked `snapshot.test`.
+   *
+   * It is an ordinary OPEN race, so standings, booked seats, End & pay and `settleDue` need
+   * nothing new. While it is open `openWindow` hits `uq_races_open` and returns it; once it is
+   * settled the normal window opens again (daily: its starts_at differs from midnight's).
+   */
+  async startTestRace({ type, startsAt, endsAt }) {
+    const config = await this.getConfig({ type });
+    if (!config?.enabled) throw errors.NOT_RUNNING({ type });
+
+    const start = new Date(startsAt);
+    const end = new Date(endsAt);
+    const maxMs = (type === 'daily' ? 1 : 7) * DAY_MS;
+    if (!(end > new Date())) throw errors.INVALID_WINDOW({ reason: 'endsAt must be in the future' });
+    if (!(start < end)) throw errors.INVALID_WINDOW({ reason: 'startsAt must be before endsAt' });
+    if (end - start > maxMs) throw errors.INVALID_WINDOW({ reason: `a ${type} race is at most ${maxMs / DAY_MS} day(s)` });
+
+    if (await this.#activeRace(type)) throw errors.ALREADY_OPEN({ type });
+    if (await this.models.Race.findOne({ where: { type, starts_at: start }, attributes: ['id'], raw: true })) {
+      throw errors.INVALID_WINDOW({ reason: 'a race of that type already starts at that time' });
+    }
+
+    try {
+      const created = await this.models.Race.create({
+        type, starts_at: start, ends_at: end, status: RACE_STATUS.OPEN, snapshot: { test: true },
+      });
+      this.logger?.info({ type, raceId: created.id, startsAt: start, endsAt: end }, 'Test race opened');
+      return created.get({ plain: true });
+    } catch (error) {
+      // Lost to the roll job (or a second click) opening a race between the checks and the insert.
+      if (error?.name === 'SequelizeUniqueConstraintError') throw errors.ALREADY_OPEN({ type });
+      throw error;
+    }
+  }
+
+  /**
    * Close a finished window, write its prizes, and open the next.
    *
    * ── THE ORDER MATTERS ────────────────────────────────────────────────
@@ -617,6 +677,7 @@ class RaceService {
             minPoints: config.minPoints,
             rankPrizes: config.rankPrizes,
             bookedSeats: config.bookedSeatsEnabled ? config.bookedSeats : [],
+            ...(race.snapshot?.test ? { test: true } : {}), // the TEST badge outlives settlement
           },
           prize_pool: config.prizePool,
           platform_fee_percent: config.platformFeePercent,
@@ -661,6 +722,7 @@ class RaceService {
         status: RACE_STATUS.CANCELLED,
         settled_at: new Date(),
         total_awarded: '0',
+        // Overwrites a test race's snapshot; acceptable, a cancelled race pays nothing anyway.
         snapshot: { cancelled: true, reason: reason || null },
       },
       { where: { id: raceId, status: RACE_STATUS.OPEN } }
@@ -930,6 +992,7 @@ class RaceService {
         winnerCount: r.winner_count,
         totalAwarded: money.toDecimalString(money.toMinor(r.total_awarded ?? '0')),
         cancelReason: r.status === RACE_STATUS.CANCELLED ? (r.snapshot?.reason ?? null) : undefined,
+        test: Boolean(r.snapshot?.test),
       })),
     };
   }
@@ -1070,14 +1133,23 @@ class RaceService {
     const used = new Set();
     const writes = [];
 
-    for (const seat of config.bookedSeats) {
+    /* A pinned boat (`{ rank, boatId }`) is kept for its own rank, so a plain seat above it never
+       takes it; an inactive or deleted pinned boat is not in `boats` and its seat gets any free one. */
+    const pinned = new Set(config.bookedSeats.map((s) => s?.boatId).filter((b) => b != null).map(String));
+    const seats = [...config.bookedSeats].sort((a, b) => seatRank(a) - seatRank(b));
+
+    for (const entry of seats) {
+      const seat = seatRank(entry);
       // A seat above the payout line can never be filled: the board is capped
       // at `winner_count`. Saved configs are already filtered, so this catches
       // a winner count that was lowered afterwards.
       if (seat > config.winnerCount) continue;
 
       const occupant = board[seat - 1];
-      const boat = boats.find((b) => !used.has(String(b.id)));
+      const free = (b) => !used.has(String(b.id));
+      const boat = (entry?.boatId != null && boats.find((b) => String(b.id) === String(entry.boatId) && free(b)))
+        || boats.find((b) => free(b) && !pinned.has(String(b.id)))
+        || boats.find(free);
       if (!boat) {
         // Loud: the board silently stops honouring booked seats past this
         // point, which looks like the feature not working rather than a

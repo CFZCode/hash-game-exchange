@@ -90,6 +90,16 @@ test('the prize curve', async (t) => {
     assert.deepStrictEqual(ranks, []);
   });
 
+  await t.test('a short tail never pays more than the podium (pool 5, 5 ranks, 60%)', () => {
+    // Uncapped this was 1.714 / 0.857 / 0.429 / 1.111 / 0.889: ranks 4 and 5 above rank 3.
+    const { netPool, ranks } = buildRankPrizes({ prizePool: '5', winnerCount: 5, platformFeePercent: 0, top3Percentage: 60 });
+    for (let i = 1; i < ranks.length; i += 1) {
+      assert.ok(money.lte(ranks[i].amount, ranks[i - 1].amount), `rank ${i + 1} (${ranks[i].amount}) pays more than rank ${i} (${ranks[i - 1].amount})`);
+    }
+    assert.strictEqual(money.toDecimalString(money.sum(ranks.map((r) => r.amount))), netPool);
+    assert.strictEqual(ranks[4].amount, ranks[3].amount); // both capped
+  });
+
   await t.test('a long tail reaches amounts below the minimum reward', () => {
     // Settlement stops at MIN_REWARD rather than writing rows that cost a claim
     // each and credit nothing. This asserts the tail really does get there, so
@@ -582,6 +592,44 @@ test('race rewards', async (t) => {
       await models.RaceBoat.destroy({ where: { id: boat.id } });
     }
   });
+
+  await t.test('a staff test race opens its own 10-minute window, refuses a second, and settleDue settles it after its end', async () => {
+    const tester = new RaceService({
+      models, db: connection, logger,
+      config: { SERVICE_NAME: 'user-service', RACE_TIMEZONE: IST },
+      clients: { casino: { get: async () => ({ rows: [] }) }, sports: { get: async () => ({ rows: [] }) } },
+    });
+    const base = (await tester.getConfig({ type: 'daily' })) ?? {};
+    tester.getConfig = async () => ({ ...base, type: 'daily', enabled: true, currency: 'USDT', minPoints: '0', winnerCount: 3, bookedSeatsEnabled: false, rankPrizes: [] });
+
+    const startsAt = new Date();
+    const endsAt = new Date(startsAt.getTime() + 10 * 60_000);
+    const opened = await tester.startTestRace({ type: 'daily', startsAt, endsAt });
+    created.races.push(opened.id);
+    assert.strictEqual(opened.status, 'open');
+    assert.strictEqual(opened.snapshot.test, true);
+
+    await assert.rejects(() => tester.startTestRace({ type: 'daily', startsAt, endsAt }), (e) => e.code === 'RACE_ALREADY_OPEN');
+    await assert.rejects(
+      () => tester.startTestRace({ type: 'daily', startsAt, endsAt: new Date(startsAt.getTime() + 2 * 86_400_000) }),
+      (e) => e.code === 'RACE_INVALID_WINDOW'
+    );
+    // The roll job while it runs must not throw: the normal window either already exists (an earlier
+    // case may have used today's) or hits uq_races_open and gets the test race back.
+    const today = windowFor('daily', new Date(), IST);
+    const during = await tester.openWindow({ type: 'daily' });
+    assert.ok(String(during.id) === String(opened.id) || new Date(during.starts_at).getTime() === today.startsAt.getTime());
+
+    const { settled, opened: next } = await tester.settleDue({ type: 'daily', at: new Date(endsAt.getTime() + 1000) });
+    if (next?.status === 'open') created.races.push(next.id);
+    assert.strictEqual(String(settled.raceId), String(opened.id));
+    const row = await models.Race.findByPk(opened.id, { raw: true });
+    assert.strictEqual(row.status, 'settled');
+    assert.strictEqual(row.snapshot.test, true);
+    // After it the normal window is back (opened now, or the one that already held today's slot).
+    assert.ok(next && String(next.id) !== String(opened.id), 'the normal window opens again');
+    assert.strictEqual(new Date(next.starts_at).getTime(), windowFor('daily', new Date(endsAt.getTime() + 1000), IST).startsAt.getTime());
+  });
 });
 
 test('a switched-off race still ranks today with no prizes', async () => {
@@ -729,4 +777,78 @@ test("the board prints each rank's share on a 0 pool; Last Champion is the last 
   const live = await service.leaderboard({ type: 'daily', userId: '8', live: true });
   assert.strictEqual(live.settled, undefined);
   assert.strictEqual(live.me.usdWagered, '9.00000000');
+});
+
+// ══════════════════════════════════════════════════════════════════════
+//  Booked seats: a boat pinned to a rank
+// ══════════════════════════════════════════════════════════════════════
+
+test('booked seats: a pinned boat takes its rank, an inactive pinned boat falls back, plain ranks still work', async () => {
+  const placeWith = async (bookedSeats, activeBoats) => {
+    const row = {
+      type: 'daily', enabled: true, prize_pool: '0', platform_fee_percent: '0', winner_count: 5,
+      top3_percentage: '60', min_points: '0', currency: 'USDT', rank_percentage: [],
+      sports_points: '1', casino_points: '1', slot_points: '1', crash_points: '1', other_points: '1',
+      booked_seats_enabled: true, booked_seats: bookedSeats,
+    };
+    const writes = [];
+    const service = new RaceService({
+      models: {
+        RaceConfig: { findOne: async () => row },
+        Race: { findOne: async () => ({ id: 1, type: 'daily', status: 'open', starts_at: new Date(), ends_at: new Date(Date.now() + 60_000) }) },
+        // `is_active: true` is in the real query, so an inactive boat is simply not returned.
+        RaceBoat: {
+          findAll: async () => activeBoats.map((id) => ({ id, name: `boat ${id}` })),
+          update: async (values, { where }) => { if (!Array.isArray(where.id)) writes.push([where.id, values.daily_rank]); },
+        },
+        Exchangerate: { findAll: async () => [] },
+        Users: { findAll: async () => [{ id: 7, name: 'p7' }, { id: 8, name: 'p8' }, { id: 9, name: 'p9' }] },
+      },
+      logger: createLogger({ name: 'race-test', level: 'silent' }),
+      config: { RACE_TIMEZONE: IST },
+      clients: {
+        casino: { get: async () => ({ rows: [
+          { userId: '7', bucket: 'slot', currency: 'USDT', amount: '300', bets: 1 },
+          { userId: '8', bucket: 'slot', currency: 'USDT', amount: '200', bets: 1 },
+          { userId: '9', bucket: 'slot', currency: 'USDT', amount: '100', bets: 1 },
+        ] }) },
+        sports: { get: async () => ({ rows: [] }) },
+      },
+      wallet: {},
+      rewardMoney: { fromUsd: async (usd) => ({ currency: 'USDT', amount: usd, usd }), toUsd: async (a) => a },
+    });
+    await service.syncBoats({ type: 'daily' });
+    return writes;
+  };
+
+  // Pinned boat 11 on rank 3; the plain rank 1 above it takes a free boat, not 11.
+  assert.deepStrictEqual(await placeWith([1, { rank: 3, boatId: 11 }], [10, 11]), [[10, 1], [11, 3]]);
+  // Boat 11 switched off: its seat still fills, with any free boat.
+  assert.deepStrictEqual(await placeWith([{ rank: 2, boatId: 11 }], [10]), [[10, 2]]);
+  // The stored plain-number form: boats in id order.
+  assert.deepStrictEqual(await placeWith([1, 3], [10, 11]), [[10, 1], [11, 3]]);
+});
+
+test('booked seats on save: one boat per rank and a rank per boat, out-of-range ranks dropped', async () => {
+  let saved = null;
+  const row = { type: 'daily', enabled: false, prize_pool: '0', platform_fee_percent: '0', winner_count: 5, top3_percentage: '60', rank_percentage: [] };
+  const service = new RaceService({
+    models: {
+      RaceConfig: {
+        findOne: async ({ raw }) => (raw ? { ...row, booked_seats: saved ?? [] } : { get: () => row }),
+        update: async (patch) => { saved = patch.booked_seats; },
+      },
+    },
+    logger: createLogger({ name: 'race-test', level: 'silent' }),
+    config: { RACE_TIMEZONE: IST },
+    clients: {},
+    wallet: {},
+    rewardMoney: {},
+  });
+
+  await service.updateConfig({ type: 'daily', bookedSeats: [3, { rank: 3, boatId: 4 }, 1, 9, { rank: 2, boatId: 5 }] });
+  assert.deepStrictEqual(saved, [1, { rank: 2, boatId: 5 }, { rank: 3, boatId: 4 }]);
+
+  await assert.rejects(() => service.updateConfig({ type: 'daily', bookedSeats: [{ rank: 1, boatId: 4 }, { rank: 2, boatId: 4 }] }), (e) => e.code === 'RACE_INVALID_CONFIG');
+  await assert.rejects(() => service.updateConfig({ type: 'daily', bookedSeats: [{ rank: 1, boatId: 4 }, { rank: 1, boatId: 5 }] }), (e) => e.code === 'RACE_INVALID_CONFIG');
 });

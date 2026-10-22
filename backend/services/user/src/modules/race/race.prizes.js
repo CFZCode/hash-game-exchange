@@ -75,7 +75,42 @@ function buildRankPrizes({ prizePool, winnerCount, platformFeePercent, top3Perce
     }),
   ];
 
+  capTail(ranks, podiumCount, net);
   return { netPool: money.toDecimalString(net), ranks };
+}
+
+/**
+ * A lower rank never pays more than a higher one.
+ *
+ * With a short tail (pool 5, 5 ranks, 60% podium) the tail's share split over two ranks gave
+ * rank 4 1.11 against rank 3's 0.43. So every tail rank is capped at the podium's last amount and
+ * the excess goes to the podium in proportion to what each podium rank already has (the rounding
+ * dust to rank 1): order kept, sum still exactly the net pool. A long tail never hits the cap.
+ */
+function capTail(ranks, podiumCount, net) {
+  const podium = ranks.slice(0, podiumCount);
+  if (podium.length < podiumCount || ranks.length === podiumCount) return;
+
+  const cap = money.toMinor(podium[podium.length - 1].amount);
+  let excess = 0n;
+  for (const row of ranks.slice(podiumCount)) {
+    const amount = money.toMinor(row.amount);
+    if (amount > cap) {
+      excess += amount - cap;
+      row.amount = money.toDecimalString(cap);
+    }
+  }
+  if (excess <= 0n) return;
+
+  const amounts = podium.map((r) => money.toMinor(r.amount));
+  const podiumTotal = amounts.reduce((a, b) => a + b, 0n);
+  const extra = amounts.map((a) => (excess * a) / podiumTotal);
+  extra[0] += excess - extra.reduce((a, b) => a + b, 0n);
+  podium.forEach((row, i) => { row.amount = money.toDecimalString(amounts[i] + extra[i]); });
+
+  for (const row of ranks) {
+    row.percentage = Number(((Number(money.toMinor(row.amount)) / Number(net)) * 100).toFixed(4));
+  }
 }
 
 /**

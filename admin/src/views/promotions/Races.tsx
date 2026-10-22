@@ -1,10 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { toast } from 'sonner'
 
-import { BanIcon, FlagIcon, ListOrderedIcon, Loader2Icon, PlusIcon, RotateCcwIcon, SaveIcon, Trash2Icon, TrophyIcon } from 'lucide-react'
+import { BanIcon, FlaskConicalIcon, FlagIcon, ListOrderedIcon, Loader2Icon, PlusIcon, RotateCcwIcon, SaveIcon, Trash2Icon, TrophyIcon, XIcon } from 'lucide-react'
 
 import Can from '@/components/shared/Can'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
@@ -12,7 +12,7 @@ import DataTable, { type Column } from '@/components/shared/DataTable'
 import DateTime from '@/components/shared/DateTime'
 import ErrorState from '@/components/shared/ErrorState'
 import FormDialog from '@/components/shared/FormDialog'
-import { SwitchField, TextAreaField, TextField } from '@/components/shared/FormField'
+import { SwitchField, TextField } from '@/components/shared/FormField'
 import Money from '@/components/shared/Money'
 import PageHeader from '@/components/shared/PageHeader'
 import { RewardCurrencyNotice } from '@/components/shared/RewardCurrency'
@@ -22,13 +22,15 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useApi, useApiMutation, useListState, usePagedApi } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
 import { formatDate, formatNumber } from '@/lib/format'
+import { cn } from '@/lib/utils'
 import { check, cleanErrors, firstError } from '@/lib/validate'
 
 /**
@@ -37,6 +39,9 @@ import { check, cleanErrors, firstError } from '@/lib/validate'
  * that config. Settling a race pays its rewards, so it is a confirm.
  */
 type RaceType = 'daily' | 'weekly'
+
+/** A booked rank (any free entry) or a rank pinned to one entry (Booked seats tab). */
+type Seat = number | { rank: number; boatId: number }
 
 type RaceConfig = {
   type: RaceType
@@ -53,7 +58,7 @@ type RaceConfig = {
   top3Percentage: number | string
   minPoints: string
   bookedSeatsEnabled: boolean
-  bookedSeats?: number[]
+  bookedSeats?: Seat[]
 
   /** The ladder that pays (USD, stored); `ladder` says whether it is the operator's own or the computed curve. */
   rankPrizes?: { rank: number; percentage: number; amount?: string }[]
@@ -69,7 +74,7 @@ type PublicRace = { type: RaceType; payout?: { currency: string; prizePool: stri
 type BoardRow = { rank: number; userId: string | null; name: string | null; points: string; usdWagered: string; bets: number; isBoat: boolean; reward: string; payout?: string }
 type Board = { raceId: number; startsAt: string; endsAt: string; winnerCount: number; payoutCurrency?: string; currency: string; leaderboard: BoardRow[] }
 
-type Race = { id: number; type: RaceType; status?: string; startsAt?: string; endsAt?: string; starts_at?: string; ends_at?: string; participants?: number; prizePool?: string; settledAt?: string | null; totalAwarded?: string; winnerCount?: number; cancelReason?: string | null }
+type Race = { id: number; type: RaceType; status?: string; startsAt?: string; endsAt?: string; starts_at?: string; ends_at?: string; participants?: number; prizePool?: string; settledAt?: string | null; totalAwarded?: string; winnerCount?: number; cancelReason?: string | null; test?: boolean }
 type Reward = { id: number; raceId?: number; type?: RaceType; raceStartsAt?: string | null; userId?: number | string; username?: string; rank?: number; points?: string; amount?: string; currency?: string; claimed?: boolean; claimedAt?: string | null; createdAt?: string }
 
 /** `meta.summary` of GET admin/user/race/rewards: every page of the same filters. */
@@ -111,47 +116,159 @@ const parseShares = (text: string) =>
     .filter(Boolean)
     .map(Number)
 
-const LadderDialog = ({ type, current }: { type: RaceType; current: RaceConfig }) => {
-  const [text, setText] = useState('')
-  const shares = parseShares(text)
+type Payout = NonNullable<PublicRace['payout']>
+
+/**
+ * The operator's own ladder as a table: rank, share of the net pool, and what that pays now.
+ * Same rules as the backend (race.prizes.js buildCustomLadder): shares > 0, at most 100, never
+ * rising down the ladder, total exactly 100; the number of rows becomes the ranks paid.
+ */
+const LadderDialog = ({ type, current, payout }: { type: RaceType; current: RaceConfig; payout?: Payout }) => {
+  const [open, setOpen] = useState(false)
+  const [rows, setRows] = useState<string[]>([])
+  const shares = rows.map(v => Number(v.trim().replace(/%$/, '')))
   const total = shares.reduce((a, b) => a + (Number.isFinite(b) ? b : 0), 0)
+  const totalOk = Math.abs(total - 100) <= 0.01
+
+  // A preview: the reward-currency net pool when the public read has it, else the USD net from the config.
+  const net = payout ? Number(payout.netPrizePool) : Number(current.prizePool) * (1 - Number(current.platformFeePercent) / 100)
+  const currency = payout?.currency ?? 'USD'
+  const amountOf = (share: number) => (Number.isFinite(share) ? (net * share) / 100 : 0)
+
+  const errors = shares.map((v, i) =>
+    !Number.isFinite(v) || v <= 0 || v > 100 ? 'Above 0 and at most 100' : i > 0 && v > shares[i - 1] ? `More than rank ${i}` : undefined
+  )
+
+  const problem = !rows.length
+    ? 'Add at least one rank'
+    : rows.length > 500
+      ? 'At most 500 ranks can be paid'
+      : errors.some(Boolean)
+        ? 'Fix the marked ranks'
+        : !totalOk
+          ? `Shares add up to ${total.toFixed(2)}% — they must total 100%`
+          : null
+
+  const invalidate = [['api', `admin/user/race/config/${type}`], ['api', 'user/race']]
 
   const save = useApiMutation({
     fn: () => api.put(`admin/user/race/config/${type}`, { rankShares: shares }),
-    invalidate: [['api', `admin/user/race/config/${type}`], ['api', 'user/race']],
-    success: 'Payout ladder saved'
+    invalidate,
+    success: 'Payout ladder saved',
+    onSuccess: () => setOpen(false)
   })
 
+  const reset = useApiMutation({
+    fn: () => api.put(`admin/user/race/config/${type}`, { resetLadder: true }),
+    invalidate,
+    success: 'Back to the computed curve',
+    onSuccess: () => setOpen(false)
+  })
+
+  const setRow = (i: number, v: string) => setRows(r => r.map((x, j) => (j === i ? v : x)))
+
   return (
-    <FormDialog
-      trigger={
-        <Button variant='outline' size='sm' onClick={() => setText((current.rankPrizes ?? []).map(r => r.percentage).join('\n'))}>
-          <ListOrderedIcon /> Edit ladder
-        </Button>
-      }
-      title={`${type[0].toUpperCase() + type.slice(1)} race — payout ladder`}
-      description='One line per paid rank, rank 1 first: its share of the net pool in %. The shares must add up to 100 and never rise down the ladder. The number of lines becomes the ranks paid.'
-      submitLabel='Save ladder'
-      onSubmit={() => save.mutateAsync()}
-      validate={() => {
-        if (!shares.length) return { ladder: 'Enter at least one rank share' }
-        if (shares.length > 500) return { ladder: 'At most 500 ranks can be paid' }
-        const bad = shares.findIndex(v => !Number.isFinite(v) || v <= 0 || v > 100)
-
-        if (bad >= 0) return { ladder: `Rank ${bad + 1}: share must be a number above 0 and at most 100` }
-        const rising = shares.findIndex((v, i) => i > 0 && v > shares[i - 1])
-
-        if (rising >= 0) return { ladder: `Rank ${rising + 1} pays more than rank ${rising} — shares must never rise down the ladder` }
-        if (Math.abs(total - 100) > 0.01) return { ladder: `Shares add up to ${total.toFixed(2)}% — they must total 100%` }
-
-        return null
-      }}
-    >
-      <TextAreaField id='ladder' label='Shares (%)' rows={10} value={text} onChange={e => setText(e.target.value)} />
-      <p className={`text-sm ${Math.abs(total - 100) <= 0.01 ? 'text-muted-foreground' : 'text-destructive'}`}>
-        {shares.length} ranks · total {total.toFixed(2)}%
-      </p>
-    </FormDialog>
+    <>
+      <Button
+        variant='outline'
+        size='sm'
+        onClick={() => {
+          setRows((current.rankPrizes ?? []).map(r => String(r.percentage)))
+          setOpen(true)
+        }}
+      >
+        <ListOrderedIcon /> Edit ladder
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className='gap-0 p-0 sm:max-w-2xl'>
+          <DialogHeader className='p-6 pb-4'>
+            <DialogTitle>{type[0].toUpperCase() + type.slice(1)} race — payout ladder</DialogTitle>
+            <DialogDescription>
+              Each rank&apos;s share of the net pool. Shares must total 100% and never rise down the ladder; the number of rows is the ranks paid.
+            </DialogDescription>
+          </DialogHeader>
+          <div className='bg-muted/40 flex flex-wrap items-center gap-2 border-y px-6 py-3 text-sm'>
+            <Badge variant={totalOk ? 'secondary' : 'destructive'} className='tabular-nums'>
+              Σ {total.toFixed(2)}% / 100%
+            </Badge>
+            <span className='text-muted-foreground tabular-nums'>
+              {rows.length} ranks · Σ <Money value={shares.reduce((a, v) => a + amountOf(v), 0).toFixed(8)} currency={currency} /> of{' '}
+              <Money value={net.toFixed(8)} currency={currency} /> net pool
+            </span>
+            <div className='bg-muted ml-auto h-1.5 w-32 overflow-hidden rounded-full'>
+              <div className={cn('h-full transition-all', totalOk ? 'bg-primary' : 'bg-destructive')} style={{ width: `${Math.min(100, Math.max(0, total))}%` }} />
+            </div>
+          </div>
+          <div className='max-h-[50vh] overflow-y-auto px-6'>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className='w-16'>Rank</TableHead>
+                  <TableHead>Share %</TableHead>
+                  <TableHead className='text-right'>Amount</TableHead>
+                  <TableHead className='w-10' />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.map((v, i) => (
+                  <TableRow key={i}>
+                    <TableCell className='tabular-nums'>#{i + 1}</TableCell>
+                    <TableCell>
+                      <Input
+                        aria-label={`Rank ${i + 1} share`}
+                        inputMode='decimal'
+                        className='h-8 w-28'
+                        aria-invalid={!!errors[i]}
+                        value={v}
+                        onChange={e => setRow(i, e.target.value)}
+                      />
+                      {errors[i] ? <p className='text-destructive mt-1 text-xs'>{errors[i]}</p> : null}
+                    </TableCell>
+                    <TableCell className='text-right'>
+                      <Money value={amountOf(shares[i]).toFixed(8)} currency={currency} />
+                    </TableCell>
+                    <TableCell>
+                      <Button variant='ghost' size='icon-sm' aria-label={`Remove rank ${i + 1}`} onClick={() => setRows(r => r.filter((_, j) => j !== i))}>
+                        <XIcon />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            <Button
+              variant='ghost'
+              size='sm'
+              className='my-3'
+              disabled={rows.length >= 500}
+              onClick={() => setRows(r => [...r, r.length ? r[r.length - 1] : '100'])}
+            >
+              <PlusIcon /> Add rank
+            </Button>
+          </div>
+          <DialogFooter className='bg-popover sticky bottom-0 items-center border-t p-4'>
+            {problem ? <p className='text-destructive mr-auto text-sm'>{problem}</p> : null}
+            <ConfirmDialog
+              trigger={
+                <Button variant='ghost' disabled={reset.isPending}>
+                  <RotateCcwIcon /> Reset to curve
+                </Button>
+              }
+              title='Go back to the computed curve?'
+              description='Your own shares are replaced by the curve from the ranks paid and the top-3 share.'
+              confirmLabel='Use the curve'
+              onConfirm={() => reset.mutateAsync()}
+            />
+            <Button variant='outline' onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <Button disabled={!!problem || save.isPending} onClick={() => save.mutate()}>
+              {save.isPending ? <Loader2Icon className='animate-spin' /> : <SaveIcon />} Save ladder
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
 
@@ -164,15 +281,11 @@ const ConfigEditor = ({ type }: { type: RaceType }) => {
   // The booked ranks as typed ("3, 7"); null = show the saved list.
   const [seatsText, setSeatsText] = useState<string | null>(null)
 
-  const reset = useApiMutation({
-    fn: () => api.put(`admin/user/race/config/${type}`, { resetLadder: true }),
-    invalidate: [['api', `admin/user/race/config/${type}`], ['api', 'user/race']],
-    success: 'Back to the computed curve'
-  })
-
+  // The text field edits the plain ranks; seats pinned to an entry (Booked seats tab) ride along.
+  const pinned = (q.data?.bookedSeats ?? []).filter(s => typeof s === 'object')
 
   const save = useApiMutation({
-    fn: () => api.put(`admin/user/race/config/${type}`, draft),
+    fn: () => api.put(`admin/user/race/config/${type}`, draft.bookedSeats ? { ...draft, bookedSeats: [...draft.bookedSeats, ...pinned] } : draft),
     invalidate: [['api', `admin/user/race/config/${type}`], ['api', 'user/race']],
     success: `${type} race configuration saved`,
     onSuccess: () => {
@@ -203,7 +316,7 @@ const ConfigEditor = ({ type }: { type: RaceType }) => {
     Object.fromEntries(NUMERIC_FIELDS.filter(f => f.key in draft).map(f => [`r-${String(f.key)}`, FIELD_RULE[f.key]?.(draft[f.key], f.label)]))
   )
 
-  if (draft.bookedSeats?.some(r => !Number.isInteger(r) || r < 1 || r > Number(c.winnerCount))) {
+  if (draft.bookedSeats?.some(r => typeof r !== 'number' || !Number.isInteger(r) || r < 1 || r > Number(c.winnerCount))) {
     errors['r-seats-ranks'] = `Booked ranks must be whole ranks from 1 to ${c.winnerCount}`
   }
 
@@ -250,9 +363,9 @@ const ConfigEditor = ({ type }: { type: RaceType }) => {
             <TextField
               id='r-seats-ranks'
               label='Booked ranks'
-              hint='The ranks a decorative entry takes, e.g. 2, 5, 8 (each sits just above the player at that rank, re-placed every few minutes). Only ranks up to "Ranks paid" are kept.'
+              hint={`The ranks any free decorative entry takes, e.g. 2, 5, 8 (each sits just above the player at that rank, re-placed every few minutes). Only ranks up to "Ranks paid" are kept. To put a particular entry on a rank, use the Booked seats tab${pinned.length ? ` (pinned now: ${pinned.map(p => `#${p.rank}`).join(', ')})` : ''}.`}
               error={errors['r-seats-ranks']}
-              value={seatsText ?? (c.bookedSeats ?? []).join(', ')}
+              value={seatsText ?? (c.bookedSeats ?? []).filter(s => typeof s === 'number').join(', ')}
               onChange={e => {
                 setSeatsText(e.target.value)
                 setDraft(d => ({ ...d, bookedSeats: parseShares(e.target.value) }))
@@ -301,25 +414,74 @@ const ConfigEditor = ({ type }: { type: RaceType }) => {
           )}
           <Can permission='config:write'>
             <div className='mt-3 flex flex-wrap gap-2'>
-              <LadderDialog type={type} current={q.data} />
-              {q.data.ladder === 'custom' ? (
-                <ConfirmDialog
-                  trigger={
-                    <Button variant='ghost' size='sm'>
-                      <RotateCcwIcon /> Use the curve
-                    </Button>
-                  }
-                  title='Go back to the computed curve?'
-                  description='Your own shares are replaced by the curve from the ranks paid and the top-3 share.'
-                  confirmLabel='Use the curve'
-                  onConfirm={() => reset.mutateAsync()}
-                />
-              ) : null}
+              <LadderDialog type={type} current={q.data} payout={payout} />
             </div>
           </Can>
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+/** A Date as a `datetime-local` value, in the browser's own zone. */
+const localInput = (d: Date) => new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 16)
+
+/**
+ * A staff test race with its own window (POST admin/user/race/races/test), so daily / weekly
+ * payouts and booked seats can be tried in minutes instead of waiting for midnight or Monday.
+ */
+const TestRaceCard = () => {
+  const [type, setType] = useState<RaceType>('daily')
+  const [start, setStart] = useState(() => localInput(new Date()))
+  const [end, setEnd] = useState(() => localInput(new Date(Date.now() + 10 * 60_000)))
+
+  const run = useApiMutation({
+    fn: () => api.post('admin/user/race/races/test', { type, startsAt: new Date(start).toISOString(), endsAt: new Date(end).toISOString() }),
+    invalidate: [['paged', 'admin/user/race/races'], ['api', `admin/user/race/leaderboard/${type}`]],
+    success: 'Test race started'
+  })
+
+  return (
+    <Card className='mb-4 shadow-none'>
+      <CardHeader>
+        <CardTitle className='flex items-center gap-2 text-base'>
+          <FlaskConicalIcon className='size-4' /> Test race
+        </CardTitle>
+        <CardDescription>Open a race over a window you choose (at most a day for daily, a week for weekly). Settle or cancel the open race of that type first.</CardDescription>
+      </CardHeader>
+      <CardContent className='flex flex-wrap items-end gap-3'>
+        <Select value={type} onValueChange={v => v && setType(v as RaceType)}>
+          <SelectTrigger className='w-32' aria-label='Race type'>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value='daily'>Daily</SelectItem>
+            <SelectItem value='weekly'>Weekly</SelectItem>
+          </SelectContent>
+        </Select>
+        <label className='grid gap-1 text-sm'>
+          Start
+          <Input type='datetime-local' className='w-56' value={start} onChange={e => setStart(e.target.value)} />
+        </label>
+        <label className='grid gap-1 text-sm'>
+          End
+          <Input type='datetime-local' className='w-56' value={end} onChange={e => setEnd(e.target.value)} />
+        </label>
+        <Can permission='config:write'>
+          <ConfirmDialog
+            trigger={
+              <Button disabled={!start || !end || run.isPending}>
+                <FlaskConicalIcon /> Start
+              </Button>
+            }
+            title={`Start a ${type} test race?`}
+            description='It counts only the wagers placed between Start and End. It pays from the current configuration (pool, ranks, booked seats) when you End & pay it, or automatically within 5 minutes after the end time. Use it for testing: the prizes are real rewards.'
+            confirmLabel='Start test race'
+            onConfirm={() => run.mutateAsync()}
+          />
+        </Can>
+      </CardContent>
+    </Card>
   )
 }
 
@@ -346,7 +508,16 @@ const RacesTab = () => {
 
   const columns: Column<Race>[] = [
     { key: 'id', header: 'Race', cell: r => <span className='font-mono text-xs'>#{r.id}</span> },
-    { key: 'type', header: 'Type', cell: r => <Badge variant='secondary'>{r.type}</Badge> },
+    {
+      key: 'type',
+      header: 'Type',
+      cell: r => (
+        <span className='flex gap-1'>
+          <Badge variant='secondary'>{r.type}</Badge>
+          {r.test ? <Badge variant='outline'>TEST</Badge> : null}
+        </span>
+      )
+    },
     { key: 'window', header: 'Window', cell: r => <span className='text-xs'><DateTime value={r.startsAt ?? r.starts_at} /> → <DateTime value={r.endsAt ?? r.ends_at} /></span> },
 
     // An open race takes its pool from the config at settlement; only a closed one has its own.
@@ -408,6 +579,7 @@ const RacesTab = () => {
   return (
     <>
     {winnersOf !== null ? <WinnersDialog raceId={winnersOf} onClose={() => setWinnersOf(null)} /> : null}
+    <TestRaceCard />
     <DataTable
       columns={columns}
       rows={list.data?.rows}
@@ -472,15 +644,53 @@ const WinnersDialog = ({ raceId, onClose }: { raceId: number; onClose: () => voi
 /** The open window's standings, as players see them (real ids for staff). */
 const BoardTab = () => {
   const [type, setType] = useState<RaceType>('daily')
-  const q = useApi<Board>(`admin/user/race/leaderboard/${type}`, undefined, { retry: false, refetchInterval: 30_000 })
+
+  /* A plain 5s timer, not useLivePoll: nothing pushes the race board over the realtime socket, so
+     useLivePoll would stop refreshing exactly while the socket is up. */
+  const q = useApi<Board>(`admin/user/race/leaderboard/${type}`, undefined, { retry: false, refetchInterval: 5_000 })
   const currency = q.data?.payoutCurrency ?? q.data?.currency
 
+  // Rows whose rank or points moved since the previous fetch, highlighted for a moment.
+  const keyOf = (r: BoardRow) => (r.isBoat ? `boat:${r.name}` : `user:${r.userId}`)
+  const prev = useRef<Map<string, string> | null>(null)
+  const [changed, setChanged] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    const rows = q.data?.leaderboard
+
+    if (!rows) return
+    const next = new Map(rows.map(r => [keyOf(r), `${r.rank}|${r.points}`]))
+    const moved = prev.current ? new Set([...next].filter(([k, v]) => prev.current!.get(k) !== v).map(([k]) => k)) : new Set<string>()
+
+    prev.current = next
+    setChanged(moved)
+    if (!moved.size) return
+    const t = setTimeout(() => setChanged(new Set()), 2_500)
+
+    return () => clearTimeout(t)
+  }, [q.data])
+
+  useEffect(() => {
+    prev.current = null // a different race type is not a change of standings
+  }, [type])
+
+  // "updated Ns ago" ticks every second.
+  const [now, setNow] = useState(() => Date.now())
+
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1_000)
+
+    return () => clearInterval(t)
+  }, [])
+  const ago = q.dataUpdatedAt ? Math.max(0, Math.round((now - q.dataUpdatedAt) / 1000)) : null
+  const flash = (r: BoardRow) => (changed.has(keyOf(r)) ? 'rounded bg-amber-400/25 px-1 transition-colors' : 'px-1 transition-colors')
+
   const columns: Column<BoardRow>[] = [
-    { key: 'rank', header: 'Rank', cell: r => <span className='tabular-nums'>{r.rank}</span> },
+    { key: 'rank', header: 'Rank', cell: r => <span className={cn('tabular-nums', flash(r))}>{r.rank}</span> },
     { key: 'user', header: 'Player', cell: r => (r.isBoat ? <Badge variant='outline'>Booked seat · {r.name}</Badge> : <span>{r.name ?? '—'} <span className='text-muted-foreground font-mono text-xs'>#{r.userId}</span></span>) },
     { key: 'wagered', header: 'Wagered (USD)', align: 'right', cell: r => <Money value={r.usdWagered} /> },
     { key: 'bets', header: 'Bets', align: 'right', cell: r => <span className='tabular-nums'>{r.bets}</span> },
-    { key: 'points', header: 'Points', align: 'right', cell: r => <span className='font-mono tabular-nums'>{r.points}</span> },
+    { key: 'points', header: 'Points', align: 'right', cell: r => <span className={cn('font-mono tabular-nums', flash(r))}>{r.points}</span> },
     { key: 'prize', header: 'Prize now', align: 'right', cell: r => (r.isBoat /* not paid: the house keeps a booked seat's prize */ ? <span className='text-muted-foreground'><Money value={r.payout ?? r.reward} currency={currency} /> (house)</span> : <Money value={r.payout ?? r.reward} currency={currency} />) }
   ]
 
@@ -496,6 +706,11 @@ const BoardTab = () => {
         {q.data ? (
           <span className='text-muted-foreground text-sm'>
             Race #{q.data.raceId} · <DateTime value={q.data.startsAt} /> → <DateTime value={q.data.endsAt} /> · top {q.data.winnerCount} paid
+          </span>
+        ) : null}
+        {ago !== null ? (
+          <span className={cn('text-xs', q.isError ? 'text-destructive' : 'text-emerald-600 dark:text-emerald-400')}>
+            ● Live · updated {ago}s ago{q.isFetching ? ' · refreshing' : ''}
           </span>
         ) : null}
       </div>
@@ -603,6 +818,60 @@ const RewardsTab = () => {
   )
 }
 
+/**
+ * Which rank an entry holds in one race type. Saving writes that type's `bookedSeats`: this
+ * entry's pin moves to the chosen rank (any plain seat on that rank is replaced); a rank pinned
+ * to another entry is disabled, so a rank is used once and an entry sits on one rank.
+ */
+const SeatSelect = ({ type, boat }: { type: RaceType; boat: Boat }) => {
+  const cfg = useApi<RaceConfig>(`admin/user/race/config/${type}`, undefined, { retry: false })
+  const boats = useApi<Boat[]>('admin/user/race/boats', undefined, { retry: false })
+  const seats = cfg.data?.bookedSeats ?? []
+  const pinOf = (s: Seat) => (typeof s === 'object' ? s : null)
+  const mine = seats.map(pinOf).find(p => p?.boatId === boat.id)?.rank
+  const holder = (rank: number) => seats.map(pinOf).find(p => p?.rank === rank && p.boatId !== boat.id)
+
+  const save = useApiMutation({
+    fn: (rank: number | null) =>
+      api.put(`admin/user/race/config/${type}`, {
+        bookedSeats: [
+          ...seats.filter(s => (typeof s === 'number' ? s !== rank : s.boatId !== boat.id && s.rank !== rank)),
+          ...(rank ? [{ rank, boatId: boat.id }] : [])
+        ]
+      }),
+    invalidate: [['api', `admin/user/race/config/${type}`], ['api', 'user/race']],
+    success: 'Seat saved'
+  })
+
+  if (!cfg.data) return <Skeleton className='h-8 w-28' />
+
+  return (
+    <Can permission='config:write' fallback={<span className='tabular-nums'>{mine ? `#${mine}` : '—'}</span>}>
+      <div className='flex items-center gap-2'>
+        <Select value={mine ? String(mine) : 'none'} onValueChange={v => v && save.mutate(v === 'none' ? null : Number(v))} disabled={save.isPending}>
+          <SelectTrigger className='w-36' aria-label={`${type} seat for ${boat.name}`}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value='none'>None</SelectItem>
+            {Array.from({ length: cfg.data.winnerCount }, (_, i) => i + 1).map(rank => {
+              const other = holder(rank)
+
+              return (
+                <SelectItem key={rank} value={String(rank)} disabled={!!other}>
+                  #{rank}
+                  {other ? ` · ${boats.data?.find(b => b.id === other.boatId)?.name ?? 'taken'}` : ''}
+                </SelectItem>
+              )
+            })}
+          </SelectContent>
+        </Select>
+        {!cfg.data.bookedSeatsEnabled ? <span className='text-muted-foreground text-xs'>seats off</span> : null}
+      </div>
+    </Can>
+  )
+}
+
 const BoatsTab = () => {
   const list = useApi<Boat[]>('admin/user/race/boats', undefined, { retry: false })
   const [name, setName] = useState('')
@@ -628,6 +897,8 @@ const BoatsTab = () => {
 
   const columns: Column<Boat>[] = [
     { key: 'name', header: 'Name', cell: b => b.name },
+    { key: 'daily', header: 'Daily seat', cell: b => <SeatSelect type='daily' boat={b} /> },
+    { key: 'weekly', header: 'Weekly seat', cell: b => <SeatSelect type='weekly' boat={b} /> },
     { key: 'active', header: 'Shown', cell: b => <Can permission='config:write' fallback={<StatusBadge value={b.isActive} />}><Button variant='ghost' size='sm' disabled={toggle.isPending} onClick={() => toggle.mutate({ id: b.id, isActive: !b.isActive })}><StatusBadge value={b.isActive ? 'active' : 'inactive'} /></Button></Can> },
     {
       key: 'actions',
@@ -654,7 +925,7 @@ const BoatsTab = () => {
   return (
     <div className='grid gap-4'>
       <p className='text-muted-foreground text-sm'>
-        Decorative entries shown on the leaderboard beside real users, when booked seats are switched on for a race type.
+        Decorative entries shown on the leaderboard beside real users, when booked seats are switched on for a race type (Configuration). Pick the rank an entry holds in each race; an entry that is not shown gives its seat to any free entry. Plain booked ranks from the Configuration tab take whichever entry is left.
       </p>
       <Can permission='config:write'>
         <FormDialog

@@ -78,6 +78,19 @@ module.exports = function adminRoutes(deps) {
     ctrl.cancel
   );
 
+  /**
+   * Open a test race with a staff-chosen window (e.g. the next 10 minutes), so daily/weekly
+   * payouts and booked seats can be tried without waiting for midnight or Monday. It settles
+   * like any race: End & pay, or the roll job once it has ended.
+   */
+  router.post(
+    '/races/test',
+    canWrite,
+    validate(v.testRace),
+    audit('race.test', (req) => ({ targetType: 'RACE', targetId: req.body.type, details: req.body })),
+    ctrl.startTestRace
+  );
+
   // ── Decorative entries ──────────────────────────────────────────────
   router.post(
     '/boats',

@@ -22,6 +22,8 @@ const amount = z
   .transform((v) => String(v))
   .refine((v) => /^\d{1,12}(\.\d{1,8})?$/.test(v), 'must be a positive decimal amount');
 
+const seatRank = z.coerce.number().int().min(1).max(MAX_WINNERS);
+
 const typeParam = { params: z.object({ type: raceType }) };
 
 const listing = {
@@ -65,6 +67,11 @@ const cancel = {
   body: z.object({ reason: z.string().trim().max(200).optional() }).strict(),
 };
 
+/** A staff test race: its own window instead of midnight→midnight / Monday→Monday. */
+const testRace = {
+  body: z.object({ type: raceType, startsAt: z.coerce.date(), endsAt: z.coerce.date() }).strict(),
+};
+
 const rewardParam = { params: z.object({ rewardId: id }) };
 
 const updateConfig = {
@@ -98,7 +105,16 @@ const updateConfig = {
        * at rank 40 of a 25-rank race is a seat that can never be filled, and
        * silently keeping it makes the boat placement loop look broken.
        */
-      bookedSeats: z.array(z.coerce.number().int().min(1).max(MAX_WINNERS)).max(MAX_WINNERS).optional(),
+      bookedSeats: z
+        .array(
+          z.union([
+            seatRank,
+            // A rank pinned to one boat; a plain number is any free boat (the older, stored form).
+            z.object({ rank: seatRank, boatId: id }).strict(),
+          ])
+        )
+        .max(MAX_WINNERS)
+        .optional(),
 
       /**
        * The operator's own payout ladder: % of the net pool per rank, rank 1 first. Sets the
@@ -131,6 +147,7 @@ module.exports = {
   adminListing,
   rewardParam,
   cancel,
+  testRace,
   updateConfig,
   addBoat,
   updateBoat,

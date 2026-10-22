@@ -207,7 +207,9 @@ export type RaceConfig = {
   minPoints: string
   rankPrizes: { rank: number; amount: string; percentage: number }[]
   bookedSeatsEnabled: boolean
-  bookedSeats: number[]
+
+  /** A rank (any free entry) or a rank pinned to one entry. */
+  bookedSeats: (number | { rank: number; boatId: number })[]
 }
 
 export type RaceRow = {

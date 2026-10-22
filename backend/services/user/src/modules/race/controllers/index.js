@@ -84,6 +84,8 @@ function createControllers({ service }) {
       response.ok(res, await service.cancel({ raceId: req.params.id, reason: req.body?.reason ?? null }))
     ),
 
+    startTestRace: asyncHandler(async (req, res) => response.created(res, await service.startTestRace(req.body))),
+
     /** Staff view of the open board: the same standings players see, real ids included. */
     adminLeaderboard: asyncHandler(async (req, res) => response.ok(res, await service.leaderboard({ type: req.params.type }))),
 
