@@ -57,8 +57,8 @@ const GROUPS: { title: string; hint: string; keys: string[] }[] = [
   },
   {
     title: 'User accounts',
-    hint: 'How a sign-in locks, how many sessions a user keeps, and whether an email must be verified before money moves.',
-    keys: ['login_max_attempts', 'login_lock_minutes', 'max_active_sessions', 'require_email_verification']
+    hint: 'How a sign-in locks, how many sessions a user keeps, how long a player stays signed in, and whether an email must be verified before money moves.',
+    keys: ['login_max_attempts', 'login_lock_minutes', 'max_active_sessions', 'player_session_minutes', 'require_email_verification']
   }
 ]
 
