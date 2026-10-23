@@ -17,7 +17,7 @@ const {
 
 const errors = require('./auth.errors');
 const { sharedIpLocator, normaliseIp } = require('./geo/ipLocation');
-const { sitePolicy, withdrawBlock, manualPayments } = require('@ibitplay/common');
+const { sitePolicy, withdrawBlock, manualPayments, operatorSettings } = require('@ibitplay/common');
 const { RegionService } = require('../region/region.service');
 /* Registration is where a referral becomes a team. Safe to require here —
    the affiliate module does not reach back into auth. */
@@ -102,6 +102,7 @@ class AuthService {
        Absent in unit tests, where the affiliate settings resolver falls back
        to its own defaults rather than calling admin-service. */
     this.clients = clients ?? null;
+    this.settings = operatorSettings({ clients, logger, config });
     this.tokens = new TokenService(config);
     // `users.two_fa` holds an encrypted secret now, so the login path needs the
     // same box the twofa module writes with.
@@ -246,7 +247,8 @@ class AuthService {
       const next = await this.#createSession(
         user,
         { ip: context.ip, userAgent: context.userAgent, deviceLabel: session.device_label },
-        transaction
+        transaction,
+        session.expires_at
       );
 
       await session.update(
@@ -1062,9 +1064,18 @@ class AuthService {
     return payload;
   }
 
-  async #createSession(user, { ip, userAgent, deviceLabel }, transaction) {
+  /* `rotatedFrom` is the expiry of the session a refresh replaces. With the operator's
+     `player_session_minutes` on, the session ends that long after SIGN-IN: a rotation keeps the
+     old end instead of starting a new one, and the access token never outlives it. Off (0), a
+     rotation slides another 30 days as before. A session signed in before the setting was turned
+     on keeps its own end. */
+  async #createSession(user, { ip, userAgent, deviceLabel }, transaction, rotatedFrom = null) {
     const refreshToken = randomToken(48);
-    const expiresAt = new Date(Date.now() + SESSION_TTL_DAYS * 24 * 3600 * 1000);
+    const minutes = Number(await this.settings.read('player_session_minutes', 0)) || 0;
+    const expiresAt =
+      minutes > 0
+        ? new Date(rotatedFrom ?? Date.now() + minutes * 60_000)
+        : new Date(Date.now() + SESSION_TTL_DAYS * 24 * 3600 * 1000);
 
     const session = await this.models.AuthSession.create(
       {
@@ -1085,6 +1096,7 @@ class AuthService {
       sessionId: session.id,
       role: 'player',
       status: user.status || 'active',
+      notAfter: minutes > 0 ? expiresAt : null,
     });
 
     return {

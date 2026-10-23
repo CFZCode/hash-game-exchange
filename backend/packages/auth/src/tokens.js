@@ -43,17 +43,18 @@ class TokenService {
   }
 
   /** Player access token. Keep the payload small — it rides on every request. */
-  signAccessToken({ userId, sessionId, role = 'player', status = 'active', extra = {} }) {
-    return jwt.sign(
-      { sub: String(userId), sid: sessionId, type: TOKEN_TYPES.ACCESS, role, status, ...extra },
-      this.accessSecret,
-      {
-        expiresIn: this.accessTtl,
-        issuer: this.issuer,
-        audience: this.audience,
-        jwtid: crypto.randomUUID(),
-      }
-    );
+  signAccessToken({ userId, sessionId, role = 'player', status = 'active', extra = {}, notAfter = null }) {
+    const sign = (expiresIn) =>
+      jwt.sign(
+        { sub: String(userId), sid: sessionId, type: TOKEN_TYPES.ACCESS, role, status, ...extra },
+        this.accessSecret,
+        { expiresIn, issuer: this.issuer, audience: this.audience, jwtid: crypto.randomUUID() }
+      );
+    const token = sign(this.accessTtl);
+    // `notAfter` (a Date): the session's own end — an access token never outlives it.
+    if (!notAfter) return token;
+    const left = Math.max(1, Math.floor((new Date(notAfter).getTime() - Date.now()) / 1000));
+    return jwt.decode(token).exp > Math.floor(Date.now() / 1000) + left ? sign(left) : token;
   }
 
   /** Refresh token — deliberately carries nothing but the session identity. */

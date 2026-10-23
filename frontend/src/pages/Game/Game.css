@@ -509,3 +509,19 @@
     height: calc(var(--og-frame-h, 720px) + 12rem);
   }
 }
+
+/* High win / Lucky win rows: the home ticker's slide-in (LatestBets: 48px, 500ms, ease-out). */
+.game-win-row {
+  animation: game-win-in 500ms cubic-bezier(0, 0, 0.58, 1) both;
+}
+@keyframes game-win-in {
+  from {
+    opacity: 0;
+    transform: translateY(-48px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .game-win-row {
+    animation: none;
+  }
+}

@@ -448,7 +448,7 @@ function GameLeaderboard({ game, gameUnique }) {
    four-column table — Player, Payout (coin + amount), Wager, Mult — zebra rows in layer5-table,
    transcribed from its desktop markup. Review is not drawn (no reviews here). */
 const DESKTOP_WIN_TABS = ['High win', 'Lucky win'];
-const TH = 'truncate px-2 py-3 align-middle font-semibold sm:px-4 w-1/4';
+const WIN_COLS = 'grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_6rem_minmax(0,1.2fr)]';
 
 function GameWinsTable({ game, gameUnique, settings }) {
   const ref = game?.ref ?? gameUnique;
@@ -494,37 +494,39 @@ function GameWinsTable({ game, gameUnique, settings }) {
         ) : rows.length === 0 ? (
           <EmptyPlaceholder className="w-full" />
         ) : (
-          <div className="relative max-h-[40rem] w-full overflow-auto rounded-xl">
-            <table className="w-full caption-bottom text-sm">
-              <thead>
-                <tr className="font-semibold text-secondary">
-                  <th className={`${TH} text-left`}>Player</th>
-                  <th className={`${TH} text-center`}>Payout</th>
-                  <th className={`${TH} text-center`}>Wager</th>
-                  <th className={`${TH} text-center`}>Mult</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.slice(0, 10).map((row) => (
-                  <tr key={row.betId} className="text-center odd:bg-layer5-table">
-                    <td className="rounded-l-lg px-2 py-3 align-middle sm:px-4">
-                      <div className="flex items-center">
-                        <img className="mr-2 size-6 rounded-full" alt="" src={defaultAvatar} />
-                        <span className="truncate font-extrabold leading-[26px] text-secondary">{displayName(row.userName)}</span>
-                      </div>
-                    </td>
-                    <td className="px-2 py-3 align-middle sm:px-4">
-                      <div className="flex items-center justify-center gap-1">
-                        <img className="size-5 flex-none rounded-full" alt="" src={coinIcon(shownIn(row.currencyName))} />
-                        <span className="font-extrabold text-brand">+{money(gross(row), row.currencyName)}</span>
-                      </div>
-                    </td>
-                    <td className="px-2 py-3 align-middle font-extrabold text-primary sm:px-4">{money(row.throwAmount, row.currencyName)}</td>
-                    <td className="rounded-r-lg px-2 py-3 align-middle font-extrabold text-primary sm:px-4">{(Number(row.payout) / 100).toFixed(4)}×</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          /* The home page's Latest round & Race board (LatestBets): a layer2 head row, 48px grid
+             rows banded layer2 / layer3_alt, the amount then its coin. Rows slide in from the top
+             one after another, the ticker's 500ms ease-out; keyed on the tab so a switch replays it. */
+          <div key={tab} className="rounded-lg bg-layer4_alt p-2 text-sm font-semibold text-secondary">
+            <div className={`grid h-12 items-center rounded-lg bg-layer2 px-4 text-xs text-tertiary ${WIN_COLS}`}>
+              <div>Player</div>
+              <div>Wager</div>
+              <div>Mult</div>
+              <div className="text-right">Payout</div>
+            </div>
+            <div className="mt-1 overflow-hidden rounded-lg">
+              {rows.slice(0, 10).map((row, i) => (
+                <div
+                  key={row.betId}
+                  className={`game-win-row grid h-12 items-center px-4 ${WIN_COLS} ${i % 2 ? 'bg-layer3_alt' : 'bg-layer2'}`}
+                  style={{ animationDelay: `${i * 60}ms` }}
+                >
+                  <div className="flex min-w-0 items-center">
+                    <img className="mr-2 size-6 flex-none rounded-full" alt="" src={defaultAvatar} />
+                    <span className="truncate text-primary">{displayName(row.userName)}</span>
+                  </div>
+                  <div className="flex min-w-0 items-center">
+                    <span className="truncate">{money(row.throwAmount, row.currencyName)}</span>
+                    <img className="ml-1 h-5 flex-none" alt="" src={coinIcon(shownIn(row.currencyName))} />
+                  </div>
+                  <div className="truncate">{(Number(row.payout) / 100).toFixed(2)}×</div>
+                  <div className="flex min-w-0 items-center justify-end text-brand">
+                    <span className="truncate">+{money(gross(row), row.currencyName)}</span>
+                    <img className="ml-1 h-5 flex-none" alt="" src={coinIcon(shownIn(row.currencyName))} />
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -613,6 +615,16 @@ export default function GamePage() {
       setLaunching(false);
     }
   };
+
+  /* Signed in, the game launches on arrival (owner's call: no Play card for a player). Once per
+     game + coin, so closing the frame or a refused launch falls back to the overlay, not a loop. */
+  const autoKey = session.login && game && currentCode ? `${gameUnique}:${currentCode}` : null;
+  const autoLaunched = React.useRef(null);
+  React.useEffect(() => {
+    if (!autoKey || autoLaunched.current === autoKey) return;
+    autoLaunched.current = autoKey;
+    play();
+  }, [autoKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* Third-party games take the original's SLOT layout (`index-CxQFC9RQ.js` -> `SlotsGameLayout`):
      a 16:9 frame across the column and no live-players panel, which is the BC Originals client's.
@@ -739,7 +751,7 @@ export default function GamePage() {
                   allowFullScreen
                 />
               </>
-            ) : loading ? (
+            ) : loading || launching ? (
               <Loading />
             ) : game ? (
               <>
@@ -816,7 +828,9 @@ export default function GamePage() {
         </section>
 
         {/* The live players panel. Its feed is the game client's own socket, so it is the site's
-            empty state here under the heading the live panel carries. */}
+            empty state here under the heading the live panel carries. Not before the game read
+            lands: until then neither is-slots nor is-original hides it, and it flashed on load. */}
+        {game ? (
         <aside className="game-side">
           <div className="game-side-head">
             <span className="game-side-dot" />
@@ -831,6 +845,7 @@ export default function GamePage() {
             <EmptyPlaceholder className="w-full" />
           </div>
         </aside>
+        ) : null}
       </div>
 
       {/* The info card (name, provider, tags, House Edge / RTP / Max Win / Stakes Range) is off

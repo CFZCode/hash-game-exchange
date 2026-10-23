@@ -15,6 +15,14 @@ Format:
 
 ---
 
+## 2026-10-23 — Player auto-logout (admin setting) + game page / header / provider logo fixes
+**Kya kiya:** Admin → Site config → Limits me naya setting "Sign players out after (minutes, 0 = never)" (`player_session_minutes`). User-service login pe session ka end = login + N min; refresh purana end hi rakhta hai (naya 30 din nahi); access token us end se aage valid nahi (`TokenService.signAccessToken({ notAfter })`). Player site `expiresAt` store karke theek us waqt sign out karta hai (`services/tokens.js`), reload ke baad bhi. Saath me: header pill me ₹ ki jagah "INR 4,637.30"; signed-in player ke liye game seedha launch (Play card nahi); game load pe side "0/0 Players" panel ka flash band; High win / Lucky win table home ke Latest round board jaisa + rows slide-in; Explore → Providers ke logos ab crop nahi hote (backend ke logos 200x80 nahi hote, `max-h-full`).
+**Kyun:** User ki demands (screenshots ke saath); auto-logout testing ke liye 5 min.
+**Files / jagah:** backend/services/admin/src/modules/site-config/siteConfig.service.js, backend/services/user/src/modules/auth/auth.service.js, backend/packages/auth/src/tokens.js (+ __tests__/accessNotAfter.test.js), frontend/src/services/tokens.js, frontend/src/layouts/MainLayout/Header/AfterLogin/index.jsx, frontend/src/pages/Game/index.jsx + Game.css, frontend/src/components/shared/ProviderLogo/index.jsx
+**Notes / pending:** Local backend pe check: 1 min pe login → session 60 s, refresh same end, 62 s baad `/me` aur refresh dono 401; 5 min pe 300 s. Live pe deploy (server pe pull + pm2 restart user/admin) ke baad Limits page pe 5 set karna hai — tab tak live pe kuch nahi badla. Setting on hone se pehle ke sessions apna 30 din wala end rakhte hain. Server pe ye setting hamesha sab real players pe lagti hai.
+
+---
+
 ## 2026-10-22 — Balance sheet me Vault ki entries
 **Kya kiya:** Admin balance sheet (section 6e) ab swap ke saath vault ki `credits_ledger` rows bhi padhta hai: `TRANSFER_OUT` / `TRANSFER_IN` jinka `meta.refType = 'VAULT'`, category "Vault", description wahi jo vault ne likhi ("Vault deposit — 7 Days"), vault me daalna = DEBIT, vault se nikalna = CREDIT. Test: "vault deposits and withdrawals are on the sheet as Vault, with their sign".
 **Kyun:** User: "valut ka bhi data ana chaiye". Pehle sheet sirf swap wale TRANSFER rows padhti thi, isliye tonny (8623441393) ki sheet me vault ke ₹100 + ₹200 "unexplained −300" aate the. Ab live par uski sheet: ledger 786.30 = live 786.30, unexplained 0.

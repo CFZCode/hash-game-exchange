@@ -42,7 +42,9 @@ export default function ProviderLogo({
 
   return (
     <div className={`center flex overflow-hidden ${boxClassName}`}>
-      <img className={`${className} object-contain`} alt={label} src={logo} />
+      {/* max-h-full: the platform's logos (casino/games/providers/<name>/logo) are not all 200x80 —
+          a square or tall one at w-24 h-auto overflowed the box and was cropped to its middle. */}
+      <img className={`${className} max-h-full object-contain`} alt={label} src={logo} />
     </div>
   );
 }

@@ -254,7 +254,7 @@ function Wallet({ mobile = false }) {
     settings: session.setting,
     // 2 places for USDT, as the wallet and the game print it (31.57, not 31.5765).
     decimals: coinDecimals(current.currencyName),
-  });
+  }).replace('₹', 'INR '); // owner asked for the code, not the rupee sign, in the header pill
   /* While the signed-in wallet is still loading the session holds the captured VISITOR row, a
      BCD (BC.GAME's own token) placeholder this platform never issues — so the pill drew
      "0 BCD" for a moment on every cold load. Until a real row lands, draw a placeholder. */

@@ -99,16 +99,29 @@ export function getSessionId() {
  * a JWT this build deliberately does not parse. Refreshing is driven by a 401 instead, which is
  * the server's answer rather than our guess at it; see `client.js`.
  */
-export function setTokens({ accessToken, refreshToken } = {}) {
+export function setTokens({ accessToken, refreshToken, expiresAt } = {}) {
   const was = Boolean(current?.accessToken);
-  current = accessToken ? { accessToken, refreshToken: refreshToken ?? null } : null;
+  current = accessToken ? { accessToken, refreshToken: refreshToken ?? null, expiresAt: expiresAt ?? null } : null;
   write(current);
+  scheduleSignOut();
   if (was !== Boolean(current)) notifySessionChanged();
+}
+
+/* The session's end (`expiresAt` from login / refresh). With the admin's "Sign players out after"
+   on it is minutes away, and the tab signs out on the dot rather than at its next 401. A 30-day
+   end is past setTimeout's 24.8-day ceiling (it would fire at once), so that one is left to the 401. */
+let signOutTimer = 0;
+function scheduleSignOut() {
+  clearTimeout(signOutTimer);
+  const left = current?.expiresAt ? new Date(current.expiresAt).getTime() - Date.now() : NaN;
+  if (!(left < 2 ** 31 - 1)) return;
+  signOutTimer = setTimeout(() => notifyAuthExpired('expired'), Math.max(0, left));
 }
 
 export function clearTokens() {
   const was = Boolean(current?.accessToken);
   current = null;
+  clearTimeout(signOutTimer);
   write(null);
   if (was) notifySessionChanged();
 }
@@ -170,3 +183,6 @@ export function notifyAuthExpired(reason) {
     }
   }
 }
+
+// A reload restores the stored session, and its end with it.
+scheduleSignOut();

@@ -128,6 +128,8 @@ const OPERATOR_SETTINGS = Object.freeze({
   login_max_attempts: { env: 'LOGIN_MAX_ATTEMPTS', kind: 'number', min: 1, max: 50, label: 'Failed logins before a lock' },
   login_lock_minutes: { env: 'LOGIN_LOCK_MINUTES', kind: 'number', min: 1, max: 1440, label: 'Lock lasts (minutes)' },
   max_active_sessions: { env: 'MAX_ACTIVE_SESSIONS', kind: 'number', min: 1, max: 100, label: 'Sessions per player' },
+  // Read by user-service's AuthService: a player's session ends this long after sign-in (0 = never).
+  player_session_minutes: { env: 'PLAYER_SESSION_MINUTES', kind: 'number', min: 0, max: 43200, label: 'Sign players out after (minutes, 0 = never)' },
   require_email_verification: { env: 'REQUIRE_EMAIL_VERIFICATION', kind: 'boolean', label: 'Verify email before transacting' },
 });
 
