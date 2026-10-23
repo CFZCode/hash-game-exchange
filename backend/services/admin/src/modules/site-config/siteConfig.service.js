@@ -129,7 +129,7 @@ const OPERATOR_SETTINGS = Object.freeze({
   login_lock_minutes: { env: 'LOGIN_LOCK_MINUTES', kind: 'number', min: 1, max: 1440, label: 'Lock lasts (minutes)' },
   max_active_sessions: { env: 'MAX_ACTIVE_SESSIONS', kind: 'number', min: 1, max: 100, label: 'Sessions per player' },
   // Read by user-service's AuthService: a player's session ends this long after sign-in (0 = never).
-  player_session_minutes: { env: 'PLAYER_SESSION_MINUTES', kind: 'number', min: 0, max: 43200, label: 'Sign players out after (minutes, 0 = never)' },
+  player_session_minutes: { env: 'PLAYER_SESSION_MINUTES', kind: 'number', min: 0, max: 43200, default: 5, label: 'Sign players out after (minutes, 0 = never)' },
   require_email_verification: { env: 'REQUIRE_EMAIL_VERIFICATION', kind: 'boolean', label: 'Verify email before transacting' },
 });
 
@@ -1064,7 +1064,8 @@ class SiteConfigService {
         env: spec.env,
         envValue: envValue === undefined ? null : String(envValue),
         stored: has ? stored[key] : null,
-        value: has ? stored[key] : (envValue === undefined ? null : envValue),
+        // `default`: the value with nothing stored and no env (only player_session_minutes has one).
+        value: has ? stored[key] : (envValue === undefined ? spec.default ?? null : envValue),
         source: has ? 'operator' : 'environment',
         ...(spec.min !== undefined ? { min: spec.min } : {}),
         ...(spec.max !== undefined ? { max: spec.max } : {}),

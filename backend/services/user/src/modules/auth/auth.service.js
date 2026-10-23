@@ -1066,12 +1066,13 @@ class AuthService {
 
   /* `rotatedFrom` is the expiry of the session a refresh replaces. With the operator's
      `player_session_minutes` on, the session ends that long after SIGN-IN: a rotation keeps the
-     old end instead of starting a new one, and the access token never outlives it. Off (0), a
+     old end instead of starting a new one, and the access token never outlives it. Default 5
+     (owner's call, 23 Oct 2026) when nothing is stored, also when admin-service is unreachable. Off (0), a
      rotation slides another 30 days as before. A session signed in before the setting was turned
      on keeps its own end. */
   async #createSession(user, { ip, userAgent, deviceLabel }, transaction, rotatedFrom = null) {
     const refreshToken = randomToken(48);
-    const minutes = Number(await this.settings.read('player_session_minutes', 0)) || 0;
+    const minutes = Number(await this.settings.read('player_session_minutes', 5)) || 0;
     const expiresAt =
       minutes > 0
         ? new Date(rotatedFrom ?? Date.now() + minutes * 60_000)
