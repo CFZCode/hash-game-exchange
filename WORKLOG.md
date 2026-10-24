@@ -15,6 +15,14 @@ Format:
 
 ---
 
+## 2026-10-24 — F2Pay sirf INR: IDR ke methods, payload aur switches hataye
+**Kya kiya:** F2Pay ab sirf INR ke liye. user-service gateway: `F2PAY_PAYIN` (INR/IDR endpoint + decimals table) hataya — `supports` = INR only, order hamesha `/payin/inr/order/create`, amount 2 decimals, phone last 10 digits. admin-service: F2Pay ki currencies me sirf INR (`f2pay_idr` switch gaya; Super Admin IDR method add kare to 422). Owner panel: F2Pay group me sirf `f2pay_inr` (IDR row + uske methods editor gaye). Migration 154: `payment_methods` se F2Pay ke 6 IDR methods (QRIS, DANA, CIMB, BRI, MANDIRI, BNI) delete. Frontend `DEPOSIT_FIATS` wapas `['INR']`. Tests INR-only ke hisaab se badle, F2Pay IDR wale test hataye. Callback check: 20:49 par F2Pay ka callback bypass ke baad 200 se aaya (signature sahi; state Paid nahi thi isliye credit nahi).
+**Kyun:** User: "f2pay bss inr ke liye hi hai bhai to idr hata do … owner panel me bss f2pay me inr hi dikhao … idr ke method and payload hata do bhai bss inr ke liye code rakho".
+**Files / jagah:** backend/services/user/src/modules/payment-orders/{gateways/index.js,__tests__/paymentOrders.test.js}, backend/services/user/src/modules/psp/__tests__/psp.test.js, backend/services/admin/src/modules/site-config/{siteConfig.service.js,__tests__/siteConfig.test.js}, backend/packages/db/migrations/154-f2pay-inr-only.js, backend/.env.example, owner-panel/src/configs/entitlementCatalogue.ts, owner-panel/src/lib/entitlements/{paymentMethods.ts,types.ts}, owner-panel/src/views/entitlements/Entitlements.tsx, frontend/src/config/hiddenFeatures.js
+**Notes / pending:** Live: migration 154 (ab `payment_methods` me sirf f2pay INR UpiMixed), parker-user-svc + parker-admin-svc restart, owner-panel + frontend build + restart. Admin code nahi badla (Payment Methods screen backend ki list dikhata hai) to admin build nahi kiya. IDR wallet currency (migrations 151/152, `credits.idr`) waise hi hai — owner panel → Fiat currencies se OFF ho sakti hai. Pehle se fail: user paymentOrders "operator's stored maximum", admin site-config "every flag the admin screen lists", owner-panel siteUi (HEAD par bhi). Push nahi kiya.
+
+---
+
 ## 2026-10-24 — F2Pay callback CORS par 403 ho raha tha — callbacks ab CORS se bahar
 **Kya kiya:** F2Pay ka callback (13.228.197.106, 15:17) `Origin: https://example.com` header ke saath aaya aur gateway ke CORS ne `403 Origin … is not allowed by CORS` de diya — signature check tak pahuncha hi nahi. `packages/common/src/createApp.js`: ek niyam `isProviderCallback(path)` (`/callback|webhook/` ya PROVIDER_CALLBACK_PREFIXES) — CORS callbacks ko chhod deta hai; `gateway/src/encryptionRule.js` ab yahi niyam use karta hai (encryption + CORS ek hi rule). Baaki routes par CORS allowlist waisi hi. Test: `packages/common/__tests__/corsCallbacks.test.js`.
 **Kyun:** User: "maine f2pay se ek callback bheja hai, dekho aaya hai, signature theek hai".

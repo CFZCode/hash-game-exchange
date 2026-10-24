@@ -784,7 +784,7 @@ test('payment orders', async (t) => {
     F2PAY_PRIVATE_KEY: ours.privateKey.export({ type: 'pkcs8', format: 'pem' }),
     F2PAY_PUBLIC_KEY: theirs.publicKey.export({ type: 'spki', format: 'der' }).toString('base64'),
   };
-  // F2Pay's methods are `payment_methods` rows (migration 153 seeds UpiMixed for INR, QRIS … BNI for IDR).
+  // F2Pay's methods are `payment_methods` rows (migration 153 seeds UpiMixed for INR; F2Pay is INR only, 154).
   const methodRow = (currency, code) => connection.models.PaymentMethod.findOne({ where: { gateway: 'f2pay', currency, code } });
   const f2payAnswer = (biz, key = theirs.privateKey) => {
     const bizContent = JSON.stringify(biz);
@@ -850,47 +850,26 @@ test('payment orders', async (t) => {
     assert.equal(await balanceOf(uid), '1000.00000000');
   });
 
-  await t.test('F2Pay offers each currency its own methods; an IDR method is refused for an INR deposit', async () => {
+  await t.test('F2Pay is INR only: only INR methods are offered and an IDR deposit never reaches F2Pay', async () => {
     const uid = newUid();
     await seed(uid, '0');
     const { service, calls } = build(cashier, F2PAY);
+    const { getGateway } = require('../gateways');
 
     const { methods } = await service.getAvailableMethods({ provider: 'f2pay' });
-    assert.deepEqual(methods.slice(0, 2), [
-      { method: 'UpiMixed', currency: 'INR' },
-      { method: 'QRIS', currency: 'IDR' },
-    ]);
-    assert.ok(methods.some((m) => m.method === 'BNI' && m.currency === 'IDR'));
+    assert.ok(methods.length > 0 && methods.every((m) => m.currency === 'INR'), JSON.stringify(methods));
+    assert.equal(getGateway('f2pay').supports('IDR', 'payin', F2PAY), false);
 
     await assert.rejects(
-      () => service.createDeposit({ userId: uid, provider: 'f2pay', currency: 'INR', amount: '500', method: 'BNI' }),
+      () => service.createDeposit({ userId: uid, provider: 'f2pay', currency: 'IDR', amount: '20000', method: 'QRIS' }),
+      (err) => err.code === 'PAYORDER_CURRENCY_NOT_SUPPORTED'
+    );
+    await assert.rejects(
+      () => service.createDeposit({ userId: uid, provider: 'f2pay', currency: 'INR', amount: '500', method: 'QRIS' }),
       (err) => err.code === 'PAYORDER_METHOD_NOT_SUPPORTED'
     );
     assert.equal(calls.length, 0);
     assert.equal(await connection.models.F2payDeposits.count({ where: { user_id: uid } }), 0);
-  });
-
-  await t.test('an IDR deposit goes to F2Pay’s IDR endpoint in IDR, whole rupiah, no conversion', async () => {
-    const { getGateway } = require('../gateways');
-    const sent = [];
-    const http = { post: async (url, body) => { sent.push({ url, body }); return cashier(url, body); } };
-    const gateway = getGateway('f2pay');
-    const config = { ...F2PAY };
-
-    assert.equal(gateway.supports('IDR', 'payin', config), true);
-    assert.equal(gateway.supports('PKR', 'payin', config), false, 'a currency with no methods in env');
-
-    const payIn = gateway.payIn('IDR', 'QRIS', [{ method: 'UpiMixed', currency: 'INR' }, { method: 'QRIS', currency: 'IDR' }]);
-    const ok = await gateway.createDeposit({ reference: 'DEP_IDR_1', userId: 1, amount: '20000', payIn }, config, { http });
-    assert.equal(ok.ok, true);
-    assert.equal(sent[0].url, 'https://f2pay.test/payin/idr/order/create');
-    const biz = JSON.parse(sent[0].body.bizContent);
-    assert.equal(biz.amount, '20000');
-    assert.equal(biz.methodCode, 'QRIS');
-
-    const cents = await gateway.createDeposit({ reference: 'DEP_IDR_2', userId: 1, amount: '20000.50', payIn }, config, { http });
-    assert.equal(cents.ok, false, 'IDR takes whole rupiah');
-    assert.equal(sent.length, 1);
   });
 
   await t.test('the owner picks the currencies F2Pay opens for (flags.f2pay_<code>)', async () => {
@@ -901,7 +880,7 @@ test('payment orders', async (t) => {
 
     try {
       const { methods } = await service.getAvailableMethods({ provider: 'f2pay' });
-      assert.ok(methods.length > 0 && methods.every((m) => m.currency === 'IDR'), 'INR is off, IDR left alone (missing = on)');
+      assert.deepEqual(methods, [], 'INR is off, so F2Pay offers nothing');
       await assert.rejects(
         () => service.createDeposit({ userId: uid, provider: 'f2pay', currency: 'INR', amount: '500' }),
         (err) => err.code === 'PAYORDER_CURRENCY_NOT_SUPPORTED'
@@ -919,7 +898,7 @@ test('payment orders', async (t) => {
     const { service, calls } = build(cashier, F2PAY, { clients: { admin } });
 
     const { methods } = await service.getAvailableMethods({ provider: 'f2pay' });
-    assert.ok(methods.length > 0 && methods.every((m) => m.currency === 'IDR'), 'INR is off at the Super Admin');
+    assert.deepEqual(methods, [], 'INR is off at the Super Admin');
     await assert.rejects(
       () => service.createDeposit({ userId: uid, provider: 'f2pay', currency: 'INR', amount: '500' }),
       (err) => err.code === 'PAYORDER_CURRENCY_NOT_SUPPORTED'

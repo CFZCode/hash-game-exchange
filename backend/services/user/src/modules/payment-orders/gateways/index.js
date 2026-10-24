@@ -599,36 +599,33 @@ const f2pay = {
   methodsInDb: true,
 
   supports(currency, flow) {
-    // Deposits only for now (user, 2026-10-24) — the payout below stays commented out. The player
-    // pays in the currency they deposit and is credited in it: no conversion anywhere.
-    return flow !== 'payout' && Boolean(F2PAY_PAYIN[currency]);
+    // Deposits only, INR only (user, 2026-10-24: "f2pay bss inr ke liye hi hai") — the payout below
+    // stays commented out. Paid and credited in INR: no conversion anywhere.
+    return flow !== 'payout' && currency === 'INR';
   },
 
   /**
    * The method the player picked among `methods` (the on ones, `[{ method, currency }]`) in
-   * `currency` — none picked = its first — with that currency's endpoint and decimals. Null = not offered.
+   * `currency` — none picked = its first. Null = not offered.
    */
   payIn(currency, method, methods) {
     const own = methods.filter((m) => m.currency === currency);
-    const picked = method ? own.find((m) => m.method === method) : own[0];
-    return picked ? { ...picked, ...F2PAY_PAYIN[currency] } : null;
+    return (method ? own.find((m) => m.method === method) : own[0]) ?? null;
   },
 
   async createDeposit({ reference, userId, amount, payIn, notifyUrl, returnUrl, customer, ip }, config, { http }) {
     if (!payIn) return { ok: false, message: 'That payment method is not available' };
-    // More decimals than F2Pay takes (INR 2, IDR 0) would make its callback amount differ from ours.
-    if (!new RegExp(`^\\d+${payIn.decimals ? `(\\.\\d{1,${payIn.decimals}})?` : ''}$`).test(String(amount))) {
-      return { ok: false, message: payIn.decimals ? `Amount can have at most ${payIn.decimals} decimals` : 'Amount must be a whole number' };
-    }
+    // More decimals than F2Pay takes (paise) would make its callback amount differ from ours.
+    if (!/^\d+(\.\d{1,2})?$/.test(String(amount))) return { ok: false, message: 'Amount can have at most 2 decimals' };
     const phone = String(customer?.phone ?? '').replace(/\D/g, '');
     const bizContent = JSON.stringify({
-      amount: Number(amount).toFixed(payIn.decimals),
+      amount: Number(amount).toFixed(2),
       body: 'Account deposit',
       customerEmail: customer?.email || 'noreply@example.com',
       customerIpAddress: ip || undefined,
       customerName: customer?.name || `Player${userId}`,
       // India: the last 10 digits (a stored "+91 98…" still works). No phone: a placeholder.
-      customerPhone: (payIn.currency === 'INR' ? phone.slice(-10) : phone) || payIn.placeholderPhone,
+      customerPhone: phone.slice(-10) || '9999999999',
       mchOrderNo: reference,
       methodCode: payIn.method,
       notifyUrl,
@@ -636,7 +633,7 @@ const f2pay = {
       subject: 'Wallet top-up',
     });
 
-    const response = await http.post(`${config.F2PAY_BASE_URL}${payIn.path}`, f2payRequest(reference, bizContent, config));
+    const response = await http.post(`${config.F2PAY_BASE_URL}/payin/inr/order/create`, f2payRequest(reference, bizContent, config));
     return interpretF2pay(response, config);
   },
 
@@ -663,12 +660,6 @@ const f2pay = {
   },
    */
 };
-
-/** Per currency F2Pay collects in (F2Pay's docs): its endpoint, how many decimals the amount carries. */
-const F2PAY_PAYIN = Object.freeze({
-  INR: { path: '/payin/inr/order/create', decimals: 2, placeholderPhone: '9999999999' },
-  IDR: { path: '/payin/idr/order/create', decimals: 0, placeholderPhone: '081234567890' },
-});
 
 /** A key from .env: PEM as-is (`\n` escapes allowed), or the bare base64 body F2Pay's dashboard shows. */
 function f2payKey(value, kind) {

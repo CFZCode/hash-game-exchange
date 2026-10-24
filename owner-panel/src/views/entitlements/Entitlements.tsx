@@ -509,7 +509,7 @@ const DailyLimitEditor = ({
   )
 }
 
-/** An F2Pay currency row of Site flags (`f2pay_idr`) → its currency (`IDR`); its methods are edited under it. */
+/** An F2Pay currency row of Site flags (`f2pay_inr`) → its currency (`INR`); its methods are edited under it. */
 const F2PAY_CURRENCY_ROW = /^f2pay_([a-z0-9]{2,10})$/
 
 /**

@@ -31,13 +31,13 @@ const PAYMENT_GATEWAYS = Object.freeze([
     label: 'F2Pay (deposits)',
     // Each currency's methods are rows of `payment_methods` (migration 153).
     currencies: [
+      // INR only (user, 2026-10-24).
       { code: 'INR', key: 'f2pay_inr', label: 'INR' },
-      { code: 'IDR', key: 'f2pay_idr', label: 'IDR' },
     ],
   },
 ]);
 
-/** A Payment Methods switch: a gateway (`apay`) or one of its currencies (`f2pay_idr`). */
+/** A Payment Methods switch: a gateway (`apay`) or one of its currencies (`f2pay_inr`). */
 const PAYMENT_SWITCHES = Object.freeze([
   ...PAYMENT_GATEWAYS.map((g) => g.name),
   ...PAYMENT_GATEWAYS.flatMap((g) => (g.currencies ?? []).map((c) => c.key)),
@@ -830,7 +830,7 @@ class SiteConfigService {
   }
 
   /**
-   * The Super Admin's switch for one gateway (`apay`) or one gateway currency (`f2pay_idr`), with the
+   * The Super Admin's switch for one gateway (`apay`) or one gateway currency (`f2pay_inr`), with the
    * transaction password. One the owner has off cannot be touched (NOT_ENTITLED).
    */
   async setPaymentGateway({ name, enabled, staffId = null, executiveId = null, transactionPassword }) {
