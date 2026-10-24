@@ -21,6 +21,7 @@ const PAYMENT_GATEWAYS = Object.freeze([
   { name: 'waypay', label: 'WayPay' },
   { name: 'cricpay', label: 'CricPay' },
   { name: 'upi', label: 'UPI (EkQR)' },
+  { name: 'f2pay', label: 'F2Pay (INR deposits)' },
 ]);
 
 /**

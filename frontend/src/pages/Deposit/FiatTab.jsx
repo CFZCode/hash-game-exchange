@@ -10,6 +10,7 @@ import { useIsDialog } from '../../context/dialogRoute';
 import SevenDayBanner from './SevenDayBanner';
 import HowToDeposit from './HowToDeposit';
 import ManualDeposit from './ManualDeposit';
+import AutoDeposit from './AutoDeposit';
 import { useGates } from '../../context/gates';
 import { USE_FIXTURES } from '../../services/client';
 import { channelIcon } from '../../utils/channelArt';
@@ -36,6 +37,7 @@ import {
   chipBonusConfig,
   depositNotes,
   extraBonusAmount,
+  readF2payCurrencies,
   groupInt,
   initialAmount,
   isMaintained,
@@ -391,6 +393,10 @@ export default function FiatTab({ onDepositCrypto }) {
      build never reaches this (it keeps the captured channels and NoChannels). */
   const gates = useGates();
   const manual = !USE_FIXTURES && gates.manualDeposit();
+  /* The automatic (F2Pay) deposit, beside the manual form: the player picks one of the two when both
+     are open. THIS BUILD'S, like ManualDeposit. */
+  const { data: autoCurrencies } = useResource(readF2payCurrencies);
+  const [mode, setMode] = React.useState('manual');
 
   /* `G1(currencyName, isFiat, !isFiat)` the other way round — the fiat half of the wallet.
      Seeded from the account's own currency when that is a fiat, which it is not in this
@@ -412,6 +418,8 @@ export default function FiatTab({ onDepositCrypto }) {
   );
 
   const channels = channelsFor(currency);
+  const auto = !USE_FIXTURES && gates.autoDeposit() && (autoCurrencies ?? []).includes(String(currency).toUpperCase().replace(/FIAT$/, ''));
+  const shownMode = !auto ? 'manual' : !manual ? 'auto' : mode;
 
   /* `ID`'s own effect: keep the current method if it is still in the list, else the
      `preSelectChannel`, else the first row. Nothing here sets a preselect. */
@@ -549,8 +557,30 @@ export default function FiatTab({ onDepositCrypto }) {
         </div>
       </div>
 
-      {!channel && manual ? (
-        <ManualDeposit currency={currency} />
+      {!channel && (manual || auto) ? (
+        <>
+          {manual && auto && (
+            <>
+              <div className="mb-1 mt-5 text-secondary">Deposit Method</div>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  ['manual', 'Manual'],
+                  ['auto', 'Automatic'],
+                ].map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    className={`button button-m h-10 ${shownMode === value ? 'button-brand' : 'button-second'}`}
+                    onClick={() => setMode(value)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+          {shownMode === 'auto' ? <AutoDeposit key={currency} currency={currency} /> : <ManualDeposit currency={currency} />}
+        </>
       ) : !channel ? (
         <NoChannels onDepositCrypto={onDepositCrypto} />
       ) : (

@@ -159,6 +159,22 @@ export const createCcpaymentDeposit = ({ currency, amount, chain }) =>
     json: { provider: 'ccpayment', currency, amount, chain },
   });
 
+/* F2Pay — the Fiat tab's AUTOMATIC INR deposit (THIS BUILD'S): the player enters an amount, the
+   order comes back with F2Pay's cashier page (`redirectUrl`) and the player pays there; F2Pay's
+   signed callback credits the wallet. `readF2payCurrencies` is `['INR']` while F2Pay is configured
+   and switched on (owner + site admin), else `[]` and the tab shows the manual form only. */
+export const readF2payCurrencies = () =>
+  USE_FIXTURES
+    ? []
+    : Promise.resolve(request('/api/v1/user/payments/methods/f2pay', { live: true })).then(
+        (data) => (Array.isArray(data?.methods) ? data.methods : []),
+        () => [],
+      );
+
+/** The order: `{ reference, amount, redirectUrl }`. Throws the API error. */
+export const createF2payDeposit = ({ currency, amount }) =>
+  request(DEPOSIT_ORDER_PATH, { live: true, method: 'POST', json: { provider: 'f2pay', currency, amount } });
+
 /* ══ THE FIAT TAB ══════════════════════════════════════════════════════════════════════════
  *
  * `/payment/deposit/fiat/<currency>/methods/` — the real path, out of `api-B_IcOSNp.js`. It is

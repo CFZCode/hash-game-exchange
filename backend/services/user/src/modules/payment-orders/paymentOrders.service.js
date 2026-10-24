@@ -111,7 +111,7 @@ class PaymentOrdersService {
    * 10,000,000 one now.
    * ─────────────────────────────────────────────────────────────────────
    */
-  async createDeposit({ userId, provider: providerName, currency, amount, method, returnUrl, phone, userName, chain }) {
+  async createDeposit({ userId, provider: providerName, currency, amount, method, returnUrl, phone, userName, chain, ip }) {
     await sitePolicy.assertAllowed(this.models, 'deposit_mode', 'automatic', this.logger);
     // The coin registry (061): a coin the owner or the site switched off takes
     // no new deposits (CURRENCY_DISABLED). A registry outage fails open.
@@ -153,6 +153,9 @@ class PaymentOrdersService {
           notifyUrl: this.#notifyUrl(providerName, FLOW.PAY_IN),
           customerName: userName,
           customerMobile: phone,
+          // F2Pay's cashier page wants the payer's own name / email / phone and IP.
+          customer: gateway.needsCustomer ? await this.#customer(userId) : null,
+          ip,
         },
         this.config,
         { http: this.http }
@@ -361,12 +364,13 @@ class PaymentOrdersService {
     const as = (model) => userIdFor(model, userId);
 
     if (flow !== FLOW.PAY_OUT) {
-      const [upi, apay, cricpay, waypay, cc] = await Promise.all([
+      const [upi, apay, cricpay, waypay, cc, f2] = await Promise.all([
         this.models.Upideposit.findAll({ where: { uid: as('Upideposit') }, raw: true }),
         this.models.Apaydeposits.findAll({ where: { user_id: as('Apaydeposits') }, raw: true }),
         this.models.Cricpaytransactions.findAll({ where: { uid: as('Cricpaytransactions') }, raw: true }),
         this.models.PayInTransactions.findAll({ where: { user_id: as('PayInTransactions') }, raw: true }),
         this.models.Ccdeposit.findAll({ where: { userid: as('Ccdeposit') }, raw: true }),
+        this.models.F2payDeposits.findAll({ where: { user_id: userId }, raw: true }),
       ]);
 
       rows.push(
@@ -374,7 +378,8 @@ class PaymentOrdersService {
         ...apay.map((r) => this.#shape('apay', FLOW.PAY_IN, r.custom_transaction_id, r.amount, r.currency, r.status, r.created_at)),
         ...cricpay.map((r) => this.#shape('cricpay', FLOW.PAY_IN, r.transaction_code, r.amount, 'INR', r.status, r.created_at)),
         ...waypay.map((r) => this.#shape('waypay', FLOW.PAY_IN, r.out_trade_no, r.amount, r.currency, r.status, r.created_at)),
-        ...cc.map((r) => this.#shape('ccpayment', FLOW.PAY_IN, r.orderid, r.price, this.#tickerFor(r.coinid), r.status, r.created_at))
+        ...cc.map((r) => this.#shape('ccpayment', FLOW.PAY_IN, r.orderid, r.price, this.#tickerFor(r.coinid), r.status, r.created_at)),
+        ...f2.map((r) => this.#shape('f2pay', FLOW.PAY_IN, r.mch_order_no, r.amount, r.currency, r.status, r.created_at))
       );
     }
 
@@ -552,7 +557,8 @@ class PaymentOrdersService {
    */
   #notifyUrl(providerName, flow) {
     const base = String(this.config.PUBLIC_BASE_URL || '').replace(/\/+$/, '');
-    return `${base}/api/v1/payments/callback/${providerName}${flow === FLOW.PAY_OUT ? '/payout' : ''}`;
+    // modules/psp's public routes; the old `/api/v1/payments/callback/<provider>` answered 404.
+    return `${base}/api/v1/user/psp/${providerName}/${flow === FLOW.PAY_OUT ? 'payout-callback' : 'callback'}`;
   }
 
   /** A reference the provider will echo back. Unguessable on purpose. */
@@ -574,6 +580,11 @@ class PaymentOrdersService {
       this.playerBonusService = this.deps.playerBonuses ?? new PlayerBonusService({ ...this.deps, walletService: this.wallet });
     }
     return this.playerBonusService;
+  }
+
+  /** The player's own name / email / phone, for a cashier page that asks for them. */
+  async #customer(userId) {
+    return this.models.Users.findByPk(userId, { attributes: ['name', 'email', 'phone'], raw: true });
   }
 
   #reference(prefix) {
@@ -693,6 +704,10 @@ class PaymentOrdersService {
       });
       return;
     }
+    if (providerName === 'f2pay') {
+      await this.models.F2payDeposits.create({ user_id: userId, mch_order_no: reference, amount, currency, status: 'Pending' });
+      return;
+    }
     await PayInTransactions.create({
       user_id: userId, transaction_id: reference, out_trade_no: reference,
       currency, amount, status: 0, pay_type: method ?? '',
@@ -752,6 +767,8 @@ class PaymentOrdersService {
         await this.models.PayInTransactions.update(
           { transaction_id: providerReference }, { where: { out_trade_no: reference } }
         );
+      } else if (providerName === 'f2pay') {
+        await this.models.F2payDeposits.update({ plat_no: providerReference }, { where: { mch_order_no: reference } });
       }
     } catch (error) {
       // The order exists and the gateway has it. Failing to record their id is
@@ -804,6 +821,11 @@ class PaymentOrdersService {
         await this.models.Cricpaytransactions.update(
           { status: 'Failed' }, { where: { transaction_code: reference } }
         );
+      } else if (providerName === 'f2pay') {
+        await this.models.F2payDeposits.update(
+          { status: 'Failed', error_reason: String(reason ?? '').slice(0, 500) },
+          { where: { mch_order_no: reference } }
+        );
       } else {
         await this.models.PayInTransactions.update({ status: 2 }, { where: { out_trade_no: reference } });
       }
@@ -850,6 +872,10 @@ class PaymentOrdersService {
     if (providerName === 'cricpay') {
       const r = await Cricpaytransactions.findOne({ where: { transaction_code: reference }, raw: true });
       return r && this.#shape('cricpay', FLOW.PAY_IN, reference, r.amount, 'INR', r.status, r.created_at, r.uid);
+    }
+    if (providerName === 'f2pay') {
+      const r = await this.models.F2payDeposits.findOne({ where: { mch_order_no: reference }, raw: true });
+      return r && this.#shape('f2pay', FLOW.PAY_IN, reference, r.amount, r.currency, r.status, r.created_at, r.user_id, r.plat_no);
     }
     if (providerName === 'apay') {
       const dep = await Apaydeposits.findOne({ where: { custom_transaction_id: reference }, raw: true });

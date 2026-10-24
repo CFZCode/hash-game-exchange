@@ -471,10 +471,10 @@ test('site-config', async (t) => {
     entitlements.configureEntitlements({ read: () => ({ features: {}, flags: { gateway_cricpay: false } }) });
     const states = (list) => list.map((g) => [g.name, g.enabled]);
     try {
-      assert.deepEqual(states(await service.paymentGateways()), [['ccpayment', true], ['apay', true], ['waypay', true], ['upi', true]]);
+      assert.deepEqual(states(await service.paymentGateways()), [['ccpayment', true], ['apay', true], ['waypay', true], ['upi', true], ['f2pay', true]]);
 
       const after = await service.setPaymentGateway({ name: 'apay', enabled: false });
-      assert.deepEqual(states(after), [['ccpayment', true], ['apay', false], ['waypay', true], ['upi', true]]);
+      assert.deepEqual(states(after), [['ccpayment', true], ['apay', false], ['waypay', true], ['upi', true], ['f2pay', true]]);
       assert.deepEqual(await service.paymentGatewaysOff(), ['apay'], 'what user-service reads');
 
       await service.setPaymentGateway({ name: 'apay', enabled: true });

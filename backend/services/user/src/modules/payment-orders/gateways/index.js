@@ -575,7 +575,123 @@ const ccpaymentChain = (chain) => {
   return CCPAYMENT_CHAINS[name] ?? name;
 };
 
-const GATEWAYS = { waypay, apay, cricpay, upi, ccpayment };
+// ══════════════════════════════════════════════════════════════════════
+//  F2Pay — INR deposits through F2Pay's UPI cashier page
+// ══════════════════════════════════════════════════════════════════════
+
+/**
+ * Every request is `{ traceId, merchantId, signType: 'RSA', bizContent, sign }`: `bizContent` is a
+ * JSON STRING and `sign` is RSA-SHA256 over exactly that string with our private key, so the
+ * string that is signed is the string that is sent. F2Pay answers (and calls back, see
+ * psp/providers) in the same shape, signed with the key F2PAY_PUBLIC_KEY checks. `code: '0000'`
+ * is success. Every key and id is configuration (backend/.env), none is in the source.
+ */
+const f2pay = {
+  name: 'f2pay',
+  requiredConfig: ['F2PAY_MERCHANT_ID', 'F2PAY_BASE_URL', 'F2PAY_PRIVATE_KEY', 'F2PAY_PUBLIC_KEY'],
+  // The cashier page asks for the payer's name, email and phone: the service reads the player's own.
+  needsCustomer: true,
+
+  supports(currency, flow) {
+    // Deposits only for now (user, 2026-10-24) — the payout below stays commented out.
+    return currency === 'INR' && flow !== 'payout';
+  },
+
+  /** The Fiat tab offers the automatic (F2Pay) deposit for these. */
+  async getAvailableMethods() {
+    return ['INR'];
+  },
+
+  async createDeposit({ reference, userId, amount, notifyUrl, returnUrl, customer, ip }, config, { http }) {
+    // F2Pay takes rupees and paise; a third decimal would make its callback amount differ from ours.
+    if (!/^\d+(\.\d{1,2})?$/.test(String(amount))) {
+      return { ok: false, message: 'Amount can have at most 2 decimals' };
+    }
+    const bizContent = JSON.stringify({
+      amount: Number(amount).toFixed(2),
+      body: 'Account deposit',
+      customerEmail: customer?.email || 'noreply@example.com',
+      customerIpAddress: ip || undefined,
+      customerName: customer?.name || `Player${userId}`,
+      // Last 10 digits (a stored "+91 98…" still works); a player with no phone gets a placeholder.
+      customerPhone: String(customer?.phone ?? '').replace(/\D/g, '').slice(-10) || '9999999999',
+      mchOrderNo: reference,
+      methodCode: config.F2PAY_METHOD_CODE || 'UpiMixed',
+      notifyUrl,
+      returnUrl: returnUrl || config.F2PAY_RETURN_URL,
+      subject: 'Wallet top-up',
+    });
+
+    const response = await http.post(`${config.F2PAY_BASE_URL}/payin/inr/order/create`, f2payRequest(reference, bizContent, config));
+    return interpretF2pay(response, config);
+  },
+
+  /*
+   * PAYOUT — kept commented out on purpose (user, 2026-10-24: "payout wala code abhi ke liye
+   * comment kar dena"). To switch it on: uncomment this, let `supports` return true for
+   * 'payout', and add F2Pay to `#recordPendingWithdrawal` / psp `#findPayout` with a
+   * f2paywithdrawals table. F2Pay's payout callback status is `Completed` / `Failed`.
+   *
+  async createWithdrawal({ reference, amount, notifyUrl, details }, config, { http }) {
+    const bizContent = JSON.stringify({
+      amount: Number(amount).toFixed(2),
+      mchOrderNo: reference,
+      methodCode: 'BANK_INR',
+      notifyUrl,
+      customerAccountNum: details.account_number,
+      customerName: details.account_name,
+      ifsc: details.bank_code,
+      customerPhone: details.phone,
+      customerEmail: details.email,
+    });
+    const response = await http.post(`${config.F2PAY_BASE_URL}/payout/inr/order/create`, f2payRequest(reference, bizContent, config));
+    return interpretF2pay(response, config);
+  },
+   */
+};
+
+/** A key from .env: PEM as-is (`\n` escapes allowed), or the bare base64 body F2Pay's dashboard shows. */
+function f2payKey(value, kind) {
+  const text = String(value ?? '').replace(/\\n/g, '\n').trim();
+  if (text.includes('-----BEGIN')) return text;
+  const key = Buffer.from(text, 'base64');
+  return kind === 'private'
+    ? crypto.createPrivateKey({ key, format: 'der', type: 'pkcs8' })
+    : crypto.createPublicKey({ key, format: 'der', type: 'spki' });
+}
+
+/** RSA-SHA256 over `bizContent` with our private key, base64. */
+function f2paySign(bizContent, config) {
+  return crypto.createSign('RSA-SHA256').update(String(bizContent), 'utf8').sign(f2payKey(config.F2PAY_PRIVATE_KEY, 'private'), 'base64');
+}
+
+/** True when `sign` is F2Pay's RSA-SHA256 signature over `bizContent`. Never throws. */
+function f2payVerify(bizContent, sign, config) {
+  if (typeof bizContent !== 'string' || typeof sign !== 'string' || !sign) return false;
+  try {
+    return crypto.createVerify('RSA-SHA256').update(bizContent, 'utf8').verify(f2payKey(config.F2PAY_PUBLIC_KEY, 'public'), sign, 'base64');
+  } catch {
+    return false;
+  }
+}
+
+function f2payRequest(reference, bizContent, config) {
+  return { traceId: reference, merchantId: config.F2PAY_MERCHANT_ID, signType: 'RSA', bizContent, sign: f2paySign(bizContent, config) };
+}
+
+/** `{code, msg, bizContent, sign}` — only '0000' with F2Pay's own signature is success. */
+function interpretF2pay(response, config) {
+  if (response?.code !== '0000') {
+    return { ok: false, code: response?.code, message: response?.msg ?? 'F2Pay refused the order', raw: response };
+  }
+  if (!f2payVerify(response.bizContent, response.sign, config)) {
+    return { ok: false, message: 'F2Pay answer failed its signature check', raw: response };
+  }
+  const biz = JSON.parse(response.bizContent); // { mchOrderNo, platNo, payUrl, … }
+  return { ok: true, providerReference: biz.platNo ?? null, redirectUrl: biz.payUrl ?? null, raw: response };
+}
+
+const GATEWAYS = { waypay, apay, cricpay, upi, ccpayment, f2pay };
 
 function getGateway(name) {
   return Object.prototype.hasOwnProperty.call(GATEWAYS, String(name)) ? GATEWAYS[String(name)] : null;
@@ -596,4 +712,6 @@ module.exports = {
   ccpaymentChain,
   refreshCcpaymentCoinIds,
   formatEkqrDate,
+  f2paySign,
+  f2payVerify,
 };
