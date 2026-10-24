@@ -101,7 +101,7 @@ function isSportsBook({ provider, type }) {
  * @param {Set<string>} bookUids
  */
 function flagsFor(game, bookUids) {
-  if ((game.uid && bookUids.has(String(game.uid).toLowerCase())) || isSportsBook(game)) return ['sports'];
+  if ((game.uid && bookUids.has(String(game.uid).toLowerCase())) || isSportsBook(game)) return ['sports', 'sportsbook'];
   const flags = ['casino', ...(PROVIDER_FLAGS[norm(game.provider)] ?? [])];
   const category = categoryFlag(game.type);
   if (category) flags.push(category);
@@ -188,8 +188,9 @@ function blockedVendors(off) {
 /** Is this catalogue row (`{vendor, game_type}`) in the plan? Sync, for code holding the document. */
 function isRowEntitledIn(doc, row) {
   const off = offFlags(doc);
+  // A book is the sportsbook: it needs the owner's sportsbook mode too (off by default).
+  if (isSportsBook({ provider: row?.vendor, type: row?.game_type })) return !off.has('sports') && entitlements.flagOnIn(doc, 'sportsbook');
   if (!off.size) return true;
-  if (isSportsBook({ provider: row?.vendor, type: row?.game_type })) return !off.has('sports');
   const flags = [...(PROVIDER_FLAGS[norm(row?.vendor)] ?? [])];
   const category = categoryFlag(row?.game_type);
   if (category) flags.push(category);

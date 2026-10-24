@@ -106,7 +106,7 @@ const sectionRowsClass =
 const GROUP_SUBTITLES: Record<string, string> = {
   Main: 'Dashboard, players and wallets',
   'Agent Management': 'Agents, downline and limits',
-  'Sports Exchange': 'Markets, bets and results',
+  Sports: 'Markets, bets and results',
   Transactions: 'Deposits, withdrawals and KYC',
   Finance: 'Payments, banks and ledgers',
   Promotions: 'Bonuses, VIP, races and codes',

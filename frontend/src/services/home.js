@@ -412,4 +412,4 @@ export const getHighlights = ({
 } = {}) =>
   USE_FIXTURES
     ? request(ENDPOINTS.betby.topEvents(brand, country, currency, lang), { fixture: matches })
-    : publicGates().then((gates) => (gates.on('sports') ? readLiveHighlights() : []));
+    : publicGates().then((gates) => (gates.on('sportsexchange') ? readLiveHighlights() : []));

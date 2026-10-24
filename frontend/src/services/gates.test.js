@@ -36,6 +36,17 @@ describe('owner / Super Admin section switches (user, 2026-10-21)', () => {
   });
 });
 
+describe('sports mode: exchange or sportsbook, one at a time (user, 2026-10-25)', () => {
+  it('the exchange runs unless the sportsbook is explicitly on; sports off closes both', () => {
+    const mode = (flags) => [makeGates({ flags }).on('sportsexchange'), makeGates({ flags }).on('sportsbook')];
+    expect(mode(undefined)).toEqual([true, false]); // not answered / an older backend: today's exchange
+    expect(mode({ sportsexchange: true })).toEqual([true, false]);
+    expect(mode({ sportsbook: true, sportsexchange: false })).toEqual([false, true]);
+    expect(mode({ sports: false, sportsbook: true })).toEqual([false, false]);
+    expect(makeGates({ flags: { sportsbook: true } }).routeOn('/sports')).toBe(true);
+  });
+});
+
 describe('CCPayment deposit (user, 2026-10-21)', () => {
   const mode = (variant) => [{ feature: 'deposit_mode', variant }];
   it('the gateway deposit follows deposit_mode, and an agent player never gets it', () => {

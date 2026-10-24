@@ -764,8 +764,12 @@ class SiteConfigService {
     const enabled = row ? Boolean(row.sports) : true;
     // Effective = the owner's flag (owner panel → Site flags → Sports) AND the Super Admin's
     // switch (Sports Exchange → Sports switch). sports-service reads `sportsEnabled` from here.
-    const entitled = await entitlements.isFlagEntitled('sports');
-    return { sportsEnabled: enabled && entitled, enabled, entitled, configured: Boolean(row) };
+    const doc = await entitlements.getEntitlements();
+    const entitled = entitlements.flagOnIn(doc, 'sports');
+    // The exchange takes bets only in exchange mode: with the owner's sportsbook on, sports-service
+    // refuses new exchange bets (open ones still settle), as the kill switch does.
+    const mode = entitlements.flagOnIn(doc, 'sportsbook') ? 'sportsbook' : entitlements.flagOnIn(doc, 'sportsexchange') ? 'exchange' : 'off';
+    return { sportsEnabled: enabled && entitled && mode === 'exchange', enabled, entitled, mode, configured: Boolean(row) };
   }
 
   /** The Super Admin's sports switch. Pushes the new flags so every open site hides/shows sports. */
@@ -1025,13 +1029,18 @@ class SiteConfigService {
     // an unconfigured deployment, not an operator switching the site off. The
     // client defaults the same way, so first paint does not flicker.
     // A flag outside the owner's plan reads as off; the stored value is kept.
-    const { flags: plan } = await entitlements.getEntitlements();
+    const planDoc = await entitlements.getEntitlements();
+    const { flags: plan } = planDoc;
     const flags = Object.fromEntries(
       PUBLIC_FLAGS.map((name) => [name, plan[name] !== false && (row ? Boolean(row[name]) : true)])
     );
     // Read-only here so a browser can hide sports. Same rule as `sportsEnabled()`: owner flag
     // AND the Super Admin's switch.
     flags.sports = plan.sports !== false && (row ? Boolean(row.sports) : true);
+    // Which sports the site runs (owner panel → Products): the third-party book in an iframe, or
+    // our exchange. Never both; `flagOnIn` closes the exchange while the sportsbook is on.
+    flags.sportsbook = flags.sports && entitlements.flagOnIn(planDoc, 'sportsbook');
+    flags.sportsexchange = flags.sports && entitlements.flagOnIn(planDoc, 'sportsexchange');
 
     const amounts = Object.fromEntries(
       PUBLIC_AMOUNTS.map((name) => [name, this.#amount(row?.[name])])

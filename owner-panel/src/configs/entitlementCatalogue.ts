@@ -533,7 +533,7 @@ export const FLAG_GROUPS: FlagGroup[] = [
   {
     title: 'Products',
     description: 'Whole sections of the site. Off hides the section and its navigation.',
-    keys: ['casino', 'sports', 'lotto', 'vipclub', 'clubmembership', 'bonus', 'affiliate', 'giftcards', 'welcomepack', 'wheelspin', 'provablyfair']
+    keys: ['casino', 'sports', 'sportsexchange', 'sportsbook', 'lotto', 'vipclub', 'clubmembership', 'bonus', 'affiliate', 'giftcards', 'welcomepack', 'wheelspin', 'provablyfair']
   },
   {
     title: 'Game categories',
@@ -586,12 +586,22 @@ export const FLAG_GROUPS: FlagGroup[] = [
   }
 ]
 
+/* Flags that read OFF when the stored document has no value: switching one on changes what the
+   site IS (the sportsbook replaces the exchange), so it never happens by default or by "Allow all".
+   Same set in backend/packages/common/src/entitlements.js. */
+export const DEFAULT_OFF_FLAGS = new Set(['sportsbook'])
+
+/* Sports runs one mode at a time: switching one of these on switches the other off. */
+export const EXCLUSIVE_FLAGS: Record<string, string> = { sportsbook: 'sportsexchange', sportsexchange: 'sportsbook' }
+
 export const FEATURE_KEYS = FEATURE_CATALOGUE.map(f => f.key)
 export const FLAG_KEYS = [...new Set(FLAG_GROUPS.flatMap(g => g.keys))]
 
 export const FLAG_LABELS: Record<string, string> = {
   casino: 'Casino',
   sports: 'Sports (kill switch: off refuses every new bet, open bets still settle)',
+  sportsexchange: 'Sports exchange (our own exchange: markets, back/lay, agent system)',
+  sportsbook: 'Sportsbook (third-party book in an iframe; on hides the whole exchange)',
   lotto: 'Lottery',
   vipclub: 'VIP club',
   clubmembership: 'Club membership',

@@ -14,6 +14,8 @@ import ExchangeLobby from './pages/Exchange/Lobby';
 import ExchangeMyBets from './pages/Exchange/MyBets';
 import ExchangeStatement from './pages/Exchange/Statement';
 import SportsInrDialog from './pages/Exchange/SportsInrDialog';
+/* The owner's other sports mode: a third-party sportsbook framed whole (owner panel → Products). */
+import Sportsbook from './pages/Sportsbook';
 import Promotions from './pages/Promotions';
 import DepositOffer from './pages/DepositOffer';
 import Blog from './pages/Blog';
@@ -82,6 +84,7 @@ import useMediaQuery, { useIsDesktop } from './hooks/useMediaQuery';
 import { SessionProvider } from './context/SessionContext';
 import { SettingsProvider } from './context/SettingsContext';
 import { GatesProvider, RouteGate } from './context/GatesContext';
+import { useGates } from './context/gates';
 import { useSession } from './context/session';
 import { FREE_PLAYS_ENABLED, PASSKEY_ENABLED } from './config/hiddenFeatures';
 
@@ -123,6 +126,8 @@ class LazyRouteBoundary extends React.Component {
 function AppShell() {
   const { session } = useSession();
   const navigate = useNavigate();
+  // Sports runs one mode: the owner's sportsbook (an iframe) or, by default, the exchange.
+  const sportsbookMode = useGates().on('sportsbook');
 
   /* `showable && areaAlert`, which is the original's own gate — Enter-MsmOuq5R.js reads
      exactly that pair before firing `block_page_view`, and its inverse
@@ -802,6 +807,13 @@ function AppShell() {
               sports icons. The `sports` gate still covers the whole prefix (RouteGate above).
               `/sports/live` is the footer's link and lands on the lobby's In-Play view; any other
               `/sports/...` keeps its URL and shows the lobby, the catch-all's own trade. */}
+          {sportsbookMode ? (
+            <>
+              <Route path="/sports" element={<Sportsbook />} />
+              <Route path="/sports/*" element={<Sportsbook />} />
+            </>
+          ) : (
+          <>
           <Route path="/sports" element={<ExchangeLobby />} />
           <Route path="/sports/live" element={<Navigate to="/sports?sport=inplay" replace />} />
           <Route
@@ -818,6 +830,8 @@ function AppShell() {
           <Route path="/sports/my-bets" element={sportsAccountNeedsAuth ? null : <ExchangeMyBets />} />
           <Route path="/sports/statement" element={sportsAccountNeedsAuth ? null : <ExchangeStatement />} />
           <Route path="/sports/*" element={<ExchangeLobby />} />
+          </>
+          )}
           {/* `/promotions/promotion` is the original's own path — it is what the footer links
               to. Its siblings there (`/promotions/daily-contest`, `/promotions/weekly-raffle`,
               `/promotions/exclusive-promo`, `/promotion/:id`) are the individual promotion
@@ -1090,7 +1104,7 @@ function AppShell() {
         />
       )}
       {/* The exchange is INR-only: a non-INR header wallet is asked to switch (or leave). */}
-      {/^\/sports(\/|$)/.test(pathname) && <SportsInrDialog />}
+      {!sportsbookMode && /^\/sports(\/|$)/.test(pathname) && <SportsInrDialog />}
       {withdrawDetailDialog && (
         <WithdrawDetailDialog onClose={closeOverlay} onBack={backOverlay} enter={dialogEnter} />
       )}

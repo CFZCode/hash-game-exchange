@@ -133,7 +133,7 @@ export default function Home() {
       {gates.flag('home_gamingcards') && <CategoryCards />}
       {gates.on('originals') && <GameSection title={brandLabel('BC Originals')} {...section('originals')} />}
       {casino && <GameSection title="Hot Games" {...section('hotGames')} />}
-      {gates.on('sports') && gates.flag('home_livesports') && <Highlights />}
+      {gates.on('sportsexchange') && gates.flag('home_livesports') && <Highlights />}
       {/* BC.GAME's exclusive tables have no Parker567 equivalent; the live feed answers []. Drawn
           only when it has games, so an empty "Exclusive" heading never shows. */}
       {casino && section('exclusive').games?.length !== 0 && <GameSection title={brandLabel('BC Exclusive')} {...section('exclusive')} />}

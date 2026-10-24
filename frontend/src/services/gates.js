@@ -62,6 +62,11 @@ export const GATES = {
   rewards: { capability: 'promotions' },
   // `sports` is the site admin's kill switch.
   sports: { flag: 'sports' },
+  /* Which sports the owner runs (owner panel → Products), one at a time: the sportsbook (a
+     third-party book in an iframe) only when its flag is explicitly on, else our exchange. An
+     older backend that sends neither reads as the exchange — today's site. */
+  sportsexchange: { flag: 'sports', mode: 'exchange' },
+  sportsbook: { flag: 'sports', mode: 'sportsbook' },
   // The third-party casino lobby: owner Site flags → Casino AND the Super Admin's Features → Casino.
   casino: { flag: 'casino' },
   // One promotion's page is its section's AND the promotions' (a sports offer goes with sports).
@@ -172,6 +177,7 @@ export function makeGates({ flags, features, capabilities, ready = true } = {}) 
     const g = GATES[gate];
     if (!g) return null;
     if (g.flag && flagMap?.[g.flag] === false) return 'site';
+    if (g.mode && (flagMap?.sportsbook === true ? 'sportsbook' : 'exchange') !== g.mode) return 'site';
     if (g.feature && list && !byKey.has(g.feature)) return 'site';
     if (g.rail && !railOpen(policy(g.rail[0]), g.rail[1]) && !(g.orManual && manualOpen())) return 'site';
     if ((PROMO_GATES.has(gate) || g.notB2B) && policy('business_model') === 'b2b') return 'site';

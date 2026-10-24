@@ -683,7 +683,7 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
                     <span className="sidebar-collapse-hide ml-2 flex-1 overflow-hidden whitespace-nowrap text-base font-semibold lg:ml-0 lg:text-sm">
                       {item.label}
                     </span>
-                    {item.hasArrow && (
+                    {item.hasArrow && (item.tree !== 'sports' || gates.on('sportsexchange')) && (
                       <button
                         className="sidebar-collapse-hide arrow-button center ms-auto flex size-6 rounded p-0 lg:me-2 lg:size-5"
                         type="button"
@@ -695,7 +695,7 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
                   </div>
 
                   {/* Expanded submenu — never shown while the sidebar is collapsed */}
-                  {isExpanded && isOpen(item.id) && item.tree === 'sports' && (
+                  {isExpanded && isOpen(item.id) && item.tree === 'sports' && gates.on('sportsexchange') && (
                     <div className="overflow-hidden">
                       <div className="h-0 w-full border-t border-third"></div>
                       <div className="px-1.5 pb-1">
