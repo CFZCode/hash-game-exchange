@@ -835,6 +835,15 @@ test('payment provider callbacks', async (t) => {
     const row = await connection.models.Credits.findOne({ where: { uid }, raw: true });
     assert.equal(money.toDecimalString(money.toMinor(row.usdt)), '10.50000000');
     assert.equal(await balanceOf(uid), '0.00000000', 'nothing converted into INR');
+
+    // A direct user: the callback's credit is one DEPOSIT row on the direct ledger.
+    const ledger = await connection.sequelize.query(
+      'SELECT event_type, category, ref, delta::text AS delta, balance_after::text AS after FROM mssports.point_ledger_direct WHERE user_id = :uid',
+      { replacements: { uid }, type: 'SELECT' }
+    );
+    assert.equal(ledger.length, 1, JSON.stringify(ledger));
+    assert.deepEqual([ledger[0].event_type, ledger[0].category, ledger[0].ref], ['DEPOSIT', 'DEPOSIT', `PSP_F2PAY:${reference}`]);
+    assert.deepEqual([Number(ledger[0].delta), Number(ledger[0].after)], [10.5, 10.5]);
   });
 
   await t.test('F2Pay: a callback not signed by F2Pay moves nothing', async () => {
