@@ -161,9 +161,10 @@ export const createCcpaymentDeposit = ({ currency, amount, chain }) =>
 
 /* F2Pay — the Fiat tab's AUTOMATIC INR deposit (THIS BUILD'S): the player enters an amount, the
    order comes back with F2Pay's cashier page (`redirectUrl`) and the player pays there; F2Pay's
-   signed callback credits the wallet. `readF2payCurrencies` is `['INR']` while F2Pay is configured
-   and switched on (owner + site admin), else `[]` and the tab shows the manual form only. */
-export const readF2payCurrencies = () =>
+   signed callback credits the wallet. `readF2payMethods` is `[{ method, currency }]` — UPI in INR,
+   the Indonesian ones (QRIS, DANA, BNI …) in IDR, charged at the site's rate — while F2Pay is
+   configured and switched on (owner + site admin), else `[]` and the tab shows the manual form only. */
+export const readF2payMethods = () =>
   USE_FIXTURES
     ? []
     : Promise.resolve(request('/api/v1/user/payments/methods/f2pay', { live: true })).then(
@@ -171,9 +172,9 @@ export const readF2payCurrencies = () =>
         () => [],
       );
 
-/** The order: `{ reference, amount, redirectUrl }`. Throws the API error. */
-export const createF2payDeposit = ({ currency, amount }) =>
-  request(DEPOSIT_ORDER_PATH, { live: true, method: 'POST', json: { provider: 'f2pay', currency, amount } });
+/** The order: `{ reference, amount, redirectUrl, pay }`. Throws the API error. */
+export const createF2payDeposit = ({ currency, amount, method }) =>
+  request(DEPOSIT_ORDER_PATH, { live: true, method: 'POST', json: { provider: 'f2pay', currency, amount, method } });
 
 /* ══ THE FIAT TAB ══════════════════════════════════════════════════════════════════════════
  *

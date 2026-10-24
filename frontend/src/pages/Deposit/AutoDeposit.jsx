@@ -4,13 +4,21 @@ import { toastError } from '../../components/shared/Toast/toast';
 import { printCurrency } from '../../utils/currency';
 import { createF2payDeposit, extraBonusAmount } from './deposit';
 
-/* The automatic INR deposit through F2Pay — THIS BUILD'S, like ManualDeposit beside it: the player
- * enters the amount and is sent to F2Pay's cashier page to pay by UPI. Nothing is filed afterwards:
- * F2Pay's signed callback credits the wallet. FiatTab offers it next to the manual form while F2Pay
- * is configured and switched on (`readF2payCurrencies`). Every class is ManualDeposit's own. */
-export default function AutoDeposit({ currency }) {
+/* The automatic deposit through F2Pay — THIS BUILD'S, like ManualDeposit beside it: the player picks
+ * a method (UPI for India, QRIS / DANA / the banks for Indonesia), enters the amount in the wallet's
+ * coin and is sent to F2Pay's cashier page. An Indonesian method is charged the IDR equivalent at
+ * the site's rate; the wallet gets the amount typed. Nothing is filed afterwards: F2Pay's signed
+ * callback credits the wallet. FiatTab offers it next to the manual form (`readF2payMethods`).
+ * Every class is ManualDeposit's own. */
+
+/* F2Pay's method codes as a player reads them; any other code shows as F2Pay sends it. */
+const METHOD_LABELS = { UpiMixed: 'UPI' };
+
+export default function AutoDeposit({ currency, methods }) {
   const coin = String(currency).toUpperCase().replace(/FIAT$/, '');
   const walletCode = `${coin}FIAT`;
+  const [picked, setPicked] = React.useState(0);
+  const method = methods[picked] ?? methods[0];
   const [amount, setAmount] = React.useState('');
   const [busy, setBusy] = React.useState(false);
   // FiatTab mounts the first-deposit terms read; zero below the bonus minimum, so the line disappears.
@@ -22,7 +30,7 @@ export default function AutoDeposit({ currency }) {
     if (!(Number(amount) > 0) || busy) return;
     setBusy(true);
     try {
-      const order = await createF2payDeposit({ currency: coin, amount });
+      const order = await createF2payDeposit({ currency: coin, amount, method: method.method });
       if (!order?.redirectUrl) throw new Error('The payment page did not open. Please try again.');
       // Stays busy: the page is leaving for F2Pay, which sends the player back when paid.
       window.location.assign(order.redirectUrl);
@@ -36,8 +44,29 @@ export default function AutoDeposit({ currency }) {
     <form onSubmit={submit}>
       <div className="my-4 flex rounded-xl bg-success/10 p-2 text-secondary">
         <IconInform className="icon -mt-0.5 mr-1.5 size-6 flex-none fill-success" />
-        <div>Enter the amount and pay by UPI on the payment page that opens. Your balance is credited automatically once the payment is confirmed.</div>
+        <div>
+          Pick a method, enter the amount and pay on the payment page that opens. Your balance is credited automatically once the payment is confirmed.
+          {method.currency !== coin && ` ${method.method} is charged in ${method.currency} at today's rate; you get the ${coin} amount you enter.`}
+        </div>
       </div>
+
+      {methods.length > 1 && (
+        <>
+          <div className="mb-1 mt-5 text-secondary">Pay With</div>
+          <div className="grid grid-cols-3 gap-2">
+            {methods.map((row, index) => (
+              <button
+                key={row.method}
+                type="button"
+                className={`button button-m h-10 ${index === picked ? 'button-brand' : 'button-second'}`}
+                onClick={() => setPicked(index)}
+              >
+                {METHOD_LABELS[row.method] ?? row.method}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
 
       <div className="mb-1 mt-5 text-secondary">Deposit Amount ({coin})</div>
       <div className="input bg-input_bright text-base">

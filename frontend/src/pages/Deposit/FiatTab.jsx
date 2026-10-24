@@ -37,7 +37,7 @@ import {
   chipBonusConfig,
   depositNotes,
   extraBonusAmount,
-  readF2payCurrencies,
+  readF2payMethods,
   groupInt,
   initialAmount,
   isMaintained,
@@ -395,7 +395,7 @@ export default function FiatTab({ onDepositCrypto }) {
   const manual = !USE_FIXTURES && gates.manualDeposit();
   /* The automatic (F2Pay) deposit, beside the manual form: the player picks one of the two when both
      are open. THIS BUILD'S, like ManualDeposit. */
-  const { data: autoCurrencies } = useResource(readF2payCurrencies);
+  const { data: autoMethods } = useResource(readF2payMethods);
   const [mode, setMode] = React.useState('manual');
 
   /* `G1(currencyName, isFiat, !isFiat)` the other way round — the fiat half of the wallet.
@@ -418,7 +418,8 @@ export default function FiatTab({ onDepositCrypto }) {
   );
 
   const channels = channelsFor(currency);
-  const auto = !USE_FIXTURES && gates.autoDeposit() && (autoCurrencies ?? []).includes(String(currency).toUpperCase().replace(/FIAT$/, ''));
+  // The wallet is INR; F2Pay credits it from every method it offers (IDR ones at the site's rate).
+  const auto = !USE_FIXTURES && gates.autoDeposit() && String(currency).toUpperCase().replace(/FIAT$/, '') === 'INR' && (autoMethods ?? []).length > 0;
   const shownMode = !auto ? 'manual' : !manual ? 'auto' : mode;
 
   /* `ID`'s own effect: keep the current method if it is still in the list, else the
@@ -579,7 +580,7 @@ export default function FiatTab({ onDepositCrypto }) {
               </div>
             </>
           )}
-          {shownMode === 'auto' ? <AutoDeposit key={currency} currency={currency} /> : <ManualDeposit currency={currency} />}
+          {shownMode === 'auto' ? <AutoDeposit key={currency} currency={currency} methods={autoMethods} /> : <ManualDeposit currency={currency} />}
         </>
       ) : !channel ? (
         <NoChannels onDepositCrypto={onDepositCrypto} />

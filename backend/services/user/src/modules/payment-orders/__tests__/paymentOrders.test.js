@@ -783,6 +783,8 @@ test('payment orders', async (t) => {
     F2PAY_BASE_URL: 'https://f2pay.test',
     F2PAY_PRIVATE_KEY: ours.privateKey.export({ type: 'pkcs8', format: 'pem' }),
     F2PAY_PUBLIC_KEY: theirs.publicKey.export({ type: 'spki', format: 'der' }).toString('base64'),
+    F2PAY_INR_METHODS: 'UpiMixed',
+    F2PAY_IDR_METHODS: 'QRIS, BNI',
   };
   const f2payAnswer = (biz, key = theirs.privateKey) => {
     const bizContent = JSON.stringify(biz);
@@ -806,6 +808,7 @@ test('payment orders', async (t) => {
     const biz = JSON.parse(sent.bizContent);
     assert.equal(biz.mchOrderNo, order.reference);
     assert.equal(biz.amount, '500.00');
+    assert.equal(biz.methodCode, 'UpiMixed', 'no method picked = the first configured one');
     assert.equal(biz.notifyUrl, 'https://api.example.test/api/v1/user/psp/f2pay/callback');
     assert.equal(biz.customerName, `pay-${uid}`);
     assert.equal(biz.customerIpAddress, '203.0.113.5');
@@ -845,5 +848,58 @@ test('payment orders', async (t) => {
     );
     assert.equal(calls.length, 0, 'neither reached F2Pay');
     assert.equal(await balanceOf(uid), '1000.00000000');
+  });
+
+  await t.test('F2Pay offers its INR and IDR methods; an unknown one is refused before anything is recorded', async () => {
+    const uid = newUid();
+    await seed(uid, '0');
+    const { service, calls } = build(cashier, F2PAY);
+
+    const { methods } = await service.getAvailableMethods({ provider: 'f2pay' });
+    assert.deepEqual(methods, [
+      { method: 'UpiMixed', currency: 'INR' },
+      { method: 'QRIS', currency: 'IDR' },
+      { method: 'BNI', currency: 'IDR' },
+    ]);
+
+    await assert.rejects(
+      () => service.createDeposit({ userId: uid, provider: 'f2pay', currency: 'INR', amount: '500', method: 'DANA' }),
+      (err) => err.code === 'PAYORDER_METHOD_NOT_SUPPORTED'
+    );
+    assert.equal(calls.length, 0);
+    assert.equal(await connection.models.F2payDeposits.count({ where: { user_id: uid } }), 0);
+  });
+
+  await t.test('an Indonesian F2Pay method is charged the IDR equivalent at the site rate; the order keeps both figures', async () => {
+    const uid = newUid();
+    await seed(uid, '0');
+    // Known rates for the test (100 INR = 20,000 IDR), restored afterwards.
+    const { Exchangerate } = connection.models;
+    const before = await Exchangerate.findAll({ where: { currency: ['INR', 'IDR'] }, raw: true });
+    const setRate = async (currency, usd_rate) => {
+      const [row] = await Exchangerate.findOrCreate({ where: { currency }, defaults: { currency, usd_rate } });
+      await row.update({ usd_rate });
+    };
+    try {
+      await setRate('INR', '0.01000000');
+      await setRate('IDR', '0.00005000');
+      const { service, calls } = build(cashier, F2PAY);
+
+      const order = await service.createDeposit({ userId: uid, provider: 'f2pay', currency: 'INR', amount: '100', method: 'BNI' });
+      assert.deepEqual(order.pay, { currency: 'IDR', amount: '20000' });
+      assert.equal(calls[0].url, 'https://f2pay.test/payin/idr/order/create');
+      const biz = JSON.parse(calls[0].body.bizContent);
+      assert.equal(biz.amount, '20000', 'IDR goes without decimals');
+      assert.equal(biz.methodCode, 'BNI');
+
+      const row = await connection.models.F2payDeposits.findOne({ where: { mch_order_no: order.reference }, raw: true });
+      assert.equal(money.toDecimalString(money.toMinor(row.amount)), '100.00000000', 'the wallet is credited the INR typed');
+      assert.equal(row.currency, 'INR');
+      assert.equal(money.toDecimalString(money.toMinor(row.pay_amount)), '20000.00000000');
+      assert.equal(row.pay_currency, 'IDR');
+    } finally {
+      await Exchangerate.destroy({ where: { currency: ['INR', 'IDR'] } });
+      for (const row of before) await Exchangerate.create(row);
+    }
   });
 });

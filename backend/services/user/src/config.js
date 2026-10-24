@@ -134,8 +134,11 @@ const config = loadEnv(
     F2PAY_BASE_URL: coercers.optionalStr(),
     F2PAY_PRIVATE_KEY: coercers.optionalStr(),
     F2PAY_PUBLIC_KEY: coercers.optionalStr(),
-    // F2Pay's payment method code for the deposit (its dashboard; UpiMixed when unset).
-    F2PAY_METHOD_CODE: coercers.optionalStr(),
+    // The deposit methods offered, per currency F2Pay collects in: comma-separated method codes
+    // (F2Pay's docs). INR → /payin/inr/order/create; IDR → /payin/idr/order/create, paid at the
+    // site's exchange rate into the INR wallet. Empty = none in that currency.
+    F2PAY_INR_METHODS: coercers.optionalStr(),
+    F2PAY_IDR_METHODS: coercers.optionalStr(),
     // Where the cashier page sends the player back after paying.
     F2PAY_RETURN_URL: coercers.optionalStr(),
 

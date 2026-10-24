@@ -19,6 +19,9 @@ module.exports = (sequelize) => {
       currency: { type: DataTypes.STRING(10), allowNull: false, defaultValue: 'INR', field: 'currency' },
       status: { type: DataTypes.STRING(20), allowNull: false, defaultValue: 'Pending', field: 'status' },
       utr_number: { type: DataTypes.STRING(64), allowNull: true, field: 'utr_number' },
+      // Migration 151: what F2Pay collects when it is another currency (IDR) than the wallet's; NULL = `amount`.
+      pay_amount: { type: DataTypes.DECIMAL(20, 8), allowNull: true, field: 'pay_amount' },
+      pay_currency: { type: DataTypes.STRING(10), allowNull: true, field: 'pay_currency' },
       error_reason: { type: DataTypes.TEXT, allowNull: true, field: 'error_reason' },
     },
     {

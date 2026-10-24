@@ -593,36 +593,52 @@ const f2pay = {
   needsCustomer: true,
 
   supports(currency, flow) {
-    // Deposits only for now (user, 2026-10-24) — the payout below stays commented out.
+    // Deposits only for now (user, 2026-10-24) — the payout below stays commented out. The wallet
+    // is INR; an Indonesian method still credits INR (see `payIn`).
     return currency === 'INR' && flow !== 'payout';
   },
 
-  /** The Fiat tab offers the automatic (F2Pay) deposit for these. */
-  async getAvailableMethods() {
-    return ['INR'];
+  /** `[{ method, currency }]` — what the Fiat tab's Automatic deposit offers. */
+  async getAvailableMethods(config) {
+    return f2payMethods(config);
   },
 
-  async createDeposit({ reference, userId, amount, notifyUrl, returnUrl, customer, ip }, config, { http }) {
-    // F2Pay takes rupees and paise; a third decimal would make its callback amount differ from ours.
-    if (!/^\d+(\.\d{1,2})?$/.test(String(amount))) {
-      return { ok: false, message: 'Amount can have at most 2 decimals' };
+  /**
+   * The method the player picked (none = the first configured), with the currency F2Pay collects it
+   * in, that currency's endpoint and decimals. Null = not offered. The service converts the wallet
+   * amount into `currency` when they differ, before the order is recorded.
+   */
+  payIn(method, config) {
+    const methods = f2payMethods(config);
+    const picked = method ? methods.find((m) => m.method === method) : methods[0];
+    return picked ? { ...picked, ...F2PAY_PAYIN[picked.currency] } : null;
+  },
+
+  async createDeposit({ reference, userId, amount, method, pay, notifyUrl, returnUrl, customer, ip }, config, { http }) {
+    const payIn = this.payIn(method, config);
+    if (!payIn) return { ok: false, message: 'That payment method is not available' };
+    const due = String(pay?.amount ?? amount);
+    // More decimals than F2Pay takes (INR 2, IDR 0) would make its callback amount differ from ours.
+    if (!new RegExp(`^\\d+${payIn.decimals ? `(\\.\\d{1,${payIn.decimals}})?` : ''}$`).test(due)) {
+      return { ok: false, message: `Amount can have at most ${payIn.decimals} decimals` };
     }
+    const phone = String(customer?.phone ?? '').replace(/\D/g, '');
     const bizContent = JSON.stringify({
-      amount: Number(amount).toFixed(2),
+      amount: Number(due).toFixed(payIn.decimals),
       body: 'Account deposit',
       customerEmail: customer?.email || 'noreply@example.com',
       customerIpAddress: ip || undefined,
       customerName: customer?.name || `Player${userId}`,
-      // Last 10 digits (a stored "+91 98…" still works); a player with no phone gets a placeholder.
-      customerPhone: String(customer?.phone ?? '').replace(/\D/g, '').slice(-10) || '9999999999',
+      // India: the last 10 digits (a stored "+91 98…" still works). No phone: a placeholder.
+      customerPhone: (payIn.currency === 'INR' ? phone.slice(-10) : phone) || payIn.placeholderPhone,
       mchOrderNo: reference,
-      methodCode: config.F2PAY_METHOD_CODE || 'UpiMixed',
+      methodCode: payIn.method,
       notifyUrl,
       returnUrl: returnUrl || config.F2PAY_RETURN_URL,
       subject: 'Wallet top-up',
     });
 
-    const response = await http.post(`${config.F2PAY_BASE_URL}/payin/inr/order/create`, f2payRequest(reference, bizContent, config));
+    const response = await http.post(`${config.F2PAY_BASE_URL}${payIn.path}`, f2payRequest(reference, bizContent, config));
     return interpretF2pay(response, config);
   },
 
@@ -649,6 +665,23 @@ const f2pay = {
   },
    */
 };
+
+/** Per currency F2Pay collects in (F2Pay's docs): its endpoint, how many decimals the amount carries. */
+const F2PAY_PAYIN = Object.freeze({
+  INR: { path: '/payin/inr/order/create', decimals: 2, placeholderPhone: '9999999999' },
+  IDR: { path: '/payin/idr/order/create', decimals: 0, placeholderPhone: '081234567890' },
+});
+
+/** F2PAY_INR_METHODS / F2PAY_IDR_METHODS (comma-separated codes) as `[{ method, currency }]`, INR first. */
+function f2payMethods(config) {
+  return Object.keys(F2PAY_PAYIN).flatMap((currency) =>
+    String(config[`F2PAY_${currency}_METHODS`] ?? '')
+      .split(',')
+      .map((method) => method.trim())
+      .filter(Boolean)
+      .map((method) => ({ method, currency }))
+  );
+}
 
 /** A key from .env: PEM as-is (`\n` escapes allowed), or the bare base64 body F2Pay's dashboard shows. */
 function f2payKey(value, kind) {
