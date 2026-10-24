@@ -43,16 +43,16 @@ const LOGOS = {
   'stake-site': 'stake-site.svg',
   addaplay: 'addaplay.webp',
   roobet: 'roobet.svg',
-  parker567: 'parker567.png',
+  parker567: 'parker567.png?v=311',
 };
 
 /* The square marks that go with a logo above (favicon, loader), by the same name. */
 const MARKS = {
-  parker567: 'parker567-mark.webp?v=308',
+  parker567: 'parker567-mark.webp?v=311',
 };
-/* The light theme's mark where the brand has one (image 310, darker metal for a white header). */
+/* The light-theme mark by the same name; for parker567 it is the owner-panel mark too (green P, image 311). */
 const MARKS_LIGHT = {
-  parker567: 'parker567-mark-light.webp?v=310',
+  parker567: 'parker567-mark-light.webp?v=311',
 };
 
 /* This front end is Parker567's. In live mode an unbranded backend (the owner has not uploaded a
@@ -253,7 +253,7 @@ export function applySiteBranding() {
   setMeta('property', 'og:site_name', runtime.siteName);
   setMeta('property', 'og:title', runtime.ogTitle ?? title);
   setMeta('property', 'og:description', runtime.ogDescription ?? description);
-  setMeta('property', 'og:image', absolute(runtime.ogImageUrl));
+  setMeta('property', 'og:image', absolute(runtime.ogImageUrl ?? runtime.markUrl));
   setMeta('name', 'theme-color', runtime.themeColor);
 }
 

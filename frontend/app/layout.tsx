@@ -22,9 +22,9 @@ const ORIGINAL_METADATA: Metadata = {
 
 /* Live mode with no owner mark yet: Parker567's own square mark (public/brand/, the same
    fallback services/siteBranding.js uses), never the original's favicon and loader art. */
-const FALLBACK_MARK = LIVE ? '/brand/parker567-mark.webp?v=308' : null;
+const FALLBACK_MARK = LIVE ? '/brand/parker567-mark.webp?v=311' : null;
 const FALLBACK_ICONS: Metadata['icons'] = FALLBACK_MARK
-  ? { icon: { url: FALLBACK_MARK, type: 'image/webp' }, apple: '/brand/parker567-mark.png?v=308' }
+  ? { icon: { url: FALLBACK_MARK, type: 'image/webp' }, apple: '/brand/parker567-mark.png?v=311' }
   : ORIGINAL_METADATA.icons;
 
 /* bc.game's own viewport, read off the live site's <meta name="viewport">:
@@ -91,7 +91,8 @@ export async function generateMetadata(): Promise<Metadata> {
       title: b.ogTitle ?? title,
       description: b.ogDescription ?? b.description ?? undefined,
       type: 'website',
-      ...(ogImage ? { images: [{ url: ogImage }] } : {}),
+      // No share image uploaded: the mark, so a shared link still shows the site's logo.
+      ...(ogImage ?? mark ? { images: [{ url: (ogImage ?? mark) as string }] } : {}),
     },
   };
 }
