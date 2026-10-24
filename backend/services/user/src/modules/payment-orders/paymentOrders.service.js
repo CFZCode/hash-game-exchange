@@ -16,7 +16,6 @@ const { validatePayoutDetails } = require('./payoutDetails');
 const { createHttpClient } = require('../psp/providers/http');
 const { ccpaymentCoinId, ccpaymentTicker, refreshCcpaymentCoinIds, formatEkqrDate } = require('./gateways');
 const { WalletService } = require('../wallet/wallet.service');
-const { ExchangeRateService } = require('../exchange-rate/exchangeRate.service');
 const { REASON } = require('../wallet/wallet.constants');
 const { PlayerBonusService } = require('../player-bonuses/playerBonus.service');
 const { createWithdrawRequirements } = require('../withdraw-requirements/withdrawRequirements');
@@ -129,13 +128,11 @@ class PaymentOrdersService {
     // The deployment's min / max is an INR figure (1 / 10L), so a ccpayment coin deposit has none.
     if (providerName !== 'ccpayment') await this.#assertWithinLimits(amount, currency, FLOW.PAY_IN);
 
-    // F2Pay: the method decides the currency it collects in, and an IDR method is charged the wallet
-    // amount at the site's exchange rate — worked out (or refused) before the order is recorded.
-    const payIn = gateway.payIn?.(method, this.config);
-    if (gateway.payIn && !payIn) throw errors.METHOD_NOT_SUPPORTED({ provider: providerName, method });
-    const pay = payIn && payIn.currency !== currency
-      ? { currency: payIn.currency, amount: await this.#converted(amount, currency, payIn.currency, payIn.decimals) }
-      : null;
+    // F2Pay: a method offered in this currency (UPI for INR, QRIS / DANA / … for IDR), checked
+    // before the order is recorded. No conversion: F2Pay collects what the wallet is credited.
+    if (gateway.payIn && !gateway.payIn(currency, method, this.config)) {
+      throw errors.METHOD_NOT_SUPPORTED({ provider: providerName, method });
+    }
 
     const reference = this.#reference('DEP');
 
@@ -143,7 +140,7 @@ class PaymentOrdersService {
     // write then fails, the player pays money we have no record of — so the
     // record has to exist before the player can possibly pay.
     await this.#recordPendingDeposit(providerName, {
-      reference, userId, currency, amount, method, chain, pay,
+      reference, userId, currency, amount, method, chain,
     });
 
     let result;
@@ -165,7 +162,6 @@ class PaymentOrdersService {
           // F2Pay's cashier page wants the payer's own name / email / phone and IP.
           customer: gateway.needsCustomer ? await this.#customer(userId) : null,
           ip,
-          pay,
         },
         this.config,
         { http: this.http }
@@ -200,8 +196,6 @@ class PaymentOrdersService {
       // Crypto: the address, memo and confirmation count the player needs.
       // Null for the collect-style providers, which have nothing to show.
       details: result.details ?? null,
-      // What the provider collects when it is another currency (F2Pay IDR), else null.
-      pay,
     };
   }
 
@@ -594,12 +588,6 @@ class PaymentOrdersService {
     return this.playerBonusService;
   }
 
-  /** `amount` of `from` in `to` at the site's exchange rate, to `decimals` places. RATE_NOT_FOUND without a rate. */
-  async #converted(amount, from, to, decimals) {
-    const { converted } = await new ExchangeRateService(this.deps).convert({ from, to, amount });
-    return Number(converted).toFixed(decimals);
-  }
-
   /** The player's own name / email / phone, for a cashier page that asks for them. */
   async #customer(userId) {
     return this.models.Users.findByPk(userId, { attributes: ['name', 'email', 'phone'], raw: true });
@@ -661,7 +649,7 @@ class PaymentOrdersService {
   // Four providers, four tables, four shapes. Confined to these methods so the
   // logic above reads as one flow rather than four.
 
-  async #recordPendingDeposit(providerName, { reference, userId, currency, amount, method, chain, pay }) {
+  async #recordPendingDeposit(providerName, { reference, userId, currency, amount, method, chain }) {
     const { Upideposit, Apaydeposits, Cricpaytransactions, PayInTransactions, Ccdeposit } = this.models;
 
     if (providerName === 'ccpayment') {
@@ -723,10 +711,7 @@ class PaymentOrdersService {
       return;
     }
     if (providerName === 'f2pay') {
-      await this.models.F2payDeposits.create({
-        user_id: userId, mch_order_no: reference, amount, currency, status: 'Pending',
-        pay_amount: pay?.amount ?? null, pay_currency: pay?.currency ?? null,
-      });
+      await this.models.F2payDeposits.create({ user_id: userId, mch_order_no: reference, amount, currency, status: 'Pending' });
       return;
     }
     await PayInTransactions.create({

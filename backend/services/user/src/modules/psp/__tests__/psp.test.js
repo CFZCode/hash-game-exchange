@@ -853,21 +853,4 @@ test('payment provider callbacks', async (t) => {
     await f2payCallback({ mchOrderNo: reference, state: 'Closed', amount: '500.00' });
     assert.equal((await f2payRow(reference)).status, 'Failed');
   });
-
-  await t.test('F2Pay: an IDR order is checked against the IDR collected and credits the INR ordered', async () => {
-    const uid = newUid();
-    await seed(uid, '0');
-    const reference = newRef();
-    await connection.models.F2payDeposits.create({
-      user_id: uid, mch_order_no: reference, amount: '100', currency: 'INR', status: 'Pending', pay_amount: '20000', pay_currency: 'IDR',
-    });
-
-    await assert.rejects(
-      () => f2payCallback({ mchOrderNo: reference, state: 'Paid', amount: '100' }),
-      (err) => err.code === 'PSP_AMOUNT_MISMATCH',
-      'the INR figure is not what F2Pay collected'
-    );
-    assert.equal((await f2payCallback({ mchOrderNo: reference, state: 'Paid', amount: '20000' })).settled, true);
-    assert.equal(await balanceOf(uid), '100.00000000');
-  });
 });

@@ -168,18 +168,15 @@ class PspService {
 
     // ── 4. The amount must match what we recorded ─────────────────────
     const expected = money.toDecimalString(money.toMinor(record.amount ?? '0'));
-    // What the provider collected, when that is another currency than the wallet's (F2Pay IDR into
-    // the INR wallet): the callback is checked against it, the wallet still gets `expected`.
-    const due = record.payAmount != null ? money.toDecimalString(money.toMinor(record.payAmount)) : expected;
     const reported = money.toDecimalString(money.toMinor(outcome.amount ?? '0'));
 
-    if (money.compare(due, reported) !== 0) {
+    if (money.compare(expected, reported) !== 0) {
       this.logger?.error(
-        { provider: providerName, reference: parsed.reference, expected: due, reported },
+        { provider: providerName, reference: parsed.reference, expected, reported },
         'REJECTED payment callback: amount does not match the recorded transaction'
       );
       await this.#record(audit, { accepted: false, rejection: 'AMOUNT_MISMATCH', amount: reported });
-      throw errors.AMOUNT_MISMATCH({ expected: due, reported });
+      throw errors.AMOUNT_MISMATCH({ expected, reported });
     }
 
     // ── 5. Credit, once — and burn the payload ────────────────────────
@@ -575,7 +572,7 @@ class PspService {
       const row = await this.models.F2payDeposits.findOne({ where: { mch_order_no: reference }, raw: true });
       return row && {
         model: 'F2payDeposits', key: { mch_order_no: reference },
-        userId: row.user_id, amount: row.amount, currency: row.currency, payAmount: row.pay_amount,
+        userId: row.user_id, amount: row.amount, currency: row.currency,
         // 'Pending' / 'Success' / 'Failed'.
         status: row.status, settled: SETTLED_STATUSES.has(String(row.status).toLowerCase()),
         createdAt: row.created_at,

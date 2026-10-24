@@ -162,8 +162,9 @@ export const createCcpaymentDeposit = ({ currency, amount, chain }) =>
 /* F2Pay — the Fiat tab's AUTOMATIC INR deposit (THIS BUILD'S): the player enters an amount, the
    order comes back with F2Pay's cashier page (`redirectUrl`) and the player pays there; F2Pay's
    signed callback credits the wallet. `readF2payMethods` is `[{ method, currency }]` — UPI in INR,
-   the Indonesian ones (QRIS, DANA, BNI …) in IDR, charged at the site's rate — while F2Pay is
-   configured and switched on (owner + site admin), else `[]` and the tab shows the manual form only. */
+   the Indonesian ones (QRIS, DANA, BNI …) in IDR; FiatTab offers those of the selected currency —
+   while F2Pay is configured and switched on (owner + site admin), else `[]` and the tab shows the
+   manual form only. */
 export const readF2payMethods = () =>
   USE_FIXTURES
     ? []

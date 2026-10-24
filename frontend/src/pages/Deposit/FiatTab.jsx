@@ -418,8 +418,9 @@ export default function FiatTab({ onDepositCrypto }) {
   );
 
   const channels = channelsFor(currency);
-  // The wallet is INR; F2Pay credits it from every method it offers (IDR ones at the site's rate).
-  const auto = !USE_FIXTURES && gates.autoDeposit() && String(currency).toUpperCase().replace(/FIAT$/, '') === 'INR' && (autoMethods ?? []).length > 0;
+  // F2Pay's methods in the selected currency (UPI for INR, QRIS / DANA / … for IDR): paid and credited in it.
+  const coinMethods = (autoMethods ?? []).filter((m) => m.currency === String(currency).toUpperCase().replace(/FIAT$/, ''));
+  const auto = !USE_FIXTURES && gates.autoDeposit() && coinMethods.length > 0;
   const shownMode = !auto ? 'manual' : !manual ? 'auto' : mode;
 
   /* `ID`'s own effect: keep the current method if it is still in the list, else the
@@ -580,7 +581,7 @@ export default function FiatTab({ onDepositCrypto }) {
               </div>
             </>
           )}
-          {shownMode === 'auto' ? <AutoDeposit key={currency} currency={currency} methods={autoMethods} /> : <ManualDeposit currency={currency} />}
+          {shownMode === 'auto' ? <AutoDeposit key={currency} currency={currency} methods={coinMethods} /> : <ManualDeposit currency={currency} />}
         </>
       ) : !channel ? (
         <NoChannels onDepositCrypto={onDepositCrypto} />

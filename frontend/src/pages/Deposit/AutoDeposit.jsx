@@ -5,11 +5,10 @@ import { printCurrency } from '../../utils/currency';
 import { createF2payDeposit, extraBonusAmount } from './deposit';
 
 /* The automatic deposit through F2Pay — THIS BUILD'S, like ManualDeposit beside it: the player picks
- * a method (UPI for India, QRIS / DANA / the banks for Indonesia), enters the amount in the wallet's
- * coin and is sent to F2Pay's cashier page. An Indonesian method is charged the IDR equivalent at
- * the site's rate; the wallet gets the amount typed. Nothing is filed afterwards: F2Pay's signed
- * callback credits the wallet. FiatTab offers it next to the manual form (`readF2payMethods`).
- * Every class is ManualDeposit's own. */
+ * one of F2Pay's methods in the selected currency (UPI for INR; QRIS, DANA, the banks for IDR),
+ * enters the amount and is sent to F2Pay's cashier page. Paid and credited in that currency, no
+ * conversion. Nothing is filed afterwards: F2Pay's signed callback credits the wallet. FiatTab
+ * offers it next to the manual form (`readF2payMethods`). Every class is ManualDeposit's own. */
 
 /* F2Pay's method codes as a player reads them; any other code shows as F2Pay sends it. */
 const METHOD_LABELS = { UpiMixed: 'UPI' };
@@ -44,10 +43,7 @@ export default function AutoDeposit({ currency, methods }) {
     <form onSubmit={submit}>
       <div className="my-4 flex rounded-xl bg-success/10 p-2 text-secondary">
         <IconInform className="icon -mt-0.5 mr-1.5 size-6 flex-none fill-success" />
-        <div>
-          Pick a method, enter the amount and pay on the payment page that opens. Your balance is credited automatically once the payment is confirmed.
-          {method.currency !== coin && ` ${method.method} is charged in ${method.currency} at today's rate; you get the ${coin} amount you enter.`}
-        </div>
+        <div>Enter the amount and pay on the payment page that opens. Your balance is credited automatically once the payment is confirmed.</div>
       </div>
 
       {methods.length > 1 && (

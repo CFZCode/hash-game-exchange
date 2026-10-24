@@ -592,10 +592,10 @@ const f2pay = {
   // The cashier page asks for the payer's name, email and phone: the service reads the player's own.
   needsCustomer: true,
 
-  supports(currency, flow) {
-    // Deposits only for now (user, 2026-10-24) — the payout below stays commented out. The wallet
-    // is INR; an Indonesian method still credits INR (see `payIn`).
-    return currency === 'INR' && flow !== 'payout';
+  supports(currency, flow, config) {
+    // Deposits only for now (user, 2026-10-24) — the payout below stays commented out. A currency
+    // is supported when it has methods in env; the player pays in it and is credited in it.
+    return flow !== 'payout' && f2payMethods(config).some((m) => m.currency === currency);
   },
 
   /** `[{ method, currency }]` — what the Fiat tab's Automatic deposit offers. */
@@ -604,27 +604,26 @@ const f2pay = {
   },
 
   /**
-   * The method the player picked (none = the first configured), with the currency F2Pay collects it
-   * in, that currency's endpoint and decimals. Null = not offered. The service converts the wallet
-   * amount into `currency` when they differ, before the order is recorded.
+   * The method the player picked among `currency`'s (none = its first), with that currency's
+   * endpoint and decimals. Null = not offered in that currency. No conversion anywhere: F2Pay
+   * collects exactly the amount and currency the wallet is credited.
    */
-  payIn(method, config) {
-    const methods = f2payMethods(config);
+  payIn(currency, method, config) {
+    const methods = f2payMethods(config).filter((m) => m.currency === currency);
     const picked = method ? methods.find((m) => m.method === method) : methods[0];
     return picked ? { ...picked, ...F2PAY_PAYIN[picked.currency] } : null;
   },
 
-  async createDeposit({ reference, userId, amount, method, pay, notifyUrl, returnUrl, customer, ip }, config, { http }) {
-    const payIn = this.payIn(method, config);
+  async createDeposit({ reference, userId, currency, amount, method, notifyUrl, returnUrl, customer, ip }, config, { http }) {
+    const payIn = this.payIn(currency, method, config);
     if (!payIn) return { ok: false, message: 'That payment method is not available' };
-    const due = String(pay?.amount ?? amount);
     // More decimals than F2Pay takes (INR 2, IDR 0) would make its callback amount differ from ours.
-    if (!new RegExp(`^\\d+${payIn.decimals ? `(\\.\\d{1,${payIn.decimals}})?` : ''}$`).test(due)) {
-      return { ok: false, message: `Amount can have at most ${payIn.decimals} decimals` };
+    if (!new RegExp(`^\\d+${payIn.decimals ? `(\\.\\d{1,${payIn.decimals}})?` : ''}$`).test(String(amount))) {
+      return { ok: false, message: payIn.decimals ? `Amount can have at most ${payIn.decimals} decimals` : 'Amount must be a whole number' };
     }
     const phone = String(customer?.phone ?? '').replace(/\D/g, '');
     const bizContent = JSON.stringify({
-      amount: Number(due).toFixed(payIn.decimals),
+      amount: Number(amount).toFixed(payIn.decimals),
       body: 'Account deposit',
       customerEmail: customer?.email || 'noreply@example.com',
       customerIpAddress: ip || undefined,

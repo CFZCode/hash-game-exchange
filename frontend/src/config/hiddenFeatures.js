@@ -13,9 +13,10 @@ export const PASSKEY_ENABLED = false;
  * the Sign In row is a single full-width button and Sign Up's "More" toggle is not drawn. */
 export const SOCIAL_LOGINS = ['Google'];
 
-/* The fiat currencies the deposit dialog's Fiat tab offers (user's request, 2026-10-16: INR only),
- * intersected with the owner's enabled list. Add a code here to offer another. */
-export const DEPOSIT_FIATS = ['INR'];
+/* The fiat currencies the deposit dialog's Fiat tab offers (user's request, 2026-10-16: INR only;
+ * 2026-10-24: IDR too, for F2Pay's Indonesian methods), intersected with the owner's enabled list.
+ * Add a code here to offer another. */
+export const DEPOSIT_FIATS = ['INR', 'IDR'];
 
 /* FREE PLAYS (user's request, 2026-10-16): the account dropdown's "Free Plays" row, the phone
  * /user/enter "Free Plays" tile, and the `/free-plays` dialog route (falls to the page under it).
