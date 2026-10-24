@@ -10,7 +10,7 @@ const env = require('./env');
 const errors = require('./errors');
 const money = require('./money');
 const { createLogger } = require('./logger');
-const { createApp, PROVIDER_CALLBACK_PREFIXES } = require('./createApp');
+const { createApp, PROVIDER_CALLBACK_PREFIXES, isProviderCallback } = require('./createApp');
 const { startServer } = require('./server');
 const { createHealthRouter } = require('./health');
 const { ServiceClient, CircuitBreaker } = require('./serviceClient');
@@ -147,6 +147,7 @@ module.exports = {
   createLogger,
   createApp,
   PROVIDER_CALLBACK_PREFIXES,
+  isProviderCallback,
   startServer,
   createHealthRouter,
   ServiceClient,

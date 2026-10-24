@@ -15,6 +15,14 @@ Format:
 
 ---
 
+## 2026-10-24 — F2Pay callback CORS par 403 ho raha tha — callbacks ab CORS se bahar
+**Kya kiya:** F2Pay ka callback (13.228.197.106, 15:17) `Origin: https://example.com` header ke saath aaya aur gateway ke CORS ne `403 Origin … is not allowed by CORS` de diya — signature check tak pahuncha hi nahi. `packages/common/src/createApp.js`: ek niyam `isProviderCallback(path)` (`/callback|webhook/` ya PROVIDER_CALLBACK_PREFIXES) — CORS callbacks ko chhod deta hai; `gateway/src/encryptionRule.js` ab yahi niyam use karta hai (encryption + CORS ek hi rule). Baaki routes par CORS allowlist waisi hi. Test: `packages/common/__tests__/corsCallbacks.test.js`.
+**Kyun:** User: "maine f2pay se ek callback bheja hai, dekho aaya hai, signature theek hai".
+**Files / jagah:** backend/packages/common/src/{createApp.js,index.js}, backend/gateway/src/encryptionRule.js, backend/packages/common/__tests__/corsCallbacks.test.js
+**Notes / pending:** Saare parker-* backend restart. Live check: foreign Origin ka nakli callback ab 401 PSP_INVALID_SIGNATURE (route tak pahunchta hai), player route par foreign Origin abhi bhi 403. F2Pay se callback dobara bhejna hai — signature tab dikhega. Push nahi kiya (user: bina bole push nahi).
+
+---
+
 ## 2026-10-24 — F2Pay live test: IPv4 fix, INR order chala, IDR "invalid method"
 **Kya kiya:** user-service `index.js` me `dns.setDefaultResultOrder('ipv4first')` — server F2Pay se IPv6 (2400:d321:2314:1798::1) par jata tha aur F2Pay ki whitelist me IPv4 hai (`20010 … not in payin ip white list`). Fix ke baad live par tonny (8623441393) ka INR ₹500 UpiMixed order bana: F2Pay `0000 success`, F2Pay ka signature hamari public key se verify, platNo PI6670135595243101, cashier URL mila (order DEP_1792847266494_461a92903d0e, Pending). IDR ke saare 6 methods (QRIS, DANA, CIMB, BRI, MANDIRI, BNI, 50,000 IDR) par F2Pay `20002 invalid method` (test DB par check kiya; tonny ki 3 live IDR requests bhi isi se Failed).
 **Kyun:** User: "ek order create karke dekhna request ja rahi hai f2pay me ki nahi … tonny ke account se karo".
