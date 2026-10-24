@@ -15,6 +15,14 @@ Format:
 
 ---
 
+## 2026-10-24 — Super Admin bhi F2Pay ki currencies ON/OFF kare (transaction code ke saath)
+**Kya kiya:** Settings → Payment Methods par F2Pay ke neeche har currency (INR, IDR) ka Super Admin switch — sirf wahi currencies dikhti hain jo owner ne ON rakhi. Switch ki key wahi jo owner flag ki (`f2pay_inr`, `f2pay_idr`) aur wo usi purani list `siteconfig.settings.payment_gateways_off` me jaati hai — naya storage nahi. user-service ka `#allowsCurrency` (pehle `#ownerAllowsCurrency`): currency tabhi chalegi jab owner ON **aur** Super Admin ON; methods list aur order dono me. Payment Methods ke har switch (gateway + currency) par ab transaction code zaroori: backend `assertTransactionPassword` (`PUT /admin/site-config/payment-gateways/:name` body `transactionPassword`), admin UI me ManualSwitch jaisa dialog. Gateway ki key ka naam `ownerFlag` → `currencySwitch`.
+**Kyun:** User: "same super admin ko bhi ye karne ka access hai … with transaction code ke sath super admin ke liye".
+**Files / jagah:** backend/services/admin/src/modules/site-config/{siteConfig.service.js,siteConfig.validators.js,routes/admin.routes.js,__tests__/siteConfig.test.js}, backend/services/user/src/modules/payment-orders/{gateways/index.js,paymentOrders.service.js,__tests__/paymentOrders.test.js}, admin/src/views/settings/PaymentMethods.tsx
+**Notes / pending:** parker-admin-svc + parker-user-svc restart, admin build. Tests: transaction code missing / galat → refuse, owner-off currency Super Admin nahi chhoo sakta, Super Admin ki OFF currency methods se hat-ti hai aur order mana. F2Pay khud abhi bhi Payment Methods me OFF (9992).
+
+---
+
 ## 2026-10-24 — IDR built-in currency + owner panel se F2Pay ki currencies
 **Kya kiya:** IDR ab asli wallet currency (INR jaisi): migration 151 `credits.idr`, registry row (builtin fiat, icon `idr.svg`), IDR rate row, aur direct-ledger trigger me `idr`; code me `CURRENCY_COLUMN`, `BUILTIN_CURRENCIES` (+ owner-panel `BUILTIN_COINS`), Credits model extension, hourly rate refresh (`FIAT_CODES`), reports ke currency columns. Live par owner panel se IDR custom coin pehle hi ban chuka tha (13:31) — migration 152 ne use built-in banaya (custom balance hota to `credits.idr` me jata; 0 tha), aur owner ka fixed rate market refresh pe diya. Owner panel: "Fiat currencies" me `idr`, naya group "F2Pay" (`f2pay_inr`, `f2pay_idr`, missing = on) — jis currency ka switch ON, usi me F2Pay khulta hai (methods list + order dono check, `#ownerAllowsCurrency`).
 **Kyun:** User: "owner panel se daal sakta hai ki f2pay me kon si currency chalegi … multiple bhi … agar idr currency na ho to vo bhi add kar do credit and exchange rate table me".

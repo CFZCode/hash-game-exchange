@@ -910,4 +910,19 @@ test('payment orders', async (t) => {
       entitlements.resetEntitlements();
     }
   });
+
+  await t.test('the Super Admin can switch one F2Pay currency off too (Payment Methods, same key)', async () => {
+    const uid = newUid();
+    await seed(uid, '0');
+    const admin = { get: async () => ({ payment_gateways_off: ['f2pay_inr'] }) };
+    const { service, calls } = build(cashier, F2PAY, { clients: { admin } });
+
+    const { methods } = await service.getAvailableMethods({ provider: 'f2pay' });
+    assert.deepEqual(methods.map((m) => m.currency), ['IDR', 'IDR'], 'INR is off at the Super Admin');
+    await assert.rejects(
+      () => service.createDeposit({ userId: uid, provider: 'f2pay', currency: 'INR', amount: '500' }),
+      (err) => err.code === 'PAYORDER_CURRENCY_NOT_SUPPORTED'
+    );
+    assert.equal(calls.length, 0);
+  });
 });

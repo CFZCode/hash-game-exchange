@@ -121,7 +121,7 @@ class PaymentOrdersService {
     // CCPayment's coin ids come from its live coin list (cached) — see `ccpaymentCoinId`.
     if (providerName === 'ccpayment') await refreshCcpaymentCoinIds(this.config, this.http);
 
-    if (!gateway.supports(currency, FLOW.PAY_IN, this.config) || !(await this.#ownerAllowsCurrency(gateway, currency))) {
+    if (!gateway.supports(currency, FLOW.PAY_IN, this.config) || !(await this.#allowsCurrency(gateway, currency))) {
       throw errors.CURRENCY_NOT_SUPPORTED({ provider: providerName, currency });
     }
 
@@ -413,9 +413,9 @@ class PaymentOrdersService {
     await this.#assertOwnerAllows(providerName);
     if (!gateway.getAvailableMethods) return { provider: providerName, methods: null };
     let methods = await gateway.getAvailableMethods(this.config, { http: this.http });
-    if (gateway.ownerFlag) {
+    if (gateway.currencySwitch) {
       const kept = [];
-      for (const m of methods) if (await this.#ownerAllowsCurrency(gateway, m.currency)) kept.push(m);
+      for (const m of methods) if (await this.#allowsCurrency(gateway, m.currency)) kept.push(m);
       methods = kept;
     }
     return { provider: providerName, methods };
@@ -556,9 +556,15 @@ class PaymentOrdersService {
     }
   }
 
-  /** A gateway the owner switches per currency (F2Pay: `flags.f2pay_<code>`, missing = on). */
-  async #ownerAllowsCurrency(gateway, currency) {
-    return !gateway.ownerFlag || entitlements.isFlagEntitled(gateway.ownerFlag(currency));
+  /**
+   * A gateway switched per currency (F2Pay: `f2pay_<code>`): on only when the owner's flag is on
+   * (missing = on) AND the Super Admin has not switched it off (Payment Methods, `payment_gateways_off`).
+   */
+  async #allowsCurrency(gateway, currency) {
+    if (!gateway.currencySwitch) return true;
+    const key = gateway.currencySwitch(currency);
+    const off = await this.settings.read('payment_gateways_off', []);
+    return (await entitlements.isFlagEntitled(key)) && !(Array.isArray(off) && off.includes(key));
   }
 
   /**
