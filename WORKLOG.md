@@ -15,6 +15,14 @@ Format:
 
 ---
 
+## 2026-10-24 — F2Pay live test: IPv4 fix, INR order chala, IDR "invalid method"
+**Kya kiya:** user-service `index.js` me `dns.setDefaultResultOrder('ipv4first')` — server F2Pay se IPv6 (2400:d321:2314:1798::1) par jata tha aur F2Pay ki whitelist me IPv4 hai (`20010 … not in payin ip white list`). Fix ke baad live par tonny (8623441393) ka INR ₹500 UpiMixed order bana: F2Pay `0000 success`, F2Pay ka signature hamari public key se verify, platNo PI6670135595243101, cashier URL mila (order DEP_1792847266494_461a92903d0e, Pending). IDR ke saare 6 methods (QRIS, DANA, CIMB, BRI, MANDIRI, BNI, 50,000 IDR) par F2Pay `20002 invalid method` (test DB par check kiya; tonny ki 3 live IDR requests bhi isi se Failed).
+**Kyun:** User: "ek order create karke dekhna request ja rahi hai f2pay me ki nahi … tonny ke account se karo".
+**Files / jagah:** backend/services/user/src/index.js
+**Notes / pending:** parker-user-svc restart. F2Pay ab Payment Methods me ON hai (user ne kiya). IDR: F2Pay se pooch-na hai ki merchant F2_6312 par IDR API me chalu hai ya methodCode alag hain. Tonny ka ₹500 order pay karne par callback se credit hona chahiye — abhi pay nahi kiya.
+
+---
+
 ## 2026-10-24 — F2Pay ke methods env se DB me: owner panel + Super Admin add / active
 **Kya kiya:** Naya table `payment_methods` (migration 153): gateway, currency, code, `owner_enabled`, `site_enabled`, `added_by` (owner / site), `updated_by` (owner / staff:<id>), timestamps — env wale 7 methods (INR UpiMixed; IDR QRIS, DANA, CIMB, BRI, MANDIRI, BNI) seed. `.env` me ab sirf F2Pay keys (`F2PAY_INR_METHODS` / `F2PAY_IDR_METHODS` config, .env.example aur live .env se hataye). user-service `#methods`: ek query + owner plan ka ek read + Super Admin list ka ek read → chalu methods (dono switch ON, currency ON); methods list aur order dono isi se. Super Admin (Settings → Payment Methods): har currency ke neeche methods, har method ka switch, "Add method" — sab transaction code ke saath, DB me `updated_by` + activity log. Owner panel: owner document me naya block `paymentMethods` (`{ f2pay: { IDR: [{ code, active }] } }`), F2Pay group me har currency ke neeche editor (site ke methods bhi dikhte hain owner-key read `GET /admin/site-config/payment-methods/owner` se; owner kisi bhi method ko OFF kar sakta hai, naya add kar sakta hai). admin-service owner document apply hote hi `payment_methods.owner_enabled` likhta hai (`applyOwnerPaymentMethods`). Owner OFF = Super Admin ON nahi kar sakta.
 **Kyun:** User: "env se hata do, env me bas keys … payment method add karne ka option owner panel me aur super admin me … background me sara data db me store hona chahiye ki admin ne kon kon sa system enable ya disable kiya".
