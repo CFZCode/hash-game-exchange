@@ -36,6 +36,8 @@ const SRC = { all: [{ not: 'foreign' }, { path: /^src\// }] };
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // No `X-Powered-By: Next.js`: the framework and its version are not advertised (docs/SECURITY-CHECKLIST.md #10).
+  poweredByHeader: false,
   env,
   /* The Vite entry rendered <App/> without <StrictMode>; the App Router turns it on by default,
      which double-runs every effect in development. Off, so dev behaves as it did. */
