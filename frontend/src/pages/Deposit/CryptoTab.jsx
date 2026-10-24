@@ -19,9 +19,11 @@ import {
   depositNotice,
   readCcpaymentCoins,
   createCcpaymentDeposit,
+  readF2payMethods,
 } from './deposit';
 import { copyWithToast } from '../../utils/clipboard';
 import ManualDeposit from './ManualDeposit';
+import AutoDeposit from './AutoDeposit';
 import { useGates } from '../../context/gates';
 import { toastError } from '../../components/shared/Toast/toast';
 
@@ -265,6 +267,13 @@ export default function CryptoTab() {
   /* No CCPayment for this coin: the manual transfer to the house's own addresses
      (admin → Bank details), whose networks replace the captured Network select. */
   const manual = !USE_FIXTURES && !ccpayLoading && !ccpay;
+  /* F2Pay's crypto payin for this coin (USDT on TRON) beside the coin's own deposit, the player picking
+     one like the Fiat tab's Manual / Automatic — THIS BUILD'S. Paid on F2Pay's page, credited in the coin. */
+  const { data: f2payMethods } = useResource(readF2payMethods);
+  const coinMethods = (f2payMethods ?? []).filter((m) => m.currency === currency);
+  const auto = !USE_FIXTURES && !ccpayLoading && gates.autoDeposit() && coinMethods.length > 0;
+  const [mode, setMode] = React.useState('own');
+  const shownMode = auto ? mode : 'own';
   const alias = getAlias(currency);
 
   /* Every depositable coin in the wallet, which is what the Currency select lists —
@@ -385,7 +394,7 @@ export default function CryptoTab() {
           </Select>
         </div>
 
-        {!manual && <div className="relative !mt-0 ml-1.5 flex-1 cursor-pointer">
+        {!manual && shownMode === 'own' && <div className="relative !mt-0 ml-1.5 flex-1 cursor-pointer">
           <div className="mb-1.5 text-secondary">Network</div>
           <Select
             value={network.chain}
@@ -412,7 +421,30 @@ export default function CryptoTab() {
       {/* `k8` verbatim. The `@container` pair puts the QR beside the address from `@2xl` (672px)
           up — the dialog is 480 wide, so it never fires and the code stays centred above. Kept
           because the same component renders full-width on the wallet page. */}
-      {ccpay ? (
+      {auto && (
+        <>
+          <div className="mb-1 mt-5 text-secondary">Deposit Method</div>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              ['own', ccpay ? 'Deposit Address' : 'Manual'],
+              ['auto', 'Automatic'],
+            ].map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                className={`button button-m h-10 ${shownMode === value ? 'button-brand' : 'button-second'}`}
+                onClick={() => setMode(value)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
+      {shownMode === 'auto' ? (
+        <AutoDeposit key={currency} currency={currency} methods={coinMethods} crypto />
+      ) : ccpay ? (
         <CcpayDeposit key={`${currency}-${network.chain}`} currency={currency} network={network} />
       ) : !address ? (
         manual && <ManualDeposit key={currency} currency={currency} crypto />

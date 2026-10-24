@@ -563,8 +563,8 @@ export const FLAG_GROUPS: FlagGroup[] = [
   {
     // Not "… currencies": a title matching /currenc/i is read as a coin group (lib/entitlements/siteCoins.ts).
     title: 'F2Pay',
-    description: 'F2Pay is INR only: ON = a player depositing in INR is offered F2Pay (UPI) and pays in INR.',
-    keys: ['f2pay_inr']
+    description: 'What F2Pay is active for: INR (UPI) and crypto (USDT). ON = a player depositing in it is offered F2Pay and pays in it. The site admin sees these and can only switch F2Pay as a whole.',
+    keys: ['f2pay_inr', 'f2pay_usdt']
   },
   {
     title: 'Home page sections',
@@ -622,6 +622,7 @@ export const FLAG_LABELS: Record<string, string> = {
   gateway_upi: 'UPI (EkQR)',
   gateway_f2pay: 'F2Pay (deposits)',
   f2pay_inr: 'INR (UPI)',
+  f2pay_usdt: 'Crypto (USDT, TRC20)',
   idr: 'IDR',
   home_heroSection: 'Hero carousel',
   home_welcomebanner: 'Welcome banner',

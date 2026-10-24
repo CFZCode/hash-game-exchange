@@ -5,17 +5,19 @@ import { printCurrency } from '../../utils/currency';
 import { createF2payDeposit, extraBonusAmount } from './deposit';
 
 /* The automatic deposit through F2Pay — THIS BUILD'S, like ManualDeposit beside it: the player picks
- * one of F2Pay's methods in the selected currency (UPI for INR; QRIS, DANA, the banks for IDR),
- * enters the amount and is sent to F2Pay's cashier page. Paid and credited in that currency, no
- * conversion. Nothing is filed afterwards: F2Pay's signed callback credits the wallet. FiatTab
- * offers it next to the manual form (`readF2payMethods`). Every class is ManualDeposit's own. */
+ * one of F2Pay's methods in the selected currency (UPI for INR, USDT on TRON for crypto), enters the
+ * amount and is sent to F2Pay's cashier page. Paid and credited in that currency, no conversion.
+ * Nothing is filed afterwards: F2Pay's signed callback credits the wallet. FiatTab offers it next to
+ * the manual form, CryptoTab (`crypto`) next to the coin's own deposit (`readF2payMethods`). Every
+ * class is ManualDeposit's own. */
 
 /* F2Pay's method codes as a player reads them; any other code shows as F2Pay sends it. */
-const METHOD_LABELS = { UpiMixed: 'UPI' };
+const METHOD_LABELS = { UpiMixed: 'UPI', PI_USDT_TRX: 'USDT · TRC20' };
 
-export default function AutoDeposit({ currency, methods }) {
+export default function AutoDeposit({ currency, methods, crypto = false }) {
   const coin = String(currency).toUpperCase().replace(/FIAT$/, '');
-  const walletCode = `${coin}FIAT`;
+  // The wallet row: a coin is keyed bare (USDT), a fiat with the suffix (INRFIAT).
+  const walletCode = crypto ? coin : `${coin}FIAT`;
   const [picked, setPicked] = React.useState(0);
   const method = methods[picked] ?? methods[0];
   const [amount, setAmount] = React.useState('');

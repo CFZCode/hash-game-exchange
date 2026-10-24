@@ -825,6 +825,18 @@ test('payment provider callbacks', async (t) => {
     assert.equal(await balanceOf(uid), '500.00000000');
   });
 
+  await t.test('F2Pay: a crypto (USDT) order is paid and credited in USDT, nothing in INR', async () => {
+    const uid = newUid();
+    await seed(uid, '0');
+    const reference = newRef();
+    await connection.models.F2payDeposits.create({ user_id: uid, mch_order_no: reference, amount: '10.5', currency: 'USDT', status: 'Pending' });
+
+    assert.equal((await f2payCallback({ mchOrderNo: reference, state: 'Paid', amount: '10.50' })).settled, true);
+    const row = await connection.models.Credits.findOne({ where: { uid }, raw: true });
+    assert.equal(money.toDecimalString(money.toMinor(row.usdt)), '10.50000000');
+    assert.equal(await balanceOf(uid), '0.00000000', 'nothing converted into INR');
+  });
+
   await t.test('F2Pay: a callback not signed by F2Pay moves nothing', async () => {
     const uid = newUid();
     await seed(uid, '0');
