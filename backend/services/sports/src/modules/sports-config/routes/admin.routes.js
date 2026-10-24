@@ -46,24 +46,41 @@ module.exports = function adminRoutes({ auth, clients, models }) {
      uses): TENEXCH checked only OWNER targets, so any agent holding users:lock could lock a rival
      master's whole downline or lift a lock its upline set. A staff member never changes their own
      lock; a player with no parent belongs to the Super Admin (docs/SECURITY-CHECKLIST.md). */
+  const notInTree = (res) => res.status(403).json({ success: false, message: 'Not in your tree' });
+  // Each target is { type: 'USER' | 'STAFF', id }; write refuses the caller's own staff lock.
+  const allInTree = async (staff, targets, write) => {
+    if (!staff || targets.length === 0) return false;
+    if (!targets.every((t) => Number.isInteger(t.id) && t.id > 0)) return false;
+    const scope = await clients.admin.get(`/internal/admin/staff-directory/staff/${staff.id}/descendants`);
+    const ids = (scope?.ids ?? scope?.data?.ids ?? []).map(Number);
+    const top = Number(staff.level) === 1 || Number(staff.parentLevel) === 1;
+    for (const { type, id } of targets) {
+      if (type === 'USER') {
+        const player = await models.Users.findByPk(id, { attributes: ['parent_staff_id'], raw: true });
+        if (!player || !(player.parent_staff_id == null ? top : ids.includes(Number(player.parent_staff_id)))) return false;
+      } else if (type !== 'STAFF' || !ids.includes(id) || (write && id === Number(staff.id))) {
+        return false;
+      }
+    }
+    return true;
+  };
   const lockScope = async (req, res, next) => {
     try {
       const type = req.body?.targetType ?? req.query?.type;
-      const targetId = Number(req.body?.targetId ?? req.params?.targetId);
       if (type === 'OWNER') return next(); // the controller allows the owner only
-      const staff = req.staff;
-      if (!staff || !Number.isInteger(targetId) || targetId <= 0) return res.status(403).json({ success: false, message: 'Not in your tree' });
-      const scope = await clients.admin.get(`/internal/admin/staff-directory/staff/${staff.id}/descendants`);
-      const ids = (scope?.ids ?? scope?.data?.ids ?? []).map(Number);
-      let allowed;
-      if (type === 'USER') {
-        const player = await models.Users.findByPk(targetId, { attributes: ['parent_staff_id'], raw: true });
-        const top = Number(staff.level) === 1 || Number(staff.parentLevel) === 1;
-        allowed = Boolean(player) && (player.parent_staff_id == null ? top : ids.includes(Number(player.parent_staff_id)));
-      } else {
-        allowed = ids.includes(targetId) && (req.method === 'GET' || targetId !== Number(staff.id));
-      }
-      return allowed ? next() : res.status(403).json({ success: false, message: 'Not in your tree' });
+      const target = { type: type === 'USER' ? 'USER' : 'STAFF', id: Number(req.body?.targetId ?? req.params?.targetId) };
+      return (await allInTree(req.staff, [target], req.method !== 'GET')) ? next() : notInTree(res);
+    } catch (error) {
+      return next(error);
+    }
+  };
+  // The market-lock toggles (single and bulk) name accounts as { account_id, account_type: 'user' | 'staff' }.
+  // Single checks the body's own account_id (what the controller acts on), bulk every accounts[] entry.
+  const marketLockScope = (bulk) => async (req, res, next) => {
+    try {
+      const accounts = bulk ? (Array.isArray(req.body?.accounts) ? req.body.accounts : []) : [req.body ?? {}];
+      const targets = accounts.map((a) => ({ type: a?.account_type === 'user' ? 'USER' : a?.account_type === 'staff' ? 'STAFF' : null, id: Number(a?.account_id) }));
+      return (await allInTree(req.staff, targets, true)) ? next() : notInTree(res);
     } catch (error) {
       return next(error);
     }
@@ -76,8 +93,8 @@ module.exports = function adminRoutes({ auth, clients, models }) {
   // ── bet locks, betting config, commission ───────────────────────────
 
   router.get('/betlock/market-locks/:event_id', canRead, authMiddleware, requireBackoffice, marketLocks('getMarketLockChildren'));
-  router.post('/betlock/toggle-market-lock', canLock, authMiddleware, requireBackoffice, requireTxnCode, marketLocks('toggleMarketLock'));
-  router.post('/betlock/bulk-toggle-market-lock', canLock, authMiddleware, requireBackoffice, requireTxnCode, marketLocks('bulkToggleMarketLock'));
+  router.post('/betlock/toggle-market-lock', canLock, marketLockScope(false), authMiddleware, requireBackoffice, requireTxnCode, marketLocks('toggleMarketLock'));
+  router.post('/betlock/bulk-toggle-market-lock', canLock, marketLockScope(true), authMiddleware, requireBackoffice, requireTxnCode, marketLocks('bulkToggleMarketLock'));
 
   router.get('/betting-config/buffer/sports', canManage, authMiddleware, requireOwner, BettingConfig('getSportsBuffers'));
   router.post('/betting-config/buffer/sports', canManage, authMiddleware, requireOwner, BettingConfig('saveSportsBuffer'));
@@ -107,6 +124,6 @@ module.exports = function adminRoutes({ auth, clients, models }) {
   router.delete('/commission-config/sports', canManage, authMiddleware, requireOwner, Commission('resetSportsCommission'));
 
   router.authorizationReviewed =
-    'mssports authorizes each route itself: authMiddleware, then requireOwner (the platform Super Admin) or requireBackoffice + the transaction password on market-lock writes. The /sports-lock routes check only that the caller is signed in (staff, here) and that only the owner touches owner locks: there is no downline check, as in TENEXCH';
+    'mssports authorizes each route itself: authMiddleware, then requireOwner (the platform Super Admin) or requireBackoffice + the transaction password on market-lock writes. Every lock route (/sports-lock and the market-lock toggles) first checks that each target is in the caller\'s own tree (lockScope / marketLockScope); only the owner touches owner locks';
   return router;
 };

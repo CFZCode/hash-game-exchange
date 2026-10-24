@@ -17,6 +17,7 @@ import { Toaster } from '@/components/ui/sonner'
 import { siteConfig } from '@/configs/site'
 import { ApiError, errorMessage, request } from '@/lib/api/client'
 import AuthBackgroundShape from '@/assets/svg/auth-background-shape'
+import { safeNext } from '@/lib/safeNext'
 
 const Login = () => {
   const router = useRouter()
@@ -48,9 +49,7 @@ const Login = () => {
       toast.success('Signed in')
 
       // Only a path on this site — never another origin from a crafted `?next=`.
-      const next = params.get('next')
-
-      router.replace(next && next.startsWith('/') && !next.startsWith('//') && !next.startsWith('/\\') ? next : '/overview')
+      router.replace(safeNext(params.get('next')))
       router.refresh()
     } catch (err) {
       const message = errorMessage(err)

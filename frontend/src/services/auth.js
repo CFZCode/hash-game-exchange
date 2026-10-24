@@ -326,11 +326,11 @@ export async function login(credentials, previous) {
 
 /* Google sign-in: the one-time code the backend's Google callback put in the URL → the same
    token pair `login` gets (`POST /user/auth/google/exchange`), then the same account load. */
-export async function loginWithGoogle(code, previous) {
+export async function loginWithGoogle(code, nonce, previous) {
   const session = await request('/api/v1/user/auth/google/exchange', {
     live: true,
     method: 'POST',
-    json: { code },
+    json: { code, nonce },
     fixture: null,
   });
   if (!session?.accessToken) return FIXTURE_ACCOUNT;

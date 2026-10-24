@@ -296,7 +296,7 @@ export function SessionProvider({ children }) {
        */
       authenticate: (credentials) => apiLogin(credentials, account),
       /* Google sign-in: the callback's one-time code, same contract as `authenticate`. */
-      authenticateGoogle: (code) => loginWithGoogle(code, account),
+      authenticateGoogle: (code, nonce) => loginWithGoogle(code, nonce, account),
 
       /**
        * Create an account, then sign into it.

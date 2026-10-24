@@ -22,7 +22,7 @@ import {
   BET_TYPE_OPTIONS,
   linksToGameDetail,
 } from '../../../services/betHistory';
-import SportsBets, { SPORTS_SIDE_KEY, SPORTS_STATUS_KEY, SportsFilters } from './SportsBets';
+import SportsBets, { SPORTS_SIDE_KEY, SPORTS_STATUS_KEY, SportsFilters } from './SportsBets.jsx';
 import { filterRows, loadSportsHistory, toCasinoRow } from './sportsBets';
 
 /* Type = Sports (value "4"): the exchange's bets, drawn by SportsBets instead of the casino table. */

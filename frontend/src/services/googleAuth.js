@@ -18,12 +18,39 @@ export function useGoogleLogin() {
   return data === true;
 }
 
+/* Login-CSRF binding: this tab's random nonce rides to /google/start and is required again at the
+   exchange, so a `/login/google?code=` link from someone else's flow cannot sign this tab in. */
+const NONCE_KEY = 'g_signin_nonce';
+const newNonce = () => {
+  const nonce = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(24)))).replace(/\+/g, '-').replace(/\//g, '_');
+  try {
+    sessionStorage.setItem(NONCE_KEY, nonce);
+  } catch {
+    /* storage blocked: the exchange then has no nonce and refuses, as it should */
+  }
+  return nonce;
+};
+/** The nonce this tab started a Google sign-in with (read once), or null. */
+export const takeGoogleNonce = () => {
+  try {
+    const nonce = sessionStorage.getItem(NONCE_KEY);
+    sessionStorage.removeItem(NONCE_KEY);
+    return nonce;
+  } catch {
+    return null;
+  }
+};
+
 /* The hero draws the button whether or not the keys are set (user's request), so the press checks
    first and says so instead of landing on the API's NOT_CONFIGURED page. */
 export const startGoogleLogin = () =>
   Promise.resolve(getGoogleLogin())
     .catch(() => false)
-    .then((on) => (on ? window.location.assign(GOOGLE_START_URL) : toast.error(GOOGLE_ERRORS.AUTH_GOOGLE_NOT_CONFIGURED)));
+    .then((on) =>
+      on
+        ? window.location.assign(`${GOOGLE_START_URL}?nonce=${newNonce()}`)
+        : toast.error(GOOGLE_ERRORS.AUTH_GOOGLE_NOT_CONFIGURED)
+    );
 
 /* Platform error codes the callback can come back with → what the player reads. */
 export const GOOGLE_ERRORS = {

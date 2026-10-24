@@ -1,6 +1,7 @@
 import { ENC_ACCEPT, openSealed } from './apiCrypto';
 import { SOCKET_READS, liveRead, markLiveStale, setLiveActive } from './liveStore';
 import {
+  adoptStoredTokens,
   clearTokens,
   getAccessToken,
   getRefreshToken,
@@ -220,11 +221,25 @@ let refreshing = null;
 
 export function refreshSession() {
   if (refreshing) return refreshing;
+  if (!getRefreshToken()) return Promise.resolve(false);
 
-  const token = getRefreshToken();
-  if (!token) return Promise.resolve(false);
+  /* ACROSS TABS TOO: one refresh at a time for the whole browser (Web Locks). A tab that waited
+     finds the pair the other tab stored and adopts it instead of presenting the retired token. */
+  const run = () => (adoptStoredTokens() ? true : rotate(getRefreshToken()));
+  refreshing = Promise.resolve(globalThis.navigator?.locks ? navigator.locks.request('parker567-auth-refresh', run) : run())
+    .catch(() => false)
+    .finally(() => {
+      /* Cleared in `finally` rather than in each arm, so a rejection cannot leave a settled
+         promise cached and turn every later 401 into an instant failure. */
+      refreshing = null;
+    });
 
-  refreshing = fetch(BASE + REFRESH_PATH, {
+  return refreshing;
+}
+
+function rotate(token) {
+  if (!token) return false;
+  return fetch(BASE + REFRESH_PATH, {
     method: 'POST',
     headers: { Accept: ENC_ACCEPT ?? 'application/json', 'Content-Type': 'application/json' },
     body: JSON.stringify({ refreshToken: token }),
@@ -243,15 +258,7 @@ export function refreshSession() {
       if (!data?.accessToken) return false;
       setTokens(data);
       return true;
-    })
-    .catch(() => false)
-    .finally(() => {
-      /* Cleared in `finally` rather than in each arm, so a rejection cannot leave a settled
-         promise cached and turn every later 401 into an instant failure. */
-      refreshing = null;
     });
-
-  return refreshing;
 }
 
 /* One fetch, no retry. `request` and `requestPage` wrap this so the token, the content type and

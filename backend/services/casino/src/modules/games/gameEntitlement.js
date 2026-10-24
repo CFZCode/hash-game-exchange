@@ -123,8 +123,10 @@ async function lookup(models, uid) {
  *
  * @param {object}   deps   the container (`models`, `config`)
  * @param {Function} pick   req → { uid?, provider?, type? } from the validated body
+ * @param {boolean}  [opts.mustExist]  the uid must be a live catalogue row (gisgamesnew / js_games):
+ *   a parked or unknown uid would otherwise pass on the `casino` flag alone and open upstream
  */
-function requireGameEntitled({ models, config } = {}, pick) {
+function requireGameEntitled({ models, config } = {}, pick, { mustExist = false } = {}) {
   const bookUids = new Set(
     [...KNOWN_BOOK_UIDS, ...String(config?.SPORTS_BOOK_GAME_UIDS ?? '').split(',')]
       .map((uid) => uid.trim().toLowerCase())
@@ -135,6 +137,7 @@ function requireGameEntitled({ models, config } = {}, pick) {
     try {
       const given = pick(req) ?? {};
       const row = await lookup(models ?? {}, given.uid);
+      if (mustExist && given.uid && !row && !bookUids.has(String(given.uid).toLowerCase())) throw E.NOT_FOUND({ uid: given.uid });
       const game = { uid: given.uid, provider: row?.provider ?? given.provider, type: row?.type ?? given.type };
       for (const flag of flagsFor(game, bookUids)) await entitlements.assertFlagEntitled(flag);
       /**

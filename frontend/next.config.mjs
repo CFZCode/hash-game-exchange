@@ -44,6 +44,34 @@ const nextConfig = {
   reactStrictMode: false,
   /* The "N" badge would sit on top of the bottom-left of every page in development. */
   devIndicators: false,
+  /* The content security policy in REPORT-ONLY mode: the browser blocks nothing and logs in its
+     console what an enforced policy would have blocked (games, the sportsbook iframe, payments,
+     scorecards load from many hosts). Enforce it — rename the header — only once a week on live
+     shows no violation from a real feature (docs/SECURITY-CHECKLIST.md #18). */
+  headers: async () => [
+    {
+      source: '/:path*',
+      headers: [
+        {
+          key: 'Content-Security-Policy-Report-Only',
+          value: [
+            "default-src 'self'",
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https:",
+            "style-src 'self' 'unsafe-inline' https:",
+            "img-src 'self' data: blob: https:",
+            "font-src 'self' data: https:",
+            "connect-src 'self' https: wss:",
+            "media-src 'self' blob: https:",
+            "frame-src 'self' https:",
+            "worker-src 'self' blob:",
+            "object-src 'none'",
+            "base-uri 'self'",
+            "form-action 'self' https:",
+          ].join('; '),
+        },
+      ],
+    },
+  ],
   turbopack: {
     root: here,
     /* Vite's own order. It matters: EditProfile has both frames.js and frames.jsx, and

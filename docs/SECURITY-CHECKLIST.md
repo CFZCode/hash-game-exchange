@@ -24,10 +24,10 @@ Last updated: 2026-10-25.
 | 12 | Log admin actions | — | Done | `backend/services/admin/src/modules/audit` and the admin Activity log; KYC document views are logged. |
 | 13 | Private storage buckets | 1 | Done | 2026-10-25: KYC files on server disk (`storage/kyc`, git-ignored), served only through `/user/kyc/documents/:kycId/:field` (owner only, else 404) and the staff route (permission + own tree + audit). Path escape refused. Live: both 401 without a login. |
 | 14 | Hide admin pages properly | — | Done | Admin `RouteGate` refuses pasted URLs; the server checks permissions again. |
-| 15 | Update vulnerable packages | 3 | Open | Next.js 16.2.6 (admin, owner panel), 16.4.0 (player site); a security upgrade is pending. `npm audit` gives no output here (pnpm installs) — run `pnpm audit --prod` per app. |
+| 15 | Update vulnerable packages | 3 | Done | 2026-10-25: Next.js 16.4.3 in all three apps (all build), jsPDF 3 → 4.2.1 (admin PDF export; 10 advisories), shadcn 4.22.1, `npm audit fix` in backend and frontend. Frontend 0 advisories. Left: `zod@3` (high, memory) only via eslint and the shadcn CLI — dev tools, never in a build. Backend: re-run `npm audit --omit=dev`. |
 | 16 | Check file upload types | 2 | Done | 2026-10-25 review: SVG logo/coin uploads are refused unless clean (no script, foreignObject, `on*`, `javascript:`, external refs) and served with `CSP: default-src 'none'; sandbox` + nosniff. Other uploads sniff magic bytes and refuse SVG. |
 | 17 | Claude security review | 1 | Done (first pass) | 2026-10-25: auth, IDOR, money, gateway, tokens, secrets, SQL, XSS, uploads. Findings below. No secrets tracked in git; JWT alg pinned; every provider callback verifies its signature before money moves. |
-| 18 | Security headers | 2 | Open (half done) | API: helmet (HSTS, nosniff, frame SAMEORIGIN, no-referrer; CSP off by design). 2026-10-25: admin and owner panel send `X-Frame-Options: DENY`, `frame-ancestors 'none'`, nosniff, referrer policy (`next.config.ts`). **Open:** player site — CSP in report-only first (games, sportsbook iframe, scorecard). |
+| 18 | Security headers | 2 | Open (half done) | API: helmet (HSTS, nosniff, frame SAMEORIGIN, no-referrer; CSP off by design). 2026-10-25: admin and owner panel send `X-Frame-Options: DENY`, `frame-ancestors 'none'`, nosniff, referrer policy (`next.config.ts`). Player site: CSP sent in **report-only** (`frontend/next.config.mjs`) — blocks nothing, logs violations in the console. **Open:** after a week on live with no violation from a real feature, rename the header to `Content-Security-Policy` to enforce. |
 | 19 | Verify webhook signatures | — | Done | HMAC + constant-time compare in JSGames, Slotegrator, seamless, x-casino, aggregator callbacks. |
 
 ## Findings
@@ -36,6 +36,30 @@ Review results land here, newest first: date, severity, where, what, fix, status
 
 | Date | Severity | Where | Finding | Fix | Status |
 | --- | --- | --- | --- | --- | --- |
+| 2026-10-25 | High | user vault `POST /user/vault/transfer-in` | A repeat request in the same minute opened a second vault deposit without debiting the wallet | Replay refused before the deposit is created | Fixed (audit run 2) |
+| 2026-10-25 | High | sports `placeBet` Match Odds / Bookmaker | Exposure and payout were worked out from the runner list the client sent (free bet) | Runners from the feed; MO/BM bet refused unless the selection is a feed runner and there are 2+ | Fixed |
+| 2026-10-25 | High | sports badlo | A lone badlo `yes` leg was accepted with zero debit and paid +stake | `/place` refuses badlo; `/place-combined` needs a `no` leg, one currency | Fixed |
+| 2026-10-25 | High | sports cancel | `unmatched: true` in the request made a filled bet cancellable for a full refund | Unmatched read from the stored bet | Fixed |
+| 2026-10-25 | Medium | player login throttle | Case variants of one email each got a fresh 8-attempt budget | Throttle key trimmed + lowercased | Fixed |
+| 2026-10-25 | Medium | sockets (user, casino) | A bound socket outlived token expiry / revocation | USER events refused past `exp`; transport closed at expiry; player site refreshes before reconnecting | Fixed |
+| 2026-10-25 | Medium | user VIP periodic award | Concurrent requests could write and claim a daily/weekly/monthly award twice | Row lock before the re-check | Fixed |
+| 2026-10-25 | Medium | spin wheel | Concurrent first spins left several active codes | DB lock on the spin | Fixed |
+| 2026-10-25 | Medium | sports socket `authenticate` | Joined room `user_<payload.userId>` without checking the token | Room from the verified token only | Fixed |
+| 2026-10-25 | Medium | sports market lock (single + bulk) | No tree check: any back-office account could lock any player | Tree scope per route (single checks `account_id`, bulk checks `accounts[]`) | Fixed |
+| 2026-10-25 | Medium | wallet adjust / points settle | A credit-only grant could also debit | `wallet:credit` for credits, `wallet:debit` for debits | Fixed |
+| 2026-10-25 | Medium | Exchange Create Account | `users:write` alone could create staff accounts | Staff roles need `staff:write` | Fixed |
+| 2026-10-25 | Medium | Google sign-in | One-time code not bound to the starting browser (login CSRF into the attacker's account) | Code hashed with a per-tab nonce from `sessionStorage`, carried in the signed state cookie | Fixed — backend and frontend deploy together |
+| 2026-10-25 | Low | staff tokens | Survived logout and password change for 8 h | `staff.token_version` (migration 156) checked by the staff guard, staff sockets, internal verify and sports routes | Fixed — run migration 156 before deploy |
+| 2026-10-25 | Low | admin + owner login `?next=` | Tab / dot-segment bypass of the prefix check (`/%09/evil`, `/.//evil`) | URL-parser check (`safeNext`) | Fixed |
+| 2026-10-25 | Verify | P2P sell | Payout rail that skips KYC, deposit rollover and cap | P2P not offered for now: module unmounted (`modules/_p2p`), admin menu and owner switch removed | Removed |
+| 2026-10-25 | Medium | session minutes cap | Any client sending `Origin: http://localhost:5190` (live accepts it) skipped `player_session_minutes`: a stolen token slid for 30 days | Exemption only with `SESSION_CAP_EXEMPT_LOCALHOST=true` (local `.env` only) | Fixed |
+| 2026-10-25 | Verify | sports khado | Line, band width and size taken from the client with no feed check | Confirm the feed carries them, then validate | Verify |
+| 2026-10-25 | Medium | casino seamless | Legacy signature covers neither member nor amount; a rollback refunded the member the request named | Rollback only the bet owner's movement; `SEAMLESS_ALLOWED_IPS` allowlist | Fixed — set `SEAMLESS_ALLOWED_IPS` to the provider's IPs on live |
+| 2026-10-25 | Medium | casino launch guard | A uid in no live catalogue (parked by the aggregator switch, or invented) passed on `casino` alone | gis / js-games / games launches need a catalogue row (`mustExist`) | Fixed |
+| 2026-10-25 | Verify | in-house games | Client outcome settles some rounds unless `INHOUSE_SERVER_AUTHORITY=true` (repo `.env` / `.env.example` set it) | Confirm on the server: `grep INHOUSE_SERVER_AUTHORITY backend/.env` | Verify |
+| 2026-10-25 | Verify | x-casino launch | Entitlement checked against the client's vendor, not the game | Only matters if x-casino is configured on live | Verify |
+| 2026-10-25 | Verify | staff deposit / withdrawal queues | No downline tree check (Admin / Sub Admin) | Confirm the intended visibility per level | Verify |
+| 2026-10-25 | Low | executive logout | Executive tokens share the parent's version, so logout ends nothing server-side | Token expires on its own | Open |
 | 2026-10-25 | High | sports `GET /sports/user/cricket/matched-bets/all` | Anyone, signed out, could read every bet on an event with usernames and IP addresses, no limit cap | Login + staff/owner only, `ip_address` excluded, limit ≤ 200 | Fixed |
 | 2026-10-25 | Medium | sports `cricket/user-open-bets(-grouped)`, `POST matchexposures/match` | Read any player's open bets (signed out) or exposure (signed in) by passing their `user_id` | Login required; `user_id` forced to the token's own id | Fixed |
 | 2026-10-25 | Medium | sports `/admin/sports/config/sports-lock/*` | An agent could set or lift sports locks on players/staff outside its tree | `lockScope` guard: target must be in the caller's tree | Fixed |
@@ -45,7 +69,7 @@ Review results land here, newest first: date, severity, where, what, fix, status
 | 2026-10-25 | Medium | socket (via gateway `wsProxy.js`) | Client-chosen `x-forwarded-for` beat the per-IP login limit and region block | Gateway resolves the client IP and sends only that | Fixed |
 | 2026-10-25 | Low–Med | promotion HTML | SVG/MathML bypasses of the denylist sanitizer | `svg`, `math` blocked | Fixed |
 | 2026-10-25 | Low | staff fiat deposit receipts | Any staff with `deposits:read` could open any receipt | Tree check like KYC | Fixed |
-| 2026-10-25 | Low | refresh tokens | Two simultaneous refreshes with one token both succeed (reuse alarm misses it) | Conditional `replaced_by IS NULL` update — held: needs the player site to share one refresh across tabs first, or a race signs players out | Open |
+| 2026-10-25 | Low | refresh tokens | Two simultaneous refreshes with one token both succeed (reuse alarm misses it) | Player site: one refresh at a time across tabs (Web Locks); a waiting tab adopts the pair the other stored (`services/client.js`, `tokens.js`). Server: conditional `replaced_by IS NULL` update (`auth.service.js`). 3 parallel refreshes locally → one 200, two `AUTH_REFRESH_TOKEN_REUSED` | Fixed |
 | 2026-10-25 | Unsure | gateway | If the gateway port is reachable directly, `x-forwarded-for` can be forged past every per-IP limit (TRUST_PROXY=1) | Confirm the port only listens behind Apache | Verify |
 | 2026-10-25 | Verify | x-casino | Legacy unsigned hash accepted only with `XCASINO_ALLOW_LEGACY_HASH=true` | Confirm it is off on the server | Verify |
 | 2026-10-25 | Medium | live API | Services not on `NODE_ENV=production`, so the production boot checks (weak secrets, default DB password) never run | Run `scripts/check-production-config.js` on the server, fix what it lists, then set `NODE_ENV=production` | Open |

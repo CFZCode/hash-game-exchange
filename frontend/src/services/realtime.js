@@ -1,6 +1,6 @@
 import { io } from 'socket.io-client';
-import { API_BASE, USE_FIXTURES } from './client';
-import { getAccessToken, onSessionChanged } from './tokens';
+import { API_BASE, USE_FIXTURES, refreshSession } from './client';
+import { getAccessToken, isAccessTokenExpired, onSessionChanged } from './tokens';
 import { liveState as storedState, onLiveState as subscribe, publishLiveState, setLiveActive } from './liveStore';
 
 /**
@@ -139,8 +139,12 @@ export function startRealtime() {
     path: '/socket.io',
     transports: WS ? ['polling', 'websocket'] : ['polling'],
     upgrade: WS,
-    // A function, so every reconnect carries the CURRENT token (the transport refreshes it).
-    auth: (cb) => cb({ token: getAccessToken() }),
+    /* A function, so every reconnect carries the CURRENT token. The server closes a socket when its
+       token expires, so an expired one is refreshed first rather than reconnecting signed out. */
+    auth: (cb) => {
+      if (!isAccessTokenExpired()) return cb({ token: getAccessToken() });
+      refreshSession().finally(() => cb({ token: getAccessToken() }));
+    },
     reconnection: true,
     reconnectionAttempts: Infinity,
     reconnectionDelay: 1000,

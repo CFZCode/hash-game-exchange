@@ -76,6 +76,16 @@ export const isSignedIn = () => Boolean(current?.accessToken);
  * row as current, which is the same state a signed-out visitor would see.
  */
 export function getSessionId() {
+  return claims()?.sid ?? null;
+}
+
+/* The access token is past its `exp`: a socket handshake with it would come back signed out. */
+export function isAccessTokenExpired() {
+  const exp = claims()?.exp;
+  return typeof exp === 'number' && exp * 1000 <= Date.now();
+}
+
+function claims() {
   const token = current?.accessToken;
   if (!token) return null;
 
@@ -83,8 +93,7 @@ export function getSessionId() {
     const payload = token.split('.')[1];
     if (!payload) return null;
     /* base64url -> base64. `atob` rejects `-` and `_`, which a JWT payload may contain. */
-    const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
-    return JSON.parse(json).sid ?? null;
+    return JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
   } catch {
     return null;
   }
@@ -116,6 +125,19 @@ function scheduleSignOut() {
   const left = current?.expiresAt ? new Date(current.expiresAt).getTime() - Date.now() : NaN;
   if (!(left < 2 ** 31 - 1)) return;
   signOutTimer = setTimeout(() => notifyAuthExpired('expired'), Math.max(0, left));
+}
+
+/**
+ * Another tab rotated the pair (localStorage holds a newer refresh token than this tab): take it.
+ * Presenting our older one would be a replayed token, and the platform answers that by revoking
+ * the whole session — every tab signed out. True when a newer pair was adopted.
+ */
+export function adoptStoredTokens() {
+  const stored = read();
+  if (!stored?.accessToken || !stored.refreshToken || stored.refreshToken === current?.refreshToken) return false;
+  current = stored;
+  scheduleSignOut();
+  return true;
 }
 
 export function clearTokens() {
