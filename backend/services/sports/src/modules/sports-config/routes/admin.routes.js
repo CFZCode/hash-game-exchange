@@ -25,7 +25,7 @@ const { lazy } = require('../../../lib/mssports');
  *  GET|PUT /betting-config/virtual-limits                                👑 virtual league limits
  *  GET|POST|DELETE /commission-config/sports (+ POST /bulk)              👑 win commission
  */
-module.exports = function adminRoutes({ auth }) {
+module.exports = function adminRoutes({ auth, clients, models }) {
   // Platform permissions first, so an executive does only what it was granted (user, 2026-10-17):
   // locks are users:lock (the agent tree holds it), global settings sports:manage.
   const canRead = auth.requirePermission(PERMISSIONS.USERS_READ);
@@ -42,9 +42,36 @@ module.exports = function adminRoutes({ auth }) {
 
   const router = Router();
 
+  /* A lock's target must sit in the caller's own tree (the same staff scope every admin read
+     uses): TENEXCH checked only OWNER targets, so any agent holding users:lock could lock a rival
+     master's whole downline or lift a lock its upline set. A staff member never changes their own
+     lock; a player with no parent belongs to the Super Admin (docs/SECURITY-CHECKLIST.md). */
+  const lockScope = async (req, res, next) => {
+    try {
+      const type = req.body?.targetType ?? req.query?.type;
+      const targetId = Number(req.body?.targetId ?? req.params?.targetId);
+      if (type === 'OWNER') return next(); // the controller allows the owner only
+      const staff = req.staff;
+      if (!staff || !Number.isInteger(targetId) || targetId <= 0) return res.status(403).json({ success: false, message: 'Not in your tree' });
+      const scope = await clients.admin.get(`/internal/admin/staff-directory/staff/${staff.id}/descendants`);
+      const ids = (scope?.ids ?? scope?.data?.ids ?? []).map(Number);
+      let allowed;
+      if (type === 'USER') {
+        const player = await models.Users.findByPk(targetId, { attributes: ['parent_staff_id'], raw: true });
+        const top = Number(staff.level) === 1 || Number(staff.parentLevel) === 1;
+        allowed = Boolean(player) && (player.parent_staff_id == null ? top : ids.includes(Number(player.parent_staff_id)));
+      } else {
+        allowed = ids.includes(targetId) && (req.method === 'GET' || targetId !== Number(staff.id));
+      }
+      return allowed ? next() : res.status(403).json({ success: false, message: 'Not in your tree' });
+    } catch (error) {
+      return next(error);
+    }
+  };
+
   // ── /sports-lock (TENEXCH: its own router, `router.use(authMiddleware)`) ──
-  router.get('/sports-lock/get/:targetId', canRead, authMiddleware, SportsLock('getSportsLocks'));
-  router.post('/sports-lock/update', canLock, authMiddleware, SportsLock('updateSportsLock'));
+  router.get('/sports-lock/get/:targetId', canRead, lockScope, authMiddleware, SportsLock('getSportsLocks'));
+  router.post('/sports-lock/update', canLock, lockScope, authMiddleware, SportsLock('updateSportsLock'));
 
   // ── bet locks, betting config, commission ───────────────────────────
 

@@ -13,7 +13,9 @@
  *
  * Returns '' outside a browser (the app is mounted client-only, so that never happens at runtime).
  */
-const BLOCKED_TAGS = 'script,noscript,iframe,frame,frameset,object,embed,applet,base,link,meta,form,template';
+/* `svg` and `math` too: SVG animation (`<animate values="javascript:…">`) and math/HTML namespace
+   confusion slip past an attribute denylist, and a promotion never needs inline vector markup. */
+const BLOCKED_TAGS = 'script,noscript,iframe,frame,frameset,object,embed,applet,base,link,meta,form,template,svg,math';
 const URL_ATTRS = new Set(['href', 'src', 'xlink:href', 'action', 'formaction', 'poster', 'background', 'srcset']);
 const BAD_SCHEME = /^\s*(?:javascript|vbscript|data):/i;
 const SAFE_DATA_IMAGE = /^\s*data:image\/(?:png|jpe?g|gif|webp|avif);/i;

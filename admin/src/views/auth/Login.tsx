@@ -114,9 +114,11 @@ const Login = () => {
       // A password somebody else chose must be replaced before anything else opens.
       if (data?.mustChangePassword) return window.location.assign('/change-password')
 
+      // Only a path on this site: `?next=javascript:…` or `?next=https://evil` in a mailed link must
+      // not run or redirect after a staff sign-in.
       const next = params.get('next')
 
-      if (next) return window.location.assign(next)
+      if (next && next.startsWith('/') && !next.startsWith('//') && !next.startsWith('/\\')) return window.location.assign(next)
 
       window.location.assign('/dashboard')
     } catch (err) {

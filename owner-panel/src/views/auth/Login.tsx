@@ -46,7 +46,11 @@ const Login = () => {
     try {
       await request('/api/auth/login', { method: 'POST', body: { username: username.trim(), password } })
       toast.success('Signed in')
-      router.replace(params.get('next') || '/overview')
+
+      // Only a path on this site — never another origin from a crafted `?next=`.
+      const next = params.get('next')
+
+      router.replace(next && next.startsWith('/') && !next.startsWith('//') && !next.startsWith('/\\') ? next : '/overview')
       router.refresh()
     } catch (err) {
       const message = errorMessage(err)

@@ -693,6 +693,9 @@ class AuthService {
     const user = await this.models.Users.findByPk(userId);
     if (!user) throw errors.GOOGLE_CODE_INVALID();
     await this.#assertUsable(user);
+    // Google proves the email, not the second factor: with 2FA on, the password sign-in (and its
+    // code) is the only way in, or a taken-over Google account would skip the code.
+    if (user.two_fa_status && user.two_fa) throw errors.GOOGLE_TWO_FACTOR_ON({ userId: user.id });
     await user.update({ last_login_at: new Date(), last_ip: context.ip || null });
     const session = await this.#issueSession(user, context);
     this.#trackLogin(user.id, context, 'login');
