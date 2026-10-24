@@ -121,7 +121,7 @@ class PaymentOrdersService {
     // CCPayment's coin ids come from its live coin list (cached) — see `ccpaymentCoinId`.
     if (providerName === 'ccpayment') await refreshCcpaymentCoinIds(this.config, this.http);
 
-    if (!gateway.supports(currency, FLOW.PAY_IN, this.config)) {
+    if (!gateway.supports(currency, FLOW.PAY_IN, this.config) || !(await this.#ownerAllowsCurrency(gateway, currency))) {
       throw errors.CURRENCY_NOT_SUPPORTED({ provider: providerName, currency });
     }
 
@@ -412,10 +412,13 @@ class PaymentOrdersService {
     const gateway = this.#gateway(providerName);
     await this.#assertOwnerAllows(providerName);
     if (!gateway.getAvailableMethods) return { provider: providerName, methods: null };
-    return {
-      provider: providerName,
-      methods: await gateway.getAvailableMethods(this.config, { http: this.http }),
-    };
+    let methods = await gateway.getAvailableMethods(this.config, { http: this.http });
+    if (gateway.ownerFlag) {
+      const kept = [];
+      for (const m of methods) if (await this.#ownerAllowsCurrency(gateway, m.currency)) kept.push(m);
+      methods = kept;
+    }
+    return { provider: providerName, methods };
   }
 
   /**
@@ -551,6 +554,11 @@ class PaymentOrdersService {
     if (!(await entitlements.isFlagEntitled(`gateway_${name}`)) || (Array.isArray(off) && off.includes(name))) {
       throw errors.PROVIDER_DISABLED({ provider: name });
     }
+  }
+
+  /** A gateway the owner switches per currency (F2Pay: `flags.f2pay_<code>`, missing = on). */
+  async #ownerAllowsCurrency(gateway, currency) {
+    return !gateway.ownerFlag || entitlements.isFlagEntitled(gateway.ownerFlag(currency));
   }
 
   /**

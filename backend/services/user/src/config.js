@@ -136,7 +136,7 @@ const config = loadEnv(
     F2PAY_PUBLIC_KEY: coercers.optionalStr(),
     // The deposit methods per currency: comma-separated method codes (F2Pay's docs). The player pays
     // in the currency they deposit and is credited in it — no conversion. INR → /payin/inr/order/create,
-    // IDR → /payin/idr/order/create (offered only once IDR is a wallet currency). Empty = none.
+    // IDR → /payin/idr/order/create. The owner switches each currency (owner panel → F2Pay). Empty = none.
     F2PAY_INR_METHODS: coercers.optionalStr(),
     F2PAY_IDR_METHODS: coercers.optionalStr(),
     // Where the cashier page sends the player back after paying.

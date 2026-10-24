@@ -591,6 +591,8 @@ const f2pay = {
   requiredConfig: ['F2PAY_MERCHANT_ID', 'F2PAY_BASE_URL', 'F2PAY_PRIVATE_KEY', 'F2PAY_PUBLIC_KEY'],
   // The cashier page asks for the payer's name, email and phone: the service reads the player's own.
   needsCustomer: true,
+  // The owner picks the currencies F2Pay opens for (owner panel → F2Pay, `flags.f2pay_inr` …, missing = on).
+  ownerFlag: (currency) => `f2pay_${String(currency).toLowerCase()}`,
 
   supports(currency, flow, config) {
     // Deposits only for now (user, 2026-10-24) — the payout below stays commented out. A currency

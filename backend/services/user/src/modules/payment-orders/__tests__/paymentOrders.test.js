@@ -891,4 +891,23 @@ test('payment orders', async (t) => {
     assert.equal(cents.ok, false, 'IDR takes whole rupiah');
     assert.equal(sent.length, 1);
   });
+
+  await t.test('the owner picks the currencies F2Pay opens for (flags.f2pay_<code>)', async () => {
+    const uid = newUid();
+    await seed(uid, '0');
+    const { service, calls } = build(cashier, F2PAY);
+    entitlements.configureEntitlements({ read: () => ({ features: {}, flags: { f2pay_inr: false } }) });
+
+    try {
+      const { methods } = await service.getAvailableMethods({ provider: 'f2pay' });
+      assert.deepEqual(methods.map((m) => m.currency), ['IDR', 'IDR'], 'INR is off, IDR left alone (missing = on)');
+      await assert.rejects(
+        () => service.createDeposit({ userId: uid, provider: 'f2pay', currency: 'INR', amount: '500' }),
+        (err) => err.code === 'PAYORDER_CURRENCY_NOT_SUPPORTED'
+      );
+      assert.equal(calls.length, 0);
+    } finally {
+      entitlements.resetEntitlements();
+    }
+  });
 });
