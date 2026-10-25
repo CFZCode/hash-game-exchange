@@ -75,7 +75,7 @@ function createControllers({ service }) {
     /** Lobby categories: the site reads active ones, the admin reads all (`req.staff`). */
     categories: asyncHandler(async (req, res) => response.ok(res, await service.categories({ includeInactive: Boolean(req.staff) }))),
     categoryGames: asyncHandler(async (req, res) =>
-      paged(req, await service.categoryGames({ ...req.query, slug: req.params.slug, includeInactive: Boolean(req.staff) }))
+      paged(req, await service.categoryGames({ ...req.query, slug: req.params.slug, includeInactive: Boolean(req.staff), automatic: Boolean(req.staff) }))
     ),
     createCategory: asyncHandler(async (req, res) => response.created(res, await service.createCategory({ ...req.body, actor: req.staff }))),
     updateCategory: asyncHandler(async (req, res) =>

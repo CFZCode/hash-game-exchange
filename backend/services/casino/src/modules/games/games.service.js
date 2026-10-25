@@ -10,6 +10,8 @@ const {
   COLLECTIONS,
   RESERVED_TABS,
   categorySlug,
+  CATEGORY_AUTO_LISTS,
+  AUTO_LIST_ADMIN_LIMIT,
   NAME_CATEGORIES,
   LIVE_PROVIDERS,
   LIVE_TYPES,
@@ -583,10 +585,20 @@ class GamesService {
     return row;
   }
 
-  /** A section's hand-picked games, one page at a time. */
-  async categoryGames({ slug, page, limit, provider, sort, includeInactive = false }) {
+  /**
+   * A section's hand-picked games, one page at a time. With none picked, `automatic` (the
+   * admin) gets the list the site shows instead, so the operator edits what players see.
+   */
+  async categoryGames({ slug, page, limit, provider, sort, includeInactive = false, automatic = false }) {
     const row = await this.#category(slug, { includeInactive });
-    return this.#curatedPage(row.uuids ?? [], { page, limit, provider, sort });
+    const rule = CATEGORY_AUTO_LISTS[row.slug];
+    if (row.uuids?.length || !automatic || !rule) return this.#curatedPage(row.uuids ?? [], { page, limit, provider, sort });
+
+    const capped = Math.min(limit, AUTO_LIST_ADMIN_LIMIT);
+    const result = rule.collection
+      ? await this.collection({ collection: rule.collection, page, limit: capped })
+      : await this.browse({ page, limit: capped, category: rule.category });
+    return { rows: result.rows, total: result.total };
   }
 
   async createCategory({ name, slug, actor }) {

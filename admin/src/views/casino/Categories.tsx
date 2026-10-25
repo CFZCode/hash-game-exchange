@@ -296,7 +296,14 @@ export const CategoriesTab = () => {
           max={5000}
           rowAction={g => <EditImage game={{ uuid: g.id, name: g.name, image: g.image ?? null }} onSaved={() => void games.refetch()} />}
           addControl={(add, listed) => <ProviderTypeGamePicker onAdd={add} listed={listed} />}
-          header={<span className='font-medium'>{current.name}</span>}
+          header={
+            <div className='grid gap-0.5'>
+              <span className='font-medium'>{current.name}</span>
+              {current.count === 0 && !!items?.length && (
+                <span className='text-muted-foreground text-xs'>Showing the automatic list the site uses now (first 500). Reorder, add or remove, then Save to pin it.</span>
+              )}
+            </div>
+          }
           emptyMessage='No games picked — the site shows this section’s automatic list. Pick Provider → Type → Game above to curate it.'
         />
       )}

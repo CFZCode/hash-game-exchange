@@ -395,6 +395,16 @@ test('game catalogue', async (t) => {
     assert.ok(!(await service.categories({ includeInactive: true })).some((c) => c.slug === created.slug));
   });
 
+  await t.test('an uncurated seeded category opens in the admin on the list the site shows', async () => {
+    // `hot` (migration 158) has no picks; the site then reads the Hot collection.
+    const shown = await seedGame({ name: 'Hh automatic hot game' });
+    await service.setCollection({ collection: 'hot', uuids: [shown], actor: staff });
+    const admin = await service.categoryGames({ slug: 'hot', page: 1, limit: 10, includeInactive: true, automatic: true });
+    assert.deepEqual(admin.rows.map((g) => g.uuid), [shown]);
+    const site = await service.categoryGames({ slug: 'hot', page: 1, limit: 10 });
+    assert.deepEqual(site.rows, [], 'the public read still answers only picks');
+  });
+
   await t.test('an unknown collection is a 404, not a query against a table named by the caller', async () => {
     await assert.rejects(
       () => service.collection({ collection: 'jackpots', page: 1, limit: 10 }),
