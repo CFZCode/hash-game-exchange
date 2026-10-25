@@ -23,6 +23,9 @@ const HeroCopy = () => {
   /* A B2B site has no sign-up (context/gates.js): the headline stays, the Sign Up button and the
      "Or Register With" row are not rendered. */
   const canSignUp = useCanSignUp();
+  // An agent's players keep the banner art but get none of its sign-up copy (user, 2026-10-25).
+  const { agentPlayer } = useGates();
+  if (agentPlayer) return null;
 
   return (
     <div className="center relative z-[1] flex h-full w-1/2 min-w-[11.25rem] flex-col whitespace-nowrap">
@@ -138,8 +141,6 @@ function SignedOutHero() {
  */
 export default function Hero({ type = 'top' }) {
   const { session } = useSession();
-  // No hero for an agent's players, on Home or /casino: its banners and sign-up art are promotions.
-  if (useGates().agentPlayer) return null;
 
   return (
     <div className="relative sm:mx-0 sm:pt-0">
