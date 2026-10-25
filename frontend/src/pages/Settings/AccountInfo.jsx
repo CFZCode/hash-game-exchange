@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import Loading from '../../components/shared/Loading';
 import { useSession } from '../../context/session';
+import { useGates } from '../../context/gates';
 import { useIsDesktop } from '../../hooks/useMediaQuery';
 import { useResource } from '../../hooks/useResource';
 import { getConnections } from '../../services/settings';
@@ -160,6 +161,8 @@ export default function SettingsAccountInfo() {
   const { session } = useSession();
   const navigate = useNavigate();
   const buttonSize = useButtonSize();
+  // An agent's player: no email, phone or Google here (user, 2026-10-25) — their agent owns the account.
+  const { agentPlayer } = useGates();
 
   const emailVerified = Boolean(session.emailVerified && session.email);
 
@@ -198,6 +201,8 @@ export default function SettingsAccountInfo() {
               </span>
             </p>
           </div>
+{/* The site admin edits an agent player's profile, not the player. */}
+          {!agentPlayer && (
           <button
             type="button"
             className={`button button-brand ${buttonSize} ml-auto h-8 min-w-24 overflow-hidden sm:h-10 sm:min-w-24`}
@@ -205,6 +210,7 @@ export default function SettingsAccountInfo() {
           >
             <span className="ml-0.5 whitespace-nowrap">Edit</span>
           </button>
+          )}
         </div>
       </div>
 
@@ -213,6 +219,7 @@ export default function SettingsAccountInfo() {
           THE TWO ROWS ARE THE SAME SHAPE AND NEITHER IS A FLEX ROW BELOW `sm`: `sm:flex
           sm:items-center` is what puts the field and its button side by side on a desktop, where a
           phone stacks them and the button goes `w-full`. */}
+      {!agentPlayer && (
       <div className="mt-3 w-full rounded-lg bg-layer4 p-3 sm:mt-4 sm:px-6 sm:py-4">
         <div className="flex h-11 flex-col items-start justify-center border-b border-solid border-third pb-3">
           <span className="text-base font-extrabold">Contact Info</span>
@@ -284,8 +291,9 @@ export default function SettingsAccountInfo() {
           </div>
         </div>
       </div>
+      )}
 
-      <Connections />
+      {!agentPlayer && <Connections />}
     </>
   );
 }

@@ -376,6 +376,8 @@ export default function Profile({ onClose, enter }) {
           <p className="text-xl font-extrabold">{isMyself ? session.name : profile.name}</p>
         </div>
         <UserIdLine userId={profile.userId} />
+        {/* An agent's player: no likes, and no edit — the site admin edits their profile (user, 2026-10-25). */}
+        {!gates.agentPlayer && (
         <button
           type="button"
           className="absolute left-0 top-6 flex h-8 cursor-auto items-center rounded-lg bg-layer3 px-2"
@@ -383,8 +385,10 @@ export default function Profile({ onClose, enter }) {
           <IconHeart className="size-5 fill-error" />
           <span className="ml-1 text-lg font-semibold">{profile.totalLikeNum || 0}</span>
         </button>
+        )}
         {/* `cursor-auto` on the like button above is the original's own — the count is a readout,
             and the Like action lives in the avatar popup. */}
+        {!gates.agentPlayer && (
         <button
           type="button"
           className="center absolute right-0 top-6 h-8 w-8 rounded-lg bg-layer3"
@@ -392,9 +396,11 @@ export default function Profile({ onClose, enter }) {
         >
           <IconEdit className="size-5" />
         </button>
+        )}
       </div>
 
-      <MedalsCard profile={profile} userId={userId} />
+      {/* No medals for an agent's player (user, 2026-10-25). */}
+      {!gates.agentPlayer && <MedalsCard profile={profile} userId={userId} />}
       <StatisticsCard
         profile={profile}
         userId={userId}

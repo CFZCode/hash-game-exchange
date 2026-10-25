@@ -264,13 +264,15 @@ export default function SettingsPreferences() {
           </div>
         </Row>
 
-        <Row label="Show full name of currency in Crypto list">
+        {/* An agent's player keeps Language and Display mode only (user, 2026-10-25): INR is
+            their only coin, and they have no email, tips or marketing. */}
+        {!agentPlayer && <Row label="Show full name of currency in Crypto list">
           <Switch
             size="small"
             value={session.setting.currencyFullName}
             onChange={(next) => setSetting('currencyFullName', next)}
           />
-        </Row>
+        </Row>}
 
         {/* The Display mode row has NO trailing container in the template — the toggle is appended
             to the row itself and brings its own `ml-auto`, which is why this one is not a `Row`. */}
@@ -282,6 +284,7 @@ export default function SettingsPreferences() {
         )}
       </Card>
 
+      {!agentPlayer && (<>
       <Card title="Privacy Preferences" className="mt-3 sm:mt-4">
         <PrivacyRows />
       </Card>
@@ -339,6 +342,7 @@ export default function SettingsPreferences() {
           <Switch size="small" value={session.acceptSmsPromotion} onChange={() => {}} />
         </Row>
       </Card>
+      </>)}
 
       <LanguageCurrencyModal
         isOpen={modal !== null}

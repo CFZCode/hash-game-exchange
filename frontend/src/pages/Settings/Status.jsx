@@ -1,4 +1,5 @@
 import { useSession } from '../../context/session';
+import { useGates } from '../../context/gates';
 import { securityStatus } from './strength';
 import { IconSuccess, IconAttention } from './icons';
 
@@ -24,7 +25,10 @@ import { IconSuccess, IconAttention } from './icons';
  */
 export default function Status({ withImg = false, className = '' }) {
   const { session } = useSession();
+  const { agentPlayer } = useGates();
   const { isWeak, isMedium, isStrong } = securityStatus(session);
+  // An agent's player only has Change Password, so there is no strength to warn about.
+  if (agentPlayer) return null;
 
   if (!withImg) {
     return (

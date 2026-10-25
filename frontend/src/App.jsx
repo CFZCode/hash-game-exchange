@@ -128,7 +128,8 @@ function AppShell() {
   const { session } = useSession();
   const navigate = useNavigate();
   // Sports runs one mode: the owner's sportsbook (an iframe) or, by default, the exchange.
-  const sportsbookMode = useGates().on('sportsbook');
+  const gates = useGates();
+  const sportsbookMode = gates.on('sportsbook');
 
   /* `showable && areaAlert`, which is the original's own gate — Enter-MsmOuq5R.js reads
      exactly that pair before firing `block_page_view`, and its inverse
@@ -344,9 +345,10 @@ function AppShell() {
      the pane layout would otherwise claim the path. `/settings/edit-avatar` is its sibling, the
      avatar picker (components/modals/EditAvatar), held out the same way. */
   const editProfileRoute = pathname === '/settings/edit-profile';
-  const editProfileDialog = editProfileRoute && session.login;
+  // Not for an agent's player: the site admin edits their profile (backend PROFILE_EDIT_NOT_FOR_AGENT_USERS).
+  const editProfileDialog = editProfileRoute && session.login && !gates.agentPlayer;
   const editAvatarRoute = pathname === '/settings/edit-avatar';
-  const editAvatarDialog = editAvatarRoute && session.login;
+  const editAvatarDialog = editAvatarRoute && session.login && !gates.agentPlayer;
 
   /* `/wallet/deposit-detail?orderId=…` — `DialogTransactionDepositDetail`, and the destination
      every deposit row in the Transaction pane has always linked to. It is a dialog at every width
@@ -1159,7 +1161,8 @@ function AppShell() {
           route is. Note that costs them `useParams`: it resolves against a MATCHED <Route> and
           there is none, so the two that take a `:userId` read it off the pathname themselves. */}
       {profileRoute && <Profile onClose={closeOverlay} enter={dialogEnter} />}
-      {medalsRoute && <ProfileMedals onClose={closeOverlay} enter={dialogEnter} />}
+      {/* No medals for an agent's player (user, 2026-10-25). */}
+      {medalsRoute && !gates.agentPlayer && <ProfileMedals onClose={closeOverlay} enter={dialogEnter} />}
       {statisticsRoute && session.login && <ProfileStatistics onClose={closeOverlay} enter={dialogEnter} />}
       {/* Both of these draw a BACK arrow rather than a close cross — the phone arm of the
           title bar has no cross at all — so they take `onBack`. `onClose` is still threaded for

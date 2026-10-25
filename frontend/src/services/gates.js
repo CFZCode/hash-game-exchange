@@ -89,7 +89,7 @@ export const GATES = {
   rollover: { notAgentPlayer: true },
 };
 
-const AGENT_PLAYER_OFF = { deposit: false, withdraw: false, swap: false, vault: false, promotions: false, tips: false, kyc: false };
+const AGENT_PLAYER_OFF = { deposit: false, withdraw: false, swap: false, vault: false, promotions: false, tips: false, kyc: false, profileEdit: false };
 
 /** Path prefix → gate, most specific first. History routes (transaction, bet history,
  *  deposit/withdraw detail) are deliberately absent: they stay readable for everyone. */

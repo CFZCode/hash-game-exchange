@@ -4,6 +4,7 @@ import Pagination from '../../components/shared/Pagination';
 import Loading from '../../components/shared/Loading';
 import EmptyPlaceholder from '../../components/shared/EmptyPlaceholder';
 import { useSession } from '../../context/session';
+import { useGates } from '../../context/gates';
 import AccountRestrictions from '../../components/modals/AccountRestrictions';
 import TwoFactorDisable from '../../components/modals/TwoFactorDisable';
 import { useIsDesktop } from '../../hooks/useMediaQuery';
@@ -137,6 +138,9 @@ function SecuritySetup() {
      the flow manager raises it. See components/modals/TwoFactorDisable. */
   const [disabling2fa, setDisabling2fa] = React.useState(false);
   const { isWeak, isMedium, statusText } = securityStatus(session);
+  /* An agent's player gets Change Password only (user, 2026-10-25): their agent owns the account,
+     so no email, 2FA or strength badge. */
+  const { agentPlayer } = useGates();
 
   const emailVerified = Boolean(session.emailVerified && session.email);
 
@@ -147,6 +151,7 @@ function SecuritySetup() {
         {/* `text-alw_dark` on all three fills, so the badge's ink is the same near-black in both
             themes — `bg-setting-red` and `bg-setting-yellow` are flat literals rather than tokens
             and do not invert. */}
+        {!agentPlayer && (
         <div
           className={`ml-auto flex h-5 items-center rounded-lg px-2.5 font-semibold text-alw_dark ${
             isWeak ? 'bg-setting-red' : isMedium ? 'bg-setting-yellow' : 'bg-brand'
@@ -154,6 +159,7 @@ function SecuritySetup() {
         >
           {statusText}
         </div>
+        )}
       </div>
 
       <div className="settings-security">
@@ -186,6 +192,7 @@ function SecuritySetup() {
                040, which is what makes the sentence it prints true. */
             action={session.passwordExist ? () => setRestricting(true) : undefined}
           />
+          {!agentPlayer && (
           <Tile
             icon={IconEmail}
             done={emailVerified}
@@ -204,8 +211,10 @@ function SecuritySetup() {
               navigate(emailVerified ? '/user-action/email-change' : '/user-action/email-bind')
             }
           />
+          )}
         </div>
 
+        {!agentPlayer && (
         <div className="settings-security-flex">
           {/* Phone Number Verification is off (owner, 2026-10-19): no SMS provider. */}
           <Tile
@@ -232,6 +241,7 @@ function SecuritySetup() {
             }
           />
         </div>
+        )}
 
         <div className="settings-security-flex">
           {/* `<Show when={ye()}>` — a WebAuthn support test rather than an account flag, so the
@@ -448,10 +458,11 @@ const IconMonitor = (props) => (
 );
 
 export default function SettingsSecurity() {
+  const { agentPlayer } = useGates();
   return (
     <div className="w-full py-4 sm:py-0">
       <SecuritySetup />
-      <Sessions />
+      {!agentPlayer && <Sessions />}
     </div>
   );
 }
