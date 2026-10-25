@@ -17,7 +17,7 @@ import { useSession } from '@/contexts/SessionContext'
 import { useApi, useApiMutation, useInvalidate } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
 import { notifyError } from '@/lib/notify'
-import { EditImage } from './GameCatalogue'
+import { EditImage } from './EditImage'
 import OrderedList, { type OrderedItem } from './OrderedList'
 import type { GisGame, GisVendor } from './types'
 

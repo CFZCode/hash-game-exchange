@@ -10,7 +10,7 @@ import { useApi, useApiMutation } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
 import { formatNumber } from '@/lib/format'
 import DateTime from '@/components/shared/DateTime'
-import { EditImage } from './GameCatalogue'
+import { EditImage } from './EditImage'
 import { CategoriesTab } from './Categories'
 import OrderedList, { type OrderedItem } from './OrderedList'
 import type { GisGame, GisPriority, GisType, GisVendor } from './types'
@@ -103,7 +103,7 @@ export const PriorityTab = ({ kind }: { kind: 'vendor' | 'type' }) => {
         )}
       </div>
       {options.error && <ErrorState error={options.error} />}
-      {options.data && options.data.length === 0 && <p className='text-muted-foreground text-sm'>The aggregator catalogue is empty. Sync games first (Game catalogue → Providers & sync).</p>}
+      {options.data && options.data.length === 0 && <p className='text-muted-foreground text-sm'>The aggregator catalogue is empty. Sync games first (the catalogue sync on the backend).</p>}
       {priority.error && <ErrorState error={priority.error} />}
       {key ? (
         <OrderedList fixed items={items} loading={priority.isLoading} search={search} onSave={ids => save.mutateAsync(ids)} canWrite={can('casino:manage')} max={5000} rowAction={imageAction(priority.refetch)} header={<span className='font-medium capitalize'>{kind}: {key}</span>} emptyMessage={`No games for this ${kind} in the lobby.`} />
