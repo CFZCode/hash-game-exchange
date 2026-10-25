@@ -204,7 +204,7 @@ Built, and all of them the original's own paths: `/` and `/casino` (both Home's 
 
 Dialog routes, matched on the pathname in `App.jsx` and mounted beside `<Routes>` rather than inside it: `/login/signin`, `/login/regist`, `/deposit`, `/user/enter`, `/free-plays`, `/vip-level`, `/user/profile/:id`, `/user/medals/:id`, `/user/statistics`, and — below `lg` only, where the original's `info.dialog` is a device test — `/wallet/withdraw`, `/referral*`, `/favorite`, `/recent`, `/settings*` and the four list pages.
 
-**The catch-all renders Home**, because every href in the chrome is a real route on the live site. An unbuilt path therefore keeps its URL and shows Home under it; that is the deliberate trade recorded under Sidebar, and the rows to give a page next are listed there.
+**The catch-all renders the 404 page** (`pages/NotFound`) at the user's request — except while an overlay route is up, when the page under a directly-loaded dialog (a pasted `/deposit`) is still Home. Unbuilt chrome links now land on the 404; they are listed under Sidebar as the rows to give a page next.
 
 ### Icon sprites
 

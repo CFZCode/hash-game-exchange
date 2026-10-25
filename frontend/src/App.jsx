@@ -4,6 +4,7 @@ import { referralCodeFromPath, savePendingReferral } from './services/referralCa
 import { Link, Navigate, Route, Routes, matchPath, useLocation, useNavigate, useNavigationType } from 'react-router-dom';
 import MainLayout from './layouts/MainLayout/MainLayout';
 import Home from './pages/Home';
+import NotFound from './pages/NotFound';
 import Casino from './pages/Casino';
 import GamePage from './pages/Game';
 import ExplorePage from './pages/Explore';
@@ -749,10 +750,8 @@ function AppShell() {
           casino page. It takes an optional tab segment, `path: "/casino/:tab?"` in
           Enter-MsmOuq5R.js:8669, which React Router spells as a second route.
 
-          The catch-all is still a stand-in — every href in the sidebar, tabbar and footer is
-          a real route on the live site and most of those pages are not built, so anything
-          else would 404 the moment you touched the chrome. It renders Home and keeps the URL,
-          so the header's route-dependent behaviour is still exercised. */}
+          The catch-all renders the 404 page (pages/NotFound) inside the normal chrome; it
+          used to render Home so unbuilt chrome links kept a page. */}
       <MainLayout>
         <RouteGate pathname={(isOverlayRoute ? pageLocation : location).pathname}>
         <Routes location={isOverlayRoute ? pageLocation : location}>
@@ -1057,7 +1056,10 @@ function AppShell() {
               "All Bingo Games" row); racing lives in the sports exchange. */}
           <Route path="/bingo" element={<Navigate to="/tagname/bingo?label=All%20Bingo%20Games" replace />} />
           <Route path="/racing" element={<Navigate to="/sports" replace />} />
-          <Route path="*" element={<Home />} />
+          {/* An unknown path is a 404. Under a dialog route reached directly (a pasted /deposit,
+              /login/signin…) `pageLocation` IS the dialog's own path and lands here, so it keeps
+              Home under the dialog as it always has. */}
+          <Route path="*" element={isOverlayRoute ? <Home /> : <NotFound />} />
         </Routes>
         </RouteGate>
       </MainLayout>
