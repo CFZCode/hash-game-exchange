@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useSession } from '../../../context/session';
-import { useCanSignUp } from '../../../context/gates';
+import { useCanSignUp, useGates } from '../../../context/gates';
 import Banner from './Banner';
 import { getSignupHeroArt } from '../../../services/banner';
 import { useResource } from '../../../hooks/useResource';
@@ -138,6 +138,8 @@ function SignedOutHero() {
  */
 export default function Hero({ type = 'top' }) {
   const { session } = useSession();
+  // No hero for an agent's players, on Home or /casino: its banners and sign-up art are promotions.
+  if (useGates().agentPlayer) return null;
 
   return (
     <div className="relative sm:mx-0 sm:pt-0">
