@@ -2,6 +2,7 @@ import { request, USE_FIXTURES } from './client';
 import { PLATFORM } from './endpoints';
 import { getSiteConfig } from './siteConfig';
 import { applyTheme, themeOf } from '../theme/applyTheme';
+import { underAgentBase } from './agentBase';
 
 /* What this site has switched on, and what THIS player's account may use — SmartBet's
  * `siteGates.ts` + `siteFeatures.tsx` (casino-sportsbook/frontend/src/lib), ported to this
@@ -206,8 +207,9 @@ export function makeGates({ flags, features, capabilities, ready = true } = {}) 
     flag: (key) => flagMap?.[key] !== false,
     /** The signed-in player belongs to an agent's tree (restricted UI: INR wallet, no KYC, no promotions). */
     agentPlayer,
-    /** Public self-registration: off on a B2B (agent-only) site. */
-    canSignUp: () => policy('business_model') !== 'b2b',
+    /** Public self-registration: off on a B2B (agent-only) site, and on /agent (services/agentBase.js),
+     *  whose players are created by their agent and only sign in. */
+    canSignUp: () => policy('business_model') !== 'b2b' && !underAgentBase(),
     /** The light theme and its toggles: only when the owner's `theme_mode` is `switch`. Not answered
      *  or failed = dark only; fixtures (the pixel reference) keep both. */
     themeSwitch: () => (list ? policy('theme_mode') === 'switch' : USE_FIXTURES),

@@ -19,7 +19,7 @@
   - **Error codes:** 60, 61, 70, 74, 75 and 90.
 - **Launch:** `POST /api/v1/casino/x-casino/launch` (player token).
   - Body: `{ gameId:int, currency (a COIN_COLUMNS key), mode real|demo|fun, language, homeUrl, device, vendor, title }`. `user_id` is refused.
-  - Guards: `refuseCustomCurrencies('GAMES')` and `requireGameEntitled({provider: vendor})`. There is no uid, so only the vendor drives the flags.
+  - Guards: `refuseCustomCurrencies('GAMES')` and `catalogued` (gameId must be an enabled `apigames` row; the body `vendor` is overwritten with the row's) then `requireGameEntitled({provider, type})` from that row.
   - Writes a `game_runs` row (32-byte hex session, 12 h TTL) and answers `201 { gameRunUrl, session }`.
 - **Other routes:** `GET /api/v1/casino/x-casino/balance?currency=`.
 - **Catalogue:** none of its own. XGaming games live in `apigames` (see x-gaming).

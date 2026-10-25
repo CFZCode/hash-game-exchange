@@ -123,7 +123,7 @@ describe('slip odds field', () => {
     expect(getOddsFieldMode('match', 'MATCH_ODDS')).toBe(ODDS_FIELD.STEPPER);
     // Khado shows the stepper shape as well — the reference picks the `− input +`
     // trio for gtype khado / match / fancy2 (racing etid 65 excepted).
-    expect(getOddsFieldMode('khado', 'khado')).toBe(ODDS_FIELD.STEPPER);
+    expect(getOddsFieldMode('khado', 'khado')).toBe(ODDS_FIELD.READONLY);
     // Line markets joined the stepper with khado and match — the same
     // reference rule lists all three.
     expect(getOddsFieldMode('fancy2', '20 Overs Line')).toBe(ODDS_FIELD.STEPPER);

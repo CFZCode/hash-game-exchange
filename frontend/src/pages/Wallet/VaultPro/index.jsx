@@ -6,7 +6,6 @@ import { toast } from '../../../components/shared/Toast/toast';
 import NumberInput from '../../../components/shared/NumberInput';
 import { Accordion, AccordionItem } from '../../../components/shared/Accordion';
 import { useSession } from '../../../context/session';
-import { getCurrency } from '../../../data/currencies';
 import { getAlias, printCurrency, amount2usd } from '../../../utils/currency';
 import { useSelectedCurrency } from '../../../hooks/useSelectedCurrency';
 import { coinIcon } from '../../../utils/coinArt';
@@ -272,7 +271,6 @@ function VaultAmountField({ currency, options, value, min, max, onChange, onChan
           options={options}
           search={(option, term) => option.toLocaleLowerCase().includes(term.toLocaleLowerCase())}
           optionRender={(code, selected) => {
-            const meta = getCurrency(code);
             /* `t.isTransferIn ? [wallet[code]] : currencyList.filter(...)` — TRANSFERRING OUT
                shows the VAULT's holding of a coin, transferring in shows the wallet's. Two
                different numbers behind one row, and the fixture makes them both zero. */
@@ -288,7 +286,7 @@ function VaultAmountField({ currency, options, value, min, max, onChange, onChan
                 <img className="h-6 w-6" alt="coin icon" src={coinIcon(code)} />
                 <div className="ml-2">
                   <div className="flex items-center text-base font-extrabold">
-                    {meta?.aliasCurrencyName ?? code}
+                    {getAlias(code)}
                   </div>
                 </div>
                 <div className="ml-auto text-right">
@@ -306,7 +304,7 @@ function VaultAmountField({ currency, options, value, min, max, onChange, onChan
           {(option) => (
             <div className="flex flex-auto items-center rounded-lg">
               <img className="mr-1 h-5 w-5" alt="coin icon" src={coinIcon(option)} />
-              <div className="text-left text-sm">{getCurrency(option)?.aliasCurrencyName ?? option}</div>
+              <div className="text-left text-sm">{getAlias(option)}</div>
             </div>
           )}
         </Select>
@@ -660,7 +658,8 @@ function AssetTable({ rows }) {
   return (
     <div className="rounded-2xl border border-third bg-card max-sm:pt-0 sm:mt-5 sm:pb-6 sm:pt-4 lg:px-6">
       <div className="flex items-center justify-between">
-        <div className="flex flex-none justify-between rounded-xl bg-layer3 px-4 py-3">
+        {/* Below `sm` it shrinks to the card: `flex-none` made it 404px wide on a 390px phone. */}
+        <div className="flex min-w-0 flex-1 justify-between gap-2 rounded-xl bg-layer3 px-4 py-3 max-sm:text-xs sm:flex-none sm:gap-0">
           <div className="relative sm:w-24">
             <span className="relative">
               Assets
@@ -716,7 +715,7 @@ const AssetRow = ({ item }) => (
       <div className="flex justify-between max-sm:mb-1 sm:w-24">
         <div className="center flex justify-start">
           <img className="h-5 w-5" alt="coin icon" src={coinIcon(item.currencyName)} />
-          <div className="ml-1.5 font-extrabold leading-normal text-primary">{item.currencyName}</div>
+          <div className="ml-1.5 font-extrabold leading-normal text-primary">{getAlias(item.currencyName)}</div>
         </div>
       </div>
       <AmountCell amount={item.amount} currencyName={item.currencyName} />

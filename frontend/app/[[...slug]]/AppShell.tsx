@@ -5,6 +5,7 @@
 import { useEffect } from 'react';
 import { BrowserRouter } from 'react-router-dom';
 import App from '../../src/App.jsx';
+import { AGENT_BASE, underAgentBase } from '../../src/services/agentBase.js';
 import { watchRemScale } from '../../src/utils/remScale.js';
 import { measureSpineRate } from '../../src/utils/spineRate.js';
 import { applyTheme, readTheme } from '../../src/context/settings.js';
@@ -45,7 +46,7 @@ export default function AppShell() {
   }, []);
 
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={underAgentBase() ? AGENT_BASE : undefined}>
       <App />
     </BrowserRouter>
   );

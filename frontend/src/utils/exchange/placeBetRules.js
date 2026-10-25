@@ -256,7 +256,10 @@ export function getOddsFieldMode(gtype, mname, { isRacing = false } = {}) {
     // Line markets (fancy2 / dtype 14) get the trio too — the same reference
     // rule listed them alongside khado and match, and the capture of "1st
     // Innings 20 Overs Line" shows `− <input> +` in its slip.
+    // Khado is read-only here (2026-10-25): the server takes its line from the feed and
+    // refuses any other, so a stepped line could only fail.
     case 'khado':
+      return ODDS_FIELD.READONLY;
     case 'fancy2':
       return ODDS_FIELD.STEPPER;
     case 'fancy':

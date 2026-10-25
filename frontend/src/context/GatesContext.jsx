@@ -11,6 +11,7 @@ import {
   publicGatesFrom,
 } from '../services/gates';
 import { onLiveState } from '../services/realtime';
+import { agentBaseTarget } from '../services/agentBase';
 import { useGates } from './gates';
 import { GatesContext } from './gates';
 import { useSession } from './session';
@@ -132,6 +133,14 @@ function LiveGates({ children }) {
   React.useEffect(() => {
     if (off) navigate('/', { replace: true });
   }, [off, navigate]);
+
+  /* An agent's player lives under /agent, everyone else outside it (services/agentBase.js). The
+     basename is fixed at mount, so crossing it is a full load; waits for `ready` (capabilities
+     answered), or an agent's player would read as direct for an instant and be sent out. */
+  const agentMove = ready && signedIn ? agentBaseTarget(window.location, value.agentPlayer) : null;
+  React.useEffect(() => {
+    if (agentMove) window.location.replace(agentMove);
+  }, [agentMove]);
 
   return <GatesContext.Provider value={value}>{children}</GatesContext.Provider>;
 }
