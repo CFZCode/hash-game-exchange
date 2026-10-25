@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 
-import { ArrowDownIcon, ArrowDownToLineIcon, ArrowUpIcon, ArrowUpToLineIcon, GripVerticalIcon, Loader2Icon, PlusIcon, RotateCcwIcon, SaveIcon, Trash2Icon } from 'lucide-react'
+import { ArrowDownIcon, ArrowDownToLineIcon, ArrowUpIcon, ArrowUpToLineIcon, ChevronLeftIcon, ChevronRightIcon, ChevronsLeftIcon, ChevronsRightIcon, GripVerticalIcon, Loader2Icon, PlusIcon, RotateCcwIcon, SaveIcon, Trash2Icon } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -10,6 +10,7 @@ import { Card } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { errorMessage } from '@/lib/api/client'
@@ -42,8 +43,12 @@ type Props = {
   addControl?: (add: (items: OrderedItem[]) => void, listed: Set<string>) => ReactNode
 }
 
+// Lazy: a long list loads only the art of the rows on screen.
 const Thumb = ({ src, alt }: { src?: string | null; alt: string }) =>
-  src ? <img src={artSrc(src) ?? undefined} alt={alt} className='size-9 rounded object-cover' /> : <div className='bg-muted size-9 rounded' />
+  src ? <img src={artSrc(src) ?? undefined} alt={alt} loading='lazy' decoding='async' className='size-9 rounded object-cover' /> : <div className='bg-muted size-9 rounded' />
+
+/** Rows per page of the table; the order and Save always cover the whole list. */
+const PAGE_SIZES = [50, 100, 200] as const
 
 const Picker = ({ search, exclude, onAdd, disabled }: { search: Props['search']; exclude: Set<string>; onAdd: (items: OrderedItem[]) => void; disabled?: boolean }) => {
   const [open, setOpen] = useState(false)
@@ -167,6 +172,8 @@ const OrderedList = ({ items, loading, search, onSave, canWrite, max, header, em
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [dragId, setDragId] = useState<string | null>(null)
   const [overId, setOverId] = useState<string | null>(null)
+  const [pageSize, setPageSize] = useState<number>(PAGE_SIZES[0])
+  const [pageBox, setPageBox] = useState({ key: '', page: 1 })
 
   const setDraft = (fn: (d: OrderedItem[]) => OrderedItem[]) => setEdited(prev => fn(prev ?? items ?? []))
 
@@ -183,6 +190,13 @@ const OrderedList = ({ items, loading, search, onSave, canWrite, max, header, em
   }, [draft])
 
   const shown = useMemo(() => draft.map((item, index) => ({ item, index })).filter(({ item }) => vendor === null || (item.vendor ?? '—') === vendor), [draft, vendor])
+
+  // The page resets when the provider filter or page size changes (derived, not an effect).
+  const pageKey = `${vendor}|${pageSize}`
+  const pages = Math.max(1, Math.ceil(shown.length / pageSize))
+  const page = Math.min(pageBox.key === pageKey ? pageBox.page : 1, pages)
+  const setPage = (next: number) => setPageBox({ key: pageKey, page: next })
+  const pageRows = useMemo(() => shown.slice((page - 1) * pageSize, page * pageSize), [shown, page, pageSize])
 
   const add = (added: OrderedItem[]) => setDraft(d => [...d, ...added.filter(a => !d.some(x => x.id === a.id))])
 
@@ -227,7 +241,7 @@ const OrderedList = ({ items, loading, search, onSave, canWrite, max, header, em
       return next
     })
 
-  const allShownPicked = shown.length > 0 && shown.every(({ item }) => selected.has(item.id))
+  const allShownPicked = pageRows.length > 0 && pageRows.every(({ item }) => selected.has(item.id))
 
   const save = async () => {
     setSaving(true)
@@ -310,14 +324,14 @@ const OrderedList = ({ items, loading, search, onSave, canWrite, max, header, em
             <TableRow>
               <TableHead className='w-8 pl-4'>
                 <Checkbox
-                  aria-label='Select all shown'
+                  aria-label='Select this page'
                   checked={allShownPicked}
-                  disabled={!canWrite || shown.length === 0}
+                  disabled={!canWrite || pageRows.length === 0}
                   onCheckedChange={() =>
                     setSelected(s => {
                       const next = new Set(s)
 
-                      for (const { item } of shown) {
+                      for (const { item } of pageRows) {
                         if (allShownPicked) next.delete(item.id)
                         else next.add(item.id)
                       }
@@ -350,7 +364,7 @@ const OrderedList = ({ items, loading, search, onSave, canWrite, max, header, em
                 </TableCell>
               </TableRow>
             ) : (
-              shown.map(({ item: g, index: i }) => (
+              pageRows.map(({ item: g, index: i }) => (
                 <TableRow
                   key={g.id}
                   draggable={canWrite}
@@ -430,6 +444,42 @@ const OrderedList = ({ items, loading, search, onSave, canWrite, max, header, em
           </TableBody>
         </Table>
       </div>
+      {shown.length > PAGE_SIZES[0] && (
+        <div className='flex flex-wrap items-center justify-between gap-3 border-t border-dashed px-4 py-3'>
+          <p className='text-muted-foreground text-sm tabular-nums'>
+            Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, shown.length)} of {shown.length}
+          </p>
+          <div className='flex items-center gap-2'>
+            <Select value={String(pageSize)} onValueChange={v => v && setPageSize(Number(v))}>
+              <SelectTrigger className='h-8 w-28'>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PAGE_SIZES.map(n => (
+                  <SelectItem key={n} value={String(n)}>
+                    {n} / page
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button variant='outline' size='icon-sm' disabled={page <= 1} onClick={() => setPage(1)} aria-label='First page'>
+              <ChevronsLeftIcon />
+            </Button>
+            <Button variant='outline' size='icon-sm' disabled={page <= 1} onClick={() => setPage(page - 1)} aria-label='Previous page'>
+              <ChevronLeftIcon />
+            </Button>
+            <span className='text-muted-foreground px-2 text-sm tabular-nums'>
+              <span className='text-foreground font-medium'>{page}</span> / {pages}
+            </span>
+            <Button variant='outline' size='icon-sm' disabled={page >= pages} onClick={() => setPage(page + 1)} aria-label='Next page'>
+              <ChevronRightIcon />
+            </Button>
+            <Button variant='outline' size='icon-sm' disabled={page >= pages} onClick={() => setPage(pages)} aria-label='Last page'>
+              <ChevronsRightIcon />
+            </Button>
+          </div>
+        </div>
+      )}
     </Card>
   )
 }
