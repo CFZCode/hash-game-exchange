@@ -44,13 +44,19 @@ const SLIDE_PLACEMENT = /^(slider-|home_top_)\d+$/;
 /* Agent mode (/agent) has its own slides, `agent-slider-<n>` in the site admin: game banners into
    the casino and sports, never a promotion (user, 2026-10-25). */
 const AGENT_SLIDE_PLACEMENT = /^agent-slider-\d+$/;
-/* Until the admin uploads agent slides, the four banners from the user's Figma (public/brand/agent). */
-const AGENT_DEFAULT_SLIDES = [['1', '/sports'], ['2', '/casino'], ['3', '/sports'], ['4', '/casino']].map(([n, linkUrl]) => ({
+/* Until the admin uploads agent slides, the four banners from the user's Figma (public/brand/agent),
+   with game copy rather than offers. */
+const AGENT_DEFAULT_SLIDES = [
+  ['1', '/sports', 'Sports', 'Cricket, football & more', 'Live odds on every match', 'Bet now'],
+  ['2', '/casino', 'Casino', 'Crash games', 'Cash out in time', 'Play now'],
+  ['3', '/sports', 'Sports', 'Back your team', 'Back or lay, in-play', 'Bet now'],
+  ['4', '/casino', 'Casino', 'Slots & live casino', 'Thousands of games', 'Play now'],
+].map(([n, linkUrl, tagName, title, description, buttonContent]) => ({
   bannerId: `agent-slider-${n}`,
-  tagName: '',
-  title: '',
-  description: '',
-  buttonContent: '',
+  tagName,
+  title,
+  description,
+  buttonContent,
   linkUrl,
   imageUrl: `/brand/agent/slide-${n}.webp`,
 }));
@@ -90,7 +96,8 @@ export const getHomeBanners = ({
 
   if (!USE_FIXTURES) {
     const agent = underAgentBase();
-    return Promise.resolve(request(PLATFORM.site.banners, { live: true, fixture: null }))
+    // Agent mode asks the backend for its own placements; the site keeps the plain list (and filters).
+    return Promise.resolve(request(agent ? `${PLATFORM.site.banners}?mode=agent` : PLATFORM.site.banners, { live: true, fixture: null }))
       .then((answer) => {
         const rows = platformSlides(answer, agent ? AGENT_SLIDE_PLACEMENT : SLIDE_PLACEMENT);
         return agent && !rows.length ? AGENT_DEFAULT_SLIDES : rows;

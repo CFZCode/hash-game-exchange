@@ -23,6 +23,10 @@ const HeroCopy = () => {
   /* A B2B site has no sign-up (context/gates.js): the headline stays, the Sign Up button and the
      "Or Register With" row are not rendered. */
   const canSignUp = useCanSignUp();
+  // Agent mode keeps the poster art signed out, with none of its sign-up copy (user, 2026-10-25).
+  const { agentPlayer } = useGates();
+  if (agentPlayer) return null;
+
   return (
     <div className="center relative z-[1] flex h-full w-1/2 min-w-[11.25rem] flex-col whitespace-nowrap">
       <div className="flex items-center gap-1">
@@ -137,12 +141,10 @@ function SignedOutHero() {
  */
 export default function Hero({ type = 'top' }) {
   const { session } = useSession();
-  const { agentPlayer } = useGates();
 
   return (
     <div className="relative sm:mx-0 sm:pt-0">
-      {/* Agent mode has no sign-up hero: its own game slider, signed in or not (user, 2026-10-25). */}
-      {session.login || agentPlayer ? <Banner type={type} /> : <SignedOutHero />}
+      {session.login ? <Banner type={type} /> : <SignedOutHero />}
     </div>
   );
 }
