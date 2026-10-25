@@ -42,7 +42,30 @@ const API = {
   providers: '/api/v1/casino/games/providers',
   bySlug: (slug) => `/api/v1/casino/games/slug/${encodeURIComponent(slug)}`,
   byUuid: (uuid) => `/api/v1/casino/games/detail/${encodeURIComponent(uuid)}`,
+  categories: '/api/v1/casino/games/categories',
+  category: (slug) => `/api/v1/casino/games/categories/${encodeURIComponent(slug)}`,
 };
+
+/* ── THE LOBBY CATEGORIES (site admin › Lobby curation › Add category) ─────────────────────────
+ *
+ * The casino strip's tabs after Lobby and Originals, in the admin's order: `[{slug, name, count}]`,
+ * `count` being how many games the admin hand-picked. A category with picks reads them in their
+ * order; one with none keeps its automatic SET_QUERY list below (or is empty for a new slug).
+ * Read once per page load and shared; `null` in fixture mode, and on a failed read, so callers
+ * fall back to the built-in tabs. */
+let categories;
+let categoriesRead;
+export function getCasinoCategories() {
+  if (USE_FIXTURES) return null;
+  categoriesRead ??= Promise.resolve(request(API.categories, { live: true, fixture: null }))
+    .then((rows) => {
+      categories = Array.isArray(rows) ? rows : null;
+      return categories;
+    })
+    .catch(() => null);
+  return categoriesRead;
+}
+const curatedCategory = (key) => categories?.find((c) => c.slug === key && c.count > 0);
 
 /* The route's own cap. A tab grid pages client-side over the first hundred. */
 export const LIVE_LIMIT = 100;
@@ -71,7 +94,8 @@ const SET_QUERY = {
 };
 
 /* Whether the live path owns this set key (so a pending read is a skeleton, not a fallback). */
-export const isLiveSet = (key) => !USE_FIXTURES && Object.prototype.hasOwnProperty.call(SET_QUERY, key);
+export const isLiveSet = (key) =>
+  !USE_FIXTURES && (Object.prototype.hasOwnProperty.call(SET_QUERY, key) || Boolean(categories?.some((c) => c.slug === key)));
 
 const SORT_PARAM = { 'a-z': 'az', 'z-a': 'za' };
 
@@ -110,6 +134,9 @@ const toGames = (rows) => (Array.isArray(rows) ? rows : []).filter(Boolean).map(
 /* The query a set key asks for, or `null` when the platform cannot feed it. A curated
    collection keeps its curated order and so takes no provider, sort, search or category. */
 function querySpec(key, { providers = [], sort = '', search, category } = {}) {
+  if (curatedCategory(key) && !search && !category) {
+    return { path: API.category(key), params: { provider: providers.length ? providers.join(',') : undefined, sort: SORT_PARAM[sort] } };
+  }
   const spec = SET_QUERY[key];
   if (!spec) return null;
   if (spec.collection && !search && !category && !providers.length && !SORT_PARAM[sort]) {
@@ -137,13 +164,16 @@ function querySpec(key, { providers = [], sort = '', search, category } = {}) {
    in from `/js-games/v1/games`; that would only double-list. */
 export function getCasinoPage(key, { page = 1, limit = LIVE_LIMIT, ...options } = {}) {
   if (USE_FIXTURES) return null;
-  const spec = querySpec(key, options);
-  if (!spec) return { games: [], total: 0, page: 1 };
-  return Promise.resolve(
-    requestPage(spec.path, { live: true, params: { ...spec.params, page, limit }, fixture: [] }),
-  ).then(({ rows, pagination }) => {
-    const games = toGames(rows);
-    return { games, total: pagination?.total ?? games.length, page };
+  /* The categories first, so a curated tab reads its own picks rather than the automatic list. */
+  return Promise.resolve(getCasinoCategories()).then(() => {
+    const spec = querySpec(key, options);
+    if (!spec) return { games: [], total: 0, page: 1 };
+    return Promise.resolve(
+      requestPage(spec.path, { live: true, params: { ...spec.params, page, limit }, fixture: [] }),
+    ).then(({ rows, pagination }) => {
+      const games = toGames(rows);
+      return { games, total: pagination?.total ?? games.length, page };
+    });
   });
 }
 

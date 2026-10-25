@@ -77,7 +77,8 @@ const SPRITE_ICONS = {
 function TabIcon({ tab, selected }) {
   const { darken } = useSettings();
   const fill = selected ? (darken ? 'fill-brand' : '') : 'fill-secondary';
-  const Svg = SVG_ICONS[tab];
+  // A tab the admin added has no glyph of its own; it takes the Lobby's.
+  const Svg = SVG_ICONS[tab] ?? (SPRITE_ICONS[tab] ? null : AllGamesIcon);
   if (Svg) {
     return <Svg className={`icon size-5 flex-none ${fill}`} />;
   }
@@ -89,7 +90,7 @@ function TabIcon({ tab, selected }) {
   );
 }
 
-export default function CasinoTabStrip({ active, compact = false, tight = false, linkTab = false }) {
+export default function CasinoTabStrip({ tabs = TABS, active, compact = false, tight = false, linkTab = false }) {
   const gates = useGates();
   return (
     /* mb-2 is the strip's own, NOT the first section header's. Measured at a matched 1530px
@@ -264,7 +265,7 @@ export default function CasinoTabStrip({ active, compact = false, tight = false,
          see the note at the top of that component. */
     >
       {/* A tab into a switched-off section (Originals, or the whole casino) is not drawn. */}
-      {TABS.filter(({ tab }) => gates.routeOn(tab ? `/casino/${tab}` : '/casino')).map(({ label, tab }) => {
+      {tabs.filter(({ tab }) => gates.routeOn(tab ? `/casino/${tab}` : '/casino')).map(({ label, tab }) => {
         const selected = tab === active;
         return (
           <NavLink

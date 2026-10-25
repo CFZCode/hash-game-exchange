@@ -105,6 +105,21 @@ export const TABS = [
   /* Themes removed (user's request, 2026-10-20): /casino/themes falls back to the lobby. */
 ];
 
+/* With the platform on, the strip after Lobby and Originals is the site admin's lobby
+   categories (services/catalog.js `getCasinoCategories`), in its order; Providers stays last.
+   `null` (fixtures, pending or a failed read) keeps the built-in TABS above. */
+export function tabsFor(categories) {
+  if (!Array.isArray(categories)) return TABS;
+  const [lobby, originals] = TABS;
+  return [lobby, originals, ...categories.map((c) => ({ label: c.name, tab: c.slug })), TABS.at(-1)];
+}
+
+/* The lobby rows from the same list: Originals, a row per category, then the provider strip. */
+export function rowsFor(categories) {
+  if (!Array.isArray(categories)) return ROWS;
+  return [ROWS[0], ...categories.map((c) => ({ title: c.name, key: c.slug, href: `/casino/${c.slug}` })), { type: 'providers' }];
+}
+
 /* Providers and Themes are not game lists — they are lists of links, so their tab bodies are
    a provider grid and a tag grid rather than a grid of tiles. The Explore panel makes the
    same split (`tab === "providers" ? ProviderGrid : GameGrid` in `wt`). */
@@ -212,7 +227,8 @@ export function rowGames(key, originals, live) {
 }
 
 /* The lobby's live rows, asked for in one go. */
-export const LOBBY_KEYS = ROWS.filter((row) => row.key && row.key !== 'brand').map((row) => row.key);
+export const lobbyKeys = (rows) => rows.filter((row) => row.key && row.key !== 'brand').map((row) => row.key);
+export const LOBBY_KEYS = lobbyKeys(ROWS);
 
 /* The Poker tab's two panels. Fixtures: the transcription. Live: the tab's own games split by
    name, since the platform has no variant feed. */

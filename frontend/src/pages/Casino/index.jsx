@@ -1,7 +1,7 @@
 import React from 'react';
 import useResource from '../../hooks/useResource';
 import { getOriginals } from '../../services/originals';
-import { getCasinoPage, getCasinoSets, getLiveProviders, isLiveSet } from '../../services/catalog';
+import { getCasinoCategories, getCasinoPage, getCasinoSets, getLiveProviders, isLiveSet } from '../../services/catalog';
 import { USE_FIXTURES } from '../../services/client';
 import { useGates } from '../../context/gates';
 import { useParams } from 'react-router-dom';
@@ -21,8 +21,9 @@ import { SearchIcon, CloseIcon } from '../../components/Explore/icons';
 import { searchGames, sortGames } from '../../components/Explore/catalogue';
 import { canonicalProvider } from '../../data/providers';
 import {
-  TABS,
-  ROWS,
+  tabsFor,
+  rowsFor,
+  lobbyKeys,
   LINK_TABS,
   FILTER_TABS,
   PROVIDERS,
@@ -31,7 +32,6 @@ import {
   GRID_PAGE_SIZE,
   gamesFor,
   rowGames,
-  LOBBY_KEYS,
 } from './catalogue';
 import './Casino.css';
 
@@ -121,7 +121,7 @@ function SearchBar({ query, setQuery }) {
 /* The Themes chips, less "BC Originals" when Originals is switched off. */
 const themesFor = (gates) => (gates.on('originals') ? THEMES : THEMES.filter((label) => label !== 'BC Originals'));
 
-function Lobby({ originals, live, providerRow }) {
+function Lobby({ rows, originals, live, providerRow }) {
   const gates = useGates();
   return [
     /* THE SAME BLOCK THE HOME PAGE CARRIES, and the casino page really does mount it — its
@@ -138,7 +138,7 @@ function Lobby({ originals, live, providerRow }) {
        favourites nor history. */
     <RecentFavorites key="recent-favorites" />,
     /* BC Originals switched off: its row goes, nothing in its place. */
-    ...ROWS.filter((row) => row.key !== 'brand' || gates.on('originals')).map((row) => {
+    ...rows.filter((row) => row.key !== 'brand' || gates.on('originals')).map((row) => {
     if (row.type === 'providers') return <ProviderRow key="providers" providers={providerRow} />;
     if (row.type === 'themes') return <ThemeRow key="themes" themes={themesFor(gates)} />;
 
@@ -203,6 +203,12 @@ export default function Casino() {
      `services/originals.js` for why the other eleven tabs stay transcribed. */
   const { data: originals } = useResource(getOriginals);
 
+  /* The strip and the lobby rows after Lobby and Originals: the site admin's categories when the
+     platform is on, the built-in list otherwise (catalogue.js `tabsFor` / `rowsFor`). */
+  const { data: categories } = useResource(getCasinoCategories);
+  const tabs = React.useMemo(() => tabsFor(categories), [categories]);
+  const rows = React.useMemo(() => rowsFor(categories), [categories]);
+
   const [query, setQuery] = React.useState('');
   const [sort, setSort] = React.useState('');
   const [providers, setProviders] = React.useState([]);
@@ -215,7 +221,7 @@ export default function Casino() {
 
   /* The tab strip is route-driven, so an unknown segment is possible — `/casino/anything`
      still matches. Fall back to the lobby rather than rendering a strip with nothing lit. */
-  const known = TABS.some((entry) => entry.tab === tab);
+  const known = tabs.some((entry) => entry.tab === tab);
   const active = known ? tab : '';
 
   const searching = query.trim().length > 0;
@@ -233,7 +239,12 @@ export default function Casino() {
   const [pageBox, setPageBox] = React.useState({ key: pageKey, page: 1 });
   const requestedPage = pageBox.key === pageKey ? pageBox.page : 1;
 
-  const readLobby = React.useCallback(() => (active ? null : getCasinoSets(LOBBY_KEYS, { limit: 10 })), [active]);
+  // Live, the rows wait for the categories so the lobby is read once, with the admin's rows.
+  const categoriesPending = !USE_FIXTURES && categories === undefined;
+  const readLobby = React.useCallback(
+    () => (active || categoriesPending ? null : getCasinoSets(lobbyKeys(rows), { limit: 10 })),
+    [active, categoriesPending, rows],
+  );
   const { data: liveLobby } = useResource(readLobby);
   const liveGrid = !USE_FIXTURES && active !== 'brand' && (searching ? !tooShort : isLiveSet(active));
   const gridKey = liveGrid
@@ -377,10 +388,10 @@ export default function Casino() {
       <SearchBar query={query} setQuery={setQuery} />
       {/* `tight` where a filter bar follows the strip instead of a grid — that bar brings its
           own 16px and does not need the strip's 32 on top of it. */}
-      <CasinoTabStrip active={active} compact={!showLobby} tight={filtered} linkTab={linkTab} />
+      <CasinoTabStrip tabs={tabs} active={active} compact={!showLobby} tight={filtered} linkTab={linkTab} />
 
       {showLobby ? (
-        <Lobby originals={originals} live={liveLobby} providerRow={USE_FIXTURES ? PROVIDERS : (liveProviders ?? []).slice(0, 8)} />
+        <Lobby rows={rows} originals={originals} live={liveLobby} providerRow={USE_FIXTURES ? PROVIDERS : (liveProviders ?? []).slice(0, 8)} />
       ) : linkTab ? (
         <div className="mt-4 w-full px-4 sm:px-0">
           {active === 'provider' ? (

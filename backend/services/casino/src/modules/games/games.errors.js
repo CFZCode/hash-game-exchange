@@ -10,6 +10,10 @@ module.exports = defineErrors('GAMES', {
     message: 'No such lobby collection',
   },
 
+  UNKNOWN_CATEGORY: { status: 404, message: 'No such lobby category' },
+  CATEGORY_EXISTS: { status: 409, message: 'A lobby category with this name already exists' },
+  CATEGORY_SLUG_INVALID: { status: 422, message: 'A category name needs at least one letter or digit' },
+
   PROVIDER_NOT_FOUND: { status: 404, message: 'No games found for this provider' },
 
   COLLECTION_TOO_LARGE: {

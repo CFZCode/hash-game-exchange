@@ -370,6 +370,31 @@ test('game catalogue', async (t) => {
     assert.deepEqual(result.uuids, [uuid]);
   });
 
+  await t.test('a lobby category: created from its name, games picked in order, switched off, deleted', async () => {
+    const name = `Cat ${TAG} Games`;
+    const created = await service.createCategory({ name, actor: staff });
+    assert.equal(created.slug, `cat-${TAG}-games`);
+    await assert.rejects(() => service.createCategory({ name, actor: staff }), (err) => err.code === 'GAMES_CATEGORY_EXISTS');
+    await assert.rejects(() => service.createCategory({ name: 'Brand', actor: staff }), (err) => err.code === 'GAMES_CATEGORY_EXISTS');
+
+    // Names no other case uses: a same-named game of the same provider is a twin and hidden.
+    const [a, b] = [await seedGame({ name: 'Zz category game' }), await seedGame({ name: 'Aa category game' })];
+    await service.updateCategory({ slug: created.slug, uuids: [a, b], actor: staff });
+    const page = await service.categoryGames({ slug: created.slug, page: 1, limit: 10 });
+    assert.deepEqual(page.rows.map((g) => g.uuid), [a, b], 'curated order');
+    const az = await service.categoryGames({ slug: created.slug, page: 1, limit: 10, sort: 'az' });
+    assert.deepEqual(az.rows.map((g) => g.uuid), [b, a]);
+    assert.equal((await service.categories()).find((c) => c.slug === created.slug).count, 2);
+
+    await service.updateCategory({ slug: created.slug, active: false, actor: staff });
+    assert.ok(!(await service.categories()).some((c) => c.slug === created.slug), 'the site no longer lists it');
+    await assert.rejects(() => service.categoryGames({ slug: created.slug, page: 1, limit: 10 }), (err) => err.code === 'GAMES_UNKNOWN_CATEGORY');
+    assert.ok((await service.categories({ includeInactive: true })).some((c) => c.slug === created.slug), 'the admin still does');
+
+    await service.deleteCategory({ slug: created.slug, actor: staff });
+    assert.ok(!(await service.categories({ includeInactive: true })).some((c) => c.slug === created.slug));
+  });
+
   await t.test('an unknown collection is a 404, not a query against a table named by the caller', async () => {
     await assert.rejects(
       () => service.collection({ collection: 'jackpots', page: 1, limit: 10 }),

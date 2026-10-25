@@ -24,6 +24,13 @@ const COLLECTIONS = Object.freeze({
 
 const COLLECTION_SLUGS = Object.freeze(Object.keys(COLLECTIONS));
 
+/** `/casino/:tab` segments the site keeps for itself; a lobby category may not take one. */
+const RESERVED_TABS = Object.freeze(['', 'lobby', 'brand', 'originals', 'provider', 'themes']);
+
+/** A category's URL key from its name: "Hot Games" -> `hot-games`. */
+const categorySlug = (name) =>
+  String(name ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
+
 /**
  * Columns a lobby response may expose.
  *
@@ -138,6 +145,8 @@ module.exports = {
   NAME_CATEGORIES,
   COLLECTIONS,
   COLLECTION_SLUGS,
+  RESERVED_TABS,
+  categorySlug,
   GAME_FIELDS,
   GAME_SUMMARY_FIELDS,
   MAX_COLLECTION_SIZE,

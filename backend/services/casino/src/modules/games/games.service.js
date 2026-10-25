@@ -8,6 +8,8 @@ const E = require('./games.errors');
 const { fetchPublicImage } = require('./publicImage');
 const {
   COLLECTIONS,
+  RESERVED_TABS,
+  categorySlug,
   NAME_CATEGORIES,
   LIVE_PROVIDERS,
   LIVE_TYPES,
@@ -499,12 +501,19 @@ class GamesService {
     const { model, key } = this.#collection(collection);
 
     const row = await this.models[model].findOne({ where: { key }, raw: true });
-    const ids = this.#splitIds(row?.game_uuids);
+    return this.#curatedPage(this.#splitIds(row?.game_uuids), { page, limit });
+  }
+
+  /** One page of a hand-picked list, in its curated order; `provider` (csv) and `sort` (az/za) narrow and reorder it. */
+  async #curatedPage(ids, { page, limit, provider, sort }) {
     if (!ids.length) return { rows: [], total: 0 };
 
+    const where = { uuid: { [Op.in]: ids } };
+    const wanted = String(provider ?? '').split(',').map((p) => p.trim()).filter(Boolean);
+    if (wanted.length) where.provider = { [Op.iLike]: { [Op.any]: wanted } };
     const games = await this.models.Gisgamesnew.findAll({
       // A curated "… Mobile" twin is shown as its desktop tile's game, not a second tile.
-      where: withoutTwins(withoutDisabled({ uuid: { [Op.in]: ids } }, await disabledProviders(this.models))),
+      where: withoutTwins(withoutDisabled(where, await disabledProviders(this.models))),
       attributes: [...GAME_FIELDS],
       raw: true,
     });
@@ -513,7 +522,12 @@ class GamesService {
     // than left to whatever the database returns.
     // Artwork first, curated order within each half (see `#order`).
     const rank = new Map(ids.map((uuid, index) => [uuid, index]));
-    games.sort((a, b) => noArt(a) - noArt(b) || rank.get(a.uuid) - rank.get(b.uuid));
+    if (sort === 'az' || sort === 'za') {
+      const dir = sort === 'az' ? 1 : -1;
+      games.sort((a, b) => dir * String(a.name).localeCompare(String(b.name)));
+    } else {
+      games.sort((a, b) => noArt(a) - noArt(b) || rank.get(a.uuid) - rank.get(b.uuid));
+    }
 
     const offset = (page - 1) * limit;
     return { rows: await this.#withSlugs(games.slice(offset, offset + limit)), total: games.length };
@@ -541,6 +555,94 @@ class GamesService {
     const found = COLLECTIONS[slug];
     if (!found) throw E.UNKNOWN_COLLECTION({ collection: slug });
     return found;
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
+  //  Lobby categories (migration 158): the sections after Lobby and Originals
+  // ══════════════════════════════════════════════════════════════════════
+
+  #sql(query, replacements = {}, type = QueryTypes.SELECT) {
+    return this.models.Gisgamesnew.sequelize.query(query, { replacements, type });
+  }
+
+  /** The sections in strip order. The site gets active ones; `count` is how many games are hand-picked. */
+  async categories({ includeInactive = false } = {}) {
+    const rows = await this.#sql(
+      `SELECT slug, name, sort_order AS "sortOrder", active, cardinality(game_uuids) AS count, updated_at AS "updatedAt"
+         FROM casino_categories ${includeInactive ? '' : 'WHERE active'} ORDER BY sort_order, id`
+    );
+    return rows.map((row) => ({ ...row, count: Number(row.count) }));
+  }
+
+  async #category(slug, { includeInactive = false } = {}) {
+    const [row] = await this.#sql(
+      `SELECT slug, name, sort_order AS "sortOrder", active, game_uuids AS uuids FROM casino_categories WHERE slug = :slug ${includeInactive ? '' : 'AND active'}`,
+      { slug }
+    );
+    if (!row) throw E.UNKNOWN_CATEGORY({ category: slug });
+    return row;
+  }
+
+  /** A section's hand-picked games, one page at a time. */
+  async categoryGames({ slug, page, limit, provider, sort, includeInactive = false }) {
+    const row = await this.#category(slug, { includeInactive });
+    return this.#curatedPage(row.uuids ?? [], { page, limit, provider, sort });
+  }
+
+  async createCategory({ name, slug, actor }) {
+    const key = slug || categorySlug(name);
+    if (!key) throw E.CATEGORY_SLUG_INVALID({ name });
+    if (RESERVED_TABS.includes(key)) throw E.CATEGORY_EXISTS({ category: key });
+    const [row] = await this.#sql(
+      `INSERT INTO casino_categories (slug, name, sort_order, updated_by)
+         VALUES (:key, :name, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM casino_categories), :actor)
+       ON CONFLICT (slug) DO NOTHING RETURNING slug`,
+      { key, name, actor: actor?.id ?? null },
+      QueryTypes.SELECT
+    );
+    if (!row) throw E.CATEGORY_EXISTS({ category: key });
+    this.logger?.info({ category: key, staffId: actor?.id }, 'Lobby category created');
+    return this.#category(key, { includeInactive: true });
+  }
+
+  /** Rename, switch on/off, or replace the games of one section. Fields left out stay as they are. */
+  async updateCategory({ slug, name, active, uuids, actor }) {
+    await this.#category(slug, { includeInactive: true });
+    const clean = uuids === undefined ? undefined : await this.#verifiedIds(uuids);
+    await this.#sql(
+      `UPDATE casino_categories SET
+         name = COALESCE(:name, name),
+         active = COALESCE(:active, active),
+         game_uuids = COALESCE(CAST(:uuids AS TEXT[]), game_uuids),
+         updated_by = :actor, updated_at = NOW()
+       WHERE slug = :slug`,
+      {
+        slug,
+        name: name ?? null,
+        active: active ?? null,
+        // A Postgres array literal; the uuids were checked against the catalogue above.
+        uuids: clean === undefined ? null : `{${clean.map((u) => `"${u}"`).join(',')}}`,
+        actor: actor?.id ?? null,
+      },
+      QueryTypes.UPDATE
+    );
+    this.logger?.info({ category: slug, count: clean?.length, staffId: actor?.id }, 'Lobby category updated');
+    return this.#category(slug, { includeInactive: true });
+  }
+
+  /** The strip order: the slugs given go first, in that order. */
+  async reorderCategories({ slugs }) {
+    for (const [index, slug] of slugs.entries()) {
+      await this.#sql(`UPDATE casino_categories SET sort_order = :order WHERE slug = :slug`, { slug, order: index + 1 }, QueryTypes.UPDATE);
+    }
+    return this.categories({ includeInactive: true });
+  }
+
+  async deleteCategory({ slug, actor }) {
+    await this.#category(slug, { includeInactive: true });
+    await this.#sql(`DELETE FROM casino_categories WHERE slug = :slug`, { slug }, QueryTypes.DELETE);
+    this.logger?.info({ category: slug, staffId: actor?.id }, 'Lobby category deleted');
+    return { slug, deleted: true };
   }
 
   // ══════════════════════════════════════════════════════════════════════
@@ -697,6 +799,13 @@ class GamesService {
     // A provider's second copy of one game is not a second result (see NOT_A_LATER_TWIN).
     const where = includeDisabled ? {} : withoutTwins(withoutDisabled({}, await disabledProviders(this.models)));
     return this.#rankedSearch({ q, limit, where });
+  }
+
+  /** Every game of one provider (optionally one type): the admin's Provider → Type → Game picker. */
+  async pickList({ vendor, type }) {
+    const where = { provider: { [Op.iLike]: vendor } };
+    if (type) where.type = { [Op.iLike]: type };
+    return this.models.Gisgamesnew.findAll({ where, attributes: [...GAME_SUMMARY_FIELDS], order: [['name', 'ASC']], limit: 2000, raw: true });
   }
 
   /** @legacy GET /api/gis/admin/gis/vendor-search */

@@ -57,8 +57,9 @@ const PROCS = [
     cwd: path.join(ROOT, 'frontend'),
     cmd: frontendCommand,
     optional: true,
-    // The frontend's own .env.local wins over nothing here; these are only defaults for a bare checkout.
-    env: {
+    // Defaults for a bare checkout only: Next.js ranks process env above .env.local, so with a
+    // .env.local present nothing is passed and its API base (e.g. the live API) is the one used.
+    env: fs.existsSync(path.join(ROOT, 'frontend/.env.local')) ? {} : {
       NEXT_PUBLIC_API_BASE: process.env.NEXT_PUBLIC_API_BASE ?? URLS.gateway,
       VITE_API_BASE: process.env.VITE_API_BASE ?? URLS.gateway,
       GATEWAY_URL: process.env.GATEWAY_URL ?? URLS.gateway

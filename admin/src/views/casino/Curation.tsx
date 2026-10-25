@@ -11,6 +11,7 @@ import { api } from '@/lib/api/client'
 import { formatNumber } from '@/lib/format'
 import DateTime from '@/components/shared/DateTime'
 import { EditImage } from './GameCatalogue'
+import { CategoriesTab } from './Categories'
 import OrderedList, { type OrderedItem } from './OrderedList'
 import type { GisGame, GisPriority, GisType, GisVendor } from './types'
 
@@ -113,6 +114,7 @@ export const PriorityTab = ({ kind }: { kind: 'vendor' | 'type' }) => {
 }
 
 const SCOPES = [
+  { value: 'category', label: 'Lobby categories' },
   { value: 'collection', label: 'Home collection' },
   { value: 'vendor', label: 'Provider' },
   { value: 'type', label: 'Type' }
@@ -120,11 +122,11 @@ const SCOPES = [
 
 /** Casino → Lobby curation: the Slotegrator lobby the site renders — a home collection, or a provider's / type's pinned games. Per game: change its tile image, move it, remove it; Add games appends from the catalogue. */
 const Curation = () => {
-  const [scope, setScope] = useState<(typeof SCOPES)[number]['value']>('collection')
+  const [scope, setScope] = useState<(typeof SCOPES)[number]['value']>('category')
 
   return (
     <div className='grid gap-4'>
-      <PageHeader title='Lobby curation' description='Pick a home collection, a provider or a type; then change any game’s image, set its priority (Top / ↑ / ↓ / Bottom), add or remove games, and Save.' />
+      <PageHeader title='Lobby curation' description='Lobby categories are the casino page’s sections after Lobby and Originals (Add category). Or pick a home collection, a provider or a type; then change any game’s image, set its order (drag, or Top / ↑ / ↓ / Bottom), add or remove games, and Save.' />
       <Select value={scope} onValueChange={v => v && setScope(v as typeof scope)}>
         <SelectTrigger className='w-48'>
           <SelectValue>{(v: string) => SCOPES.find(s => s.value === v)?.label ?? v}</SelectValue>
@@ -137,7 +139,7 @@ const Curation = () => {
           ))}
         </SelectContent>
       </Select>
-      {scope === 'collection' ? <CollectionsTab /> : <PriorityTab key={scope} kind={scope} />}
+      {scope === 'category' ? <CategoriesTab /> : scope === 'collection' ? <CollectionsTab /> : <PriorityTab key={scope} kind={scope} />}
     </div>
   )
 }

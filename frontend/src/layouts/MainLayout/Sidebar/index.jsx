@@ -6,11 +6,21 @@ import LanguageCurrencyModal from '../../../components/modals/LanguageCurrencyMo
 import Refer from '../../../components/modals/Refer';
 import { FLYOUTS, ORIGINALS } from './originals';
 import { getOriginals } from '../../../services/originals';
+import { getCasinoCategories } from '../../../services/catalog';
 import useResource from '../../../hooks/useResource';
 import { useSession } from '../../../context/session';
 import { useGates } from '../../../context/gates';
 import { useSettings } from '../../../context/settings';
 import './Sidebar.css';
+
+/* A lobby category's sidebar glyph and the list pages that light its row, by slug. */
+const CATEGORY_ICON = {
+  hot: 'hotgame', slots: 'slots', live: 'liveevents', 'game-shows': 'game_shows', 'table-game': 'tablegame',
+  blackjack: 'blackjack', roulette: 'roulette', baccarat: 'baccarat', new: 'newreleases', 'crash-games': 'popular', poker: 'poker',
+};
+const CATEGORY_MATCH = {
+  hot: ['/section/hot_games'], slots: ['/gamelist/slots'], live: ['/gamelist/live'], new: ['/section/new'], 'table-game': ['/section/table_games'],
+};
 import SportsMenu from './SportsMenu';
 import GiftCardDialog from '../../../components/modals/GiftCard';
 import { IconGift } from '../Header/AfterLogin/icons';
@@ -307,6 +317,7 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
      transcribed list: Arrow Bow and Diamonds were missing from it. A game with no sprite of its own
      draws the sheet's fallback cell, as `dice` does. */
   const { data: originalGames } = useResource(getOriginals);
+  const { data: casinoCategories } = useResource(getCasinoCategories);
   const liveOriginals = originalGames?.map((game) => ({
     href: `/game/${game.slug}`,
     icon: ORIGINALS.find((row) => row.href === `/game/${game.slug}`)?.icon ?? game.slug,
@@ -414,6 +425,12 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
     setGiftOpen(true);
   };
 
+  /* The Casino group's game rows are the site admin's lobby categories once they are read
+     (Lobby curation › Add category); until then, and with fixtures, the built-in rows below. */
+  const categoryRows = Array.isArray(casinoCategories)
+    ? casinoCategories.map((c) => ({ label: c.name, menuIcon: CATEGORY_ICON[c.slug] ?? 'slots', href: `/casino/${c.slug}`, match: CATEGORY_MATCH[c.slug] }))
+    : null;
+
   // Main nav items with submenu data from original HTML
   const mainNavItems = [
     {
@@ -426,18 +443,20 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
            two Sports Provider rows carry it too and have no list here, so they render the
            chevron and open nothing, which is what they already did. */
         { label: brandLabel('BC Exclusive'), menuIcon: 'bc_exlusive', href: '/section/exclusive' },
+        ...(categoryRows ?? [
         { label: 'Hot Games', menuIcon: 'hotgame', href: '/casino/hot', match: ['/section/hot_games'] },
         { label: 'Slots', menuIcon: 'slots', href: '/casino/slots', match: ['/gamelist/slots'] },
         { label: 'Live Casino', menuIcon: 'liveevents', href: '/casino/live', match: ['/gamelist/live'] },
         { label: 'Game Shows', menuIcon: 'game_shows', href: '/casino/game-shows' },
         { label: 'New Releases', menuIcon: 'newreleases', href: '/casino/new', match: ['/section/new'] },
+        ]),
         // Pachinko, Pachislot and Crash Games exist in the bundle's menu definition
         // but do not render on the live site — they are gated off by brand/region
         // config. Do not "restore the missing items" from the bundle alone.
         /* `/bingo` is not a page here (App redirects it); the row points at the bingo tag list
            the home page's "All Bingo Games" row opens. */
         { label: 'Bingo', menuIcon: 'bingo_home', href: '/tagname/bingo?label=All%20Bingo%20Games', match: ['/tagname/bingo'] },
-        { label: 'Table Games', menuIcon: 'tablegame', href: '/casino/table-game', match: ['/section/table_games'] },
+        ...(categoryRows ? [] : [{ label: 'Table Games', menuIcon: 'tablegame', href: '/casino/table-game', match: ['/section/table_games'] }]),
         { label: 'Providers', menuIcon: 'favorites', href: '/casino/provider' },
       ]
     },
