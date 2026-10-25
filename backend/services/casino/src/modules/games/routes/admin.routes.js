@@ -97,6 +97,15 @@ module.exports = function adminRoutes(deps) {
   /** @legacy GET /api/gis/admin/gis/games/search */
   router.get('/catalogue/search', canRead, validate(v.searchGames), ctrl.adminSearch);
   router.get('/catalogue/pick', canRead, validate(v.pickList), ctrl.pickList);
+  // The tile art as a file (PNG, JPEG or WebP, 1 MB); the URL form is PUT /catalogue/:uuid/image.
+  router.put(
+    '/catalogue/:uuid/image-file',
+    canManage,
+    ...imageUpload.singleImage({ field: 'image', errors: E, maxBytes: LOGO_MAX_BYTES }),
+    noBody(),
+    validate(v.uuidParam),
+    ctrl.putGameImage
+  );
   /** @legacy PUT /api/gis/admin/gis/games/:uuid/image */
   router.put('/catalogue/:uuid/image', canManage, validate(v.updateImage), ctrl.updateImage);
 

@@ -17,7 +17,7 @@ import { useSession } from '@/contexts/SessionContext'
 import { useApi, useApiMutation, useInvalidate } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
 import { notifyError } from '@/lib/notify'
-import { EditImage } from './EditImage'
+import { artSrc, EditImage } from './EditImage'
 import OrderedList, { type OrderedItem } from './OrderedList'
 import type { GisGame, GisVendor } from './types'
 
@@ -28,7 +28,7 @@ const BASE = 'admin/casino/games/categories'
 
 /** A game's tile art, small, beside its name in the pickers. */
 const Art = ({ src, className = 'size-6' }: { src?: string | null; className?: string }) =>
-  src ? <img src={src} alt='' className={`${className} flex-none rounded object-cover`} /> : <span className={`${className} bg-muted flex-none rounded`} />
+  src ? <img src={artSrc(src) ?? undefined} alt='' className={`${className} flex-none rounded object-cover`} /> : <span className={`${className} bg-muted flex-none rounded`} />
 
 const gisItem = (g: GisGame): OrderedItem => ({ id: g.uuid, name: g.name, vendor: g.provider, type: g.type, image: g.image })
 const gisSearch = async (q: string) => (await api.get<GisGame[]>('admin/casino/games/catalogue/search', { q, limit: 100 })).map(gisItem)

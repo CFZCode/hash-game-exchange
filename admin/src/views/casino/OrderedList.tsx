@@ -14,6 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { errorMessage } from '@/lib/api/client'
 import { notifyError } from '@/lib/notify'
+import { artSrc } from './EditImage'
 
 export type OrderedItem = { id: string; name: string; vendor?: string | null; type?: string | null; image?: string | null; inactive?: boolean }
 
@@ -42,7 +43,7 @@ type Props = {
 }
 
 const Thumb = ({ src, alt }: { src?: string | null; alt: string }) =>
-  src ? <img src={src} alt={alt} className='size-9 rounded object-cover' /> : <div className='bg-muted size-9 rounded' />
+  src ? <img src={artSrc(src) ?? undefined} alt={alt} className='size-9 rounded object-cover' /> : <div className='bg-muted size-9 rounded' />
 
 const Picker = ({ search, exclude, onAdd, disabled }: { search: Props['search']; exclude: Set<string>; onAdd: (items: OrderedItem[]) => void; disabled?: boolean }) => {
   const [open, setOpen] = useState(false)

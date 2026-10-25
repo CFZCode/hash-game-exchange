@@ -443,6 +443,30 @@ test('game catalogue', async (t) => {
     assert.deepEqual(read.games.map((g) => g.uuid), [uuid]);
   });
 
+  await t.test('an uploaded tile image is stored, served and becomes the game image', async () => {
+    const uuid = await seedGame({ name: 'Uu uploaded art game', image: 'https://cdn.example/old.png' });
+    // A real PNG head (signature + IHDR 300x400) so the size is read, padded past the minimum.
+    const ihdr = Buffer.alloc(25);
+    ihdr.writeUInt32BE(13, 0);
+    ihdr.write('IHDR', 4);
+    ihdr.writeUInt32BE(300, 8);
+    ihdr.writeUInt32BE(400, 12);
+    const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), ihdr, Buffer.alloc(200, 1)]);
+
+    const out = await service.putGameImage({ uuid, file: { buffer: png, size: png.length, originalname: 'a.png', mimetype: 'image/png' }, actor: staff });
+    assert.match(out.image, /^\/api\/v1\/casino\/games\/image\/[a-z0-9]+\.png\?v=\d+$/);
+    const name = out.image.split('/').pop().split('?')[0];
+    const served = await service.artwork({ name });
+    assert.ok(served.data.equals(png));
+    const row = await models.Gisgamesnew.findOne({ where: { uuid }, raw: true });
+    assert.equal(row.image, out.image);
+
+    await assert.rejects(
+      () => service.putGameImage({ uuid, file: { buffer: Buffer.alloc(300, 0x41), size: 300, originalname: 'x.png' }, actor: staff }),
+      (err) => err.code === 'GAMES_NOT_AN_IMAGE'
+    );
+  });
+
   await t.test('a vendor with nothing pinned opens on its games in lobby order, pinned first once saved', async () => {
     const vendor = `${TAG}-OpenVendor`;
     const a = await seedGame({ provider: vendor, name: 'Oo first open game' });

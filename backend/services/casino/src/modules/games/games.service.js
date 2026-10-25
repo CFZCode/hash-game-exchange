@@ -33,6 +33,8 @@ const {
   isProviderDisabled,
 } = require('./providerSwitch');
 const { imageUpload, money, wagerCategory } = require('@ibitplay/common');
+// shortcut: the artwork script's own size reader, required across from backend/scripts; move it to a package if a third caller needs it.
+const { imageSize } = require('../../../../../scripts/lib/image-size');
 
 /** A provider logo is a small mark, not a hero image. */
 const LOGO_MAX_BYTES = 1024 * 1024;
@@ -1185,6 +1187,37 @@ class GamesService {
   // ══════════════════════════════════════════════════════════════════════
   //  Editing
   // ══════════════════════════════════════════════════════════════════════
+
+  /**
+   * A game's tile art from an uploaded file (the URL form is `updateImage`). The bytes are
+   * sniffed (PNG, JPEG or WebP, 1 MB), kept in `game_artwork` like fix-game-artwork.js's
+   * self-hosted art, and served at /api/v1/casino/games/image/<name>; `?v=` changes with each
+   * upload so a day-cached tile shows the new art at once.
+   */
+  async putGameImage({ uuid, file, actor }) {
+    const game = await this.models.Gisgamesnew.findOne({ where: { uuid }, attributes: ['uuid', 'name'], raw: true });
+    if (!game) throw E.NOT_FOUND({ uuid });
+    const upload = imageUpload.inspect(file, E, { maxBytes: LOGO_MAX_BYTES });
+    const name = `${String(uuid).toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 70)}${upload.extension}`;
+    const size = imageSize(upload.data) ?? { width: 0, height: 0 };
+    const image = `/api/v1/casino/games/image/${name}?v=${Date.now()}`;
+
+    await this.models.Gisgamesnew.sequelize.transaction(async (transaction) => {
+      await this.models.Gisgamesnew.sequelize.query(
+        `INSERT INTO game_artwork (game_uuid, image, name, data, content_type, byte_size, width, height, source, source_url, previous_image)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'admin-upload', $9, (SELECT image FROM gisgamesnew WHERE uuid = $1))
+         ON CONFLICT (game_uuid) DO UPDATE SET
+           image = EXCLUDED.image, name = EXCLUDED.name, data = EXCLUDED.data, content_type = EXCLUDED.content_type,
+           byte_size = EXCLUDED.byte_size, width = EXCLUDED.width, height = EXCLUDED.height,
+           source = EXCLUDED.source, source_url = EXCLUDED.source_url, updated_at = NOW()`,
+        { bind: [uuid, image, name, upload.data, upload.contentType, upload.byteSize, size.width, size.height, `staff:${actor?.id ?? ''}`], transaction }
+      );
+      await this.models.Gisgamesnew.update({ image }, { where: { uuid }, transaction });
+    });
+
+    this.logger?.info({ uuid, bytes: upload.byteSize, staffId: actor?.id }, 'Game image uploaded');
+    return { uuid, name: game.name, image };
+  }
 
   /**
    * @legacy PUT /api/gis/admin/gis/games/:uuid/image — unauthenticated.

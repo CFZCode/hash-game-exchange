@@ -84,6 +84,9 @@ function createControllers({ service }) {
     reorderCategories: asyncHandler(async (req, res) => response.ok(res, await service.reorderCategories(req.body))),
     deleteCategory: asyncHandler(async (req, res) => response.ok(res, await service.deleteCategory({ slug: req.params.slug, actor: req.staff }))),
 
+    putGameImage: asyncHandler(async (req, res) =>
+      response.ok(res, await service.putGameImage({ uuid: req.params.uuid, file: req.file, actor: req.staff }))
+    ),
     pickList: asyncHandler(async (req, res) => response.ok(res, await service.pickList(req.query))),
 
     /** @legacy GET /api/gis/admin/gis/games/search */
