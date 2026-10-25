@@ -65,3 +65,10 @@ Callbacks you sign and send to our own backend (a test harness that simulates a 
   - **Sports exchange:** INR stakes without a cap, including big single bets.
   - Every bet is placed from the main session, which the owner approves one action at a time; a sub-agent's bet is refused by the safety classifier.
   - Log every stake in `logs/qa/live-e2e-h2/`.
+
+- **2026-10-25 (run t2510, 5 new live players, referral chain)**, set by the owner in chat: full affiliate, locked rewards, withdrawal and INR calculation test.
+  - **Slotegrator (GIS) casino:** at most **10 USDT** staked across the whole run.
+  - **Original games:** at most **₹100 a bet** (INR).
+  - **Sports exchange:** INR, no cap; bets left to settle automatically from the result feed.
+  - **Deposits / withdrawals / KYC:** manual, approved in the live site admin.
+  - Bets placed from the main session. Scope: this run and these players only.
