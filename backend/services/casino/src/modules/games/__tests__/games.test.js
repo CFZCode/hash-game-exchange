@@ -443,6 +443,28 @@ test('game catalogue', async (t) => {
     assert.deepEqual(read.games.map((g) => g.uuid), [uuid]);
   });
 
+  await t.test('a vendor with nothing pinned opens on its games in lobby order, pinned first once saved', async () => {
+    const vendor = `${TAG}-OpenVendor`;
+    const a = await seedGame({ provider: vendor, name: 'Oo first open game' });
+    const b = await seedGame({ provider: vendor, name: 'Oo second open game' });
+
+    const before = await service.vendorPriority({ vendor });
+    assert.equal(before.pinned, 0);
+    assert.deepEqual(new Set(before.games.map((g) => g.uuid)), new Set([a, b]), 'not an empty table');
+
+    await service.setVendorPriority({ vendor, uuids: [b, a], actor: staff });
+    const after = await service.vendorPriority({ vendor });
+    assert.deepEqual(after.games.map((g) => g.uuid), [b, a]);
+    assert.equal(after.pinned, 2);
+
+    // Switched off, it is out of the lobby but the admin still sees and orders its games.
+    const c = await seedGame({ provider: vendor, name: 'Oo third open game' });
+    await service.updateProviderSetting({ name: vendor, enabled: false, actor: staff });
+    const off = await service.vendorPriority({ vendor });
+    assert.deepEqual(off.games.map((g) => g.uuid), [b, a, c]);
+    await service.updateProviderSetting({ name: vendor, enabled: true, actor: staff });
+  });
+
   await t.test('a type priority is matched with surrounding whitespace trimmed', async () => {
     const type = `${TAG}-live`;
     const uuid = await seedGame({ type });

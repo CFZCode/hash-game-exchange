@@ -34,6 +34,9 @@ type Props = {
   /** An extra per-row control (e.g. the tile image editor), drawn before the priority arrows. */
   rowAction?: (item: OrderedItem) => ReactNode
 
+  /** A list whose games are fixed (a vendor's or type's own): no Add games, no remove — only image and order. */
+  fixed?: boolean
+
   /** Another way to append games (e.g. Provider → Type → Game), drawn beside Add games. */
   addControl?: (add: (items: OrderedItem[]) => void, listed: Set<string>) => ReactNode
 }
@@ -153,7 +156,7 @@ const Picker = ({ search, exclude, onAdd, disabled }: { search: Props['search'];
 }
 
 /** An ordered list with move/remove/add and a dirty-gated save. The order is the whole value: saving PUTs every id. */
-const OrderedList = ({ items, loading, search, onSave, canWrite, max, header, emptyMessage = 'Nothing curated yet. Add games to build the list.', rowAction, addControl }: Props) => {
+const OrderedList = ({ items, loading, search, onSave, canWrite, max, header, emptyMessage = 'Nothing curated yet. Add games to build the list.', rowAction, addControl, fixed = false }: Props) => {
   const [edited, setEdited] = useState<OrderedItem[] | null>(null)
   const draft = useMemo(() => edited ?? items ?? [], [edited, items])
   const [saving, setSaving] = useState(false)
@@ -250,7 +253,7 @@ const OrderedList = ({ items, loading, search, onSave, canWrite, max, header, em
           {max ? ` / ${max}` : ''} games
         </Badge>
         {canWrite && addControl && <div className='order-last basis-full'>{addControl(add, ids)}</div>}
-        <Picker search={search} exclude={ids} disabled={!canWrite} onAdd={add} />
+        {!fixed && <Picker search={search} exclude={ids} disabled={!canWrite} onAdd={add} />}
         <Button variant='outline' disabled={!dirty || saving} onClick={() => setEdited(null)}>
           <RotateCcwIcon /> Reset
         </Button>
@@ -280,6 +283,7 @@ const OrderedList = ({ items, loading, search, onSave, canWrite, max, header, em
           <Button size='sm' variant='outline' disabled={!canWrite} onClick={() => moveSelected('bottom')}>
             <ArrowDownToLineIcon /> Move to bottom
           </Button>
+          {!fixed && (
           <Button
             size='sm'
             variant='outline'
@@ -292,6 +296,7 @@ const OrderedList = ({ items, loading, search, onSave, canWrite, max, header, em
           >
             <Trash2Icon /> Remove
           </Button>
+          )}
           <Button size='sm' variant='ghost' onClick={() => setSelected(new Set())}>
             Clear
           </Button>
@@ -411,9 +416,11 @@ const OrderedList = ({ items, loading, search, onSave, canWrite, max, header, em
                       <Button size='icon-sm' variant='ghost' disabled={!canWrite || i === draft.length - 1} onClick={() => move(i, draft.length - 1)} aria-label='Bottom'>
                         <ArrowDownToLineIcon />
                       </Button>
-                      <Button size='icon-sm' variant='ghost' className='text-destructive' disabled={!canWrite} onClick={() => setDraft(d => d.filter(x => x.id !== g.id))} aria-label='Remove'>
-                        <Trash2Icon />
-                      </Button>
+                      {!fixed && (
+                        <Button size='icon-sm' variant='ghost' className='text-destructive' disabled={!canWrite} onClick={() => setDraft(d => d.filter(x => x.id !== g.id))} aria-label='Remove'>
+                          <Trash2Icon />
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>

@@ -30,7 +30,7 @@ const GIS_COLLECTIONS = [
 
 const gisSearch = async (q: string) => (await api.get<GisGame[]>('admin/casino/games/catalogue/search', { q, limit: 100 })).map(gisItem)
 
-/** Settings → Providers Priority (zip jaisa): home ke GIS collections ka order. */
+/** Lobby curation › Home collection: the order of the four GIS home rows. */
 export const CollectionsTab = ({ picker = true }: { picker?: boolean }) => {
   const { can } = useSession()
   const [collection, setCollection] = useState('hot')
@@ -91,12 +91,13 @@ export const PriorityTab = ({ kind }: { kind: 'vendor' | 'type' }) => {
         </Select>
         {priority.data && (
           <span className='text-muted-foreground text-sm'>
+            {priority.data.games.length} games, in the order the site shows them.{' '}
             {priority.data.updated_at ? (
               <>
-                Pinned order saved <DateTime value={priority.data.updated_at} relative />
+                {priority.data.pinned ?? 0} pinned, saved <DateTime value={priority.data.updated_at} relative />.
               </>
             ) : (
-              'No pinned order — catalogue order applies.'
+              'Nothing pinned yet — drag or move games, then Save to pin this order.'
             )}
           </span>
         )}
@@ -105,9 +106,9 @@ export const PriorityTab = ({ kind }: { kind: 'vendor' | 'type' }) => {
       {options.data && options.data.length === 0 && <p className='text-muted-foreground text-sm'>The aggregator catalogue is empty. Sync games first (Game catalogue → Providers & sync).</p>}
       {priority.error && <ErrorState error={priority.error} />}
       {key ? (
-        <OrderedList items={items} loading={priority.isLoading} search={search} onSave={ids => save.mutateAsync(ids)} canWrite={can('casino:manage')} max={5000} rowAction={imageAction(priority.refetch)} header={<span className='font-medium capitalize'>{kind}: {key}</span>} />
+        <OrderedList fixed items={items} loading={priority.isLoading} search={search} onSave={ids => save.mutateAsync(ids)} canWrite={can('casino:manage')} max={5000} rowAction={imageAction(priority.refetch)} header={<span className='font-medium capitalize'>{kind}: {key}</span>} emptyMessage={`No games for this ${kind} in the lobby.`} />
       ) : (
-        <p className='text-muted-foreground text-sm'>Pick a {kind} to pin games to the top of its list.</p>
+        <p className='text-muted-foreground text-sm'>Pick a {kind} to see and order its games.</p>
       )}
     </div>
   )

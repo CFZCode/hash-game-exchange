@@ -715,12 +715,29 @@ class GamesService {
 
   /** @legacy GET /api/gis/admin/gis/priority/:vendor */
   async vendorPriority({ vendor }) {
-    return this.#readPriority(this.models.GisPrioritizedGames, 'vendor', vendor);
+    return this.#inSiteOrder(await this.#readPriority(this.models.GisPrioritizedGames, 'vendor', vendor), { provider: vendor });
   }
 
   /** @legacy GET /api/gis/admin/gis/type-priority/:type */
   async typePriority({ type }) {
-    return this.#readPriority(this.models.GisPrioritizedTypes, 'type', type);
+    return this.#inSiteOrder(await this.#readPriority(this.models.GisPrioritizedTypes, 'type', type.trim()), { type: type.trim() });
+  }
+
+  /**
+   * The admin edits the WHOLE list in the order the lobby shows it (pinned first, then the
+   * catalogue order), not only the pinned games — so a vendor with nothing pinned opens on its
+   * games rather than an empty table. `pinned` is how many of them are pinned. A switched-off
+   * provider is not in the lobby, so it gets its catalogue rows instead: pinned first, then by name.
+   */
+  async #inSiteOrder(read, filter) {
+    const pinned = read.games.length;
+    const site = await this.browse({ page: 1, limit: MAX_COLLECTION_SIZE, ...filter });
+    if (site.rows.length) return { ...read, pinned, games: site.rows };
+
+    const where = filter.provider ? { provider: { [Op.iLike]: filter.provider } } : { type: { [Op.iLike]: filter.type } };
+    const all = await this.models.Gisgamesnew.findAll({ where, attributes: [...GAME_SUMMARY_FIELDS], order: [['name', 'ASC']], limit: MAX_COLLECTION_SIZE, raw: true });
+    const seen = new Set(read.games.map((g) => g.uuid));
+    return { ...read, pinned, games: [...read.games, ...all.filter((g) => !seen.has(g.uuid))] };
   }
 
   /** @legacy POST /api/gis/admin/gis/priority/:vendor — unauthenticated. */
