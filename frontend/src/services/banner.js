@@ -1,6 +1,7 @@
 import { request, API_BASE, USE_FIXTURES } from './client';
 import ENDPOINTS, { PLATFORM } from './endpoints';
 import { TOP_BANNERS, FALLBACK_BANNERS } from '../pages/Home/Hero/banners';
+import { underAgentBase } from './agentBase';
 
 /* The signed-in hero carousel's feed.
  *
@@ -40,6 +41,19 @@ const normalise = (rows, hasSportsbook) =>
    Banners.tsx); `home_top_<n>` is this build's older name. Both are slides, so an upload from the
    admin reaches the strip whichever it used. */
 const SLIDE_PLACEMENT = /^(slider-|home_top_)\d+$/;
+/* Agent mode (/agent) has its own slides, `agent-slider-<n>` in the site admin: game banners into
+   the casino and sports, never a promotion (user, 2026-10-25). */
+const AGENT_SLIDE_PLACEMENT = /^agent-slider-\d+$/;
+/* Until the admin uploads agent slides, the four banners from the user's Figma (public/brand/agent). */
+const AGENT_DEFAULT_SLIDES = [['1', '/sports'], ['2', '/casino'], ['3', '/sports'], ['4', '/casino']].map(([n, linkUrl]) => ({
+  bannerId: `agent-slider-${n}`,
+  tagName: '',
+  title: '',
+  description: '',
+  buttonContent: '',
+  linkUrl,
+  imageUrl: `/brand/agent/slide-${n}.webp`,
+}));
 
 /* LIVE MODE BUILDS THE STRIP FROM THE PLATFORM'S ROWS ONLY. The captured slides in `banners.js`
  * are bc.game's own campaigns (Soaked by Sea Men, €20/€10 free spins, Knockoin, a $500 soccer
@@ -48,10 +62,10 @@ const SLIDE_PLACEMENT = /^(slider-|home_top_)\d+$/;
  * (`title`, `subtitle`, `cta`). No rows, a 500 or a refused fetch is an EMPTY strip, and the
  * carousel then renders nothing (Banner's `if (!count) return null`). Fixture mode keeps the
  * capture, which is the pixel reference. */
-const platformSlides = (answer) => {
+const platformSlides = (answer, placement = SLIDE_PLACEMENT) => {
   const rows = Array.isArray(answer) ? answer : (answer?.rows ?? []);
   return rows
-    .filter((row) => typeof row?.type === 'string' && SLIDE_PLACEMENT.test(row.type) && row.active !== false)
+    .filter((row) => typeof row?.type === 'string' && placement.test(row.type) && row.active !== false)
     .sort((x, y) => (x.sortOrder ?? 0) - (y.sortOrder ?? 0) || x.type.localeCompare(y.type, undefined, { numeric: true }))
     .map((row) => ({
       bannerId: row.type,
@@ -75,9 +89,13 @@ export const getHomeBanners = ({
   const slides = normalise(TOP_BANNERS, hasSportsbook);
 
   if (!USE_FIXTURES) {
+    const agent = underAgentBase();
     return Promise.resolve(request(PLATFORM.site.banners, { live: true, fixture: null }))
-      .then(platformSlides)
-      .catch(() => []);
+      .then((answer) => {
+        const rows = platformSlides(answer, agent ? AGENT_SLIDE_PLACEMENT : SLIDE_PLACEMENT);
+        return agent && !rows.length ? AGENT_DEFAULT_SLIDES : rows;
+      })
+      .catch(() => (agent ? AGENT_DEFAULT_SLIDES : []));
   }
 
   return request(ENDPOINTS.homeMainBanner({ bannerType, areaCode, uid, level, vip }), {

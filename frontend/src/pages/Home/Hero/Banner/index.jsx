@@ -442,9 +442,9 @@ const bannerAllowed = (gates, banner) => {
   /* Not answered yet: the strip is showing its skeleton anyway (see `feedLoading`), and keeping
      the slides counted keeps the early `!count` return from collapsing the box meanwhile. */
   if (!gates.ready) return true;
-  // An agent's player gets no banner at all: every slide is promotion art (user, 2026-10-18).
-  if (gates.agentPlayer) return false;
   const link = String(banner?.linkUrl ?? '');
+  // An agent's player gets only the agent slides (game banners, services/banner.js), never promotions.
+  if (gates.agentPlayer) return String(banner?.bannerId ?? '').startsWith('agent-') && gates.routeOn(link);
   if (PROMO_LINK.test(link) && !gates.on('promotions')) return false;
   // A slide into one game goes with that game's section (Originals or the casino).
   const game = link.match(/^\/game\/([^/?#]+)/)?.[1];

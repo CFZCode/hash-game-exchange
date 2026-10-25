@@ -38,6 +38,11 @@ const PLACEMENTS = [
     label: `Promo slider · slide ${n}`,
     hint: 'With a title: copy on the left, the image as art on the right (transparent cut-out, about 700×700). Without a title: a finished banner covering the card, about 900×420.'
   })),
+  ...[1, 2, 3, 4, 5, 6].map(n => ({
+    value: `agent-slider-${n}`,
+    label: `Agent mode slider · slide ${n}`,
+    hint: 'Shown only to agent players (/agent), on home and casino. A game banner, never a promotion: link it to /casino or /sports. Art on the right of a dark card, about 840×420. With none uploaded the site shows its four built-in game banners.'
+  })),
   { value: 'casino', label: 'Casino · wide promo banner', hint: 'A finished banner across the casino lobby, about 1280×260.' }
 ] as const
 
