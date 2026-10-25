@@ -89,6 +89,8 @@ export const GATES = {
   rollover: { notAgentPlayer: true },
 };
 
+const AGENT_PLAYER_OFF = { deposit: false, withdraw: false, swap: false, vault: false, promotions: false, tips: false, kyc: false };
+
 /** Path prefix → gate, most specific first. History routes (transaction, bet history,
  *  deposit/withdraw detail) are deliberately absent: they stay readable for everyone. */
 export const ROUTES = [
@@ -160,7 +162,10 @@ const railOpen = (mode, channel) => mode === 'both' || mode === channel;
  *
  * @param {{flags?: object|null, features?: Array|null, capabilities?: object|null, ready?: boolean}} reads
  */
-export function makeGates({ flags, features, capabilities, ready = true } = {}) {
+export function makeGates({ flags, features, capabilities: read, ready = true } = {}) {
+  /* /agent is only for an agent's players, so even signed out it shows what they get: the backend's
+     agentPlayers.js switches these off for them (and a signed-in non-agent player is moved out). */
+  const capabilities = underAgentBase() ? { ...read, ...AGENT_PLAYER_OFF } : read;
   const list = Array.isArray(features) ? features : null;
   const byKey = new Map((list ?? []).map((f) => [f.feature, f]));
   const flagMap = flags && typeof flags === 'object' ? flags : null;

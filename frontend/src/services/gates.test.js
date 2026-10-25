@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { gateOf, makeGates, walletCoins } from './gates';
 
 const AGENT = { promotions: false, vault: false, deposit: false, swap: false, withdraw: false, tips: false, kyc: false };
@@ -54,5 +54,15 @@ describe('CCPayment deposit (user, 2026-10-21)', () => {
     expect(makeGates({ features: mode('automatic') }).autoDeposit()).toBe(true);
     expect(makeGates({ features: mode('manual') }).autoDeposit()).toBe(false);
     expect(makeGates({ features: mode('both'), capabilities: AGENT }).autoDeposit()).toBe(false);
+  });
+  afterEach(() => vi.unstubAllGlobals());
+  it('/agent shows an agent player\'s site even signed out: no VIP, promotions, referral or sign-up', () => {
+    vi.stubGlobal('location', { pathname: '/agent' });
+    const gates = makeGates({});
+    expect(gates.agentPlayer).toBe(true);
+    for (const gate of ['vip', 'promotions', 'affiliate', 'deposit']) expect(gates.on(gate)).toBe(false);
+    expect(gates.canSignUp()).toBe(false);
+    vi.stubGlobal('location', { pathname: '/' });
+    expect(makeGates({}).on('vip')).toBe(true);
   });
 });

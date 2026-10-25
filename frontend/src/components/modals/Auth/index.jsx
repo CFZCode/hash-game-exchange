@@ -33,6 +33,7 @@ import './Auth.css';
 import '../../shared/DialogShell/DialogShell.css';
 import { PASSKEY_ENABLED, SOCIAL_LOGINS } from '../../../config/hiddenFeatures';
 import { startGoogleLogin, useGoogleLogin } from '../../../services/googleAuth';
+import { underAgentBase } from '../../../services/agentBase';
 
 /* The sign-in / sign-up dialog.
  *
@@ -225,8 +226,10 @@ function DirectRow({ heading, children }) {
 }
 
 function SignInForm({ onSubmit, pending, error, onForgot }) {
-  // Google shows only while the backend has its keys.
-  const googleOn = useGoogleLogin();
+  /* /agent: an agent's players sign in with the username their agent gave them, so no Email tab
+     and no Google (which would open a new account). Google shows only while the backend has its keys. */
+  const agentSite = underAgentBase();
+  const googleOn = useGoogleLogin() && !agentSite;
   const thirdParty = SHOWN_THIRD_PARTY.filter((item) => item.label !== 'Google' || googleOn);
   /* Username vs Email — THIS BUILD'S TABS (user's request, 2026-10-16), in place of bc.game's
      Password / One-time Code: the platform has no one-time code, and its login takes either an
@@ -249,6 +252,7 @@ function SignInForm({ onSubmit, pending, error, onForgot }) {
 
   return (
     <>
+      {!agentSite && (
       <div
         role="tablist"
         className="scroll-x tabs-title hide-scroll"
@@ -276,6 +280,7 @@ function SignInForm({ onSubmit, pending, error, onForgot }) {
         </div>
         <div className="tabs-indicator" />
       </div>
+      )}
 
       <div className="tabs-content bg-transparent">
         {/* One form for both tabs — the Password capture's structure. bc.game's One-time Code

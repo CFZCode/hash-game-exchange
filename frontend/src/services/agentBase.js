@@ -3,7 +3,7 @@
    the URL the browser opened; GatesContext moves a signed-in player to the right side of it. */
 export const AGENT_BASE = '/agent';
 
-export const underAgentBase = (pathname = window.location.pathname) =>
+export const underAgentBase = (pathname = globalThis.location?.pathname ?? '') =>
   pathname === AGENT_BASE || pathname.startsWith(`${AGENT_BASE}/`);
 
 /* The same page on the other side of the base: in for an agent's player, out for everyone else. */

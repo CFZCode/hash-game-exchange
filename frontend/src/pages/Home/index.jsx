@@ -120,7 +120,8 @@ export default function Home() {
        Padding rather than margin, so no trailing margin from the last section can collapse into
        it. */
     <div ref={setPage} className="home-page lg:pb-8">
-      {gates.flag('home_heroSection') && <Hero />}
+      {/* No hero for an agent's players: its banners and sign-up art are promotions. */}
+      {gates.flag('home_heroSection') && !gates.agentPlayer && <Hero />}
       {/* ABOVE Recent Big Wins, which is where `Dn` puts it: that component is
           [wu, Iu, Ao] — the Continue Playing / Favorites block, Game of the Week (Korea only,
           not built), then Recent Big Wins — and `ng()` inserts the whole of it as the FIRST
