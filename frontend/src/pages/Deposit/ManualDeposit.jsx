@@ -4,7 +4,7 @@ import { copyWithToast } from '../../utils/clipboard';
 import { showToast, toastError } from '../../components/shared/Toast/toast';
 import { getBankDetails, readBankQr, submitFiatDeposit } from '../../services/fiatDeposit';
 import { printCurrency } from '../../utils/currency';
-import { depositBonusConfig, extraBonusAmount } from './deposit';
+import { depositBonusConfig } from './deposit';
 import { useSelectedCurrency } from '../../hooks/useSelectedCurrency';
 import QrCode from './QrCode';
 import useResource from '../../hooks/useResource';
@@ -104,7 +104,6 @@ export default function ManualDeposit({ currency, crypto = false }) {
   useResource(getRechargeBonusConfig);
   const walletCode = crypto ? coin : `${coin}FIAT`;
   const bonus = depositBonusConfig(walletCode);
-  const extra = extraBonusAmount(amount, walletCode);
   const site = useSelectedCurrency();
   const fiat = (value) => printCurrency(value, walletCode, { target: walletCode });
 
@@ -200,8 +199,6 @@ export default function ManualDeposit({ currency, crypto = false }) {
           <div className="mb-1 mt-5 text-secondary">Deposit Amount ({coin})</div>
           <div className="input bg-input_bright text-base">
             <input inputMode="decimal" name="amount" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))} />
-            {/* FiatTab's `iC` line: zero below the bonus minimum, so it disappears rather than shrinking. */}
-            {extra > 0 && <div className="px-2 font-extrabold text-success">Extra +{fiat(extra)}</div>}
           </div>
 
           {noMatch && (

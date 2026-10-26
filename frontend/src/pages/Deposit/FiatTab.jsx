@@ -4,7 +4,7 @@ import { useSession } from '../../context/session';
 import { getCurrency } from '../../data/currencies';
 import { ownerKind } from '../../services/currencies';
 import { DEPOSIT_FIATS } from '../../config/hiddenFeatures';
-import { getAlias, printCurrency, toFiatStr } from '../../utils/currency';
+import { getAlias, toFiatStr } from '../../utils/currency';
 import { coinIcon } from '../../utils/coinArt';
 import { useIsDialog } from '../../context/dialogRoute';
 import SevenDayBanner from './SevenDayBanner';
@@ -36,7 +36,6 @@ import {
   channelsFor,
   chipBonusConfig,
   depositNotes,
-  extraBonusAmount,
   readF2payMethods,
   groupInt,
   initialAmount,
@@ -455,12 +454,6 @@ export default function FiatTab({ onDepositCrypto }) {
     setAmount(null);
   };
 
-  const extra = extraBonusAmount(shownAmount, currency);
-  /* The target is forced to the currency being deposited rather than the account's display one:
-     what this figure promises is what will be credited in the currency you are paying in. */
-  const money = (value) =>
-    printCurrency(value, currency, { target: currency, settings: session.setting });
-
   /* `s()` in `yD`: modes 0/6/8/10 open a payment window and 5/15 an iframe; either way the
      button announces the destination. Anything else is a plain "Deposit". */
   const newWindow = channel && [0, 5, 6, 8, 10, 15].includes(channel.mode);
@@ -613,13 +606,7 @@ export default function FiatTab({ onDepositCrypto }) {
               min={0}
               max={Number(channel.maxDepositAmount)}
               onChange={setAmount}
-            >
-              {/* `iC` — zero below the bonus minimum rather than a smaller bonus, so the line
-                  disappears entirely if you type 500 into an INR box. */}
-              {extra > 0 && (
-                <div className="px-2 font-extrabold text-success">Extra +{money(extra)}</div>
-              )}
-            </AmountInput>
+            />
 
             <QuickAmounts
               amounts={amounts}
