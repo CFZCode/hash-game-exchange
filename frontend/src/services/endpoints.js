@@ -777,6 +777,8 @@ export const PLATFORM = {
       login: '/api/v1/user/auth/login',
       refresh: '/api/v1/user/auth/refresh',
       logout: '/api/v1/user/auth/logout',
+      /* Idle logout (owner + Super Admin switch): asked once, at login's `idleCheckAt`. */
+      idleCheck: '/api/v1/user/auth/idle-check',
       me: '/api/v1/user/auth/me',
       sessions: '/api/v1/user/auth/sessions',
       changePassword: '/api/v1/user/auth/change-password',

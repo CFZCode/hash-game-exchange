@@ -3,7 +3,7 @@ import { loadCapabilities } from './gates';
 import { getSiteConfig, isCurrencyEnabled } from './siteConfig';
 import { isCurrencyListed, loadEnabledCurrencies } from './currencies';
 import { PLATFORM } from './endpoints';
-import { clearTokens, setTokens } from './tokens';
+import { clearIdleCheck, clearTokens, notifyAuthExpired, onIdleCheck, setTokens } from './tokens';
 import { ACCOUNT_DEFAULTS, SIGNED_IN, SIGNED_IN_BALANCES, VISITOR } from '../context/account';
 import { vipLevelRow } from '../data/vipConfig';
 import { pushLogin, pushLogout } from './onesignal';
@@ -288,6 +288,14 @@ function toAccount(profile, rows, previous, prefs, bonus, siteDefault = null) {
     defaultCurrency: siteDefault,
   };
 }
+
+/* Idle logout's one check (see `tokens.js`): no bet since sign-in signs the tab out. A failed call
+   keeps the time, so the next page load asks again. */
+onIdleCheck(async () => {
+  const result = await Promise.resolve(request(PLATFORM.user.auth.idleCheck, { live: true, method: 'POST', fixture: null })).catch(() => null);
+  if (result?.signedOut) notifyAuthExpired('expired');
+  else if (result) clearIdleCheck();
+});
 
 /* ── The reads ─────────────────────────────────────────────────────────────────────────────
  *

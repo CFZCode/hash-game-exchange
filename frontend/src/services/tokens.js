@@ -107,24 +107,41 @@ function claims() {
  * so it cannot be used to decide when to refresh — and the access token's own expiry is inside
  * a JWT this build deliberately does not parse. Refreshing is driven by a 401 instead, which is
  * the server's answer rather than our guess at it; see `client.js`.
+ *
+ * A sign-in also answers `idleCheckAt` (null when idle logout is off); a refresh does not, so the
+ * sign-in's time is kept across rotations.
  */
-export function setTokens({ accessToken, refreshToken, expiresAt } = {}) {
+export function setTokens({ accessToken, refreshToken, expiresAt, idleCheckAt } = {}) {
   const was = Boolean(current?.accessToken);
-  current = accessToken ? { accessToken, refreshToken: refreshToken ?? null, expiresAt: expiresAt ?? null } : null;
+  const checkAt = idleCheckAt !== undefined ? idleCheckAt : current?.idleCheckAt ?? null;
+  current = accessToken ? { accessToken, refreshToken: refreshToken ?? null, expiresAt: expiresAt ?? null, idleCheckAt: checkAt } : null;
   write(current);
-  scheduleSignOut();
+  scheduleIdleCheck();
   if (was !== Boolean(current)) notifySessionChanged();
 }
 
-/* The session's end (`expiresAt` from login / refresh). With the admin's "Sign players out after"
-   on it is minutes away, and the tab signs out on the dot rather than at its next 401. A 30-day
-   end is past setTimeout's 24.8-day ceiling (it would fire at once), so that one is left to the 401. */
-let signOutTimer = 0;
-function scheduleSignOut() {
-  clearTimeout(signOutTimer);
-  const left = current?.expiresAt ? new Date(current.expiresAt).getTime() - Date.now() : NaN;
-  if (!(left < 2 ** 31 - 1)) return;
-  signOutTimer = setTimeout(() => notifyAuthExpired('expired'), Math.max(0, left));
+/* Idle logout (owner + Super Admin switch): at `idleCheckAt`, 5 minutes after sign-in, the handler
+   `auth.js` registers asks the backend once whether the player bet; it signs out or calls
+   `clearIdleCheck`. A reload restores the time, so the check is not skipped by reloading. */
+let idleTimer = 0;
+let idleHandler = null;
+function scheduleIdleCheck() {
+  clearTimeout(idleTimer);
+  const at = current?.idleCheckAt;
+  if (!at || !idleHandler) return;
+  idleTimer = setTimeout(idleHandler, Math.max(0, new Date(at).getTime() - Date.now()));
+}
+
+export function onIdleCheck(fn) {
+  idleHandler = fn;
+  scheduleIdleCheck();
+}
+
+/* The check ran and the player stays: it never runs again for this sign-in. */
+export function clearIdleCheck() {
+  if (!current?.idleCheckAt) return;
+  current = { ...current, idleCheckAt: null };
+  write(current);
 }
 
 /**
@@ -136,14 +153,14 @@ export function adoptStoredTokens() {
   const stored = read();
   if (!stored?.accessToken || !stored.refreshToken || stored.refreshToken === current?.refreshToken) return false;
   current = stored;
-  scheduleSignOut();
+  scheduleIdleCheck();
   return true;
 }
 
 export function clearTokens() {
   const was = Boolean(current?.accessToken);
   current = null;
-  clearTimeout(signOutTimer);
+  clearTimeout(idleTimer);
   write(null);
   if (was) notifySessionChanged();
 }
@@ -205,6 +222,3 @@ export function notifyAuthExpired(reason) {
     }
   }
 }
-
-// A reload restores the stored session, and its end with it.
-scheduleSignOut();
