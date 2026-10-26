@@ -15,6 +15,14 @@ Format:
 
 ---
 
+## 2026-10-26 — Owner panel: payment methods ab entitlements API me (alag route hataya)
+**Kya kiya:** Owner panel ka `GET /api/owner/entitlements` ab document ke saath `siteMethods` bhi deta hai (site ke `payment_methods` rows: gateway, currency, code, ownerEnabled, siteEnabled, addedBy, `source` / `reason`). Alag route `GET /api/owner/payment-methods` hata diya; Features screen ka F2Pay methods editor ab ek hi call padhta hai. `SiteMethods` type `lib/entitlements/types.ts` me. Super Admin ka `admin/site-config/payment-gateways` pehle se methods ko har gateway ki currencies ke andar deta hai — wahan koi alag API nahi thi, badla nahi.
+**Kyun:** User: `/owner/api/owner/payment-methods` ka data usi API me aaye jisse payment gateway ka baaki data aata hai, merge karo, alag API nahi.
+**Files / jagah:** owner-panel/src/app/api/owner/entitlements/route.ts, owner-panel/src/app/api/owner/payment-methods/route.ts (deleted), owner-panel/src/lib/entitlements/{siteMethods.ts,types.ts}, owner-panel/src/views/entitlements/Entitlements.tsx
+**Notes / pending:** Live: owner-panel build + parker-owner-panel restart. Live check: signed-in `GET /owner/api/owner/entitlements` me `siteMethods` (f2pay INR UpiMixed, USDT PI_USDT_TRX), purana route 404. Coins / Branding screens bhi yahi GET padhte hain — ab unke load pe bhi site ka methods read hota hai (4 s timeout, fail hone pe khaali list). Tests 66/67 (siteUi pehle se fail). Backend nahi badla. Push nahi kiya.
+
+---
+
 ## 2026-10-26 — Branch casino bets: vendor naam hataye + push
 **Kya kiya:** Branch view ke casino bets "Provider" column me Slotegrator / JSGames / Seamless likha aata tha — ab shared `casinoSourceLabel` (Casino feed 1/2/3). Origin ke 2 naye commits par rebase karke push kiya.
 **Kyun:** Admin me vendor ka naam nahi dikhna chahiye (admin-no-vendor-names). User: "code push krde".
