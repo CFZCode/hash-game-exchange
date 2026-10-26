@@ -17,7 +17,7 @@ import Logo from '@/components/shared/Logo'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -29,6 +29,7 @@ import { siteConfig } from '@/configs/site'
 // Lib Imports
 import { ApiError, errorMessage, request } from '@/lib/api/client'
 import { safeNext } from '@/lib/safeNext'
+import { check, cleanErrors } from '@/lib/validate'
 
 type Mode = 'staff' | 'executive'
 
@@ -48,19 +49,30 @@ const Login = () => {
   const [mustChange, setMustChange] = useState(false)
   const [newPassword, setNewPassword] = useState('')
 
+  // Live field checks: a field's message shows once it has been left (blur) or a submit was tried.
+  const [touched, setTouched] = useState<Record<string, boolean>>({})
+  const [tried, setTried] = useState(false)
+
+  const fieldErrors = cleanErrors({
+    identifier: mode === 'staff' ? check.email(identifier, 'Email address') : check.required(identifier, 'Username'),
+    password: check.required(password, 'Password'),
+    newPassword: mustChange
+      ? newPassword.length < 12
+        ? 'The new password must be at least 12 characters.'
+        : newPassword === password && 'Choose a new password different from the current one.'
+      : undefined,
+    code: needsCode && code && !/^\d{6}$/.test(code) ? 'The two-factor code is the 6 digits from your authenticator app.' : undefined
+  })
+
+  const shown = (key: string) => (tried || touched[key] ? fieldErrors[key] : undefined)
+  const leave = (key: string) => () => setTouched(t => ({ ...t, [key]: true }))
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+    setTried(true)
 
-    if (!identifier.trim() || !password)
-      return setError(`Enter your ${mode === 'staff' ? 'email' : 'username'} and password.`)
-    if (needsCode && code && !/^\d{6}$/.test(code.trim()))
-      return setError('The two-factor code is the 6 digits from your authenticator app.')
-
-    if (mustChange) {
-      if (newPassword.length < 12) return setError('The new password must be at least 12 characters.')
-      if (newPassword === password) return setError('Choose a new password different from the current one.')
-    }
+    if (Object.keys(fieldErrors).length) return
 
     setBusy(true)
 
@@ -138,6 +150,7 @@ const Login = () => {
       }
 
       setError(errorMessage(err))
+      toast.error(errorMessage(err))
     } finally {
       setBusy(false)
     }
@@ -194,9 +207,9 @@ const Login = () => {
               </TabsList>
             </Tabs>
 
-            <form onSubmit={submit}>
+            <form onSubmit={submit} noValidate>
               <FieldGroup className='gap-4'>
-                <Field className='gap-2'>
+                <Field className='gap-2' data-invalid={!!shown('identifier')}>
                   <FieldLabel htmlFor='identifier'>
                     {mode === 'staff' ? 'Email address' : 'Executive username'}
                   </FieldLabel>
@@ -206,12 +219,15 @@ const Login = () => {
                     autoComplete='username'
                     value={identifier}
                     onChange={e => setIdentifier(e.target.value)}
+                    onBlur={leave('identifier')}
+                    aria-invalid={!!shown('identifier')}
                     required
                     placeholder={mode === 'staff' ? 'admin@example.com' : 'username'}
                   />
+                  {shown('identifier') && <FieldError>{shown('identifier')}</FieldError>}
                 </Field>
 
-                <Field className='w-full gap-2'>
+                <Field className='w-full gap-2' data-invalid={!!shown('password')}>
                   <FieldLabel htmlFor='password'>{mustChange ? 'Current password' : 'Password'}</FieldLabel>
                   <InputGroup>
                     <InputGroupInput
@@ -220,6 +236,8 @@ const Login = () => {
                       autoComplete='current-password'
                       value={password}
                       onChange={e => setPassword(e.target.value)}
+                      onBlur={leave('password')}
+                      aria-invalid={!!shown('password')}
                       required
                       placeholder='••••••••••••'
                     />
@@ -236,10 +254,11 @@ const Login = () => {
                       </Button>
                     </InputGroupAddon>
                   </InputGroup>
+                  {shown('password') && <FieldError>{shown('password')}</FieldError>}
                 </Field>
 
                 {mustChange && (
-                  <Field className='gap-2'>
+                  <Field className='gap-2' data-invalid={!!shown('newPassword')}>
                     <FieldLabel htmlFor='newPassword'>New password</FieldLabel>
                     <Input
                       id='newPassword'
@@ -247,14 +266,17 @@ const Login = () => {
                       autoComplete='new-password'
                       value={newPassword}
                       onChange={e => setNewPassword(e.target.value)}
+                      onBlur={leave('newPassword')}
+                      aria-invalid={!!shown('newPassword')}
                       required
-                      minLength={8}
+                      minLength={12}
                     />
+                    {shown('newPassword') && <FieldError>{shown('newPassword')}</FieldError>}
                   </Field>
                 )}
 
                 {needsCode && (
-                  <Field className='gap-2'>
+                  <Field className='gap-2' data-invalid={!!shown('code')}>
                     <FieldLabel htmlFor='code'>Authenticator code</FieldLabel>
                     <Input
                       id='code'
@@ -263,9 +285,12 @@ const Login = () => {
                       maxLength={6}
                       value={code}
                       onChange={e => setCode(e.target.value.replace(/\D/g, ''))}
+                      onBlur={leave('code')}
+                      aria-invalid={!!shown('code')}
                       autoFocus
                       placeholder='123456'
                     />
+                    {shown('code') && <FieldError>{shown('code')}</FieldError>}
                   </Field>
                 )}
 
