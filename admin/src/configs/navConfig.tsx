@@ -204,6 +204,9 @@ export type MenuLeafSubItem = {
 
   /** A direct-user screen: only the Super Admin and its executives (`actor.direct`). */
   direct?: boolean
+
+  /** Hidden unless this owner on/off policy (`branch_management`, …) is on. */
+  policy?: string
 }
 
 export type MenuGroupSubItem = {
@@ -238,6 +241,9 @@ export type MenuItem = {
 
   /** Staff's own logins only — an executive session never sees it. */
   notExecutive?: boolean
+
+  /** Hidden unless this owner on/off policy (`branch_management`, …) is on. */
+  policy?: string
 } & (
   | {
       href: string
@@ -317,6 +323,16 @@ export const navItems: NavItem[] = [
       { icon: 'TrendingUp', label: 'Total Profit Loss', href: '/exchange/reports/total-profit-loss', ownerFlag: 'sportsexchange', permission: 'reports:read' },
       { icon: 'UserRoundCheck', label: 'User Win Loss', href: '/exchange/reports/user-win-loss', ownerFlag: 'sportsexchange', permission: 'reports:read' },
       { icon: 'Lock', label: 'General Lock', href: '/exchange/reports/general-lock', ownerFlag: 'sportsexchange', permission: 'reports:read' }
+    ]
+  },
+  {
+    // Owner policy `branch_management`: branches with their own login (/branch), Super Admin only.
+    groupLabel: 'Branch Management',
+    groupIcon: 'Building2',
+    collapsible: true,
+    items: [
+      { icon: 'Building2', label: 'Branches', href: '/branches', activePath: '/branches', permission: 'reports:read', direct: true, policy: 'branch_management' } as MenuItem,
+      { icon: 'ChartColumn', label: 'Branch Report', href: '/branch-report', permission: 'reports:read', direct: true, policy: 'branch_management' }
     ]
   },
   {
@@ -615,6 +631,9 @@ export type NavMarks = {
 
   /** Staff's own logins only — an executive session never sees it (e.g. managing executives). */
   notExecutive?: boolean
+
+  /** Hidden unless this owner on/off policy (`branch_management`, …) is on. */
+  policy?: string
 }
 
 type NavEntry = NavMarks & { href?: string; childItems?: MenuSubItem[] }

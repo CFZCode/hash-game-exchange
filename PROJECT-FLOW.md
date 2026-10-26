@@ -73,6 +73,16 @@ Reference: `admin-structure.zip` → adminpanel/src/components/users. Teen tab (
 - TargetX: `turnover_settings` (default, 3x) / `turnover_targets` (user ka apna + lock). "Update All TargetX" locked users ko chhod ke sabka. API `admin/turnover-report` (naya). Withdrawal rules pe asar nahi.
 - Redeem Codes = purana `/redeem-codes`, ab sidebar Main me.
 
+## 3f. Branch Management (owner switch)
+
+- **Switch:** owner panel → Features & plan → **Branch management** (policy `branch_management`, `off` default). Off = admin menu chhupa, saari branch APIs 403 `BRANCH_DISABLED`, branch login band.
+- **Branch** = `branches` table (migration 159) ka login, **staff row nahi** (staff tree, agent ladder, sports wallet me kabhi nahi dikhta). Super Admin banata hai: name + username + password.
+- **Branch ke players** = normal **direct users** (`parent_staff_id IS NULL`) + `users.branch_id`. Site pe khud deposit / withdraw karte hain, promotions milte hain; Users → Direct Users me bhi dikhte hain. Branch sirf ID banata hai, paisa nahi hilata.
+- **Super Admin** (sidebar **Branch Management**, `direct` + `reports:read`, writes `staff:write`, sirf Super Admin / uske executives): Branches `/branches` (create, rename, active/inactive, change password, View) → `/branches/:id` (branch jo dekhta hai wahi); Branch Report `/branch-report` (saari branches ek period me + total). API `admin/branches/*` (module `services/admin/src/modules/branches`).
+- **Branch panel:** `/branch/login` → `/branch` (apna cookie `<SESSION_COOKIE_NAME>_branch`, apna sidebar, staff ka nahi). Sidebar: Dashboard (totals), Users (list + Create ID; player page `/branch/users/:id` = profile, balance + niche wale saare reports usi player ke), Deposits / Withdrawals (har rail, har status, payment method + reference + details — user-service ki rail list `/internal/user/history/branch`), Originals / Casino / Sports (statements module ki bet lists, `betsFor`; originals = in-house + Original Games), Statement (`mssports.point_ledger_direct`). Har report: date + Player ID filter. API `admin/branches/portal/*` (`public` audience, apna branch token `TOKEN_TYPES.BRANCH`, key admin key se derive). Super Admin ka `/branches/:id` me wahi sab tabs, player page `/branches/:id/users/:userId`.
+- **Numbers:** Dashboard ka hi engine (`DashboardStatsService` + `branchId`), isliye branch ke figures Dashboard se kabhi alag nahi.
+- **Inactive / password change / logout** = `branches.token_version` +1 → branch turant signed out. Inactive branch ke players normal khelte rehte hain (user, 2026-10-26).
+
 ## 4. Paisa / wallet
 
 - Sabka balance `credits` table me hai: player = `uid`, staff = `staff_id`, owner = `staff_id` (OWNER).
