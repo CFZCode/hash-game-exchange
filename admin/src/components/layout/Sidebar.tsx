@@ -111,6 +111,7 @@ const GROUP_SUBTITLES: Record<string, string> = {
   Finance: 'Payments, banks and ledgers',
   Promotions: 'Bonuses, VIP, races and codes',
   Casino: 'Providers, games and lobby',
+  'Original Games': 'Our own games and settings',
   Team: 'Staff and roles',
   Content: 'Banners, pages and messages',
   Reports: 'Profit, turnover and audits',
