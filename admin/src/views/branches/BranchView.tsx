@@ -22,6 +22,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useApi, useApiMutation, useListState, usePagedApi } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
+import { casinoSourceLabel } from '@/lib/casinoSource'
 import { check } from '@/lib/validate'
 import { defaultRange } from '@/views/exchange/reports/reportKit'
 
@@ -112,7 +113,6 @@ const CATEGORIES = ['ALL', 'DEPOSIT', 'WITHDRAW', 'SPORTS', 'CASINO', 'ORIGINAL_
 const MONEY_STATUSES = ['pending', 'approved', 'success', 'paid', 'completed', 'rejected', 'failed']
 
 const METHOD_LABELS: Record<string, string> = { crypto: 'Crypto', manual: 'Bank / manual', apay: 'A-Pay', waypay: 'WayPay', f2pay: 'F2Pay' }
-const SOURCE_LABELS: Record<string, string> = { inhouse: 'Original', og: 'Original Games', gis: 'Slotegrator', jsgamesv2: 'JSGames', seamless: 'Seamless' }
 
 /** `{ from, to }` days (to included) as the half-open window the totals routes take. */
 export const windowOf = (range: { from: string; to: string }) => ({
@@ -408,7 +408,7 @@ const casinoColumns = (withPlayer: boolean): Column<CasinoBet>[] => [
   { key: 'ts', header: 'Date', cell: b => <DateTime value={b.ts} /> },
   ...(withPlayer ? [{ key: 'user', header: 'Player', cell: (b: CasinoBet) => <span className='text-sm'>{b.user}</span> }] : []),
   { key: 'game', header: 'Game', cell: b => <span className='text-sm'>{b.game ?? '—'}</span> },
-  { key: 'source', header: 'Provider', cell: b => <Badge variant='outline'>{SOURCE_LABELS[b.source] ?? b.source}</Badge> },
+  { key: 'source', header: 'Provider', cell: b => <Badge variant='outline'>{casinoSourceLabel(b.source)}</Badge> },
   { key: 'stake', header: 'Stake', align: 'right', cell: b => (b.stake == null ? '—' : <Money value={b.stake} currency={b.currency} />) },
   { key: 'amount', header: 'Wallet move', align: 'right', cell: b => (b.amount == null ? '—' : <Money value={b.amount} currency={b.currency} signed />) },
   { key: 'status', header: 'Status', cell: b => (b.status ? <StatusBadge value={b.status} /> : '—') }

@@ -15,6 +15,12 @@ Format:
 
 ---
 
+## 2026-10-26 — Branch casino bets: vendor naam hataye + push
+**Kya kiya:** Branch view ke casino bets "Provider" column me Slotegrator / JSGames / Seamless likha aata tha — ab shared `casinoSourceLabel` (Casino feed 1/2/3). Origin ke 2 naye commits par rebase karke push kiya.
+**Kyun:** Admin me vendor ka naam nahi dikhna chahiye (admin-no-vendor-names). User: "code push krde".
+**Files / jagah:** admin/src/views/branches/BranchView.tsx
+**Notes / pending:** Live: admin build + parker-admin restart.
+
 ## 2026-10-26 — Branch panel: sidebar + Users / Deposits / Withdrawals / Originals / Casino / Sports / Statement
 **Kya kiya:** Branch panel (`/branch`) ko apna sidebar diya (mobile pe ☰). Naye reports, sirf branch ke direct players: Deposits / Withdrawals (har rail, har status, payment method, reference, details — user-service `transaction-history` me `branchId` filter + internal route `GET /internal/user/history/branch`, internalAcl me admin-service ko allow), Originals / Casino / Sports (StatementsService `betsFor(ids, { kind, sources })`, casino union me `sources` filter), player page (profile + balance + saare reports us player ke). Branch module me routes `players/:userId`, `deposits`, `withdrawals`, `bets?kind=` (portal + Super Admin dono). Super Admin ka `/branches/:id` ab saare tabs + `/branches/:id/users/:userId`.
 **Kyun:** User: "branch panel in side bar where we can see users, deposite withdraw reports payment method and details report regarding original, casino, sports and all history … the branch can see all data of his user properly".
