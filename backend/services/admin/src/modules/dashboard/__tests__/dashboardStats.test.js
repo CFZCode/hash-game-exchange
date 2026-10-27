@@ -231,11 +231,12 @@ test('dashboard stats against a database', async (t) => {
     assert.equal(r.totals.casinoWagered, '0.00000000');
   });
 
-  await t.test('without a currency the figures are converted to USD at the current rate', async () => {
+  await t.test('without a currency the figures are converted to the site\'s default coin at the current rate', async () => {
     const r = await service.series({ actor: { id: ownerId }, ...window, granularity: 'week' });
 
     assert.equal(r.converted, true);
-    assert.equal(r.currency, 'USD');
+    // The owner's default_currency, USDT when unset (reportingCurrency); USDT is 1:1 with USD.
+    assert.equal(r.currency, 'USDT');
     assert.equal(r.totals.deposits, '303.00000000', '150 COIN at 2, plus 3 USD at 1');
     assert.equal(r.unconverted.length, 0);
     // 2001-03-03 is a Saturday: its ISO week starts on Monday the 26th of February.
