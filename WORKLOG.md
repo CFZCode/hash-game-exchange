@@ -16,7 +16,7 @@ Format:
 ---
 
 ## 2026-10-27 — Demo game card theme ke hisaab se
-**Kya kiya:** Demo account ke game card me: brand green lock icon (gol halke green background me), bold "Real account needed", "Please sign in with a real user to play this game.", chhoti line "Demo accounts can bet on sports only.", aur brand button **Play Sports** (→ `/sports`, agent site pe `/agent/sports`). Sab theme tokens (brand / primary / secondary / tertiary), light theme me bhi apne aap.
+**Kya kiya:** Demo account ke game card me: brand green lock icon (gol halke green background me), bold "Real account needed", "Please sign in with a real user to play this game.", aur brand button **Play Sports** (→ `/sports`, agent site pe `/agent/sports`). Sab theme tokens (brand / primary / secondary / tertiary), light theme me bhi apne aap.
 **Kyun:** user: validation popup theme ke hisaab se accha dikhe.
 **Files / jagah:** frontend/src/pages/Game/index.jsx (PlayOverlay demo arm)
 **Notes:** Browser: desktop 1366 (slot) + mobile 390 (Limbo) screenshot dekhe.

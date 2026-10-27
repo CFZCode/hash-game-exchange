@@ -227,7 +227,6 @@ function PlayOverlay({ game, login, demo, currencyName, balances, setting, launc
             </span>
             <div className="mt-4 text-lg font-extrabold text-primary">Real account needed</div>
             <p className="mb-0 mt-2 text-sm font-semibold text-secondary">Please sign in with a real user to play this game.</p>
-            <p className="mb-0 mt-1 text-xs text-tertiary">Demo accounts can bet on sports only.</p>
             <Link to="/sports" className="button button-brand button-m mt-6 w-64">
               <IconStart className="mr-2 size-4" />
               Play Sports
