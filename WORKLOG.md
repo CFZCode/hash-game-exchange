@@ -15,6 +15,18 @@ Format:
 
 ---
 
+## 2026-10-27 — Demo login (TENEXCH jaisa): Demo button, ₹1500, sirf sports exchange, 30 min, phir delete; admin me kahin nahi
+**Kya kiya:**
+- **Owner panel → "Demo login"** switch (`demo_login`, default ON). OFF = button gayab aur backend mana (DEMO_DISABLED).
+- **Website:** Sign In ke paas **Demo** button (desktop + mobile; mobile pe button aane ke liye square logo). Ek click = naya demo account, seedha `/sports`. Header me **DEMO** badge, sirf INR balance, bell/gift nahi, menu me sirf Bet History (sports My Bets) + Log Out. Wallet, settings, profile, notifications, sports Statement, bonus/promo/VIP sab band (gates `notDemo`). Casino/Originals dikhte hain par launch pe toast "Demo accounts can only bet on sports". 30 min pe apne aap sign out.
+- **Backend:** `POST /user/auth/demo-login` → `users.is_demo` direct user `demo######`, random password, credits.inr 1500, session + token demo ke end (30 min) tak, idle logout nahi, signup/referral bonus nahi. Restrictions agent player jaisi (`isRestrictedPlayer` = agent ya demo): koi deposit/withdraw/bonus/VIP/race/notification nahi, wallet sirf INR. Casino launch guard + in-house engine demo ko mana (DEMO_NOT_ALLOWED).
+- **Exchange (TENEXCH flow):** demo ka `mssports.users` account **`demo_owner`** (mssports.Owners #2) ke neeche, `is_demo` + `demo_expires_at` ke saath — iska P&L / commission site owner tak nahi jaata (walletService ki demo branch).
+- **Delete:** user-worker job har 5 min: jo demo expire ho chuka aur koi open sports bet nahi, uski har table (`public` + `mssports`, user_id/uid/userid) ki rows + users row ek transaction me delete.
+- **Admin:** 23 files me demo users har list/count/report/dashboard/chart/market book/bet list/lookup/push/notification audience se bahar (`is_demo`).
+**Kyun:** user: TENEXCH jaisa demo user — 1500, sirf sports exchange bet, koi promotion/bonus/extra feature nahi, sirf INR, bet history, thodi der me sab delete, admin me kuch nahi, demo ka sign, owner panel se ON/OFF, demo owner TENEXCH jaisa.
+**Files / jagah:** migration 161-demo-users; auth (demoLogin, demoCleanup + job), packages/auth agentPlayers; wallet, notifications; casino gameEntitlement + in-house engine; sports platformAccounts (ensureDemoOwner); admin 23 service files; frontend DemoButton, gates, GatesContext, Header/AfterLogin, UserEnter, Exchange rail/frame, Game page; owner-panel entitlementCatalogue.
+**Notes / tests:** demoLogin.test 5/5 (₹1500, 30 min, caps off, expired refresh refused, purge open-bet/real-player safe); admin 3 naye test, baaki failures pehle se same; gates 8/8, frontend 255/255. Live: demo-login, /me, sirf INR 1500, originals launch/deposit/withdraw/bonus refused, notifications 0, **₹100 sports bet laga** (1500→1400) aur exchange account demo_owner ke neeche; admin users list/dashboard/direct wallet/exchange bets/book me nahi dikha; purge: expired bina bet wala demo poora gaya, open bet wala ruka. UI (headless, desktop + 390 mobile) check kiya.
+
 ## 2026-10-27 — F2Pay ka adhoora (non-final) callback ab audit log me save hota hai
 **Kya kiya:** Deposit aur payout callback jab final state (Paid / Completed / Failed / Closed) nahi hota to pehle chupchap 200 deta tha, body kahin save nahi hoti thi. Ab `psp_callback_log` me ek row (`rejection_code = NOT_FINAL`, poora signed payload) likhti hai. Paisa / status kuch nahi badalta, digest reserve nahi hota.
 **Kyun:** ₹100 payout (WD_1793114441952_6cd937034923) ka callback 17:32 UTC pe F2Pay (13.228.197.106) se aaya, signature sahi, 200 diya, par row Pending hi rahi — F2Pay ne kaunsa status bheja ye pata hi nahi chal sakta tha.

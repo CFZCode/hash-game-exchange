@@ -74,7 +74,7 @@ export const GATES = {
   // One promotion's page is its section's AND the promotions' (a sports offer goes with sports).
   sportsPromo: { flag: 'sports', feature: 'promotions', capability: 'promotions' },
   casinoPromo: { flag: 'casino', feature: 'promotions', capability: 'promotions' },
-  notifications: { feature: 'notifications' },
+  notifications: { feature: 'notifications', notDemo: true },
   // KYC: the owner's feature, and never for an agent's player — the agent vouches for them
   // (addaplay's `useAgentUser` rule: their personal-verification section is hidden).
   kyc: { feature: 'kyc', notAgentPlayer: true },
@@ -88,6 +88,12 @@ export const GATES = {
   blog: { feature: 'blog', notAgentPlayer: true },
   // Deposit rollover: an agent's player has no deposit or withdrawal, so nothing to roll over.
   rollover: { notAgentPlayer: true },
+  /* A demo account (Demo button, `/me` demo) sees its balance, its sports bets and Log out only
+     (user, 2026-10-27): no wallet pages, settings, profile or account statement. */
+  wallet: { notDemo: true },
+  settings: { notDemo: true },
+  profile: { notDemo: true },
+  sportsStatement: { notDemo: true },
 };
 
 const AGENT_PLAYER_OFF = { deposit: false, withdraw: false, swap: false, vault: false, promotions: false, tips: false, kyc: false, profileEdit: false };
@@ -118,6 +124,7 @@ export const ROUTES = [
   ['/promotion', 'promotions'],
   ['/deposit-offer', 'promotions'],
   ['/blog', 'blog'],
+  ['/sports/statement', 'sportsStatement'],
   ['/sports', 'sports'],
   ['/notification', 'notifications'],
   // Payout accounts and the withdrawal address whitelist: withdraw rail only (not an agent's player).
@@ -126,6 +133,11 @@ export const ROUTES = [
   ['/settings/verify', 'kyc'],
   ['/settings/verification', 'kyc'],
   // The sidebar's BC Originals entry and the casino page's Originals tag page.
+  ['/wallet', 'wallet'],
+  ['/settings', 'settings'],
+  ['/user/profile', 'profile'],
+  ['/user/medals', 'profile'],
+  ['/user/statistics', 'profile'],
   ['/casino/brand', 'originals'],
   ['/gamelist/brand', 'originals'],
   ['/section/originals', 'originals'],
@@ -177,6 +189,8 @@ export function makeGates({ flags, features, capabilities: read, ready = true } 
      are switched off for nobody else (backend agentPlayers.js; b2b only takes `promotions`, a
      withdraw lock only `withdraw`), so both off together is that player. */
   const agentPlayer = capabilities?.vault === false && capabilities?.deposit === false;
+  // The Demo button's account (`capabilitiesOf` carries `/me` demo): locked down like an agent player, and more.
+  const demo = capabilities?.demo === true;
   /* The manual bank-transfer deposit: the owner's deposit_mode allows 'manual' AND the site admin's
      Manual deposit switch (`/me` capabilities.manualDeposit) is on. */
   const manualOpen = () => railOpen(policy('deposit_mode'), 'manual') && capabilities?.manualDeposit !== false;
@@ -189,6 +203,7 @@ export function makeGates({ flags, features, capabilities: read, ready = true } 
     if (g.rail && !railOpen(policy(g.rail[0]), g.rail[1]) && !(g.orManual && manualOpen()) && !(g.orAuto && railOpen(policy(g.rail[0]), 'automatic'))) return 'site';
     if ((PROMO_GATES.has(gate) || g.notB2B) && policy('business_model') === 'b2b') return 'site';
     if (g.notAgentPlayer && agentPlayer) return 'account';
+    if (g.notDemo && demo) return 'account';
     if (g.capability && !can(g.capability)) return 'account';
     return null;
   };
@@ -216,6 +231,7 @@ export function makeGates({ flags, features, capabilities: read, ready = true } 
     flag: (key) => flagMap?.[key] !== false,
     /** The signed-in player belongs to an agent's tree (restricted UI: INR wallet, no KYC, no promotions). */
     agentPlayer,
+    demo,
     /** Public self-registration: off on a B2B (agent-only) site, and on /agent (services/agentBase.js),
      *  whose players are created by their agent and only sign in. */
     canSignUp: () => policy('business_model') !== 'b2b' && !underAgentBase(),
@@ -301,6 +317,7 @@ export async function loadCapabilities() {
 export function capabilitiesOf(me) {
   const caps = me?.capabilities;
   if (!caps || typeof caps !== 'object') return null;
-  if (caps.withdraw === false && me.withdraw_locked && caps.deposit !== false) return { ...caps, withdraw: true };
-  return caps;
+  const withDemo = me.demo === true ? { ...caps, demo: true, demoEndsAt: me.demoExpiresAt ?? null } : caps;
+  if (withDemo.withdraw === false && me.withdraw_locked && withDemo.deposit !== false) return { ...withDemo, withdraw: true };
+  return withDemo;
 }

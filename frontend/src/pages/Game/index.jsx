@@ -8,7 +8,8 @@ import { useResource } from '../../hooks/useResource';
 import { useSession } from '../../context/session';
 import PopCenter from '../../components/shared/PopCenter';
 import Select from '../../components/shared/Select';
-import { toast } from '../../components/shared/Toast/toast';
+import { toast, showToast } from '../../components/shared/Toast/toast';
+import { useGates } from '../../context/gates';
 import { getGame, launchGame, launchCurrency } from '../../services/game';
 import { tagWords } from '../../services/catalog';
 import { amount2usd, getAlias, printCurrency } from '../../utils/currency';
@@ -546,6 +547,7 @@ export default function GamePage() {
   const { gameUnique = '' } = useParams();
   const { session, balances, setSetting } = useSession();
   const navigate = useNavigate();
+  const { demo } = useGates();
 
   /* `attempt` re-runs the read from the inline Retry below. A FAILED read (429 rate limit, 5xx,
      network) is NOT a game missing from the catalogue: it used to fall into `missing` and print
@@ -595,6 +597,11 @@ export default function GamePage() {
       return;
     }
     if (!game || launching) return;
+    // A demo account bets on sports only; the backend refuses its launch too (DEMO_NOT_ALLOWED).
+    if (demo) {
+      showToast('Demo accounts can only bet on sports. Sign up to play casino games.', { type: 'error' });
+      return;
+    }
     setLaunching(true);
     const target = gameUnique;
     try {

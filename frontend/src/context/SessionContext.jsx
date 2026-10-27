@@ -14,6 +14,7 @@ import {
   loadAccount,
   login as apiLogin,
   loginWithGoogle,
+  demoLogin,
   logout as apiLogout,
   register as apiRegister,
   toWalletRows,
@@ -297,6 +298,8 @@ export function SessionProvider({ children }) {
       authenticate: (credentials) => apiLogin(credentials, account),
       /* Google sign-in: the callback's one-time code, same contract as `authenticate`. */
       authenticateGoogle: (code, nonce) => loginWithGoogle(code, nonce, account),
+      /* The Demo button: a new demo account, same contract as `authenticate`. */
+      authenticateDemo: () => demoLogin(account),
 
       /**
        * Create an account, then sign into it.

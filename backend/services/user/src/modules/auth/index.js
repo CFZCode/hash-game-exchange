@@ -16,4 +16,13 @@ module.exports = {
     public: require('./routes/public.routes'),
     user: require('./routes/user.routes'),
   },
+  jobs: [
+    {
+      // Demo accounts whose 30 minutes are up, with everything they made (demoCleanup.js).
+      name: 'auth:purge-demo-accounts',
+      intervalMs: Number(process.env.DEMO_PURGE_INTERVAL_MS || 5 * 60_000),
+      immediate: true,
+      run: (container) => require('./demoCleanup').purgeDemoAccounts(container),
+    },
+  ],
 };

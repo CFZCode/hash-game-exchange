@@ -7,6 +7,7 @@ import { saveStakeButtons } from '../../services/exchange';
 import { toast } from '../../components/shared/Toast/toast';
 import { BET_TOAST } from '../../utils/exchange';
 import { useSession } from '../../context/session';
+import { useGates } from '../../context/gates';
 import { stakeLabel } from './model';
 /* The rail's geometry (`.sports-rail*`) is the sports lobby's own — measured off BetBy's widget
    in pages/Sports/Sports.css — so the exchange keeps hash.game's sports bar rather than drawing a
@@ -34,6 +35,8 @@ function tipFrom(e, label) {
  */
 export default function ExchangeRail() {
   const { pathname } = useLocation();
+  // A demo account has no Statement (services/gates.js `sportsStatement`).
+  const { routeOn } = useGates();
   const [tip, setTip] = React.useState(null);
   const tipProps = (label) => ({
     onMouseEnter: (e) => setTip(tipFrom(e, label)),
@@ -45,7 +48,7 @@ export default function ExchangeRail() {
   return (
     <div className="sports-rail">
       <div className="sports-rail-scroll hide-scroll">
-        {NAV.map((item) => {
+        {NAV.filter((item) => routeOn(item.to)).map((item) => {
           const active = item.end ? pathname === item.to || pathname === `${item.to}/` : pathname.startsWith(item.to);
           return (
             <Link

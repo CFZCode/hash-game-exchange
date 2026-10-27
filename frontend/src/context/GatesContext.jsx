@@ -15,6 +15,7 @@ import { agentBaseTarget } from '../services/agentBase';
 import { useGates } from './gates';
 import { GatesContext } from './gates';
 import { useSession } from './session';
+import { showToast } from '../components/shared/Toast/toast';
 import { useSettings } from './settings';
 import Loading from '../components/shared/Loading';
 
@@ -40,7 +41,7 @@ export function GatesProvider({ children }) {
 }
 
 function LiveGates({ children }) {
-  const { session, setSetting } = useSession();
+  const { session, setSetting, signOut } = useSession();
   const signedIn = Boolean(session.login);
   const userId = signedIn ? session.userId : 0;
 
@@ -120,6 +121,17 @@ function LiveGates({ children }) {
     if (currencyName !== 'INRFIAT') setSetting('currencyName', 'INRFIAT');
   }, [agentInr, enableLocaleCurrency, currencyName, setSetting]);
 
+  /* A demo account ends with its 30 minutes (backend `demo_expires_at`): signed out then, with a word. */
+  const demoEndsAt = ready && value.demo ? capabilities?.demoEndsAt : null;
+  React.useEffect(() => {
+    if (!demoEndsAt) return undefined;
+    const timer = setTimeout(() => {
+      signOut();
+      showToast('Your demo session has ended. Sign up to keep playing.');
+    }, Math.max(0, new Date(demoEndsAt).getTime() - Date.now()));
+    return () => clearTimeout(timer);
+  }, [demoEndsAt, signOut]);
+
   /* Light theme switched off by the owner: back to dark, whatever an older visit saved. */
   const { theme, setTheme } = useSettings();
   const darkOnly = pub !== null && !value.themeSwitch();
@@ -137,7 +149,8 @@ function LiveGates({ children }) {
   /* An agent's player lives under /agent, everyone else outside it (services/agentBase.js). The
      basename is fixed at mount, so crossing it is a full load; waits for `ready` (capabilities
      answered), or an agent's player would read as direct for an instant and be sent out. */
-  const agentMove = ready && signedIn ? agentBaseTarget(window.location, value.agentPlayer) : null;
+  // A demo account is locked down like an agent player but stays on the main site (it signs up there).
+  const agentMove = ready && signedIn ? agentBaseTarget(window.location, value.agentPlayer && !value.demo) : null;
   React.useEffect(() => {
     if (agentMove) window.location.replace(agentMove);
   }, [agentMove]);

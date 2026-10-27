@@ -3,6 +3,7 @@ import { useIsDesktop } from '../../hooks/useMediaQuery';
 import ExchangeRail, { ExchangeTools } from './ExchangeRail';
 import Notice from '../../components/shared/Notice';
 import { useSession } from '../../context/session';
+import { useGates } from '../../context/gates';
 import { getAlias } from '../../utils/currency';
 import { useExchangeCurrency } from '../../hooks/exchange';
 
@@ -68,11 +69,12 @@ const MENU = [
  */
 export function ExchangeAccountPage({ title, children }) {
   const isDesktop = useIsDesktop();
+  const { routeOn } = useGates();
 
   if (isDesktop) {
     return (
       <MenuPageLayout
-        menu={MENU}
+        menu={MENU.filter((item) => routeOn(item.href))}
         title={
           <div className="flex items-center justify-between gap-4">
             <span>{title}</span>

@@ -290,6 +290,8 @@ const TILES = [
   { label: 'Transaction', Icon: IconTransaction, link: '/wallet/transaction', show: true },
   { label: 'Rollover', Icon: IconRollover, link: '/wallet/rollover', show: true },
   { label: 'Bet History', Icon: IconBetHistory, link: '/wallet/bet-history', show: true },
+  /* A demo account has no wallet pages: its bets are the exchange's own My Bets. */
+  { label: 'Bet History', Icon: IconBetHistory, link: '/sports/my-bets', show: true, demoOnly: true },
   { label: 'Free Plays', Icon: IconFreePlays, link: '/free-plays', show: FREE_PLAYS_ENABLED, dot: true },
   { label: 'Annual Report', Icon: IconAnnualReport, link: '/wallet/annual-report', show: false },
 ];
@@ -299,7 +301,7 @@ function BalanceCard() {
   const navigate = useNavigate();
   /* What the site and account have on (services/gates.js): an agent's player has no deposit or
      withdraw rail, so neither button, and only the history tiles. All on with fixtures. */
-  const { on, routeOn } = useGates();
+  const { on, routeOn, demo, agentPlayer } = useGates();
   const depositOn = on('deposit');
   const withdrawOn = on('withdraw');
 
@@ -307,11 +309,15 @@ function BalanceCard() {
      the whole wallet converted coin by coin and then summed, which is the same figure the
      wallet's Balance pane prints in its first cell. Adding raw amounts across coins would be
      meaningless. */
-  const total = printCurrency(
-    balances.reduce((sum, coin) => sum + amount2usd(coin.amount, coin.currencyName), 0),
-    'USDFIAT',
-    { settings: session.setting },
-  );
+  // An INR-only account (an agent's player, a demo account) reads its INR, not a dollar total.
+  const inr = agentPlayer ? balances.find((coin) => coin.currencyName === 'INRFIAT') : null;
+  const total = inr
+    ? printCurrency(inr.amount, 'INRFIAT', { settings: session.setting })
+    : printCurrency(
+      balances.reduce((sum, coin) => sum + amount2usd(coin.amount, coin.currencyName), 0),
+      'USDFIAT',
+      { settings: session.setting },
+    );
 
   return (
     <div className="mt-4 px-4">
@@ -358,9 +364,9 @@ function BalanceCard() {
         )}
 
         <div className="mt-1 flex w-full flex-wrap">
-          {TILES.filter((tile) => tile.show && routeOn(tile.link)).map(({ label, Icon, link }) => (
+          {TILES.filter((tile) => tile.show && routeOn(tile.link) && Boolean(tile.demoOnly) === demo).map(({ label, Icon, link }) => (
             <button
-              key={label}
+              key={link}
               type="button"
               onClick={() => navigate(link)}
               className="button center relative mt-2 h-14 w-1/4 flex-none flex-col overflow-hidden px-0 py-0"
@@ -698,7 +704,16 @@ function SupportBlock({ onSignOut }) {
 export default function UserEnterPanels(props) {
   /* VIP and the referral programme are promotions: gone when the site or the account has them
      off (an agent's player). services/gates.js; all on with fixtures. */
-  const { on, agentPlayer } = useGates();
+  const { on, agentPlayer, demo } = useGates();
+  /* A demo account (user, 2026-10-27): its balance, its sports bets and Sign Out — nothing else. */
+  if (demo) {
+    return (
+      <div className="bg-layer2 pt-4">
+        <BalanceCard />
+        <SupportBlock {...props} />
+      </div>
+    );
+  }
   return (
     <>
       <ProfileHeader />

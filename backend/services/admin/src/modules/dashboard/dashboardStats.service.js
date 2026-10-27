@@ -336,9 +336,9 @@ class DashboardStatsService {
 
   async #registrationRows(ctx) {
     const scope = ctx.scope.all
-      ? ''
+      ? 'AND NOT is_demo'
       : ctx.scope.direct
-        ? `AND parent_staff_id IS NULL${ctx.scope.branchId != null ? ' AND branch_id = :branchId' : ''}`
+        ? `AND parent_staff_id IS NULL AND NOT is_demo${ctx.scope.branchId != null ? ' AND branch_id = :branchId' : ''}`
         : 'AND parent_staff_id IN (:staffIds)';
     return this.#query(
       `SELECT ${this.#bucket('created')} AS bucket, COUNT(*) AS n
@@ -553,11 +553,13 @@ class DashboardStatsService {
     return `${column} >= CAST(:fromTz AS timestamptz) AND ${column} < CAST(:toTz AS timestamptz)`;
   }
 
-  /** The owner column inside the scope: direct users, the caller's tree, or nothing for the root. */
+  /** The owner column inside the scope: direct users, the caller's tree, or for the root everyone but a demo user. */
   #owned(ctx, column, isText = false) {
-    if (ctx.scope.all) return '';
+    if (ctx.scope.all) {
+      return `AND (${column} IS NULL OR ${column} NOT IN (SELECT u.id${isText ? '::text' : ''} FROM users u WHERE u.is_demo))`;
+    }
     const players = ctx.scope.direct
-      ? `u.parent_staff_id IS NULL${ctx.scope.branchId != null ? ' AND u.branch_id = :branchId' : ''}`
+      ? `u.parent_staff_id IS NULL AND NOT u.is_demo${ctx.scope.branchId != null ? ' AND u.branch_id = :branchId' : ''}`
       : 'u.parent_staff_id IN (:staffIds)';
     return isText
       ? `AND ${column} IN (SELECT u.id::text FROM users u WHERE ${players})`

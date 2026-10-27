@@ -1205,7 +1205,7 @@ class ReportsService {
     const replacements = { staffIds };
     const parts = [
       seesUnassigned
-        ? '(u.parent_staff_id IN (:staffIds) OR u.parent_staff_id IS NULL)'
+        ? '(u.parent_staff_id IN (:staffIds) OR (u.parent_staff_id IS NULL AND NOT u.is_demo))'
         : 'u.parent_staff_id IN (:staffIds)',
     ];
     // Direct Users | Agent Users tab: direct = koi parent nahi, agent = agent ke neeche.
@@ -1783,9 +1783,11 @@ class ReportsService {
      */
     const seesUnassigned = staffIds.map(Number).includes(1);
 
+    // A demo user (the Demo button's throwaway account) is never shown — kept beside, not inside,
+    // the `Op.or`, because a search replaces `where[Op.or]`.
     if (channel === 'direct') {
       if (!seesUnassigned) return { empty: true, where: {} };
-      return { empty: false, where: { parent_staff_id: null } };
+      return { empty: false, where: { parent_staff_id: null, is_demo: false } };
     }
 
     if (channel === 'agent') return { empty: false, where: { parent_staff_id: staffIds } };
@@ -1793,7 +1795,7 @@ class ReportsService {
     return {
       empty: false,
       where: seesUnassigned
-        ? { [Op.or]: [{ parent_staff_id: staffIds }, { parent_staff_id: null }] }
+        ? { [Op.or]: [{ parent_staff_id: staffIds }, { parent_staff_id: null }], is_demo: false }
         : { parent_staff_id: staffIds },
     };
   }

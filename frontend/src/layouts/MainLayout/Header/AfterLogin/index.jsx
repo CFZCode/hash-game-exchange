@@ -377,9 +377,9 @@ function AccountMenu() {
   /* The original's own `.filter(t => !!t)` over deployment flags, here over the site's and the
      account's gates (services/gates.js): an agent's player loses Withdraw, Buy Crypto, VIP Club,
      Vault Pro and Referral. Every row stays with fixtures. */
-  const { routeOn } = useGates();
+  const { routeOn, demo } = useGates();
   const rows = ACCOUNT_MENU.filter(
-    (row) => (!row.link || routeOn(row.link)) && (FREE_PLAYS_ENABLED || row.link !== '/free-plays'),
+    (row) => (!row.link || routeOn(row.link)) && (FREE_PLAYS_ENABLED || row.link !== '/free-plays') && Boolean(row.demoOnly) === demo,
   );
   /* `+ 1` is the Do Not Disturb row; with it hidden (config/hiddenFeatures) the panel is one row shorter. */
   const panelHeight = (rows.length + (DO_NOT_DISTURB_ENABLED ? 1 : 0)) * 44 + 8;
@@ -477,12 +477,21 @@ const SpriteIcon = ({ name }) => (
    signal `onToggleNotice` moves. Both branches of the header carry a chat button and both are
    wired, which is the original's arrangement: `Se` hands its logged-out arm the identical setter,
    so the room is readable without an account. See components/Chat and components/RightDrawer. */
+/* THIS BUILD'S — the sign that this is a demo account (Demo button; user, 2026-10-27). */
+const DemoBadge = ({ className = '' }) => (
+  <span className={`flex-none rounded-md bg-warning px-2 py-1 text-xs font-extrabold leading-none text-black ${className}`} title="Demo account: play money, sports only">
+    DEMO
+  </span>
+);
+
 export default function AfterLogin({ onToggleChat, onToggleNotice }) {
   /* The gift is the bonus section's door: gone when the site or the account has no bonus. */
-  const bonusOn = useGates().on('bonus');
+  const { on, demo } = useGates();
+  const bonusOn = on('bonus');
   const unread = useUnreadNotices();
   return (
     <div className="ml-3 flex items-center">
+      {demo && <DemoBadge className="mr-3" />}
       <Wallet />
 
       {bonusOn && (
@@ -504,6 +513,8 @@ export default function AfterLogin({ onToggleChat, onToggleNotice }) {
           is kept verbatim; this one is not. The chunk's own line, for the record:
             clsx("button relative ml-3 flex h-10 flex-none rounded-lg bg-layer5 p-0",
                  isOfflineAgent ? "w-10" : "w-30") */}
+      {/* A demo account gets no notifications (user, 2026-10-27), so no bell. */}
+      {!demo && (
       <div className="button relative ml-3 flex h-10 flex-none rounded-lg bg-layer5 p-0">
         {/* First child, so `first:left-10` wins over `left-20` and the rule sits at 40px. */}
         {/* No chat on this platform (services/availability.js): the group drops to the bell
@@ -536,6 +547,7 @@ export default function AfterLogin({ onToggleChat, onToggleNotice }) {
           {unread > 0 && <Dot className="absolute right-0 top-1" />}
         </button>
       </div>
+      )}
 
       <AccountMenu />
     </div>
@@ -562,7 +574,8 @@ export function MobileAfterLogin() {
   const unread = useUnreadNotices();
   const navigate = useNavigate();
   const { session } = useSession();
-  const bonusOn = useGates().on('bonus');
+  const { on, demo } = useGates();
+  const bonusOn = on('bonus');
   /* The owner panel's square mark (live mode) at h-10, the wallet pill's height; else the original at h-9. */
   const { darken } = useSettings();
   const mark = useSiteMark({ light: !darken });
@@ -574,6 +587,7 @@ export function MobileAfterLogin() {
       </Link>
 
       <div className="flex items-center gap-2">
+        {demo && <DemoBadge />}
         <Wallet mobile />
 
         {/* `bg-alw_white dark:bg-white_alpha5` on both boxes, and unlike the pill above these
@@ -594,6 +608,7 @@ export function MobileAfterLogin() {
         </button>
         )}
 
+        {!demo && (
         <div className="center relative rounded-lg bg-alw_white text-secondary dark:bg-white_alpha5">
           <button
             type="button"
@@ -605,6 +620,7 @@ export function MobileAfterLogin() {
             {unread > 0 && <Dot className="absolute right-1 top-1.5" />}
           </button>
         </div>
+        )}
 
         <button
           type="button"

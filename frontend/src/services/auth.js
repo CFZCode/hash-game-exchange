@@ -346,6 +346,15 @@ export async function loginWithGoogle(code, nonce, previous) {
   return loadAccount(previous);
 }
 
+/* The Demo button (TENEXCH's): the backend makes a throwaway demo account — ₹1500, sports
+   exchange only, 30 minutes — and answers the same token pair `login` gets. */
+export async function demoLogin(previous) {
+  const session = await request('/api/v1/user/auth/demo-login', { live: true, method: 'POST', json: {}, fixture: null });
+  if (!session?.accessToken) return FIXTURE_ACCOUNT;
+  setTokens(session);
+  return loadAccount(previous);
+}
+
 /* The bonus summary, read only for an account allowed promotions. An agent-tree player's
    `/user/bonus` answers `403 PROMOTIONS_NOT_FOR_AGENT_USERS` on every load, so the account's
    capabilities (`/user/auth/me`) are asked first and the read is skipped when promotions is

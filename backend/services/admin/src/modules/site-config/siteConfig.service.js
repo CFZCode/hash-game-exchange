@@ -1042,6 +1042,8 @@ class SiteConfigService {
     // our exchange. Never both; `flagOnIn` closes the exchange while the sportsbook is on.
     flags.sportsbook = flags.sports && entitlements.flagOnIn(planDoc, 'sportsbook');
     flags.sportsexchange = flags.sports && entitlements.flagOnIn(planDoc, 'sportsexchange');
+    // The owner's Demo login switch: the player site draws the Demo button only while it is on.
+    flags.demo_login = entitlements.flagOnIn(planDoc, 'demo_login');
 
     const amounts = Object.fromEntries(
       PUBLIC_AMOUNTS.map((name) => [name, this.#amount(row?.[name])])
@@ -1358,7 +1360,7 @@ class SiteConfigService {
     const everyone = staffIds.includes(root);
 
     const player = await this.models.Users.findOne({
-      where: { id: userId, ...(everyone ? {} : { parent_staff_id: staffIds }) },
+      where: { id: userId, is_demo: false, ...(everyone ? {} : { parent_staff_id: staffIds }) },
       attributes: ['id'],
       raw: true,
     });

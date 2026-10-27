@@ -51,6 +51,8 @@ export const ACCOUNT_MENU = [
   { label: 'Transactions', link: '/wallet/transaction', icon: IconTransaction },
   { label: 'Free Plays', link: '/free-plays', icon: IconFreePlays, dot: true },
   { label: 'Bet History', link: '/wallet/bet-history', icon: IconBetHistory },
+  /* A demo account has no wallet pages: its bets are the exchange's own My Bets (index.jsx shows it only to one). */
+  { label: 'Bet History', link: '/sports/my-bets', icon: IconBetHistory, demoOnly: true },
   { label: 'Rollover Overview', link: '/wallet/rollover', icon: IconRollover },
   { label: 'VIP Club', link: '/vip', icon: IconVipClub },
   { label: 'Vault Pro', link: '/wallet/vault', icon: IconVaultPro, gated: '!isFiat && !isOfflineAgent' },
