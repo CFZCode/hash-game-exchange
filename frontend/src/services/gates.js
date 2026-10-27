@@ -207,8 +207,9 @@ export function makeGates({ flags, features, capabilities: read, ready = true } 
     policy,
     /** The manual (bank transfer + screenshot) deposit form may show: deposit allowed for this player and manual open. */
     manualDeposit: () => on('deposit') && can('deposit') && manualOpen(),
-    /** The manual (staff-reviewed) withdrawal form may show: withdraw allowed and the owner's withdrawal_mode takes manual. */
-    manualWithdraw: () => on('withdraw') && railOpen(policy('withdrawal_mode'), 'manual'),
+    /** The manual (staff-reviewed) withdrawal form may show: withdraw allowed, the owner's withdrawal_mode takes manual
+        and the site admin's Manual withdrawal switch (`/me` capabilities.manualWithdraw) is on. */
+    manualWithdraw: () => on('withdraw') && railOpen(policy('withdrawal_mode'), 'manual') && can('manualWithdraw'),
     /** The gateway deposit (CCPayment's address per order) may show: deposit allowed and the owner's deposit_mode takes automatic. */
     autoDeposit: () => on('deposit') && can('deposit') && railOpen(policy('deposit_mode'), 'automatic'),
     /** One site-admin flag (`home_*` sections etc.); absent / not answered = on. */

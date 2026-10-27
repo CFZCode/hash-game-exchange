@@ -163,6 +163,9 @@ export default function FiatForm({ currencyName }) {
   const [mode, setMode] = React.useState('manual');
   const shownMode = !auto ? 'manual' : !manual ? 'auto' : mode;
 
+  // Manual switched off by the site admin and no automatic payout: no form at all.
+  if (!manual && !auto) return autoCurrencies ? <RequirementNotice>Bank withdrawals are not available right now.</RequirementNotice> : null;
+
   return (
     <>
       {manual && auto && (

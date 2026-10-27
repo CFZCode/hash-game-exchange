@@ -55,6 +55,10 @@ describe('CCPayment deposit (user, 2026-10-21)', () => {
     expect(makeGates({ features: mode('manual') }).autoDeposit()).toBe(false);
     expect(makeGates({ features: mode('both'), capabilities: AGENT }).autoDeposit()).toBe(false);
   });
+  it('the manual withdrawal follows the site admin\'s Manual withdrawal switch', () => {
+    expect(makeGates({}).manualWithdraw()).toBe(true);
+    expect(makeGates({ capabilities: { manualWithdraw: false } }).manualWithdraw()).toBe(false);
+  });
   afterEach(() => vi.unstubAllGlobals());
   it('/agent shows an agent player\'s site even signed out: no VIP, promotions, referral or sign-up', () => {
     vi.stubGlobal('location', { pathname: '/agent' });

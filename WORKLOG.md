@@ -15,6 +15,11 @@ Format:
 
 ---
 
+## 2026-10-27 — Manual withdrawal toggle ab website pe bhi lagta hai
+**Kya kiya:** Admin → Transactions → Withdraw → Manual ka Super Admin "Manual withdrawals ON / OFF" switch pehle se tha aur backend mana karta tha (MANUAL_WITHDRAW_DISABLED), par website form dikhata rehta tha. Ab `gates.manualWithdraw()` `/me` capabilities.manualWithdraw bhi dekhta hai: OFF = Withdraw me Manual form/tab nahi dikhta (Automatic chalu ho to sirf wahi). Dono band = "Bank withdrawals are not available right now." Gate test +1.
+**Kyun:** user: deposit jaisa — Super Admin OFF kare to website se manual withdraw na ho.
+**Files / jagah:** frontend/src/services/gates.js, gates.test.js, frontend/src/pages/Wallet/Withdraw/FiatForm.jsx
+
 ## 2026-10-27 — Manual deposit approve: amount ab edit nahi hota
 **Kya kiya:** Admin → Transactions → Deposit → Manual → Approve dialog me "Credit amount" ab sirf dikhta hai (disabled), badla nahi ja sakta. Approve pe sirf transaction password jaata hai, player ne jitna amount bheja utna hi credit hota hai. Kam amount + reason wala field hata diya.
 **Kyun:** user: approve karte waqt amount editable nahi hona chahiye.
