@@ -15,6 +15,12 @@ Format:
 
 ---
 
+## 2026-10-27 — Demo game card theme ke hisaab se
+**Kya kiya:** Demo account ke game card me: brand green lock icon (gol halke green background me), bold "Real account needed", "Please sign in with a real user to play this game.", chhoti line "Demo accounts can bet on sports only.", aur brand button **Play Sports** (→ `/sports`, agent site pe `/agent/sports`). Sab theme tokens (brand / primary / secondary / tertiary), light theme me bhi apne aap.
+**Kyun:** user: validation popup theme ke hisaab se accha dikhe.
+**Files / jagah:** frontend/src/pages/Game/index.jsx (PlayOverlay demo arm)
+**Notes:** Browser: desktop 1366 (slot) + mobile 390 (Limbo) screenshot dekhe.
+
 ## 2026-10-27 — Demo user: game page pe "Please sign in with a real user to play this game."
 **Kya kiya:** Demo account Original / GIS (koi bhi casino) game kholta hai to Play wala card (currency sentence + Balance + Play button) ki jagah sirf "Please sign in with a real user to play this game." Toast hataya (card hi bata deta hai). Bug bhi theek: page reload pe gates (/me) aane se pehle auto-launch chal jaata tha → backend DEMO_NOT_ALLOWED → "Under Maintenance" popup; ab auto-launch aur Play gates ready hone tak rukte hain.
 **Kyun:** user: demo user ko game pe "please sign in with real user to play this game" dikhe.

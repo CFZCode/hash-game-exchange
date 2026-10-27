@@ -9,6 +9,7 @@ import { useSession } from '../../context/session';
 import PopCenter from '../../components/shared/PopCenter';
 import Select from '../../components/shared/Select';
 import { toast } from '../../components/shared/Toast/toast';
+import { IconLock } from '../../components/exchange/icons';
 import { useGates } from '../../context/gates';
 import { getGame, launchGame, launchCurrency } from '../../services/game';
 import { tagWords } from '../../services/catalog';
@@ -220,7 +221,18 @@ function PlayOverlay({ game, login, demo, currencyName, balances, setting, launc
       <div className="game-overlay-card w-full max-w-[30rem] rounded-xl bg-layer3 p-8">
         {/* A demo account (Demo Login) cannot play casino games (user, 2026-10-27). */}
         {demo ? (
-          <p className="mb-0 text-center text-sm font-semibold text-secondary">Please sign in with a real user to play this game.</p>
+          <div className="flex flex-col items-center text-center">
+            <span className="center size-14 rounded-full bg-brand/15">
+              <IconLock className="size-7 fill-brand" aria-hidden="true" />
+            </span>
+            <div className="mt-4 text-lg font-extrabold text-primary">Real account needed</div>
+            <p className="mb-0 mt-2 text-sm font-semibold text-secondary">Please sign in with a real user to play this game.</p>
+            <p className="mb-0 mt-1 text-xs text-tertiary">Demo accounts can bet on sports only.</p>
+            <Link to="/sports" className="button button-brand button-m mt-6 w-64">
+              <IconStart className="mr-2 size-4" />
+              Play Sports
+            </Link>
+          </div>
         ) : login ? (
           <>
             <div className="items-left flex flex-col justify-center gap-2">
