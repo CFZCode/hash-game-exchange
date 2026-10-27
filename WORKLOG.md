@@ -15,6 +15,11 @@ Format:
 
 ---
 
+## 2026-10-27 — TEMP: withdraw ka wagering (rollover) check band, F2Pay withdrawal test ke liye
+**Kya kiya:** `rules()` me `wager: true` → `wager: false`. Ab koi bhi withdrawal "Complete your wagering requirement…" pe nahi rukta (backend + Withdraw page dono).
+**Kyun:** user ko F2Pay automatic withdrawal test karna hai, test player ka rollover pura nahi tha. **Test ke baad wapas `wager: true` karna hai.**
+**Files / jagah:** backend/services/user/src/modules/withdraw-requirements/withdrawRequirements.js:183
+
 ## 2026-10-27 — F2Pay withdrawal (automatic) chalu + Withdraw me Manual / Automatic do section
 **Kya kiya:** F2Pay ka commented payout code chalu kiya: INR bank payout (BANK_INR, `/payout/inr/order/create`), sirf INR. Player request karta hai → balance usi waqt hold (ek transaction me hold + `f2paywithdrawals` Pending row) → F2Pay ko signed payout → reject / error pe turant refund. Callback `/api/v1/user/psp/f2pay/payout-callback`: `Completed` → Success, `Failed` → ek hi baar refund, `Processing` jaisa beech ka state → kuch nahi (pehle har non-success pe refund ho jata tha). Naya table `f2paywithdrawals` (migration 160, model `F2payWithdrawals`). F2Pay withdrawal har jagah gina: player Transaction history + admin Transactions → Withdraw → Fiat, withdrawal cap + daily limit (pending bhi), admin dashboard totals + movements, finance stats (Fiat withdrawals "F2Pay"), player stats, reports (lifetime totals, reward totals, ledger), statement. `/user/payments/methods/f2pay` ab `payout: ['INR']` bhi deta hai (AUTO_WITHDRAWALS_ENABLED + owner withdrawal_mode + gateway / `f2pay_inr` switch). Player site Wallet → Withdraw (INR): "Withdraw Type: Manual | Automatic" (deposit jaisa) — Automatic me Account Holder Name, Account Number, IFSC, amount → F2Pay. Owner ne withdrawal_mode "automatic only" kiya ho tab bhi Withdraw tab khula rehta hai.
 **Kyun:** User: "f2pay ka withdraw bhi hai usko bhi laga do … ek section withdraw me automatic rakhna and ek manual do section me divide karo … automatic me f2pay ka withdraw laga do … ui me bhi".

@@ -179,7 +179,8 @@ function createWithdrawRequirements(deps) {
     // cannot submit documents, so requiring them would stop every withdrawal.
     // The deposit rollover is required whatever the policy (user, 2026-10-21: no withdrawal before the
     // rollover is complete). Multiplier 0 makes the target 0, which clears it.
-    return { policy, kyc: requires('kyc') && kycSwitch && owner.kycFeature, wager: true, cap: owner.cap, daily: owner.daily };
+    // TEMP (user, 2026-10-27): rollover check OFF to test the F2Pay withdrawal — set back to `wager: true`.
+    return { policy, kyc: requires('kyc') && kycSwitch && owner.kycFeature, wager: false, cap: owner.cap, daily: owner.daily };
   }
 
   /**
