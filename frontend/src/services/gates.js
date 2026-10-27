@@ -44,7 +44,8 @@ export const GATES = {
   deposit: { capability: 'deposit', rail: ['deposit_mode', 'automatic'], orManual: true },
   // P2P / card buy is a deposit rail on the backend (`deposit` capability covers "P2P buy").
   buy: { capability: 'deposit' },
-  withdraw: { capability: 'withdraw', rail: ['withdrawal_mode', 'manual'] },
+  // Manual (staff-reviewed) or automatic (F2Pay payout, FiatForm): either open keeps the entry.
+  withdraw: { capability: 'withdraw', rail: ['withdrawal_mode', 'manual'], orAuto: true },
   swap: { feature: 'swap', capability: 'swap' },
   vault: { feature: 'vault', capability: 'vault' },
   bonus: { flag: 'bonus', feature: 'bonus', capability: 'promotions' },
@@ -185,7 +186,7 @@ export function makeGates({ flags, features, capabilities: read, ready = true } 
     if (g.flag && flagMap?.[g.flag] === false) return 'site';
     if (g.mode && (flagMap?.sportsbook === true ? 'sportsbook' : 'exchange') !== g.mode) return 'site';
     if (g.feature && list && !byKey.has(g.feature)) return 'site';
-    if (g.rail && !railOpen(policy(g.rail[0]), g.rail[1]) && !(g.orManual && manualOpen())) return 'site';
+    if (g.rail && !railOpen(policy(g.rail[0]), g.rail[1]) && !(g.orManual && manualOpen()) && !(g.orAuto && railOpen(policy(g.rail[0]), 'automatic'))) return 'site';
     if ((PROMO_GATES.has(gate) || g.notB2B) && policy('business_model') === 'b2b') return 'site';
     if (g.notAgentPlayer && agentPlayer) return 'account';
     if (g.capability && !can(g.capability)) return 'account';
@@ -206,6 +207,8 @@ export function makeGates({ flags, features, capabilities: read, ready = true } 
     policy,
     /** The manual (bank transfer + screenshot) deposit form may show: deposit allowed for this player and manual open. */
     manualDeposit: () => on('deposit') && can('deposit') && manualOpen(),
+    /** The manual (staff-reviewed) withdrawal form may show: withdraw allowed and the owner's withdrawal_mode takes manual. */
+    manualWithdraw: () => on('withdraw') && railOpen(policy('withdrawal_mode'), 'manual'),
     /** The gateway deposit (CCPayment's address per order) may show: deposit allowed and the owner's deposit_mode takes automatic. */
     autoDeposit: () => on('deposit') && can('deposit') && railOpen(policy('deposit_mode'), 'automatic'),
     /** One site-admin flag (`home_*` sections etc.); absent / not answered = on. */

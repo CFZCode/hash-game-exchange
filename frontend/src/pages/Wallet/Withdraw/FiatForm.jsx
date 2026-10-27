@@ -6,6 +6,7 @@ import Notice from '../../../components/shared/Notice';
 import { IconArrow, IconClose, IconInform } from '../../../components/shared/icons';
 import { showToast } from '../../../components/shared/Toast/toast';
 import { useSession } from '../../../context/session';
+import { useGates } from '../../../context/gates';
 import useResource from '../../../hooks/useResource';
 import { USE_FIXTURES } from '../../../services/client';
 import { getAlias } from '../../../utils/currency';
@@ -15,6 +16,8 @@ import {
   FIAT_WITHDRAW_MINIMUM,
   getBankAccounts,
   getWithdrawRequirements,
+  readAutoWithdrawCurrencies,
+  submitAutoWithdraw,
   submitFiatWithdraw,
   withdrawErrorMessage,
 } from '../../../services/withdraw';
@@ -122,7 +125,141 @@ function SubmittedPop({ onClose }) {
   );
 }
 
+/* The Withdraw Method choice — THIS BUILD'S, like the deposit tab's: Manual (staff review, the form
+   below) or Automatic (F2Pay pays the bank account straight away) when both are open; only one
+   open = that one, no choice drawn. Same markup as FiatTab's "Deposit Method". */
 export default function FiatForm({ currencyName }) {
+  const gates = useGates();
+  const manual = USE_FIXTURES || gates.manualWithdraw();
+  const { data: autoCurrencies } = useResource(readAutoWithdrawCurrencies);
+  const auto = (autoCurrencies ?? []).includes(currencyName.replace(/FIAT$/, ''));
+  const [mode, setMode] = React.useState('manual');
+  const shownMode = !auto ? 'manual' : !manual ? 'auto' : mode;
+
+  return (
+    <>
+      {manual && auto && (
+        <>
+          <div className="mb-1 mt-5 text-secondary">Withdraw Type</div>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              ['manual', 'Manual'],
+              ['auto', 'Automatic'],
+            ].map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                className={`button button-m h-10 ${shownMode === value ? 'button-brand' : 'button-second'}`}
+                onClick={() => setMode(value)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+      {shownMode === 'auto' ? <AutoWithdraw currencyName={currencyName} /> : <ManualWithdraw currencyName={currencyName} />}
+    </>
+  );
+}
+
+const AUTO_FIELDS = [
+  { key: 'account_name', label: 'Account Holder Name' },
+  { key: 'account_number', label: 'Account Number' },
+  { key: 'bank_code', label: 'IFSC Code' },
+];
+
+/* A refused payout's own sentence, plus which field the server named (422 INVALID_PAYOUT_DETAILS). */
+const autoErrorMessage = (reason) => {
+  const fields = reason?.fields ?? reason?.details?.fields ?? {};
+  const named = Object.entries(fields)
+    .map(([key, why]) => `${AUTO_FIELDS.find((f) => f.key === key)?.label ?? key} ${why}`)
+    .join('; ');
+  return named ? `${withdrawErrorMessage(reason)}: ${named}` : withdrawErrorMessage(reason);
+};
+
+/* The automatic withdrawal: bank details + amount, sent to F2Pay at once (BANK_INR). The amount
+   leaves the balance on request; F2Pay's callback marks it paid, or refunds it if the payout fails.
+   Every class is the manual form's own. */
+function AutoWithdraw({ currencyName }) {
+  const { balances, refreshBalances } = useSession();
+  const [fields, setFields] = React.useState({});
+  const [amount, setAmount] = React.useState(null);
+  const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState(null);
+  const [done, setDone] = React.useState(false);
+
+  const row = balances.find((coin) => coin.currencyName === currencyName);
+  const balance = Math.max(0, Number(row?.generalAmount ?? row?.amount ?? 0) || 0);
+  const min = FIAT_WITHDRAW_MINIMUM;
+  const shownAmount = amount ?? min;
+
+  const submit = (forfeitBonus = false) => {
+    setBusy(true);
+    setError(null);
+    submitAutoWithdraw({
+      currency: currencyName.replace(/FIAT$/, ''),
+      amount: String(shownAmount),
+      details: Object.fromEntries(AUTO_FIELDS.map((field) => [field.key, String(fields[field.key] ?? '').trim()])),
+      forfeitBonus,
+    })
+      .then(() => {
+        showToast(`Your withdrawal of ${shownAmount} ${getAlias(currencyName)} has been sent to your bank account.`, { type: 'success' });
+        refreshBalances();
+        setFields({});
+        setAmount(null);
+        setDone(true);
+      })
+      .catch((reason) => setError({ code: reason?.code, message: autoErrorMessage(reason) }))
+      .finally(() => setBusy(false));
+  };
+
+  return (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        submit(false);
+      }}
+    >
+      <div className="my-4 flex rounded-xl bg-success/10 p-2 text-secondary">
+        <IconInform className="icon -mt-0.5 mr-1.5 size-6 flex-none fill-success" />
+        <div>Paid straight to your bank account, no review. If the payout fails, the amount comes back to your balance automatically.</div>
+      </div>
+
+      {AUTO_FIELDS.map((field) => (
+        <TextField
+          key={field.key}
+          id={`auto-${field.key}`}
+          label={field.label}
+          value={fields[field.key] ?? ''}
+          onChange={(value) => setFields((current) => ({ ...current, [field.key]: value }))}
+        />
+      ))}
+
+      <AmountField amount={shownAmount} onAmount={setAmount} min={min} balance={balance} currency={currencyName} precision={2} />
+      <AvailableRow currencyName={currencyName} unlocked={balance} className="mt-5" />
+
+      {error && (
+        <Notice type="error" className="mt-5 font-normal">
+          {error.message}
+        </Notice>
+      )}
+      {error?.code === 'BONUS_FORFEIT_REQUIRED' && (
+        <button type="button" className="button button-second button-m mt-2 w-full" disabled={busy} onClick={() => submit(true)}>
+          Forfeit bonus and withdraw
+        </button>
+      )}
+
+      <button type="submit" disabled={busy || balance < min} className="button button-brand button-m my-4 w-full">
+        {busy ? 'Loading…' : 'Withdraw'}
+      </button>
+
+      {done && <SubmittedPop onClose={() => setDone(false)} />}
+    </form>
+  );
+}
+
+function ManualWithdraw({ currencyName }) {
   const { balances, refreshBalances, updateBalance } = useSession();
   const [method, setMethod] = React.useState(FIAT_METHODS[0].method);
   /* `null` = not chosen yet: the first saved account for the method, or new details when there

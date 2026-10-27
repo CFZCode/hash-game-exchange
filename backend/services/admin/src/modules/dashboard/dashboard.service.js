@@ -582,6 +582,7 @@ class DashboardService {
     const window = (since) => [
       this.#groupByCurrency(this.models.Withdrawals, WITHDRAWAL_DONE.withdrawals, 'date', since, 'coin', this.#ownerWhere(scope, 'uid')),
       this.#groupByCurrency(this.models.FiatWithdrawals, WITHDRAWAL_DONE.fiat_withdrawals, 'date', since, 'currency', this.#ownerWhere(scope, 'uid')),
+      this.#groupByCurrency(this.models.F2payWithdrawals, WITHDRAWAL_DONE.f2paywithdrawals, 'created_at', since, 'currency', this.#ownerWhere(scope, 'user_id')),
     ];
 
     const [lifetime, today, inRange] = await Promise.all([

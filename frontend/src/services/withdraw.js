@@ -262,3 +262,26 @@ export function submitFiatWithdraw(body) {
     }),
   );
 }
+
+/* ══ THE AUTOMATIC RAIL (F2Pay) ═══════════════════════════════════════════════════════════════
+ *
+ * THIS BUILD'S. F2Pay pays straight to the player's bank account (BANK_INR), no staff approval:
+ * the balance is held on request and F2Pay's signed callback settles it (a failed payout is
+ * refunded). `readAutoWithdrawCurrencies` is `['INR']` while F2Pay, its INR switch, the owner's
+ * withdrawal_mode and the backend's AUTO_WITHDRAWALS_ENABLED are all on, else `[]` and the fiat
+ * arm keeps the manual form only. */
+export const readAutoWithdrawCurrencies = () =>
+  USE_FIXTURES
+    ? []
+    : Promise.resolve(request('/api/v1/user/payments/methods/f2pay', { live: true })).then(
+        (data) => (Array.isArray(data?.payout) ? data.payout : []),
+        () => [],
+      );
+
+/** `details` is `{ account_name, account_number, bank_code }` (IFSC). Throws the API error. */
+export const submitAutoWithdraw = ({ currency, amount, details, forfeitBonus }) =>
+  request('/api/v1/user/payments/withdrawals', {
+    live: true,
+    method: 'POST',
+    json: { provider: 'f2pay', currency, amount, details, ...(forfeitBonus ? { forfeitBonus: true } : {}) },
+  });
