@@ -15,6 +15,11 @@ Format:
 
 ---
 
+## 2026-10-27 — Automatic withdraw: ₹100–₹30,000 ki limit + "approved successfully" popup; wagering check wapas chalu
+**Kya kiya:** Wallet → Withdraw → Automatic me amount ₹100 se kam ya ₹30,000 se zyada ho to form wahi rok deta hai (Max button bhi 30,000 pe rukta hai, niche "Max: 30,000 INR" likha). Payout accept hone pe naya popup "Withdrawal request approved successfully" (amount + Transaction link), purana toast hata diya. TEMP wala `wager: false` wapas `wager: true` — rollover check fir se chalu.
+**Kyun:** F2Pay ₹10 ka payout mana kar raha tha ("amount should between 100.00 - 30000.00"); user ko success ke baad clear popup chahiye tha. F2Pay test ho gaya, isliye wagering check wapas.
+**Files / jagah:** frontend/src/pages/Wallet/Withdraw/FiatForm.jsx (AutoWithdraw, ApprovedPop), backend/services/user/src/modules/withdraw-requirements/withdrawRequirements.js
+
 ## 2026-10-27 — TEMP: withdraw ka wagering (rollover) check band, F2Pay withdrawal test ke liye
 **Kya kiya:** `rules()` me `wager: true` → `wager: false`. Ab koi bhi withdrawal "Complete your wagering requirement…" pe nahi rukta (backend + Withdraw page dono).
 **Kyun:** user ko F2Pay automatic withdrawal test karna hai, test player ka rollover pura nahi tha. **Test ke baad wapas `wager: true` karna hai.**

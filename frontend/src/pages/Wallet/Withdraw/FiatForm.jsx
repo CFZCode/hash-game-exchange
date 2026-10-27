@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import Select from '../../../components/shared/Select';
 import PopCenter from '../../../components/shared/PopCenter';
 import Notice from '../../../components/shared/Notice';
-import { IconArrow, IconClose, IconInform } from '../../../components/shared/icons';
+import { IconArrow, IconCheck, IconClose, IconInform } from '../../../components/shared/icons';
 import { showToast } from '../../../components/shared/Toast/toast';
 import { useSession } from '../../../context/session';
 import { useGates } from '../../../context/gates';
@@ -125,6 +125,33 @@ function SubmittedPop({ onClose }) {
   );
 }
 
+/* THIS BUILD'S — the automatic withdrawal's pop: F2Pay accepted the payout, nobody reviews it. */
+function ApprovedPop({ amount, currencyName, onClose }) {
+  return (
+    <PopCenter open onClose={onClose} label="Withdraw">
+      <div className="space-y-4 text-center">
+        <IconCheck className="icon mx-auto size-12 fill-success" />
+        <div className="text-lg font-extrabold text-primary">Withdrawal request approved successfully</div>
+        <p className="text-secondary">
+          {amount} {getAlias(currencyName)} is on its way to your bank account. If the bank payout fails, the amount
+          comes back to your balance automatically. Track it in
+          <Link
+            className="hover:text-brand-dark mx-1 text-brand underline transition-colors"
+            to="/wallet/transaction?type=withdraw"
+            onClick={onClose}
+          >
+            Transaction
+          </Link>
+          .
+        </p>
+        <button type="button" className="button button-brand button-m mx-auto w-40" onClick={onClose}>
+          OK
+        </button>
+      </div>
+    </PopCenter>
+  );
+}
+
 /* The Withdraw Method choice — THIS BUILD'S, like the deposit tab's: Manual (staff review, the form
    below) or Automatic (F2Pay pays the bank account straight away) when both are open; only one
    open = that one, no choice drawn. Same markup as FiatTab's "Deposit Method". */
@@ -169,6 +196,10 @@ const AUTO_FIELDS = [
   { key: 'bank_code', label: 'IFSC Code' },
 ];
 
+// shortcut: F2Pay's BANK_INR payout range as it refuses today ("amount should between 100.00 - 30000.00"), hard-coded; read it from the backend if F2Pay changes it.
+const AUTO_MIN = 100;
+const AUTO_MAX = 30000;
+
 /* A refused payout's own sentence, plus which field the server named (422 INVALID_PAYOUT_DETAILS). */
 const autoErrorMessage = (reason) => {
   const fields = reason?.fields ?? reason?.details?.fields ?? {};
@@ -187,14 +218,19 @@ function AutoWithdraw({ currencyName }) {
   const [amount, setAmount] = React.useState(null);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState(null);
-  const [done, setDone] = React.useState(false);
+  const [done, setDone] = React.useState(null);
 
   const row = balances.find((coin) => coin.currencyName === currencyName);
   const balance = Math.max(0, Number(row?.generalAmount ?? row?.amount ?? 0) || 0);
-  const min = FIAT_WITHDRAW_MINIMUM;
+  const min = AUTO_MIN;
   const shownAmount = amount ?? min;
 
   const submit = (forfeitBonus = false) => {
+    const value = Number(shownAmount);
+    if (!(value >= AUTO_MIN && value <= AUTO_MAX)) {
+      setError({ message: `Amount must be between ${AUTO_MIN} and ${AUTO_MAX.toLocaleString('en-IN')} ${getAlias(currencyName)}.` });
+      return;
+    }
     setBusy(true);
     setError(null);
     submitAutoWithdraw({
@@ -204,11 +240,10 @@ function AutoWithdraw({ currencyName }) {
       forfeitBonus,
     })
       .then(() => {
-        showToast(`Your withdrawal of ${shownAmount} ${getAlias(currencyName)} has been sent to your bank account.`, { type: 'success' });
         refreshBalances();
         setFields({});
         setAmount(null);
-        setDone(true);
+        setDone(shownAmount);
       })
       .catch((reason) => setError({ code: reason?.code, message: autoErrorMessage(reason) }))
       .finally(() => setBusy(false));
@@ -236,7 +271,9 @@ function AutoWithdraw({ currencyName }) {
         />
       ))}
 
-      <AmountField amount={shownAmount} onAmount={setAmount} min={min} balance={balance} currency={currencyName} precision={2} />
+      {/* `balance` capped at F2Pay's maximum, so Max and the clamp on blur stop there. */}
+      <AmountField amount={shownAmount} onAmount={setAmount} min={min} balance={Math.min(balance, AUTO_MAX)} currency={currencyName} precision={2} />
+      <div className="mt-1 text-tertiary">Max: {AUTO_MAX.toLocaleString('en-IN')} {getAlias(currencyName)}</div>
       <AvailableRow currencyName={currencyName} unlocked={balance} className="mt-5" />
 
       {error && (
@@ -254,7 +291,7 @@ function AutoWithdraw({ currencyName }) {
         {busy ? 'Loading…' : 'Withdraw'}
       </button>
 
-      {done && <SubmittedPop onClose={() => setDone(false)} />}
+      {done != null && <ApprovedPop amount={done} currencyName={currencyName} onClose={() => setDone(null)} />}
     </form>
   );
 }
