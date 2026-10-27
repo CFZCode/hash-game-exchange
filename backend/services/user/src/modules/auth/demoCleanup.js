@@ -6,13 +6,14 @@ const { QueryTypes } = require('@ibitplay/db');
  * Demo accounts (migration 161, user 2026-10-27): once its 30 minutes are up and no sports bet of
  * its is still open, a demo account is deleted with everything it made. Runs in the user-worker.
  *
- * Its rows are found by the user columns the tables use (`user_id`, `uid`, `userid`) in the
+ * Its rows are found by the user columns the tables use (`user_id`, `uid`, `userid`, and
+ * `source_user_id` — its `mssports.point_ledger` rows, migration 162) in the
  * `public` and `mssports` schemas — for ids that ARE demo accounts only, so a real player's row
  * can never match. Tables other tables point at (`mssports.users`, `credits`, …) go last, so no
  * foreign key stops the delete. All of it in one transaction: a failure leaves the account whole
  * for the next run.
  */
-const USER_COLUMNS = ['user_id', 'uid', 'userid'];
+const USER_COLUMNS = ['user_id', 'uid', 'userid', 'source_user_id'];
 const NUMERIC = new Set(['bigint', 'integer', 'smallint', 'numeric']);
 
 async function purgeDemoAccounts({ db, logger }, { limit = 200 } = {}) {

@@ -66,6 +66,7 @@ test('demo accounts', async (t) => {
       await sequelize.query('DELETE FROM mssports."SportsBet" WHERE user_id = :id', { replacements: { id } });
       await sequelize.query('DELETE FROM mssports.users WHERE user_id = :id', { replacements: { id } });
       await sequelize.query('DELETE FROM mssports.point_ledger_direct WHERE user_id = :id', { replacements: { id } });
+      await sequelize.query('DELETE FROM mssports.point_ledger WHERE source_user_id = :id', { replacements: { id } });
       await models.AuthSession.destroy({ where: { user_id: id } });
       await models.Credits.destroy({ where: { uid: id } });
       await models.Users.destroy({ where: { id } });
@@ -92,6 +93,14 @@ test('demo accounts', async (t) => {
 
     const credits = await models.Credits.findOne({ where: { uid: user.id }, raw: true });
     assert.equal(Number(credits.inr), 1500);
+
+    // Its moves are in point_ledger (TENEXCH's demo user), not the direct users' ledger (migration 162).
+    const [[ledger]] = await sequelize.query(
+      `SELECT (SELECT COUNT(*)::int FROM mssports.point_ledger WHERE source_user_id = :id AND delta = 1500) AS points,
+              (SELECT COUNT(*)::int FROM mssports.point_ledger_direct WHERE user_id = :id) AS direct`,
+      { replacements: { id: user.id } }
+    );
+    assert.deepEqual(ledger, { points: 1, direct: 0 });
 
     const row = await models.AuthSession.findOne({ where: { user_id: user.id }, raw: true });
     assert.equal(new Date(row.expires_at).getTime(), new Date(user.demo_expires_at).getTime(), 'the session ends with the demo');
@@ -136,6 +145,8 @@ test('demo accounts', async (t) => {
     assert.equal(await models.Users.count({ where: { id: gone.user.id } }), 0, 'the expired demo is gone');
     assert.equal(await models.Credits.count({ where: { uid: gone.user.id } }), 0, 'with its wallet');
     assert.equal(await models.AuthSession.count({ where: { user_id: gone.user.id } }), 0, 'and its sessions');
+    const [[points]] = await sequelize.query('SELECT COUNT(*)::int AS n FROM mssports.point_ledger WHERE source_user_id = :id', { replacements: { id: gone.user.id } });
+    assert.equal(points.n, 0, 'and its point_ledger rows');
     assert.equal(await models.Users.count({ where: { id: betting.user.id } }), 1, 'an open bet keeps it');
     assert.equal(Number((await models.Credits.findOne({ where: { uid: real.id }, raw: true })).inr), 42, 'a real player is untouched');
 

@@ -379,7 +379,7 @@ function AccountMenu() {
      Vault Pro and Referral. Every row stays with fixtures. */
   const { routeOn, demo } = useGates();
   const rows = ACCOUNT_MENU.filter(
-    (row) => (!row.link || routeOn(row.link)) && (FREE_PLAYS_ENABLED || row.link !== '/free-plays') && Boolean(row.demoOnly) === demo,
+    (row) => (!row.link || routeOn(row.link)) && (FREE_PLAYS_ENABLED || row.link !== '/free-plays') && (!row.demoOnly || demo),
   );
   /* `+ 1` is the Do Not Disturb row; with it hidden (config/hiddenFeatures) the panel is one row shorter. */
   const panelHeight = (rows.length + (DO_NOT_DISTURB_ENABLED ? 1 : 0)) * 44 + 8;

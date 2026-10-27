@@ -364,7 +364,7 @@ function BalanceCard() {
         )}
 
         <div className="mt-1 flex w-full flex-wrap">
-          {TILES.filter((tile) => tile.show && routeOn(tile.link) && Boolean(tile.demoOnly) === demo).map(({ label, Icon, link }) => (
+          {TILES.filter((tile) => tile.show && routeOn(tile.link) && (!tile.demoOnly || demo)).map(({ label, Icon, link }) => (
             <button
               key={link}
               type="button"

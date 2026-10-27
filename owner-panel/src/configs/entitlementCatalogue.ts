@@ -578,7 +578,7 @@ export const FLAG_GROUPS: FlagGroup[] = [
   },
   {
     title: 'Demo login',
-    description: 'ON: a Demo button beside Sign In gives anyone a throwaway account — ₹1500, sports exchange bets only, no bonus or promotions, hidden from the admin — deleted after 30 minutes. OFF: no button, and new demos are refused.',
+    description: 'ON: a Demo Login button in the agent site\'s Sign In popup gives anyone a throwaway account — ₹1500, sports exchange bets only, no bonus or promotions, hidden from the admin — deleted after 30 minutes. OFF: no button, and new demos are refused.',
     keys: ['demo_login']
   },
   {
@@ -649,7 +649,7 @@ export const FLAG_LABELS: Record<string, string> = {
   f2pay_inr: 'INR (UPI)',
   f2pay_usdt: 'Crypto (USDT, TRC20)',
   idle_logout: 'Idle logout (no bet in the first 5 minutes after sign-in)',
-  demo_login: 'Demo login (Demo button: ₹1500, sports only, 30 minutes)',
+  demo_login: 'Demo login (agent Sign In: ₹1500, sports only, 30 minutes)',
   idr: 'IDR',
   home_heroSection: 'Hero carousel',
   home_welcomebanner: 'Welcome banner',

@@ -18,9 +18,10 @@ module.exports = {
   },
   jobs: [
     {
-      // Demo accounts whose 30 minutes are up, with everything they made (demoCleanup.js).
+      // Demo accounts whose 30 minutes are up, with everything they made (demoCleanup.js). Every
+      // minute, so they are gone right after; a run with nothing expired is one indexed read.
       name: 'auth:purge-demo-accounts',
-      intervalMs: Number(process.env.DEMO_PURGE_INTERVAL_MS || 5 * 60_000),
+      intervalMs: Number(process.env.DEMO_PURGE_INTERVAL_MS || 60_000),
       immediate: true,
       run: (container) => require('./demoCleanup').purgeDemoAccounts(container),
     },

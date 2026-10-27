@@ -15,6 +15,12 @@ Format:
 
 ---
 
+## 2026-10-27 — Demo: entries point_ledger me, desktop pe Log Out, purge har 1 min
+**Kya kiya:** (1) Migration 162: `direct_ledger_write` trigger ab demo user (`is_demo`) ki har balance entry `mssports.point_ledger` me likhta hai (wallet_id = uski `credits.id`, source_user_id = demo), `point_ledger_direct` me nahi — TENEXCH ke demo user jaisa. Baaki users ke liye function same. Purge `source_user_id` se point_ledger rows bhi delete karta hai. (2) Bug: desktop account menu me demo ko sirf "Bet History" dikhta tha, **Log Out** gayab tha (demoOnly filter galat tha) — theek; mobile tiles ka filter bhi same. (3) Demo 30 min hi (user ne 15 bola phir 30 hi rakhne ko kaha); purge job ab har 1 min (pehle 5), to expire hote hi data jaldi hat jaata hai. Owner panel ka text "agent Sign In popup … 30 minutes".
+**Kyun:** user: demo entry point_ledger me, direct me nahi; logout ka option; time ke baad data hate.
+**Files / jagah:** migrations/162-demo-point-ledger.js, auth/demoCleanup.js, auth/index.js, demoLogin.test.js; frontend Header/AfterLogin/index.jsx, UserEnter/Panels.jsx; owner-panel entitlementCatalogue.ts
+**Notes:** demo test 5/5, direct-ledger wale tests 85/85. Live: migration 162 chali; naye demo → point_ledger 1, point_ledger_direct 0; desktop menu "Bet History, Log Out", mobile "Bet History, Sign Out"; worker purge interval 60000.
+
 ## 2026-10-27 — Demo game card theme ke hisaab se
 **Kya kiya:** Demo account ke game card me: brand green lock icon (gol halke green background me), bold "Real account needed", "Please sign in with a real user to play this game.", aur brand button **Play Sports** (→ `/sports`, agent site pe `/agent/sports`). Sab theme tokens (brand / primary / secondary / tertiary), light theme me bhi apne aap.
 **Kyun:** user: validation popup theme ke hisaab se accha dikhe.
