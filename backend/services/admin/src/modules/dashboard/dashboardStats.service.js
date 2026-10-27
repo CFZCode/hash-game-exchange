@@ -27,7 +27,7 @@ const { gisKindSql, gisSideAmountSql, gisBetCountSql, gisPlayFilterSql } = requi
  *                definition User reports and the Users page share). The Super
  *                Admin's Direct User Wallet credit / debit is neither a deposit
  *                nor a withdrawal (owner, 19 Oct 2026).
- *   withdrawals  withdrawals + fiat_withdrawals, withdrawn statuses (bank
+ *   withdrawals  withdrawals + fiat_withdrawals + f2paywithdrawals, withdrawn statuses (bank
  *                Approved or Paid, crypto Sent — WITHDRAWAL_DONE)
  *   casino       the four casino sources as `bet-history/profileStats.js`
  *                defines them: in-house `bets` (not refunded), Slotegrator
@@ -132,6 +132,7 @@ const COUNT_KEYS = Object.freeze(['depositCount', 'withdrawalCount', 'registrati
 const MONEY_SOURCES = Object.freeze([
   { side: 'withdrawal', table: 'withdrawals', date: 'date', owner: 'uid', amount: 'amount', currency: 'coin', statuses: WITHDRAWAL_DONE.withdrawals },
   { side: 'withdrawal', table: 'fiat_withdrawals', date: 'date', owner: 'uid', amount: 'amount', currency: 'currency', statuses: WITHDRAWAL_DONE.fiat_withdrawals },
+  { side: 'withdrawal', table: 'f2paywithdrawals', date: 'created_at', owner: 'user_id', amount: 'amount', currency: 'currency', statuses: WITHDRAWAL_DONE.f2paywithdrawals },
 ]);
 
 /** 'Cricket' for '4'; "Sport 99" for an id the map does not know; 'Other' when the bet has none. */

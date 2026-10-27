@@ -15,6 +15,12 @@ Format:
 
 ---
 
+## 2026-10-27 — F2Pay withdrawal admin dashboard chart me bhi + F2Pay data audit
+**Kya kiya:** Dashboard ka deposits/withdrawals chart (`stats/series`) sirf `withdrawals` + `fiat_withdrawals` padhta tha — `f2paywithdrawals` (Success) joda. Baaki jagah check kiya, F2Pay pehle se aa raha tha: dashboard headline + drill-down (movements), Transactions → Withdraw/Deposit → Fiat, Users list Deposits/Withdrawals + upar ke cards, balance sheet, finance/player stats, statements. F2Pay deposits sab jagah (depositRails). `point_ledger_direct` me F2Pay deposit (+500), withdrawal hold (-10, -100) aur refund (+10) sab rows hain.
+**Kyun:** user: F2Pay withdraw ka data bhi har jagah dikhe jahan baaki withdraw dikhte hain; deposit aur direct ledger bhi check.
+**Files / jagah:** backend/services/admin/src/modules/dashboard/dashboardStats.service.js
+**Notes / pending:** ₹100 F2Pay payout (WD_1793114441952_6cd937034923) 15:20 UTC se Pending — F2Pay ka payout callback abhi tak nahi aaya. Dashboard tests 40/42 (2 fail pehle se, change ke bina bhi).
+
 ## 2026-10-27 — Manual withdrawal toggle ab website pe bhi lagta hai
 **Kya kiya:** Admin → Transactions → Withdraw → Manual ka Super Admin "Manual withdrawals ON / OFF" switch pehle se tha aur backend mana karta tha (MANUAL_WITHDRAW_DISABLED), par website form dikhata rehta tha. Ab `gates.manualWithdraw()` `/me` capabilities.manualWithdraw bhi dekhta hai: OFF = Withdraw me Manual form/tab nahi dikhta (Automatic chalu ho to sirf wahi). Dono band = "Bank withdrawals are not available right now." Gate test +1.
 **Kyun:** user: deposit jaisa — Super Admin OFF kare to website se manual withdraw na ho.
