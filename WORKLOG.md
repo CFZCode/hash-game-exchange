@@ -15,6 +15,11 @@ Format:
 
 ---
 
+## 2026-10-27 — Manual deposit approve: amount ab edit nahi hota
+**Kya kiya:** Admin → Transactions → Deposit → Manual → Approve dialog me "Credit amount" ab sirf dikhta hai (disabled), badla nahi ja sakta. Approve pe sirf transaction password jaata hai, player ne jitna amount bheja utna hi credit hota hai. Kam amount + reason wala field hata diya.
+**Kyun:** user: approve karte waqt amount editable nahi hona chahiye.
+**Files / jagah:** admin/src/views/finance/FiatDeposits.tsx (Approve)
+
 ## 2026-10-27 — Admin Deposit → Manual: Super Admin ka "Manual deposits ON / OFF" toggle wapas
 **Kya kiya:** Transactions → Deposit → Direct Users → Manual ke upar `ManualSwitch kind='deposit'` wapas lagaya (Withdraw wale jaisa). OFF = website pe manual deposit ka option chhup jaata hai (`gates.manualDeposit()` → `/me` capabilities.manualDeposit) aur backend bhi mana karta hai (MANUAL_DEPOSIT_DISABLED). Sirf Super Admin badal sakta hai, transaction password ke saath. Naya code nahi — switch, API aur gate pehle se the, sirf admin me dikhna band tha (362be175).
 **Kyun:** user chahta hai manual deposit website pe tabhi dikhe jab Super Admin ne ON kiya ho.
