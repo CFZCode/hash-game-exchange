@@ -15,6 +15,11 @@ Format:
 
 ---
 
+## 2026-10-27 — Admin Deposit → Manual: Super Admin ka "Manual deposits ON / OFF" toggle wapas
+**Kya kiya:** Transactions → Deposit → Direct Users → Manual ke upar `ManualSwitch kind='deposit'` wapas lagaya (Withdraw wale jaisa). OFF = website pe manual deposit ka option chhup jaata hai (`gates.manualDeposit()` → `/me` capabilities.manualDeposit) aur backend bhi mana karta hai (MANUAL_DEPOSIT_DISABLED). Sirf Super Admin badal sakta hai, transaction password ke saath. Naya code nahi — switch, API aur gate pehle se the, sirf admin me dikhna band tha (362be175).
+**Kyun:** user chahta hai manual deposit website pe tabhi dikhe jab Super Admin ne ON kiya ho.
+**Files / jagah:** admin/src/views/transactions/Transactions.tsx
+
 ## 2026-10-27 — Automatic withdraw: ₹100–₹30,000 ki limit + "approved successfully" popup; wagering check wapas chalu
 **Kya kiya:** Wallet → Withdraw → Automatic me amount ₹100 se kam ya ₹30,000 se zyada ho to form wahi rok deta hai (Max button bhi 30,000 pe rukta hai, niche "Max: 30,000 INR" likha). Payout accept hone pe naya popup "Withdrawal request approved successfully" (amount + Transaction link), purana toast hata diya. TEMP wala `wager: false` wapas `wager: true` — rollover check fir se chalu.
 **Kyun:** F2Pay ₹10 ka payout mana kar raha tha ("amount should between 100.00 - 30000.00"); user ko success ke baad clear popup chahiye tha. F2Pay test ho gaya, isliye wagering check wapas.
