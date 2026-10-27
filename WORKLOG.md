@@ -15,6 +15,12 @@ Format:
 
 ---
 
+## 2026-10-27 — Demo user: game page pe "Please sign in with a real user to play this game."
+**Kya kiya:** Demo account Original / GIS (koi bhi casino) game kholta hai to Play wala card (currency sentence + Balance + Play button) ki jagah sirf "Please sign in with a real user to play this game." Toast hataya (card hi bata deta hai). Bug bhi theek: page reload pe gates (/me) aane se pehle auto-launch chal jaata tha → backend DEMO_NOT_ALLOWED → "Under Maintenance" popup; ab auto-launch aur Play gates ready hone tak rukte hain.
+**Kyun:** user: demo user ko game pe "please sign in with real user to play this game" dikhe.
+**Files / jagah:** frontend/src/pages/Game/index.jsx (PlayOverlay `demo`, play / autoKey `gatesReady`)
+**Notes:** Browser (agent site, demo): slot `90spins-by-espressogames` aur Original `limbo` dono pe sirf naya message, maintenance popup nahi.
+
 ## 2026-10-27 — Demo Login ab sirf agent site ke Sign In popup me
 **Kya kiya:** Header (desktop + mobile) se Demo button hataya, mobile header wapas pehle jaisa (wide logo). **Demo Login** button ab sirf `/agent` site ke Sign In popup me, Sign In ke neeche (owner flag `demo_login` ON ho tab). Demo account `/agent` site pe hi rehta hai (agent player jaisa, `/agent/sports`). Messages "Sign up…" ki jagah "Use a real ID…" (agent site pe sign up nahi): casino toast + backend DEMO_NOT_ALLOWED, demo khatam hone ka toast, DEMO_EXPIRED.
 **Kyun:** user: demo button upar header me nahi, sirf sign in popup me, aur sirf agent sign in page pe.

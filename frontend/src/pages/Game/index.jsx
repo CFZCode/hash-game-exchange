@@ -8,7 +8,7 @@ import { useResource } from '../../hooks/useResource';
 import { useSession } from '../../context/session';
 import PopCenter from '../../components/shared/PopCenter';
 import Select from '../../components/shared/Select';
-import { toast, showToast } from '../../components/shared/Toast/toast';
+import { toast } from '../../components/shared/Toast/toast';
 import { useGates } from '../../context/gates';
 import { getGame, launchGame, launchCurrency } from '../../services/game';
 import { tagWords } from '../../services/catalog';
@@ -189,7 +189,7 @@ function GameUnavailable({ open, onClose }) {
  * this game's route cannot settle takes. The picker lists only the wallets it CAN settle, so the
  * fix is one tap away; picking writes `setting.currencyName`, the header's own selection, as
  * `We`'s `onChange` does. */
-function PlayOverlay({ game, login, currencyName, balances, setting, launching, onPlay, onSignIn, onPickCurrency }) {
+function PlayOverlay({ game, login, demo, currencyName, balances, setting, launching, onPlay, onSignIn, onPickCurrency }) {
   const code = launchCurrency(game, currencyName);
   const alias = getAlias(currencyName || 'INRFIAT');
   /* The wallet's real balance beside its code, in the wallet's OWN currency (`target` pins it, so
@@ -218,7 +218,10 @@ function PlayOverlay({ game, login, currencyName, balances, setting, launching, 
   return (
     <div className="game-overlay absolute inset-0 z-20 flex items-center justify-center bg-black/60 px-4">
       <div className="game-overlay-card w-full max-w-[30rem] rounded-xl bg-layer3 p-8">
-        {login ? (
+        {/* A demo account (Demo Login) cannot play casino games (user, 2026-10-27). */}
+        {demo ? (
+          <p className="mb-0 text-center text-sm font-semibold text-secondary">Please sign in with a real user to play this game.</p>
+        ) : login ? (
           <>
             <div className="items-left flex flex-col justify-center gap-2">
               {choices.length ? (
@@ -547,7 +550,7 @@ export default function GamePage() {
   const { gameUnique = '' } = useParams();
   const { session, balances, setSetting } = useSession();
   const navigate = useNavigate();
-  const { demo } = useGates();
+  const { demo, ready: gatesReady } = useGates();
 
   /* `attempt` re-runs the read from the inline Retry below. A FAILED read (429 rate limit, 5xx,
      network) is NOT a game missing from the catalogue: it used to fall into `missing` and print
@@ -596,12 +599,9 @@ export default function GamePage() {
       navigate(`/login/signin?redirect=${encodeURIComponent(`/game/${gameUnique}`)}`);
       return;
     }
-    if (!game || launching) return;
-    // A demo account bets on sports only; the backend refuses its launch too (DEMO_NOT_ALLOWED).
-    if (demo) {
-      showToast('Demo accounts can only bet on sports. Use a real ID to play casino games.', { type: 'error' });
-      return;
-    }
+    if (!game || launching || !gatesReady) return;
+    // A demo account bets on sports only: the overlay says so, and the backend refuses its launch too (DEMO_NOT_ALLOWED).
+    if (demo) return;
     setLaunching(true);
     const target = gameUnique;
     try {
@@ -625,7 +625,8 @@ export default function GamePage() {
 
   /* Signed in, the game launches on arrival (owner's call: no Play card for a player). Once per
      game + coin, so closing the frame or a refused launch falls back to the overlay, not a loop. */
-  const autoKey = session.login && game && currentCode ? `${gameUnique}:${currentCode}` : null;
+  // Waits for the gates: until /me answers, a demo account would read as a player and launch (refused, "Under Maintenance").
+  const autoKey = session.login && gatesReady && game && currentCode ? `${gameUnique}:${currentCode}` : null;
   const autoLaunched = React.useRef(null);
   React.useEffect(() => {
     if (!autoKey || autoLaunched.current === autoKey) return;
@@ -766,6 +767,7 @@ export default function GamePage() {
                 <PlayOverlay
                   game={game}
                   login={session.login}
+                  demo={demo}
                   currencyName={session.setting?.currencyName}
                   balances={balances}
                   setting={session.setting}
