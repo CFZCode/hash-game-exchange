@@ -599,7 +599,7 @@ export default function GamePage() {
     if (!game || launching) return;
     // A demo account bets on sports only; the backend refuses its launch too (DEMO_NOT_ALLOWED).
     if (demo) {
-      showToast('Demo accounts can only bet on sports. Sign up to play casino games.', { type: 'error' });
+      showToast('Demo accounts can only bet on sports. Use a real ID to play casino games.', { type: 'error' });
       return;
     }
     setLaunching(true);

@@ -15,6 +15,12 @@ Format:
 
 ---
 
+## 2026-10-27 — Demo Login ab sirf agent site ke Sign In popup me
+**Kya kiya:** Header (desktop + mobile) se Demo button hataya, mobile header wapas pehle jaisa (wide logo). **Demo Login** button ab sirf `/agent` site ke Sign In popup me, Sign In ke neeche (owner flag `demo_login` ON ho tab). Demo account `/agent` site pe hi rehta hai (agent player jaisa, `/agent/sports`). Messages "Sign up…" ki jagah "Use a real ID…" (agent site pe sign up nahi): casino toast + backend DEMO_NOT_ALLOWED, demo khatam hone ka toast, DEMO_EXPIRED.
+**Kyun:** user: demo button upar header me nahi, sirf sign in popup me, aur sirf agent sign in page pe.
+**Files / jagah:** frontend Header/index.jsx (wapas), components/modals/Auth/DemoButton.jsx (Header se move) + Auth/index.jsx, context/GatesContext.jsx, pages/Game/index.jsx; backend casino games/in-house errors, user auth.errors.
+**Notes:** Browser (desktop + 390 mobile): main site header + Sign In popup me Demo 0; `/agent/login/signin` me 1; click → `/agent/sports`, DEMO badge, ₹1500.
+
 ## 2026-10-27 — Demo login (TENEXCH jaisa): Demo button, ₹1500, sirf sports exchange, 30 min, phir delete; admin me kahin nahi
 **Kya kiya:**
 - **Owner panel → "Demo login"** switch (`demo_login`, default ON). OFF = button gayab aur backend mana (DEMO_DISABLED).

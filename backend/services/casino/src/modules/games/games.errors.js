@@ -64,7 +64,7 @@ module.exports = defineErrors('GAMES', {
   },
 
   // A demo account (`users.is_demo`) bets on the sports exchange only: every game launch refuses it.
-  DEMO_NOT_ALLOWED: { status: 403, message: 'Demo accounts can only bet on sports. Sign up to play casino games.' },
+  DEMO_NOT_ALLOWED: { status: 403, message: 'Demo accounts can only bet on sports. Use a real ID to play casino games.' },
 
   LOGO_NOT_FOUND: { status: 404, message: 'No logo for this provider' },
   ARTWORK_NOT_FOUND: { status: 404, message: 'No artwork by this name' },

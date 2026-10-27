@@ -35,7 +35,7 @@ module.exports = defineErrors('AUTH', {
   },
   DEMO_EXPIRED: {
     status: 401,
-    message: 'Your demo session has ended. Start a new demo or sign up.',
+    message: 'Your demo session has ended. Start a new demo or use a real ID.',
   },
   TOO_MANY_ATTEMPTS: {
     status: 429,

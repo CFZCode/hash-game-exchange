@@ -34,6 +34,7 @@ import '../../shared/DialogShell/DialogShell.css';
 import { PASSKEY_ENABLED, SOCIAL_LOGINS } from '../../../config/hiddenFeatures';
 import { startGoogleLogin, useGoogleLogin } from '../../../services/googleAuth';
 import { underAgentBase } from '../../../services/agentBase';
+import DemoButton from './DemoButton';
 
 /* The sign-in / sign-up dialog.
  *
@@ -387,6 +388,8 @@ function SignInForm({ onSubmit, pending, error, onForgot }) {
               )}
             </button>
           </form>
+          {/* The agent site's Sign In only (owner panel `demo_login`). */}
+          {agentSite && <DemoButton className="button button-second button-l mt-3 h-14 w-full rounded-xl text-base" />}
       </div>
 
       {(PASSKEY_ENABLED || thirdParty.length > 0) && (

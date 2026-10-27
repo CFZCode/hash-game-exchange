@@ -8,10 +8,8 @@ import LanguageCurrencyModal from '../../../components/modals/LanguageCurrencyMo
 import { useSession } from '../../../context/session';
 import { useCanSignUp, useGates } from '../../../context/gates';
 import { useSettings } from '../../../context/settings';
-import { siteName, useSiteLogo, useSiteMark } from '../../../services/siteBranding';
-import logoSmall from '../../../assets/logo_small.png';
+import { siteName, useSiteLogo } from '../../../services/siteBranding';
 import AfterLogin, { MobileAfterLogin } from './AfterLogin';
-import DemoButton from './DemoButton';
 import './Header.css';
 import { useSiteCurrency } from '../../../hooks/useSiteCurrency';
 
@@ -98,10 +96,7 @@ export default function Header({
   const navigate = useNavigate();
   const { session } = useSession();
   const siteCurrency = useSiteCurrency();
-  const { agentPlayer, flag } = useGates();
-  /* Sign In + Demo + Sign Up do not fit beside the wide logo on a phone, so with the owner's Demo
-     login on the signed-out phone header takes the square mark the signed-in one already uses. */
-  const demoOn = flag('demo_login');
+  const { agentPlayer } = useGates();
   /* Off on a B2B site (context/gates.js): Sign In stays, Sign Up is not rendered. */
   const canSignUp = useCanSignUp();
 
@@ -125,7 +120,6 @@ export default function Header({
   /* The owner uploads ONE logo, drawn for the dark theme (white "PARKER"); on the light theme it
      vanishes against the light header, so it is inverted there (index.css `.brand-logo-on-light`). */
   const logoTone = brandLogo && !darken ? ' brand-logo-on-light' : '';
-  const mark = useSiteMark({ light: !darken });
 
   const [langModalOpen, setLangModalOpen] = React.useState(false);
   const [langModalTab, setLangModalTab] = React.useState('language');
@@ -228,7 +222,6 @@ export default function Header({
               >
                 Sign In
               </button>
-              <DemoButton className="button button-m ml-1 h-10 rounded-lg border-2 border-solid border-third px-4 text-base font-semibold" />
 
               {canSignUp && (
               <button
@@ -315,11 +308,7 @@ export default function Header({
         <div className="flex size-full items-center overflow-hidden px-4">
           <div className="text-[0] flex-none">
             <NavLink to="/">
-              {demoOn ? (
-                <img alt={(mark && siteName()) || 'logo'} className={mark ? 'h-10 w-10 object-contain' : 'h-9 w-9'} src={mark ?? logoSmall} />
-              ) : (
-                <img alt={logoAlt} className={`mobile-logo-img object-contain${logoTone}`} src={logo} />
-              )}
+              <img alt={logoAlt} className={`mobile-logo-img object-contain${logoTone}`} src={logo} />
             </NavLink>
           </div>
           <button
@@ -329,7 +318,6 @@ export default function Header({
           >
             Sign In
           </button>
-          <DemoButton className="button mobile-header-btn ml-1 break-all rounded-lg border-[2px] border-white_alpha20 px-2 text-base font-extrabold !leading-none flex-none" />
           {canSignUp && (
           <button
             className="button button-brand mobile-header-btn mobile-signup-btn ml-1 break-all rounded-lg px-2 text-base !leading-none flex-none"
