@@ -15,6 +15,12 @@ Format:
 
 ---
 
+## 2026-10-27 — F2Pay ka adhoora (non-final) callback ab audit log me save hota hai
+**Kya kiya:** Deposit aur payout callback jab final state (Paid / Completed / Failed / Closed) nahi hota to pehle chupchap 200 deta tha, body kahin save nahi hoti thi. Ab `psp_callback_log` me ek row (`rejection_code = NOT_FINAL`, poora signed payload) likhti hai. Paisa / status kuch nahi badalta, digest reserve nahi hota.
+**Kyun:** ₹100 payout (WD_1793114441952_6cd937034923) ka callback 17:32 UTC pe F2Pay (13.228.197.106) se aaya, signature sahi, 200 diya, par row Pending hi rahi — F2Pay ne kaunsa status bheja ye pata hi nahi chal sakta tha.
+**Files / jagah:** backend/services/user/src/modules/psp/psp.service.js
+**Notes:** PSP tests 35/35.
+
 ## 2026-10-27 — 2 purane fail test theek kiye (bug nahi tha)
 **Kya kiya:** (1) Dashboard chart test `USD` maang raha tha — dashboard ab owner ki default coin (USDT, unset ho to) me dikhata hai (b5570102), USDT = USD 1:1, isliye sirf test ki expectation `USDT` ki. (2) Manual deposit test kam amount (450 of 500) bina reason ke approve kar raha tha — backend ab reason maangta hai (CREDIT_REASON_REQUIRED), test me reason joda. App ka code nahi badla.
 **Kyun:** user: fail kyun hue, koi bug to nahi — dono test purane the, code sahi.

@@ -112,8 +112,10 @@ class PspService {
       return { status: 'ok', duplicate: true, reference: parsed.reference };
     }
 
-    // An in-between state (F2Pay reports more than paid / failed): nothing to do yet.
+    // An in-between state (F2Pay reports more than paid / failed): nothing to do yet. Kept in the
+    // audit log so the state the provider sent can be read later.
     if (parsed.status === PSP_STATUS.PENDING) {
+      await this.#record(audit, { accepted: false, rejection: 'NOT_FINAL' });
       return { status: 'ok', settled: false, reference: parsed.reference };
     }
 
@@ -305,6 +307,7 @@ class PspService {
 
     // ── Still in flight (F2Pay's Processing): nothing to do until a final state arrives. ──
     if (parsed.status === PSP_STATUS.PENDING) {
+      await this.#record(audit, { accepted: false, rejection: 'NOT_FINAL' });
       return { status: 'ok', settled: false, pending: true, reference: parsed.reference };
     }
 
