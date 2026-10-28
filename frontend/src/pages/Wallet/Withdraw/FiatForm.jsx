@@ -152,6 +152,46 @@ function ApprovedPop({ amount, currencyName, onClose }) {
   );
 }
 
+/* THIS BUILD'S — the losing-bonus confirmation (user, 2026-10-28): a withdrawal while a bonus is
+   still locked is refused with BONUS_FORFEIT_REQUIRED; this asks before resending with
+   `forfeitBonus: true`. `details.bonuses` is the server's list of what would be lost; `title` and
+   `message` are the site admin's copy (Limits and policy → Bonus), this text when unset. */
+function ForfeitPop({ details, busy, onConfirm, onClose }) {
+  const bonuses = details?.bonuses ?? [];
+  return (
+    <PopCenter open onClose={onClose} label="Withdraw">
+      <div className="space-y-4 text-center">
+        <IconInform className="icon mx-auto size-12 fill-warning" />
+        <div className="text-lg font-extrabold text-primary">{details?.title || 'You will lose your bonus'}</div>
+        <p className="text-secondary">
+          {details?.message ||
+            'Your bonus is still locked: its wagering is not complete. If you withdraw now, the locked bonus is forfeited and cannot be recovered. Your cash balance is not affected.'}
+        </p>
+        {bonuses.length > 0 && (
+          <div className="rounded-lg bg-layer4 p-3 text-left">
+            {bonuses.map((bonus) => (
+              <div key={bonus.id} className="flex justify-between">
+                <span className="text-secondary">Bonus to forfeit</span>
+                <span className="font-extrabold text-primary">
+                  {Number(bonus.amount).toLocaleString('en-IN', { maximumFractionDigits: 2 })} {getAlias(bonus.currency)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="flex gap-3">
+          <button type="button" className="button button-second button-m flex-1" disabled={busy} onClick={onClose}>
+            Cancel
+          </button>
+          <button type="button" className="button button-brand button-m flex-1" disabled={busy} onClick={onConfirm}>
+            {busy ? 'Loading…' : 'Forfeit bonus and withdraw'}
+          </button>
+        </div>
+      </div>
+    </PopCenter>
+  );
+}
+
 /* The Withdraw Method choice — THIS BUILD'S, like the deposit tab's: Manual (staff review, the form
    below) or Automatic (F2Pay pays the bank account straight away) when both are open; only one
    open = that one, no choice drawn. Same markup as FiatTab's "Deposit Method". */
@@ -248,7 +288,7 @@ function AutoWithdraw({ currencyName }) {
         setAmount(null);
         setDone(shownAmount);
       })
-      .catch((reason) => setError({ code: reason?.code, message: autoErrorMessage(reason) }))
+      .catch((reason) => setError({ code: reason?.code, message: autoErrorMessage(reason), details: reason?.details }))
       .finally(() => setBusy(false));
   };
 
@@ -279,15 +319,13 @@ function AutoWithdraw({ currencyName }) {
       <div className="mt-1 text-tertiary">Max: {AUTO_MAX.toLocaleString('en-IN')} {getAlias(currencyName)}</div>
       <AvailableRow currencyName={currencyName} unlocked={balance} className="mt-5" />
 
-      {error && (
+      {error && error.code !== 'BONUS_FORFEIT_REQUIRED' && (
         <Notice type="error" className="mt-5 font-normal">
           {error.message}
         </Notice>
       )}
       {error?.code === 'BONUS_FORFEIT_REQUIRED' && (
-        <button type="button" className="button button-second button-m mt-2 w-full" disabled={busy} onClick={() => submit(true)}>
-          Forfeit bonus and withdraw
-        </button>
+        <ForfeitPop details={error.details} busy={busy} onConfirm={() => submit(true)} onClose={() => setError(null)} />
       )}
 
       <button type="submit" disabled={busy || balance < min} className="button button-brand button-m my-4 w-full">
@@ -372,7 +410,7 @@ function ManualWithdraw({ currencyName }) {
         setAmount(null);
         setDone(true);
       })
-      .catch((reason) => setError({ code: reason?.code, message: withdrawErrorMessage(reason) }))
+      .catch((reason) => setError({ code: reason?.code, message: withdrawErrorMessage(reason), details: reason?.details }))
       .finally(() => setBusy(false));
   };
 
@@ -524,20 +562,13 @@ function ManualWithdraw({ currencyName }) {
         />
         <AvailableRow currencyName={currencyName} unlocked={balance} className="mt-5" />
 
-        {error && (
+        {error && !canForfeit && (
           <Notice type="error" className="mt-5 font-normal">
             {error.message}
           </Notice>
         )}
         {canForfeit && (
-          <button
-            type="button"
-            className="button button-second button-m mt-2 w-full"
-            disabled={busy}
-            onClick={() => submit(true)}
-          >
-            Forfeit bonus and withdraw
-          </button>
+          <ForfeitPop details={error.details} busy={busy} onConfirm={() => submit(true)} onClose={() => setError(null)} />
         )}
 
         <button

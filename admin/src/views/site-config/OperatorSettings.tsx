@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
+import { Textarea } from '@/components/ui/textarea'
 import { useSession } from '@/contexts/SessionContext'
 import { useApi, useApiMutation } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
@@ -39,7 +40,7 @@ import { check, cleanErrors, firstError } from '@/lib/validate'
 type Setting = {
   key: string
   label: string
-  kind: 'number' | 'decimal' | 'boolean' | 'timezone'
+  kind: 'number' | 'decimal' | 'boolean' | 'timezone' | 'text'
   env: string
   envValue: string | null
   stored: string | number | boolean | null
@@ -47,6 +48,7 @@ type Setting = {
   source: 'operator' | 'environment'
   min?: number
   max?: number
+  maxLength?: number
 }
 
 const GROUPS: { title: string; hint: string; keys: string[] }[] = [
@@ -59,6 +61,11 @@ const GROUPS: { title: string; hint: string; keys: string[] }[] = [
     title: 'User accounts',
     hint: 'How a sign-in locks, how many sessions a user keeps, whether a player with no bet is signed out 5 minutes after sign-in, and whether an email must be verified before money moves.',
     keys: ['login_max_attempts', 'login_lock_minutes', 'max_active_sessions', 'idle_logout', 'require_email_verification']
+  },
+  {
+    title: 'Bonus',
+    hint: 'Whether a granted bonus stays locked until it is wagered (only while the owner panel has the lock on too), whether a player may give a locked bonus up to withdraw, and the popup the player confirms that in.',
+    keys: ['bonus_wagering_lock', 'bonus_forfeit_allowed', 'bonus_forfeit_title', 'bonus_forfeit_message']
   }
 ]
 
@@ -127,6 +134,16 @@ const OperatorSettings = () => {
         continue
       }
 
+      if (s.kind === 'text') {
+        const text = String(v).trim()
+
+        if (!text) found[key] = `${s.label} is required — use Reset to default instead`
+        else if (s.maxLength && text.length > s.maxLength) found[key] = `${s.label} must be ${s.maxLength} characters or fewer`
+        else if (/[<>]/.test(text)) found[key] = `${s.label} cannot contain < or >`
+
+        continue
+      }
+
       found[key] = check.number(String(v), s.label, { min: s.min ?? 0, max: s.max, integer: s.kind === 'number' })
     }
 
@@ -172,6 +189,35 @@ const OperatorSettings = () => {
           disabled={!canWrite}
           onCheckedChange={v => setDraft(d => ({ ...d, [s.key]: v }))}
         />
+      )
+    }
+
+    if (s.kind === 'text') {
+      const Field = (s.maxLength ?? 0) > 100 ? Textarea : Input
+
+      return (
+        <span className='grid gap-1'>
+          <Field
+            className='w-80 text-sm'
+            value={current === null || current === undefined ? '' : String(current)}
+            maxLength={s.maxLength}
+            disabled={!canWrite}
+            aria-invalid={errors[s.key] ? true : undefined}
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+              const value = e.target.value
+
+              setDraft(d => ({ ...d, [s.key]: value }))
+              setErrors(prev => {
+                const next = { ...prev }
+
+                delete next[s.key]
+
+                return next
+              })
+            }}
+          />
+          {errors[s.key] && <span className='text-destructive w-80 text-xs'>{errors[s.key]}</span>}
+        </span>
       )
     }
 
