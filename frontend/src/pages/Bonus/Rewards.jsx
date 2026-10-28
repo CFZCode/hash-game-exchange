@@ -10,6 +10,7 @@ import { walletCode } from '../../utils/currency';
 import { useSelectedCurrency } from '../../hooks/useSelectedCurrency';
 import { coinIcon } from '../../utils/coinArt';
 import LevelCard from './LevelCard';
+import LossBonus from './LossBonus';
 import { REWARD_TYPES, COUNTDOWN, isRecurringReward } from './bonus';
 import { RewardType } from './rewardTypes';
 import * as icons from './icons';
@@ -403,6 +404,8 @@ export default function Rewards({ payload, sections, mobile = false, loading = f
         <LevelCard session={session} />
         <TotalClaimable payload={payload} onClaimed={onClaimed} />
       </div>
+
+      <LossBonus onClaimed={onClaimed} />
 
       <div className="flex flex-col gap-3 @container">
         {/* THE LEVEL CARD IS NOT GATED WITH THE SECTIONS, and that is not a shortcut: it reads

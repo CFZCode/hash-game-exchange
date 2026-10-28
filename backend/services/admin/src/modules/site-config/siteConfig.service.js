@@ -163,6 +163,16 @@ const OPERATOR_SETTINGS = Object.freeze({
     default: 'Your bonus is still locked because its wagering requirement has not been met. If you withdraw now, the locked bonus will be forfeited and cannot be recovered. Your cash balance will not be affected.',
     label: 'Forfeit popup message',
   },
+
+  // Loss bonus (lossback), read by user-service's LossBonusService (user, 2026-10-28): a share of a
+  // player's net loss over the last completed period, claimed by the player. Amounts are in the
+  // site's reward currency; OFF until the Super Admin turns it on.
+  loss_bonus_enabled: { env: 'LOSS_BONUS_ENABLED', kind: 'boolean', default: false, label: 'Loss bonus on' },
+  loss_bonus_percent: { env: 'LOSS_BONUS_PERCENT', kind: 'decimal', min: 0, max: 100, default: '10', label: 'Loss bonus % of net loss' },
+  loss_bonus_period_days: { env: 'LOSS_BONUS_PERIOD_DAYS', kind: 'number', min: 1, max: 31, default: 7, label: 'Period (days; 7 = Monday to Monday, 1 = daily)' },
+  loss_bonus_min_loss: { env: 'LOSS_BONUS_MIN_LOSS', kind: 'decimal', min: 0, default: '0', label: 'Minimum net loss to qualify' },
+  loss_bonus_max: { env: 'LOSS_BONUS_MAX', kind: 'decimal', min: 0, default: '0', label: 'Maximum bonus per period (0 = no cap)' },
+  loss_bonus_wager_multiplier: { env: 'LOSS_BONUS_WAGER_MULTIPLIER', kind: 'decimal', min: 0, max: 100, default: '1', label: 'Wager before the bonus becomes cash (× bonus; 0 = cash at once)' },
 });
 
 /** A pair whose maximum may not sit under its minimum. */
