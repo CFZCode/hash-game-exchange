@@ -15,6 +15,12 @@ Format:
 
 ---
 
+## 2026-10-28 — Player site ka platform socket ab WebSocket pe (polling nahi)
+**Kya kiya:** `frontend/src/services/realtime.js`: socket.io ab `transports: ['websocket', 'polling']` + `tryAllTransports: true` — seedha WebSocket khulta hai; polling sirf tab jab WebSocket na khul paaye. Balance, exposure, me/profile ka 2 s `SYNC_STATE` aur `C.CREDIT` push ab ek khule WebSocket pe frames hain, alag HTTP requests nahi. Purana `NEXT_PUBLIC_SOCKET_TRANSPORT` env knob hata diya (kahin set nahi tha).
+**Kyun:** user: "pooling na karke websocket me karna hai … jaise tenexch me". Pehle har 2 s + har push `/socket.io?transport=polling` ki HTTP request thi.
+**Files / jagah:** frontend/src/services/realtime.js
+**Notes:** Backend/Apache me kuch nahi badla — Apache vhost me Upgrade rewrite aur gateway `wsProxy.js` pehle se `/socket.io` WebSocket carry karte the. Live check: node client `wss://api.parker567.com/socket.io` websocket-only connect + SYNC_STATE reply; headless Chrome me parker567.com 12 s: 1 WebSocket, 0 polling request, 7 frames. Signed-in player ke saath browser me alag se check nahi kiya (handshake same `auth` callback hai). 2 s tick abhi bhi chalta hai (backend pe DB reads utne hi).
+
 ## 2026-10-28 — Frontend: build ke time live site "This page couldn't load" nahi dikhayega
 **Kya kiya:** pm2 `parker-frontend` ab `frontend/scripts/start-live.sh` se chalta hai: live `.next-live` se serve hota hai (`NEXT_DIST_DIR`, next.config `distDir`), jo har (re)start pe last FINISHED build (`.next/BUILD_ID` naya ho tab) ki copy hai. `npm run build` sirf `.next` me likhta hai, live ko chhoota hi nahi. Flow same: `npm run build` + `pm2 restart parker-frontend`.
 **Kyun:** user ka screenshot: mobile pe kabhi kabhi Next ka "This page couldn't load". Wajah: `next build` usi `.next` ko mita ke dobara likhta tha jisse live server chal raha tha — build ke dauraan aur restart tak chunks 500 dete the (live pe pakda: 07:34 UTC wale build ke baad `3b4bmj6f5fp-l.js` 500).

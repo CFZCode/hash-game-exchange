@@ -39,7 +39,6 @@ const CREDIT = '660cb6fe7737d7b70e7a07b706b93f70';
 const PUSHES = [CREDIT, 'accountUpdated', 'featuresUpdated', 'siteConfigUpdated', 'currenciesUpdated'];
 const SALT = 'p567.sync.v1';
 const TICK_MS = 2000;
-const WS = process.env.NEXT_PUBLIC_SOCKET_TRANSPORT === 'websocket';
 
 let socket = null;
 let timer = null;
@@ -123,10 +122,11 @@ function applyCredit(frame) {
 
 /**
  * Open the socket (no-op with fixtures on, or when it is already open for the current token).
- * Long-polling, like the platform's other clients (casino-sportsbook's lib/socket.ts): plain HTTP
- * requests that pass any proxy and show in the Network tab. NEXT_PUBLIC_SOCKET_TRANSPORT=websocket
- * lets it upgrade to a WebSocket where the edge carries one. The backend's HTTP rate limit does
- * not count /socket.io (each socket event has its own limit).
+ * WebSocket, like TENEXCH and the sports balance socket (exchange/balanceSocket.js): one open
+ * connection, so the 2 s sync and every push are frames on it, not HTTP requests (Apache and the
+ * gateway's wsProxy.js carry the upgrade). Long-polling only when the WebSocket cannot open (a
+ * proxy that drops the upgrade). The backend's HTTP rate limit does not count /socket.io (each
+ * socket event has its own limit).
  */
 export function startRealtime() {
   if (USE_FIXTURES || typeof window === 'undefined') return;
@@ -137,8 +137,8 @@ export function startRealtime() {
   setLiveActive(true);
   socket = io(SOCKET_BASE || undefined, {
     path: '/socket.io',
-    transports: WS ? ['polling', 'websocket'] : ['polling'],
-    upgrade: WS,
+    transports: ['websocket', 'polling'],
+    tryAllTransports: true,
     /* A function, so every reconnect carries the CURRENT token. The server closes a socket when its
        token expires, so an expired one is refreshed first rather than reconnecting signed out. */
     auth: (cb) => {
