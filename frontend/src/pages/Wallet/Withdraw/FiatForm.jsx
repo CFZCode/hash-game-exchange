@@ -165,7 +165,7 @@ function ForfeitPop({ details, busy, onConfirm, onClose }) {
         <div className="text-lg font-extrabold text-primary">{details?.title || 'You will lose your bonus'}</div>
         <p className="text-secondary">
           {details?.message ||
-            'Your bonus is still locked: its wagering is not complete. If you withdraw now, the locked bonus is forfeited and cannot be recovered. Your cash balance is not affected.'}
+            'Your bonus is still locked because its wagering requirement has not been met. If you withdraw now, the locked bonus will be forfeited and cannot be recovered. Your cash balance will not be affected.'}
         </p>
         {bonuses.length > 0 && (
           <div className="rounded-lg bg-layer4 p-3 text-left">

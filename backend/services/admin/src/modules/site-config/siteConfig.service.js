@@ -160,7 +160,7 @@ const OPERATOR_SETTINGS = Object.freeze({
     env: 'BONUS_FORFEIT_MESSAGE',
     kind: 'text',
     maxLength: 400,
-    default: 'Your bonus is still locked: its wagering is not complete. If you withdraw now, the locked bonus is forfeited and cannot be recovered. Your cash balance is not affected.',
+    default: 'Your bonus is still locked because its wagering requirement has not been met. If you withdraw now, the locked bonus will be forfeited and cannot be recovered. Your cash balance will not be affected.',
     label: 'Forfeit popup message',
   },
 });
