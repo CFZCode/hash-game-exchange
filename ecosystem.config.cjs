@@ -26,7 +26,8 @@ module.exports = {
     svc('sports-worker', 'services/sports/src/worker.js'),
     svc('user-worker', 'services/user/src/worker.js'),
     svc('gateway', 'gateway/src/index.js'),
-    next('frontend', 'frontend', 5190, '127.0.0.1'),
+    // Serves .next-live, copied from the finished build at each (re)start, so a build never breaks the live site.
+    { ...next('frontend', 'frontend', 5190, '127.0.0.1'), script: 'scripts/start-live.sh' },
     next('admin', 'admin', 3080, '127.0.0.1'),
     next('owner-panel', 'owner-panel', 3085, '127.0.0.1'),
   ],

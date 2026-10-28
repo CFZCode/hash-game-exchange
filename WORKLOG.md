@@ -15,6 +15,12 @@ Format:
 
 ---
 
+## 2026-10-28 — Frontend: build ke time live site "This page couldn't load" nahi dikhayega
+**Kya kiya:** pm2 `parker-frontend` ab `frontend/scripts/start-live.sh` se chalta hai: live `.next-live` se serve hota hai (`NEXT_DIST_DIR`, next.config `distDir`), jo har (re)start pe last FINISHED build (`.next/BUILD_ID` naya ho tab) ki copy hai. `npm run build` sirf `.next` me likhta hai, live ko chhoota hi nahi. Flow same: `npm run build` + `pm2 restart parker-frontend`.
+**Kyun:** user ka screenshot: mobile pe kabhi kabhi Next ka "This page couldn't load". Wajah: `next build` usi `.next` ko mita ke dobara likhta tha jisse live server chal raha tha — build ke dauraan aur restart tak chunks 500 dete the (live pe pakda: 07:34 UTC wale build ke baad `3b4bmj6f5fp-l.js` 500).
+**Files / jagah:** frontend/scripts/start-live.sh (naya), frontend/next.config.mjs (distDir), ecosystem.config.cjs (frontend script), .gitignore (.next-live*)
+**Notes:** Live pe build chalate hue har ~1s page + saare chunks poll kiye: build (11s) me 0 error; sirf pm2 restart ka ~1s 503 (pehle jaisa). Restart pe copy 0.4s. Admin / owner-panel me abhi bhi purana tareeka (unka build bhi live ko beech me todta hai).
+
 ## 2026-10-27 — Demo: entries point_ledger me, desktop pe Log Out, purge har 1 min
 **Kya kiya:** (1) Migration 162: `direct_ledger_write` trigger ab demo user (`is_demo`) ki har balance entry `mssports.point_ledger` me likhta hai (wallet_id = uski `credits.id`, source_user_id = demo), `point_ledger_direct` me nahi — TENEXCH ke demo user jaisa. Baaki users ke liye function same. Purge `source_user_id` se point_ledger rows bhi delete karta hai. (2) Bug: desktop account menu me demo ko sirf "Bet History" dikhta tha, **Log Out** gayab tha (demoOnly filter galat tha) — theek; mobile tiles ka filter bhi same. (3) Demo 30 min hi (user ne 15 bola phir 30 hi rakhne ko kaha); purge job ab har 1 min (pehle 5), to expire hote hi data jaldi hat jaata hai. Owner panel ka text "agent Sign In popup … 30 minutes".
 **Kyun:** user: demo entry point_ledger me, direct me nahi; logout ka option; time ke baad data hate.

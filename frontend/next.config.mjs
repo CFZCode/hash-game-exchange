@@ -38,6 +38,9 @@ const SRC = { all: [{ not: 'foreign' }, { path: /^src\// }] };
 const nextConfig = {
   // No `X-Powered-By: Next.js`: the framework and its version are not advertised (docs/SECURITY-CHECKLIST.md #10).
   poweredByHeader: false,
+  /* Live (pm2) serves `.next-live`, a copy of the last finished build made by scripts/start-live.sh,
+     so a `next build` — which wipes `.next` — never breaks the running site. */
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   env,
   /* The Vite entry rendered <App/> without <StrictMode>; the App Router turns it on by default,
      which double-runs every effect in development. Off, so dev behaves as it did. */
