@@ -6,7 +6,7 @@ import { useGates } from '../../../context/gates';
 
 /* THIS BUILD'S — the Sign In dialog's Demo Login on the agent site only (TENEXCH's Demo; user,
    2026-10-27): one tap makes a throwaway demo account (₹1500, sports exchange only, 30 minutes;
-   backend `AuthService.demoLogin`), signs it in and opens the exchange. */
+   backend `AuthService.demoLogin`), signs it in and opens Home. */
 export default function DemoButton({ className }) {
   const { authenticateDemo, signIn } = useSession();
   // The owner panel's Demo login switch (site-config public `demo_login`).
@@ -20,7 +20,7 @@ export default function DemoButton({ className }) {
     Promise.resolve(authenticateDemo())
       .then((result) => {
         signIn(result);
-        navigate('/sports');
+        navigate('/');
       })
       .catch((error) => showToast(error?.message || 'Could not start a demo. Try again.', { type: 'error' }))
       .finally(() => setBusy(false));
