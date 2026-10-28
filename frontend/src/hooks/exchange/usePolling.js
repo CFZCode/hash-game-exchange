@@ -14,20 +14,22 @@ export const rateLimitDelay = (intervalMs, strikes) =>
  * Self-scheduling (the next cycle starts `intervalMs` after the previous one BEGAN, or at once
  * if the request took longer; backed off on 429, see RATE_LIMIT_*) — never setInterval, which piles overlapping requests up and lets
  * an old answer overwrite a newer one. Paused while the tab is hidden; on return it polls at once.
- * `refreshEvent` (a window event name, e.g. 'bet:placed') triggers an immediate poll.
+ * `refreshEvent` (a window event name, e.g. 'bet:placed', or a list of them) triggers an immediate poll.
  *
  * `key` identifies WHAT is being read (e.g. the gmid). Data belongs to the key it was read for,
  * so switching keys shows `data: undefined` on the very next render instead of the old match's
  * data — derived during render, no reset effect.
  *
  * @param {(signal: AbortSignal) => Promise<*>} fetcher  must be stable for a given key
- * @param {{ intervalMs?: number, enabled?: boolean, key?: string, refreshEvent?: string,
+ * @param {{ intervalMs?: number, enabled?: boolean, key?: string, refreshEvent?: string|string[],
  *           keepOnError?: boolean }} opts
  * @returns {{ data: *, error: Error|null, loading: boolean, refresh: () => void }}
  */
 export function usePolling(fetcher, { intervalMs = 0, enabled = true, key = '', refreshEvent, keepOnError = true } = {}) {
   const [state, setState] = React.useState({ key: null, data: undefined, error: null });
   const kickRef = React.useRef(null);
+  // A string, so an inline list does not restart the loop on every render.
+  const refreshOn = [].concat(refreshEvent || []).join(' ');
 
   React.useEffect(() => {
     if (!enabled) return undefined;
@@ -77,7 +79,8 @@ export function usePolling(fetcher, { intervalMs = 0, enabled = true, key = '', 
       else kick();
     };
     document.addEventListener('visibilitychange', onVisibility);
-    if (refreshEvent) window.addEventListener(refreshEvent, kick);
+    const events = refreshOn ? refreshOn.split(' ') : [];
+    events.forEach((name) => window.addEventListener(name, kick));
 
     run(gen);
     return () => {
@@ -86,9 +89,9 @@ export function usePolling(fetcher, { intervalMs = 0, enabled = true, key = '', 
       controller?.abort();
       kickRef.current = null;
       document.removeEventListener('visibilitychange', onVisibility);
-      if (refreshEvent) window.removeEventListener(refreshEvent, kick);
+      events.forEach((name) => window.removeEventListener(name, kick));
     };
-  }, [fetcher, intervalMs, enabled, key, refreshEvent, keepOnError]);
+  }, [fetcher, intervalMs, enabled, key, refreshOn, keepOnError]);
 
   const refresh = React.useCallback(() => kickRef.current?.(), []);
   const mine = state.key === key;

@@ -1,5 +1,5 @@
 import { ENC_ACCEPT, openSealed } from './apiCrypto';
-import { SOCKET_READS, liveRead, markLiveStale, setLiveActive } from './liveStore';
+import { SOCKET_READS, liveRead, markLiveStale, markLiveWritten, setLiveActive } from './liveStore';
 import {
   adoptStoredTokens,
   clearTokens,
@@ -366,7 +366,7 @@ async function send(url, path, init) {
     shared.clear();
     markLiveStale();
     // And again once it has landed: a sync asked while the write was in flight may predate it.
-    return sendOnce(url, path, init).finally(markLiveStale);
+    return sendOnce(url, path, init).finally(markLiveWritten);
   }
 
   /* THE STARTUP READS COME OFF THE SOCKET. Branding, region, the coin list and the player's me,

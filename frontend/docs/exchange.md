@@ -50,11 +50,11 @@ look stays hash.game's (the hash-ui-fidelity skill lists it under Deliberate dep
 
 | Endpoint (`/api/v1/sports/user` +) | Service | Hook | Returned shape |
 |---|---|---|---|
-| `POST /cricket/all-data {id:sid}` | `getSportEvents(sid)` | `useSportsList(sid)` 5s | `{t1, t2, events}` — EventRow[]; `events` = both, deduped, in-play first |
+| `POST /cricket/all-data {id:sid}` | `getSportEvents(sid)` | `useSportsList(sid)` 5s (server: one provider call per sport per 2s for every viewer, `CricketService` `sharedRead`) | `{t1, t2, events}` — EventRow[]; `events` = both, deduped, in-play first |
 | `GET /all/sports/tree` | `getSportsTree()` | `useSportsTree()` 60s, one shared poll for every caller (`hooks/exchange/sharedSportsTree.js`) | `{sports:[{name, etid, children:[{name, cid, children:[{name, gmid, etid, iscc}]}]}], racing:[…sdatetime]}` |
 | `GET /v1/sports-get_latest_events` | `getLatestEvents()` | `useLatestEvents()` 30s | `[{id, lid, name, sportId}]` |
-| `POST /cricket/get-match-private-data {gmid,sid}` | `getMatchMarkets(gmid,sid)` | `useMatchMarkets(gmid,sid)` 1s (not 300ms: gateway 429), watchdog, paused hidden | service `{state:'ok'\|'no_record'\|'gone'\|'empty', markets}`; hook `{markets (shaped), loading, error, noMarkets, roundGone, matchGone, getMarkets(), refresh}` |
-| `GET /v1/sports-gamedetailPrivate?gmid&etid` | `getMatchHeader(gmid,sid)` | `useMatchHeader(gmid,sid)` 5s | `{gmid, cname, ename, stime, iplay, iscc, tv, scard, bm, …}` or null |
+| `POST /cricket/get-match-private-data {gmid,sid}` | `getMatchMarkets(gmid,sid)` | `useMatchMarkets(gmid,sid)`: PUSHED over the sports socket (`services/exchange/oddsSocket.js` → backend `modules/odds-events/sockets/oddsPush.mjs`, board on change + 2s heartbeat); the 1s HTTP poll (not 300ms: gateway 429) runs only while no push landed in 5s — watchdog, paused hidden | service `{state:'ok'\|'no_record'\|'gone'\|'empty', markets}`; hook `{markets (shaped), loading, error, noMarkets, roundGone, matchGone, getMarkets(), refresh}` |
+| `GET /v1/sports-gamedetailPrivate?gmid&etid` | `getMatchHeader(gmid,sid)` | `useMatchHeader(gmid,sid)` 5s (server caches it 5s per match) | `{gmid, cname, ename, stime, iplay, iscc, tv, scard, bm, …}` or null |
 | `GET /cricket/score-url?gmid&etid` | `getScoreUrl` | — | `string\|null` (single-use token: once per card) |
 | `GET /virtual/event-media?gmid&etid` | `getVirtualEventMedia` | — | `{gmid, etid, stream, score}\|null` |
 | `GET /betting-config` | `getBettingConfig()` (60s cache) + `getSportsBufferSeconds`, `getSportsMaxOddsRule`, `peekVirtualLimit`, `applyVirtualLimits` | `useBettingConfig()` | `{buffers:{global, grid, sports}, max_odds, virtual_limits, leagues}` |
@@ -62,8 +62,8 @@ look stays hash.game's (the hash-ui-fidelity skill lists it under Deliberate dep
 | `POST /place` | `placeBet(payload)` | — | `{ok, odds, stake, balanceDelta, oldBalance, newBalance, totalExposure, exposure, duplicate, raw}` |
 | `POST /place-combined {bets}` | `placeCombinedBet` | — | same + `legs` |
 | `GET /bet-result/:clientRef` | `getBetResult`, `reconcilePendingBets(onOutcome)` | — | `{state:'pending'\|'accepted'\|'rejected'\|'unknown', message, odds, stake}` |
-| `POST /matchexposures/match {match_id}` | `getMatchExposure(gmid)` | `useMatchExposure(gmid, markets)` 2s + `bet:placed` | rows `[{match_id, event_id, team_name, exposure_amount:number, game_type, …}]`; hook adds `book` `{'<mid>:<runner lc>': n}` |
-| `GET /cricket/user-open-bets-grouped?eventid` | `getOpenBets(gmid)` | `useOpenBets(gmid)` 5s + `bet:placed` | `{matched, unmatched}` of Addaplay `normaliseBet` rows |
+| `POST /matchexposures/match {match_id}` | `getMatchExposure(gmid)` | `useMatchExposure(gmid, markets)` at once on `bet:placed` or a money push (`services/exchange/changeFeed.js`), else 30s (2s with an unmatched order) | rows `[{match_id, event_id, team_name, exposure_amount:number, game_type, …}]`; hook adds `book` `{'<mid>:<runner lc>': n}` |
+| `GET /cricket/user-open-bets-grouped?eventid` | `getOpenBets(gmid)` | `useOpenBets(gmid)` at once on `bet:placed` or a money push, else 30s | `{matched, unmatched}` of Addaplay `normaliseBet` rows |
 | `GET /fancy-bets?runner&match_id&event_id&sport_id&market_type` | `getFancyBets` | — | `[{bet_type, stake_amount, odds, size, liability, market_type, fancy_name, badlo}]` |
 | `GET /cricket/sports-bets/user?page&limit…` | `getSportsBets` | — | `{rows: normaliseBet[], pagination:{total, page, limit, total_pages, total_stake}}` |
 | `POST /account-statement-v2` | `getAccountStatement` | — | `{rows:[{date, credit, debit, closing (2-dp strings or '-'), description, betId, eventId, matchId, marketType, gameType, fancyName…}], total, totalPages, page}` |
@@ -107,7 +107,10 @@ look stays hash.game's (the hash-ui-fidelity skill lists it under Deliberate dep
 **Backend used as is**: `POST matchexposures/match` and `GET cricket/user-open-bets-grouped` read
 `user_id` from the request (400 without it), so `services/exchange/positions.js` sends the platform user
 id from the access token's `sub` (`currentUserId()`), which is the id mssports keys its users on.
-`exposure` is omitted from `balanceUpdate` while the player has none.
+`exposure` is omitted from `balanceUpdate` while the player has none. Every money write (bet, combined
+bet, cancel, void, market void, settlement) pushes `balanceUpdate` with `credits.inr` + total exposure the
+moment it commits (backend `lib/helper/pushBalance.mjs`); the socket's own `subscribeBalance` tick is a
+30s safety read (TENEXCH push-instead-of-poll).
 
 ## Odds scales and money rules
 

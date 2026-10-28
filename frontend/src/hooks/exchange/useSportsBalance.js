@@ -5,8 +5,9 @@ import { getAccessToken } from '../../services/tokens';
 /* ─── Sports balance + total exposure, pushed ─────────────────────────────────────────────
  *
  * Socket.IO to sports-service through the gateway (`/ws/sports/socket.io`): 'authenticate'
- * {userId, token} + 'subscribeBalance', then a 'balanceUpdate' every 3s and after every
- * settlement. While the socket is down, the REST fallback is polled every 3s (TENEXCH's header
+ * {userId, token} + 'subscribeBalance', then a 'balanceUpdate' the moment any money write commits
+ * (bet, cancel, void, settlement) and every 30s as a safety read. While the socket is down, the REST
+ * fallback is polled every 3s (TENEXCH's header
  * did the same with GET /user/balance; see fetchBalanceRest for what it reads here).
  *
  * @param {{ userId: number|string|null }} p  the platform user id (session `userId`); null = signed out

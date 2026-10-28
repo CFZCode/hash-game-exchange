@@ -1,7 +1,7 @@
 import { io } from 'socket.io-client';
 import { API_BASE, USE_FIXTURES, refreshSession } from './client';
 import { getAccessToken, isAccessTokenExpired, onSessionChanged } from './tokens';
-import { liveState as storedState, onLiveState as subscribe, publishLiveState, setLiveActive } from './liveStore';
+import { liveState as storedState, onLiveState as subscribe, onSyncWanted, publishLiveState, setLiveActive } from './liveStore';
 
 /**
  * ─── The one platform socket ─────────────────────────────────────────────────────────────────
@@ -10,12 +10,15 @@ import { liveState as storedState, onLiveState as subscribe, publishLiveState, s
  * socket carries the site half — and re-opened with the new token on sign-in / sign-out, so the
  * handshake always names the current player. Over it:
  *
- *   every 2 s   SYNC_STATE → the whole client state in one scrambled reply:
+ *   SYNC_STATE → the whole client state in one scrambled reply:
  *                 { me, profile, balances, preferences }   the player
  *                 { flags, features, currencies, branding } the site
  *                 { region }                               this visitor's address and country
  *               It lands in services/liveStore.js, which answers those startup GETs in
  *               `client.js` (see SOCKET_READS there) so they never go over HTTP.
+ *   asked       every 30 s as a SAFETY read while the tab is visible (TENEXCH: push first, poll
+ *               only to catch a missed push), at once when the tab comes back, and at once when
+ *               liveStore asks (a read found nothing fresh, a write landed — onSyncWanted);
  *   at once     a push re-asks without waiting for the tick:
  *                 C.CREDIT          the balance moved (any service — DB trigger, migration 113)
  *                 accountUpdated    an operator locked / unlocked the account
@@ -38,11 +41,13 @@ const SYNC_STATE = '3b84d3951808e13e1b8c65a67d6b7235';
 const CREDIT = '660cb6fe7737d7b70e7a07b706b93f70';
 const PUSHES = [CREDIT, 'accountUpdated', 'featuresUpdated', 'siteConfigUpdated', 'currenciesUpdated'];
 const SALT = 'p567.sync.v1';
-const TICK_MS = 2000;
+const TICK_MS = 30000;
 
 let socket = null;
 let timer = null;
 let inFlight = false;
+/** A sync was wanted while one was in flight: that reply may predate what wanted it, so ask again. */
+let again = false;
 let keyFor = { id: null, key: null };
 let openedWith = null;
 /** When the last C.CREDIT push landed: a sync asked before it carries the balances from before it. */
@@ -80,6 +85,10 @@ function sync() {
   const askedAt = Date.now();
   socket.timeout(8000).emit(SYNC_STATE, null, (err, reply) => {
     inFlight = false;
+    if (again) {
+      again = false;
+      sync();
+    }
     if (err) return;
     let body;
     try {
@@ -91,7 +100,6 @@ function sync() {
     const token = openedWith;
     unscramble(body.d, id).then(
       (state) => {
-        console.log('[socket] SYNC_STATE', state);
         // Asked before a balance push: keep the pushed balances, not this older read's.
         const pushed = askedAt < pushedAt ? storedState()?.balances : null;
         publishLiveState(pushed ? { ...state, balances: pushed } : state, token, askedAt);
@@ -100,6 +108,15 @@ function sync() {
     );
   });
 }
+
+function syncSoon() {
+  if (inFlight) again = true;
+  else sync();
+}
+
+const syncIfVisible = () => {
+  if (!document.hidden) sync();
+};
 
 /* C.CREDIT carries every balance (`{ status, credit: { inr, usdt, … } }`, backend
    wallet.service creditPayload): applied at once, so a settled game round reaches the header even
@@ -123,7 +140,7 @@ function applyCredit(frame) {
 /**
  * Open the socket (no-op with fixtures on, or when it is already open for the current token).
  * WebSocket, like TENEXCH and the sports balance socket (exchange/balanceSocket.js): one open
- * connection, so the 2 s sync and every push are frames on it, not HTTP requests (Apache and the
+ * connection, so every sync and every push are frames on it, not HTTP requests (Apache and the
  * gateway's wsProxy.js carry the upgrade). Long-polling only when the WebSocket cannot open (a
  * proxy that drops the upgrade). The backend's HTTP rate limit does not count /socket.io (each
  * socket event has its own limit).
@@ -153,14 +170,17 @@ export function startRealtime() {
   socket.on('connect', sync);
   PUSHES.forEach((name) => socket.on(name, sync));
   socket.on(CREDIT, applyCredit);
-  timer = setInterval(sync, TICK_MS);
+  timer = setInterval(syncIfVisible, TICK_MS);
+  document.addEventListener('visibilitychange', syncIfVisible);
 }
 
 /** Close it. */
 export function stopRealtime() {
   clearInterval(timer);
   timer = null;
+  if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', syncIfVisible);
   inFlight = false;
+  again = false;
   keyFor = { id: null, key: null };
   openedWith = null;
   setLiveActive(false);
@@ -179,4 +199,7 @@ export function restartRealtime() {
 
 /* The moment the token appears or goes, not when React next renders: the reads a sign-in
    triggers are then answered by the new player's socket. */
-if (typeof window !== 'undefined') onSessionChanged(() => socket && restartRealtime());
+if (typeof window !== 'undefined') {
+  onSessionChanged(() => socket && restartRealtime());
+  onSyncWanted(syncSoon);
+}

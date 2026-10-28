@@ -6,6 +6,7 @@ import { getMatchExposure, getOpenBets } from '../../services/exchange/positions
 import { getBettingConfig } from '../../services/exchange/config';
 import { getStakeButtons, getOneClickButtons } from '../../services/exchange/stakes';
 import { BET_PLACED_EVENT } from '../../services/exchange/bets';
+import { USER_DATA_CHANGED } from '../../services/exchange/changeFeed';
 import { isSignedIn } from '../../services/tokens';
 import { mapMatchExposures } from '../../utils/exchange/exposureMapping';
 
@@ -39,15 +40,17 @@ export function useMatchHeader(gmid, sid) {
   return usePolling(fetcher, { intervalMs: 5000, enabled: Boolean(gmid && sid), key: `${gmid}|${sid}` });
 }
 
-/* Exposure only moves when a bet is placed (refreshed at once on `bet:placed`), matched or
-   settled, so an idle page reads it every 5s; with an unmatched order open — the one case where
-   it changes with nothing on this page doing anything — every 2s. Was 2s always, which with the
-   1s markets poll was most of an idle match page's ~140 requests a minute. */
-const EXPOSURE_IDLE_MS = 5000;
+/* Exposure and open bets move only with money: a bet placed here (`bet:placed`), or any money
+   write the sports socket pushes (USER_DATA_CHANGED — a settlement, a void, a bet from another
+   tab). Both refetch at once on those, so an idle page only reads them every 30s as a safety net
+   (TENEXCH: push + 30s). An unmatched order open is the one case that can move with no push, so
+   exposure is read every 2s while one is. */
+const SAFETY_MS = 30000;
 const EXPOSURE_OPEN_ORDER_MS = 2000;
+const MONEY_EVENTS = [BET_PLACED_EVENT, USER_DATA_CHANGED];
 
 /**
- * The player's exposure on a match, every 5s (2s while `hasOpenOrder`) and at once on `bet:placed`.
+ * The player's exposure on a match, at once on a money push or `bet:placed`, else every 30s (2s while `hasOpenOrder`).
  * Signed out → never fetches (data undefined).
  * @param {string|number} gmid
  * @param {object[]} [markets]  the live list from useMatchMarkets — when given, `book` is mapped
@@ -58,18 +61,18 @@ const EXPOSURE_OPEN_ORDER_MS = 2000;
 export function useMatchExposure(gmid, markets, { hasOpenOrder = false } = {}) {
   const fetcher = React.useCallback((signal) => getMatchExposure(gmid, { signal }), [gmid]);
   const res = usePolling(fetcher, {
-    intervalMs: hasOpenOrder ? EXPOSURE_OPEN_ORDER_MS : EXPOSURE_IDLE_MS,
-    enabled: Boolean(gmid) && isSignedIn(), key: String(gmid ?? ''), refreshEvent: BET_PLACED_EVENT,
+    intervalMs: hasOpenOrder ? EXPOSURE_OPEN_ORDER_MS : SAFETY_MS,
+    enabled: Boolean(gmid) && isSignedIn(), key: String(gmid ?? ''), refreshEvent: MONEY_EVENTS,
   });
   const book = React.useMemo(() => mapMatchExposures(res.data || [], markets || []), [res.data, markets]);
   return { ...res, book };
 }
 
-/** Open bets on a match, every 5s and on `bet:placed`. data: { matched, unmatched }. */
+/** Open bets on a match, at once on a money push or `bet:placed`, else every 30s. data: { matched, unmatched }. */
 export function useOpenBets(gmid) {
   const fetcher = React.useCallback((signal) => getOpenBets(gmid, { signal }), [gmid]);
   return usePolling(fetcher, {
-    intervalMs: 5000, enabled: Boolean(gmid) && isSignedIn(), key: String(gmid ?? ''), refreshEvent: BET_PLACED_EVENT,
+    intervalMs: SAFETY_MS, enabled: Boolean(gmid) && isSignedIn(), key: String(gmid ?? ''), refreshEvent: MONEY_EVENTS,
   });
 }
 

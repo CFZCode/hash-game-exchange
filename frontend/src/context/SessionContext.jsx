@@ -184,8 +184,8 @@ export function SessionProvider({ children }) {
    *
    * Opened at start-up for everyone (a visitor's socket brings the branding, region, flags and
    * coin list), and re-opened with the new token whenever the player signs in or out. The
-   * startup GETs are answered out of it by services/client.js. Its state lands every ~2 s
-   * and at once when the balance moves anywhere on the platform (a settled bet, an approved
+   * startup GETs are answered out of it by services/client.js. Its state lands every 30 s (a
+   * safety read), when a read or a write asks, and at once when the balance moves anywhere on the platform (a settled bet, an approved
    * deposit, an operator's adjustment), so the wallet never waits for a reload. The rows are built
    * exactly as `loadAccount` builds them, and only when the balances or the coin list changed,
    * so an unchanged tick re-renders nothing.

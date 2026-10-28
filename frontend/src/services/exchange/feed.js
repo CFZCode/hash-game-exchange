@@ -103,6 +103,20 @@ export async function getMatchMarkets(gmid, sid, { signal } = {}) {
     }
     throw e;
   }
+  return readMatchMarkets(body);
+}
+
+/**
+ * The same answer pushed by the sports socket (oddsSocket.js): the server sends the REST reply as
+ * `{ status, body }`, read here exactly as getMatchMarkets reads the HTTP one.
+ */
+export function readPushedMarkets(status, body) {
+  if (status === 404 || status === 410 || (status >= 400 && isGoneBody(body))) return { state: 'gone', markets: [] };
+  if (status >= 400) throw new ExchangeError(String(body?.error || `HTTP ${status}`), { status, code: `HTTP_${status}`, body });
+  return readMatchMarkets(body);
+}
+
+function readMatchMarkets(body) {
   const d = unwrapFeed(body);
   if (Array.isArray(d)) return { state: 'ok', markets: d };
   if (d && d.success === false) {

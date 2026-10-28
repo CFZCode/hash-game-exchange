@@ -1,7 +1,8 @@
 /**
  * ─── The realtime socket's state, shared ─────────────────────────────────────────────────────
  *
- * One store between the socket (services/realtime.js, which fills it every ~2 s) and everything
+ * One store between the socket (services/realtime.js, which fills it every 30 s, on every push, and
+ * at once when a read here or a landed write asks — see askSync) and everything
  * that reads the platform: `client.js` answers the startup GETs below out of it instead of
  * calling the API, and components subscribe through `onLiveState` / `useLiveState`. Its own
  * module so `client.js` can read it without importing the socket (realtime.js imports client.js).
@@ -33,7 +34,8 @@ export const SOCKET_READS = Object.freeze({
   '/api/v1/user/preferences': { key: 'preferences', player: true },
 });
 
-/** A state older than this is not answered from; the socket is probably down. */
+/** A state older than this is not answered from: the read asks the socket for a new one (askSync)
+    and waits briefly, then goes over HTTP if none comes (the socket is down). */
 const FRESH_MS = 6000;
 
 let last = null;
@@ -63,6 +65,20 @@ export function setLiveActive(on) {
 let staleBefore = 0;
 export function markLiveStale() {
   staleBefore = Date.now();
+}
+
+/* How to ask the socket for a state now; realtime.js registers it. The socket's own tick is a 30 s
+   safety read (TENEXCH), so a read that finds nothing fresh, and a write that has landed, ask for
+   one instead of waiting for the tick. */
+let askSync = () => {};
+export function onSyncWanted(fn) {
+  askSync = fn;
+}
+
+/** A write has landed (client.js): stale as above, and a state built after it is asked for at once. */
+export function markLiveWritten() {
+  markLiveStale();
+  askSync();
 }
 
 /* The SITE half (owner / operator config). When it changes after the first state, every read on
@@ -124,6 +140,7 @@ export async function liveRead(path, token, waitMs = 2500) {
   if (!read) return undefined;
   const usable = (h) => h && (!read.player || (h.state.signedIn && h.sameUser));
   let hit = fresh(token);
+  if (!usable(hit) && active) askSync();
   // Still connecting, or the state is the previous session's (a sign-in re-opens the socket):
   // wait for one this read can use, rather than going to HTTP straight away.
   const deadline = Date.now() + waitMs;

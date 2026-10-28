@@ -1,6 +1,7 @@
 import { io } from 'socket.io-client';
 import { request } from '../client';
 import { SOCKET_BASE } from '../realtime';
+import { announceUserDataChange } from './changeFeed';
 
 /**
  * ─── Sports balance push (mssports socket) ───────────────────────────────────────────────
@@ -11,12 +12,14 @@ import { SOCKET_BASE } from '../realtime';
  *
  *   client → 'authenticate' {userId, token}   join room user_<userId> (the room settlement
  *                                               workers push to after a payout)
- *   client → 'subscribeBalance' {token}        server ticks balanceUpdate every 3s
+ *   client → 'subscribeBalance' {token}        server sends balanceUpdate now, then every 30s (safety)
  *   server → 'balanceUpdate' {userId, balance:{inr_balance, exposure}, timestamp}
+ *                                               also pushed the moment a money write commits
+ *                                               (backend lib/helper/pushBalance.mjs) — announced to
+ *                                               changeFeed.js so the match page refetches its book
  *
- * WEBSOCKET ONLY. TENEXCH pinned long-polling (its proxy dropped upgraded frames); this gateway
- * is the opposite — only the UPGRADE is proxied for `/ws/<service>`, its HTTP routes do not carry
- * `/ws/sports/socket.io` polling requests at all.
+ * WEBSOCKET ONLY, like TENEXCH: only the UPGRADE is proxied for `/ws/<service>`, the gateway's HTTP
+ * routes do not carry `/ws/sports/socket.io` polling requests at all.
  *
  * `userId` is the platform user id: mssports keys its accounts on it (platformAccounts.mjs
  * `decodePlatformToken` → `user_id: Number(sub)`).
@@ -54,6 +57,7 @@ export function connectBalanceSocket({ token, userId, onBalance, onStatus }) {
     if (!data || data.error) return;
     // A push to this socket's room or this socket itself; still compare ids when both are present.
     if (data.userId != null && userId != null && String(data.userId) !== String(userId)) return;
+    announceUserDataChange();
     const b = data.balance || {};
     onBalance({
       balance: b.inr_balance != null ? Number(b.inr_balance) : null,
