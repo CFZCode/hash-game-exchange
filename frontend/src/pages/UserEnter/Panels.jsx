@@ -1,5 +1,4 @@
 import { languageName } from '../../components/modals/LanguageCurrencyModal/languages';
-import React from 'react';
 import { LIVE_SUPPORT_AVAILABLE } from '../../services/availability';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSession } from '../../context/session';
@@ -10,7 +9,6 @@ import { CAPTURE_RATES, getCommissionRates, getInvitationCode } from '../../serv
 import { getVipStanding } from '../../services/vip';
 import { useSelectedCurrency } from '../../hooks/useSelectedCurrency';
 import useResource from '../../hooks/useResource';
-import SOCIALS from '../../components/modals/RegionBlock/icons';
 import DisturbSetting from '../../layouts/MainLayout/Header/AfterLogin/DisturbSetting';
 import { DO_NOT_DISTURB_ENABLED, FREE_PLAYS_ENABLED } from '../../config/hiddenFeatures';
 import {
@@ -33,7 +31,6 @@ import {
   IconCurrency,
   IconDarkMode,
   IconDeposit,
-  IconEmail,
   IconLanguage,
   IconLightMode,
   IconLiveSupport,
@@ -630,12 +627,10 @@ function ReferBanner() {
 }
 
 /* ------------------------------------------------------------------------------------------ */
-/* Live Support, Leave Feedback, the community card and Sign Out — `O2`.                         */
+/* Live Support and Sign Out — `O2`.                                                              */
 /* ------------------------------------------------------------------------------------------ */
 
 function SupportBlock({ onSignOut }) {
-  const navigate = useNavigate();
-
   return (
     <div className="mb-6 mt-3 w-full px-4">
       {/* `J.emit("live_support", !0)` opens the support widget, which is not built. Inert. */}
@@ -649,46 +644,9 @@ function SupportBlock({ onSignOut }) {
       </div>
       )}
 
-      {/* `/user/enter/feedback` is a dialog sibling of this route and is not built, so this
-          lands on the catch-all. Left navigating rather than made inert because the path is the
-          original's own — the trade the sidebar's rows were converted under. */}
-      <div
-        className="btn-like mt-3 flex h-11 w-full items-center rounded-lg bg-layer4 px-3"
-        onClick={() => navigate('/user/enter/feedback')}
-      >
-        <IconEmail className="size-6 fill-secondary" />
-        <RowLabel>Leave Feedback</RowLabel>
-        <Chevron className="ml-auto" />
-      </div>
-
-      {/* THE SQUARE IS NOT `components/shared/CommunityItem`. That component is
-          `CommunityItem-DguQXLpB.js`, a 40px `btn-like … rounded-lg` button in `text-secondary`
-          which the footer and the sidebar card share; this list is written inline in the account
-          page's own chunk as `center h-10 w-10 rounded-md bg-layer3` with no text colour, so its
-          marks take the page's white rather than the footer's grey. Different radius, different
-          colour, different file — they are not the same square and are not merged.
-
-          The eight entries ARE the same `Kk` list, so the data is shared and only the icon's
-          class is replaced. `target="_black"` is the chunk's own typo; kept like `f-ull` and
-          `texxt-sm`, with `rel` added because an unnamed target on a live link is a real
-          risk this build does not have to reproduce. */}
-      <div className="mt-3 w-full rounded-lg bg-layer4 px-3 py-4">
-        <p className="w-full text-center text-base font-semibold">Join Our Community</p>
-        <div className="mt-3 flex items-center justify-center gap-2">
-          {SOCIALS.map((social) => (
-            <a
-              key={social.label}
-              className="center h-10 w-10 rounded-md bg-layer3"
-              href={social.href}
-              target="_black"
-              rel="noreferrer"
-              aria-label={social.label}
-            >
-              {React.cloneElement(social.icon, { className: 'icon size-6' })}
-            </a>
-          ))}
-        </div>
-      </div>
+      {/* Leave Feedback and the "Join Our Community" card (bc.game's own socials) are removed
+          (user, 2026-10-28): the site branding carries no social links, so there is nothing of
+          Parker567's to list — the same call as the Footer and the Sidebar. */}
 
       {/* `y1.push(() => l(T1, {}))` — the Signing Out confirm, `Signout-CdJMMBfB.js`. */}
       <div className="center mt-3 h-10 w-full">
