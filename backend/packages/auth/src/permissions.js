@@ -80,79 +80,40 @@ const PERMISSIONS = {
 
 const ALL = Object.values(PERMISSIONS);
 
+/**
+ * What an agent does: its players and their balances, and its reports. Nothing else.
+ *
+ * Product rule (user, 2026-10-29): every staff level below the Super Admin sees exactly the
+ * Agent's admin — same sidebar, same dashboard, no extra tab or feature. The only difference up
+ * the tree is `staff:read` / `staff:write`, so a level can build the level beneath it (scoped in
+ * `StaffService` by `CHILD_LEVELS` and to its own subtree).
+ */
+const AGENT_GRANTS = [
+  PERMISSIONS.USERS_READ,
+  PERMISSIONS.USERS_WRITE,
+  // Lock / suspend / bet-lock — own subtree only (`LordsService.setStatus`).
+  PERMISSIONS.USERS_LOCK,
+  PERMISSIONS.WALLET_READ,
+  PERMISSIONS.WALLET_CREDIT,
+  PERMISSIONS.WALLET_DEBIT,
+  PERMISSIONS.REPORTS_READ,
+];
+const TREE_STAFF_GRANTS = [...AGENT_GRANTS, PERMISSIONS.STAFF_READ, PERMISSIONS.STAFF_WRITE];
+
 /** Default grants per staff level. A role row in the DB can override these. */
 const LEVEL_PERMISSIONS = {
   [STAFF_LEVELS.SUPER_ADMIN]: ['*'],
-  [STAFF_LEVELS.ADMIN]: ALL.filter((p) => p !== PERMISSIONS.ROLES_MANAGE),
-  [STAFF_LEVELS.SUB_ADMIN]: [
-    PERMISSIONS.USERS_READ,
-    PERMISSIONS.USERS_WRITE,
-    PERMISSIONS.USERS_LOCK,
-    PERMISSIONS.WALLET_READ,
-    PERMISSIONS.WALLET_CREDIT,
-    PERMISSIONS.WALLET_DEBIT,
-    PERMISSIONS.DEPOSITS_READ,
-    PERMISSIONS.DEPOSITS_APPROVE,
-    PERMISSIONS.WITHDRAWALS_READ,
-    PERMISSIONS.WITHDRAWALS_APPROVE,
-    PERMISSIONS.CASINO_READ,
-    PERMISSIONS.SPORTS_READ,
-    PERMISSIONS.REPORTS_READ,
-    PERMISSIONS.STAFF_READ,
-    // A sub admin builds its own super masters and executives — scoped in
-    // `StaffService.create` by `CHILD_LEVELS` and to its own subtree.
-    PERMISSIONS.STAFF_WRITE,
-    PERMISSIONS.CONFIG_READ,
-    PERMISSIONS.REDEEM_CODES_WRITE,
-  ],
-  /**
-   * The agent tree (B2B). `staff:write` lets a super master build masters and
-   * agents beneath itself, and a master agents beneath itself. It is SCOPED in
-   * `StaffService`: a creator may only create (or re-level) an account strictly
-   * below its own level, under itself or one of its own descendants, and may
-   * only edit, reset or remove accounts strictly below it in its own subtree.
-   */
-  [STAFF_LEVELS.SUPER_MASTER]: [
-    PERMISSIONS.USERS_READ,
-    PERMISSIONS.USERS_WRITE,
-    // Lock / suspend / bet-lock — own subtree only (`LordsService.setStatus`).
-    PERMISSIONS.USERS_LOCK,
-    PERMISSIONS.WALLET_READ,
-    PERMISSIONS.WALLET_CREDIT,
-    PERMISSIONS.WALLET_DEBIT,
-    PERMISSIONS.CASINO_READ,
-    PERMISSIONS.SPORTS_READ,
-    PERMISSIONS.REPORTS_READ,
-    PERMISSIONS.STAFF_READ,
-    PERMISSIONS.STAFF_WRITE,
-  ],
-  [STAFF_LEVELS.MASTER]: [
-    PERMISSIONS.USERS_READ,
-    PERMISSIONS.USERS_WRITE,
-    PERMISSIONS.USERS_LOCK,
-    PERMISSIONS.WALLET_READ,
-    PERMISSIONS.WALLET_CREDIT,
-    PERMISSIONS.WALLET_DEBIT,
-    PERMISSIONS.REPORTS_READ,
-    // A master sees and builds its own agents.
-    PERMISSIONS.STAFF_READ,
-    PERMISSIONS.STAFF_WRITE,
-  ],
+  [STAFF_LEVELS.ADMIN]: TREE_STAFF_GRANTS,
+  [STAFF_LEVELS.SUB_ADMIN]: TREE_STAFF_GRANTS,
+  [STAFF_LEVELS.SUPER_MASTER]: TREE_STAFF_GRANTS,
+  [STAFF_LEVELS.MASTER]: TREE_STAFF_GRANTS,
   /**
    * An agent runs players, never staff. `users:write` is what creating and
    * editing a player needs; every route behind it is tree-scoped in its
    * service (players, locks, KYC review, wager, single-player email), and an
    * agent's tree is itself — so it reaches its own players only.
    */
-  [STAFF_LEVELS.AGENT]: [
-    PERMISSIONS.USERS_READ,
-    PERMISSIONS.USERS_WRITE,
-    PERMISSIONS.USERS_LOCK,
-    PERMISSIONS.WALLET_READ,
-    PERMISSIONS.WALLET_CREDIT,
-    PERMISSIONS.WALLET_DEBIT,
-    PERMISSIONS.REPORTS_READ,
-  ],
+  [STAFF_LEVELS.AGENT]: AGENT_GRANTS,
   [STAFF_LEVELS.EXECUTIVE]: [PERMISSIONS.USERS_READ, PERMISSIONS.WALLET_READ, PERMISSIONS.REPORTS_READ],
 };
 
@@ -310,13 +271,12 @@ function canIssueFunds(staff) {
 const isAgentTree = (staff) => AGENT_TREE_LEVELS.includes(effectiveStaffLevel(staff || {}));
 
 /**
- * May this staff session see promotion (and vault) admin at all? House staff
- * (1–3) only.
+ * May this staff session see promotion (and vault) admin at all? The Super Admin
+ * (and its executives) only — every level below sees the Agent's admin (user, 2026-10-29).
  * Fails closed: an unknown or executive-without-parent level is refused.
  */
 function canManagePromotions(staff) {
-  const level = effectiveStaffLevel(staff || {});
-  return Number.isFinite(level) && level >= STAFF_LEVELS.SUPER_ADMIN && level <= STAFF_LEVELS.SUB_ADMIN;
+  return effectiveStaffLevel(staff || {}) === STAFF_LEVELS.SUPER_ADMIN;
 }
 
 module.exports = {
