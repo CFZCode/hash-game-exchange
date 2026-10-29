@@ -22,8 +22,9 @@ const errors = require('./lossBonus.errors');
  *   bonus     = min(net loss × percent / 100, max)   — 0 below the minimum loss
  *   claimable = once the window has ended, until `claim hours` after (0 = no expiry)
  *
- * Casino: the wallet ledger's bet movements (stakes negative, payouts / refunds / rollbacks
- * positive), sports rows excluded. Sports: the exchange's settlement ledger P/L (profit + loss on
+ * Casino: the wallet ledger's bet movements written by casino-service (stakes negative, payouts /
+ * refunds / rollbacks positive) — the statements' rule; sports writes the same reasons from its
+ * own service, and an Original's rows carry a bet_id, so neither column can tell them apart. Sports: the exchange's settlement ledger P/L (profit + loss on
  * settlement / void / commission rows), the same figures the admin dashboard's sports GGR reads.
  * Every currency is converted at today's rate.
  *
@@ -110,7 +111,7 @@ class LossBonusService {
       `SELECT UPPER(currency) AS currency, SUM(amount)::text AS pnl
          FROM public.credits_ledger
         WHERE user_id = :userId AND created_at >= :from AND created_at < :to AND reason IN (:play)
-          AND bet_id IS NULL AND sport_id IS NULL AND match_id IS NULL
+          AND source_service = 'casino-service'
         GROUP BY 1
        UNION ALL
        SELECT UPPER(currency), SUM(COALESCE(profit, 0) + COALESCE(loss, 0))::text
@@ -136,7 +137,7 @@ class LossBonusService {
        SELECT l.currency, SUM(c.amount)::text AS pnl
          FROM public.credits_ledger c JOIN l ON l.currency = UPPER(c.currency)
         WHERE c.user_id = :userId AND c.created_at >= :from AND c.created_at < :to AND c.reason = 'BET_STAKE'
-          AND c.bet_id IS NULL AND c.sport_id IS NULL AND c.match_id IS NULL AND -c.amount > l.lim
+          AND c.source_service = 'casino-service' AND -c.amount > l.lim
         GROUP BY 1
        UNION ALL
        SELECT l.currency, SUM(s.loss)::text
