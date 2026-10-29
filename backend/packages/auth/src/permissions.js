@@ -227,11 +227,14 @@ const canActOn = (actorLevel, targetLevel) =>
   Number.isFinite(actorLevel) && Number.isFinite(targetLevel) && actorLevel < targetLevel;
 
 /**
- * The agent tree — SUPER_MASTER, MASTER, AGENT. Product rule: these levels run
- * players and balances, never promotions. No bonus, code, gift card, spin
+ * The agent tree — every level below the Super Admin: ADMIN, SUB_ADMIN, SUPER_MASTER, MASTER,
+ * AGENT (user, 2026-10-29). Product rule: these levels run players and balances in their own
+ * downline, never promotions, site config or direct users. No bonus, code, gift card, spin
  * wheel, VIP/club, affiliate, race or rakeback screen or API is theirs.
  */
 const AGENT_TREE_LEVELS = Object.freeze([
+  STAFF_LEVELS.ADMIN,
+  STAFF_LEVELS.SUB_ADMIN,
   STAFF_LEVELS.SUPER_MASTER,
   STAFF_LEVELS.MASTER,
   STAFF_LEVELS.AGENT,
@@ -267,7 +270,7 @@ function canIssueFunds(staff) {
   return Number(staff.level) === STAFF_LEVELS.SUPER_ADMIN;
 }
 
-/** Is this staff session part of the agent tree (levels 4, 5, 6)? */
+/** Is this staff session part of the agent tree (levels 2–6, i.e. anyone below the Super Admin)? */
 const isAgentTree = (staff) => AGENT_TREE_LEVELS.includes(effectiveStaffLevel(staff || {}));
 
 /**

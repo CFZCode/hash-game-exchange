@@ -15,6 +15,14 @@ Format:
 
 ---
 
+## 2026-10-29 — Backend check: Super Admin (+ executive) ke alawa koi house / site-wide power nahi
+**Kya kiya:** `AGENT_TREE_LEVELS` (packages/auth/src/permissions.js) ab levels 2–6 (Admin, Sub Admin bhi) — `isAgentTree` wale saare backend checks unpe bhi: casino house listing apne tree tak (`house.service.js`), email service ka tree scope, reports ka agent-tree player classification. Bulk email (`POST /email/bulk`) `requireLevel(SUB_ADMIN)` → `requireLevel(SUPER_ADMIN)`. Purane "levels 1–3 = house" tests (houseScope, cleanup-agent-tree-referrals selection) naye rule pe.
+**Kyun:** user: "ye chije backend pe check laga … superadmin ya uske executive ko chhod kar baaki kisi down level staff ko koi bhi chije dekhne ya update karne ka option nahi"; "baaki sare child ko utni hi permission jitni agent ko".
+**Files / jagah:** backend/packages/auth/src/permissions.js, backend/services/user/src/modules/email/routes/admin.routes.js, backend/services/casino/src/modules/house/house.service.js (comment), tests: casino house/houseScope, user affiliate/agentTreeReferral
+**Notes / pending:** Full backend suite vs baseline: koi naya failure nahi (baseline ke 58 failing subtests purane). Player listings pehle se tree-scoped (`playerScope.visibleStaff`: sirf root wale tree ko sab), exchange direct players + owner topups sirf `canIssueFunds` (Super Admin). Child levels ke paas Agent ke grants + sirf staff:read/write (ek level neeche banane ke liye).
+
+---
+
 ## 2026-10-29 — Super Admin ke alawa har staff = Agent jaisa admin (same sidebar, same dashboard)
 **Kya kiya:** `packages/auth/src/permissions.js`: naya `AGENT_GRANTS` (users read/write/lock, wallet read/credit/debit, reports:read); Admin (2), Sub Admin (3), Super Master (4), Master (5) = `TREE_STAFF_GRANTS` (Agent ke grants + staff:read/write, sirf apne neeche ka level banane ke liye); Agent = `AGENT_GRANTS`. `canManagePromotions` (= `denyAgentTree` / houseOnly routes, reports ka `house`, UI capability) ab sirf Super Admin + uske executives. Admin UI me `isAgentTreeLevel` = levels 2–6 (SessionContext + api/auth/me). Purane rule wale tests (levels 1–3 = house) naye rule pe.
 **Kyun:** user: "super admin ke alawa sare hirarchy ka dashboard same me same hi rahega … koi bhi extra tab ya extra feature unko nhi dikhega"; site config, direct users ka len-den sirf Super Admin (aur uska executive, jitni permission mili). adminx11 (Admin) ko Finance / Casino / Content / Site Config dikh raha tha.
