@@ -15,6 +15,14 @@ Format:
 
 ---
 
+## 2026-10-29 — Create Account rule change ka regression check
+**Kya kiya:** Poora backend suite chalaya (2688 tests): 60 fail + 1 cancel. Inme sirf `tipLimits.test.js` pichle full run (aaj 15:40) se naya tha, aur vo create rule se nahi, commit 10bbc8b5 se tha (route `auth.requireAnyPermission` use karta hai, test ke fake auth me ye nahi tha → TypeError + 180s hang). Fake auth me `requireAnyPermission` jod diya → 4/4 pass. Baaki saare fails pehle se hain, koi staff create / level se juda naya nahi. Code check: market book, account list, points settle, parent funding, reports sab `parent_id` chain pe chalte hai, level number pe nahi; staff edit/re-level create wala rule use nahi karta; admin UI me "level + 1" wala koi logic nahi.
+**Kyun:** user: "ye change karne se baaki kuch hilega nhi bhai ye check karo".
+**Files / jagah:** backend/services/admin/src/modules/site-config/__tests__/tipLimits.test.js
+**Notes / pending:** Sirf test file badli, restart ki zaroorat nahi. Push nahi kiya.
+
+---
+
 ## 2026-10-29 — Create Account: apne se neeche ka har level bana sakte hai (TENEXCH jaisa)
 **Kya kiya:** Create Account ke "User Type" me ab creator ko apne se neeche ke saare staff level dikhte hai, aur backend bhi wahi allow karta hai. Admin → Sub Admin, Super Master, Master, Agent; Sub Admin → Super Master, Master, Agent; Super Master → Master, Agent; Master → Agent; Agent → sirf User. Naye account ka parent creator khud hota hai. Pehle har level sirf theek neeche wala level bana sakta tha (Sub Admin ko sirf Super Master + User dikhta tha). `CHILD_LEVELS` ab "har level jo creator se neeche hai", `#assertChildOfParent` aur `LEVEL_NOT_DIRECT_CHILD` hata diye (parent ke neeche hona `#assertLevelBelow` already check karta hai).
 **Kyun:** user (subadminx11 se login): "usko sirf super master and user create karne ka option dikh rha hai bss aisa nhi tha tenexch me ... vho same type and same rule for account creation". TENEXCH: InsertUser `ROLES.filter(r => r.id > roleId)` + server `validateHierarchy` (creator strictly upar) + `validateParent` (parent = creator).
