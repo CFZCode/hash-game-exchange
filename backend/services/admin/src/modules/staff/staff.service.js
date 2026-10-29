@@ -225,7 +225,6 @@ class StaffService {
       // account too, or the tree would hold a master beneath an agent.
       const parentLevel = await this.#staffLevel(parent);
       this.#assertLevelBelow(parentLevel, level, 'below the account it reports to');
-      this.#assertChildOfParent(actor, parentLevel, level);
     }
 
     const existing = await this.models.Staff.findOne({ where: { email }, raw: true, transaction: outer });
@@ -499,10 +498,9 @@ class StaffService {
   }
 
   /**
-   * The Addaplay ladder (`CHILD_LEVELS` in `@ibitplay/auth`): a creator makes
-   * ONLY the level directly below its own — Admin → Sub Admin, Sub Admin →
-   * Super Master, Super Master → Master, Master → Agent; an Agent makes
-   * players only. The Super Admin makes any level strictly below it.
+   * TENEXCH's rule (`CHILD_LEVELS` in `@ibitplay/auth`): a creator makes any
+   * staff level below its own — a Sub Admin a Super Master, a Master or an
+   * Agent; an Agent makes players only.
    *
    * EXECUTIVE (7) is never a staff row made here, by anyone: executives are
    * sub-logins and are made through `/admin/access/executives`.
@@ -512,20 +510,9 @@ class StaffService {
       throw errors.NOT_PERMITTED({ reason: 'executives are created from the executives screen, not as staff' });
     }
     this.#assertLevelBelow(actor.level, level);
-    if (Number(actor.level) === STAFF_LEVELS.SUPER_ADMIN) return;
+    // Below the caller but no staff level at all (an odd role level): fails closed.
     if (!canCreateLevel(actor.level, level)) {
-      throw errors.LEVEL_NOT_DIRECT_CHILD({
-        level,
-        reason: 'you can only create the level directly below your own',
-      });
-    }
-  }
-
-  /** Under a descendant, the new level must also be that parent's direct child level. */
-  #assertChildOfParent(actor, parentLevel, level) {
-    if (Number(actor.level) === STAFF_LEVELS.SUPER_ADMIN) return;
-    if (!canCreateLevel(parentLevel, level)) {
-      throw errors.LEVEL_NOT_DIRECT_CHILD({ level, reason: 'the new account must be the level directly below its parent' });
+      throw errors.LEVEL_NOT_BELOW({ level, reason: 'not a staff level you can create' });
     }
   }
 

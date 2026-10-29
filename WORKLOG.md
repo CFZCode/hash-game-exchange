@@ -15,6 +15,14 @@ Format:
 
 ---
 
+## 2026-10-29 — Create Account: apne se neeche ka har level bana sakte hai (TENEXCH jaisa)
+**Kya kiya:** Create Account ke "User Type" me ab creator ko apne se neeche ke saare staff level dikhte hai, aur backend bhi wahi allow karta hai. Admin → Sub Admin, Super Master, Master, Agent; Sub Admin → Super Master, Master, Agent; Super Master → Master, Agent; Master → Agent; Agent → sirf User. Naye account ka parent creator khud hota hai. Pehle har level sirf theek neeche wala level bana sakta tha (Sub Admin ko sirf Super Master + User dikhta tha). `CHILD_LEVELS` ab "har level jo creator se neeche hai", `#assertChildOfParent` aur `LEVEL_NOT_DIRECT_CHILD` hata diye (parent ke neeche hona `#assertLevelBelow` already check karta hai).
+**Kyun:** user (subadminx11 se login): "usko sirf super master and user create karne ka option dikh rha hai bss aisa nhi tha tenexch me ... vho same type and same rule for account creation". TENEXCH: InsertUser `ROLES.filter(r => r.id > roleId)` + server `validateHierarchy` (creator strictly upar) + `validateParent` (parent = creator).
+**Files / jagah:** backend/packages/auth/src/permissions.js (CHILD_LEVELS), backend/services/admin/src/modules/staff/staff.service.js, staff.errors.js, admin/src/views/exchange/accounts/CreateAccount.tsx; tests: permissions.test.js, staff.test.js, lords/agentMoney.test.js (purana `changed` assert e8603aee ke baad stale tha → ab ALREADY_SET check)
+**Notes / pending:** auth, staff, staff-auth, lords tests pass (passwordRoute.test.js ek baar full run me atka, akele pass). exchange-accounts ke 2 failures pehle se the. parker-admin-svc, parker-admin, parker-admin-local restart. Push nahi kiya.
+
+---
+
 ## 2026-10-29 — Parent ne staff ka password badla → child ko phir se password change + naya transaction password (TENEXCH jaisa)
 **Kya kiya:** Account List → More → Change Password se parent jab kisi staff ka password badalta hai, to ab us staff pe `must_change_password = true` lagta hai, isliye agle login pe pehle password change screen khulti hai. Us forced change pe har baar naya 6-digit transaction password banta hai (purana band ho jata hai) aur login screen pe ek baar dikhta hai. Pehle naya code sirf pehli baar (first sign-in, jab koi code na ho) milta tha, aur Account List wala reset forced change lagata hi nahi tha. Executive session ko kabhi code nahi milta.
 **Kyun:** user: "upar parent ne password change kar diya kisi bhi staff ka to ... child dubara login karta hai to usko fir se password change karne ka option dikhana ... trsaction password fir se change hokr dikhega ... jaise tenexch me hai". TENEXCH: parent reset → `first_login=false` → child ka forced change naya `transaction_password` deta hai (StaffController.updateStaffPassword, userController staff reset).

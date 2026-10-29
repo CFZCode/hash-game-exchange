@@ -474,7 +474,6 @@ test('admin staff', async (t) => {
     );
   const cleanup = (...ids) => connection.models.Staff.destroy({ where: { id: ids } });
   const refusedLevel = (err) => err.code === 'STAFF_LEVEL_NOT_BELOW' && err.status === 403;
-  const refusedSkip = (err) => err.code === 'STAFF_LEVEL_NOT_DIRECT_CHILD' && err.status === 403 && /directly below your own/.test(err.message);
 
   await t.test('an Admin cannot create a Super Admin, nor another Admin', async () => {
     const admin = await seedStaff(newStaffId(), { level: 2 });
@@ -487,20 +486,25 @@ test('admin staff', async (t) => {
     await cleanup(sub.id);
   });
 
-  await t.test('each level creates ONLY the level directly below it (CHILD_LEVELS)', async () => {
+  await t.test('each level creates any level below it, under itself (TENEXCH rule)', async () => {
     const admin = await seedStaff(newStaffId(), { level: 2 });
-    await assert.rejects(() => make(actorFor(admin), 4), refusedSkip, 'an Admin does not skip to Super Master');
+    const smOfAdmin = await make(actorFor(admin), 4);
+    assert.equal(Number(smOfAdmin.parentId), admin);
 
     const sub = await seedStaff(newStaffId(), { parentId: admin, level: 3 });
     await assert.rejects(() => make(actorFor(sub), 3), refusedLevel, 'not a peer');
-    await assert.rejects(() => make(actorFor(sub), 5), refusedSkip, 'a Sub Admin does not skip to Master');
+    await assert.rejects(() => make(actorFor(sub), 2), refusedLevel, 'not upwards');
     const smMade = await make(actorFor(sub), 4);
     assert.equal(Number(smMade.parentId), sub);
+    const masterOfSub = await make(actorFor(sub), 5);
+    const agentOfSub = await make(actorFor(sub), 6);
+    assert.equal(Number(agentOfSub.parentId), sub);
 
     const sm = await seedStaff(newStaffId(), { level: 4 });
     await assert.rejects(() => make(actorFor(sm), 4), refusedLevel, 'not a peer');
     await assert.rejects(() => make(actorFor(sm), 3), refusedLevel, 'not upwards');
-    await assert.rejects(() => make(actorFor(sm), 6), refusedSkip, 'a Super Master does not skip to Agent');
+    const agentOfSm = await make(actorFor(sm), 6);
+    assert.equal(Number(agentOfSm.parentId), sm);
 
     const master = await make(actorFor(sm), 5);
     levels.set(Number(master.id), 5);
@@ -515,7 +519,7 @@ test('admin staff', async (t) => {
     await assert.rejects(() => make(actorFor(agentOfMaster.id), 7));
     await assert.rejects(() => make(actorFor(agentOfMaster.id), 6), refusedLevel);
 
-    await cleanup(agentOfMaster.id, master.id, smMade.id);
+    await cleanup(agentOfMaster.id, master.id, smMade.id, agentOfSub.id, masterOfSub.id, agentOfSm.id, smOfAdmin.id);
   });
 
   await t.test('the Super Admin creates any level, under itself or a descendant', async () => {
@@ -536,13 +540,14 @@ test('admin staff', async (t) => {
     await cleanup(agent.id, agentDirect.id, admin.id);
   });
 
-  await t.test('below the Super Admin, a create under a descendant must be that parent\'s direct child level', async () => {
+  await t.test('below the Super Admin, a create under a descendant must sit below that parent', async () => {
     const sm = await seedStaff(newStaffId(), { level: 4 });
     const master = await seedStaff(newStaffId(), { parentId: sm, level: 5 });
     const stranger = await seedStaff(newStaffId(), { level: 5 });
 
-    // A Super Master's child level is Master; Agent under its master is refused.
-    await assert.rejects(() => make(actorFor(sm), 6, { parentId: master }), refusedSkip);
+    const agent = await make(actorFor(sm), 6, { parentId: master });
+    assert.equal(Number(agent.parentId), master);
+    await cleanup(agent.id);
     await assert.rejects(() => make(actorFor(sm), 5, { parentId: master }), refusedLevel);
     await assert.rejects(
       () => make(actorFor(sm), 5, { parentId: stranger }),

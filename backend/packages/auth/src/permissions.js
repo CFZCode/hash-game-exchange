@@ -85,7 +85,7 @@ const ALL = Object.values(PERMISSIONS);
  *
  * Product rule (user, 2026-10-29): every staff level below the Super Admin sees exactly the
  * Agent's admin — same sidebar, same dashboard, no extra tab or feature. The only difference up
- * the tree is `staff:read` / `staff:write`, so a level can build the level beneath it (scoped in
+ * the tree is `staff:read` / `staff:write`, so a level can build the levels beneath it (scoped in
  * `StaffService` by `CHILD_LEVELS` and to its own subtree).
  */
 const AGENT_GRANTS = [
@@ -118,27 +118,28 @@ const LEVEL_PERMISSIONS = {
 };
 
 /**
- * Which staff level each creator level may create through Sports Exchange ka
+ * Which staff levels each creator level may create through Sports Exchange ka
  * Create Account (`POST /admin/exchange/accounts-admin/create` → `StaffService.create`)
- * (the Addaplay ladder): every level creates ONLY the level directly below it,
- * inside its own tree. The Super Admin may create any level. An agent creates
- * players only. EXECUTIVE (7) is never created as a staff row — executives are
- * sub-logins made through `/admin/access/executives`.
+ * — TENEXCH's rule (`validateHierarchy`, user 2026-10-29): EVERY staff level below
+ * the creator's own, inside its own tree; a Sub Admin makes a Super Master, a Master
+ * or an Agent. An agent creates players only. EXECUTIVE (7) is never created as a
+ * staff row — executives are sub-logins made through `/admin/access/executives`.
  */
-const CHILD_LEVELS = Object.freeze({
-  [STAFF_LEVELS.SUPER_ADMIN]: Object.freeze([
-    STAFF_LEVELS.ADMIN,
-    STAFF_LEVELS.SUB_ADMIN,
-    STAFF_LEVELS.SUPER_MASTER,
-    STAFF_LEVELS.MASTER,
-    STAFF_LEVELS.AGENT,
-  ]),
-  [STAFF_LEVELS.ADMIN]: Object.freeze([STAFF_LEVELS.SUB_ADMIN]),
-  [STAFF_LEVELS.SUB_ADMIN]: Object.freeze([STAFF_LEVELS.SUPER_MASTER]),
-  [STAFF_LEVELS.SUPER_MASTER]: Object.freeze([STAFF_LEVELS.MASTER]),
-  [STAFF_LEVELS.MASTER]: Object.freeze([STAFF_LEVELS.AGENT]),
-  [STAFF_LEVELS.AGENT]: Object.freeze([]),
-});
+const CREATABLE_LEVELS = [
+  STAFF_LEVELS.ADMIN,
+  STAFF_LEVELS.SUB_ADMIN,
+  STAFF_LEVELS.SUPER_MASTER,
+  STAFF_LEVELS.MASTER,
+  STAFF_LEVELS.AGENT,
+];
+const CHILD_LEVELS = Object.freeze(
+  Object.fromEntries(
+    [STAFF_LEVELS.SUPER_ADMIN, ...CREATABLE_LEVELS].map((creator) => [
+      creator,
+      Object.freeze(CREATABLE_LEVELS.filter((level) => level > creator)),
+    ])
+  )
+);
 
 /** May a creator at `creatorLevel` create a staff account at `level`? Fails closed. */
 const canCreateLevel = (creatorLevel, level) =>
