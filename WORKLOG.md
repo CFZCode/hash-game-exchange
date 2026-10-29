@@ -15,6 +15,14 @@ Format:
 
 ---
 
+## 2026-10-29 — Admin bina domain ke chale: sign-in proxy se, backend local port pe
+**Kya kiya:** Admin sign-in ab browser se seedha `https://api.parker567.com` nahi jaata — same-origin proxy `/api/gw/api/v1/admin/auth/login` (aur executive login) se jaata hai; middleware ki PUBLIC_API list me dono login paths. `API_URL` (server-side) = `http://127.0.0.1:4700` (admin/.env.local + .env.example). Session cookie `secure` ab sirf https pe (Apache `X-Forwarded-Proto: https`), taaki plain-http local run (`next start -p 3081`, IP se) bhi login rakh sake.
+**Kyun:** user ne parker567.com ka DNS doosre server (72.62.251.4) pe kar diya; local admin pe "Sign-in failed — Network error" (browser → domain → galat cert / CORS). User: "admin locally run ho raha hai to local port backend ko api hit kare bss".
+**Files / jagah:** admin/src/views/auth/Login.tsx, admin/src/proxy.ts, admin/src/lib/auth/session.ts, admin/src/app/api/auth/session/route.ts, admin/.env.example (+ untracked admin/.env.local)
+**Notes / pending:** asli staff login se end-to-end test nahi hua (credentials nahi the) — galat password pe gateway ka `STAFF_AUTH_INVALID_CREDENTIALS` proxy se aaya. RealtimeRefresh socket abhi bhi `NEXT_PUBLIC_API_BASE` (domain) pe jaata hai → DNS bina sirf live auto-refresh nahi chalega, baaki admin chalega.
+
+---
+
 ## 2026-10-28 — TENEXCH jaisa "push instead of poll": balance / exposure, odds (get-match-private-data), all-data, platform sync
 **Kya kiya:** TENEXCH ka concept (docs/porting/2026-10-26-production-optimizations.md §B4, §C, odds push plan 2026-10-21) apne structure me:
 1. **Balance + exposure push (sports-svc):** naya `lib/helper/pushBalance.mjs` — commit ke turant baad `credits.inr` (getUserWallet 'USER' = credits row) + total exposure → `balanceUpdate`. Lagaya: placeBet, combined bet, cancelBet, void (pehle sirf inr bhejta tha), market void, single open-bet void. Settlement worker pehle se bhejta tha. Socket `subscribeBalance` tick 3 s → **30 s** (sirf safety read).

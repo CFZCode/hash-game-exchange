@@ -96,8 +96,8 @@ const Login = () => {
       else body.username = identifier
       if (code) body.twoFactorCode = code
 
-      // Signed in at the platform's base URL itself; the admin server only keeps the token in its
-      // httpOnly cookie (app/api/auth/session).
+      // Signed in through the same-origin proxy (API_URL, server-side): no CORS, no domain needed
+      // locally. The admin server only keeps the token in its httpOnly cookie (app/api/auth/session).
       const payload = { ...body }
 
       delete payload.mode
@@ -108,7 +108,7 @@ const Login = () => {
         firstLogin?: boolean
         mustChangePassword?: boolean
         actor?: { name?: string }
-      }>(`${siteConfig.apiBaseUrl}${path}`, { raw: true, method: 'POST', body: payload })
+      }>(`/api/gw${path}`, { raw: true, method: 'POST', body: payload })
 
       await request('/api/auth/session', { raw: true, method: 'POST', body: { token: data.token } })
 
