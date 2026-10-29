@@ -47,6 +47,14 @@ Format:
 
 ---
 
+## 2026-10-29 — Super Admin ke neeche wale staff ke liye Original Games → Bet history (downline)
+**Kya kiya:** Super Admin ke neeche har staff (Admin … Agent + unke executives) ke sidebar me "Original Games → Bet history" (`/casino/original-games/history`): Bets + Stats tabs, Casino → Bet history jaisa, sirf unke downline ke players. Super Admin side ko ye entry nahi dikhti (naya nav mark `tree`, `direct` ka ulta); uske purane Dashboard / Turnover / Bet history / Games waise hi. Backend `admin/original-games` stats / bets / games ab `playerScope` se caller ke players tak scoped; gate: Super Admin side `originals:read` (pehle jaisa), neeche wale `reports:read` (casino bet history jaisa). Games page aur Turnover agent ko nahi.
+**Kyun:** user: "super admin ke alawa jo bhi staff hai … casino jaisa ek section original game ka bana do, usme bss unki bet history and stat … aur koi bhi access nahi dena".
+**Files / jagah:** backend/services/admin/src/modules/original-games/{originalGames.service.js,routes/admin.routes.js,__tests__/originalGames.test.js (naya)}, admin/src/configs/navConfig.tsx, admin/src/hooks/use-nav-visible.ts, admin/src/views/casino/OriginalGames.tsx, admin/src/app/(pages)/casino/original-games/history/page.tsx (naya)
+**Notes / pending:** Tests 8/8 (scope: agent ko sirf apna player; gate: SA exec ko originals:read chahiye, agent ko reports:read). Live: Super Admin ka total API = DB (6 bets, demo chhod ke); live pe kisi agent ke downline ki Original Games bet nahi hai, isliye agent ka screen live data se nahi dekha. Super Admin ke Original Games figures se ab demo users bahar (admin me demo kabhi nahi dikhta). Commit nahi kiya (user ka naya rule). Restart: parker-admin-svc, admin build + parker-admin + parker-admin-local.
+
+---
+
 ## 2026-10-29 — Account List → More → Profile me Email
 **Kya kiya:** `GET admin/exchange/accounts` ki har row me ab `email` (staff: `staff.email`, player: `users.email`), aur More dialog ke Profile tab ki "Additional Information" me "User Name" ke neeche "Email".
 **Kyun:** user: "more par click karke profile check karte hai to vha email bhi show kara do".
