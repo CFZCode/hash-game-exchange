@@ -15,6 +15,14 @@ Format:
 
 ---
 
+## 2026-10-29 — Transaction password badla nahi ja sakta
+**Kya kiya:** My Account ka "Change transaction password" hata diya: card ab sirf us account ko dikhta hai jiska transaction password abhi set nahi hai (ek baar "Set"). Backend `setTransactionPassword` set ho chuke password pe 409 `TXN_PASSWORD_ALREADY_SET` deta hai, to API se bhi change nahi hota. First-login notice ka text "can change it later under My account" → "cannot be changed".
+**Kyun:** user: "change transaction password wala tab hata de admin panel se … ye koi change nahi karega".
+**Files / jagah:** backend/services/admin/src/modules/staff-auth/transactionPassword.js, staff-auth/__tests__/txnPasswordMode.test.js, admin/src/views/account/MyAccount.tsx, admin/src/views/auth/IssuedTransactionPassword.tsx
+**Notes / pending:** Live pe 5 purane staff (3 Admin, 1 level 5, 1 level 6) ke paas transaction password nahi hai, wo ek baar set kar sakte hain. Bhool gaye to abhi koi reset nahi hai (sirf DB). staff-auth tests 37/37. Live check: Super Admin ka change POST → 409. Restart: parker-admin-svc, admin build + parker-admin.
+
+---
+
 ## 2026-10-29 — Staff first login: password reset, phir transaction password (TENEXCH flow)
 **Kya kiya:** Naya staff (Admin, Master, Agent… jo bhi `staff.service.create` / Create Account se bane) ab `must_change_password + first_login = true` ke saath banta hai, to pehle login pe seedha `/change-password` khulta hai. Wahan apna password badalne par backend 6-digit transaction password banata hai (`crypto.randomInt`, bcrypt hash save) aur response me sirf ek baar bhejta hai. Session khatam ho jaata hai (token_version), isliye code sessionStorage me rakh ke login screen pe ek baar dikhaya jaata hai (EN + Hindi, copy button), "Continue to sign in" dabane par normal login. Login.tsx ka naya-password `minLength` 12 → 8 bhi theek kiya.
 **Kyun:** user: "staff first login karta hai usko apna password reset karna padega … uske baad use transaction password milega … super admin ke chhod ke sare staff ke liye". Reference: TENEXCH `StaffController.updateStaffPassword` + `ChangePasswordSuccess.jsx`.

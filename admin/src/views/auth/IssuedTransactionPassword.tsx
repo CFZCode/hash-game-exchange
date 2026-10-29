@@ -18,7 +18,7 @@ export const keepIssuedTransactionPassword = (code: string) => {
   try {
     sessionStorage.setItem(ISSUED_TXN_KEY, code)
   } catch {
-    // Storage blocked: the code is lost, the staff sets a new one under My account.
+    // shortcut: storage blocked = the code is lost and cannot be changed; add a superior reset if it ever happens.
   }
 }
 
@@ -58,11 +58,11 @@ const IssuedTransactionPassword = ({ code, onContinue }: { code: string; onConti
       <AlertDescription className='grid gap-2'>
         <p>
           Remember it: from now on every transaction on the panel needs this password. Do not share it with anyone. It
-          is shown only this once; you can change it later under My account.
+          is shown only this once and cannot be changed.
         </p>
         <p>
           इसे याद रखें: अब से पैनल के सभी लेन-देन केवल इसी पासवर्ड से होंगे। इसे किसी के साथ साझा न करें। यह सिर्फ एक
-          बार दिखेगा।
+          बार दिखेगा और बदला नहीं जा सकता।
         </p>
       </AlertDescription>
     </Alert>
