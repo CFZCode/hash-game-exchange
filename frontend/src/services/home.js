@@ -268,6 +268,9 @@ export function getGameTopWins(ref, slug) {
  * captured list rather than answering nothing. */
 /* Tab → the backend's `category` (0 All takes every row). */
 const BIG_WIN_TABS = { 1: 'original', 2: 'slots', 3: 'live' };
+const BIG_WINS_SHOWN = 20;
+// A win worth less than this (in USD) is not a big win — 0.001 USDT rounds read as noise.
+const MIN_BIG_WIN_USD = 1;
 
 export const getRecentBigWins = ({ tab = 0 } = {}) => {
   if (USE_FIXTURES) return request(ENDPOINTS.recentBigWins, { fixture: bigWinsByTab[tab] ?? bigWinsByTab[0] });
@@ -278,18 +281,29 @@ export const getRecentBigWins = ({ tab = 0 } = {}) => {
   /* An empty or failed read falls back to the static showcase for that tab (see `orStatic`). */
   const fallback = () => originalsOn().then((originals) => staticBigWins(tab, { originals }));
   const want = BIG_WIN_TABS[tab];
+  /* THIS BUILD'S (user, 2026-10-29: the strip showed one Limbo win over and over). Dust wins
+     (under MIN_BIG_WIN_USD) are left out, and while the site has fewer than 20 real wins the
+     strip is topped up from the showcase — real wins first, no showcase row for a game already
+     shown — instead of repeating the few real ones. */
   return orStatic(
     () =>
       publicGates().then((gates) =>
         Promise.resolve(
           request(PLATFORM.casino.topWins, { live: true, params: { limit: TOP_WINS_POOL }, fixture: [] }),
-        ).then((rows) =>
-          byUsdProfit(rows)
+        ).then((rows) => {
+          const real = byUsdProfit(rows)
+            .filter((row) => usdProfit(row) >= MIN_BIG_WIN_USD)
             .filter((row) => (row.category ?? 'original') !== 'original' || gates.on('originals'))
             .filter((row) => !want || (row.category ?? 'original') === want)
-            .slice(0, 20)
-            .map(toBigWin),
-        ),
+            .slice(0, BIG_WINS_SHOWN)
+            .map(toBigWin);
+          if (!real.length || real.length >= BIG_WINS_SHOWN) return real;
+          return fallback().then((showcase) =>
+            real
+              .concat(showcase.filter((s) => !real.some((r) => r.gameUnique === s.gameUnique)))
+              .slice(0, BIG_WINS_SHOWN),
+          );
+        }),
       ),
     fallback,
   );
