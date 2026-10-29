@@ -12,7 +12,6 @@
 export const siteConfig = {
   key: process.env.NEXT_PUBLIC_SITE_KEY ?? 'admins',
   name: process.env.NEXT_PUBLIC_SITE_NAME ?? 'Site Admin',
-  tagline: process.env.NEXT_PUBLIC_SITE_TAGLINE ?? 'Operator panel',
   environment: process.env.NEXT_PUBLIC_ENV_LABEL ?? 'localhost',
 
   /** The platform's public base URL: the browser signs in here directly (views/auth/Login.tsx). */

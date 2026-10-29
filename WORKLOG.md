@@ -15,6 +15,14 @@ Format:
 
 ---
 
+## 2026-10-29 — Transaction password screen sirf English, "Operator panel" hataya
+**Kya kiya:** First sign-in ke baad jo transaction password screen khulti hai, usse saari Hindi lines hata di (sirf English bachi). "Operator panel" tagline poori hata di: sidebar me brand naam ke neeche se, login page ke left side se, `siteConfig.tagline` aur `NEXT_PUBLIC_SITE_TAGLINE` env se bhi. Admin aur owner panel ka meta description ab sirf site ka naam hai.
+**Kyun:** user: "trsaction pass wala page ... usme hindi wale text hata diyo ... jaha jaha operator panel likha hai vo hat do".
+**Files / jagah:** admin/src/views/auth/IssuedTransactionPassword.tsx, admin/src/components/layout/Sidebar.tsx, admin/src/views/auth/Login.tsx, admin/src/configs/site.ts, admin/src/app/layout.tsx, admin/.env.example (+ .env.local), owner-panel/src/app/layout.tsx
+**Notes / pending:** Admin aur owner panel dono build karke restart kiye. Push nahi kiya.
+
+---
+
 ## 2026-10-29 — Account List → More → Profile me Email
 **Kya kiya:** `GET admin/exchange/accounts` ki har row me ab `email` (staff: `staff.email`, player: `users.email`), aur More dialog ke Profile tab ki "Additional Information" me "User Name" ke neeche "Email".
 **Kyun:** user: "more par click karke profile check karte hai to vha email bhi show kara do".

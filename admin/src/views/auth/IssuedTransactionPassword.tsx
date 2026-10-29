@@ -42,11 +42,10 @@ const IssuedTransactionPassword = ({ code, onContinue }: { code: string; onConti
         <CircleCheckIcon className='size-7' />
       </span>
       <p className='text-heading text-lg font-medium'>Your password has been updated</p>
-      <p className='text-muted-foreground'>आपका पासवर्ड बदला जा चुका है।</p>
     </div>
 
     <div className='grid gap-2'>
-      <span className='text-muted-foreground text-sm'>Your transaction password · आपका लेनदेन पासवर्ड</span>
+      <span className='text-muted-foreground text-sm'>Your transaction password</span>
       <div className='bg-muted/40 flex items-center justify-center gap-2 rounded-lg border border-dashed px-4 py-4'>
         <span className='text-heading font-mono text-3xl font-semibold tracking-[0.3em] tabular-nums'>{code}</span>
         <CopyButton value={code} label='Copy transaction password' />
@@ -55,15 +54,9 @@ const IssuedTransactionPassword = ({ code, onContinue }: { code: string; onConti
 
     <Alert>
       <ShieldAlertIcon />
-      <AlertDescription className='grid gap-2'>
-        <p>
-          Remember it: from now on every transaction on the panel needs this password. Do not share it with anyone. It
-          is shown only this once and cannot be changed.
-        </p>
-        <p>
-          इसे याद रखें: अब से पैनल के सभी लेन-देन केवल इसी पासवर्ड से होंगे। इसे किसी के साथ साझा न करें। यह सिर्फ एक
-          बार दिखेगा और बदला नहीं जा सकता।
-        </p>
+      <AlertDescription>
+        Remember it: from now on every transaction on the panel needs this password. Do not share it with anyone. It is
+        shown only this once and cannot be changed.
       </AlertDescription>
     </Alert>
 

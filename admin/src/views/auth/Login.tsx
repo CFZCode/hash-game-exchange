@@ -196,7 +196,6 @@ const Login = () => {
         {/* Luno's sign-in: brand and a few lines about the panel on the left, the form card on the right. */}
         <div className='hidden lg:block lg:pl-6'>
           <BrandLogo fallback={<Logo className='[&_span]:text-heading gap-3 [&_span]:text-[28px] [&_span]:font-semibold [&>*:first-child]:size-11'/>} />
-          <h1 className='text-heading mt-6 text-[32px] leading-tight font-medium'>{siteConfig.tagline}</h1>
         </div>
 
         <Card className='animate-in fade-in slide-in-from-bottom-4 z-1 mx-auto w-full max-w-[512px] gap-8 py-10 duration-500 motion-reduce:animate-none sm:px-6'>
