@@ -58,7 +58,7 @@ const errors = defineErrors('TXN_PASSWORD', {
   },
 });
 
-const MIN_LENGTH = 8;
+const MIN_LENGTH = 6;
 
 const setSchema = {
   body: z

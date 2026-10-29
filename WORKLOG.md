@@ -15,6 +15,14 @@ Format:
 
 ---
 
+## 2026-10-29 — Transaction password minimum wapas 6
+**Kya kiya:** Transaction password ka minimum 8 → 6 (jaise pehle tha). Backend `transactionPassword.js` `MIN_LENGTH = 6`; admin My Account → Transaction password: hint, check aur `minLength` 6. Baaki saare passwords 8 hi rahe.
+**Kyun:** user: "bss transaction password 6 kar do jaise pehle tha".
+**Files / jagah:** backend/services/admin/src/modules/staff-auth/transactionPassword.js, admin/src/views/account/MyAccount.tsx
+**Notes / pending:** staff-auth tests 36/36 pass. Restart: parker-admin-svc, admin build + parker-admin.
+
+---
+
 ## 2026-10-29 — Har password ki minimum length 8 character
 **Kya kiya:** Jahan bhi "password must be at least N characters" tha, sab 8 kar diya. Backend: player register / reset / change (`auth.validators.js` 10 → 8), staff first-login + change (`staffAuth.validators.js` 12 → 8), executive (`access.validators.js` 12 → 8), staff create/password (`staff.validators.js` 12 → 8), agent password (`lords.validators.js` 12 → 8), Create Account staff (`createAccount.js` 12 → 8), transaction password (`transactionPassword.js` 6 → 8), `scripts/reset-staff-password.js` (10 → 8). Admin UI: Login (first-login new password), Change Password, My Account (login + transaction password), Executives (create + reset), Exchange More → password — sab check, `minLength` aur hint 8. Branch / player / exchange account pehle se 8 the.
 **Kyun:** user: "jahaha jaha validation lagi hai password must be at least character usko 8 character kar do frontend me bhi and backend me bhi".
