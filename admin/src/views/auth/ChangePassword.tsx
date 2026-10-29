@@ -85,7 +85,7 @@ const ChangePassword = () => {
           <form onSubmit={submit}>
             <FieldGroup className='gap-4'>
               <Field className='gap-2'>
-                <FieldLabel htmlFor='current'>Temporary password</FieldLabel>
+                <FieldLabel htmlFor='current'>Current password</FieldLabel>
                 <Input id='current' type='password' autoComplete='current-password' required value={current} onChange={e => setCurrent(e.target.value)} />
               </Field>
               <Field className='gap-2'>

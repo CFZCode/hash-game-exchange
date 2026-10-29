@@ -15,6 +15,14 @@ Format:
 
 ---
 
+## 2026-10-29 — First-login password screen: "Current password" label
+**Kya kiya:** `/change-password` (staff ka pehla login / reset ke baad) ke pehle field ka label "Temporary password" → "Current password".
+**Kyun:** user: "first section me temporary pass ki jagah current pass kar do".
+**Files / jagah:** admin/src/views/auth/ChangePassword.tsx
+**Notes / pending:** Sirf label badla; upar ka description ("given a temporary password") waisa hi hai. Restart: admin build + parker-admin + parker-admin-local.
+
+---
+
 ## 2026-10-29 — Deposit → Provider probe: sirf active gateways
 **Kya kiya:** Transactions → Deposit → Fiat → Provider probe ka gateway dropdown ab fixed list (waypay, apay, cricpay, upi, f2pay) nahi dikhata: sirf wahi jo active hain (owner panel ON + Super Admin ka switch ON, `GET admin/site-config/payment-gateways`). Koi active nahi to dropdown band, "No active gateway". Wo GET ab `config:read` ya `deposits:read` dono se khulta hai, taaki sirf deposits wala executive bhi list padh sake.
 **Kyun:** user: "provider probe wale me sirf wahi payment gateway dikhne chahiye jo active hai filter me".
