@@ -15,6 +15,14 @@ Format:
 
 ---
 
+## 2026-10-29 — Har password ki minimum length 8 character
+**Kya kiya:** Jahan bhi "password must be at least N characters" tha, sab 8 kar diya. Backend: player register / reset / change (`auth.validators.js` 10 → 8), staff first-login + change (`staffAuth.validators.js` 12 → 8), executive (`access.validators.js` 12 → 8), staff create/password (`staff.validators.js` 12 → 8), agent password (`lords.validators.js` 12 → 8), Create Account staff (`createAccount.js` 12 → 8), transaction password (`transactionPassword.js` 6 → 8), `scripts/reset-staff-password.js` (10 → 8). Admin UI: Login (first-login new password), Change Password, My Account (login + transaction password), Executives (create + reset), Exchange More → password — sab check, `minLength` aur hint 8. Branch / player / exchange account pehle se 8 the.
+**Kyun:** user: "jahaha jaha validation lagi hai password must be at least character usko 8 character kar do frontend me bhi and backend me bhi".
+**Files / jagah:** backend/services/user/src/modules/auth/auth.validators.js, backend/services/admin/src/modules/{staff-auth/staffAuth.validators.js,staff-auth/transactionPassword.js,access/access.validators.js,staff/staff.validators.js,lords/lords.validators.js,exchange-accounts/createAccount.js}, backend/scripts/reset-staff-password.js, admin/src/views/{auth/Login.tsx,auth/ChangePassword.tsx,account/MyAccount.tsx,access/ExecutivesList.tsx,exchange/MoreDialog.tsx}, test access.test.js (7 refused, 8 ok), frontend Auth modal comment
+**Notes / pending:** Player site me client-side length check nahi hai — server ka message hi dikhta hai, isliye frontend build nahi kiya. Touched modules ke tests: sirf exchange-accounts ke 2 fail (staff_role_id_fkey, bina change ke bhi fail — purane). Transaction password ab naya set karte waqt 8 chahiye; purane 6–7 wale chalte rahenge (verify me min nahi). Restart: parker-user-svc, parker-admin-svc, admin build + parker-admin.
+
+---
+
 ## 2026-10-29 — Backend check: Super Admin (+ executive) ke alawa koi house / site-wide power nahi
 **Kya kiya:** `AGENT_TREE_LEVELS` (packages/auth/src/permissions.js) ab levels 2–6 (Admin, Sub Admin bhi) — `isAgentTree` wale saare backend checks unpe bhi: casino house listing apne tree tak (`house.service.js`), email service ka tree scope, reports ka agent-tree player classification. Bulk email (`POST /email/bulk`) `requireLevel(SUB_ADMIN)` → `requireLevel(SUPER_ADMIN)`. Purane "levels 1–3 = house" tests (houseScope, cleanup-agent-tree-referrals selection) naye rule pe.
 **Kyun:** user: "ye chije backend pe check laga … superadmin ya uske executive ko chhod kar baaki kisi down level staff ko koi bhi chije dekhne ya update karne ka option nahi"; "baaki sare child ko utni hi permission jitni agent ko".

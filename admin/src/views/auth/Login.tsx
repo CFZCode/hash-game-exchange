@@ -57,8 +57,8 @@ const Login = () => {
     identifier: mode === 'staff' ? check.email(identifier, 'Email address') : check.required(identifier, 'Username'),
     password: check.required(password, 'Password'),
     newPassword: mustChange
-      ? newPassword.length < 12
-        ? 'The new password must be at least 12 characters.'
+      ? newPassword.length < 8
+        ? 'The new password must be at least 8 characters.'
         : newPassword === password && 'Choose a new password different from the current one.'
       : undefined,
     code: needsCode && code && !/^\d{6}$/.test(code) ? 'The two-factor code is the 6 digits from your authenticator app.' : undefined

@@ -88,8 +88,8 @@ const PasswordTab = ({ row, onDone }: { row: AccountRow; onDone: () => void }) =
     setError('')
     if (!form.password) return setError('The Password field is required')
 
-    // Server (`lords.validators.js setPassword`): 12–200 characters.
-    if (form.password.length < 12) return setError('The Password must be at least 12 characters')
+    // Server (`lords.validators.js setPassword`): 8–200 characters.
+    if (form.password.length < 8) return setError('The Password must be at least 8 characters')
     if (form.password.length > 200) return setError('The Password must be at most 200 characters')
     if (form.password !== form.confirm) return setError('The Confirm Password confirmation does not match')
     if (!form.txn) return setError('The Transaction Code field is required')

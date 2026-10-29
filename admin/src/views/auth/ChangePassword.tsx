@@ -41,7 +41,7 @@ const ChangePassword = () => {
     e.preventDefault()
     setError(null)
 
-    if (next.length < 12) return setError('The new password must be at least 12 characters.')
+    if (next.length < 8) return setError('The new password must be at least 8 characters.')
     if (next !== confirm) return setError('The two new passwords do not match.')
     if (next === current) return setError('Choose a password different from the one you were given.')
 
@@ -85,11 +85,11 @@ const ChangePassword = () => {
               </Field>
               <Field className='gap-2'>
                 <FieldLabel htmlFor='next'>New password</FieldLabel>
-                <Input id='next' type='password' autoComplete='new-password' required minLength={12} value={next} onChange={e => setNext(e.target.value)} />
+                <Input id='next' type='password' autoComplete='new-password' required minLength={8} value={next} onChange={e => setNext(e.target.value)} />
               </Field>
               <Field className='gap-2'>
                 <FieldLabel htmlFor='confirm'>Repeat new password</FieldLabel>
-                <Input id='confirm' type='password' autoComplete='new-password' required minLength={12} value={confirm} onChange={e => setConfirm(e.target.value)} />
+                <Input id='confirm' type='password' autoComplete='new-password' required minLength={8} value={confirm} onChange={e => setConfirm(e.target.value)} />
               </Field>
 
               {error && (

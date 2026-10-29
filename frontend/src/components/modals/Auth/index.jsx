@@ -109,7 +109,7 @@ const TWO_FACTOR_REQUIRED = 'AUTH_TWO_FACTOR_REQUIRED';
    only when it answered with neither (a network failure has no envelope to read).
 
    The 422 arm is what makes a weak password readable: the envelope's top-level message is just
-   "Validation failed", and the sentence the visitor needs ("password must be at least 10
+   "Validation failed", and the sentence the visitor needs ("password must be at least 8
    characters") is in `details.fields`, which `ApiError` already lifts onto `fields`. */
 const messageOf = (failure, fallback) =>
   AUTH_MESSAGES[failure?.code] ||
