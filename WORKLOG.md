@@ -15,6 +15,14 @@ Format:
 
 ---
 
+## 2026-10-29 — Parent ne staff ka password badla → child ko phir se password change + naya transaction password (TENEXCH jaisa)
+**Kya kiya:** Account List → More → Change Password se parent jab kisi staff ka password badalta hai, to ab us staff pe `must_change_password = true` lagta hai, isliye agle login pe pehle password change screen khulti hai. Us forced change pe har baar naya 6-digit transaction password banta hai (purana band ho jata hai) aur login screen pe ek baar dikhta hai. Pehle naya code sirf pehli baar (first sign-in, jab koi code na ho) milta tha, aur Account List wala reset forced change lagata hi nahi tha. Executive session ko kabhi code nahi milta.
+**Kyun:** user: "upar parent ne password change kar diya kisi bhi staff ka to ... child dubara login karta hai to usko fir se password change karne ka option dikhana ... trsaction password fir se change hokr dikhega ... jaise tenexch me hai". TENEXCH: parent reset → `first_login=false` → child ka forced change naya `transaction_password` deta hai (StaffController.updateStaffPassword, userController staff reset).
+**Files / jagah:** backend/services/admin/src/modules/lords/lords.service.js (setPassword), backend/services/admin/src/modules/staff/staff.service.js (changePassword), backend/services/admin/src/modules/staff-auth/transactionPassword.js (comment), tests: lords.test.js, staff.test.js
+**Notes / pending:** staff, lords aur staff-auth tests 84/84 pass. parker-admin-svc restart kiya. Admin UI me koi change nahi chahiye tha: login `mustChangePassword` pe /change-password bhejta hai aur wahan se code login screen pe dikhta hai. Push nahi kiya.
+
+---
+
 ## 2026-10-29 — Transaction password screen sirf English, "Operator panel" hataya
 **Kya kiya:** First sign-in ke baad jo transaction password screen khulti hai, usse saari Hindi lines hata di (sirf English bachi). "Operator panel" tagline poori hata di: sidebar me brand naam ke neeche se, login page ke left side se, `siteConfig.tagline` aur `NEXT_PUBLIC_SITE_TAGLINE` env se bhi. Admin aur owner panel ka meta description ab sirf site ka naam hai.
 **Kyun:** user: "trsaction pass wala page ... usme hindi wale text hata diyo ... jaha jaha operator panel likha hai vo hat do".

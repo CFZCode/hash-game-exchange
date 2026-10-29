@@ -316,16 +316,17 @@ class StaffService {
       if (!actor.canResetOthers) throw errors.NOT_PERMITTED({ reason: 'you may not reset another account' });
     } else {
       const row = await this.models.Staff.findByPk(target, {
-        attributes: ['password', 'first_login', 'must_change_password', 'transaction_password'],
+        attributes: ['password', 'must_change_password'],
         raw: true,
       });
       if (!row) throw errors.NOT_FOUND({ staffId: target });
       if (!(await verifyPassword(oldPassword ?? '', row.password ?? ''))) {
         throw errors.OLD_PASSWORD_WRONG();
       }
-      // First sign-in (TENEXCH flow): the forced change issues a 6-digit transaction
-      // password, returned once. Never over one the account already has.
-      if (row.first_login && row.must_change_password && !row.transaction_password && !isLoginPasswordMode()) {
+      // A forced change — first sign-in, or the next one after a superior's reset (TENEXCH flow) —
+      // issues a fresh 6-digit transaction password, returned once; the old one stops working.
+      // Never to an executive: it acts for this account but does not own its secrets.
+      if (row.must_change_password && !actor.executiveId && !isLoginPasswordMode()) {
         transactionPassword = String(randomInt(100000, 1000000));
       }
     }

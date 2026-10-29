@@ -19,7 +19,8 @@ const { verifyTransactionPassword } = require('../staff-directory/staffDirectory
  * member, and the wallet adjust route simply skipped the check.
  *
  * `POST /admin/auth/transaction-password` sets it, once: a set one is never
- * changed (user, 2026-10-29). It requires the
+ * changed by its owner (user, 2026-10-29). Only a superior's password reset
+ * replaces it, at the forced change that follows (StaffService#changePassword). It requires the
  * caller's LOGIN password (a stolen session alone cannot set the second
  * factor), it is stored as a bcrypt hash exactly like the login password, and
  * it may not equal the login password — a second factor that is the first

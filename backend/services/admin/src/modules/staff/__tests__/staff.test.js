@@ -605,6 +605,17 @@ test('admin staff', async (t) => {
     });
     assert.equal(await mustChange(created.id), true);
 
+    // …and the forced change after it issues a NEW transaction password; the old one stops working.
+    const rotated = await service.changePassword({
+      actor: { id: created.id, level: 4 }, oldPassword: 'reset by the boss!!', newPassword: 'a fourth long password',
+    });
+    assert.match(rotated.transactionPassword, /^\d{6}$/);
+    const after = await connection.models.Staff.findByPk(created.id, { attributes: ['transaction_password'], raw: true });
+    assert.equal(await verifyPassword(rotated.transactionPassword, after.transaction_password), true);
+    if (rotated.transactionPassword !== first.transactionPassword) {
+      assert.equal(await verifyPassword(first.transactionPassword, after.transaction_password), false);
+    }
+
     // Neither the create, the own change nor the reset left a cleartext copy.
     const row = await connection.models.Staff.findByPk(created.id, { attributes: ['password', 'password2'], raw: true });
     assert.match(row.password, /^\$2[aby]\$/);
