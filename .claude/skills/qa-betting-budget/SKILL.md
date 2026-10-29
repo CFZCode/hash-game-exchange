@@ -72,3 +72,10 @@ Callbacks you sign and send to our own backend (a test harness that simulates a 
   - **Sports exchange:** INR, no cap; bets left to settle automatically from the result feed.
   - **Deposits / withdrawals / KYC:** manual, approved in the live site admin.
   - Bets placed from the main session. Scope: this run and these players only.
+
+- **2026-10-29 (run gr29, one new live player: game ratio + loss bonus test)**, set by the owner in chat:
+  - **Slotegrator (GIS) casino:** INR only (no USDT), at most **₹100 a bet**, **₹500** staked across the whole run, on 2–3 games.
+  - **Original games:** INR, at most **₹2,000** staked across the whole run.
+  - **Sports exchange:** INR, no stake cap. Manual settlement only on a market where this player's bet is the only one; otherwise the result feed settles it.
+  - **Deposits:** manual, approved in the live site admin.
+  - **Live config for the test:** loss bonus ON with 1-hour protection and 1x wager, then every setting restored exactly. Scope: this run and this player only.
