@@ -30,3 +30,18 @@ test('game, then provider, then category, else 100%; sports under 1.5 counts not
   assert.equal(await contributionFor(sequelize, { category: 'sports', odds: '1.4' }), '0');
   assert.equal(await contributionFor(sequelize, { category: 'sports', odds: '2' }), '0.5');
 });
+
+test('the player-facing table: types (missing = 100%), providers, games highest first', async () => {
+  const { contributionTable } = require('../wagerContribution');
+  clearContributionCache();
+  const rows = [
+    { category: 'slots', provider: null, game_ref: null, percent: 0 },
+    { category: null, provider: 'PGSoft', game_ref: null, percent: 5 },
+    { category: null, provider: null, game_ref: 'u1', percent: 10, name: 'Chicken Route', game_provider: 'InOut', image: 'x.png' },
+    { category: null, provider: null, game_ref: 'u2', percent: 20, name: 'Wheel', game_provider: null, image: null },
+  ];
+  const t = await contributionTable({ query: async () => rows });
+  assert.deepEqual(t.types, { slots: 0, originals: 100, live: 100, sports: 100 });
+  assert.deepEqual(t.providers, [{ name: 'PGSoft', percent: 5 }]);
+  assert.deepEqual(t.games.map((g) => [g.ref, g.percent]), [['u2', 20], ['u1', 10]]);
+});

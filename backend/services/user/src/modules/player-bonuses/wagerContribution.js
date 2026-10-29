@@ -50,6 +50,43 @@ async function contributionFor(sequelize, { category, provider, game_ref: gameRe
 /** Admin edits: drop the cache. */
 function clearContributionCache() {
   cache = { at: 0, rules: null };
+  tableCache = { at: 0, table: null };
 }
 
-module.exports = { contributionFor, clearContributionCache, providerKey, MIN_SPORTS_ODDS };
+let tableCache = { at: 0, table: null };
+const TYPES = ['slots', 'originals', 'live', 'sports'];
+
+/**
+ * What the player is shown (Bonus page, promotion page): the % each game type, provider and game
+ * counts toward a locked bonus, games with their catalogue name and art. A type with no rule
+ * counts 100%, as `contributionFor` does. Cached 60 s.
+ */
+async function contributionTable(sequelize) {
+  if (tableCache.table && Date.now() - tableCache.at < TTL_MS) return tableCache.table;
+  const rows = await sequelize.query(
+    `SELECT w.category, w.provider, w.game_ref, w.percent::float8 AS percent,
+            COALESCE(o.name, g.name, j.game_name) AS name,
+            CASE WHEN o.code IS NOT NULL OR lower(j.vendor) IN ('in-house', 'inhouse') THEN 'Originals'
+                 ELSE COALESCE(g.provider, j.vendor) END AS game_provider,
+            COALESCE(g.image, j.game_icon) AS image
+       FROM wager_contribution w
+       LEFT JOIN LATERAL (SELECT name, provider, image FROM gisgamesnew WHERE uuid = w.game_ref LIMIT 1) g ON w.game_ref IS NOT NULL
+       LEFT JOIN LATERAL (SELECT game_name, vendor, game_icon FROM js_games WHERE lower(game_uid) = w.game_ref LIMIT 1) j ON w.game_ref IS NOT NULL
+       LEFT JOIN LATERAL (SELECT code, name FROM og_games WHERE lower(code) = w.game_ref LIMIT 1) o ON w.game_ref IS NOT NULL`,
+    { type: QueryTypes.SELECT }
+  );
+  const types = Object.fromEntries(TYPES.map((t) => [t, rows.find((r) => r.category === t)?.percent ?? 100]));
+  const table = {
+    types,
+    providers: rows.filter((r) => r.provider).map((r) => ({ name: r.provider, percent: r.percent })),
+    games: rows
+      .filter((r) => r.game_ref)
+      .map((r) => ({ ref: r.game_ref, name: r.name ?? r.game_ref, provider: r.game_provider ?? null, image: r.image ?? null, percent: r.percent }))
+      .sort((a, b) => b.percent - a.percent || a.name.localeCompare(b.name)),
+    minSportsOdds: MIN_SPORTS_ODDS,
+  };
+  tableCache = { at: Date.now(), table };
+  return table;
+}
+
+module.exports = { contributionFor, contributionTable, clearContributionCache, providerKey, MIN_SPORTS_ODDS };

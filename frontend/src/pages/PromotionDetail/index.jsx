@@ -7,6 +7,8 @@ import { Accordion, AccordionItem } from '../../components/shared/Accordion';
 import { IconArrow } from '../../components/shared/icons';
 import { useIsDialog } from '../../context/dialogRoute';
 import usePromotion from './usePromotion';
+import { useResource } from '../../hooks/useResource';
+import { getBonusContribution, percentForHref } from '../../services/bonusContribution';
 import sanitizeHtml from '../../utils/sanitizeHtml';
 import { useSelectedCurrency } from '../../hooks/useSelectedCurrency';
 import { rupeesIn } from '../../utils/currency';
@@ -188,6 +190,16 @@ function ctaOf(promo) {
 }
 
 /** The page body, shared by the desktop page and the phone's sheet (./Dialog.jsx). */
+/* THIS BUILD'S — under each participating game, the % of a bet on it that counts toward unlocking
+   a locked bonus (user, 2026-10-29: the game ratio, shown on the promotion too). Nothing when the
+   game has no ratio of its own. */
+function GameRatio({ href }) {
+  const { data } = useResource(getBonusContribution);
+  const percent = percentForHref(data, href);
+  if (percent == null) return null;
+  return <div className="text-center text-xs text-secondary">Bonus wager {percent}%</div>;
+}
+
 export function PromotionDetailView({ promo, loading }) {
   const isDialog = useIsDialog();
   const navigate = useNavigate();
@@ -344,14 +356,10 @@ export function PromotionDetailView({ promo, loading }) {
                 <div className="mb-5 text-left text-lg font-extrabold text-primary">Participating Games</div>
                 <div className="grid grid-cols-3 gap-2 sm:grid-cols-6 sm:gap-3 xl:grid-cols-8">
                   {promo.qualifyingGames.map((game, i) => (
-                    <GameTile
-                      key={`${game.href}-${i}`}
-                      index={i}
-                      name={game.name}
-                      image={game.img}
-                      slug={game.slug}
-                      href={game.href}
-                    />
+                    <div key={`${game.href}-${i}`} className="flex flex-col gap-1">
+                      <GameTile index={i} name={game.name} image={game.img} slug={game.slug} href={game.href} />
+                      <GameRatio href={game.href} />
+                    </div>
                   ))}
                 </div>
               </div>
