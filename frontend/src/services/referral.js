@@ -62,9 +62,7 @@ import { printCurrency } from '../utils/currency';
  * taken live and the LINK is built here, which keeps the three surfaces agreeing with each other
  * and pointing at the app the visitor is actually using.
  */
-const INVITE_HOST = USE_FIXTURES ? 'https://hash.game' : window.location.origin;
-
-const inviteUrl = (code) => `${INVITE_HOST}/i-${code}-n/`;
+const inviteUrl = (code) => `${window.location.origin}/i-${code}-n/`;
 
 export const getReferral = () =>
   request(ENDPOINTS.referral.history, {
@@ -122,7 +120,7 @@ export const getInvitationCode = () => {
   });
 
   /* The live answer is `{referralCode, referralLink}`; only the code is taken, for the reason at
-     `INVITE_HOST`. The fixture is already in this shell's shape, so as elsewhere the branch is on
+     `inviteUrl`. The fixture is already in this shell's shape, so as elsewhere the branch is on
      whether a Promise came back rather than on inspecting the object. */
   if (!answer || typeof answer.then !== 'function') return answer;
 

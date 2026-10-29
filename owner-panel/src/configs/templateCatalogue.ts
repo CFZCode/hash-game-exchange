@@ -31,10 +31,10 @@ export type TemplateEntry = {
 export const TEMPLATE_CATALOGUE: TemplateEntry[] = [
   {
     key: 'hash_game',
-    label: 'Hash Game (original)',
-    description: "The bc.game UI in its own colours: bc green on slate. This client's default.",
+    label: 'Default',
+    description: "The site UI in its own colours: green on slate. This client's default.",
     swatch: { accent: '#24EE89', background: '#232626' },
-    colours: 'Original bc.game colours, unchanged.',
+    colours: 'Original colours, unchanged.',
 
     // The one layout per feature the bc.game UI has (configs/siteUi.ts; same as the backend's hash_game).
     variants: {

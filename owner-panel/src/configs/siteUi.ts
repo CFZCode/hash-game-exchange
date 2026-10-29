@@ -18,7 +18,7 @@
  * (`pinToUi` in lib/entitlements/store.ts), so the document can never say otherwise.
  */
 
-export const UI_LABEL = 'bc.game UI'
+export const UI_LABEL = 'Site UI'
 
 export type UiSupport = { status: 'toggle'; variant: string; surfaces: string } | { status: 'fixed'; variant: string; surfaces: string } | { status: 'absent'; why: string }
 

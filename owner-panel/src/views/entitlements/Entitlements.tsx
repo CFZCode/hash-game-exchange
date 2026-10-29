@@ -136,7 +136,7 @@ const GROUPS: Section[] = [
         {
           id: 'feature:absent',
           title: 'Not in this UI',
-          description: 'The bc.game UI has no screen for these, so they stay off and the backend refuses them.',
+          description: 'The site UI has no screen for these, so they stay off and the backend refuses them.',
           bulk: false,
           rows: FEATURE_CATALOGUE.filter(f => !f.policy && uiSupport(f.key)?.status === 'absent').map(f => ({
             kind: 'feature' as const,
@@ -1235,9 +1235,8 @@ const Entitlements = () => {
                   <div>
                     <h2 className='text-lg font-semibold'>Template</h2>
                     <p className='text-muted-foreground text-sm'>
-                      The site&apos;s colour theme. This site runs the {UI_LABEL}: a template recolours it (layout,
-                      fonts and art stay) and never changes a feature below. Hash Game (original) keeps bc.game&apos;s
-                      own colours.
+                      The site&apos;s colour theme. A template recolours the site UI (layout, fonts and art stay) and
+                      never changes a feature below. Default keeps the site&apos;s own colours.
                     </p>
                   </div>
                   <div className='grid gap-4 sm:grid-cols-2 xl:grid-cols-4'>
