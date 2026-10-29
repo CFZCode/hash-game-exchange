@@ -16,9 +16,9 @@ Format:
 ---
 
 ## 2026-10-29 — Admin bina domain ke chale: sign-in proxy se, backend local port pe
-**Kya kiya:** Admin sign-in ab browser se seedha `https://api.parker567.com` nahi jaata — same-origin proxy `/api/gw/api/v1/admin/auth/login` (aur executive login) se jaata hai; middleware ki PUBLIC_API list me dono login paths. `API_URL` (server-side) = `http://127.0.0.1:4700` (admin/.env.local + .env.example). Session cookie `secure` ab sirf https pe (Apache `X-Forwarded-Proto: https`), taaki plain-http local run (`next start -p 3081`, IP se) bhi login rakh sake.
+**Kya kiya:** Admin sign-in ab browser se seedha `https://api.parker567.com` nahi jaata — same-origin proxy `/api/gw/api/v1/admin/auth/login` (aur executive login) se jaata hai; middleware ki PUBLIC_API list me dono login paths. `API_URL` (server-side) = `http://127.0.0.1:4700` (admin/.env.local + .env.example). Session cookie `secure` ab sirf https pe (Apache `X-Forwarded-Proto: https`), taaki plain-http local run (`next start -p 3081`, IP se) bhi login rakh sake. Gateway proxy (`app/api/gw/[...path]/route.ts`) browser ka `Origin` header aage nahi bhejta — warna gateway "Origin http://217.216.78.106:3081 is not allowed by CORS" deta tha.
 **Kyun:** user ne parker567.com ka DNS doosre server (72.62.251.4) pe kar diya; local admin pe "Sign-in failed — Network error" (browser → domain → galat cert / CORS). User: "admin locally run ho raha hai to local port backend ko api hit kare bss".
-**Files / jagah:** admin/src/views/auth/Login.tsx, admin/src/proxy.ts, admin/src/lib/auth/session.ts, admin/src/app/api/auth/session/route.ts, admin/.env.example (+ untracked admin/.env.local)
+**Files / jagah:** admin/src/views/auth/Login.tsx, admin/src/proxy.ts, admin/src/app/api/gw/[...path]/route.ts, admin/src/lib/auth/session.ts, admin/src/app/api/auth/session/route.ts, admin/.env.example (+ untracked admin/.env.local)
 **Notes / pending:** asli staff login se end-to-end test nahi hua (credentials nahi the) — galat password pe gateway ka `STAFF_AUTH_INVALID_CREDENTIALS` proxy se aaya. RealtimeRefresh socket abhi bhi `NEXT_PUBLIC_API_BASE` (domain) pe jaata hai → DNS bina sirf live auto-refresh nahi chalega, baaki admin chalega.
 
 ---
