@@ -36,6 +36,17 @@ const TYPES = [
 const valid = (p: string) => /^\d+(\.\d+)?$/.test(p.trim()) && Number(p) <= 100
 const same = (a: Exception, b: Exception) => a.kind === b.kind && a.key.toLowerCase() === b.key.toLowerCase()
 
+/** A promotion's game card links `/game/<uuid>` (lobby) or `/game/<slug>` (an Original); bets carry the uuid / game code. */
+const ORIGINAL_CODE: Record<string, string> = { mines: 'mine', 'tower-legend': 'tower', 'video-poker': 'videopoker' }
+
+type PromoCard = { name: string; href: string }
+
+const promoGameRef = (href: string) => {
+  const ref = decodeURIComponent(/^\/game\/([^/?#]+)/.exec(href)?.[1] ?? '').toLowerCase()
+
+  return ref.includes('-') || ORIGINAL_CODE[ref] ? (ORIGINAL_CODE[ref] ?? ref.replace(/-/g, '_')) : ref
+}
+
 const Pct = ({ value, onChange, disabled, label, placeholder }: { value: string; onChange: (v: string) => void; disabled?: boolean; label: string; placeholder?: string }) => (
   <div className='flex items-center gap-1'>
     <Input
@@ -141,12 +152,42 @@ const Editor = ({ initial }: { initial: Rule[] }) => {
   const [open, setOpen] = useState(false)
   const [filter, setFilter] = useState('')
   const [newPct, setNewPct] = useState('100')
+  const [promoPct, setPromoPct] = useState('10')
+  const [promoBusy, setPromoBusy] = useState(false)
+  const [promoNote, setPromoNote] = useState('')
   const dirty = JSON.stringify({ types, exceptions }) !== JSON.stringify(start)
 
   const values = Object.values(types)
   const everyBet = values.every(v => v === values[0]) ? values[0] : ''
   const allValid = values.every(valid) && exceptions.every(r => valid(r.percent))
   const shown = exceptions.filter(r => !filter || r.label.toLowerCase().includes(filter.toLowerCase()))
+
+  /* Bonus counts only on the games of the live promotions: every game type to 0%, those games at
+     `promoPct`, every other exception dropped. Saved only when the staff press Save. */
+  const applyPromotionGames = async () => {
+    setPromoBusy(true)
+
+    try {
+      const list = await api.get<{ id: number; published: boolean; promoStatus?: string }[]>('admin/promotions', { limit: 100 })
+      const live = list.filter(p => p.published && (p.promoStatus ?? 'live') === 'live')
+      const details = await Promise.all(live.map(p => api.get<{ qualifyingGames?: PromoCard[] }>(`admin/promotions/${p.id}`)))
+      const games = new Map<string, Exception>()
+
+      for (const d of details)
+        for (const g of d.qualifyingGames ?? []) {
+          const key = promoGameRef(g.href)
+
+          if (key) games.set(key, { kind: 'game', key, percent: promoPct, label: g.name })
+        }
+
+      setTypes(Object.fromEntries(TYPES.map(t => [t.key, '0'])))
+      setExceptions([...games.values()])
+      setOpen(true)
+      setPromoNote(`${games.size} game(s) from ${live.length} live promotion(s) at ${promoPct}%; every other game 0%. Press Save.`)
+    } finally {
+      setPromoBusy(false)
+    }
+  }
 
   const save = useApiMutation({
     fn: () =>
@@ -179,6 +220,20 @@ const Editor = ({ initial }: { initial: Rule[] }) => {
             </label>
           ))}
         </div>
+      </section>
+
+      <section className='grid gap-2 rounded-lg border p-4'>
+        <div className='flex flex-wrap items-center gap-2'>
+          <span>Only promotion games count, at</span>
+          <Pct label='Promotion games %' value={promoPct} onChange={setPromoPct} disabled={!writable} />
+          <Button type='button' variant='outline' disabled={!writable || !valid(promoPct) || promoBusy} onClick={() => void applyPromotionGames()}>
+            {promoBusy && <Loader2Icon className='animate-spin' />}
+            Use promotion games
+          </Button>
+        </div>
+        <p className='text-muted-foreground text-sm'>
+          {promoNote || "Takes the games of every live promotion: bets on them unlock a bonus at this %, bets on any other game count 0%."}
+        </p>
       </section>
 
       <section className='rounded-lg border'>
