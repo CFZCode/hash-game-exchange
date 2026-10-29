@@ -9,6 +9,7 @@ const assert = require('node:assert');
 
 const db = require('@ibitplay/db');
 const { createLogger, money } = require('@ibitplay/common');
+const { verifyPassword } = require('@ibitplay/auth');
 
 const { StaffService } = require('../staff.service');
 const v = require('../staff.validators');
@@ -574,15 +575,29 @@ test('admin staff', async (t) => {
     (await connection.models.Staff.findByPk(id, { attributes: ['must_change_password'], raw: true }))
       .must_change_password;
 
-  await t.test("a created account keeps its creator's password; a superior's reset forces a change", async () => {
+  await t.test('a created account must change its password first; that change issues the transaction password', async (st) => {
+    const prevMode = process.env.TXN_PASSWORD_MODE;
+    process.env.TXN_PASSWORD_MODE = 'separate';
+    st.after(() => { if (prevMode === undefined) delete process.env.TXN_PASSWORD_MODE; else process.env.TXN_PASSWORD_MODE = prevMode; });
+
     const boss = await seedStaff(newStaffId(), { level: 3 });
     const created = await make(actorFor(boss), 4);
-    assert.equal(await mustChange(created.id), false);
+    assert.equal(await mustChange(created.id), true);
 
-    await service.changePassword({
+    const first = await service.changePassword({
       actor: { id: created.id, level: 4 }, oldPassword: PASSWORD, newPassword: 'another long password',
     });
     assert.equal(await mustChange(created.id), false);
+    assert.match(first.transactionPassword, /^\d{6}$/);
+    const stored = await connection.models.Staff.findByPk(created.id, { attributes: ['transaction_password', 'first_login'], raw: true });
+    assert.equal(await verifyPassword(first.transactionPassword, stored.transaction_password), true);
+    assert.equal(stored.first_login, false);
+
+    // Issued once: a later own change leaves it alone.
+    const again = await service.changePassword({
+      actor: { id: created.id, level: 4 }, oldPassword: 'another long password', newPassword: 'a third long password',
+    });
+    assert.equal(again.transactionPassword, undefined);
 
     // A superior's reset sets it again — they know the password now.
     await service.changePassword({

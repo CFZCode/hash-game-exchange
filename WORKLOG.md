@@ -15,6 +15,14 @@ Format:
 
 ---
 
+## 2026-10-29 — Staff first login: password reset, phir transaction password (TENEXCH flow)
+**Kya kiya:** Naya staff (Admin, Master, Agent… jo bhi `staff.service.create` / Create Account se bane) ab `must_change_password + first_login = true` ke saath banta hai, to pehle login pe seedha `/change-password` khulta hai. Wahan apna password badalne par backend 6-digit transaction password banata hai (`crypto.randomInt`, bcrypt hash save) aur response me sirf ek baar bhejta hai. Session khatam ho jaata hai (token_version), isliye code sessionStorage me rakh ke login screen pe ek baar dikhaya jaata hai (EN + Hindi, copy button), "Continue to sign in" dabane par normal login. Login.tsx ka naya-password `minLength` 12 → 8 bhi theek kiya.
+**Kyun:** user: "staff first login karta hai usko apna password reset karna padega … uske baad use transaction password milega … super admin ke chhod ke sare staff ke liye". Reference: TENEXCH `StaffController.updateStaffPassword` + `ChangePasswordSuccess.jsx`.
+**Files / jagah:** backend/services/admin/src/modules/staff/staff.service.js (create + changePassword), staff/__tests__/staff.test.js, admin/src/views/auth/{IssuedTransactionPassword.tsx (naya), ChangePassword.tsx, Login.tsx}
+**Notes / pending:** Super Admin pe ye flow nahi lagta: wo sirf DB seeder (`packages/db/seeders/001-roles-and-admin.js`, .env SEED_ADMIN_*) se ek baar banta hai, API se nahi (create API sirf apne se neeche ka level banata hai). Transaction password tabhi banta hai jab first_login + must_change_password dono true hon aur pehle se koi transaction password na ho, isliye purana kabhi overwrite nahi hota (live Super Admin ka first_login true hai par txn set hai, wo safe hai). TXN_PASSWORD_MODE=login me kuch nahi banta. Purane live staff pe koi asar nahi. Executives (sub-login) shamil nahi, wo parent ka transaction password use karte hain. Tests: staff + staff-auth + lords/locks/exchange pass; exchange-accounts ke 2 purane `staff_role_id_fkey` fail. Restart: parker-admin-svc, admin build + parker-admin.
+
+---
+
 ## 2026-10-29 — Transaction password minimum wapas 6
 **Kya kiya:** Transaction password ka minimum 8 → 6 (jaise pehle tha). Backend `transactionPassword.js` `MIN_LENGTH = 6`; admin My Account → Transaction password: hint, check aur `minLength` 6. Baaki saare passwords 8 hi rahe.
 **Kyun:** user: "bss transaction password 6 kar do jaise pehle tha".

@@ -20,6 +20,8 @@ import { useSession } from '@/contexts/SessionContext'
 // Lib Imports
 import { errorMessage, request } from '@/lib/api/client'
 
+import { keepIssuedTransactionPassword } from './IssuedTransactionPassword'
+
 // SVG Import
 import AuthBackgroundShape from '@/assets/svg/auth-background-shape'
 
@@ -48,7 +50,10 @@ const ChangePassword = () => {
     setBusy(true)
 
     try {
-      await request('admin/staff/password', { method: 'PATCH', body: { oldPassword: current, newPassword: next } })
+      const { data } = await request<{ transactionPassword?: string }>('admin/staff/password', { method: 'PATCH', body: { oldPassword: current, newPassword: next } })
+
+      // A first sign-in is issued its transaction password; the login screen shows it once.
+      if (data?.transactionPassword) keepIssuedTransactionPassword(data.transactionPassword)
 
       // The change ends every session of this account (staff.token_version), this one too: sign in
       // again with the new password. signOut clears the cookie and the query cache.

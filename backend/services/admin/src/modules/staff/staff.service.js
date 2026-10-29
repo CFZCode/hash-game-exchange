@@ -1,11 +1,13 @@
 'use strict';
 
+const { randomInt } = require('crypto');
 const { Op, QueryTypes, literal } = require('sequelize');
 const {
   hashPassword,
   verifyPassword,
   canActOn,
   canCreateLevel,
+  isLoginPasswordMode,
   STAFF_LEVELS,
 } = require('@ibitplay/auth');
 const { money, withdrawBlock } = require('@ibitplay/common');
@@ -243,9 +245,10 @@ class StaffService {
           parent_id: parent,
           percentage: percentage ?? null,
           status: 'active',
-          // The creator's password is final: no forced change on first sign-in.
-          must_change_password: false,
-          first_login: false,
+          // The creator knows this password: the first sign-in must replace it,
+          // and that change issues the transaction password (`changePassword`).
+          must_change_password: true,
+          first_login: true,
         },
         { transaction }
       );
@@ -302,6 +305,7 @@ class StaffService {
   async changePassword({ actor, targetId, oldPassword, newPassword }) {
     const self = !targetId || Number(targetId) === Number(actor.id);
     const target = self ? actor.id : Number(targetId);
+    let transactionPassword = null;
 
     if (!self) {
       // A session still on a password somebody else chose may only change its own.
@@ -311,10 +315,18 @@ class StaffService {
       // in the controller. It is a permission on the route here.
       if (!actor.canResetOthers) throw errors.NOT_PERMITTED({ reason: 'you may not reset another account' });
     } else {
-      const row = await this.models.Staff.findByPk(target, { attributes: ['password'], raw: true });
+      const row = await this.models.Staff.findByPk(target, {
+        attributes: ['password', 'first_login', 'must_change_password', 'transaction_password'],
+        raw: true,
+      });
       if (!row) throw errors.NOT_FOUND({ staffId: target });
       if (!(await verifyPassword(oldPassword ?? '', row.password ?? ''))) {
         throw errors.OLD_PASSWORD_WRONG();
+      }
+      // First sign-in (TENEXCH flow): the forced change issues a 6-digit transaction
+      // password, returned once. Never over one the account already has.
+      if (row.first_login && row.must_change_password && !row.transaction_password && !isLoginPasswordMode()) {
+        transactionPassword = String(randomInt(100000, 1000000));
       }
     }
 
@@ -325,6 +337,7 @@ class StaffService {
         // it: they know the password now, so you must replace it.
         must_change_password: !self,
         ...(self ? { first_login: false } : {}),
+        ...(transactionPassword ? { transaction_password: await hashPassword(transactionPassword, PASSWORD_ROUNDS) } : {}),
         // Ends every session of the target — the caller's own too on a self change — so a
         // token stolen before the change stops working now, not in 8 h.
         token_version: literal('token_version + 1'),
@@ -332,8 +345,8 @@ class StaffService {
       { where: { id: target } }
     );
 
-    this.logger?.warn({ actorStaffId: actor.id, targetStaffId: target, self }, 'Staff password changed');
-    return { staffId: target, changed: true };
+    this.logger?.warn({ actorStaffId: actor.id, targetStaffId: target, self, transactionPasswordIssued: Boolean(transactionPassword) }, 'Staff password changed');
+    return { staffId: target, changed: true, ...(transactionPassword ? { transactionPassword } : {}) };
   }
 
   // ══════════════════════════════════════════════════════════════════════

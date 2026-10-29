@@ -1,7 +1,7 @@
 'use client'
 
 // React Imports
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 // Next Imports
 import { useSearchParams } from 'next/navigation'
@@ -31,6 +31,8 @@ import { ApiError, errorMessage, request } from '@/lib/api/client'
 import { safeNext } from '@/lib/safeNext'
 import { check, cleanErrors } from '@/lib/validate'
 
+import IssuedTransactionPassword, { takeIssuedTransactionPassword } from './IssuedTransactionPassword'
+
 type Mode = 'staff' | 'executive'
 
 const Login = () => {
@@ -48,6 +50,17 @@ const Login = () => {
   // First-login: the platform refuses with PASSWORD_CHANGE_REQUIRED until a new password is set.
   const [mustChange, setMustChange] = useState(false)
   const [newPassword, setNewPassword] = useState('')
+
+  // The transaction password the first-sign-in change was just issued, shown once before signing in.
+  const [issuedTxn, setIssuedTxn] = useState<string | null>(null)
+
+  useEffect(() => {
+    const code = takeIssuedTransactionPassword()
+
+    // sessionStorage exists only after hydration, so it is read here, once.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (code) setIssuedTxn(code)
+  }, [])
 
   // Live field checks: a field's message shows once it has been left (blur) or a submit was tried.
   const [touched, setTouched] = useState<Record<string, boolean>>({})
@@ -190,125 +203,133 @@ const Login = () => {
           <CardHeader className='items-center gap-6 px-6 text-center'>
             <Logo className='justify-center gap-3 [&>*:first-child]:size-12' />
             <div>
-              <CardTitle className='text-heading mb-2 text-[40px] leading-tight font-normal'>Sign in</CardTitle>
-              <CardDescription className='text-base'>Staff sign-in to {siteConfig.name}</CardDescription>
+              <CardTitle className='text-heading mb-2 text-[40px] leading-tight font-normal'>{issuedTxn ? 'Welcome' : 'Sign in'}</CardTitle>
+              <CardDescription className='text-base'>
+                {issuedTxn ? 'Note your transaction password, then sign in with your new password.' : `Staff sign-in to ${siteConfig.name}`}
+              </CardDescription>
             </div>
           </CardHeader>
 
           <CardContent className='px-6'>
-            <Tabs value={mode} onValueChange={v => setMode(v as Mode)} className='mb-6'>
-              <TabsList className='w-full'>
-                <TabsTrigger value='staff' className='flex-1'>
-                  Staff
-                </TabsTrigger>
-                <TabsTrigger value='executive' className='flex-1'>
-                  Executive
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
+            {issuedTxn ? (
+              <IssuedTransactionPassword code={issuedTxn} onContinue={() => setIssuedTxn(null)} />
+            ) : (
+              <>
+                <Tabs value={mode} onValueChange={v => setMode(v as Mode)} className='mb-6'>
+                  <TabsList className='w-full'>
+                    <TabsTrigger value='staff' className='flex-1'>
+                      Staff
+                    </TabsTrigger>
+                    <TabsTrigger value='executive' className='flex-1'>
+                      Executive
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
 
-            <form onSubmit={submit} noValidate>
-              <FieldGroup className='gap-4'>
-                <Field className='gap-2' data-invalid={!!shown('identifier')}>
-                  <FieldLabel htmlFor='identifier'>
-                    {mode === 'staff' ? 'Email address' : 'Executive username'}
-                  </FieldLabel>
-                  <Input
-                    id='identifier'
-                    type={mode === 'staff' ? 'email' : 'text'}
-                    autoComplete='username'
-                    value={identifier}
-                    onChange={e => setIdentifier(e.target.value)}
-                    onBlur={leave('identifier')}
-                    aria-invalid={!!shown('identifier')}
-                    required
-                    placeholder={mode === 'staff' ? 'admin@example.com' : 'username'}
-                  />
-                  {shown('identifier') && <FieldError>{shown('identifier')}</FieldError>}
-                </Field>
+                <form onSubmit={submit} noValidate>
+                  <FieldGroup className='gap-4'>
+                    <Field className='gap-2' data-invalid={!!shown('identifier')}>
+                      <FieldLabel htmlFor='identifier'>
+                        {mode === 'staff' ? 'Email address' : 'Executive username'}
+                      </FieldLabel>
+                      <Input
+                        id='identifier'
+                        type={mode === 'staff' ? 'email' : 'text'}
+                        autoComplete='username'
+                        value={identifier}
+                        onChange={e => setIdentifier(e.target.value)}
+                        onBlur={leave('identifier')}
+                        aria-invalid={!!shown('identifier')}
+                        required
+                        placeholder={mode === 'staff' ? 'admin@example.com' : 'username'}
+                      />
+                      {shown('identifier') && <FieldError>{shown('identifier')}</FieldError>}
+                    </Field>
 
-                <Field className='w-full gap-2' data-invalid={!!shown('password')}>
-                  <FieldLabel htmlFor='password'>{mustChange ? 'Current password' : 'Password'}</FieldLabel>
-                  <InputGroup>
-                    <InputGroupInput
-                      id='password'
-                      type={visible ? 'text' : 'password'}
-                      autoComplete='current-password'
-                      value={password}
-                      onChange={e => setPassword(e.target.value)}
-                      onBlur={leave('password')}
-                      aria-invalid={!!shown('password')}
-                      required
-                      placeholder='••••••••••••'
-                    />
-                    <InputGroupAddon align='inline-end' className='pr-1.5'>
-                      <Button
-                        type='button'
-                        variant='ghost'
-                        size='icon'
-                        onClick={() => setVisible(v => !v)}
-                        className='text-muted-foreground rounded-l-none hover:bg-transparent'
-                      >
-                        {visible ? <EyeOffIcon /> : <EyeIcon />}
-                        <span className='sr-only'>{visible ? 'Hide password' : 'Show password'}</span>
+                    <Field className='w-full gap-2' data-invalid={!!shown('password')}>
+                      <FieldLabel htmlFor='password'>{mustChange ? 'Current password' : 'Password'}</FieldLabel>
+                      <InputGroup>
+                        <InputGroupInput
+                          id='password'
+                          type={visible ? 'text' : 'password'}
+                          autoComplete='current-password'
+                          value={password}
+                          onChange={e => setPassword(e.target.value)}
+                          onBlur={leave('password')}
+                          aria-invalid={!!shown('password')}
+                          required
+                          placeholder='••••••••••••'
+                        />
+                        <InputGroupAddon align='inline-end' className='pr-1.5'>
+                          <Button
+                            type='button'
+                            variant='ghost'
+                            size='icon'
+                            onClick={() => setVisible(v => !v)}
+                            className='text-muted-foreground rounded-l-none hover:bg-transparent'
+                          >
+                            {visible ? <EyeOffIcon /> : <EyeIcon />}
+                            <span className='sr-only'>{visible ? 'Hide password' : 'Show password'}</span>
+                          </Button>
+                        </InputGroupAddon>
+                      </InputGroup>
+                      {shown('password') && <FieldError>{shown('password')}</FieldError>}
+                    </Field>
+
+                    {mustChange && (
+                      <Field className='gap-2' data-invalid={!!shown('newPassword')}>
+                        <FieldLabel htmlFor='newPassword'>New password</FieldLabel>
+                        <Input
+                          id='newPassword'
+                          type='password'
+                          autoComplete='new-password'
+                          value={newPassword}
+                          onChange={e => setNewPassword(e.target.value)}
+                          onBlur={leave('newPassword')}
+                          aria-invalid={!!shown('newPassword')}
+                          required
+                          minLength={8}
+                        />
+                        {shown('newPassword') && <FieldError>{shown('newPassword')}</FieldError>}
+                      </Field>
+                    )}
+
+                    {needsCode && (
+                      <Field className='gap-2' data-invalid={!!shown('code')}>
+                        <FieldLabel htmlFor='code'>Authenticator code</FieldLabel>
+                        <Input
+                          id='code'
+                          inputMode='numeric'
+                          pattern='[0-9]{6}'
+                          maxLength={6}
+                          value={code}
+                          onChange={e => setCode(e.target.value.replace(/\D/g, ''))}
+                          onBlur={leave('code')}
+                          aria-invalid={!!shown('code')}
+                          autoFocus
+                          placeholder='123456'
+                        />
+                        {shown('code') && <FieldError>{shown('code')}</FieldError>}
+                      </Field>
+                    )}
+
+                    {error && (
+                      <Alert variant='destructive'>
+                        <AlertTitle>Sign-in failed</AlertTitle>
+                        <AlertDescription>{error}</AlertDescription>
+                      </Alert>
+                    )}
+
+                    <Field>
+                      <Button className='mt-2 h-11 w-auto self-center px-6 uppercase' type='submit' disabled={busy}>
+                        {busy && <Loader2Icon className='animate-spin' />}
+                        {mustChange ? 'Set new password' : needsCode ? 'Verify and sign in' : 'Sign in'}
                       </Button>
-                    </InputGroupAddon>
-                  </InputGroup>
-                  {shown('password') && <FieldError>{shown('password')}</FieldError>}
-                </Field>
-
-                {mustChange && (
-                  <Field className='gap-2' data-invalid={!!shown('newPassword')}>
-                    <FieldLabel htmlFor='newPassword'>New password</FieldLabel>
-                    <Input
-                      id='newPassword'
-                      type='password'
-                      autoComplete='new-password'
-                      value={newPassword}
-                      onChange={e => setNewPassword(e.target.value)}
-                      onBlur={leave('newPassword')}
-                      aria-invalid={!!shown('newPassword')}
-                      required
-                      minLength={12}
-                    />
-                    {shown('newPassword') && <FieldError>{shown('newPassword')}</FieldError>}
-                  </Field>
-                )}
-
-                {needsCode && (
-                  <Field className='gap-2' data-invalid={!!shown('code')}>
-                    <FieldLabel htmlFor='code'>Authenticator code</FieldLabel>
-                    <Input
-                      id='code'
-                      inputMode='numeric'
-                      pattern='[0-9]{6}'
-                      maxLength={6}
-                      value={code}
-                      onChange={e => setCode(e.target.value.replace(/\D/g, ''))}
-                      onBlur={leave('code')}
-                      aria-invalid={!!shown('code')}
-                      autoFocus
-                      placeholder='123456'
-                    />
-                    {shown('code') && <FieldError>{shown('code')}</FieldError>}
-                  </Field>
-                )}
-
-                {error && (
-                  <Alert variant='destructive'>
-                    <AlertTitle>Sign-in failed</AlertTitle>
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                )}
-
-                <Field>
-                  <Button className='mt-2 h-11 w-auto self-center px-6 uppercase' type='submit' disabled={busy}>
-                    {busy && <Loader2Icon className='animate-spin' />}
-                    {mustChange ? 'Set new password' : needsCode ? 'Verify and sign in' : 'Sign in'}
-                  </Button>
-                </Field>
-              </FieldGroup>
-            </form>
+                    </Field>
+                  </FieldGroup>
+                </form>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
