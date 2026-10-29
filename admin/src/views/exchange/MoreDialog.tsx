@@ -51,6 +51,7 @@ const ProfileTab = ({ row }: { row: AccountRow }) => (
       <h4 className='text-sm font-semibold'>Additional Information</h4>
       {info([
         ['User Name:', row.username],
+        ['Email:', row.email || ''],
         ['Mobile Number:', row.phone || ''],
         ['City:', row.city || ''],
         ['Credit pts:', fmt(row.credit)],

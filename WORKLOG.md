@@ -15,6 +15,14 @@ Format:
 
 ---
 
+## 2026-10-29 — Account List → More → Profile me Email
+**Kya kiya:** `GET admin/exchange/accounts` ki har row me ab `email` (staff: `staff.email`, player: `users.email`), aur More dialog ke Profile tab ki "Additional Information" me "User Name" ke neeche "Email".
+**Kyun:** user: "more par click karke profile check karte hai to vha email bhi show kara do".
+**Files / jagah:** backend/services/admin/src/modules/exchange/accountList.js, admin/src/views/exchange/{types.ts,MoreDialog.tsx}
+**Notes / pending:** Jo player bina email ke bane (agent-tree), unka Email khaali dikhta hai. Drill-down ka "P" button bhi yahi Profile tab dikhata hai. Live check: API rows me email aata hai, 3081 pe Profile me dikh raha hai. Restart: parker-admin-svc, admin build + parker-admin + parker-admin-local.
+
+---
+
 ## 2026-10-29 — First-login password screen: "Current password" label
 **Kya kiya:** `/change-password` (staff ka pehla login / reset ke baad) ke pehle field ka label "Temporary password" → "Current password".
 **Kyun:** user: "first section me temporary pass ki jagah current pass kar do".
