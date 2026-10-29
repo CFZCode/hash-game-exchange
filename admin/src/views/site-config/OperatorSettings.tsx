@@ -65,17 +65,21 @@ const GROUPS: { title: string; hint: string; keys: string[] }[] = [
   {
     title: 'Bonus',
     hint: 'Whether a granted bonus stays locked until it is wagered (only while the owner panel has the lock on too), whether a player may give a locked bonus up to withdraw, and the popup the player confirms that in.',
-    keys: ['bonus_wagering_lock', 'bonus_forfeit_allowed', 'bonus_forfeit_title', 'bonus_forfeit_message']
+    keys: ['bonus_wagering_lock', 'bonus_contribution_all', 'bonus_forfeit_allowed', 'bonus_forfeit_title', 'bonus_forfeit_message']
   },
   {
     title: 'Loss bonus',
-    hint: "A share of a player's net loss (casino + sports, bets minus wins) over the last completed period, in the site's reward currency. The player sees it on the Bonus page and claims it after a confirmation; it then follows the wager multiplier below.",
+    hint: "Lossback (Welcome Shield): a share of a player's net loss (casino + sports, bets minus wins) in the hours after their first deposit — or, with Welcome Shield off, over every completed period. Settled automatically when the window ends; the player claims it on the Bonus page after a confirmation, within the claim hours. Amounts are in the site's reward currency.",
     keys: [
       'loss_bonus_enabled',
-      'loss_bonus_percent',
+      'loss_bonus_welcome',
+      'loss_bonus_protection_hours',
       'loss_bonus_period_days',
-      'loss_bonus_min_loss',
+      'loss_bonus_percent',
       'loss_bonus_max',
+      'loss_bonus_min_loss',
+      'loss_bonus_max_bet',
+      'loss_bonus_claim_hours',
       'loss_bonus_wager_multiplier'
     ]
   }

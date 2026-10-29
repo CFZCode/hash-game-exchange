@@ -15,6 +15,10 @@ const MIN_SPORTS_ODDS = 1.5;
 let cache = { at: 0, rules: null };
 
 const norm = (value) => String(value ?? '').trim().toLowerCase();
+/* A provider is matched on its letters and digits with a trailing "gaming" / "games" / version
+   number dropped: the seeded names ("pg soft", "hacksaw") and the catalogue's ("PGSoft",
+   "Hacksaw Gaming", "Platipus2") then meet. */
+const providerKey = (value) => norm(value).replace(/[^a-z0-9]/g, '').replace(/(gaming|games|\d+)$/, '');
 
 async function rules(sequelize, logger) {
   if (cache.rules && Date.now() - cache.at < TTL_MS) return cache.rules;
@@ -26,7 +30,7 @@ async function rules(sequelize, logger) {
     for (const r of rows) {
       const pct = String(Number(r.percent) / 100);
       if (r.game_ref) byGame.set(norm(r.game_ref), pct);
-      else if (r.provider) byProvider.set(norm(r.provider), pct);
+      else if (r.provider) byProvider.set(providerKey(r.provider), pct);
       else if (r.category) byCategory.set(norm(r.category), pct);
     }
     cache = { at: Date.now(), rules: { byGame, byProvider, byCategory } };
@@ -40,7 +44,7 @@ async function rules(sequelize, logger) {
 async function contributionFor(sequelize, { category, provider, game_ref: gameRef, odds } = {}, { logger } = {}) {
   if (category === 'sports' && odds != null && Number(odds) < MIN_SPORTS_ODDS) return '0';
   const { byGame, byProvider, byCategory } = await rules(sequelize, logger);
-  return byGame.get(norm(gameRef)) ?? byProvider.get(norm(provider)) ?? byCategory.get(norm(category)) ?? '1';
+  return byGame.get(norm(gameRef)) ?? byProvider.get(providerKey(provider)) ?? byCategory.get(norm(category)) ?? '1';
 }
 
 /** Admin edits: drop the cache. */
@@ -48,4 +52,4 @@ function clearContributionCache() {
   cache = { at: 0, rules: null };
 }
 
-module.exports = { contributionFor, clearContributionCache, MIN_SPORTS_ODDS };
+module.exports = { contributionFor, clearContributionCache, providerKey, MIN_SPORTS_ODDS };
