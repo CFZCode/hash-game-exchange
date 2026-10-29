@@ -63,8 +63,9 @@ const Pct = ({ value, onChange, disabled, label, placeholder }: { value: string;
   </div>
 )
 
-/** One search for providers and games; each result is added as an exception at `percent`. */
-const AddException = ({ percent, disabled, onAdd }: { percent: string; disabled: boolean; onAdd: (rows: Exception[]) => void }) => {
+/** One search for providers and games; each result is added as an exception at `percent`. A result
+    already in the list shows its current % and offers a change instead of an add. */
+const AddException = ({ percent, disabled, onAdd, existing }: { percent: string; disabled: boolean; onAdd: (rows: Exception[]) => void; existing: Exception[] }) => {
   const vendors = useApi<GisVendor[]>('admin/casino/games/vendors')
   const originals = useApi<{ games: Original[] }>('admin/original-games/games')
   const [q, setQ] = useState('')
@@ -114,14 +115,19 @@ const AddException = ({ percent, disabled, onAdd }: { percent: string; disabled:
             )}
           </div>
           <div className='max-h-64 divide-y overflow-y-auto rounded-md border'>
-            {found.map(r => (
-              <div key={`${r.kind}:${r.key}`} className='flex items-center gap-3 px-3 py-2 text-sm'>
-                <span className='flex-1 truncate'>{r.label}</span>
-                <Button type='button' size='sm' variant='ghost' disabled={disabled} onClick={() => onAdd([{ ...r, percent }])}>
-                  Add at {percent}%
-                </Button>
-              </div>
-            ))}
+            {found.map(r => {
+              const now = existing.find(x => same(x, r))
+
+              return (
+                <div key={`${r.kind}:${r.key}`} className='flex items-center gap-3 px-3 py-2 text-sm'>
+                  <span className='flex-1 truncate'>{r.label}</span>
+                  {now && <span className='text-muted-foreground'>Now {now.percent}%</span>}
+                  <Button type='button' size='sm' variant='ghost' disabled={disabled || now?.percent === percent} onClick={() => onAdd([{ ...r, percent }])}>
+                    {now ? `Change to ${percent}%` : `Add at ${percent}%`}
+                  </Button>
+                </div>
+              )
+            })}
           </div>
         </div>
       )}
@@ -253,7 +259,7 @@ const Editor = ({ initial }: { initial: Rule[] }) => {
                 <span>Add an exception at</span>
                 <Pct label='Exception %' value={newPct} onChange={setNewPct} disabled={!writable} />
               </div>
-              <AddException percent={newPct} disabled={!writable || !valid(newPct)} onAdd={rows => setExceptions(rs => [...rows, ...rs.filter(r => !rows.some(a => same(a, r)))])} />
+              <AddException percent={newPct} existing={exceptions} disabled={!writable || !valid(newPct)} onAdd={rows => setExceptions(rs => [...rows, ...rs.filter(r => !rows.some(a => same(a, r)))])} />
             </div>
             {exceptions.length > 0 && (
               <div className='grid gap-2'>
