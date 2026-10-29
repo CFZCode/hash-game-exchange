@@ -15,6 +15,14 @@ Format:
 
 ---
 
+## 2026-10-29 — Deposit → Provider probe: sirf active gateways
+**Kya kiya:** Transactions → Deposit → Fiat → Provider probe ka gateway dropdown ab fixed list (waypay, apay, cricpay, upi, f2pay) nahi dikhata: sirf wahi jo active hain (owner panel ON + Super Admin ka switch ON, `GET admin/site-config/payment-gateways`). Koi active nahi to dropdown band, "No active gateway". Wo GET ab `config:read` ya `deposits:read` dono se khulta hai, taaki sirf deposits wala executive bhi list padh sake.
+**Kyun:** user: "provider probe wale me sirf wahi payment gateway dikhne chahiye jo active hai filter me".
+**Files / jagah:** admin/src/views/finance/PaymentOrders.tsx (PspProbe), backend/services/admin/src/modules/site-config/routes/admin.routes.js
+**Notes / pending:** Live pe abhi sirf f2pay dikhta hai (owner ne ccpayment + f2pay on kiye hain, ccpayment probe me nahi). site-config tests: `siteConfig.test.js` ka "sports is on the screen but not writable" purana fail, is badlav se nahi. Restart: parker-admin-svc, admin build + parker-admin + parker-admin-local (3081).
+
+---
+
 ## 2026-10-29 — Transaction password badla nahi ja sakta
 **Kya kiya:** My Account ka "Change transaction password" hata diya: card ab sirf us account ko dikhta hai jiska transaction password abhi set nahi hai (ek baar "Set"). Backend `setTransactionPassword` set ho chuke password pe 409 `TXN_PASSWORD_ALREADY_SET` deta hai, to API se bhi change nahi hota. First-login notice ka text "can change it later under My account" → "cannot be changed".
 **Kyun:** user: "change transaction password wala tab hata de admin panel se … ye koi change nahi karega".
