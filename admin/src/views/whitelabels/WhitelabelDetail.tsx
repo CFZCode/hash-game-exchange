@@ -25,7 +25,8 @@ import { TxnPasswordLabel } from '@/views/finance/StaffFloat'
 
 import ImageField, { type PickedImage } from './ImageField'
 import PaletteEditor, { paletteError, type ThemeValue } from './PaletteEditor'
-import type { WhitelabelDetail as Detail, WhitelabelTransfer } from './types'
+import { TEMPLATE_PALETTES } from './palettes'
+import { PALETTE_KEYS, type Palette, type WhitelabelDetail as Detail, type WhitelabelTransfer } from './types'
 
 const BUSY = ['queued', 'creating', 'deleting']
 
@@ -215,12 +216,28 @@ const BrandImages = ({ wl, invalidate }: { wl: Detail; invalidate: string[][] })
   )
 }
 
+const samePalette = (a: Palette, b: Palette) => PALETTE_KEYS.every(k => a[k].toLowerCase() === b[k].toLowerCase())
+
+/**
+ * A copy's built-in template (`wl.template`) is fixed when it is built, so another template is
+ * sent as that template's 13 colours. Shown back as that template, not as custom colours.
+ */
+const shownTheme = (wl: Detail): ThemeValue => {
+  if (!wl.palette) return { template: wl.template, palette: null }
+  const match = Object.keys(TEMPLATE_PALETTES).find(k => samePalette(TEMPLATE_PALETTES[k], wl.palette as Palette))
+
+  return match ? { template: match, palette: null } : { template: wl.template, palette: wl.palette }
+}
+
 const Colours = ({ wl, invalidate }: { wl: Detail; invalidate: string[][] }) => {
-  const [theme, setTheme] = useState<ThemeValue>({ template: wl.template, palette: wl.palette })
+  const [theme, setTheme] = useState<ThemeValue>(() => shownTheme(wl))
   const error = paletteError(theme.palette)
 
   const save = useApiMutation({
-    fn: () => api.put(`admin/whitelabels/${wl.id}/palette`, { palette: theme.palette }),
+    fn: () =>
+      api.put(`admin/whitelabels/${wl.id}/palette`, {
+        palette: theme.palette ?? (theme.template === wl.template ? null : TEMPLATE_PALETTES[theme.template])
+      }),
     invalidate,
     success: wl.status === 'live' ? 'Colours saved — the player site shows them on its next load' : 'Colours saved for the setup'
   })
@@ -230,7 +247,7 @@ const Colours = ({ wl, invalidate }: { wl: Detail; invalidate: string[][] }) => 
       <CardHeader className='flex flex-row items-start justify-between gap-4'>
         <div>
           <CardTitle>Player site colours</CardTitle>
-          <CardDescription>The template is set at setup; custom colours can be changed any time.</CardDescription>
+          <CardDescription>Change the template or any colour at any time; the player site shows it on its next page load.</CardDescription>
         </div>
         <Button size='sm' disabled={save.isPending || Boolean(error)} onClick={() => save.mutate()}>
           {save.isPending && <Loader2Icon className='animate-spin' />} Save colours
@@ -239,7 +256,7 @@ const Colours = ({ wl, invalidate }: { wl: Detail; invalidate: string[][] }) => 
       <CardContent className='grid gap-2'>
         <PaletteEditor
           value={theme}
-          onChange={v => setTheme({ template: wl.template, palette: v.palette })}
+          onChange={setTheme}
           name={wl.name}
           logoUrl={wl.hasLogo ? `/api/gw/api/v1/admin/whitelabels/${wl.id}/logo` : null}
         />
