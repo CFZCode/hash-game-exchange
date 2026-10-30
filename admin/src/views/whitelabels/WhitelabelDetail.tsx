@@ -354,11 +354,12 @@ const WhitelabelDetail = ({ id }: { id: string }) => {
                 {job.step ?? (job.status === 'queued' ? 'Waiting for the setup script to pick it up.' : '')} {job.startedAt && <>· started <DateTime value={job.startedAt} relative /></>}
               </CardDescription>
             </div>
-            {wl.status === 'failed' && (
+            {wl.status === 'failed' && job.kind === 'create' && (
               <Button size='sm' disabled={retrySetup.isPending} onClick={() => retrySetup.mutate()}>
                 <RotateCwIcon /> Run setup again
               </Button>
             )}
+            {wl.status === 'failed' && job.kind === 'delete' && <span className='text-muted-foreground text-sm'>Press Delete to run it again.</span>}
           </CardHeader>
           {job.log && (
             <CardContent>

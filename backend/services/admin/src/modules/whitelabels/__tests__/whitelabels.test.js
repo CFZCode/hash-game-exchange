@@ -302,6 +302,12 @@ test('whitelabels against a database', async (t) => {
     const job = await one(`SELECT kind, status FROM whitelabel_jobs WHERE whitelabel_id = :id ORDER BY id DESC LIMIT 1`, { id: wl.id });
     assert.deepEqual(job, { kind: 'delete', status: 'queued' });
     await assert.rejects(() => service.remove({ id: wl.id, confirmName: wl.name, actor }), (e) => e.code === 'WHITELABEL_BUSY');
+
+    // The delete fails part-way: deleting again is the way on, building it back is refused.
+    await q(`UPDATE whitelabel_jobs SET status = 'failed' WHERE id = (SELECT MAX(id) FROM whitelabel_jobs WHERE whitelabel_id = :id)`, { id: wl.id });
+    await q(`UPDATE whitelabels SET status = 'failed' WHERE id = :id`, { id: wl.id });
+    await assert.rejects(() => service.retrySetup(wl.id, actor), (e) => e.code === 'WHITELABEL_DELETE_FAILED');
+    assert.deepEqual(await service.remove({ id: wl.id, confirmName: wl.name, actor }), { status: 'deleting' });
   });
 
   await t.test('a queued one that never started is just cancelled', async () => {

@@ -429,6 +429,9 @@ class WhitelabelsService {
   async retrySetup(id, actor) {
     const row = await this.#row(id);
     if (row.status !== 'failed') throw errors.NOT_FAILED({ status: row.status });
+    // A failed delete is finished by deleting again, never by building it back.
+    const [last] = await this.#q('SELECT kind FROM whitelabel_jobs WHERE whitelabel_id = :id ORDER BY id DESC LIMIT 1', { id });
+    if (last?.kind === 'delete') throw errors.DELETE_FAILED();
     await this.db.transaction(async (transaction) => {
       await this.#q("UPDATE whitelabels SET status = 'queued', updated_at = NOW() WHERE id = :id RETURNING id", { id }, transaction);
       await this.#enqueue(id, 'create', actor, transaction);

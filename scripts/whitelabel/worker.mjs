@@ -30,6 +30,8 @@ const { createSecretBox } = requireBackend('@ibitplay/auth');
 const POLL_MS = 5_000;
 const COMMAND_TIMEOUT_MS = 30 * 60_000;
 const LOG_LIMIT = 200_000;
+// `pm2 jlist` alone is ~1.5 MB on this machine (every app with its env) and grows with each copy.
+const MAX_OUTPUT = 64 * 1024 * 1024;
 const once = process.argv.includes('--once');
 
 const readEnv = (file) => (fs.existsSync(file) ? parseEnv(fs.readFileSync(file, 'utf8')) : {});
@@ -57,7 +59,15 @@ function run(cmd, args, { cwd = ROOT, input, allowFail = false, timeoutMs = COMM
     const child = spawn(cmd, args, { cwd, env: childEnv(), stdio: ['pipe', 'pipe', 'pipe'] });
     let stdout = '';
     let stderr = '';
-    const keep = (s, chunk) => (s.length > 1_000_000 ? s : s + chunk);
+    let tooBig = false;
+    // Never cut output silently: a cut JSON list fails far from its cause.
+    const keep = (s, chunk) => {
+      if (s.length + chunk.length > MAX_OUTPUT) {
+        tooBig = true;
+        return s;
+      }
+      return s + chunk;
+    };
     child.stdout.on('data', (c) => (stdout = keep(stdout, c)));
     child.stderr.on('data', (c) => (stderr = keep(stderr, c)));
     const timer = setTimeout(() => child.kill('SIGKILL'), timeoutMs);
@@ -67,6 +77,7 @@ function run(cmd, args, { cwd = ROOT, input, allowFail = false, timeoutMs = COMM
     });
     child.on('close', (code) => {
       clearTimeout(timer);
+      if (tooBig) return reject(new Error(`${cmd} printed more than ${MAX_OUTPUT / 1024 / 1024} MB`));
       if (code !== 0 && !allowFail) return reject(new Error(`${cmd} failed (exit ${code})\n${tail(`${stderr}\n${stdout}`.trim())}`));
       return resolve({ code, stdout, stderr });
     });

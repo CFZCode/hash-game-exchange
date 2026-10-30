@@ -15,6 +15,14 @@ Format:
 
 ---
 
+## 2026-10-30 — Whitelabel delete: pm2 list 1 MB se bada
+**Kya kiya:** wl-test ka delete "Stopping the processes" pe fail hua: worker har command ka output 1 MB pe kaat deta tha aur is server pe `pm2 jlist` ~1.47 MB hai (145 apps), to JSON aadha aaya. Limit ab 64 MB, aur usse bada output chupchap kaatne ki jagah saaf error deta hai. Fail hue delete ke baad panel ab "Run setup again" nahi dikhata (backend bhi `WHITELABEL_DELETE_FAILED` se mana karta hai) — Delete dobara dabana hai. Transfer amount 2 decimals me bhejna (pichli entry se alag commit) bhi isi din.
+**Kyun:** user screenshot: delete pe "Unterminated string in JSON".
+**Files / jagah:** scripts/whitelabel/worker.mjs, backend whitelabels service/errors/test, admin views/whitelabels/WhitelabelDetail.tsx.
+**Notes / pending:** wl-test abhi bhi poori chal rahi hai (off), delete se pehle ka export `/var/www/main/whitelabel-archive/wl-test-20261030-021438.sql.gz` ban chuka. Worker restart ke baad Delete dobara.
+
+---
+
 ## 2026-10-30 — Whitelabel: icon / favicon, naam dikhna, INR coin
 **Kya kiya:** (1) Pehli test copy (wl-test) pe player site Parker567 ka logo dikha raha tha: setup ne `site_branding_meta.owner_meta` NULL likha, branding store ka rule hai ki Super Admin ka naam tabhi dikhe jab ye owner ke current meta ke barabar ho (koi owner doc nahi = `metaOf(null)`), isliye site "branded: false" padhi aur frontend ne Parker567 default dikhaya. Setup ab `metaOf(null)` likhta hai (test store ke `metaOf` se milata hai) aur saari META_KEYS. (2) Favicon / chhota icon = branding `mark` slot, jo setup bharta hi nahi tha: ab optional square Icon (create form + detail "Logo & icon"), na ho to logo hi mark. Detail se badlav live copy pe `PUT whitelabel-link/branding` (branding store setSite) se. Migration 165 (`whitelabels.icon`). (3) Copy USDT me thi (seed default): setup ab parent ka `default_currency` + `reward_currency` copy karta hai.
 **Kyun:** user screenshots: WL Test login pe Parker ka P icon, player site pe Parker567 logo + USDT.

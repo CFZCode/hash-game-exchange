@@ -21,6 +21,8 @@ module.exports = defineErrors('WHITELABEL', {
 
   NOT_FAILED: { status: 409, message: 'Only a failed setup can be run again' },
 
+  DELETE_FAILED: { status: 409, message: 'The last run was a delete — press Delete to run it again' },
+
   BUSY: { status: 409, message: 'A setup or delete is already running for this whitelabel' },
 
   MUST_BE_OFF: { status: 409, message: 'Switch the whitelabel off before deleting it' },
