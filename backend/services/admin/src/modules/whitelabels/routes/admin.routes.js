@@ -16,6 +16,8 @@ const { WhitelabelsService } = require('../whitelabels.service');
  *   GET    /admin/whitelabels/:id                    row + jobs + transfers + the copy's summary
  *   GET    /admin/whitelabels/:id/logo               its logo (…/icon: its square icon)
  *   PUT    /admin/whitelabels/:id/branding           { logo?, icon? } (base64) — also on the live copy
+ *   PUT    /admin/whitelabels/:id/poster             { desktop?, mobile? } (base64) — the home-page poster
+ *   GET    /admin/whitelabels/:id/poster/:which      poster | poster_mobile
  *   POST   /admin/whitelabels/:id/transfers          { amount, note?, transactionPassword } Direct → company Direct
  *   POST   /admin/whitelabels/:id/transfers/retry    send every pending transfer again
  *   PUT    /admin/whitelabels/:id/company-password   { password } (company signed out)
@@ -72,7 +74,7 @@ module.exports = function adminRoutes(deps) {
 
   const sendImage = (which) =>
     asyncHandler(async (req, res) => {
-      const logo = await service.image(id(req), which);
+      const logo = which === 'poster' ? await service.posterImage(id(req), req.params.which) : await service.image(id(req), which);
       res.set({
         'Content-Type': logo.contentType,
         'Cache-Control': 'private, no-cache',
@@ -84,6 +86,8 @@ module.exports = function adminRoutes(deps) {
     });
   router.get('/:id/logo', canRead, validate(v.byId), sendImage('logo'));
   router.get('/:id/icon', canRead, validate(v.byId), sendImage('icon'));
+  router.get('/:id/poster/:which', canRead, validate(v.posterImage), sendImage('poster'));
+  router.put('/:id/poster', canWrite, validate(v.poster), audited('whitelabel.poster'), asyncHandler(async (req, res) => response.ok(res, await service.setPoster(id(req), req.body))));
   router.put('/:id/branding', canWrite, validate(v.branding), audited('whitelabel.branding'), asyncHandler(async (req, res) => response.ok(res, await service.setBranding(id(req), req.body))));
 
   router.post(

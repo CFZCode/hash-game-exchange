@@ -8,8 +8,10 @@ import { Button } from '@/components/ui/button'
 
 export type PickedImage = { type: string; data: string; url: string }
 
-const MAX_BYTES = 256 * 1024
-const TYPES = ['image/png', 'image/webp', 'image/svg+xml']
+const LOGO_TYPES = ['image/png', 'image/webp', 'image/svg+xml']
+
+/** A poster is a photo: PNG, JPEG or WebP up to 600 KB (the backend's limit). */
+export const POSTER = { types: ['image/png', 'image/jpeg', 'image/webp'], maxBytes: 600 * 1024 }
 
 /**
  * One image (logo or square icon) as base64 for admin/whitelabels — the backend checks the bytes
@@ -22,7 +24,9 @@ const ImageField = ({
   onChange,
   onError,
   current,
-  square
+  square,
+  types = LOGO_TYPES,
+  maxBytes = 256 * 1024
 }: {
   label: string
   hint: string
@@ -31,6 +35,8 @@ const ImageField = ({
   onError: (message: string) => void
   current?: string | null
   square?: boolean
+  types?: string[]
+  maxBytes?: number
 }) => {
   // The preview's object URL dies with the image it showed.
   useEffect(
@@ -42,8 +48,8 @@ const ImageField = ({
 
   const pick = (file: File | undefined) => {
     if (!file) return
-    if (!TYPES.includes(file.type)) return onError('PNG, WebP or SVG only')
-    if (file.size > MAX_BYTES) return onError('At most 256 KB')
+    if (!types.includes(file.type)) return onError(`${types.map(t => t.split('/')[1].replace('svg+xml', 'SVG').toUpperCase()).join(', ')} only`)
+    if (file.size > maxBytes) return onError(`At most ${Math.round(maxBytes / 1024)} KB`)
     const reader = new FileReader()
 
     reader.onload = () => onChange({ type: file.type, data: String(reader.result).split(',')[1] ?? '', url: URL.createObjectURL(file) })
@@ -62,7 +68,7 @@ const ImageField = ({
         )}
         <Button type='button' variant='outline' size='sm' nativeButton={false} render={<label />}>
           <UploadIcon /> {shown ? 'Change' : 'Upload'}
-          <input type='file' accept={TYPES.join(',')} className='hidden' onChange={e => pick(e.target.files?.[0])} />
+          <input type='file' accept={types.join(',')} className='hidden' onChange={e => pick(e.target.files?.[0])} />
         </Button>
         {value && (
           <Button type='button' variant='ghost' size='sm' onClick={() => onChange(null)}>

@@ -2,7 +2,7 @@
 
 const crypto = require('crypto');
 const { QueryTypes } = require('sequelize');
-const { money } = require('@ibitplay/common');
+const { money, imageUpload } = require('@ibitplay/common');
 const { hashPassword, createSecretBox } = require('@ibitplay/auth');
 
 const errors = require('./whitelabels.errors');
@@ -36,6 +36,18 @@ function decodeImage(input, slot) {
   if (!input) return null;
   const bytes = Buffer.from(input.data, 'base64');
   if (imageProblem(bytes, `${slot}.${EXT[input.type]}`, slot)) throw slot === 'logo' ? errors.BAD_LOGO() : errors.BAD_ICON();
+  return bytes;
+}
+
+const POSTER_MAX_BYTES = 600 * 1024;
+const PLACEMENT = { poster: 'home', poster_mobile: 'home_mobile' };
+
+/** A poster's bytes, checked by signature (PNG / JPEG / WebP) and size; null when absent. */
+function decodePoster(input) {
+  if (!input) return null;
+  const bytes = Buffer.from(input.data, 'base64');
+  const sniffed = imageUpload.sniff(bytes);
+  if (bytes.length < 64 || bytes.length > POSTER_MAX_BYTES || !sniffed || sniffed.contentType !== input.type) throw errors.BAD_POSTER();
   return bytes;
 }
 
@@ -137,6 +149,8 @@ class WhitelabelsService {
 
     const logo = decodeImage(input.logo, 'logo');
     const icon = decodeImage(input.icon, 'mark');
+    const posters = { poster: decodePoster(input.poster), poster_mobile: decodePoster(input.posterMobile) };
+    const posterTypes = { poster: input.poster?.type, poster_mobile: input.posterMobile?.type };
 
     const row = await this.db.transaction(async (transaction) => {
       let created;
@@ -167,6 +181,9 @@ class WhitelabelsService {
         // Two creates racing past the check above: the partial unique indexes decide.
         if (error.name === 'SequelizeUniqueConstraintError') throw errors.TAKEN();
         throw error;
+      }
+      for (const [slot, bytes] of Object.entries(posters)) {
+        if (bytes) await this.#savePoster(created.id, slot, posterTypes[slot], bytes, transaction);
       }
       await this.#enqueue(created.id, 'create', actor, transaction);
       return created;
@@ -206,6 +223,7 @@ class WhitelabelsService {
     const transfers = await this.#q('SELECT * FROM whitelabel_transfers WHERE whitelabel_id = :id ORDER BY id DESC LIMIT 25', { id });
     return {
       ...view(row),
+      posters: await this.posters(id),
       summary,
       summaryError,
       jobs: jobs.map((j) => ({
@@ -228,6 +246,41 @@ class WhitelabelsService {
     const [row] = await this.#q(`SELECT ${column} AS data, ${column}_type AS type FROM whitelabels WHERE id = :id AND status <> 'deleted'`, { id });
     if (!row?.data || !row.type) throw errors.NOT_FOUND({ id });
     return { data: row.data, contentType: row.type };
+  }
+
+  #savePoster(id, slot, type, bytes, transaction) {
+    return this.#q(
+      `INSERT INTO whitelabel_assets (whitelabel_id, slot, content_type, bytes) VALUES (:id, :slot, :type, :bytes)
+       ON CONFLICT (whitelabel_id, slot) DO UPDATE SET content_type = EXCLUDED.content_type, bytes = EXCLUDED.bytes, updated_at = NOW()
+       RETURNING slot`,
+      { id, slot, type, bytes },
+      transaction
+    );
+  }
+
+  async posterImage(id, which) {
+    const [row] = await this.#q('SELECT content_type, bytes FROM whitelabel_assets WHERE whitelabel_id = :id AND slot = :which', { id, which });
+    if (!row) throw errors.NOT_FOUND({ id });
+    return { data: row.bytes, contentType: row.content_type };
+  }
+
+  async posters(id) {
+    const rows = await this.#q('SELECT slot, updated_at FROM whitelabel_assets WHERE whitelabel_id = :id', { id });
+    return Object.fromEntries(rows.map((r) => [r.slot, r.updated_at]));
+  }
+
+  /** New home-page poster(s): kept here (a setup run again uses them) and, when live, put on the copy. */
+  async setPoster(id, { desktop, mobile }) {
+    const row = await this.#row(id);
+    if (['creating', 'deleting'].includes(row.status)) throw errors.BUSY({ status: row.status });
+    const given = { poster: desktop, poster_mobile: mobile };
+    const bytes = Object.fromEntries(Object.entries(given).map(([slot, input]) => [slot, decodePoster(input)]));
+    for (const [slot, input] of Object.entries(given)) {
+      if (!input) continue;
+      if (row.status === 'live') await this.link(row, 'PUT', '/poster', { placement: PLACEMENT[slot], type: input.type, data: input.data });
+      await this.#savePoster(id, slot, input.type, bytes[slot]);
+    }
+    return { posters: await this.posters(id) };
   }
 
   /**

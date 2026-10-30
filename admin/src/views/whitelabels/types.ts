@@ -61,6 +61,9 @@ export type WhitelabelTransfer = {
 }
 
 export type WhitelabelDetail = Whitelabel & {
+
+  /** slot (`poster` | `poster_mobile`) → last updated; absent = none uploaded. */
+  posters: Record<string, string>
   summary: WhitelabelSummary | null
   summaryError: string | null
   jobs: WhitelabelJob[]

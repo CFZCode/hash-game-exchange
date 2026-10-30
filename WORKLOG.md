@@ -15,6 +15,14 @@ Format:
 
 ---
 
+## 2026-10-30 — Whitelabel: admin bhi theme me, home poster
+**Kya kiya:** (1) Copy ka admin ab player site ke rang me: `WhitelabelTheme` (sirf WHITELABEL build) copy ka palette (`whitelabel-link/theme`) ya template ke 13 rang admin ke tokens pe lagata hai — brand colour dono mode me, dark surfaces sirf dark mode me. Login page pe bhi (proxy PUBLIC_API me theme + features/public). (2) Home poster ("JOIN THE UNTAMED" Parker art): copy pe Parker567 ka art kabhi nahi — apna poster na ho to logo brand colour pe (`BrandPoster`). Parent panel se Poster upload (desktop + phone, PNG/JPEG/WebP ≤ 600 KB): create form + detail "Home poster" card; live copy pe `PUT whitelabel-link/poster` (BannersService `home` / `home_mobile`), setup bhi `whitelabel_assets` se banners me likhta hai. Migration 166.
+**Kyun:** user: "admin panel theme also changes to theme", "and this poster also".
+**Files / jagah:** admin components/shared/WhitelabelTheme.tsx, app/layout.tsx, proxy.ts, views/whitelabels/{ImageField,WhitelabelCreate,WhitelabelDetail,types}; frontend pages/Home/Hero/index.jsx; backend whitelabels/*, whitelabel-link routes, migration 166; scripts/whitelabel/steps.mjs.
+**Notes / pending:** wltest (id 2) purane code pe bani — ye sab dekhne ke liye use dobara banana hoga (ya "update code" feature).
+
+---
+
 ## 2026-10-30 — Whitelabel delete: pm2 list 1 MB se bada
 **Kya kiya:** wl-test ka delete "Stopping the processes" pe fail hua: worker har command ka output 1 MB pe kaat deta tha aur is server pe `pm2 jlist` ~1.47 MB hai (145 apps), to JSON aadha aaya. Limit ab 64 MB, aur usse bada output chupchap kaatne ki jagah saaf error deta hai. Fail hue delete ke baad panel ab "Run setup again" nahi dikhata (backend bhi `WHITELABEL_DELETE_FAILED` se mana karta hai) — Delete dobara dabana hai. Transfer amount 2 decimals me bhejna (pichli entry se alag commit) bhi isi din.
 **Kyun:** user screenshot: delete pe "Unterminated string in JSON".

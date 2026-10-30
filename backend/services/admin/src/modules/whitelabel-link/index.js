@@ -16,6 +16,7 @@
  *   PUT  /maintenance        { on }
  *   PUT  /palette            { palette: { bg, s1 … lo } | null }
  *   PUT  /branding           { slot: logo|mark, type, data(base64) } — the Super Admin's image slots
+ *   PUT  /poster             { placement: home|home_mobile, type, data(base64) } — the home-page poster
  *   POST /preview            → { code } for /preview?code= on this site's admin
  */
 module.exports = {

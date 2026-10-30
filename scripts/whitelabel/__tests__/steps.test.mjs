@@ -91,6 +91,7 @@ function machine({ dns = SERVER_IP, files = {}, pm2 = [], dbExists = false } = {
       query: async (sql, params) => {
         parentQueries.push({ sql, params });
         if (/FROM exchangerate/.test(sql)) return [{ currency: 'USDT', usd_rate: '1.0' }, { currency: 'INR', usd_rate: '0.012' }];
+        if (/FROM whitelabel_assets/.test(sql)) return [{ slot: 'poster', content_type: 'image/jpeg', bytes: Buffer.from('jpeg-bytes') }];
         if (/FROM site_features/.test(sql)) return [{ feature: 'default_currency', enabled: true, variant: 'INR' }, { feature: 'reward_currency', enabled: true, variant: 'INR' }];
         return [];
       },
@@ -172,6 +173,8 @@ test('create: the whole sequence, in order, with nothing secret on a command lin
     'the admin reports in the parent’s coin'
   );
   assert.match(copySql, /INSERT INTO owner_branding_assets/);
+  const banner = m.copyQueries.find((q) => /INSERT INTO banners/.test(q.sql));
+  assert.deepEqual(banner.params.slice(0, 2), ['home', 'home.jpg'], 'the desktop poster is the home placement');
   const slots = m.copyQueries.filter((q) => /INSERT INTO site_branding \(slot/.test(q.sql)).map((q) => q.params[0]);
   assert.deepEqual(slots, ['logo', 'mark'], 'no icon given: the logo is the favicon / mark too');
   const metaRow = m.copyQueries.find((q) => /INSERT INTO site_branding_meta/.test(q.sql));

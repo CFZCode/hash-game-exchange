@@ -34,6 +34,8 @@ const palette = z
   .strict();
 
 const image = z.object({ type: z.enum(['image/png', 'image/webp', 'image/svg+xml']), data: z.string().max(360_000) }).strict();
+// A poster is a photo: PNG, JPEG or WebP, at most 600 KB (as base64 it stays inside the 1 MB body).
+const poster = z.object({ type: z.enum(['image/png', 'image/jpeg', 'image/webp']), data: z.string().max(820_000) }).strict();
 
 const amount = z
   .string()
@@ -57,6 +59,9 @@ const create = {
       logo: image.optional(),
       // The square mark: favicon and small icons. Absent = the logo is used.
       icon: image.optional(),
+      // The home-page poster (desktop, phone). Absent = the copy's own logo on its brand colours.
+      poster: poster.optional(),
+      posterMobile: poster.optional(),
       companyRoleName: text(40).pipe(z.string().min(2, 'hierarchy name must be at least 2 characters')),
       companyName: text(80).pipe(z.string().min(2, 'company name must be at least 2 characters')),
       companyEmail: z.string().trim().toLowerCase().email().max(190),
@@ -85,6 +90,14 @@ module.exports = {
   password: { ...params, body: z.object({ password }).strict() },
   maintenance: { ...params, body: z.object({ on: z.boolean() }).strict() },
   palette: { ...params, body: z.object({ palette: palette.nullable() }).strict() },
+  poster: {
+    ...params,
+    body: z
+      .object({ desktop: poster.optional(), mobile: poster.optional() })
+      .strict()
+      .refine((b) => b.desktop || b.mobile, 'send a desktop poster, a phone poster or both'),
+  },
+  posterImage: { params: z.object({ id, which: z.enum(['poster', 'poster_mobile']) }).strict() },
   branding: {
     ...params,
     body: z

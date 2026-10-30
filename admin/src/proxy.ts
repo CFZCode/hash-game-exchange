@@ -14,8 +14,17 @@ const BRANCH_API = '/api/gw/api/v1/admin/branches/portal/'
 const PUBLIC = ['/login', '/preview', '/api/auth/session', '/api/auth/logout']
 
 // Gateway calls a signed-out page needs (the login screen's site config, brand mark and sign-in,
-// and the whitelabel preview's one-time code).
-const PUBLIC_API = ['/site-config/public', '/branding/public', '/branding/asset/', '/admin/auth/login', '/admin/auth/executive/login', '/admin/whitelabel-link/preview/redeem']
+// the whitelabel preview's one-time code, and a whitelabel's colours: its palette and template).
+const PUBLIC_API = [
+  '/site-config/public',
+  '/branding/public',
+  '/branding/asset/',
+  '/admin/auth/login',
+  '/admin/auth/executive/login',
+  '/admin/whitelabel-link/preview/redeem',
+  '/admin/whitelabel-link/theme',
+  '/admin/features/public'
+]
 
 function tokenLooksValid(token: string | undefined) {
   if (!token) return false

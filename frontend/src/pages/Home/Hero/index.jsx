@@ -4,8 +4,13 @@ import { useCanSignUp, useGates } from '../../../context/gates';
 import Banner from './Banner';
 import { getSignupHeroArt } from '../../../services/banner';
 import { useResource } from '../../../hooks/useResource';
+import { useSiteLogo } from '../../../services/siteBranding';
 
 const DEFAULT_HERO_ART = '/brand/parker567-hero.jpg';
+/* A whitelabel copy never shows Parker567's poster: without its own (parent's Whitelabel panel ›
+   Poster, or its admin › Banners `home` / `home_mobile`) the panel draws its logo on its brand
+   colours instead. */
+const WHITELABEL = process.env.NEXT_PUBLIC_WHITELABEL_MODE === 'true';
 /* Figma "Frame 146" (372×215 @2x): the phone banner, two players on the right. */
 const DEFAULT_HERO_ART_MOBILE = '/brand/parker567-hero-mobile.jpg';
 import googleIcon from '../../../assets/google.png';
@@ -81,6 +86,17 @@ const HeroCopy = () => {
   );
 };
 
+/* A whitelabel's poster when it has none uploaded: its brand colour fading over the panel, its
+   logo on the side the copy leaves free. */
+function BrandPoster({ logo, className, logoClassName }) {
+  return (
+    <div className={`pointer-events-none absolute inset-0 ${className}`}>
+      <div className="absolute inset-0 bg-[linear-gradient(110deg,transparent_35%,color-mix(in_srgb,var(--color-brand)_45%,transparent))]" />
+      {logo && <img alt="" className={`absolute top-1/2 w-auto -translate-y-1/2 object-contain ${logoClassName}`} src={logo} />}
+    </div>
+  );
+}
+
 /* `z`, the default export of BC-D5accpIK.js — the signed-OUT panel, and the only thing this
    file used to contain. */
 function SignedOutHero() {
@@ -92,11 +108,12 @@ function SignedOutHero() {
      `home_mobile`), placed exactly as the original's banner.png / banner_mobile.png were.
      With none uploaded the bundled Parker567 banner shows. */
   const { data: art } = useResource(getSignupHeroArt);
+  const logo = useSiteLogo();
   /* Parker567's own banner (Figma "Frame 145", 1276×270 @2x) when the admin has uploaded none. */
-  const desktopArt = art?.desktop ?? DEFAULT_HERO_ART;
+  const desktopArt = art?.desktop ?? (WHITELABEL ? null : DEFAULT_HERO_ART);
   /* An admin desktop banner without a mobile one falls back to it (getSignupHeroArt); with no
      admin art at all the phone gets its own Parker567 banner. */
-  const mobileArt = art?.mobile ?? DEFAULT_HERO_ART_MOBILE;
+  const mobileArt = art?.mobile ?? (WHITELABEL ? null : DEFAULT_HERO_ART_MOBILE);
   return (
     <div dir="ltr" className="w-full px-4 sm:px-0">
       <div className="hero-panel relative h-[14.375rem] w-full overflow-hidden rounded-lg pl-2.5 sm:h-[260px]">
@@ -105,8 +122,16 @@ function SignedOutHero() {
             players stand wider, so it sits bottom-right at 92% height (8% past the right edge) with
             its left and top edges faded into the panel, keeping the players clear of the copy.
             Desktop: the finished banner covers the panel, anchored left (the crowned P). */}
-        <img alt="banner" className="absolute -right-[8%] bottom-0 h-[92%] w-auto max-w-none [mask-image:linear-gradient(to_right,transparent,#000_28%),linear-gradient(to_bottom,transparent,#000_14%)] [mask-composite:intersect] lg:hidden" src={mobileArt} />
-        <img alt="banner" className="absolute inset-0 hidden h-full w-full object-cover object-left lg:block" src={desktopArt} />
+        {mobileArt ? (
+          <img alt="banner" className="absolute -right-[8%] bottom-0 h-[92%] w-auto max-w-none [mask-image:linear-gradient(to_right,transparent,#000_28%),linear-gradient(to_bottom,transparent,#000_14%)] [mask-composite:intersect] lg:hidden" src={mobileArt} />
+        ) : (
+          <BrandPoster logo={logo} className="lg:hidden" logoClassName="right-[6%] h-[38%] max-w-[42%]" />
+        )}
+        {desktopArt ? (
+          <img alt="banner" className="absolute inset-0 hidden h-full w-full object-cover object-left lg:block" src={desktopArt} />
+        ) : (
+          <BrandPoster logo={logo} className="hidden lg:block" logoClassName="left-[5%] h-[42%] max-w-[30%]" />
+        )}
 
         <div className="relative hidden h-full w-[50%] items-center justify-center lg:ml-[12%] lg:flex">
           <HeroCopy />

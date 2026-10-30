@@ -17,6 +17,7 @@ const { readOwnerDirectBalance } = require('../../lords/ownerWallet');
 const { schemas: linkSchemas } = require('../../whitelabel-link/routes/public.routes');
 const migration = require('../../../../../../packages/db/migrations/164-whitelabels');
 const iconMigration = require('../../../../../../packages/db/migrations/165-whitelabel-icon');
+const posterMigration = require('../../../../../../packages/db/migrations/166-whitelabel-posters');
 
 // A real 1×1 PNG: the branding checks read its magic bytes.
 const PNG = { type: 'image/png', data: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=' };
@@ -125,6 +126,7 @@ test('whitelabels against a database', async (t) => {
   const one = async (sql, replacements = {}) => (await sequelize.query(sql, { replacements, type: sequelize.QueryTypes.SELECT }))[0];
   await migration.up({ sequelize });
   await iconMigration.up({ sequelize });
+  await posterMigration.up({ sequelize });
 
   // The parent's Super Admin, with a Direct balance and a transaction password.
   // 7_100_000+: clear of the 9500–10500 roles the staff suites seed and re-level.
@@ -133,6 +135,7 @@ test('whitelabels against a database', async (t) => {
   const cleanup = async () => {
     await q(`DELETE FROM whitelabel_transfers WHERE whitelabel_id IN (SELECT id FROM whitelabels WHERE slug LIKE :p)`, { p: `lucky-${tag}%` });
     await q(`DELETE FROM whitelabel_jobs WHERE whitelabel_id IN (SELECT id FROM whitelabels WHERE slug LIKE :p)`, { p: `lucky-${tag}%` });
+    await q(`DELETE FROM whitelabel_assets WHERE whitelabel_id IN (SELECT id FROM whitelabels WHERE slug LIKE :p)`, { p: `lucky-${tag}%` });
     await q(`DELETE FROM whitelabels WHERE slug LIKE :p`, { p: `lucky-${tag}%` });
     await q(`DELETE FROM owner_direct_ledger WHERE owner_id = :id`, { id: ownerId });
     await q(`DELETE FROM staff_transfers WHERE from_id = :id OR to_id = :id`, { id: ownerId });
@@ -167,7 +170,7 @@ test('whitelabels against a database', async (t) => {
   let answer = () => ({ status: 200, body: { success: true, data: {} } });
   const calls = [];
   // Every body is checked against the copy's own route validators: what the copy would refuse fails here.
-  const LINK_BODY = { credit: linkSchemas.credit, 'company-password': linkSchemas.password, maintenance: linkSchemas.maintenance, palette: linkSchemas.palette, branding: linkSchemas.branding };
+  const LINK_BODY = { credit: linkSchemas.credit, 'company-password': linkSchemas.password, maintenance: linkSchemas.maintenance, palette: linkSchemas.palette, branding: linkSchemas.branding, poster: linkSchemas.poster };
   const fetchImpl = async (url, init) => {
     const body = init.body ? JSON.parse(init.body) : null;
     const schema = LINK_BODY[url.split('/').pop()];
@@ -271,6 +274,15 @@ test('whitelabels against a database', async (t) => {
     const { contentType } = await service.image(wl.id, 'icon');
     assert.equal(contentType, 'image/png');
     await assert.rejects(() => service.setBranding(wl.id, { icon: { type: 'image/png', data: Buffer.from('x'.repeat(80)).toString('base64') } }), (e) => e.code === 'WHITELABEL_BAD_ICON');
+  });
+
+  await t.test('poster: kept here and put on the live copy as the home banners', async () => {
+    const before = calls.length;
+    const result = await service.setPoster(wl.id, { desktop: PNG, mobile: PNG });
+    assert.deepEqual(Object.keys(result.posters).sort(), ['poster', 'poster_mobile']);
+    assert.deepEqual(calls.slice(before).map((c) => c.body.placement), ['home', 'home_mobile']);
+    assert.equal((await service.posterImage(wl.id, 'poster_mobile')).contentType, 'image/png');
+    await assert.rejects(() => service.setPoster(wl.id, { desktop: { type: 'image/jpeg', data: PNG.data } }), (e) => e.code === 'WHITELABEL_BAD_POSTER', 'the type must match the bytes');
   });
 
   await t.test('preview, maintenance and the company password go to the copy', async () => {

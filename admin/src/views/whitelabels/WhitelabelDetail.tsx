@@ -23,7 +23,7 @@ import { api } from '@/lib/api/client'
 import { check } from '@/lib/validate'
 import { TxnPasswordLabel } from '@/views/finance/StaffFloat'
 
-import ImageField, { type PickedImage } from './ImageField'
+import ImageField, { POSTER, type PickedImage } from './ImageField'
 import PaletteEditor, { paletteError, type ThemeValue } from './PaletteEditor'
 import { TEMPLATE_PALETTES } from './palettes'
 import { PALETTE_KEYS, type Palette, type WhitelabelDetail as Detail, type WhitelabelTransfer } from './types'
@@ -227,6 +227,46 @@ const shownTheme = (wl: Detail): ThemeValue => {
   const match = Object.keys(TEMPLATE_PALETTES).find(k => samePalette(TEMPLATE_PALETTES[k], wl.palette as Palette))
 
   return match ? { template: match, palette: null } : { template: wl.template, palette: wl.palette }
+}
+
+const Poster = ({ wl, invalidate }: { wl: Detail; invalidate: string[][] }) => {
+  const [desktop, setDesktop] = useState<PickedImage | null>(null)
+  const [mobile, setMobile] = useState<PickedImage | null>(null)
+  const [error, setError] = useState('')
+  const stored = (slot: string) => (wl.posters?.[slot] ? `/api/gw/api/v1/admin/whitelabels/${wl.id}/poster/${slot}?v=${encodeURIComponent(wl.posters[slot])}` : null)
+
+  const save = useApiMutation({
+    fn: () =>
+      api.put(`admin/whitelabels/${wl.id}/poster`, {
+        ...(desktop ? { desktop: { type: desktop.type, data: desktop.data } } : {}),
+        ...(mobile ? { mobile: { type: mobile.type, data: mobile.data } } : {})
+      }),
+    invalidate,
+    success: wl.status === 'live' ? 'Poster saved — the player site shows it on its next page load' : 'Poster saved for the setup',
+    onSuccess: () => {
+      setDesktop(null)
+      setMobile(null)
+    }
+  })
+
+  return (
+    <Card>
+      <CardHeader className='flex flex-row items-start justify-between gap-4'>
+        <div>
+          <CardTitle>Home poster</CardTitle>
+          <CardDescription>The big picture at the top of the player site. Without one it shows the logo on the brand colours.</CardDescription>
+        </div>
+        <Button size='sm' disabled={save.isPending || (!desktop && !mobile)} onClick={() => save.mutate()}>
+          {save.isPending && <Loader2Icon className='animate-spin' />} Save poster
+        </Button>
+      </CardHeader>
+      <CardContent className='grid gap-4 sm:grid-cols-2'>
+        <ImageField label='Desktop' hint='About 1276×270, at most 600 KB.' value={desktop} onChange={setDesktop} onError={setError} current={stored('poster')} {...POSTER} />
+        <ImageField label='Phone' hint='About 372×215. Without one: the desktop poster.' value={mobile} onChange={setMobile} onError={setError} current={stored('poster_mobile')} {...POSTER} />
+        {error && <span className='text-destructive text-sm sm:col-span-2'>{error}</span>}
+      </CardContent>
+    </Card>
+  )
 }
 
 const Colours = ({ wl, invalidate }: { wl: Detail; invalidate: string[][] }) => {
@@ -435,6 +475,7 @@ const WhitelabelDetail = ({ id }: { id: string }) => {
       )}
 
       {!['creating', 'deleting'].includes(wl.status) && <BrandImages wl={wl} invalidate={invalidate} />}
+      {!['creating', 'deleting'].includes(wl.status) && <Poster wl={wl} invalidate={invalidate} />}
       {wl.status !== 'deleting' && <Colours key={wl.updatedAt} wl={wl} invalidate={invalidate} />}
     </div>
   )

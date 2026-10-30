@@ -263,6 +263,22 @@ async function setUpCompany(ctx, copy, wl) {
   const [mark, markType] = wl.icon && wl.icon_type ? [wl.icon, wl.icon_type] : [wl.logo, wl.logo_type];
   if (mark && markType) await setImage(copy, 'mark', mark, markType);
   ctx.log(`${wl.logo ? 'logo' : 'no logo'}, ${wl.icon ? 'icon' : wl.logo ? 'logo as icon' : 'no icon'}`);
+  // The home-page poster(s), into the banner placements the player site's hero reads.
+  const posters = await ctx.parent.query(`SELECT slot, content_type, bytes FROM whitelabel_assets WHERE whitelabel_id = $1`, [wl.id]);
+  for (const p of posters) {
+    const placement = p.slot === 'poster' ? 'home' : 'home_mobile';
+    const ext = { 'image/png': '.png', 'image/jpeg': '.jpg', 'image/webp': '.webp' }[p.content_type];
+    await copy.query(
+      `INSERT INTO banners (type, image, image_data, content_type, byte_size, is_active, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, true, NOW(), NOW())
+       ON CONFLICT (type) DO UPDATE SET image = EXCLUDED.image, image_data = EXCLUDED.image_data, content_type = EXCLUDED.content_type,
+         byte_size = EXCLUDED.byte_size, is_active = true, updated_at = NOW()
+       RETURNING id`,
+      [placement, `${placement}${ext}`, p.bytes, p.content_type, p.bytes.length]
+    );
+  }
+  if (posters.length) ctx.log(`poster: ${posters.map((p) => p.slot).join(', ')}`);
+
   // Every key the store's setMeta writes; the browser bar takes the brand colour.
   const meta = {
     siteName: wl.name.slice(0, 40),

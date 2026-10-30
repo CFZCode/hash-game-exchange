@@ -13,7 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useApiMutation } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
 
-import ImageField, { type PickedImage } from './ImageField'
+import ImageField, { POSTER, type PickedImage } from './ImageField'
 import PaletteEditor, { paletteError, type ThemeValue } from './PaletteEditor'
 import type { Whitelabel } from './types'
 
@@ -66,6 +66,8 @@ const WhitelabelCreate = () => {
   const [theme, setTheme] = useState<ThemeValue>({ template: 'hash_game', palette: null })
   const [logo, setLogo] = useState<PickedImage | null>(null)
   const [icon, setIcon] = useState<PickedImage | null>(null)
+  const [poster, setPoster] = useState<PickedImage | null>(null)
+  const [posterMobile, setPosterMobile] = useState<PickedImage | null>(null)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   const set = (patch: Partial<typeof form>) => {
@@ -115,6 +117,8 @@ const WhitelabelCreate = () => {
         palette: theme.palette,
         ...(logo ? { logo: { type: logo.type, data: logo.data } } : {}),
         ...(icon ? { icon: { type: icon.type, data: icon.data } } : {}),
+        ...(poster ? { poster: { type: poster.type, data: poster.data } } : {}),
+        ...(posterMobile ? { posterMobile: { type: posterMobile.type, data: posterMobile.data } } : {}),
         companyRoleName: form.companyRoleName.trim(),
         companyName: form.companyName.trim(),
         companyEmail: form.companyEmail.trim().toLowerCase(),
@@ -183,7 +187,25 @@ const WhitelabelCreate = () => {
             square
           />
         </div>
-        {(errors.logo || errors.icon) && <span className='text-destructive text-sm'>{errors.logo || errors.icon}</span>}
+        <div className='grid gap-4 sm:grid-cols-2'>
+          <ImageField
+            label='Home poster, desktop (optional)'
+            hint='About 1276×270. Without one: the logo on the brand colours.'
+            value={poster}
+            onChange={setPoster}
+            onError={message => setErrors(e => ({ ...e, poster: message }))}
+            {...POSTER}
+          />
+          <ImageField
+            label='Home poster, phone (optional)'
+            hint='About 372×215. Without one: the desktop poster.'
+            value={posterMobile}
+            onChange={setPosterMobile}
+            onError={message => setErrors(e => ({ ...e, poster: message }))}
+            {...POSTER}
+          />
+        </div>
+        {(errors.logo || errors.icon || errors.poster) && <span className='text-destructive text-sm'>{errors.logo || errors.icon || errors.poster}</span>}
       </Section>
 
       <Section title='Domains' description='Point all three at this server (A record) before setup runs: it fetches the SSL certificates.'>

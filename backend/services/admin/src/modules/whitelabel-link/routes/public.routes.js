@@ -6,6 +6,7 @@ const { z, validate, noBody, response, asyncHandler, createRateLimiter, Unauthor
 
 const { WhitelabelLinkService, PALETTE_KEYS } = require('../whitelabelLink.service');
 const { brandingStore } = require('../../branding/branding.store');
+const { BannersService } = require('../../banners/banners.service');
 
 /** Constant-time, like the owner key (modules/owner). Unset secret = never matches. */
 function keyMatches(given, secret) {
@@ -34,6 +35,12 @@ const schemas = {
   },
   password: { body: z.object({ password: z.string().min(8).max(200) }).strict() },
   maintenance: { body: z.object({ on: z.boolean() }).strict() },
+  // The home-page poster: banner placements `home` / `home_mobile` (the player site's hero art).
+  poster: {
+    body: z
+      .object({ placement: z.enum(['home', 'home_mobile']), type: z.enum(['image/png', 'image/jpeg', 'image/webp']), data: z.string().min(1).max(820_000) })
+      .strict(),
+  },
   // The logo or the square mark (favicon), base64; the branding store checks the bytes.
   branding: {
     body: z
@@ -106,6 +113,15 @@ function publicRoutes(deps) {
       const store = deps.brandingStore ?? brandingStore(deps);
       const ownerBranding = deps.entitlementsStore?.current()?.branding ?? null;
       return response.ok(res, await store.setSite(req.body.slot, Buffer.from(req.body.data, 'base64'), { staff: null, ownerBranding }));
+    })
+  );
+  router.put(
+    '/poster',
+    validate(schemas.poster),
+    asyncHandler(async (req, res) => {
+      const banners = new BannersService(deps);
+      const file = { buffer: Buffer.from(req.body.data, 'base64'), originalname: `${req.body.placement}.img`, mimetype: req.body.type };
+      return response.ok(res, await banners.putBanner({ staff: null, type: req.body.placement, file }));
     })
   );
   router.put('/palette', validate(schemas.palette), asyncHandler(async (req, res) => response.ok(res, await service.setPalette(req.body.palette))));
