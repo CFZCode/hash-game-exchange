@@ -14,6 +14,7 @@ const { WhitelabelsService } = require('../whitelabels.service');
 const adminRoutes = require('../routes/admin.routes');
 const v = require('../whitelabels.validators');
 const { readOwnerDirectBalance } = require('../../lords/ownerWallet');
+const { schemas: linkSchemas } = require('../../whitelabel-link/routes/public.routes');
 const migration = require('../../../../../../packages/db/migrations/164-whitelabels');
 const iconMigration = require('../../../../../../packages/db/migrations/165-whitelabel-icon');
 
@@ -165,8 +166,16 @@ test('whitelabels against a database', async (t) => {
   // The copy, played by a fake fetch: `answer` decides each call.
   let answer = () => ({ status: 200, body: { success: true, data: {} } });
   const calls = [];
+  // Every body is checked against the copy's own route validators: what the copy would refuse fails here.
+  const LINK_BODY = { credit: linkSchemas.credit, 'company-password': linkSchemas.password, maintenance: linkSchemas.maintenance, palette: linkSchemas.palette, branding: linkSchemas.branding };
   const fetchImpl = async (url, init) => {
-    calls.push({ url, method: init.method, body: init.body ? JSON.parse(init.body) : null, key: init.headers['x-whitelabel-key'] });
+    const body = init.body ? JSON.parse(init.body) : null;
+    const schema = LINK_BODY[url.split('/').pop()];
+    if (schema) {
+      const checked = schema.body.safeParse(body);
+      assert.ok(checked.success, `the copy would refuse ${url}: ${JSON.stringify(checked.error?.issues)}`);
+    }
+    calls.push({ url, method: init.method, body, key: init.headers['x-whitelabel-key'] });
     const a = answer(url, init);
     if (a instanceof Error) throw a;
     return { ok: a.status < 400, status: a.status, json: async () => a.body };
@@ -205,6 +214,7 @@ test('whitelabels against a database', async (t) => {
     const sent = calls.at(-1);
     assert.match(sent.url, /^http:\/\/127\.0\.0\.1:1\/api\/v1\/admin\/whitelabel-link\/credit$/);
     assert.equal(sent.body.transferId, `p${done.id}`);
+    assert.equal(sent.body.amount, '100.00', 'two decimals, as the copy takes it');
     assert.equal(sent.key, service.secrets.open((await one(`SELECT link_key FROM whitelabels WHERE id = :id`, { id: wl.id })).link_key));
 
     await assert.rejects(() => service.transfer({ id: wl.id, amount: '5000', transactionPassword: TXN, actor }), (e) => e.code === 'INSUFFICIENT_FUNDS');

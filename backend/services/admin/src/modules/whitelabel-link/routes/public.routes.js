@@ -53,7 +53,11 @@ const schemas = {
   },
 };
 
-module.exports = function publicRoutes(deps) {
+module.exports = publicRoutes;
+// The parent's tests send every link body through these, so the two sides cannot drift apart.
+module.exports.schemas = schemas;
+
+function publicRoutes(deps) {
   const router = Router();
   const service = deps.whitelabelLinkService ?? new WhitelabelLinkService(deps);
   const enabled = deps.config.RATE_LIMIT_ENABLED !== false;
@@ -109,4 +113,4 @@ module.exports = function publicRoutes(deps) {
   router.post('/preview', noBody(), asyncHandler(async (_req, res) => response.ok(res, await service.preview())));
 
   return router;
-};
+}

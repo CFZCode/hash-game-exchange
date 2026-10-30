@@ -22,6 +22,15 @@ const {
 const RETRY_AFTER_MS = 15_000;
 const EXT = { 'image/png': 'png', 'image/webp': 'webp', 'image/svg+xml': 'svg' };
 
+/**
+ * A stored amount ("10000.00000000", the platform's scale) as the link sends it: 2 decimals, the
+ * copy's rule. Exact: the panel takes at most 2 decimals, so only zeros are dropped.
+ */
+function twoDecimals(stored) {
+  const [whole, fraction = ''] = money.fromStored(stored).split('.');
+  return `${whole}.${`${fraction}00`.slice(0, 2)}`;
+}
+
 /** base64 → bytes, checked like any branding upload (`slot` sets the size limit); null when absent. */
 function decodeImage(input, slot) {
   if (!input) return null;
@@ -300,7 +309,7 @@ class WhitelabelsService {
     try {
       await this.link(row, 'POST', '/credit', {
         transferId: `p${transfer.id}`,
-        amount: money.fromStored(transfer.amount),
+        amount: twoDecimals(transfer.amount),
         ...(transfer.note ? { note: transfer.note } : {}),
       });
       const [done] = await this.#q(
