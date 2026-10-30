@@ -352,7 +352,7 @@ export const navItems: NavItem[] = [
           groupLabel: 'Whitelabel',
           groupIcon: 'Globe',
           collapsible: true,
-          items: [{ icon: 'Globe', label: 'Whitelabels', href: '/whitelabels', activePath: '/whitelabels', permission: 'reports:read', direct: true } as MenuItem]
+          items: [{ icon: 'Globe', label: 'Whitelabels', href: '/whitelabels', activePath: '/whitelabels', permission: 'reports:read', direct: true, policy: 'whitelabel' } as MenuItem]
         } as NavItem
       ]),
   {

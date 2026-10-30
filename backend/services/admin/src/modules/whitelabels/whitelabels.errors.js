@@ -7,6 +7,8 @@ module.exports = defineErrors('WHITELABEL', {
 
   NOT_ON_A_COPY: { status: 403, message: 'A whitelabel copy cannot create whitelabels of its own' },
 
+  DISABLED: { status: 403, message: 'Whitelabel is switched off on this site' },
+
   NOT_FOUND: { status: 404, message: 'Whitelabel not found' },
 
   TAKEN: { status: 409, message: 'That name or domain is already used by another whitelabel' },

@@ -1,7 +1,7 @@
 'use strict';
 
 const { Router } = require('express');
-const { validate, noBody, response, asyncHandler, createActivityRecorder } = require('@ibitplay/common');
+const { validate, noBody, response, asyncHandler, createActivityRecorder, sitePolicy } = require('@ibitplay/common');
 const { PERMISSIONS, canIssueFunds } = require('@ibitplay/auth');
 
 const v = require('../whitelabels.validators');
@@ -33,10 +33,13 @@ module.exports = function adminRoutes(deps) {
   const router = Router();
   const withActivity = createActivityRecorder({ client: clients.admin, logger, serviceName: config.SERVICE_NAME });
 
-  const ownerOnly = (req, _res, next) => {
-    if (config.WHITELABEL_MODE) return next(errors.NOT_ON_A_COPY());
-    return next(canIssueFunds(req.staff) ? undefined : errors.OWNER_ONLY());
-  };
+  const ownerOnly = asyncHandler(async (req, _res, next) => {
+    if (config.WHITELABEL_MODE) throw errors.NOT_ON_A_COPY();
+    if (!canIssueFunds(req.staff)) throw errors.OWNER_ONLY();
+    // The owner's switch (owner panel → Features & plan → Whitelabel).
+    if ((await sitePolicy.readPolicy(deps.models, 'whitelabel')) !== 'on') throw errors.DISABLED();
+    next();
+  });
   const canRead = [auth.requirePermission(PERMISSIONS.REPORTS_READ), ownerOnly];
   const canWrite = [auth.requirePermission(PERMISSIONS.STAFF_WRITE), ownerOnly];
   const canMoveMoney = [auth.requirePermission(PERMISSIONS.WALLET_ADJUST), ownerOnly];

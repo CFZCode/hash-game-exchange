@@ -64,7 +64,7 @@ test('create validators', () => {
 
 test('the panel is the Super Admin’s, and never on a copy', async (t) => {
   const pass = (_req, _res, next) => next();
-  const routes = (cfg, level) => {
+  const routes = (cfg, level, models) => {
     const app = express();
     app.use(express.json());
     app.use((req, _res, next) => {
@@ -77,6 +77,7 @@ test('the panel is the Super Admin’s, and never on a copy', async (t) => {
         clients: { admin: { post: async () => ({}) } },
         logger,
         config: cfg,
+        models,
         whitelabelsService: { list: async () => ({ rows: [], total: 0 }) },
       })
     );
@@ -97,6 +98,10 @@ test('the panel is the Super Admin’s, and never on a copy', async (t) => {
   assert.equal((await get(routes(config, 1))).status, 200);
   assert.equal((await get(routes(config, 2))).body.code, 'WHITELABEL_OWNER_ONLY');
   assert.equal((await get(routes({ ...config, WHITELABEL_MODE: true }, 1))).body.code, 'WHITELABEL_NOT_ON_A_COPY');
+  const policy = (variant) => ({ SiteFeature: { findByPk: async () => (variant ? { variant } : null) } });
+  assert.equal((await get(routes(config, 1, policy('off')))).body.code, 'WHITELABEL_DISABLED');
+  assert.equal((await get(routes(config, 1, policy('on')))).status, 200);
+  assert.equal((await get(routes(config, 1, policy(null)))).status, 200, 'unset = on');
   t.diagnostic('guards checked');
 });
 
