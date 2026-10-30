@@ -30,5 +30,7 @@ module.exports = {
     { ...next('frontend', 'frontend', 5190, '127.0.0.1'), script: 'scripts/start-live.sh' },
     next('admin', 'admin', 3080, '127.0.0.1'),
     next('owner-panel', 'owner-panel', 3085, '127.0.0.1'),
+    // Builds and removes whitelabel copies: the admin Whitelabel panel's queued jobs (scripts/whitelabel/).
+    { ...base, name: 'parker-whitelabel-worker', script: 'scripts/whitelabel/worker.mjs', cwd: root },
   ],
 };

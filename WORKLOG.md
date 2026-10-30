@@ -15,6 +15,30 @@ Format:
 
 ---
 
+## 2026-10-30 — Whitelabel Phase 3: setup / delete script
+**Kya kiya:** `scripts/whitelabel/` — `lib.mjs` (naam, ports, Redis, env, Apache, pm2 file; pure), `steps.mjs` (create / remove, har asar `ctx` se), `worker.mjs` (queued jobs, pm2 `parker-whitelabel-worker`, ecosystem.config.cjs me joda). Flow aur har step: PROJECT-FLOW.md §3g.
+**Kyun:** user: "go ahead" (Phase 3).
+**Files / jagah:** scripts/whitelabel/{lib,steps,worker}.mjs, scripts/whitelabel/__tests__/{lib,steps}.test.mjs, ecosystem.config.cjs.
+**Notes / pending:** Tests (`node --test scripts/whitelabel/__tests__/lib.test.mjs scripts/whitelabel/__tests__/steps.test.mjs`) 10 pass — nakli machine pe poora create / delete sequence, secrets na command line pe na log me, delete sirf apna. Asli machine pe kuch nahi chalaya: worker start nahi, koi DB / Apache / pm2 nahi bana. Live karne se pehle: branch commit + parker me merge (copy `git archive HEAD` leta hai), parker567 DB pe migration 163 + 164, parker services restart + admin / frontend build, worker start — sab user ka GO chahiye. Limit: Redis 8–15 = max 8 whitelabel is server pe.
+
+---
+
+## 2026-10-30 — Whitelabel Phase 2: parent ka Whitelabel panel
+**Kya kiya:** Sidebar "Whitelabel → Whitelabels" (Super Admin, copy pe chhupa): list, New (brand, logo, 3 domains, template + custom colours live preview ke saath, company login), detail (setup log, copy ke figures, Send balance, transfers + resend, company password, on/off, Preview admin, colours, Delete). Backend `admin modules/whitelabels` + migration 164. Transfer: parent ka Direct pehle kata, phir copy ko idempotent `p<id>`; bina jawab = pending (kabhi auto refund nahi), seedha mana = refund. Copy ke `summary` me agents / players ka INR aur "players with balance (kisi bhi coin me)" joda (delete warning ke liye). Flow: PROJECT-FLOW.md §3g.
+**Kyun:** user: "continue 2 phase".
+**Files / jagah:** backend: services/admin/src/modules/whitelabels/* (naya), whitelabel-link/whitelabelLink.service.js (summary), lords/{ownerWallet,lords.constants}.js (to_whitelabel, whitelabel_refund), packages/db/migrations/164-whitelabels.js. admin: views/whitelabels/* (naya), app/(pages)/whitelabels/*, configs/navConfig.tsx, views/exchange/OwnerDirectLedger.tsx.
+**Notes / pending:** Branch `feature/whitelabel`, commit / build / deploy nahi. Tests: whitelabels (10) + touched suites 262 pass. Pehle test ne galti se staff suite ke 2 role (9805, 9883, sirf ibitplay_test) ka level 1 kar diya tha — wapas kar diya, test ab 7_100_000+ ids use karta hai. Phase 3 (setup / delete script jo jobs uthata hai) baaki — tab tak naya whitelabel `queued` hi rahega.
+
+---
+
+## 2026-10-30 — Whitelabel Phase 1: company mode (copy ki side)
+**Kya kiya:** Whitelabel copy ke liye company mode (`WHITELABEL_MODE`, parent pe off): company khud balance add nahi kar sakti (add-balance / add-direct-balance / non-INR credit adjust → 403), parent ka transfer Direct balance me (idempotent `whitelabel-link/credit`), company ka Direct → Agent System move, first login pe apna transaction code, maintenance (gateway 503, callbacks + workers chalte), read-only preview (token `ro`, har write 403), player site ke custom colours (`palette`). Migration 163 (`whitelabel_settings`, `whitelabel_inbound_credits`). Flow: PROJECT-FLOW.md §3g.
+**Kyun:** user: whitelabel panel — parent Super Admin company banata hai, company ka paisa sirf parent se, off/on, preview, delete (Phase 2/3 me parent ka panel + setup script).
+**Files / jagah:** backend: packages/common/src/env.js, packages/auth/src/{tokens,middleware}.js, gateway/src/{app.js,middleware/maintenance.js,middleware/verifyToken.js}, services/admin/src/modules/{whitelabel-link/*,exchange/*,lords/{ownerWallet,lords.constants}.js,staff/staff.{service,validators}.js,staff-auth/staffAuth.service.js}, services/user/src/modules/wallet/{controllers/admin.controller.js,routes/admin.routes.js}, packages/db/migrations/163-whitelabel-link.js. admin: configs/site.ts, views/auth/{ChangePassword,Preview}.tsx, app/(blank)/preview, proxy.ts, app/api/auth/me, lib/auth/session.ts, contexts/SessionContext.tsx, app/(pages)/layout.tsx, views/exchange/{OwnerAddBalance,OwnerDirectLedger}.tsx, ProfileDropdown, AccountPage. frontend: src/theme/{applyTheme.js,palettes.css}, src/services/gates.js, docs/backend-gaps.md.
+**Notes / pending:** Branch `feature/whitelabel` (worktree /var/www/main/hge-whitelabel), commit/push nahi kiya, live pe kuch deploy nahi. Tests: naye whitelabel-link (10), readOnlyPreview, gateway maintenance, adjustRouting case, applyTheme (3) pass; admin modules suite 237 pass; wallet suite ke 7 tipping/rain fail pehle se main pe bhi. Migration 163 sirf ibitplay_test pe chali. Phase 2 (parent ka Whitelabel panel) aur Phase 3 (setup / delete script) baaki.
+
+---
+
 ## 2026-10-29 — Create Account rule change ka regression check
 **Kya kiya:** Poora backend suite chalaya (2688 tests): 60 fail + 1 cancel. Inme sirf `tipLimits.test.js` pichle full run (aaj 15:40) se naya tha, aur vo create rule se nahi, commit 10bbc8b5 se tha (route `auth.requireAnyPermission` use karta hai, test ke fake auth me ye nahi tha → TypeError + 180s hang). Fake auth me `requireAnyPermission` jod diya → 4/4 pass. Baaki saare fails pehle se hain, koi staff create / level se juda naya nahi. Code check: market book, account list, points settle, parent funding, reports sab `parent_id` chain pe chalte hai, level number pe nahi; staff edit/re-level create wala rule use nahi karta; admin UI me "level + 1" wala koi logic nahi.
 **Kyun:** user: "ye change karne se baaki kuch hilega nhi bhai ye check karo".

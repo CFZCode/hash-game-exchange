@@ -13,6 +13,10 @@
  * same dark-to-light ladder the bc palette uses. Dark mode only: the light theme (`.app-root:not(.dark)`)
  * is bc's own and keeps its colours.
  *
+ * `custom` is a whitelabel copy's palette chosen by its parent site: no block of its own here — its
+ * --p-* tokens are inline on <html> (applyTheme.js `applyPalette`), and it joins the mapping lists.
+ * It has no sprite copies, so the icon sprites keep bc's own colours under it.
+ *
  * Icon sprites (sidebar, header, tabbar, category icons) are PNGs with the colours baked in; their
  * per-theme copies and rules are src/theme/sprites.css (tools/gen-theme-sprites.mjs).
  *
@@ -104,7 +108,8 @@ html[data-theme='neon_navy'] {
 html[data-theme='carbon_gold'] .app-root.dark,
 html[data-theme='violet_night'] .app-root.dark,
 html[data-theme='emerald_dark'] .app-root.dark,
-html[data-theme='neon_navy'] .app-root.dark {
+html[data-theme='neon_navy'] .app-root.dark,
+html[data-theme='custom'] .app-root.dark {
   /* Surfaces, darkest → lightest, on bc's own ladder (#171A1A < #1E2121 < #232626 < #292D2E < #323738 < #3A4142 < #4A5354). */
   --color-alw_dark: color-mix(in srgb, var(--p-bg) 80%, #000);
   --color-card_dark: color-mix(in srgb, var(--p-bg) 80%, #000);
@@ -164,7 +169,8 @@ html[data-theme='neon_navy'] .app-root.dark {
 html[data-theme='carbon_gold'] .app-root.dark .bonus-scope,
 html[data-theme='violet_night'] .app-root.dark .bonus-scope,
 html[data-theme='emerald_dark'] .app-root.dark .bonus-scope,
-html[data-theme='neon_navy'] .app-root.dark .bonus-scope {
+html[data-theme='neon_navy'] .app-root.dark .bonus-scope,
+html[data-theme='custom'] .app-root.dark .bonus-scope {
   --color-quarterary: color-mix(in srgb, var(--p-muted) 75%, var(--p-border));
   --color-card: color-mix(in srgb, var(--p-bg) 80%, #000);
 }
@@ -173,14 +179,16 @@ html[data-theme='neon_navy'] .app-root.dark .bonus-scope {
 html[data-theme='carbon_gold'] .app-root.dark .footer-bg,
 html[data-theme='violet_night'] .app-root.dark .footer-bg,
 html[data-theme='emerald_dark'] .app-root.dark .footer-bg,
-html[data-theme='neon_navy'] .app-root.dark .footer-bg {
+html[data-theme='neon_navy'] .app-root.dark .footer-bg,
+html[data-theme='custom'] .app-root.dark .footer-bg {
   --footer-bg: var(--p-bg);
 }
 
 html[data-theme='carbon_gold'] .dark .settings-page,
 html[data-theme='violet_night'] .dark .settings-page,
 html[data-theme='emerald_dark'] .dark .settings-page,
-html[data-theme='neon_navy'] .dark .settings-page {
+html[data-theme='neon_navy'] .dark .settings-page,
+html[data-theme='custom'] .dark .settings-page {
   --Chip-Group-Tab: var(--p-s3);
   --Chip-Group-Button: color-mix(in srgb, var(--p-s3) 40%, var(--p-border));
 }

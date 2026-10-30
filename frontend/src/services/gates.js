@@ -1,7 +1,7 @@
 import { request, USE_FIXTURES } from './client';
 import { PLATFORM } from './endpoints';
 import { getSiteConfig } from './siteConfig';
-import { applyTheme, themeOf } from '../theme/applyTheme';
+import { applyPalette, applyTheme, themeOf } from '../theme/applyTheme';
 import { underAgentBase } from './agentBase';
 
 /* What this site has switched on, and what THIS player's account may use — SmartBet's
@@ -26,6 +26,9 @@ import { underAgentBase } from './agentBase';
 
 /** Not in `endpoints.js` on purpose: other areas edit that file; this one is read only here. */
 const FEATURES_PUBLIC = '/api/v1/admin/features/public';
+// A whitelabel copy's custom palette, set by its parent site (admin modules/whitelabel-link).
+const WHITELABEL_THEME = '/api/v1/admin/whitelabel-link/theme';
+const WHITELABEL = process.env.NEXT_PUBLIC_WHITELABEL_MODE === 'true';
 
 /**
  * gate → what switches it. `flag` is a site-config key, `feature` an owner catalogue key
@@ -279,12 +282,14 @@ export function loadPublicGates() {
 
 async function readPublicGates() {
   if (USE_FIXTURES) return { flags: null, features: null };
-  const [features, flags] = await Promise.all([
+  const [features, flags, theme] = await Promise.all([
     Promise.resolve(request(FEATURES_PUBLIC, { live: true, fixture: null })).catch(() => null),
     getSiteConfig(),
+    WHITELABEL ? Promise.resolve(request(WHITELABEL_THEME, { live: true, fixture: null })).catch(() => null) : null,
   ]);
-  // The owner's template is this UI's colour theme (src/theme/palettes.css). A failed read keeps
-  // whatever is on screen.
+  // The parent's custom palette first (it beats the template), then the owner's template as this
+  // UI's colour theme (src/theme/palettes.css). A failed read keeps whatever is on screen.
+  if (theme) applyPalette(theme.palette ?? null);
   if (Array.isArray(features)) applyTheme(themeOf(features));
   return { flags: flags ?? null, features: Array.isArray(features) ? features : null };
 }

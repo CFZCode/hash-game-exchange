@@ -332,6 +332,7 @@ The SmartBet rules (`siteGates.ts` / `siteFeatures.tsx`), ported in `services/ga
 | --- | --- | --- |
 | Owner plan (feature listed = on, plus `business_model`) | `GET admin/features/public` | **Connected**, read on load and again on focus (at most every 10 s). SmartBet re-reads on the `featuresUpdated` socket push; this build has no socket client |
 | Site admin switches (`bonus`, `vipclub`, `affiliate`, `lotto`, `sports`) | `GET admin/site-config/public` | **Connected**, same timing |
+| Whitelabel custom palette (13 `--p-*` tokens set by the parent site; beats the owner's template) | `GET admin/whitelabel-link/theme` | **Connected, 2026-10-30**, same timing — only in a build with `NEXT_PUBLIC_WHITELABEL_MODE=true`; never read on the parent site. Icon sprites keep bc's colours under it |
 | Player capabilities (agent-tree players: all false) | `GET user/auth/me` → `capabilities` | **Connected**. Unknown while it loads, so capability rows stay hidden until it answers (SmartBet's rule) |
 
 What is hidden: the wallet rail, the account dropdown, the mobile account page, the sidebar, the
