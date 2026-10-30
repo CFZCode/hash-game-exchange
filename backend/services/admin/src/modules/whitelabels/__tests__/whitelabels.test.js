@@ -15,6 +15,10 @@ const adminRoutes = require('../routes/admin.routes');
 const v = require('../whitelabels.validators');
 const { readOwnerDirectBalance } = require('../../lords/ownerWallet');
 const migration = require('../../../../../../packages/db/migrations/164-whitelabels');
+const iconMigration = require('../../../../../../packages/db/migrations/165-whitelabel-icon');
+
+// A real 1×1 PNG: the branding checks read its magic bytes.
+const PNG = { type: 'image/png', data: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=' };
 
 /**
  * The parent's Whitelabel panel: a create is queued and never shows a secret; a transfer is
@@ -119,6 +123,7 @@ test('whitelabels against a database', async (t) => {
   const q = (sql, replacements = {}) => sequelize.query(sql, { replacements });
   const one = async (sql, replacements = {}) => (await sequelize.query(sql, { replacements, type: sequelize.QueryTypes.SELECT }))[0];
   await migration.up({ sequelize });
+  await iconMigration.up({ sequelize });
 
   // The parent's Super Admin, with a Direct balance and a transaction password.
   // 7_100_000+: clear of the 9500–10500 roles the staff suites seed and re-level.
@@ -234,6 +239,28 @@ test('whitelabels against a database', async (t) => {
     assert.equal(await balance(), before, 'back where it was');
     const back = await one(`SELECT COUNT(*)::int AS n FROM staff_transfers WHERE to_id = :id AND transfer_type = 'whitelabel_refund'`, { id: ownerId });
     assert.equal(back.n, 1);
+  });
+
+  await t.test('logo and icon: kept here and put on the live copy (no icon yet = the logo is the mark too)', async () => {
+    answer = () => ({ status: 200, body: { success: true, data: {} } });
+    const before = calls.length;
+    const updated = await service.setBranding(wl.id, { logo: PNG });
+    assert.equal(updated.hasLogo, true);
+    assert.deepEqual(calls.slice(before).map((c) => [c.url.split('/').pop(), c.body.slot]), [['branding', 'logo'], ['branding', 'mark']]);
+
+    const mid = calls.length;
+    const withIcon = await service.setBranding(wl.id, { icon: PNG });
+    assert.equal(withIcon.hasIcon, true);
+    assert.deepEqual(calls.slice(mid).map((c) => c.body.slot), ['mark']);
+
+    // Once it has an icon, a new logo leaves the mark alone.
+    const last = calls.length;
+    await service.setBranding(wl.id, { logo: PNG });
+    assert.deepEqual(calls.slice(last).map((c) => c.body.slot), ['logo']);
+
+    const { contentType } = await service.image(wl.id, 'icon');
+    assert.equal(contentType, 'image/png');
+    await assert.rejects(() => service.setBranding(wl.id, { icon: { type: 'image/png', data: Buffer.from('x'.repeat(80)).toString('base64') } }), (e) => e.code === 'WHITELABEL_BAD_ICON');
   });
 
   await t.test('preview, maintenance and the company password go to the copy', async () => {

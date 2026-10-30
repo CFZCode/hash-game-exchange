@@ -14,7 +14,8 @@ const { WhitelabelsService } = require('../whitelabels.service');
  *   GET    /admin/whitelabels                        list ?search&status&limit&offset
  *   POST   /admin/whitelabels                        create → queued for the setup script
  *   GET    /admin/whitelabels/:id                    row + jobs + transfers + the copy's summary
- *   GET    /admin/whitelabels/:id/logo               the logo it was created with
+ *   GET    /admin/whitelabels/:id/logo               its logo (…/icon: its square icon)
+ *   PUT    /admin/whitelabels/:id/branding           { logo?, icon? } (base64) — also on the live copy
  *   POST   /admin/whitelabels/:id/transfers          { amount, note?, transactionPassword } Direct → company Direct
  *   POST   /admin/whitelabels/:id/transfers/retry    send every pending transfer again
  *   PUT    /admin/whitelabels/:id/company-password   { password } (company signed out)
@@ -69,12 +70,9 @@ module.exports = function adminRoutes(deps) {
 
   router.get('/:id', canRead, validate(v.byId), asyncHandler(async (req, res) => response.ok(res, await service.detail(id(req)))));
 
-  router.get(
-    '/:id/logo',
-    canRead,
-    validate(v.byId),
+  const sendImage = (which) =>
     asyncHandler(async (req, res) => {
-      const logo = await service.logo(id(req));
+      const logo = await service.image(id(req), which);
       res.set({
         'Content-Type': logo.contentType,
         'Cache-Control': 'private, no-cache',
@@ -83,8 +81,10 @@ module.exports = function adminRoutes(deps) {
         'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; sandbox",
       });
       return res.status(200).end(logo.data);
-    })
-  );
+    });
+  router.get('/:id/logo', canRead, validate(v.byId), sendImage('logo'));
+  router.get('/:id/icon', canRead, validate(v.byId), sendImage('icon'));
+  router.put('/:id/branding', canWrite, validate(v.branding), audited('whitelabel.branding'), asyncHandler(async (req, res) => response.ok(res, await service.setBranding(id(req), req.body))));
 
   router.post(
     '/:id/transfers',

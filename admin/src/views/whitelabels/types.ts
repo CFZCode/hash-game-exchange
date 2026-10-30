@@ -19,6 +19,7 @@ export type Whitelabel = {
   template: string
   palette: Palette | null
   hasLogo: boolean
+  hasIcon: boolean
   companyRoleName: string
   companyName: string
   companyEmail: string

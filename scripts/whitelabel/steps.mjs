@@ -48,6 +48,14 @@ const APPS = ['backend', 'admin', 'owner-panel', 'frontend'];
 const BUILT = ['admin', 'owner-panel', 'frontend'];
 const OUR_VHOST = '# Whitelabel copy — written by scripts/whitelabel.';
 
+/**
+ * branding.store.js `metaOf(null)`: the Super Admin's name and title show only while
+ * `site_branding_meta.owner_meta` equals the owner's current metadata — a new copy has no owner
+ * document, so this empty one. NULL there hides the name and the site reads as not branded
+ * (the player site then shows the parent's art). A test checks it against the store's own.
+ */
+export const NO_OWNER_META = JSON.stringify(['', '', '', '', [], '', '', '']);
+
 const domainsOf = (wl) => [wl.site_domain, wl.admin_domain, wl.api_domain].map(assertDomain);
 
 /** psql as the postgres superuser, the script on stdin (never on the command line). */
@@ -214,8 +222,8 @@ async function waitFor(ctx, url, timeoutMs) {
 /**
  * The seeded super-admin becomes the company: its name, email and the password the parent chose
  * (as its bcrypt hash — the same algorithm here), forced to change on first sign-in. The level-1
- * role takes the hierarchy name. Then the parent's exchange rates (setup's are placeholders), the
- * logo, the name and title, and the custom palette.
+ * role takes the hierarchy name. Then the parent's default / reward coin and exchange rates
+ * (setup's are USDT and placeholders), the logo and mark, the name and title, and the palette.
  */
 async function setUpCompany(ctx, copy, wl) {
   const [company] = await copy.query(
@@ -232,6 +240,17 @@ async function setUpCompany(ctx, copy, wl) {
   );
   ctx.log(`company ${wl.company_email} (${wl.company_role_name})`);
 
+  // The parent's coins: default (what the admin reports in) and reward. Fresh setup says USDT.
+  const coins = await ctx.parent.query(`SELECT feature, enabled, variant FROM site_features WHERE feature IN ('default_currency', 'reward_currency')`);
+  for (const c of coins) {
+    await copy.query(
+      `INSERT INTO site_features (feature, enabled, variant) VALUES ($1, $2, $3)
+       ON CONFLICT (feature) DO UPDATE SET enabled = EXCLUDED.enabled, variant = EXCLUDED.variant, updated_at = NOW() RETURNING feature`,
+      [c.feature, c.enabled, c.variant]
+    );
+  }
+  ctx.log(`coins as the parent: ${coins.map((c) => `${c.feature} ${c.variant}`).join(', ') || 'parent has none set'}`);
+
   const rates = await ctx.parent.query(`SELECT UPPER(currency) AS currency, usd_rate FROM exchangerate WHERE usd_rate IS NOT NULL`);
   for (const r of rates) {
     const updated = await copy.query(`UPDATE exchangerate SET usd_rate = $2, last_updated = NOW() WHERE UPPER(currency) = $1 RETURNING id`, [r.currency, r.usd_rate]);
@@ -239,26 +258,26 @@ async function setUpCompany(ctx, copy, wl) {
   }
   ctx.log(`${rates.length} exchange rates from the parent`);
 
-  if (wl.logo && wl.logo_type) {
-    const ext = { 'image/png': 'png', 'image/webp': 'webp', 'image/svg+xml': 'svg' }[wl.logo_type];
-    const file = `${crypto.createHash('sha256').update(wl.logo).digest('hex')}.${ext}`;
-    await copy.query(
-      `INSERT INTO owner_branding_assets (file, content_type, byte_size, bytes) VALUES ($1, $2, $3, $4) ON CONFLICT (file) DO NOTHING RETURNING file`,
-      [file, wl.logo_type, wl.logo.length, wl.logo]
-    );
-    await copy.query(
-      `INSERT INTO site_branding (slot, file, content_type, byte_size, owner_file, updated_at) VALUES ('logo', $1, $2, $3, NULL, NOW())
-       ON CONFLICT (slot) DO UPDATE SET file = EXCLUDED.file, content_type = EXCLUDED.content_type, byte_size = EXCLUDED.byte_size, updated_at = NOW()
-       RETURNING slot`,
-      [file, wl.logo_type, wl.logo.length]
-    );
-    ctx.log('logo set');
-  }
-  const meta = { siteName: wl.name.slice(0, 40), title: (wl.title || wl.name).slice(0, 70), description: wl.description || '' };
+  // The logo, and the square mark (favicon, small icons): the icon, else the logo again.
+  if (wl.logo && wl.logo_type) await setImage(copy, 'logo', wl.logo, wl.logo_type);
+  const [mark, markType] = wl.icon && wl.icon_type ? [wl.icon, wl.icon_type] : [wl.logo, wl.logo_type];
+  if (mark && markType) await setImage(copy, 'mark', mark, markType);
+  ctx.log(`${wl.logo ? 'logo' : 'no logo'}, ${wl.icon ? 'icon' : wl.logo ? 'logo as icon' : 'no icon'}`);
+  // Every key the store's setMeta writes; the browser bar takes the brand colour.
+  const meta = {
+    siteName: wl.name.slice(0, 40),
+    title: (wl.title || wl.name).slice(0, 70),
+    titleTemplate: '',
+    description: wl.description || '',
+    keywords: [],
+    ogTitle: '',
+    ogDescription: '',
+    themeColor: wl.palette?.primary?.toUpperCase() ?? '',
+  };
   await copy.query(
-    `INSERT INTO site_branding_meta (id, meta, owner_meta, updated_at) VALUES (1, $1::jsonb, NULL, NOW())
-     ON CONFLICT (id) DO UPDATE SET meta = EXCLUDED.meta, updated_at = NOW() RETURNING id`,
-    [JSON.stringify(meta)]
+    `INSERT INTO site_branding_meta (id, meta, owner_meta, updated_at) VALUES (1, $1::jsonb, $2, NOW())
+     ON CONFLICT (id) DO UPDATE SET meta = EXCLUDED.meta, owner_meta = EXCLUDED.owner_meta, updated_at = NOW() RETURNING id`,
+    [JSON.stringify(meta), NO_OWNER_META]
   );
   await copy.query(
     `INSERT INTO whitelabel_settings (id, palette, updated_at) VALUES (1, $1::jsonb, NOW())
@@ -266,6 +285,22 @@ async function setUpCompany(ctx, copy, wl) {
     [wl.palette ? JSON.stringify(wl.palette) : null]
   );
   ctx.log(wl.palette ? 'custom colours set' : `template ${wl.template}`);
+}
+
+/** One Super Admin image slot on the copy, stored by content hash — branding.store.js setSite's rows. */
+async function setImage(copy, slot, bytes, type) {
+  const ext = { 'image/png': 'png', 'image/webp': 'webp', 'image/svg+xml': 'svg' }[type];
+  const file = `${crypto.createHash('sha256').update(bytes).digest('hex')}.${ext}`;
+  await copy.query(
+    `INSERT INTO owner_branding_assets (file, content_type, byte_size, bytes) VALUES ($1, $2, $3, $4) ON CONFLICT (file) DO NOTHING RETURNING file`,
+    [file, type, bytes.length, bytes]
+  );
+  await copy.query(
+    `INSERT INTO site_branding (slot, file, content_type, byte_size, owner_file, updated_at) VALUES ($1, $2, $3, $4, NULL, NOW())
+     ON CONFLICT (slot) DO UPDATE SET file = EXCLUDED.file, content_type = EXCLUDED.content_type, byte_size = EXCLUDED.byte_size, updated_at = NOW()
+     RETURNING slot`,
+    [slot, file, type, bytes.length]
+  );
 }
 
 // ══════════════════════════════════════════════════════════════════════════

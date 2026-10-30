@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 
 import { useRouter } from 'next/navigation'
 
-import { Loader2Icon, UploadIcon, XIcon } from 'lucide-react'
+import { Loader2Icon } from 'lucide-react'
 
 import { TextAreaField, TextField } from '@/components/shared/FormField'
 import PageHeader from '@/components/shared/PageHeader'
@@ -13,11 +13,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useApiMutation } from '@/hooks/use-api'
 import { api } from '@/lib/api/client'
 
+import ImageField, { type PickedImage } from './ImageField'
 import PaletteEditor, { paletteError, type ThemeValue } from './PaletteEditor'
 import type { Whitelabel } from './types'
 
-const MAX_LOGO = 256 * 1024
-const LOGO_TYPES = ['image/png', 'image/webp', 'image/svg+xml']
 const DOMAIN = /^(?=.{4,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/
 const SLUG = /^[a-z][a-z0-9-]{2,28}[a-z0-9]$/
 
@@ -65,16 +64,9 @@ const WhitelabelCreate = () => {
 
   const [slugTouched, setSlugTouched] = useState(false)
   const [theme, setTheme] = useState<ThemeValue>({ template: 'hash_game', palette: null })
-  const [logo, setLogo] = useState<{ type: string; data: string; url: string } | null>(null)
+  const [logo, setLogo] = useState<PickedImage | null>(null)
+  const [icon, setIcon] = useState<PickedImage | null>(null)
   const [errors, setErrors] = useState<Record<string, string>>({})
-
-  // The preview's object URL dies with the logo it showed.
-  useEffect(
-    () => () => {
-      if (logo?.url) URL.revokeObjectURL(logo.url)
-    },
-    [logo]
-  )
 
   const set = (patch: Partial<typeof form>) => {
     setForm(f => ({ ...f, ...patch }))
@@ -85,22 +77,6 @@ const WhitelabelCreate = () => {
 
       return next
     })
-  }
-
-  const pickLogo = (file: File | undefined) => {
-    if (!file) return
-    if (!LOGO_TYPES.includes(file.type)) return setErrors(e => ({ ...e, logo: 'PNG, WebP or SVG only' }))
-    if (file.size > MAX_LOGO) return setErrors(e => ({ ...e, logo: 'At most 256 KB' }))
-    const reader = new FileReader()
-
-    reader.onload = () => {
-      const data = String(reader.result).split(',')[1] ?? ''
-
-      setLogo({ type: file.type, data, url: URL.createObjectURL(file) })
-      setErrors(e => ({ ...e, logo: '' }))
-    }
-
-    reader.readAsDataURL(file)
   }
 
   const validate = () => {
@@ -138,6 +114,7 @@ const WhitelabelCreate = () => {
         template: theme.template,
         palette: theme.palette,
         ...(logo ? { logo: { type: logo.type, data: logo.data } } : {}),
+        ...(icon ? { icon: { type: icon.type, data: icon.data } } : {}),
         companyRoleName: form.companyRoleName.trim(),
         companyName: form.companyName.trim(),
         companyEmail: form.companyEmail.trim().toLowerCase(),
@@ -189,26 +166,24 @@ const WhitelabelCreate = () => {
         </div>
         {field('title', 'Page title (optional)', { maxLength: 70 })}
         <TextAreaField id='wl-description' label='Description (optional)' maxLength={300} value={form.description} onChange={e => set({ description: e.target.value })} />
-        <div className='grid gap-2'>
-          <span className='text-sm font-medium'>Logo (optional)</span>
-          <div className='flex flex-wrap items-center gap-3'>
-            {logo && (
-               
-              <img src={logo.url} alt='Logo preview' className='bg-muted h-10 max-w-40 rounded object-contain p-1' />
-            )}
-            <Button type='button' variant='outline' size='sm' nativeButton={false} render={<label />}>
-              <UploadIcon /> {logo ? 'Change logo' : 'Upload logo'}
-              <input type='file' accept={LOGO_TYPES.join(',')} className='hidden' onChange={e => pickLogo(e.target.files?.[0])} />
-            </Button>
-            {logo && (
-              <Button type='button' variant='ghost' size='sm' onClick={() => setLogo(null)}>
-                <XIcon /> Remove
-              </Button>
-            )}
-            <span className='text-muted-foreground text-xs'>PNG, WebP or SVG, at most 256 KB.</span>
-          </div>
-          {errors.logo && <span className='text-destructive text-sm'>{errors.logo}</span>}
+        <div className='grid gap-4 sm:grid-cols-2'>
+          <ImageField
+            label='Logo (optional)'
+            hint='PNG, WebP or SVG, at most 256 KB.'
+            value={logo}
+            onChange={setLogo}
+            onError={message => setErrors(e => ({ ...e, logo: message }))}
+          />
+          <ImageField
+            label='Icon (optional)'
+            hint='Square. Favicon and small icons; without one the logo is used.'
+            value={icon}
+            onChange={setIcon}
+            onError={message => setErrors(e => ({ ...e, icon: message }))}
+            square
+          />
         </div>
+        {(errors.logo || errors.icon) && <span className='text-destructive text-sm'>{errors.logo || errors.icon}</span>}
       </Section>
 
       <Section title='Domains' description='Point all three at this server (A record) before setup runs: it fetches the SSL certificates.'>

@@ -5,6 +5,7 @@ const { Router } = require('express');
 const { z, validate, noBody, response, asyncHandler, createRateLimiter, UnauthorizedError } = require('@ibitplay/common');
 
 const { WhitelabelLinkService, PALETTE_KEYS } = require('../whitelabelLink.service');
+const { brandingStore } = require('../../branding/branding.store');
 
 /** Constant-time, like the owner key (modules/owner). Unset secret = never matches. */
 function keyMatches(given, secret) {
@@ -33,6 +34,12 @@ const schemas = {
   },
   password: { body: z.object({ password: z.string().min(8).max(200) }).strict() },
   maintenance: { body: z.object({ on: z.boolean() }).strict() },
+  // The logo or the square mark (favicon), base64; the branding store checks the bytes.
+  branding: {
+    body: z
+      .object({ slot: z.enum(['logo', 'mark']), type: z.enum(['image/png', 'image/webp', 'image/svg+xml']), data: z.string().min(1).max(360_000) })
+      .strict(),
+  },
   // Every token, as #RRGGBB; null clears it.
   palette: {
     body: z
@@ -87,6 +94,15 @@ module.exports = function publicRoutes(deps) {
     '/company-password',
     validate(schemas.password),
     asyncHandler(async (req, res) => response.ok(res, await service.setCompanyPassword(req.body.password)))
+  );
+  router.put(
+    '/branding',
+    validate(schemas.branding),
+    asyncHandler(async (req, res) => {
+      const store = deps.brandingStore ?? brandingStore(deps);
+      const ownerBranding = deps.entitlementsStore?.current()?.branding ?? null;
+      return response.ok(res, await store.setSite(req.body.slot, Buffer.from(req.body.data, 'base64'), { staff: null, ownerBranding }));
+    })
   );
   router.put('/palette', validate(schemas.palette), asyncHandler(async (req, res) => response.ok(res, await service.setPalette(req.body.palette))));
   router.put('/maintenance', validate(schemas.maintenance), asyncHandler(async (req, res) => response.ok(res, await service.setMaintenance(req.body.on))));

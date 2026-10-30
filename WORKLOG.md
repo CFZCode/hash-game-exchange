@@ -15,6 +15,14 @@ Format:
 
 ---
 
+## 2026-10-30 — Whitelabel: icon / favicon, naam dikhna, INR coin
+**Kya kiya:** (1) Pehli test copy (wl-test) pe player site Parker567 ka logo dikha raha tha: setup ne `site_branding_meta.owner_meta` NULL likha, branding store ka rule hai ki Super Admin ka naam tabhi dikhe jab ye owner ke current meta ke barabar ho (koi owner doc nahi = `metaOf(null)`), isliye site "branded: false" padhi aur frontend ne Parker567 default dikhaya. Setup ab `metaOf(null)` likhta hai (test store ke `metaOf` se milata hai) aur saari META_KEYS. (2) Favicon / chhota icon = branding `mark` slot, jo setup bharta hi nahi tha: ab optional square Icon (create form + detail "Logo & icon"), na ho to logo hi mark. Detail se badlav live copy pe `PUT whitelabel-link/branding` (branding store setSite) se. Migration 165 (`whitelabels.icon`). (3) Copy USDT me thi (seed default): setup ab parent ka `default_currency` + `reward_currency` copy karta hai.
+**Kyun:** user screenshots: WL Test login pe Parker ka P icon, player site pe Parker567 logo + USDT.
+**Files / jagah:** scripts/whitelabel/steps.mjs (+ test), backend whitelabels/* + whitelabel-link routes, branding.store.js (META_KEYS, metaOf export), migration 165, admin views/whitelabels/{ImageField,WhitelabelCreate,WhitelabelDetail,types}.
+**Notes / pending:** wl-test purane code / data pe bani hai — use delete karke dobara banana hoga (ya uske DB me owner_meta + mark theek karke uska admin-svc restart). Hero "JOIN THE UNTAMED" art = banner slot; company apne admin → Content → Banners se apna hero daale, warna Parker567 ka built-in art dikhta hai.
+
+---
+
 ## 2026-10-30 — Whitelabel Phase 3: setup / delete script
 **Kya kiya:** `scripts/whitelabel/` — `lib.mjs` (naam, ports, Redis, env, Apache, pm2 file; pure), `steps.mjs` (create / remove, har asar `ctx` se), `worker.mjs` (queued jobs, pm2 `parker-whitelabel-worker`, ecosystem.config.cjs me joda). Flow aur har step: PROJECT-FLOW.md §3g.
 **Kyun:** user: "go ahead" (Phase 3).

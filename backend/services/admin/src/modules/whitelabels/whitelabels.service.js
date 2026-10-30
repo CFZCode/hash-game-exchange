@@ -22,6 +22,14 @@ const {
 const RETRY_AFTER_MS = 15_000;
 const EXT = { 'image/png': 'png', 'image/webp': 'webp', 'image/svg+xml': 'svg' };
 
+/** base64 → bytes, checked like any branding upload (`slot` sets the size limit); null when absent. */
+function decodeImage(input, slot) {
+  if (!input) return null;
+  const bytes = Buffer.from(input.data, 'base64');
+  if (imageProblem(bytes, `${slot}.${EXT[input.type]}`, slot)) throw slot === 'logo' ? errors.BAD_LOGO() : errors.BAD_ICON();
+  return bytes;
+}
+
 /** What the panel may see of a row: never the link key, the password hash or the logo bytes. */
 function view(r) {
   return {
@@ -36,6 +44,7 @@ function view(r) {
     template: r.template,
     palette: r.palette ?? null,
     hasLogo: Boolean(r.logo_type),
+    hasIcon: Boolean(r.icon_type),
     companyRoleName: r.company_role_name,
     companyName: r.company_name,
     companyEmail: r.company_email,
@@ -117,11 +126,8 @@ class WhitelabelsService {
     );
     if (clash) throw errors.TAKEN();
 
-    let logo = null;
-    if (input.logo) {
-      logo = Buffer.from(input.logo.data, 'base64');
-      if (imageProblem(logo, `logo.${EXT[input.logo.type]}`, 'logo')) throw errors.BAD_LOGO();
-    }
+    const logo = decodeImage(input.logo, 'logo');
+    const icon = decodeImage(input.icon, 'mark');
 
     const row = await this.db.transaction(async (transaction) => {
       let created;
@@ -129,9 +135,9 @@ class WhitelabelsService {
         [created] = await this.#q(
           `INSERT INTO whitelabels
              (slug, name, title, description, site_domain, admin_domain, api_domain, template, palette, logo, logo_type,
-              company_role_name, company_name, company_email, company_password_hash, link_key, created_by)
+              icon, icon_type, company_role_name, company_name, company_email, company_password_hash, link_key, created_by)
            VALUES (:slug, :name, :title, :description, :siteDomain, :adminDomain, :apiDomain, :template, CAST(:palette AS JSONB),
-              :logo, :logoType, :companyRoleName, :companyName, :companyEmail, :passwordHash, :linkKey, :actorId)
+              :logo, :logoType, :icon, :iconType, :companyRoleName, :companyName, :companyEmail, :passwordHash, :linkKey, :actorId)
            RETURNING *`,
           {
             ...input,
@@ -140,6 +146,8 @@ class WhitelabelsService {
             palette: input.palette ? JSON.stringify(input.palette) : null,
             logo,
             logoType: input.logo?.type ?? null,
+            icon,
+            iconType: input.icon?.type ?? null,
             passwordHash: await hashPassword(input.companyPassword, PASSWORD_ROUNDS),
             linkKey: this.secrets.seal(crypto.randomBytes(32).toString('hex')),
             actorId: actor.id,
@@ -205,10 +213,39 @@ class WhitelabelsService {
     };
   }
 
-  async logo(id) {
-    const [row] = await this.#q("SELECT logo, logo_type FROM whitelabels WHERE id = :id AND status <> 'deleted'", { id });
-    if (!row?.logo) throw errors.NOT_FOUND({ id });
-    return { data: row.logo, contentType: row.logo_type };
+  /** `which` = 'logo' | 'icon': the image the whitelabel was created or last updated with. */
+  async image(id, which) {
+    const column = which === 'icon' ? 'icon' : 'logo'; // a fixed name, never input
+    const [row] = await this.#q(`SELECT ${column} AS data, ${column}_type AS type FROM whitelabels WHERE id = :id AND status <> 'deleted'`, { id });
+    if (!row?.data || !row.type) throw errors.NOT_FOUND({ id });
+    return { data: row.data, contentType: row.type };
+  }
+
+  /**
+   * A new logo and / or icon. Kept here (a setup run again uses them) and, when live, put on the
+   * copy at once through its branding store (the icon is the copy's "mark" slot: favicon and the
+   * small icons). A copy with no icon of its own shows the logo there too, so a new logo also
+   * goes to the mark slot then.
+   */
+  async setBranding(id, { logo, icon }) {
+    const row = await this.#row(id);
+    if (['creating', 'deleting'].includes(row.status)) throw errors.BUSY({ status: row.status });
+    const logoBytes = decodeImage(logo, 'logo');
+    const iconBytes = decodeImage(icon, 'mark');
+
+    if (row.status === 'live') {
+      if (logo) await this.link(row, 'PUT', '/branding', { slot: 'logo', type: logo.type, data: logo.data });
+      const mark = icon ?? (logo && !row.icon_type ? logo : null);
+      if (mark) await this.link(row, 'PUT', '/branding', { slot: 'mark', type: mark.type, data: mark.data });
+    }
+    await this.#q(
+      `UPDATE whitelabels
+          SET logo = COALESCE(:logo, logo), logo_type = COALESCE(:logoType, logo_type),
+              icon = COALESCE(:icon, icon), icon_type = COALESCE(:iconType, icon_type), updated_at = NOW()
+        WHERE id = :id RETURNING id`,
+      { id, logo: logoBytes, logoType: logo?.type ?? null, icon: iconBytes, iconType: icon?.type ?? null }
+    );
+    return view(await this.#row(id));
   }
 
   // ══════════════════════════════════════════════════════════════════════

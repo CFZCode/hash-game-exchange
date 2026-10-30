@@ -2,7 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 
-import { createWhitelabel, removeWhitelabel } from '../steps.mjs';
+import { createRequire } from 'node:module';
+
+import { NO_OWNER_META, createWhitelabel, removeWhitelabel } from '../steps.mjs';
+
+const { metaOf } = createRequire(import.meta.url)('../../../backend/services/admin/src/modules/branding/branding.store.js');
 import { parseEnv } from '../lib.mjs';
 
 /**
@@ -87,6 +91,7 @@ function machine({ dns = SERVER_IP, files = {}, pm2 = [], dbExists = false } = {
       query: async (sql, params) => {
         parentQueries.push({ sql, params });
         if (/FROM exchangerate/.test(sql)) return [{ currency: 'USDT', usd_rate: '1.0' }, { currency: 'INR', usd_rate: '0.012' }];
+        if (/FROM site_features/.test(sql)) return [{ feature: 'default_currency', enabled: true, variant: 'INR' }, { feature: 'reward_currency', enabled: true, variant: 'INR' }];
         return [];
       },
     },
@@ -161,8 +166,18 @@ test('create: the whole sequence, in order, with nothing secret on a command lin
   assert.match(copySql, /UPDATE roles SET name = \$1 WHERE level = 1/);
   assert.ok(m.copyQueries.some((q) => /UPDATE staff SET name/.test(q.sql) && q.params[3] === wl.company_password_hash));
   assert.ok(m.copyQueries.some((q) => /INSERT INTO exchangerate/.test(q.sql) && q.params[0] === 'USDT'), 'a missing rate is added');
+  assert.deepEqual(
+    m.copyQueries.filter((q) => /INSERT INTO site_features/.test(q.sql)).map((q) => q.params),
+    [['default_currency', true, 'INR'], ['reward_currency', true, 'INR']],
+    'the admin reports in the parent’s coin'
+  );
   assert.match(copySql, /INSERT INTO owner_branding_assets/);
-  assert.match(copySql, /INSERT INTO site_branding_meta/);
+  const slots = m.copyQueries.filter((q) => /INSERT INTO site_branding \(slot/.test(q.sql)).map((q) => q.params[0]);
+  assert.deepEqual(slots, ['logo', 'mark'], 'no icon given: the logo is the favicon / mark too');
+  const metaRow = m.copyQueries.find((q) => /INSERT INTO site_branding_meta/.test(q.sql));
+  assert.equal(metaRow.params[1], metaOf(null), 'the name shows: the copy has no owner document');
+  assert.equal(NO_OWNER_META, metaOf(null));
+  assert.equal(JSON.parse(metaRow.params[0]).siteName, 'Lucky Play');
 
   // Ports recorded first, then live with the admin port.
   assert.match(m.parentQueries[1].sql, /UPDATE whitelabels SET ports/);

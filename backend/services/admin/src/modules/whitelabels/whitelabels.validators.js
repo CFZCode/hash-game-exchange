@@ -33,6 +33,8 @@ const palette = z
   .object(Object.fromEntries(PALETTE_KEYS.map((k) => [k, z.string().regex(/^#[0-9a-fA-F]{6}$/, 'must be #RRGGBB')])))
   .strict();
 
+const image = z.object({ type: z.enum(['image/png', 'image/webp', 'image/svg+xml']), data: z.string().max(360_000) }).strict();
+
 const amount = z
   .string()
   .trim()
@@ -52,10 +54,9 @@ const create = {
       template: z.enum(featureCatalogue.TEMPLATE_KEYS),
       palette: palette.nullable().optional(),
       // base64 of the file; checked byte by byte in the service (branding.rules imageProblem).
-      logo: z
-        .object({ type: z.enum(['image/png', 'image/webp', 'image/svg+xml']), data: z.string().max(360_000) })
-        .strict()
-        .optional(),
+      logo: image.optional(),
+      // The square mark: favicon and small icons. Absent = the logo is used.
+      icon: image.optional(),
       companyRoleName: text(40).pipe(z.string().min(2, 'hierarchy name must be at least 2 characters')),
       companyName: text(80).pipe(z.string().min(2, 'company name must be at least 2 characters')),
       companyEmail: z.string().trim().toLowerCase().email().max(190),
@@ -84,6 +85,13 @@ module.exports = {
   password: { ...params, body: z.object({ password }).strict() },
   maintenance: { ...params, body: z.object({ on: z.boolean() }).strict() },
   palette: { ...params, body: z.object({ palette: palette.nullable() }).strict() },
+  branding: {
+    ...params,
+    body: z
+      .object({ logo: image.optional(), icon: image.optional() })
+      .strict()
+      .refine((b) => b.logo || b.icon, 'send a logo, an icon or both'),
+  },
   remove: {
     ...params,
     body: z.object({ confirmName: z.string().trim().max(60), acknowledgeBalances: z.boolean().optional() }).strict(),

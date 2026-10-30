@@ -23,6 +23,7 @@ import { api } from '@/lib/api/client'
 import { check } from '@/lib/validate'
 import { TxnPasswordLabel } from '@/views/finance/StaffFloat'
 
+import ImageField, { type PickedImage } from './ImageField'
 import PaletteEditor, { paletteError, type ThemeValue } from './PaletteEditor'
 import type { WhitelabelDetail as Detail, WhitelabelTransfer } from './types'
 
@@ -171,6 +172,46 @@ const DeleteWhitelabel = ({ wl }: { wl: Detail }) => {
       )}
       <TextField id='wl-del-name' label={`Type “${wl.name}” to confirm`} required value={name} onChange={e => setName(e.target.value)} />
     </FormDialog>
+  )
+}
+
+const BrandImages = ({ wl, invalidate }: { wl: Detail; invalidate: string[][] }) => {
+  const [logo, setLogo] = useState<PickedImage | null>(null)
+  const [icon, setIcon] = useState<PickedImage | null>(null)
+  const [error, setError] = useState('')
+  const stored = (which: 'logo' | 'icon') => `/api/gw/api/v1/admin/whitelabels/${wl.id}/${which}?v=${encodeURIComponent(wl.updatedAt)}`
+
+  const save = useApiMutation({
+    fn: () =>
+      api.put(`admin/whitelabels/${wl.id}/branding`, {
+        ...(logo ? { logo: { type: logo.type, data: logo.data } } : {}),
+        ...(icon ? { icon: { type: icon.type, data: icon.data } } : {})
+      }),
+    invalidate,
+    success: wl.status === 'live' ? 'Saved — the whitelabel shows it on its next page load' : 'Saved for the setup',
+    onSuccess: () => {
+      setLogo(null)
+      setIcon(null)
+    }
+  })
+
+  return (
+    <Card>
+      <CardHeader className='flex flex-row items-start justify-between gap-4'>
+        <div>
+          <CardTitle>Logo & icon</CardTitle>
+          <CardDescription>The icon is the favicon and the small icon in both panels; without one the logo is used.</CardDescription>
+        </div>
+        <Button size='sm' disabled={save.isPending || (!logo && !icon)} onClick={() => save.mutate()}>
+          {save.isPending && <Loader2Icon className='animate-spin' />} Save images
+        </Button>
+      </CardHeader>
+      <CardContent className='grid gap-4 sm:grid-cols-2'>
+        <ImageField label='Logo' hint='PNG, WebP or SVG, at most 256 KB.' value={logo} onChange={setLogo} onError={setError} current={wl.hasLogo ? stored('logo') : null} />
+        <ImageField label='Icon' hint='Square, at most 256 KB.' value={icon} onChange={setIcon} onError={setError} current={wl.hasIcon ? stored('icon') : null} square />
+        {error && <span className='text-destructive text-sm sm:col-span-2'>{error}</span>}
+      </CardContent>
+    </Card>
   )
 }
 
@@ -375,6 +416,7 @@ const WhitelabelDetail = ({ id }: { id: string }) => {
         </Card>
       )}
 
+      {!['creating', 'deleting'].includes(wl.status) && <BrandImages wl={wl} invalidate={invalidate} />}
       {wl.status !== 'deleting' && <Colours key={wl.updatedAt} wl={wl} invalidate={invalidate} />}
     </div>
   )

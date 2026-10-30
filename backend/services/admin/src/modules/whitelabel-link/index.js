@@ -15,6 +15,7 @@
  *   POST /company-password   { password } → reset; every company session ends
  *   PUT  /maintenance        { on }
  *   PUT  /palette            { palette: { bg, s1 … lo } | null }
+ *   PUT  /branding           { slot: logo|mark, type, data(base64) } — the Super Admin's image slots
  *   POST /preview            → { code } for /preview?code= on this site's admin
  */
 module.exports = {
