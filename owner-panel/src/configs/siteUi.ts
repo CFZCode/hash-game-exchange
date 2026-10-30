@@ -44,7 +44,7 @@ export const SITE_UI: Record<string, UiSupport> = {
   tips: { status: 'absent', why: 'No tip-sending screen in this UI.' },
   chat: { status: 'absent', why: 'Chat is socket-only and this UI has no socket client.' },
   club_membership: { status: 'absent', why: 'No club screens in this UI.' },
-  push_notifications: { status: 'absent', why: 'This UI does not load a push SDK.' },
+  push_notifications: { status: 'toggle', variant: 'onesignal', surfaces: 'browser push (frontend/src/services/onesignal.js), site admin Push notifications' },
   analytics: { status: 'absent', why: 'This UI does not load a Google tag.' }
 }
 

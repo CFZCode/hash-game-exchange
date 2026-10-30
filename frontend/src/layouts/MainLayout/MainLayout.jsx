@@ -8,6 +8,7 @@ import Footer from './Footer';
 import Explore from '../../components/Explore';
 import RightDrawer from '../../components/RightDrawer';
 import ToastLayer from '../../components/shared/Toast';
+import PushPrompt from '../../components/PushPrompt';
 import './MainLayout.css';
 
 /* The width at or above which the sidebar shows its labels. Also `openRight`'s own test, because
@@ -166,6 +167,7 @@ export default function MainLayout({ children }) {
           queue is a module store, so anything can raise one without this component's existence
           being a prop somebody has to thread. */}
       <ToastLayer />
+      <PushPrompt />
     </div>
   );
 }

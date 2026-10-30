@@ -74,6 +74,17 @@ export function initPush({ apiBase } = {}) {
           allowLocalhostAsSecureOrigin: location.hostname === 'localhost' || location.hostname === '127.0.0.1',
           serviceWorkerPath: 'OneSignalSDKWorker.js',
         });
+        // Our chime only while the site is open: a closed site gets the OS's own sound, browsers allow no custom one.
+        const chime = new Audio('/sounds/notify.mp3');
+        // The site admin's sound (Push → Prompt & settings), if one is set: an upload path on the API, or an https URL.
+        fetchSharedJson('/api/v1/admin/push/prompt', { base: trim(apiBase) }).then((p) => {
+          const url = p?.data?.soundUrl;
+          if (url) chime.src = url.startsWith('/api/') ? trim(apiBase) + url : url;
+        });
+        OneSignal.Notifications.addEventListener('foregroundWillDisplay', () => {
+          chime.currentTime = 0;
+          chime.play().catch(() => {}); // blocked until the player has clicked the page once
+        });
         if (pendingUser) await OneSignal.login(pendingUser);
       });
       return true;

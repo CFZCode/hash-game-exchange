@@ -33,7 +33,7 @@ export const SITE_UI: Record<string, UiSupport> = {
   p2p: { status: 'absent', why: 'No P2P trading screen in this UI.' },
   chat: { status: 'absent', why: 'Chat is socket-only and this UI has no socket client.' },
   club_membership: { status: 'absent', why: 'No club screens in this UI.' },
-  push_notifications: { status: 'absent', why: 'This UI does not load a push SDK.' },
+  push_notifications: { status: 'toggle', variant: 'onesignal', surfaces: 'browser push notifications, sent from the Push notifications pages' },
   analytics: { status: 'absent', why: 'This UI does not load a Google tag.' },
   blog: { status: 'absent', why: "This UI's Blog row is a link to an off-site blog; there is no blog page." }
 }

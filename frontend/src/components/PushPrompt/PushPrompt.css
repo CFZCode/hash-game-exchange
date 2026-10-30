@@ -1,0 +1,5 @@
+/* OneSignal's own slide prompt (its dashboard "Push slide prompt") sits exactly where ours does and
+   draws over it; ours is the only ask on this site, so theirs never shows even if the dashboard keeps it. */
+#onesignal-slidedown-container {
+  display: none !important;
+}
