@@ -36,15 +36,13 @@ export function cleanBranding(data) {
     const v = data[key];
     out[key] = typeof v === 'string' && ASSET_PATH_RE.test(v) ? v : null;
   }
-  // The floating WhatsApp button: a number, or an https link on WhatsApp's own hosts.
-  const wa = data.whatsapp && typeof data.whatsapp === 'object' ? data.whatsapp : {};
-  const link = typeof wa.link === 'string' ? wa.link.trim() : '';
-  const message = typeof wa.message === 'string' ? wa.message.trim() : '';
-  out.whatsapp = {
-    enabled: wa.enabled === true,
-    link: /^\+?\d{6,15}$/.test(link) || /^https:\/\/(wa\.me|([a-z0-9-]+\.)*whatsapp\.com)\//i.test(link) ? link : null,
-    message: message && message.length <= 300 && !badText(message) ? message : null,
-  };
+  // The floating chat buttons: the backend sends the href it built (https, on the app's own hosts).
+  const hosts = { whatsapp: /^https:\/\/(wa\.me|([a-z0-9-]+\.)*whatsapp\.com)\//i, telegram: /^https:\/\/(t|telegram)\.me\//i };
+  for (const [kind, re] of Object.entries(hosts)) {
+    const c = data[kind] && typeof data[kind] === 'object' ? data[kind] : {};
+    const link = typeof c.link === 'string' ? c.link.trim() : '';
+    out[kind] = { enabled: c.enabled === true, link: re.test(link) ? link : null };
+  }
   return out;
 }
 

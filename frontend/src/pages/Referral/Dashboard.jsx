@@ -354,7 +354,7 @@ export default function ReferralDashboard() {
   const active = TABS.some((t) => t.id === section) ? section : 'referral';
   const { paneClass } = TABS.find((t) => t.id === active);
   const { program, faq, live } = data;
-  const amount = cur.show(REFERRAL_AMOUNT, 'USDFIAT');
+  const amount = cur.show(Number(dashboardInfo?.dashboard?.perFriendUsd) || REFERRAL_AMOUNT, 'USDFIAT');
 
   const onAction = (target) => navigate(target === 'dashboard' ? '/referral' : target);
 

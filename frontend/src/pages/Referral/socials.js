@@ -21,7 +21,7 @@ const socialArt = globMaps.socialArt;
 
 /* Order and `icon` index are `ox`'s own; `url` is its base, which the original appends an
    encoded invite URL to. */
-export const SOCIALS = [
+const ALL_SOCIALS = [
   { name: 'Facebook', file: 'facebook', icon: 3, url: 'https://www.facebook.com/sharer/sharer.php?u=' },
   { name: 'X', file: 'x', icon: 8, url: 'https://x.com/share?url=' },
   { name: 'Telegram', file: 'telegram', icon: 7, url: 'https://t.me/share?url=' },
@@ -32,5 +32,8 @@ export const SOCIALS = [
   { name: 'Linkedin', file: 'linkedin', icon: 16, url: 'https://www.linkedin.com/sharing/share-offsite/?url=' },
   { name: 'Whatsapp', file: 'whatsapp', icon: 17, url: 'https://wa.me/?text=' },
 ];
+
+/* THIS BUILD'S: the invite card shares to WhatsApp and Telegram only (user's request, 2026-11-01). */
+export const SOCIALS = ALL_SOCIALS.filter((s) => s.file === 'whatsapp' || s.file === 'telegram');
 
 export const socialIcon = (file) => socialArt[`../../assets/referral/socials/${file}.png`];

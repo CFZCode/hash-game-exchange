@@ -178,6 +178,8 @@ export const getAffiliateDashboard = ({ reloads } = {}) => {
           /* hash.game's "Locked Rewards": friends' referral steps not unlocked yet (USD), from
              `GET /user/affiliate` → `lockedRewards`. `ratio`/`maxRatio`/`todayWagerUsd` keep zeros. */
           remainingRewardUsd: String(num(info?.lockedRewards?.lockedUsd)),
+          /* The invite headline: the admin's referral steps summed (USD); 0 = not answered, the page keeps its default. */
+          perFriendUsd: String(num(info?.lockedRewards?.perFriendUsd)),
         },
         /* Rewards Activities: one Commission Rewards line per credited commission, newest first. */
         topCommissions: (earned?.rows ?? []).map((row) => ({ commissionUsd: String(num(row.amount)) })),
