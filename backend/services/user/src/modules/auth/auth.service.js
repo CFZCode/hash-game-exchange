@@ -697,6 +697,8 @@ class AuthService {
       }
       await this.region.assertAllowed(context.ip);
       const user = await this.#googleUser(identity, context);
+      // Google is for the site's own (B2C) players: an agent's player signs in with what the agent gave them.
+      if (await isAgentPlayer(user.id)) throw errors.GOOGLE_SIGNIN_FAILED();
       await this.#assertUsable(user);
       const oneTime = randomToken(32);
       // Hashed with the starting tab's nonce: only the browser that began this flow can redeem it.
