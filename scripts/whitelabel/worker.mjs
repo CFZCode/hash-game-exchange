@@ -7,9 +7,9 @@
  *   node scripts/whitelabel/worker.mjs          keep running (pm2: parker-whitelabel-worker)
  *   node scripts/whitelabel/worker.mjs --once   run the next queued job, if any, then exit
  *
- * Runs as root (it writes Apache sites, runs certbot, pm2, sudo -u postgres). It reads the
+ * Runs as root (it writes nginx sites, runs certbot, pm2, sudo -u postgres). It reads the
  * parent's backend/.env for its own database and secret box, and NEVER passes that environment
- * to what it runs: every command gets PATH / HOME / LANG only, so a copy's migrations and builds
+ * to what it runs: every command gets PATH / HOME / LANG only (plus REDISCLI_AUTH for redis-cli), so a copy's migrations and builds
  * read the copy's own files and can never reach the parent's database.
  */
 import { spawn, execFileSync } from 'node:child_process';
@@ -53,10 +53,10 @@ function serverIp() {
 const tail = (text, n = 3_000) => (text.length > n ? `…${text.slice(-n)}` : text);
 
 /** A program with arguments (no shell), its output collected; a failure carries the output's tail. */
-function run(cmd, args, { cwd = ROOT, input, allowFail = false, timeoutMs = COMMAND_TIMEOUT_MS } = {}, log = () => {}) {
+function run(cmd, args, { cwd = ROOT, input, env = {}, allowFail = false, timeoutMs = COMMAND_TIMEOUT_MS } = {}, log = () => {}) {
   log(`$ ${cmd} ${args.join(' ')}${cwd !== ROOT ? `   (in ${cwd})` : ''}`);
   return new Promise((resolve, reject) => {
-    const child = spawn(cmd, args, { cwd, env: childEnv(), stdio: ['pipe', 'pipe', 'pipe'] });
+    const child = spawn(cmd, args, { cwd, env: { ...childEnv(), ...env }, stdio: ['pipe', 'pipe', 'pipe'] });
     let stdout = '';
     let stderr = '';
     let tooBig = false;

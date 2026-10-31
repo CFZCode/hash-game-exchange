@@ -1,6 +1,6 @@
 /**
  * Pure helpers for the whitelabel setup script (worker.mjs / steps.mjs): names, ports, Redis
- * databases, env files, Apache sites and the pm2 file of one copy. Nothing here touches the
+ * databases, env files, nginx sites and the pm2 file of one copy. Nothing here touches the
  * machine, so all of it is unit-tested (__tests__/lib.test.mjs).
  */
 import crypto from 'node:crypto';
@@ -186,15 +186,23 @@ export function copyEnv({ wl, slug, ports, redisDb, parentEnv, parentFrontendEnv
   const api = `https://${wl.api_domain}`;
   const dbName = dbNameOf(slug);
   const origins = [site, admin].join(',');
+  const redis = redisOf(parentEnv);
 
   const backend = {
     ...sharedFromParent(parentEnv),
     ...Object.fromEntries(BLANK_ON_COPY.map((k) => [k, ''])),
+    // Staff 2FA off on copies (the owner's choice): no level has to enrol an authenticator.
+    STAFF_2FA_REQUIRED_LEVEL: '0',
     NODE_ENV: 'production',
     DB_NAME: dbName,
     DB_USER: dbName,
     DB_PASSWORD: secrets.dbPassword,
+    // The parent's Redis server (its password too), the copy's own database on it.
+    REDIS_HOST: redis.host,
+    REDIS_PORT: String(redis.port),
+    REDIS_PASSWORD: redis.password,
     REDIS_DB: String(redisDb),
+    REDIS_URL: redisUrl(redis, redisDb),
     REDIS_PREFIX: slug,
     CORS_ORIGIN: origins,
     SOCKET_ALLOWED_ORIGINS: origins,
@@ -323,41 +331,97 @@ module.exports = {
 `;
 }
 
-// ── Apache ────────────────────────────────────────────────────────────────
+// ── nginx ─────────────────────────────────────────────────────────────────
+
+export const SITES_AVAILABLE = '/etc/nginx/sites-available';
+export const SITES_ENABLED = '/etc/nginx/sites-enabled';
+/** certbot --webroot's folder; port 80 serves the challenge from here (the parent's pattern). */
+export const ACME_ROOT = '/var/www/certbot';
+export const OUR_VHOST = '# Whitelabel copy — written by scripts/whitelabel.';
+
+const PROXY = [
+  'proxy_http_version 1.1;',
+  'proxy_set_header Upgrade $http_upgrade;',
+  'proxy_set_header Connection "upgrade";',
+  'proxy_set_header Host $host;',
+  'proxy_set_header X-Real-IP $remote_addr;',
+  'proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;',
+  'proxy_set_header X-Forwarded-Proto https;',
+  'proxy_set_header X-Forwarded-Host $host;',
+  'proxy_read_timeout 120s;',
+];
 
 /**
- * The three port-80 sites, the parent's pattern (certbot adds the -le-ssl twin and the redirect).
- * `routes` = [[path, port]], longest first; a WebSocket upgrade goes to the last (the `/` one).
+ * One domain's nginx site. Without `ssl`: port 80 only (the ACME challenge, the rest redirected),
+ * enough for certbot's first certificate. With `ssl`: plus the 443 server on that certificate.
+ * `routes` = [[path, port]]; every location carries the WebSocket upgrade headers.
  */
-function vhost(domain, routes) {
-  const [, rootPort] = routes[routes.length - 1];
-  const proxies = routes
-    .map(([p, port]) => `    ProxyPass        ${p} http://127.0.0.1:${port}${p} keepalive=On timeout=120\n    ProxyPassReverse ${p} http://127.0.0.1:${port}${p}`)
+function vhost(domain, routes, { ssl, extra = [] }) {
+  assertDomain(domain);
+  const http = `server {
+    listen 80;
+    listen [::]:80;
+    server_name ${domain};
+    location /.well-known/acme-challenge/ { root ${ACME_ROOT}; }
+    location / { return 301 https://$host$request_uri; }
+}
+`;
+  if (!ssl) return `${OUR_VHOST}\n${http}`;
+  const locations = routes
+    .map(([p, port]) => `    location ${p} {\n        proxy_pass http://127.0.0.1:${port};\n${PROXY.map((l) => `        ${l}`).join('\n')}\n    }`)
     .join('\n');
-  return `# Whitelabel copy — written by scripts/whitelabel.
-<VirtualHost *:80>
-    ServerName ${assertDomain(domain)}
-    RewriteEngine On
-    ProxyPreserveHost On
-    ProxyRequests Off
-    RequestHeader set X-Forwarded-Proto "http"
-    ProxyPass /.well-known !
-    RewriteCond %{HTTP:Upgrade} =websocket [NC]
-    RewriteRule ^/(.*) ws://127.0.0.1:${rootPort}/$1 [P,L]
-${proxies}
-    ErrorLog \${APACHE_LOG_DIR}/${domain}-error.log
-    CustomLog \${APACHE_LOG_DIR}/${domain}-access.log combined
-</VirtualHost>
+  return `${OUR_VHOST}
+${http}
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name ${domain};
+    ssl_certificate     /etc/letsencrypt/live/${domain}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${domain}/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers off;
+    ssl_session_timeout 1d;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Content-Type-Options nosniff always;
+    add_header Referrer-Policy strict-origin-when-cross-origin always;
+${extra.map((l) => `    ${l}`).join('\n')}${extra.length ? '\n' : ''}    client_max_body_size 20m;
+
+${locations}
+}
 `;
 }
 
-export function vhosts(wl, ports) {
+export function vhosts(wl, ports, { ssl = true } = {}) {
   return {
-    [wl.site_domain]: vhost(wl.site_domain, [['/', ports.frontend]]),
-    [wl.admin_domain]: vhost(wl.admin_domain, [['/owner', ports.ownerPanel], ['/', ports.siteAdmin]]),
-    [wl.api_domain]: vhost(wl.api_domain, [['/', ports.gateway]]),
+    [wl.site_domain]: vhost(wl.site_domain, [['/', ports.frontend]], { ssl }),
+    [wl.admin_domain]: vhost(wl.admin_domain, [['/owner', ports.ownerPanel], ['/', ports.siteAdmin]], {
+      ssl,
+      // The owner's first sign-in link, as on the parent's admin domain.
+      extra: ['add_header X-Frame-Options SAMEORIGIN always;', 'location = /owner-first-login { return 301 https://$host/owner/login; }'],
+    }),
+    [wl.api_domain]: vhost(wl.api_domain, [['/', ports.gateway]], { ssl }),
   };
 }
 
-export const SITES_AVAILABLE = '/etc/apache2/sites-available';
-export const vhostFiles = (domain) => [`${assertDomain(domain)}.conf`, `${domain}-le-ssl.conf`].map((f) => path.join(SITES_AVAILABLE, f));
+/** [the site file, its sites-enabled link]. */
+export const vhostFiles = (domain) => [path.join(SITES_AVAILABLE, `wl-${assertDomain(domain)}`), path.join(SITES_ENABLED, `wl-${domain}`)];
+
+/** `nginx -t` output → the problem with one of `domains`, if any (a duplicate server_name is only a warning there). */
+export function nginxConflict(output, domains) {
+  for (const domain of domains) {
+    if (String(output).includes(`conflicting server name "${domain}"`)) return `another nginx site already serves ${domain}`;
+  }
+  return null;
+}
+
+// ── Redis server ──────────────────────────────────────────────────────────
+
+/** The parent's Redis server (this machine's other sites may run their own): the copies share it, one database each. */
+export const redisOf = (parentEnv) => ({
+  host: parentEnv.REDIS_HOST || '127.0.0.1',
+  port: Number(parentEnv.REDIS_PORT || 6379),
+  password: parentEnv.REDIS_PASSWORD || '',
+});
+
+export const redisUrl = ({ host, port, password }, db) => `redis://${password ? `:${encodeURIComponent(password)}@` : ''}${host}:${port}/${db}`;

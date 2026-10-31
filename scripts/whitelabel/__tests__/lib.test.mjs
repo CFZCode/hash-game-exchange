@@ -15,7 +15,9 @@ import {
   redisDbsWithKeys,
   sharedFromParent,
   targetDirOf,
+  vhostFiles,
   vhosts,
+  nginxConflict,
 } from '../lib.mjs';
 
 test('names come only from a safe slug', () => {
@@ -69,6 +71,7 @@ test('a copy takes the shared feed and limits from the parent, never its secrets
   assert.equal(env.backend.WHITELABEL_LINK_KEY, 'link');
   assert.equal(env.backend.DB_NAME, 'wl_lucky');
   assert.equal(env.backend.REDIS_DB, '8');
+  assert.equal(env.backend.REDIS_URL, 'redis://127.0.0.1:6379/8', 'no Redis settings on the parent: the local default');
   assert.equal(env.backend.CORS_ORIGIN, 'https://lucky.com,https://admin.lucky.com');
   assert.equal(env.backend.JSGAMES_CALLBACK_URL, 'https://api.lucky.com/api/v1/casino/js-games/v2/bet-callback');
   assert.equal(env.backend.TELEGRAM_BOT_TOKEN, '', 'blanked even if .env.example ships one');
@@ -78,14 +81,21 @@ test('a copy takes the shared feed and limits from the parent, never its secrets
   assert.equal(env.siteAdmin.NEXT_PUBLIC_WHITELABEL_MODE, 'true');
 });
 
-test('Apache sites and pm2 file follow the parent pattern on the copy ports', () => {
+test('nginx sites and pm2 file follow the parent pattern on the copy ports', () => {
   const wl = { site_domain: 'lucky.com', admin_domain: 'admin.lucky.com', api_domain: 'api.lucky.com' };
   const confs = vhosts(wl, portsFrom(6100));
-  assert.match(confs['lucky.com'], /ProxyPass {8}\/ http:\/\/127\.0\.0\.1:6109\/ /);
-  assert.match(confs['admin.lucky.com'], /ProxyPass {8}\/owner http:\/\/127\.0\.0\.1:6108\/owner /);
-  assert.match(confs['admin.lucky.com'], /ws:\/\/127\.0\.0\.1:6107\//);
-  assert.match(confs['api.lucky.com'], /ws:\/\/127\.0\.0\.1:6100\//);
-  assert.throws(() => vhosts({ ...wl, site_domain: 'evil.com\nInclude /etc/passwd' }, portsFrom(6100)), /unsafe domain/);
+  assert.match(confs['lucky.com'], /location \/ \{\n {8}proxy_pass http:\/\/127\.0\.0\.1:6109;/);
+  assert.match(confs['admin.lucky.com'], /location \/owner \{\n {8}proxy_pass http:\/\/127\.0\.0\.1:6108;/);
+  assert.match(confs['admin.lucky.com'], /location \/ \{\n {8}proxy_pass http:\/\/127\.0\.0\.1:6107;/);
+  assert.match(confs['api.lucky.com'], /proxy_pass http:\/\/127\.0\.0\.1:6100;\n {8}proxy_http_version 1\.1;\n {8}proxy_set_header Upgrade/, 'socket.io upgrades');
+  assert.match(confs['api.lucky.com'], /ssl_certificate {5}\/etc\/letsencrypt\/live\/api\.lucky\.com\/fullchain\.pem;/);
+  const plain = vhosts(wl, portsFrom(6100), { ssl: false });
+  assert.doesNotMatch(plain['lucky.com'], /443|ssl_certificate/, 'before the certificate: port 80 only');
+  assert.match(plain['lucky.com'], /location \/\.well-known\/acme-challenge\/ \{ root \/var\/www\/certbot; \}/);
+  assert.throws(() => vhosts({ ...wl, site_domain: 'evil.com;\ninclude /etc/passwd' }, portsFrom(6100)), /unsafe domain/);
+  assert.deepEqual(vhostFiles('lucky.com'), ['/etc/nginx/sites-available/wl-lucky.com', '/etc/nginx/sites-enabled/wl-lucky.com']);
+  assert.equal(nginxConflict('nginx: [warn] conflicting server name "admin.lucky.com" on 0.0.0.0:80, ignored', ['lucky.com', 'admin.lucky.com']), 'another nginx site already serves admin.lucky.com');
+  assert.equal(nginxConflict('nginx: [warn] conflicting server name "parker567.com" on 0.0.0.0:80, ignored', ['lucky.com']), null);
 
   const eco = ecosystem({ slug: 'lucky', ports: portsFrom(6100) });
   assert.match(eco, /name: `lucky-\$\{name\}`/);

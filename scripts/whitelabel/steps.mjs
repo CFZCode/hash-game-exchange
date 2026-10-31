@@ -22,8 +22,10 @@ import crypto from 'node:crypto';
 import path from 'node:path';
 
 import {
+  ACME_ROOT,
   ARCHIVE_DIR,
   MARKER,
+  OUR_VHOST,
   REDIS_FIRST_DB,
   WHITELABEL_ROOT,
   assertDomain,
@@ -32,12 +34,14 @@ import {
   dbNameOf,
   ecosystem,
   listeningPorts,
+  nginxConflict,
   patchEnv,
   pickPortBase,
   pickRedisDb,
   portsFrom,
   redisDbsNamed,
   redisDbsWithKeys,
+  redisOf,
   stackConfig,
   targetDirOf,
   vhostFiles,
@@ -46,7 +50,6 @@ import {
 
 const APPS = ['backend', 'admin', 'owner-panel', 'frontend'];
 const BUILT = ['admin', 'owner-panel', 'frontend'];
-const OUR_VHOST = '# Whitelabel copy — written by scripts/whitelabel.';
 
 /**
  * branding.store.js `metaOf(null)`: the Super Admin's name and title show only while
@@ -63,6 +66,37 @@ const psql = (ctx, sql, { db = 'postgres', allowFail = false } = {}) =>
   ctx.run('sudo', ['-u', 'postgres', 'psql', '-v', 'ON_ERROR_STOP=1', '-q', '-d', db], { input: sql, allowFail });
 
 // `dbName` is slug-derived (lower-case letters, digits, _), so it is safe inside the literal.
+/** redis-cli on the parent's Redis server; the password goes in the environment, never on the command line. */
+async function redisCli(ctx, args) {
+  const { host, port, password } = redisOf(ctx.parentEnv);
+  const out = await ctx.run('redis-cli', ['-h', host, '-p', String(port), ...args], { env: password ? { REDISCLI_AUTH: password } : {} });
+  if (/^(NOAUTH|WRONGPASS|ERR)\b/m.test(out.stdout)) throw new Error(`redis-cli ${args.join(' ')}: ${out.stdout.trim()}`);
+  return out;
+}
+
+/**
+ * Writes (or rewrites) the domains' nginx sites and links them, then `nginx -t` and a reload. If
+ * the test fails, or another site already serves one of the domains, this whitelabel's files come
+ * out again before anything is reloaded — a bad file must never stay where the next reload of
+ * ANY site on this machine would trip over it.
+ */
+async function writeSites(ctx, confs) {
+  const written = [];
+  for (const [domain, conf] of Object.entries(confs)) {
+    const [file, link] = vhostFiles(domain);
+    await ctx.fs.write(file, conf, 0o644);
+    written.push(domain);
+    await ctx.run('ln', ['-sfn', file, link]);
+  }
+  const test = await ctx.run('nginx', ['-t'], { allowFail: true });
+  const problem = test.code !== 0 ? `nginx -t failed:\n${`${test.stderr}\n${test.stdout}`.trim()}` : nginxConflict(test.stderr, written);
+  if (problem) {
+    for (const domain of written) for (const f of [...vhostFiles(domain)].reverse()) await ctx.fs.rm(f);
+    throw new Error(`${problem} — this whitelabel's nginx files were taken out again`);
+  }
+  await ctx.run('systemctl', ['reload', 'nginx']);
+}
+
 const databaseExists = async (ctx, dbName) =>
   (await ctx.run('sudo', ['-u', 'postgres', 'psql', '-Atqc', `SELECT 1 FROM pg_database WHERE datname = '${dbName}'`])).stdout.trim() === '1';
 
@@ -116,7 +150,7 @@ export async function createWhitelabel(ctx, wl) {
   const envTexts = [];
   for (const file of await ctx.envFiles()) envTexts.push(await ctx.fs.read(file).catch(() => ''));
   const usedRedis = new Set([
-    ...redisDbsWithKeys((await ctx.run('redis-cli', ['INFO', 'keyspace'])).stdout),
+    ...redisDbsWithKeys((await redisCli(ctx, ['INFO', 'keyspace'])).stdout),
     ...redisDbsNamed(envTexts),
     ...others.map((r) => r.ports?.redisDb).filter(Number.isInteger),
   ]);
@@ -191,17 +225,16 @@ export async function createWhitelabel(ctx, wl) {
   if (!healthy) throw new Error('the copy did not answer /health within 3 minutes (see its pm2 logs)');
   if (!(await ctx.httpOk(`http://127.0.0.1:${ports.admin}/api/v1/admin/whitelabel-link/status`))) throw new Error('the copy is up but its whitelabel link does not answer');
 
-  ctx.step('Apache sites and SSL certificates');
-  for (const [domain, conf] of Object.entries(vhosts(wl, ports))) {
-    await ctx.fs.write(vhostFiles(domain)[0], conf, 0o644);
-    await ctx.run('a2ensite', [`${domain}.conf`]);
-  }
-  await ctx.run('apache2ctl', ['configtest']);
-  await ctx.run('systemctl', ['reload', 'apache2']);
+  ctx.step('nginx sites and SSL certificates');
+  // Port 80 first (the ACME challenge), then a certificate per domain, then the full HTTPS sites.
+  await ctx.fs.mkdir(ACME_ROOT);
+  await writeSites(ctx, vhosts(wl, ports, { ssl: false }));
   for (const domain of domains) {
-    await ctx.run('certbot', ['--apache', '--non-interactive', '--agree-tos', '--redirect', '-d', domain]);
-    ctx.log(`https://${domain} ready`);
+    await ctx.run('certbot', ['certonly', '--webroot', '-w', ACME_ROOT, '--cert-name', domain, '-d', domain, '--non-interactive', '--agree-tos', '--keep-until-expiring']);
+    ctx.log(`certificate for ${domain}`);
   }
+  await writeSites(ctx, vhosts(wl, ports));
+  for (const domain of domains) ctx.log(`https://${domain} ready`);
 
   await ctx.parent.query(
     `UPDATE whitelabels SET status = 'live', admin_port = $2, company_password_hash = NULL, updated_at = NOW() WHERE id = $1`,
@@ -325,7 +358,7 @@ async function setImage(copy, slot, bytes, type) {
 
 /**
  * Takes away everything `createWhitelabel` made, each part only if it is this whitelabel's: the
- * folder by its marker, Apache sites by the line this script writes in them, pm2 apps by the
+ * folder by its marker, nginx sites by the line this script writes in them, pm2 apps by the
  * `<slug>-` prefix, the Redis database by the number recorded for it (8–15 only). Each part that
  * is already gone is skipped, so it can run again after a failure. `archive` keeps a final
  * database export first (a real delete; not the cleanup before a setup retry).
@@ -357,23 +390,20 @@ export async function removeWhitelabel(ctx, wl, { archive = true } = {}) {
   if (ours.length) await ctx.run('pm2', ['save']);
   ctx.log(`${ours.length} processes removed`);
 
-  ctx.step('Removing the Apache sites and certificates');
+  ctx.step('Removing the nginx sites and certificates');
   let reload = false;
   for (const domain of domainsOf(wl)) {
-    const [plain, ssl] = vhostFiles(domain);
-    if (!(await ctx.fs.exists(plain)) || !(await ctx.fs.read(plain)).startsWith(OUR_VHOST)) continue;
-    for (const file of [ssl, plain]) {
-      if (!(await ctx.fs.exists(file))) continue;
-      await ctx.run('a2dissite', [path.basename(file)], { allowFail: true });
-      await ctx.fs.rm(file);
-    }
+    const [file, link] = vhostFiles(domain);
+    if (!(await ctx.fs.exists(file)) || !(await ctx.fs.read(file)).startsWith(OUR_VHOST)) continue;
+    await ctx.fs.rm(link);
+    await ctx.fs.rm(file);
     await ctx.run('certbot', ['delete', '--non-interactive', '--cert-name', domain], { allowFail: true });
     reload = true;
     ctx.log(`${domain} removed`);
   }
   if (reload) {
-    await ctx.run('apache2ctl', ['configtest']);
-    await ctx.run('systemctl', ['reload', 'apache2']);
+    await ctx.run('nginx', ['-t']);
+    await ctx.run('systemctl', ['reload', 'nginx']);
   }
 
   ctx.step('Dropping the database');
@@ -382,7 +412,7 @@ export async function removeWhitelabel(ctx, wl, { archive = true } = {}) {
   const redisDb = recorded?.redisDb;
   if (Number.isInteger(redisDb) && redisDb >= REDIS_FIRST_DB && redisDb <= 15) {
     ctx.step('Clearing its Redis database');
-    await ctx.run('redis-cli', ['-n', String(redisDb), 'FLUSHDB']);
+    await redisCli(ctx, ['-n', String(redisDb), 'FLUSHDB']);
   }
 
   ctx.step('Removing the folder');

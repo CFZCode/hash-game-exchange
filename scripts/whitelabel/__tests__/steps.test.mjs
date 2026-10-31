@@ -37,7 +37,7 @@ const wl = {
   ports: null,
 };
 
-function machine({ dns = SERVER_IP, files = {}, pm2 = [], dbExists = false } = {}) {
+function machine({ dns = SERVER_IP, files = {}, pm2 = [], dbExists = false, nginxTest = { code: 0, stdout: '', stderr: '' } } = {}) {
   const fsMap = new Map(Object.entries(files));
   const commands = [];
   const logs = [];
@@ -53,7 +53,7 @@ function machine({ dns = SERVER_IP, files = {}, pm2 = [], dbExists = false } = {
     sleep: async () => {},
     envFiles: async () => ['/var/www/main/other/backend/.env'],
     parentRoot: '/var/www/main/hash-game-exchange',
-    parentEnv: { DB_PORT: '5432', AVRKHUB_SPORTS_KEY: 'feed', JWT_ACCESS_SECRET: 'parent-jwt', F2PAY_PRIVATE_KEY: 'parent-psp' },
+    parentEnv: { DB_PORT: '5432', AVRKHUB_SPORTS_KEY: 'feed', JWT_ACCESS_SECRET: 'parent-jwt', F2PAY_PRIVATE_KEY: 'parent-psp', REDIS_HOST: '127.0.0.1', REDIS_PORT: '6380', REDIS_PASSWORD: 'redis-secret' },
     parentFrontendEnv: {},
     linkKey: 'link-secret',
     secrets,
@@ -72,14 +72,15 @@ function machine({ dns = SERVER_IP, files = {}, pm2 = [], dbExists = false } = {
       },
     },
     run: async (cmd, args, opts = {}) => {
-      commands.push({ cmd, args, cwd: opts.cwd, input: opts.input });
+      commands.push({ cmd, args, cwd: opts.cwd, input: opts.input, env: opts.env });
       const line = `${cmd} ${args.join(' ')}`;
       if (cmd === 'ss') return { code: 0, stdout: 'LISTEN 0 511 127.0.0.1:6100 0.0.0.0:*\n', stderr: '' };
-      if (cmd === 'redis-cli' && args[0] === 'INFO') return { code: 0, stdout: 'db8:keys=2,expires=0\n', stderr: '' };
+      if (cmd === 'nginx') return nginxTest;
+      if (cmd === 'redis-cli' && args.includes('INFO')) return { code: 0, stdout: 'db8:keys=2,expires=0\n', stderr: '' };
       if (line.includes('pg_database')) return { code: 0, stdout: dbExists ? '1\n' : '', stderr: '' };
       if (cmd === 'pm2' && args[0] === 'jlist') return { code: 0, stdout: JSON.stringify(pm2), stderr: '' };
       if (cmd === 'node' && args[0] === 'scripts/make-env.mjs') {
-        fsMap.set(path.join(opts.cwd, 'backend/.env'), '# example\nNODE_ENV=development\nJWT_ACCESS_SECRET=fresh-copy-secret\nTELEGRAM_BOT_TOKEN=example\n');
+        fsMap.set(path.join(opts.cwd, 'backend/.env'), '# example\nNODE_ENV=development\nJWT_ACCESS_SECRET=fresh-copy-secret\nTELEGRAM_BOT_TOKEN=example\nSTAFF_2FA_REQUIRED_LEVEL=0\n');
       }
       return { code: 0, stdout: '', stderr: '' };
     },
@@ -119,7 +120,7 @@ test('create: the whole sequence, in order, with nothing secret on a command lin
   const run = lines(m.commands);
   const order = [
     'ss -ltnH',
-    'redis-cli INFO keyspace',
+    'redis-cli -h 127.0.0.1 -p 6380 INFO keyspace',
     '| git -C /var/www/main/hash-game-exchange archive --format=tar HEAD | tar -x -C /var/www/main/lucky-play',
     'node scripts/make-env.mjs',
     'npm ci --no-audit --no-fund --prefer-offline',
@@ -130,10 +131,12 @@ test('create: the whole sequence, in order, with nothing secret on a command lin
     'npm run build',
     'pm2 start /var/www/main/lucky-play/ecosystem.config.cjs',
     'pm2 save',
-    'a2ensite lucky.example.com.conf',
-    'apache2ctl configtest',
-    'systemctl reload apache2',
-    'certbot --apache --non-interactive --agree-tos --redirect -d lucky.example.com',
+    'ln -sfn /etc/nginx/sites-available/wl-lucky.example.com /etc/nginx/sites-enabled/wl-lucky.example.com',
+    'nginx -t',
+    'systemctl reload nginx',
+    'certbot certonly --webroot -w /var/www/certbot --cert-name lucky.example.com -d lucky.example.com --non-interactive --agree-tos --keep-until-expiring',
+    'nginx -t',
+    'systemctl reload nginx',
   ];
   let at = -1;
   for (const want of order) {
@@ -149,7 +152,8 @@ test('create: the whole sequence, in order, with nothing secret on a command lin
   const createRole = m.commands.find((c) => c.input?.includes('CREATE ROLE'));
   assert.match(createRole.input, /CREATE ROLE wl_lucky_play LOGIN PASSWORD 'db-secret-hex';\nCREATE DATABASE wl_lucky_play OWNER wl_lucky_play;/);
   const everything = JSON.stringify(m.commands.map((c) => c.args ?? c.pipe)) + m.logs.join('\n');
-  for (const secret of ['db-secret-hex', 'link-secret', 'seed-secret', 'parent-jwt', wl.company_password_hash]) assert.equal(everything.includes(secret), false, secret);
+  for (const secret of ['db-secret-hex', 'link-secret', 'seed-secret', 'parent-jwt', 'redis-secret', wl.company_password_hash]) assert.equal(everything.includes(secret), false, secret);
+  assert.equal(m.commands.find((c) => c.cmd === 'redis-cli').env.REDISCLI_AUTH, 'redis-secret', 'redis-cli authenticates through its environment');
 
   // The copy's env: its own secrets, the link key, the shared feed — not the parent's secrets.
   const backendEnv = parseEnv(m.fsMap.get('/var/www/main/lucky-play/backend/.env'));
@@ -158,9 +162,15 @@ test('create: the whole sequence, in order, with nothing secret on a command lin
   assert.equal(backendEnv.AVRKHUB_SPORTS_KEY, 'feed');
   assert.equal(backendEnv.F2PAY_PRIVATE_KEY, undefined);
   assert.equal(backendEnv.TELEGRAM_BOT_TOKEN, '');
+  assert.equal(backendEnv.STAFF_2FA_REQUIRED_LEVEL, '0', 'staff 2FA is off on copies');
   assert.equal(backendEnv.REDIS_DB, '9', 'db8 has keys, so 9');
+  assert.equal(backendEnv.REDIS_URL, 'redis://:redis-secret@127.0.0.1:6380/9', 'the parent’s Redis server, the copy’s own database');
+  assert.equal(backendEnv.REDIS_PORT, '6380');
+  assert.equal(backendEnv.REDIS_PASSWORD, 'redis-secret');
   assert.equal(JSON.parse(m.fsMap.get('/var/www/main/lucky-play/.whitelabel.json')).id, 42, 'the folder is marked as ours');
-  assert.match(m.fsMap.get('/etc/apache2/sites-available/admin.lucky.example.com.conf'), /^# Whitelabel copy — written by scripts\/whitelabel\./);
+  const adminSite = m.fsMap.get('/etc/nginx/sites-available/wl-admin.lucky.example.com');
+  assert.match(adminSite, /^# Whitelabel copy — written by scripts\/whitelabel\./);
+  assert.match(adminSite, /listen 443 ssl;/, 'the HTTPS site replaces the port-80-only one once certified');
 
   // The company, the parent's rates, the branding.
   const copySql = m.copyQueries.map((q) => q.sql).join('\n');
@@ -211,10 +221,11 @@ test('delete: export first, then only what is this whitelabel’s', async () => 
     files: {
       [`${target}/.whitelabel.json`]: JSON.stringify({ id: 42 }),
       [`${target}/backend/.env`]: 'x',
-      '/etc/apache2/sites-available/lucky.example.com.conf': '# Whitelabel copy — written by scripts/whitelabel.\n<VirtualHost *:80>',
-      '/etc/apache2/sites-available/lucky.example.com-le-ssl.conf': '<VirtualHost *:443>',
+      '/etc/nginx/sites-available/wl-lucky.example.com': '# Whitelabel copy — written by scripts/whitelabel.\nserver {',
+      '/etc/nginx/sites-enabled/wl-lucky.example.com': '(link)',
       // Same name, not written by this script: left alone.
-      '/etc/apache2/sites-available/api.lucky.example.com.conf': '<VirtualHost *:80> someone else',
+      '/etc/nginx/sites-available/wl-api.lucky.example.com': 'server { someone else',
+      '/etc/nginx/sites-enabled/wl-api.lucky.example.com': '(link)',
     },
     pm2: [
       { name: 'lucky-play-gateway', pm2_env: { pm_cwd: `${target}/backend` } },
@@ -233,12 +244,14 @@ test('delete: export first, then only what is this whitelabel’s', async () => 
   assert.match(m.commands[dump].toFile, /^\/var\/www\/main\/whitelabel-archive\/lucky-play-\d{8}-\d{6}\.sql\.gz$/);
 
   assert.deepEqual(run.filter((l) => l.startsWith('pm2 delete')), ['pm2 delete lucky-play-gateway', 'pm2 delete lucky-play-admin']);
-  assert.equal(m.fsMap.has('/etc/apache2/sites-available/lucky.example.com.conf'), false);
-  assert.equal(m.fsMap.has('/etc/apache2/sites-available/lucky.example.com-le-ssl.conf'), false);
-  assert.equal(m.fsMap.has('/etc/apache2/sites-available/api.lucky.example.com.conf'), true, 'not ours: kept');
+  assert.equal(m.fsMap.has('/etc/nginx/sites-available/wl-lucky.example.com'), false);
+  assert.equal(m.fsMap.has('/etc/nginx/sites-enabled/wl-lucky.example.com'), false);
+  assert.equal(m.fsMap.has('/etc/nginx/sites-available/wl-api.lucky.example.com'), true, 'not ours: kept');
+  assert.equal(m.fsMap.has('/etc/nginx/sites-enabled/wl-api.lucky.example.com'), true, 'not ours: kept');
+  assert.ok(run.indexOf('nginx -t') < run.indexOf('systemctl reload nginx'));
   assert.deepEqual(run.filter((l) => l.startsWith('certbot delete')), ['certbot delete --non-interactive --cert-name lucky.example.com']);
   assert.ok(m.commands.some((c) => c.input === 'DROP DATABASE IF EXISTS wl_lucky_play WITH (FORCE);\nDROP ROLE IF EXISTS wl_lucky_play;\n'));
-  assert.ok(run.includes('redis-cli -n 9 FLUSHDB'));
+  assert.ok(run.includes('redis-cli -h 127.0.0.1 -p 6380 -n 9 FLUSHDB'), 'the parent’s Redis server, not the machine default');
   assert.equal([...m.fsMap.keys()].some((k) => k.startsWith(`${target}/`)), false, 'folder gone');
 });
 
@@ -250,4 +263,24 @@ test('delete refuses a folder that is not this whitelabel’s, and never flushes
   const shared = machine();
   await removeWhitelabel(shared.ctx, { ...wl, ports: { redisDb: 1 } }, { archive: false });
   assert.equal(lines(shared.commands).some((l) => l.includes('FLUSHDB')), false);
+});
+
+test('a bad nginx test, or a domain another site serves, takes this whitelabel’s files out before any reload', async () => {
+  for (const nginxTest of [
+    { code: 1, stdout: '', stderr: 'nginx: [emerg] unexpected "}"' },
+    { code: 0, stdout: '', stderr: 'nginx: [warn] conflicting server name "api.lucky.example.com" on 0.0.0.0:80, ignored' },
+  ]) {
+    const m = machine({ nginxTest });
+    await assert.rejects(() => createWhitelabel(m.ctx, wl), /taken out again/);
+    assert.equal([...m.fsMap.keys()].some((k) => k.startsWith('/etc/nginx/')), false, 'no site file or link left behind');
+    assert.equal(lines(m.commands).includes('systemctl reload nginx'), false);
+  }
+});
+
+test('a Redis password that does not work stops setup before anything is copied', async () => {
+  const m = machine();
+  const run = m.ctx.run;
+  m.ctx.run = async (cmd, args, opts) => (cmd === 'redis-cli' ? { code: 0, stdout: 'NOAUTH Authentication required.\n', stderr: '' } : run(cmd, args, opts));
+  await assert.rejects(() => createWhitelabel(m.ctx, wl), /NOAUTH/);
+  assert.equal(m.commands.some((c) => c.pipe), false);
 });
