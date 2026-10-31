@@ -9,8 +9,8 @@ import './PushPrompt.css';
 /* THIS BUILD'S — the "allow notifications" soft-ask in the site's own look, before the browser's
  * dialog, so a "Not now" here costs nothing (a browser "Block" cannot be asked again). Its copy,
  * delay and cooldown come from site admin → Push notifications → Prompt & settings
- * (GET /api/v1/admin/push/prompt). Shown only when push is on, the player is signed in and the
- * browser has not been asked yet. OneSignal's own slide prompt must be removed in its dashboard,
+ * (GET /api/v1/admin/push/prompt). Shown only when push is on and the browser has not been asked
+ * yet — to any visitor ('on_visit') or only to a signed-in player ('after_login'). OneSignal's own slide prompt must be removed in its dashboard,
  * or the player sees both. */
 
 const DISMISSED_KEY = 'push-prompt-dismissed-at';
@@ -30,14 +30,16 @@ export default function PushPrompt() {
   const [prompt, setPrompt] = React.useState(null);
 
   React.useEffect(() => {
-    if (!session.login || demo || typeof Notification === 'undefined' || Notification.permission !== 'default') return undefined;
+    if (demo || typeof Notification === 'undefined' || Notification.permission !== 'default') return undefined;
     let alive = true;
     let timer;
     // This effect runs before AppShell's (children first), so it must pass the base itself: initPush caches its first answer.
     Promise.all([initPush({ apiBase: API_BASE }), fetchSharedJson('/api/v1/admin/push/prompt')]).then(([on, json]) => {
       const p = json?.data;
-      // shortcut: 'after_first_deposit' is not wired (the page has no first-deposit signal here), so only 'after_login' shows.
-      if (!alive || !on || !p?.enabled || p.trigger !== 'after_login') return;
+      // 'on_visit' asks anyone (a later sign-in ties this browser to the player); 'after_login' only a signed-in player.
+      // shortcut: 'after_first_deposit' is not wired (the page has no first-deposit signal here), so it never shows.
+      const shows = p?.trigger === 'on_visit' || (p?.trigger === 'after_login' && session.login);
+      if (!alive || !on || !p?.enabled || !shows) return;
       if (Date.now() - readDismissed() < (p.cooldownDays || 0) * DAY_MS) return;
       timer = setTimeout(() => {
         if (Notification.permission === 'default') setPrompt(p);
