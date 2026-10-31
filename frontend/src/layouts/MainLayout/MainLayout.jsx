@@ -4,6 +4,7 @@ import Header from './Header';
 import Sidebar from './Sidebar';
 import Tabbar from './Tabbar';
 import FloatingActions from './FloatingActions';
+import WhatsAppWidget from '../../components/WhatsAppWidget';
 import Footer from './Footer';
 import Explore from '../../components/Explore';
 import RightDrawer from '../../components/RightDrawer';
@@ -153,6 +154,7 @@ export default function MainLayout({ children }) {
         onToggleSidebar={() => setMobileMenuOpen(prev => !prev)}
       />
       <FloatingActions />
+      <WhatsAppWidget />
       {/* Portals itself to <body> — it is above everything (z-index 9999) and must not sit
           inside the layout's stacking or scroll context. */}
       <Explore open={exploreOpen} onClose={closeExplore} />
