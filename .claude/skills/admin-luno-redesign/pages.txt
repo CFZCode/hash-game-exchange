@@ -102,7 +102,6 @@
 /site-config/branding
 /site-config/flags
 /site-config/limits
-/site-config/email
 /site-config/affiliate
 /site-config/welcome-bonuses
 
