@@ -3,7 +3,7 @@
  * Read by scripts/make-env.mjs (writes the env files) and scripts/dev.mjs (runs everything).
  */
 export const SITE_KEY = 'hash-game-exchange'
-export const SITE_NAME = 'Hash Game Exchange'
+export const SITE_NAME = 'Parker567'
 export const SITE_TEMPLATE = 'bcgame' // resolves to the catalogue template `emerald_dark`
 export const DB_NAME = 'parker567'
 export const TEST_DB_NAME = 'parker567_test'
