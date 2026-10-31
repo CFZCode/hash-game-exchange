@@ -392,7 +392,6 @@ module.exports = (sequelize) => {
     apaynotificationemail: {
       type: DataTypes.STRING(255),
       allowNull: true,
-      defaultValue: "salvin.dev.cfz@gmail.com",
       field: "apaynotificationemail",
     },
     gmailuser: {
