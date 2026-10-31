@@ -7,6 +7,7 @@ import '../src/index.css';
 import '../src/theme/palettes.css';
 import '../src/theme/sprites.css';
 import { BOOT_CSS } from './boot-style';
+import ClientApp from './[[...slug]]/client';
 import { THEME_BOOT_SCRIPT } from '../src/theme/applyTheme';
 import { BRANDING_BOOT_SCRIPT, BRANDING_PATH, cleanBranding } from '../src/services/siteBrandingCore.js';
 
@@ -115,6 +116,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         {LIVE && <script dangerouslySetInnerHTML={{ __html: BRANDING_BOOT_SCRIPT }} />}
       </head>
       <body className="app-root dark" suppressHydrationWarning>
+        {/* Every path renders the same client-only shell; React Router inside it owns routing,
+            exactly as under Vite. `#root` is the mount point index.html had. It lives in the
+            layout so a Next segment swap never remounts it — see app/[[...slug]]/page.tsx. */}
+        <div id="root">
+          <ClientApp />
+        </div>
         {children}
         <div id="start-up"></div>
       </body>

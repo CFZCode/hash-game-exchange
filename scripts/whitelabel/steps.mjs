@@ -21,6 +21,8 @@
 import crypto from 'node:crypto';
 import path from 'node:path';
 
+import whitelabelPlan from '../../backend/packages/common/src/whitelabelPlan.js';
+
 import {
   ACME_ROOT,
   ARCHIVE_DIR,
@@ -334,6 +336,23 @@ async function setUpCompany(ctx, copy, wl) {
     [wl.palette ? JSON.stringify(wl.palette) : null]
   );
   ctx.log(wl.palette ? 'custom colours set' : `template ${wl.template}`);
+
+  // The products and features the parent sold it: the copy's entitlements read the plan as a
+  // ceiling, and the policies it decides are written as the owner would. No plan = not limited.
+  const plan = whitelabelPlan.cleanPlan(wl.plan);
+  if (plan) {
+    await copy.query(`UPDATE whitelabel_settings SET plan = $1::jsonb, updated_at = NOW() WHERE id = 1 RETURNING id`, [JSON.stringify(plan)]);
+    for (const [feature, variant] of Object.entries(whitelabelPlan.policiesOf(plan))) {
+      await copy.query(
+        `INSERT INTO site_features (feature, variant, enabled, owner_enabled, updated_by) VALUES ($1, $2, true, true, 'owner')
+         ON CONFLICT (feature) DO UPDATE SET variant = EXCLUDED.variant, enabled = true, owner_enabled = true, updated_by = 'owner', updated_at = NOW()
+         RETURNING feature`,
+        [feature, variant]
+      );
+    }
+    const on = (group) => Object.keys(group).filter((k) => group[k]).join(', ') || 'none';
+    ctx.log(`plan: products ${on(plan.products)}; features ${on(plan.features)}`);
+  }
 }
 
 /** One Super Admin image slot on the copy, stored by content hash — branding.store.js setSite's rows. */

@@ -38,7 +38,15 @@ export default function AppShell() {
     bootLoaderScheduled = true;
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        document.getElementById('start-up')?.remove();
+        /* HIDDEN, NEVER REMOVED: `#start-up` is rendered by app/layout.tsx, so React owns it.
+           Removing it left React holding a node that is no longer in <body>; the next time Next
+           swapped the page segment (Back onto a history entry written before a reload) React
+           inserted before it and the page died on "insertBefore … not a child of this node". */
+        const loader = document.getElementById('start-up');
+        if (loader) {
+          loader.hidden = true;
+          loader.style.display = 'none';
+        }
       });
     });
     /* Web push. The backend decides whether it is on; see services/onesignal.js. */
