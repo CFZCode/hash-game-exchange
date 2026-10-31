@@ -14,7 +14,7 @@ const newRequestId = () => globalThis.crypto?.randomUUID?.();
  * /user/enter open this instead: a username (with the backend's picker), coin, amount, note. The
  * backend holds every rule (KYC, limits, opt-out) and its message is what the player reads. */
 export default function SendTip({ open, onClose }) {
-  const { balances, refreshBalances } = useSession();
+  const { session, balances, refreshBalances } = useSession();
   const coins = React.useMemo(() => balances.map((b) => b.currencyName), [balances]);
   const [toUsername, setToUsername] = React.useState('');
   const [picked, setPicked] = React.useState(null);
@@ -25,8 +25,12 @@ export default function SendTip({ open, onClose }) {
   // One id per tip the player means to send; a double press or retry moves the money once.
   const requestId = React.useRef(newRequestId());
 
-  // Until the player picks, the first coin that holds money (the list starts with empty ones).
-  const currency = picked ?? balances.find((b) => Number(b.amount) > 0)?.currencyName ?? coins[0];
+  // Until the player picks: the header's coin when it holds money, else the first that does, else
+  // the header's coin — never the list's first row (BTC), which turned "10" into 10 BTC.
+  const selected = session.setting?.currencyName;
+  const funded = (code) => Number(balances.find((b) => b.currencyName === code)?.amount) > 0;
+  const currency =
+    picked ?? (funded(selected) ? selected : balances.find((b) => Number(b.amount) > 0)?.currencyName ?? (coins.includes(selected) ? selected : coins[0]));
   const balance = balances.find((b) => b.currencyName === currency)?.amount;
 
   React.useEffect(() => {
