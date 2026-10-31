@@ -495,6 +495,27 @@ test('tips', async (t) => {
     });
   });
 
+  await t.test('limits: on an INR site the caps are rupees, and a USDT tip is valued in rupees', async () => {
+    const inrSite = new TipService({ ...deps, models: { ...m, SiteFeature: { findByPk: async () => ({ variant: 'INR' }) } } });
+    const a = await seed({ inr: '5000' });
+    const b = await seed({ inr: '0' });
+    await m.Credits.update({ usdt: '100' }, { where: { uid: a.id } });
+
+    await withLimits({ maxPerTipUsd: '1000', maxPerDayUsd: '0' }, async () => {
+      const details = await rejectsWithDetails(
+        inrSite.send({ userId: a.id, toUsername: b.name, currency: 'INR', amount: '1000.01' }),
+        'TIP_OVER_PER_TIP_LIMIT',
+        400
+      );
+      assert.deepEqual(details, { maxUsd: '1000.00000000', maxInCurrency: '1000.00000000', currency: 'INR' });
+      // 13 USDT is 1,040 INR at 80/$: over. 12 USDT is 960 INR: fine.
+      await rejectsWith(inrSite.send({ userId: a.id, toUsername: b.name, currency: 'USDT', amount: '13' }), 'TIP_OVER_PER_TIP_LIMIT', 400);
+      await inrSite.send({ userId: a.id, toUsername: b.name, currency: 'USDT', amount: '12' });
+      await inrSite.send({ userId: a.id, toUsername: b.name, currency: 'INR', amount: '1000' });
+      assert.equal((await inrSite.getSettings({ userId: a.id })).limits.currency, 'INR');
+    });
+  });
+
   await t.test('limits: the daily cap sums the last 24h across currencies in USD', async () => {
     const a = await seed({ inr: '10000' });
     const b = await seed({ inr: '0' });
@@ -534,6 +555,7 @@ test('tips', async (t) => {
         maxPerTipUsd: '0.00000000',
         maxPerDayUsd: '20.00000000',
         minWageredUsd: '0.00000000',
+        currency: 'USDT',
         usedTodayUsd: '20.00000000',
       });
 
@@ -620,6 +642,7 @@ test('tips', async (t) => {
       maxPerTipUsd: '500.00000000',
       maxPerDayUsd: '2000.00000000',
       minWageredUsd: '0.00000000',
+      currency: 'USDT',
       usedTodayUsd: '2000.00000000',
     });
 
@@ -691,7 +714,7 @@ test('tips', async (t) => {
     assert.deepEqual(hist.data, { rows: [], total: 0 });
     assert.deepEqual((await call('GET', '/settings')).data, {
       enabled: true,
-      limits: { maxPerTipUsd: '500.00000000', maxPerDayUsd: '2000.00000000', minWageredUsd: '0.00000000', usedTodayUsd: '0.00000000' },
+      limits: { maxPerTipUsd: '500.00000000', maxPerDayUsd: '2000.00000000', minWageredUsd: '0.00000000', currency: 'USDT', usedTodayUsd: '0.00000000' },
     });
     assert.deepEqual((await call('PATCH', '/settings', { enabled: false })).data, { enabled: false });
 
