@@ -597,8 +597,9 @@ export async function register({ username, email, password, referral }, previous
     live: true,
     method: 'POST',
     json: {
+      // The Sign Up tab sends both (user's request, 2026-10-31); a caller with only an email still works.
       username: byUsername ? username : usernameFromEmail(email),
-      ...(byUsername ? {} : { email }),
+      ...(email ? { email } : {}),
       password,
       /* Only when the visitor opened the panel and typed one — an empty string is a value the
          validator would accept and store as a referrer that does not exist. */

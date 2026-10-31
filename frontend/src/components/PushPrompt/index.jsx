@@ -70,7 +70,7 @@ export default function PushPrompt() {
     <div
       role="dialog"
       aria-labelledby="push-prompt-title"
-      className="fixed left-1/2 top-4 z-[1200] w-[calc(100%-2rem)] max-w-[24rem] -translate-x-1/2 rounded-xl border border-layer5 bg-layer4 p-4 shadow-lg"
+      className="fixed left-1/2 top-4 z-[999] w-[calc(100%-2rem)] max-w-[24rem] -translate-x-1/2 rounded-xl border border-layer5 bg-layer4 p-4 shadow-lg"
     >
       <div className="flex gap-3">
         <div className="flex size-10 flex-none items-center justify-center rounded-lg bg-layer5">

@@ -425,13 +425,15 @@ function SignInForm({ onSubmit, pending, error, onForgot }) {
 /* Transcribed from the live dialog's rendered DOM, like the Sign In tab. */
 /* The platform's username rule (profile.validators.js): 3–30 of letters, digits, `_ . -`. */
 const USERNAME_RULE = /^[A-Za-z0-9_.-]{3,30}$/;
+/* A plain shape check; the platform's validator is the authority. */
+const EMAIL_RULE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 function SignUpForm({ onSubmit, error, onClearError }) {
   const googleOn = useGoogleLogin();
   const othersShown = SHOWN_THIRD_PARTY.some((item) => item.label !== 'Google');
-  /* Username vs Email, as on the Sign In tab (user's request): Username first. */
-  const [method, setMethod] = React.useState(0);
-  const byUsername = method === 0;
+  /* Username AND Email, both required (user's request, 2026-10-31) — no Username / Email tabs
+     here; the Sign In tab keeps its pair. */
+  const [username, setUsername] = React.useState('');
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [revealed, setRevealed] = React.useState(false);
@@ -445,8 +447,9 @@ function SignUpForm({ onSubmit, error, onClearError }) {
   const [agreed, setAgreed] = React.useState(true);
   const [moreOpen, setMoreOpen] = React.useState(false);
 
-  const usernameBad = byUsername && email.trim().length > 0 && !USERNAME_RULE.test(email.trim());
-  const ready = email.trim().length > 0 && !usernameBad && password.length > 0 && agreed;
+  const usernameBad = username.trim().length > 0 && !USERNAME_RULE.test(username.trim());
+  const emailBad = email.trim().length > 0 && !EMAIL_RULE.test(email.trim());
+  const ready = USERNAME_RULE.test(username.trim()) && EMAIL_RULE.test(email.trim()) && password.length > 0 && agreed;
 
   return (
     <>
@@ -470,7 +473,8 @@ function SignUpForm({ onSubmit, error, onClearError }) {
             if (ready) {
               onSubmit({
                 signUp: true,
-                ...(byUsername ? { username: email.trim() } : { email: email.trim() }),
+                username: username.trim(),
+                email: email.trim(),
                 password,
                 referral: referral || undefined,
               });
@@ -478,53 +482,43 @@ function SignUpForm({ onSubmit, error, onClearError }) {
           }
         }}
       >
-        <div
-          role="tablist"
-          className="scroll-x tabs-title hide-scroll mb-4"
-          style={indicatorVars(method, 2)}
-        >
-          <div className="tabs-btn-group">
-            {[
-              { label: 'Username', Icon: UserIcon },
-              { label: 'Email', Icon: MailIcon },
-            ].map((item, index) => (
-              <button
-                key={item.label}
-                type="button"
-                role="tab"
-                className="tabs-btn btn-like"
-                aria-selected={method === index ? 'true' : undefined}
-                onClick={() => setMethod(index)}
-              >
-                <div className="flex items-center justify-center">
-                  <item.Icon className="size-4" />
-                  <p className="ml-1 font-extrabold">{item.label}</p>
-                </div>
-              </button>
-            ))}
-          </div>
-          <div className="tabs-indicator" />
-        </div>
-
-        <Label>{byUsername ? 'Username' : 'Email'}</Label>
+        <Label>Username</Label>
         {/* Two nested `relative` wrappers in the capture. Kept — that is presumably where a
             validation popover anchors, and dropping them is a change, not a tidy-up. */}
         <div className="relative">
           <div className="relative">
             <Field
-              key={byUsername ? 'username' : 'email'}
               autoFocus
-              type={byUsername ? 'text' : 'email'}
-              autoComplete={byUsername ? 'username' : 'email'}
-              value={email}
-              onChange={setEmail}
+              type="text"
+              autoComplete="username"
+              value={username}
+              onChange={setUsername}
               /* `J(t.errorMsg && "border-error", "!mt-0")` on the original's EmailPhoneInput: the
                  box turns red while a refusal is showing, and focusing it clears the refusal —
                  `onFocus: () => { …; t.errorMsg && t.setStore({errorMsg: ""}) }`. */
-              className={error && !passwordError ? 'border-error' : ''}
+              className={(error && !passwordError) || usernameBad ? 'border-error' : ''}
               onFocus={error && !passwordError ? onClearError : undefined}
             />
           </div>
+        </div>
+        {/* Our own hint: the platform refuses these anyway. */}
+        {usernameBad ? <p className="mt-1 text-xs text-error">3–30 characters: letters, digits, _ . - only</p> : null}
+
+        <div className="mt-6">
+          <Label>Email</Label>
+          <div className="relative">
+            <div className="relative">
+              <Field
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={setEmail}
+                className={(error && !passwordError) || emailBad ? 'border-error' : ''}
+                onFocus={error && !passwordError ? onClearError : undefined}
+              />
+            </div>
+          </div>
+          {emailBad ? <p className="mt-1 text-xs text-error">Enter a valid email address</p> : null}
         </div>
 
         {/* THE SIGN UP FORM'S ERROR SLOT, and where it sits is the chunk's, not a choice.
@@ -541,10 +535,6 @@ function SignUpForm({ onSubmit, error, onClearError }) {
             prints here, through the same `messageOf` the Sign In tab uses, and no toast doubles
             it. The three site-level refusals still move to Sign In (`SIGNUP_REFUSALS`). */}
         {error && !passwordError ? <p className="mt-1 text-xs text-error">{error}</p> : null}
-        {/* Our own hint, in the same slot and style: the platform refuses these anyway. */}
-        {!error && usernameBad ? (
-          <p className="mt-1 text-xs text-error">3–30 characters: letters, digits, _ . - only</p>
-        ) : null}
 
         <div className="mt-6">
           <Label>Password</Label>
