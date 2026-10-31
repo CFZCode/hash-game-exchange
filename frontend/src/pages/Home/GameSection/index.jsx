@@ -137,6 +137,16 @@ export default function GameSection({ title, games, href, showController = true,
   const pending = !games;
   const rows = games ?? [];
 
+  /* A row with no games draws NOTHING — not its heading, not its controller. The call site in
+     Home already did this for BC Exclusive ("so an empty Exclusive heading never shows"), but
+     the guard belongs here: every row needs it. Originals is empty until `og_games` is synced
+     and Hot Games until the operator curates the `hot` collection, and until then each was
+     drawing a bare heading with its All / ‹ / › buttons over an empty strip.
+
+     Not while PENDING: `games === undefined` is the loading state and its skeleton must still
+     paint, or the page would jump as each feed lands. */
+  if (!pending && rows.length === 0) return null;
+
   /* `go`: the View All tile is appended only when the section links somewhere AND has more
      than 8 games — an 8-or-fewer row is fully visible at the widest breakpoint, so there
      would be nothing to view. */
