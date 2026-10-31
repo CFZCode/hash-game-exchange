@@ -289,6 +289,20 @@ const CATALOGUE: FeatureEntry[] = [
     ]
   },
   {
+    // Google sign-in: a policy (always on, owner-only). Mirrors backend featureCatalogue.js.
+    key: 'google_signin',
+    label: 'Google sign-in',
+    category: 'business',
+    flag: null,
+    policy: true,
+    defaultVariant: 'on',
+    note: 'On: the "Sign in with Google" button shows on the login and sign-up screens (while the server has the Google keys). Off: the button hides and Google sign-in / sign-up is refused.',
+    variants: [
+      { key: 'on', label: 'On', description: 'Players can sign in and sign up with Google (when the server has the Google keys). The default.' },
+      { key: 'off', label: 'Off', description: 'The Google button hides on login and sign-up, and Google sign-in is refused.' }
+    ]
+  },
+  {
     key: 'vip',
     label: 'VIP club',
     category: 'engagement',

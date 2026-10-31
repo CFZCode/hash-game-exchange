@@ -659,13 +659,14 @@ class AuthService {
 
   // ══ Google sign-in (./google.js) ═══════════════════════════════════════
 
-  googleEnabled() {
-    return google.configured(this.config);
+  /** Keys present and the owner's `google_signin` policy on — off hides the button, sign-in and sign-up alike. */
+  async googleEnabled() {
+    return google.configured(this.config) && (await sitePolicy.readPolicy(this.models, 'google_signin')) === 'on';
   }
 
   /** `{ url, cookie }`: where to send the browser, and the signed state cookie to set first. */
-  googleStart({ nonce } = {}) {
-    if (!this.googleEnabled()) throw errors.GOOGLE_NOT_CONFIGURED();
+  async googleStart({ nonce } = {}) {
+    if (!(await this.googleEnabled())) throw errors.GOOGLE_NOT_CONFIGURED();
     // No tab nonce, nothing to bind the code to: refuse up front rather than mint a dead code.
     if (!google.NONCE.test(String(nonce ?? ''))) throw errors.GOOGLE_SIGNIN_FAILED();
     return google.startRequest(this.config, nonce);
@@ -682,7 +683,7 @@ class AuthService {
    */
   async googleCallback({ code, state, cookie }, rawContext = {}, { fetchImpl } = {}) {
     const back = (params) => `${String(this.config.PUBLIC_SITE_URL).replace(/\/+$/, '')}/login/google?${new URLSearchParams(params)}`;
-    if (!this.googleEnabled()) return back({ error: 'AUTH_GOOGLE_NOT_CONFIGURED' });
+    if (!(await this.googleEnabled())) return back({ error: 'AUTH_GOOGLE_NOT_CONFIGURED' });
     const context = withClientIp(rawContext);
     try {
       const { verifier, nonce } = google.verifierFor(cookie, state, this.config) ?? {};

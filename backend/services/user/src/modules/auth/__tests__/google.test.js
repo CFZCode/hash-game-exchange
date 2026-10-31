@@ -125,7 +125,7 @@ test('exchange: the code alone, or with another tab\'s nonce, is refused (login 
   assert.equal(redeemed, 0, 'a foreign browser never redeems the code');
   await assert.rejects(service.googleExchange({ code, nonce: NONCE }), refused);
   assert.equal(redeemed, 1, 'the starting tab does');
-  assert.throws(() => service.googleStart({}), (e) => e.code === 'AUTH_GOOGLE_SIGNIN_FAILED', 'no nonce, no start');
+  await assert.rejects(service.googleStart({}), (e) => e.code === 'AUTH_GOOGLE_SIGNIN_FAILED', 'no nonce, no start');
 });
 
 test('callback: an email held by a password account is refused, not linked', async () => {
@@ -165,8 +165,20 @@ test('callback: a locked account and a bad state never get a code', async () => 
   assert.equal(codes.length, 0);
 });
 
-test('off without keys: start refuses with GOOGLE_NOT_CONFIGURED', () => {
+test('off without keys: start refuses with GOOGLE_NOT_CONFIGURED', async () => {
   const service = new AuthService({ models: {}, db: {}, config: { ...CONFIG, GOOGLE_CLIENT_ID: undefined }, logger: null });
-  assert.equal(service.googleEnabled(), false);
-  assert.throws(() => service.googleStart(), (e) => e.code === 'AUTH_GOOGLE_NOT_CONFIGURED' && e.status === 503);
+  assert.equal(await service.googleEnabled(), false);
+  await assert.rejects(service.googleStart(), (e) => e.code === 'AUTH_GOOGLE_NOT_CONFIGURED' && e.status === 503);
+});
+
+test("owner's google_signin off: no button, start refused, callback sends the error back", async () => {
+  const { service, codes } = harness({ linked: { id: 77, status: 'active' } });
+  assert.equal(await service.googleEnabled(), true, 'unset = on');
+  service.models.SiteFeature = { findByPk: async (key) => (key === 'google_signin' ? { variant: 'off' } : null) };
+  assert.equal(await service.googleEnabled(), false);
+  await assert.rejects(service.googleStart({ nonce: NONCE }), (e) => e.code === 'AUTH_GOOGLE_NOT_CONFIGURED');
+  const { cookie } = google.startRequest(CONFIG, NONCE);
+  const target = new URL(await service.googleCallback({ code: 'c', state: 's', cookie }, {}, { fetchImpl: fakeFetch(idToken()) }));
+  assert.equal(target.searchParams.get('error'), 'AUTH_GOOGLE_NOT_CONFIGURED');
+  assert.equal(codes.length, 0);
 });

@@ -29,11 +29,11 @@ function createPublicController({ service }) {
     }),
 
     /** Whether the player site should draw the Google button. */
-    googleStatus: asyncHandler(async (_req, res) => response.ok(res, { enabled: service.googleEnabled() })),
+    googleStatus: asyncHandler(async (_req, res) => response.ok(res, { enabled: await service.googleEnabled() })),
 
     /** 302 to Google, after setting the signed state cookie the callback needs. */
     googleStart: asyncHandler(async (req, res) => {
-      const { url, cookie } = service.googleStart({ nonce: req.query.nonce });
+      const { url, cookie } = await service.googleStart({ nonce: req.query.nonce });
       res.cookie(google.COOKIE, cookie, {
         httpOnly: true,
         secure: req.secure || req.headers['x-forwarded-proto'] === 'https',
