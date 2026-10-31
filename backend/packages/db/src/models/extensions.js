@@ -40,6 +40,12 @@ const EXTENSIONS = {
     // ── migration 077-tips ─────────────────────────────────────────────
     // The player's own switch for receiving tips. No row = the default (on).
     tips_enabled: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true, field: 'tips_enabled' },
+    // ── migration 167-userconfig-privacy-email ─────────────────────────
+    hide_gaming_data: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false, field: 'hide_gaming_data' },
+    hide_username: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false, field: 'hide_username' },
+    max_profit_alert: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true, field: 'max_profit_alert' },
+    deposit_email: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true, field: 'deposit_email' },
+    withdraw_email: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true, field: 'withdraw_email' },
   },
 
   // ── migration 008-wager-columns ──────────────────────────────────────

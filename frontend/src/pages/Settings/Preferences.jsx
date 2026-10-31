@@ -6,7 +6,7 @@ import { useGates } from '../../context/gates';
 import { useSession } from '../../context/session';
 import { useSettings } from '../../context/settings';
 import { useResource } from '../../hooks/useResource';
-import { getPrivacy, setRefuseTip, updatePreferences } from '../../services/settings';
+import { getPreferences, getPrivacy, setRefuseTip, updatePreferences } from '../../services/settings';
 import { USE_FIXTURES } from '../../services/client';
 import { toast, toastError } from '../../components/shared/Toast/toast';
 import { getAlias } from '../../utils/currency';
@@ -134,6 +134,36 @@ const PRIVACY_ROWS = [
   },
 ];
 
+/* THIS BUILD'S — the rows the platform now stores per account (`/user/preferences`, migration 167):
+   hide gaming data / username, max profit alert and the two success emails. The server's values
+   are adopted ONCE when the pane opens; a flip is written there and flipped back if refused. */
+const SERVER_PRIVACY_FIELD = { hideGameData: 'hideGamingData', hideName: 'hideUsername' };
+
+function useServerPreferences() {
+  const { setSetting } = useSession();
+  const { setPrivacy } = useSettings();
+  const { data } = useResource(getPreferences);
+  const applied = React.useRef(false);
+  React.useEffect(() => {
+    if (USE_FIXTURES || !data || applied.current) return;
+    applied.current = true;
+    setPrivacy({ hideGameData: data.hideGamingData, hideName: data.hideUsername });
+    setSetting('maxbetAlert', data.maxProfitAlert);
+    setSetting('allowRechargeSuccessEmail', data.depositEmail ? 1 : 0);
+    setSetting('allowWithdrawSuccessEmail', data.withdrawEmail ? 1 : 0);
+  }, [data, setPrivacy, setSetting]);
+}
+
+/** Write one server preference; on refusal run `revert` and show the server's words. */
+const savePreference = (patch, revert) =>
+  USE_FIXTURES
+    ? Promise.resolve()
+    : Promise.resolve(updatePreferences(patch)).catch((failure) => {
+        revert();
+        toastError(failure);
+        throw failure;
+      });
+
 function PrivacyRows() {
   const { session, setSetting } = useSession();
   const { privacy, setPrivacy } = useSettings();
@@ -164,7 +194,14 @@ function PrivacyRows() {
      unwraps an Error into `.error(message)` with the server's own words. */
   const toggle = (row, next) => {
     setPrivacy({ [row.key]: next });
-    if (row.key !== 'refuseTip' || USE_FIXTURES) {
+    if (SERVER_PRIVACY_FIELD[row.key]) {
+      savePreference({ [SERVER_PRIVACY_FIELD[row.key]]: next }, () => setPrivacy({ [row.key]: !next })).then(
+        () => toast(next ? row.on : row.off),
+        () => {},
+      );
+      return;
+    }
+    if (USE_FIXTURES) {
       toast(next ? row.on : row.off);
       return;
     }
@@ -192,7 +229,10 @@ function PrivacyRows() {
         <Switch
           size="small"
           value={session.setting.maxbetAlert}
-          onChange={(next) => setSetting('maxbetAlert', next)}
+          onChange={(next) => {
+            setSetting('maxbetAlert', next);
+            savePreference({ maxProfitAlert: next }, () => setSetting('maxbetAlert', !next)).catch(() => {});
+          }}
         />
       </Row>
     </>
@@ -200,8 +240,9 @@ function PrivacyRows() {
 }
 
 export default function SettingsPreferences() {
-  const { session, setSetting, setAccountField } = useSession();
+  const { session, setSetting } = useSession();
   const [modal, setModal] = React.useState(null);
+  useServerPreferences();
 
   /* `getAlias(localeCurrencyName).replace(/FIAT$/, "")` — the chunk strips the suffix at the call
      site even though `getAlias` is the alias lookup rather than the stripper, which is why both
@@ -297,51 +338,25 @@ export default function SettingsPreferences() {
           <Switch
             size="small"
             value={session.setting.allowRechargeSuccessEmail === 1}
-            onChange={(next) => setSetting('allowRechargeSuccessEmail', next ? 1 : 0)}
+            onChange={(next) => {
+              setSetting('allowRechargeSuccessEmail', next ? 1 : 0);
+              savePreference({ depositEmail: next }, () => setSetting('allowRechargeSuccessEmail', next ? 0 : 1)).catch(() => {});
+            }}
           />
         </Row>
         <Row label="Receive withdraw successful email">
           <Switch
             size="small"
             value={session.setting.allowWithdrawSuccessEmail === 1}
-            onChange={(next) => setSetting('allowWithdrawSuccessEmail', next ? 1 : 0)}
-          />
-        </Row>
-      </Card>
-
-      {/* THE MARKETING PAIR IS ONE REQUEST FOR BOTH ON THE ORIGINAL, debounced by a full second:
-          `pe(fn, 1000)` — lodash `throttle` with `maxWait` — around
-          `POST /account/setting/resetAcceptPromotion/ {acceptPromotion, acceptSmsPromotion}`. So
-          flipping both quickly sends one body carrying both, which is why each of its handlers
-          reads the OTHER switch's current value rather than sending its own field alone.
-
-          THAT ARRANGEMENT IS NOT REPRODUCED, because only one of the two has anywhere to go. The
-          platform's `PATCH /user/preferences` carries `emailNotifications`, which is this row; its
-          `pushNotifications` is a different channel from SMS and mapping one onto the other would
-          be inventing a meaning the server does not have. So the email switch reads and writes and
-          the SMS switch is left as it was — see `services/settings.js` for the full field-by-field
-          reckoning.
-
-          The write is OPTIMISTIC and reverts on failure. The alternative is a switch that does not
-          move until a round trip lands, which reads as a broken control on a slow connection; the
-          revert is what keeps it honest when the server refuses. */}
-      <Card title="Marketing" className="mt-3 sm:mt-4">
-        <Row label="Receive marketing promotions by Email">
-          <Switch
-            size="small"
-            value={session.acceptPromotion}
             onChange={(next) => {
-              setAccountField('acceptPromotion', next);
-              updatePreferences({ emailNotifications: next }).catch(() =>
-                setAccountField('acceptPromotion', !next),
-              );
+              setSetting('allowWithdrawSuccessEmail', next ? 1 : 0);
+              savePreference({ withdrawEmail: next }, () => setSetting('allowWithdrawSuccessEmail', next ? 0 : 1)).catch(() => {});
             }}
           />
         </Row>
-        <Row label="Receive marketing promotions by SMS">
-          <Switch size="small" value={session.acceptSmsPromotion} onChange={() => {}} />
-        </Row>
       </Card>
+
+      {/* No Marketing card: the user asked for it gone (2026-10-31). */}
       </>)}
 
       <LanguageCurrencyModal
