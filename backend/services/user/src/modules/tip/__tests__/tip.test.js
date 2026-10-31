@@ -140,6 +140,8 @@ test('tips', async (t) => {
     clients: { admin: fakeAdmin },
     tipLimits: { limits: async () => currentLimits },
     rewardMoney: fakeRewardMoney,
+    // The withdraw-style rules (KYC, wagering, caps) are covered by tipRequirements.test.js.
+    withdrawRequirements: { assertMet: async () => null, assertCapInTransaction: async () => {} },
   };
   const tips = new TipService(deps);
 
