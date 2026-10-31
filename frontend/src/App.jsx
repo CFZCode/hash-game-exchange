@@ -525,6 +525,8 @@ function AppShell() {
    * page is kept rather than overwritten. */
   const isOverlayRoute =
     showAuth ||
+    // The Google callback renders nothing: the page stays underneath instead of the 404.
+    authMode === 'google' ||
     showDeposit ||
     depositNeedsAuth ||
     userEnterRoute ||
