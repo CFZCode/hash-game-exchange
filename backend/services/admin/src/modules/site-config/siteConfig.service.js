@@ -1496,7 +1496,7 @@ class SiteConfigService {
       config: {
         ...this.config,
         ...(settings.hasAppPassword
-          ? { SMTP_USER: settings.sendFrom, SMTP_PASSWORD: await this.#appPassword() }
+          ? { SMTP_HOST: this.config.SMTP_HOST || 'smtp.gmail.com', SMTP_USER: settings.sendFrom, SMTP_PASSWORD: await this.#appPassword() }
           : {}),
       },
       logger: this.logger,
@@ -1522,6 +1522,16 @@ class SiteConfigService {
   async #appPassword() {
     const row = await this.#configRow(['id', 'gmailapppassword']);
     return row?.gmailapppassword ?? null;
+  }
+
+  /**
+   * Site Config → Email's sender for user-service's player emails (OTP, deposit / withdrawal
+   * success) — INTERNAL only, it carries the app password. Null until both are set.
+   */
+  async mailSender() {
+    const row = await this.#configRow(['id', 'gmailuser', 'gmailapppassword']);
+    if (!row?.gmailuser || !row?.gmailapppassword) return null;
+    return { sendFrom: row.gmailuser, appPassword: row.gmailapppassword };
   }
 
   // ══════════════════════════════════════════════════════════════════════
