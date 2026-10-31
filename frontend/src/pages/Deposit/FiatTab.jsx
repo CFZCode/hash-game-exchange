@@ -7,7 +7,6 @@ import { DEPOSIT_FIATS } from '../../config/hiddenFeatures';
 import { getAlias, toFiatStr } from '../../utils/currency';
 import { coinIcon } from '../../utils/coinArt';
 import { useIsDialog } from '../../context/dialogRoute';
-import SevenDayBanner from './SevenDayBanner';
 import HowToDeposit from './HowToDeposit';
 import ManualDeposit from './ManualDeposit';
 import AutoDeposit from './AutoDeposit';
@@ -475,8 +474,7 @@ export default function FiatTab({ onDepositCrypto }) {
        arm is gated in JS on being a page, not left as a bare utility, for the reason spelled
        out at the same spot in CryptoTab. */
     <div className={`rounded-xl bg-layer4 p-4 ${dialog ? '' : 'lg:px-8'}`}>
-      <SevenDayBanner currencyName={currency} className="ml-auto mt-3" />
-
+      {/* The 7-Day Deposit Guarantee pill (SevenDayBanner.jsx) is removed at the user's request (2026-10-31). */}
       <div className="mt-3 flex items-center justify-between gap-3">
         <div className="relative mr-0 flex flex-auto cursor-pointer items-center justify-between">
           {/* `mb-1.5` is the shared `vw` template's — the same label div the crypto tab uses,
