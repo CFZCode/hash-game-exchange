@@ -49,6 +49,8 @@ export const ACCOUNT_MENU = [
   { label: 'Wallet', link: '/wallet/balance', icon: IconWallet, gated: '!isFiat' },
   { label: 'Withdraw', link: '/wallet/withdraw', icon: IconWithdraw, gated: '!isFiat && !isOfflineAgent' },
   { label: 'Transactions', link: '/wallet/transaction', icon: IconTransaction },
+  /* THIS BUILD'S: opens the Send Tip dialog (components/shared/SendTip), behind the `tips` gate. */
+  { label: 'Send Tip', link: '', action: 'tip', icon: IconTransaction, gate: 'tips' },
   { label: 'Free Plays', link: '/free-plays', icon: IconFreePlays, dot: true },
   { label: 'Bet History', link: '/wallet/bet-history', icon: IconBetHistory },
   /* A demo account has no wallet pages: its bets are the exchange's own My Bets (index.jsx shows it only to one). */

@@ -51,6 +51,8 @@ export const GATES = {
   withdraw: { capability: 'withdraw', rail: ['withdrawal_mode', 'manual'], orAuto: true },
   swap: { feature: 'swap', capability: 'swap' },
   vault: { feature: 'vault', capability: 'vault' },
+  // Send Tip (account menu, /user/enter): the owner's `tips` feature and the player's capability.
+  tips: { feature: 'tips', capability: 'tips', notDemo: true },
   bonus: { flag: 'bonus', feature: 'bonus', capability: 'promotions' },
   vip: { flag: 'vipclub', feature: 'vip', capability: 'promotions' },
   affiliate: { flag: 'affiliate', feature: 'affiliate', capability: 'promotions' },

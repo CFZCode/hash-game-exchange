@@ -41,7 +41,7 @@ export const SITE_UI: Record<string, UiSupport> = {
   banners: { status: 'fixed', variant: 'artwork_slides', surfaces: 'the home hero carousel (artwork from the site admin banners)' },
 
   spin_wheel: { status: 'absent', why: 'The backend has it; this UI has no wheel screen.' },
-  tips: { status: 'absent', why: 'No tip-sending screen in this UI.' },
+  tips: { status: 'toggle', variant: 'peer_to_peer', surfaces: 'account menu Send Tip row, /user/enter Send Tip tile' },
   chat: { status: 'absent', why: 'Chat is socket-only and this UI has no socket client.' },
   club_membership: { status: 'absent', why: 'No club screens in this UI.' },
   push_notifications: { status: 'toggle', variant: 'onesignal', surfaces: 'browser push (frontend/src/services/onesignal.js), site admin Push notifications' },

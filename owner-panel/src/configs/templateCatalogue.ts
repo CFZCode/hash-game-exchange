@@ -49,7 +49,7 @@ export const TEMPLATE_CATALOGUE: TemplateEntry[] = [
       raffles: 'ticket_raffle',
       vault: 'flat_balance',
       swap: 'swap_page',
-      tips: 'none',
+      tips: 'peer_to_peer',
       p2p: 'none',
       chat: 'none',
       notifications: 'notice_centre',

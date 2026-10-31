@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { languageName } from '../../components/modals/LanguageCurrencyModal/languages';
 import { LIVE_SUPPORT_AVAILABLE } from '../../services/availability';
 import { Link, useNavigate } from 'react-router-dom';
@@ -40,6 +41,7 @@ import {
   IconTheme,
 } from './icons';
 import CopyInput from '../../components/shared/CopyInput';
+import SendTip from '../../components/shared/SendTip';
 import { useSettings } from '../../context/settings';
 import { avatarSrc } from '../../services/avatars';
 import balanceCoin from '../../assets/user-enter/balance_coin.png';
@@ -285,6 +287,8 @@ const TILES = [
   { label: 'Swap', Icon: IconSwap, link: '/wallet/swap', show: true },
   { label: 'Vault Pro', Icon: IconVaultPro, link: '/wallet/vault', show: true },
   { label: 'Transaction', Icon: IconTransaction, link: '/wallet/transaction', show: true },
+  /* THIS BUILD'S: the Send Tip dialog (components/shared/SendTip), behind the `tips` gate. */
+  { label: 'Send Tip', Icon: IconTransaction, link: '#tip', show: true, gate: 'tips' },
   { label: 'Rollover', Icon: IconRollover, link: '/wallet/rollover', show: true },
   { label: 'Bet History', Icon: IconBetHistory, link: '/wallet/bet-history', show: true },
   /* A demo account has no wallet pages: its bets are the exchange's own My Bets. */
@@ -296,6 +300,7 @@ const TILES = [
 function BalanceCard() {
   const { session, balances } = useSession();
   const navigate = useNavigate();
+  const [tipOpen, setTipOpen] = useState(false);
   /* What the site and account have on (services/gates.js): an agent's player has no deposit or
      withdraw rail, so neither button, and only the history tiles. All on with fixtures. */
   const { on, routeOn, demo, agentPlayer } = useGates();
@@ -361,11 +366,11 @@ function BalanceCard() {
         )}
 
         <div className="mt-1 flex w-full flex-wrap">
-          {TILES.filter((tile) => tile.show && routeOn(tile.link) && (!tile.demoOnly || demo)).map(({ label, Icon, link }) => (
+          {TILES.filter((tile) => tile.show && routeOn(tile.link) && (!tile.gate || on(tile.gate)) && (!tile.demoOnly || demo)).map(({ label, Icon, link }) => (
             <button
               key={link}
               type="button"
-              onClick={() => navigate(link)}
+              onClick={() => (link === '#tip' ? setTipOpen(true) : navigate(link))}
               className="button center relative mt-2 h-14 w-1/4 flex-none flex-col overflow-hidden px-0 py-0"
             >
               <Icon className="size-6 flex-none fill-secondary" />
@@ -375,6 +380,7 @@ function BalanceCard() {
             </button>
           ))}
         </div>
+        <SendTip open={tipOpen} onClose={() => setTipOpen(false)} />
       </div>
     </div>
   );

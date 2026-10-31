@@ -18,6 +18,7 @@ import ManageAssets from './ManageAssets';
 import DisturbSetting from './DisturbSetting';
 import { useConfirm } from './useConfirm';
 import BonusPanel, { BonusLayer } from './BonusPanel';
+import SendTip from '../../../../components/shared/SendTip';
 import { IconGift, IconArrow, IconAdd } from './icons';
 import { avatarSrc } from '../../../../services/avatars';
 import logoSmall from '../../../../assets/logo_small.png';
@@ -377,9 +378,9 @@ function AccountMenu() {
   /* The original's own `.filter(t => !!t)` over deployment flags, here over the site's and the
      account's gates (services/gates.js): an agent's player loses Withdraw, Buy Crypto, VIP Club,
      Vault Pro and Referral. Every row stays with fixtures. */
-  const { routeOn, demo } = useGates();
+  const { on, routeOn, demo } = useGates();
   const rows = ACCOUNT_MENU.filter(
-    (row) => (!row.link || routeOn(row.link)) && (FREE_PLAYS_ENABLED || row.link !== '/free-plays') && (!row.demoOnly || demo),
+    (row) => (!row.link || routeOn(row.link)) && (!row.gate || on(row.gate)) && (FREE_PLAYS_ENABLED || row.link !== '/free-plays') && (!row.demoOnly || demo),
   );
   /* `+ 1` is the Do Not Disturb row; with it hidden (config/hiddenFeatures) the panel is one row shorter. */
   const panelHeight = (rows.length + (DO_NOT_DISTURB_ENABLED ? 1 : 0)) * 44 + 8;
@@ -389,9 +390,12 @@ function AccountMenu() {
      the top of ConfirmDialog.jsx; the short version is that clicking the dialog satisfies the
      click-outside above, so the dropdown closes underneath it. */
   const [confirm, confirmDialog] = useConfirm();
+  // Outlives the panel for the same reason as the confirm dialog.
+  const [tipOpen, setTipOpen] = React.useState(false);
 
   const go = (row) => {
-    if (row.label === 'Log Out') signOut();
+    if (row.action === 'tip') setTipOpen(true);
+    else if (row.label === 'Log Out') signOut();
     /* `d.link === "refer" ? emit("open-refer") : d.link ? navigate(d.link) : push(<PopSignout/>)`.
        No row carries `refer` today; the branch is the chunk's and is kept so the value has
        somewhere to go if one ever does. */
@@ -458,6 +462,7 @@ function AccountMenu() {
       )}
 
       {confirmDialog}
+      <SendTip open={tipOpen} onClose={() => setTipOpen(false)} />
     </div>
   );
 }
