@@ -53,6 +53,15 @@ let openedWith = null;
 /** When the last C.CREDIT push landed: a sync asked before it carries the balances from before it. */
 let pushedAt = 0;
 
+/* Every socket event in the browser console: on in development, and on a live site after
+   `localStorage.socketDebug = '1'` in the console (then reload). Off for players otherwise. */
+const DEBUG =
+  process.env.NODE_ENV !== 'production' ||
+  (typeof window !== 'undefined' && (() => { try { return localStorage.getItem('socketDebug') === '1'; } catch { return false; } })());
+const debug = (...args) => {
+  if (DEBUG) console.log('%c[socket]', 'color:#24EE89;font-weight:bold', ...args);
+};
+
 /** Every state the socket brings, newest first to a new subscriber. Returns unsubscribe. */
 export const onLiveState = subscribe;
 export const liveState = storedState;
@@ -102,6 +111,7 @@ function sync() {
       (state) => {
         // Asked before a balance push: keep the pushed balances, not this older read's.
         const pushed = askedAt < pushedAt ? storedState()?.balances : null;
+        debug('sync reply', state);
         publishLiveState(pushed ? { ...state, balances: pushed } : state, token, askedAt);
       },
       () => {},
@@ -134,6 +144,7 @@ function applyCredit(frame) {
   const balances = { ...last.balances };
   for (const [code, value] of Object.entries(body.credit)) balances[code.toUpperCase()] = value;
   pushedAt = Date.now();
+  debug('balance push', body.credit);
   publishLiveState({ ...last, balances }, openedWith);
 }
 
@@ -167,6 +178,10 @@ export function startRealtime() {
     reconnectionDelay: 1000,
     reconnectionDelayMax: 5000,
   });
+  socket.on('connect', () => debug('connected', socket.id, openedWith ? '(signed in)' : '(visitor)'));
+  socket.on('disconnect', (reason) => debug('disconnected:', reason));
+  socket.on('connect_error', (error) => debug('connect error:', error?.message));
+  socket.onAny((event) => debug('push', event === CREDIT ? 'C.CREDIT (balance moved)' : event));
   socket.on('connect', sync);
   PUSHES.forEach((name) => socket.on(name, sync));
   socket.on(CREDIT, applyCredit);
