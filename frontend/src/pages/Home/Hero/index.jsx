@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSession } from '../../../context/session';
 import { useCanSignUp, useGates } from '../../../context/gates';
@@ -14,7 +15,7 @@ const WHITELABEL = process.env.NEXT_PUBLIC_WHITELABEL_MODE === 'true';
 /* Figma "Frame 146" (372×215 @2x): the phone banner, two players on the right. */
 const DEFAULT_HERO_ART_MOBILE = '/brand/parker567-hero-mobile.jpg';
 import googleIcon from '../../../assets/google.png';
-import { startGoogleLogin } from '../../../services/googleAuth';
+import GoogleSignUpConfirm from '../../../components/shared/GoogleSignUpConfirm';
 import telegramIcon from '../../../assets/telegram.png';
 import './Hero.css';
 
@@ -30,6 +31,8 @@ const HeroCopy = () => {
   const canSignUp = useCanSignUp();
   // Agent mode keeps the poster art signed out, with none of its sign-up copy (user, 2026-10-25).
   const { agentPlayer } = useGates();
+  // "Or Register With Google" is a sign-up: the reference's confirmation first.
+  const [googleConfirm, setGoogleConfirm] = useState(false);
   if (agentPlayer) return null;
 
   return (
@@ -60,7 +63,7 @@ const HeroCopy = () => {
             <button
               className="button h-8 w-[5.5rem] flex-none gap-1 rounded-lg border border-third bg-black_alpha5 p-0 text-xs backdrop-blur-sm sm:h-10 sm:w-[120px] sm:text-base"
               type="button"
-              onClick={startGoogleLogin}
+              onClick={() => setGoogleConfirm(true)}
             >
               <img alt="google" className="size-[0.875rem] sm:size-5" src={googleIcon} />
               <span className="font-extrabold text-primary">Google</span>
@@ -82,6 +85,7 @@ const HeroCopy = () => {
       </>
         </>
       )}
+      <GoogleSignUpConfirm open={googleConfirm} onClose={() => setGoogleConfirm(false)} />
     </div>
   );
 };

@@ -9,6 +9,7 @@ import { useIsDesktop } from '../../../hooks/useMediaQuery';
 import Loading from '../../shared/Loading';
 import Input from '../../shared/Input';
 import PopCenter from '../../shared/PopCenter';
+import GoogleSignUpConfirm from '../../shared/GoogleSignUpConfirm';
 import { IconTwoFactor } from '../../../pages/Settings/icons';
 import googleImg from '../../../assets/google.png';
 import {
@@ -446,6 +447,7 @@ function SignUpForm({ onSubmit, error, onClearError }) {
   /* Pre-ticked on the live dialog — `aria-selected="true"` on a freshly opened one. */
   const [agreed, setAgreed] = React.useState(true);
   const [moreOpen, setMoreOpen] = React.useState(false);
+  const [googleConfirm, setGoogleConfirm] = React.useState(false);
 
   const usernameBad = username.trim().length > 0 && !USERNAME_RULE.test(username.trim());
   const emailBad = email.trim().length > 0 && !EMAIL_RULE.test(email.trim());
@@ -675,7 +677,7 @@ function SignUpForm({ onSubmit, error, onClearError }) {
             {googleOn && (
             <button
               type="button"
-              onClick={startGoogleLogin}
+              onClick={() => setGoogleConfirm(true)}
               className="button button-m h-11 flex-1 bg-layer4 shadow-[0px_2px_4px_rgba(0,0,0,0.10)]"
             >
               {/* An <img>, not an SVG — the original inlines the four-colour mark as a 40x40
@@ -722,6 +724,7 @@ function SignUpForm({ onSubmit, error, onClearError }) {
         </div>
       </DirectRow>
       )}
+      <GoogleSignUpConfirm open={googleConfirm} onClose={() => setGoogleConfirm(false)} />
     </>
   );
 }
