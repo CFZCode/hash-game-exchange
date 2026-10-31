@@ -5,9 +5,9 @@
 export const SESSION_COOKIE = `${(process.env.SITE_NAME || 'site').toLowerCase().replace(/[^a-z0-9]+/g, '_')}_owner_session`
 
 export const siteConfig = {
-  key: 'hash-game-exchange',
+  key: 'parker567',
   name: 'Owner Panel',
-  tagline: 'hash-game-exchange',
+  tagline: 'parker567',
   environment: process.env.NEXT_PUBLIC_ENV_LABEL ?? 'localhost'
 } as const
 
@@ -22,7 +22,7 @@ export const serverConfig = {
 
   // Ed25519 private key (base64 PKCS8 DER). The backend holds only the public half.
   signingKey: process.env.OWNER_SIGNING_KEY ?? '',
-  siteKey: process.env.SITE_KEY || 'hash-game-exchange',
+  siteKey: process.env.SITE_KEY || 'parker567',
   siteName: process.env.SITE_NAME || 'Parker567',
   gatewayUrl: process.env.SITE_GATEWAY_URL || process.env.NEXT_PUBLIC_API_BASE || 'https://api.parker567.com',
   adminUrl: process.env.SITE_ADMIN_URL ?? '',

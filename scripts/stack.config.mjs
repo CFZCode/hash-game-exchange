@@ -2,7 +2,7 @@
  * The one place this client's stack decides its site key, database and ports.
  * Read by scripts/make-env.mjs (writes the env files) and scripts/dev.mjs (runs everything).
  */
-export const SITE_KEY = 'hash-game-exchange'
+export const SITE_KEY = 'parker567'
 export const SITE_NAME = 'Parker567'
 export const SITE_TEMPLATE = 'bcgame' // resolves to the catalogue template `emerald_dark`
 export const DB_NAME = 'parker567'

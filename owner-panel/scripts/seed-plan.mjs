@@ -25,7 +25,7 @@ import { templateByKey } from '../src/configs/templateCatalogue.ts'
 import { diffDocs, planSeed } from './seed-owner.mjs'
 
 const panel = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const SITE = process.env.SITE_KEY || 'hash-game-exchange'
+const SITE = process.env.SITE_KEY || 'parker567'
 const TEMPLATE = 'emerald_dark' // = bcgame
 const USER = 'seed-plan'
 

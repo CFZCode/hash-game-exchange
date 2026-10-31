@@ -138,7 +138,7 @@ function parseStaff(text, site) {
 const ownerEnv = parseEnv(readText(path.join(PANEL, '.env.local')))
 const player = parsePlayer(readText(path.join(REPO, 'credentials.md')))
 const hubFile = process.env.E2E_HUB_CREDENTIALS || path.resolve(REPO, '..', '..', 'admins', 'CREDENTIALS.md')
-const staff = parseStaff(readText(hubFile), ownerEnv.SITE_KEY || 'hash-game-exchange')
+const staff = parseStaff(readText(hubFile), ownerEnv.SITE_KEY || 'parker567')
 
 const CREDS = {
   ownerUser: process.env.E2E_OWNER_USER || ownerEnv.OWNER_USERNAME,
