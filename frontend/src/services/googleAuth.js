@@ -41,16 +41,60 @@ export const takeGoogleNonce = () => {
   }
 };
 
+/* Google opens in a POPUP and this tab stays put (user's request, 2026-10-31). Google's pages set a
+   Cross-Origin-Opener-Policy that cuts `window.opener`, so the popup's callback page hands the result
+   back over a same-origin BroadcastChannel instead; this tab then completes it at /login/google with
+   ITS nonce. A blocked popup (or no BroadcastChannel) falls back to the old same-tab redirect. */
+const CHANNEL = 'google-signin';
+
+function awaitPopup() {
+  const channel = new BroadcastChannel(CHANNEL);
+  channel.onmessage = ({ data }) => {
+    if (data?.type !== 'result') return;
+    channel.postMessage({ type: 'ack' });
+    channel.close();
+    window.history.pushState(null, '', `/login/google?${data.query}`);
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  };
+}
+
+/** On the callback page: give the result to a tab waiting on a popup. True when one took it. */
+export const handToOpener = (query) =>
+  new Promise((resolve) => {
+    if (typeof BroadcastChannel === 'undefined') return resolve(false);
+    const channel = new BroadcastChannel(CHANNEL);
+    const timer = setTimeout(() => {
+      channel.close();
+      resolve(false);
+    }, 500);
+    channel.onmessage = ({ data }) => {
+      if (data?.type !== 'ack') return;
+      clearTimeout(timer);
+      channel.close();
+      resolve(true);
+    };
+    channel.postMessage({ type: 'result', query });
+  });
+
 /* The hero draws the button whether or not the keys are set (user's request), so the press checks
-   first and says so instead of landing on the API's NOT_CONFIGURED page. */
-export const startGoogleLogin = () =>
-  Promise.resolve(getGoogleLogin())
+   first and says so instead of landing on the API's NOT_CONFIGURED page. The popup is opened
+   inside the click itself: one opened after the status await would be blocked. */
+export const startGoogleLogin = () => {
+  const popup = typeof BroadcastChannel === 'undefined' ? null : window.open('', CHANNEL, 'popup,width=500,height=650');
+  return Promise.resolve(getGoogleLogin())
     .catch(() => false)
-    .then((on) =>
-      on
-        ? window.location.assign(`${GOOGLE_START_URL}?nonce=${newNonce()}`)
-        : toast.error(GOOGLE_ERRORS.AUTH_GOOGLE_NOT_CONFIGURED)
-    );
+    .then((on) => {
+      if (!on) {
+        popup?.close();
+        toast.error(GOOGLE_ERRORS.AUTH_GOOGLE_NOT_CONFIGURED);
+        return;
+      }
+      const url = `${GOOGLE_START_URL}?nonce=${newNonce()}`;
+      if (!popup) return window.location.assign(url);
+      awaitPopup();
+      popup.location.href = url;
+    });
+};
 
 /* Platform error codes the callback can come back with → what the player reads. */
 export const GOOGLE_ERRORS = {
