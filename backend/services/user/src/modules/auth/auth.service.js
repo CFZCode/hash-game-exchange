@@ -708,6 +708,7 @@ class AuthService {
       );
       return back({ code: oneTime });
     } catch (error) {
+      if (!error.code) this.logger?.warn({ err: error.message }, 'Google sign-in failed after Google answered');
       return back({ error: error.code ?? 'AUTH_GOOGLE_SIGNIN_FAILED' });
     }
   }
@@ -723,7 +724,9 @@ class AuthService {
     for (let i = 0; i < 5 && (await this.models.Users.findOne({ where: { name: username }, attributes: ['id'], raw: true })); i += 1) {
       username = `${base}${crypto.randomInt(1000, 9999)}`;
     }
-    const created = await this.#insertPlayer({ username, email, passwordHash: null, ip: context.ip, googleSub: sub });
+    // users.password is NOT NULL: a random hash nobody knows, so the password sign-in stays closed
+    // until the player sets one through "forgot password".
+    const created = await this.#insertPlayer({ username, email, passwordHash: await hashPassword(randomToken(24)), ip: context.ip, googleSub: sub });
     await this.#linkReferrer({ userId: created.id, referredBy: null });
     this.logger?.info({ userId: String(created.id) }, 'Player registered with Google');
     this.#trackLogin(created.id, context, 'register');
