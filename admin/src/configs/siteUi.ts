@@ -35,6 +35,7 @@ export const SITE_UI: Record<string, UiSupport> = {
   club_membership: { status: 'absent', why: 'No club screens in this UI.' },
   push_notifications: { status: 'toggle', variant: 'onesignal', surfaces: 'browser push notifications, sent from the Push notifications pages' },
   analytics: { status: 'absent', why: 'This UI does not load a Google tag.' },
+  live_tv: { status: 'toggle', variant: 'gated', surfaces: 'the TV button on a sports match (minimum balance and inactive hours under Settings)' },
   blog: { status: 'absent', why: "This UI's Blog row is a link to an off-site blog; there is no blog page." }
 }
 
