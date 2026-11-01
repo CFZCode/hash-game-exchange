@@ -82,6 +82,11 @@ function view(r) {
   };
 }
 
+/** Did anything happen in a statement's period: play, a paid gateway order, a transfer? */
+const hadActivity = (st) =>
+  st.products.some((p) => (p.betCount ?? 0) > 0 || (p.ggr != null && !money.isZero(p.ggr))) ||
+  st.gateway.depositCount + st.gateway.withdrawalCount + st.transfers.count > 0;
+
 const transferView = (t) => ({
   id: String(t.id),
   amount: money.fromStored(t.amount),
@@ -309,10 +314,15 @@ class WhitelabelsService {
 
   /** Every whitelabel that has been live: one statement each, and the totals. */
   async reportAll({ from, to }) {
-    // Anything that may have run in the period (a deleted one too); never-built rows have nothing.
+    // Never-built rows have nothing. A deleted one shows only when it had activity in the period
+    // (its last month is still owed); otherwise it is gone from the report as from the list.
     const rows = await this.#q(`SELECT * FROM whitelabels WHERE status NOT IN ('queued', 'creating') ORDER BY id`);
     const statements = [];
-    for (const row of rows) statements.push({ id: Number(row.id), name: row.name, slug: row.slug, status: row.status, ...(await this.#statement(row, { from, to })) });
+    for (const row of rows) {
+      const statement = await this.#statement(row, { from, to });
+      if (['deleting', 'deleted'].includes(row.status) && !hadActivity(statement)) continue;
+      statements.push({ id: Number(row.id), name: row.name, slug: row.slug, status: row.status, ...statement });
+    }
     const sum = (key) => money.toDecimalString(statements.reduce((n, s) => n + money.toMinorQuantised(s[key]), 0n));
     return { from, to, currency: 'INR', whitelabels: statements, totalGgr: sum('totalGgr'), totalShare: sum('totalShare') };
   }

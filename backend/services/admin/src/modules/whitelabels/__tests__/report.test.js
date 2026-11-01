@@ -75,7 +75,7 @@ test('statement from the database', async (t) => {
     await q(`DELETE FROM whitelabel_casino_rounds WHERE whitelabel_id = :wlId`, { wlId });
     await q(`DELETE FROM whitelabel_gateway_orders WHERE whitelabel_id = :wlId`, { wlId });
     await q(`DELETE FROM whitelabel_transfers WHERE whitelabel_id = :wlId`, { wlId });
-    await q(`DELETE FROM whitelabels WHERE id = :wlId`, { wlId });
+    await q(`DELETE FROM whitelabels WHERE id IN (:wlId, :quiet)`, { wlId, quiet: wlId + 1 });
   };
   t.after(async () => {
     try {
@@ -147,8 +147,16 @@ test('statement from the database', async (t) => {
   assert.equal(report.transfers.amount, '100000.00000000');
   assert.deepEqual(report.copyFigures, { currency: 'INR', casinoGgr: '1100.00000000', originalsGgr: '-200.00000000' });
 
+  // A deleted whitelabel with nothing in the month is left out; one with activity stays (its month is owed).
+  await q(
+    `INSERT INTO whitelabels (id, slug, name, site_domain, admin_domain, api_domain, template, company_role_name, company_name, company_email, link_key, status)
+     VALUES (:id, :slug, 'Gone', :site, :admin, :api, 'hash_game', 'Company', 'Co', 'co@test.invalid', 'x', 'deleted')`,
+    { id: wlId + 1, slug: `gone-${wlId}`, site: `g${wlId}.test.invalid`, admin: `ga${wlId}.test.invalid`, api: `gp${wlId}.test.invalid` }
+  );
+  await q(`UPDATE whitelabels SET status = 'deleted' WHERE id = :wlId`, { wlId });
   const all = await service.reportAll({ from: '2026-10-01', to: '2026-11-01' });
+  assert.equal(all.whitelabels.some((w) => w.id === wlId + 1), false, 'a deleted whitelabel with no activity is not listed');
   const mine = all.whitelabels.find((w) => w.id === wlId);
-  assert.equal(mine.totalShare, '210.00000000');
-  assert.ok(money.gte(all.totalShare, '210'));
+  assert.equal(mine.totalShare, '90.00000000', 'deleted but active: listed (sports cannot be asked of it any more)');
+  assert.ok(money.gte(all.totalShare, '90'));
 });

@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 
-import { EyeIcon, PlusIcon } from 'lucide-react'
+import { ChartColumnIcon, EyeIcon, PlusIcon } from 'lucide-react'
 
 import DataTable, { type Column } from '@/components/shared/DataTable'
 import DateTime from '@/components/shared/DateTime'
@@ -52,9 +52,16 @@ const WhitelabelsList = () => {
       header: '',
       align: 'right',
       cell: r => (
-        <Button variant='ghost' size='icon-sm' aria-label='Open' title='Open' nativeButton={false} render={<Link href={`/whitelabels/${r.id}`} />}>
-          <EyeIcon />
-        </Button>
+        <div className='flex justify-end gap-1'>
+          {!['queued', 'creating'].includes(r.status) && (
+            <Button variant='ghost' size='sm' nativeButton={false} render={<Link href={`/whitelabels/report?id=${r.id}`} />}>
+              <ChartColumnIcon /> Report
+            </Button>
+          )}
+          <Button variant='ghost' size='icon-sm' aria-label='Open' title='Open' nativeButton={false} render={<Link href={`/whitelabels/${r.id}`} />}>
+            <EyeIcon />
+          </Button>
+        </div>
       )
     }
   ]
