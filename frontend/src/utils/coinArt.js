@@ -61,4 +61,6 @@ const coins = globMaps.coins;
    which is why this is recorded rather than reconciled. */
 /* A coin this build has no file for (USDP, MKR, MVR…) falls back to the owner's own artwork from
    `/admin/currencies/public`, so it never renders as an empty box. */
-export const coinIcon = (currencyName) => coins[`../assets/coins/${currencyName}.png`] ?? ownerImage(currencyName);
+// A bare fiat code ("INR", the owner's default currency) finds its `INRFIAT` file too.
+export const coinIcon = (currencyName) =>
+  coins[`../assets/coins/${currencyName}.png`] ?? coins[`../assets/coins/${currencyName}FIAT.png`] ?? ownerImage(currencyName);
