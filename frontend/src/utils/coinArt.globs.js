@@ -55,106 +55,107 @@ import g0_49 from '../assets/coins/ETH.png';
 import g0_50 from '../assets/coins/EURFIAT.png';
 import g0_51 from '../assets/coins/FIL.png';
 import g0_52 from '../assets/coins/GBPFIAT.png';
-import g0_53 from '../assets/coins/GHSFIAT.png';
-import g0_54 from '../assets/coins/GMX.png';
-import g0_55 from '../assets/coins/GNFFIAT.png';
-import g0_56 from '../assets/coins/GODS.png';
-import g0_57 from '../assets/coins/HBAR.png';
-import g0_58 from '../assets/coins/HNT.png';
-import g0_59 from '../assets/coins/ICP.png';
-import g0_60 from '../assets/coins/IDRFIAT.png';
-import g0_61 from '../assets/coins/INRFIAT.png';
-import g0_62 from '../assets/coins/IOTX.png';
-import g0_63 from '../assets/coins/JMDFIAT.png';
-import g0_64 from '../assets/coins/JPYFIAT.png';
-import g0_65 from '../assets/coins/KAVA.png';
-import g0_66 from '../assets/coins/KESFIAT.png';
-import g0_67 from '../assets/coins/KGSFIAT.png';
-import g0_68 from '../assets/coins/KHRFIAT.png';
-import g0_69 from '../assets/coins/KLAY.png';
-import g0_70 from '../assets/coins/KRWFIAT.png';
-import g0_71 from '../assets/coins/KSM.png';
-import g0_72 from '../assets/coins/KZTFIAT.png';
-import g0_73 from '../assets/coins/LINK.png';
-import g0_74 from '../assets/coins/LKRFIAT.png';
-import g0_75 from '../assets/coins/LTC.png';
-import g0_76 from '../assets/coins/LUNA.png';
-import g0_77 from '../assets/coins/MANA.png';
-import g0_78 from '../assets/coins/MATIC.png';
-import g0_79 from '../assets/coins/MDLFIAT.png';
-import g0_80 from '../assets/coins/MMKFIAT.png';
-import g0_81 from '../assets/coins/MXNFIAT.png';
-import g0_82 from '../assets/coins/MYRFIAT.png';
-import g0_83 from '../assets/coins/NANO.png';
-import g0_84 from '../assets/coins/NEAR.png';
-import g0_85 from '../assets/coins/NEXO.png';
-import g0_86 from '../assets/coins/NGNFIAT.png';
-import g0_87 from '../assets/coins/NOKFIAT.png';
-import g0_88 from '../assets/coins/NPRFIAT.png';
-import g0_89 from '../assets/coins/NZDFIAT.png';
-import g0_90 from '../assets/coins/OP.png';
-import g0_91 from '../assets/coins/PENFIAT.png';
-import g0_92 from '../assets/coins/PEOPLE.png';
-import g0_93 from '../assets/coins/PEPE.png';
-import g0_94 from '../assets/coins/PHPFIAT.png';
-import g0_95 from '../assets/coins/PKRFIAT.png';
-import g0_96 from '../assets/coins/PLNFIAT.png';
-import g0_97 from '../assets/coins/QTUM.png';
-import g0_98 from '../assets/coins/ROSE.png';
-import g0_99 from '../assets/coins/RUBFIAT.png';
-import g0_100 from '../assets/coins/RUNE.png';
-import g0_101 from '../assets/coins/RVN.png';
-import g0_102 from '../assets/coins/RWFFIAT.png';
-import g0_103 from '../assets/coins/SAND.png';
-import g0_104 from '../assets/coins/SATS.png';
-import g0_105 from '../assets/coins/SC.png';
-import g0_106 from '../assets/coins/SEKFIAT.png';
-import g0_107 from '../assets/coins/SHIB.png';
-import g0_108 from '../assets/coins/SOL.png';
-import g0_109 from '../assets/coins/SUI.png';
-import g0_110 from '../assets/coins/SUSHI.png';
-import g0_111 from '../assets/coins/TFUEL.png';
-import g0_112 from '../assets/coins/THBFIAT.png';
-import g0_113 from '../assets/coins/THETA.png';
-import g0_114 from '../assets/coins/TJSFIAT.png';
-import g0_115 from '../assets/coins/TNDFIAT.png';
-import g0_116 from '../assets/coins/TOMO.png';
-import g0_117 from '../assets/coins/TON.png';
-import g0_118 from '../assets/coins/TRUMP.png';
-import g0_119 from '../assets/coins/TRX.png';
-import g0_120 from '../assets/coins/TRYFIAT.png';
-import g0_121 from '../assets/coins/TUSD.png';
-import g0_122 from '../assets/coins/TWDFIAT.png';
-import g0_123 from '../assets/coins/TWT.png';
-import g0_124 from '../assets/coins/TZSFIAT.png';
-import g0_125 from '../assets/coins/UAHFIAT.png';
-import g0_126 from '../assets/coins/UGXFIAT.png';
-import g0_127 from '../assets/coins/UNI.png';
-import g0_128 from '../assets/coins/USDC.png';
-import g0_129 from '../assets/coins/USDFIAT.png';
-import g0_130 from '../assets/coins/USDT.png';
-import g0_131 from '../assets/coins/UST.png';
-import g0_132 from '../assets/coins/UZSFIAT.png';
-import g0_133 from '../assets/coins/VESFIAT.png';
-import g0_134 from '../assets/coins/VET.png';
-import g0_135 from '../assets/coins/VNDFIAT.png';
-import g0_136 from '../assets/coins/VTHO.png';
-import g0_137 from '../assets/coins/WAVES.png';
-import g0_138 from '../assets/coins/WAXP.png';
-import g0_139 from '../assets/coins/WBNB.png';
-import g0_140 from '../assets/coins/WBTC.png';
-import g0_141 from '../assets/coins/WLD.png';
-import g0_142 from '../assets/coins/XAFFIAT.png';
-import g0_143 from '../assets/coins/XLM.png';
-import g0_144 from '../assets/coins/XMR.png';
-import g0_145 from '../assets/coins/XOFFIAT.png';
-import g0_146 from '../assets/coins/XRP.png';
-import g0_147 from '../assets/coins/XTZ.png';
-import g0_148 from '../assets/coins/YFI.png';
-import g0_149 from '../assets/coins/YGG.png';
-import g0_150 from '../assets/coins/ZARFIAT.png';
-import g0_151 from '../assets/coins/ZIL.png';
-import g0_152 from '../assets/coins/ZMWFIAT.png';
+import g0_53 from '../assets/coins/GELFIAT.png';
+import g0_54 from '../assets/coins/GHSFIAT.png';
+import g0_55 from '../assets/coins/GMX.png';
+import g0_56 from '../assets/coins/GNFFIAT.png';
+import g0_57 from '../assets/coins/GODS.png';
+import g0_58 from '../assets/coins/HBAR.png';
+import g0_59 from '../assets/coins/HNT.png';
+import g0_60 from '../assets/coins/ICP.png';
+import g0_61 from '../assets/coins/IDRFIAT.png';
+import g0_62 from '../assets/coins/INRFIAT.png';
+import g0_63 from '../assets/coins/IOTX.png';
+import g0_64 from '../assets/coins/JMDFIAT.png';
+import g0_65 from '../assets/coins/JPYFIAT.png';
+import g0_66 from '../assets/coins/KAVA.png';
+import g0_67 from '../assets/coins/KESFIAT.png';
+import g0_68 from '../assets/coins/KGSFIAT.png';
+import g0_69 from '../assets/coins/KHRFIAT.png';
+import g0_70 from '../assets/coins/KLAY.png';
+import g0_71 from '../assets/coins/KRWFIAT.png';
+import g0_72 from '../assets/coins/KSM.png';
+import g0_73 from '../assets/coins/KZTFIAT.png';
+import g0_74 from '../assets/coins/LINK.png';
+import g0_75 from '../assets/coins/LKRFIAT.png';
+import g0_76 from '../assets/coins/LTC.png';
+import g0_77 from '../assets/coins/LUNA.png';
+import g0_78 from '../assets/coins/MANA.png';
+import g0_79 from '../assets/coins/MATIC.png';
+import g0_80 from '../assets/coins/MDLFIAT.png';
+import g0_81 from '../assets/coins/MMKFIAT.png';
+import g0_82 from '../assets/coins/MXNFIAT.png';
+import g0_83 from '../assets/coins/MYRFIAT.png';
+import g0_84 from '../assets/coins/NANO.png';
+import g0_85 from '../assets/coins/NEAR.png';
+import g0_86 from '../assets/coins/NEXO.png';
+import g0_87 from '../assets/coins/NGNFIAT.png';
+import g0_88 from '../assets/coins/NOKFIAT.png';
+import g0_89 from '../assets/coins/NPRFIAT.png';
+import g0_90 from '../assets/coins/NZDFIAT.png';
+import g0_91 from '../assets/coins/OP.png';
+import g0_92 from '../assets/coins/PENFIAT.png';
+import g0_93 from '../assets/coins/PEOPLE.png';
+import g0_94 from '../assets/coins/PEPE.png';
+import g0_95 from '../assets/coins/PHPFIAT.png';
+import g0_96 from '../assets/coins/PKRFIAT.png';
+import g0_97 from '../assets/coins/PLNFIAT.png';
+import g0_98 from '../assets/coins/QTUM.png';
+import g0_99 from '../assets/coins/ROSE.png';
+import g0_100 from '../assets/coins/RUBFIAT.png';
+import g0_101 from '../assets/coins/RUNE.png';
+import g0_102 from '../assets/coins/RVN.png';
+import g0_103 from '../assets/coins/RWFFIAT.png';
+import g0_104 from '../assets/coins/SAND.png';
+import g0_105 from '../assets/coins/SATS.png';
+import g0_106 from '../assets/coins/SC.png';
+import g0_107 from '../assets/coins/SEKFIAT.png';
+import g0_108 from '../assets/coins/SHIB.png';
+import g0_109 from '../assets/coins/SOL.png';
+import g0_110 from '../assets/coins/SUI.png';
+import g0_111 from '../assets/coins/SUSHI.png';
+import g0_112 from '../assets/coins/TFUEL.png';
+import g0_113 from '../assets/coins/THBFIAT.png';
+import g0_114 from '../assets/coins/THETA.png';
+import g0_115 from '../assets/coins/TJSFIAT.png';
+import g0_116 from '../assets/coins/TNDFIAT.png';
+import g0_117 from '../assets/coins/TOMO.png';
+import g0_118 from '../assets/coins/TON.png';
+import g0_119 from '../assets/coins/TRUMP.png';
+import g0_120 from '../assets/coins/TRX.png';
+import g0_121 from '../assets/coins/TRYFIAT.png';
+import g0_122 from '../assets/coins/TUSD.png';
+import g0_123 from '../assets/coins/TWDFIAT.png';
+import g0_124 from '../assets/coins/TWT.png';
+import g0_125 from '../assets/coins/TZSFIAT.png';
+import g0_126 from '../assets/coins/UAHFIAT.png';
+import g0_127 from '../assets/coins/UGXFIAT.png';
+import g0_128 from '../assets/coins/UNI.png';
+import g0_129 from '../assets/coins/USDC.png';
+import g0_130 from '../assets/coins/USDFIAT.png';
+import g0_131 from '../assets/coins/USDT.png';
+import g0_132 from '../assets/coins/UST.png';
+import g0_133 from '../assets/coins/UZSFIAT.png';
+import g0_134 from '../assets/coins/VESFIAT.png';
+import g0_135 from '../assets/coins/VET.png';
+import g0_136 from '../assets/coins/VNDFIAT.png';
+import g0_137 from '../assets/coins/VTHO.png';
+import g0_138 from '../assets/coins/WAVES.png';
+import g0_139 from '../assets/coins/WAXP.png';
+import g0_140 from '../assets/coins/WBNB.png';
+import g0_141 from '../assets/coins/WBTC.png';
+import g0_142 from '../assets/coins/WLD.png';
+import g0_143 from '../assets/coins/XAFFIAT.png';
+import g0_144 from '../assets/coins/XLM.png';
+import g0_145 from '../assets/coins/XMR.png';
+import g0_146 from '../assets/coins/XOFFIAT.png';
+import g0_147 from '../assets/coins/XRP.png';
+import g0_148 from '../assets/coins/XTZ.png';
+import g0_149 from '../assets/coins/YFI.png';
+import g0_150 from '../assets/coins/YGG.png';
+import g0_151 from '../assets/coins/ZARFIAT.png';
+import g0_152 from '../assets/coins/ZIL.png';
+import g0_153 from '../assets/coins/ZMWFIAT.png';
 
 /* import.meta.glob('../assets/coins/*.png', { eager: true, import: 'default' }) */
 export const coins = {
@@ -211,104 +212,105 @@ export const coins = {
   '../assets/coins/EURFIAT.png': g0_50,
   '../assets/coins/FIL.png': g0_51,
   '../assets/coins/GBPFIAT.png': g0_52,
-  '../assets/coins/GHSFIAT.png': g0_53,
-  '../assets/coins/GMX.png': g0_54,
-  '../assets/coins/GNFFIAT.png': g0_55,
-  '../assets/coins/GODS.png': g0_56,
-  '../assets/coins/HBAR.png': g0_57,
-  '../assets/coins/HNT.png': g0_58,
-  '../assets/coins/ICP.png': g0_59,
-  '../assets/coins/IDRFIAT.png': g0_60,
-  '../assets/coins/INRFIAT.png': g0_61,
-  '../assets/coins/IOTX.png': g0_62,
-  '../assets/coins/JMDFIAT.png': g0_63,
-  '../assets/coins/JPYFIAT.png': g0_64,
-  '../assets/coins/KAVA.png': g0_65,
-  '../assets/coins/KESFIAT.png': g0_66,
-  '../assets/coins/KGSFIAT.png': g0_67,
-  '../assets/coins/KHRFIAT.png': g0_68,
-  '../assets/coins/KLAY.png': g0_69,
-  '../assets/coins/KRWFIAT.png': g0_70,
-  '../assets/coins/KSM.png': g0_71,
-  '../assets/coins/KZTFIAT.png': g0_72,
-  '../assets/coins/LINK.png': g0_73,
-  '../assets/coins/LKRFIAT.png': g0_74,
-  '../assets/coins/LTC.png': g0_75,
-  '../assets/coins/LUNA.png': g0_76,
-  '../assets/coins/MANA.png': g0_77,
-  '../assets/coins/MATIC.png': g0_78,
-  '../assets/coins/MDLFIAT.png': g0_79,
-  '../assets/coins/MMKFIAT.png': g0_80,
-  '../assets/coins/MXNFIAT.png': g0_81,
-  '../assets/coins/MYRFIAT.png': g0_82,
-  '../assets/coins/NANO.png': g0_83,
-  '../assets/coins/NEAR.png': g0_84,
-  '../assets/coins/NEXO.png': g0_85,
-  '../assets/coins/NGNFIAT.png': g0_86,
-  '../assets/coins/NOKFIAT.png': g0_87,
-  '../assets/coins/NPRFIAT.png': g0_88,
-  '../assets/coins/NZDFIAT.png': g0_89,
-  '../assets/coins/OP.png': g0_90,
-  '../assets/coins/PENFIAT.png': g0_91,
-  '../assets/coins/PEOPLE.png': g0_92,
-  '../assets/coins/PEPE.png': g0_93,
-  '../assets/coins/PHPFIAT.png': g0_94,
-  '../assets/coins/PKRFIAT.png': g0_95,
-  '../assets/coins/PLNFIAT.png': g0_96,
-  '../assets/coins/QTUM.png': g0_97,
-  '../assets/coins/ROSE.png': g0_98,
-  '../assets/coins/RUBFIAT.png': g0_99,
-  '../assets/coins/RUNE.png': g0_100,
-  '../assets/coins/RVN.png': g0_101,
-  '../assets/coins/RWFFIAT.png': g0_102,
-  '../assets/coins/SAND.png': g0_103,
-  '../assets/coins/SATS.png': g0_104,
-  '../assets/coins/SC.png': g0_105,
-  '../assets/coins/SEKFIAT.png': g0_106,
-  '../assets/coins/SHIB.png': g0_107,
-  '../assets/coins/SOL.png': g0_108,
-  '../assets/coins/SUI.png': g0_109,
-  '../assets/coins/SUSHI.png': g0_110,
-  '../assets/coins/TFUEL.png': g0_111,
-  '../assets/coins/THBFIAT.png': g0_112,
-  '../assets/coins/THETA.png': g0_113,
-  '../assets/coins/TJSFIAT.png': g0_114,
-  '../assets/coins/TNDFIAT.png': g0_115,
-  '../assets/coins/TOMO.png': g0_116,
-  '../assets/coins/TON.png': g0_117,
-  '../assets/coins/TRUMP.png': g0_118,
-  '../assets/coins/TRX.png': g0_119,
-  '../assets/coins/TRYFIAT.png': g0_120,
-  '../assets/coins/TUSD.png': g0_121,
-  '../assets/coins/TWDFIAT.png': g0_122,
-  '../assets/coins/TWT.png': g0_123,
-  '../assets/coins/TZSFIAT.png': g0_124,
-  '../assets/coins/UAHFIAT.png': g0_125,
-  '../assets/coins/UGXFIAT.png': g0_126,
-  '../assets/coins/UNI.png': g0_127,
-  '../assets/coins/USDC.png': g0_128,
-  '../assets/coins/USDFIAT.png': g0_129,
-  '../assets/coins/USDT.png': g0_130,
-  '../assets/coins/UST.png': g0_131,
-  '../assets/coins/UZSFIAT.png': g0_132,
-  '../assets/coins/VESFIAT.png': g0_133,
-  '../assets/coins/VET.png': g0_134,
-  '../assets/coins/VNDFIAT.png': g0_135,
-  '../assets/coins/VTHO.png': g0_136,
-  '../assets/coins/WAVES.png': g0_137,
-  '../assets/coins/WAXP.png': g0_138,
-  '../assets/coins/WBNB.png': g0_139,
-  '../assets/coins/WBTC.png': g0_140,
-  '../assets/coins/WLD.png': g0_141,
-  '../assets/coins/XAFFIAT.png': g0_142,
-  '../assets/coins/XLM.png': g0_143,
-  '../assets/coins/XMR.png': g0_144,
-  '../assets/coins/XOFFIAT.png': g0_145,
-  '../assets/coins/XRP.png': g0_146,
-  '../assets/coins/XTZ.png': g0_147,
-  '../assets/coins/YFI.png': g0_148,
-  '../assets/coins/YGG.png': g0_149,
-  '../assets/coins/ZARFIAT.png': g0_150,
-  '../assets/coins/ZIL.png': g0_151,
-  '../assets/coins/ZMWFIAT.png': g0_152,
+  '../assets/coins/GELFIAT.png': g0_53,
+  '../assets/coins/GHSFIAT.png': g0_54,
+  '../assets/coins/GMX.png': g0_55,
+  '../assets/coins/GNFFIAT.png': g0_56,
+  '../assets/coins/GODS.png': g0_57,
+  '../assets/coins/HBAR.png': g0_58,
+  '../assets/coins/HNT.png': g0_59,
+  '../assets/coins/ICP.png': g0_60,
+  '../assets/coins/IDRFIAT.png': g0_61,
+  '../assets/coins/INRFIAT.png': g0_62,
+  '../assets/coins/IOTX.png': g0_63,
+  '../assets/coins/JMDFIAT.png': g0_64,
+  '../assets/coins/JPYFIAT.png': g0_65,
+  '../assets/coins/KAVA.png': g0_66,
+  '../assets/coins/KESFIAT.png': g0_67,
+  '../assets/coins/KGSFIAT.png': g0_68,
+  '../assets/coins/KHRFIAT.png': g0_69,
+  '../assets/coins/KLAY.png': g0_70,
+  '../assets/coins/KRWFIAT.png': g0_71,
+  '../assets/coins/KSM.png': g0_72,
+  '../assets/coins/KZTFIAT.png': g0_73,
+  '../assets/coins/LINK.png': g0_74,
+  '../assets/coins/LKRFIAT.png': g0_75,
+  '../assets/coins/LTC.png': g0_76,
+  '../assets/coins/LUNA.png': g0_77,
+  '../assets/coins/MANA.png': g0_78,
+  '../assets/coins/MATIC.png': g0_79,
+  '../assets/coins/MDLFIAT.png': g0_80,
+  '../assets/coins/MMKFIAT.png': g0_81,
+  '../assets/coins/MXNFIAT.png': g0_82,
+  '../assets/coins/MYRFIAT.png': g0_83,
+  '../assets/coins/NANO.png': g0_84,
+  '../assets/coins/NEAR.png': g0_85,
+  '../assets/coins/NEXO.png': g0_86,
+  '../assets/coins/NGNFIAT.png': g0_87,
+  '../assets/coins/NOKFIAT.png': g0_88,
+  '../assets/coins/NPRFIAT.png': g0_89,
+  '../assets/coins/NZDFIAT.png': g0_90,
+  '../assets/coins/OP.png': g0_91,
+  '../assets/coins/PENFIAT.png': g0_92,
+  '../assets/coins/PEOPLE.png': g0_93,
+  '../assets/coins/PEPE.png': g0_94,
+  '../assets/coins/PHPFIAT.png': g0_95,
+  '../assets/coins/PKRFIAT.png': g0_96,
+  '../assets/coins/PLNFIAT.png': g0_97,
+  '../assets/coins/QTUM.png': g0_98,
+  '../assets/coins/ROSE.png': g0_99,
+  '../assets/coins/RUBFIAT.png': g0_100,
+  '../assets/coins/RUNE.png': g0_101,
+  '../assets/coins/RVN.png': g0_102,
+  '../assets/coins/RWFFIAT.png': g0_103,
+  '../assets/coins/SAND.png': g0_104,
+  '../assets/coins/SATS.png': g0_105,
+  '../assets/coins/SC.png': g0_106,
+  '../assets/coins/SEKFIAT.png': g0_107,
+  '../assets/coins/SHIB.png': g0_108,
+  '../assets/coins/SOL.png': g0_109,
+  '../assets/coins/SUI.png': g0_110,
+  '../assets/coins/SUSHI.png': g0_111,
+  '../assets/coins/TFUEL.png': g0_112,
+  '../assets/coins/THBFIAT.png': g0_113,
+  '../assets/coins/THETA.png': g0_114,
+  '../assets/coins/TJSFIAT.png': g0_115,
+  '../assets/coins/TNDFIAT.png': g0_116,
+  '../assets/coins/TOMO.png': g0_117,
+  '../assets/coins/TON.png': g0_118,
+  '../assets/coins/TRUMP.png': g0_119,
+  '../assets/coins/TRX.png': g0_120,
+  '../assets/coins/TRYFIAT.png': g0_121,
+  '../assets/coins/TUSD.png': g0_122,
+  '../assets/coins/TWDFIAT.png': g0_123,
+  '../assets/coins/TWT.png': g0_124,
+  '../assets/coins/TZSFIAT.png': g0_125,
+  '../assets/coins/UAHFIAT.png': g0_126,
+  '../assets/coins/UGXFIAT.png': g0_127,
+  '../assets/coins/UNI.png': g0_128,
+  '../assets/coins/USDC.png': g0_129,
+  '../assets/coins/USDFIAT.png': g0_130,
+  '../assets/coins/USDT.png': g0_131,
+  '../assets/coins/UST.png': g0_132,
+  '../assets/coins/UZSFIAT.png': g0_133,
+  '../assets/coins/VESFIAT.png': g0_134,
+  '../assets/coins/VET.png': g0_135,
+  '../assets/coins/VNDFIAT.png': g0_136,
+  '../assets/coins/VTHO.png': g0_137,
+  '../assets/coins/WAVES.png': g0_138,
+  '../assets/coins/WAXP.png': g0_139,
+  '../assets/coins/WBNB.png': g0_140,
+  '../assets/coins/WBTC.png': g0_141,
+  '../assets/coins/WLD.png': g0_142,
+  '../assets/coins/XAFFIAT.png': g0_143,
+  '../assets/coins/XLM.png': g0_144,
+  '../assets/coins/XMR.png': g0_145,
+  '../assets/coins/XOFFIAT.png': g0_146,
+  '../assets/coins/XRP.png': g0_147,
+  '../assets/coins/XTZ.png': g0_148,
+  '../assets/coins/YFI.png': g0_149,
+  '../assets/coins/YGG.png': g0_150,
+  '../assets/coins/ZARFIAT.png': g0_151,
+  '../assets/coins/ZIL.png': g0_152,
+  '../assets/coins/ZMWFIAT.png': g0_153,
 };

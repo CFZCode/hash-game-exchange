@@ -456,6 +456,7 @@ export default function LanguageCurrencyModal({
                     })
                   ) : (
                     filteredCurrencies.map((curr) => {
+                      const icon = curr.code === 'NONE' ? siteCurrency && coinIcon(siteCurrency) : coinIcon(`${curr.code}FIAT`);
                       /* NONE is the switch being OFF rather than a currency, so it cannot be
                          compared by code — with conversion off there is no selected currency at
                          all, and `localeCurrencyName` still holds whatever was last chosen. */
@@ -481,14 +482,11 @@ export default function LanguageCurrencyModal({
                           }}
                         >
                           <div className="flex items-center gap-2">
-                            {/* INVENTED. The original serves these as remote artwork from
-                                imgxcut.com/coin/<CODE>.rect.png and the mirror saved only
-                                five of them (USD, INR, IDR, KES, PHP), so every row would
-                                need a network round-trip that does not exist here. A tinted
-                                disc with the currency's own symbol is the stand-in — same
-                                24px circle, same position, drawn rather than fetched. */}
-                            {curr.code === 'NONE' && siteCurrency && coinIcon(siteCurrency) ? (
-                              <img alt="coin" className="size-6" src={coinIcon(siteCurrency)} />
+                            {/* The original's own artwork (imgxcut.com/coin/<CODE>.rect.png), saved in
+                                assets/coins as <CODE>FIAT.png; None shows the site's coin. A code
+                                with no file keeps the tinted disc with its symbol. */}
+                            {icon ? (
+                              <img alt="coin" className="size-6 rounded-full object-cover" src={icon} />
                             ) : (
                               <div
                                 className="flex size-6 items-center justify-center rounded-full text-[0.625rem] font-black leading-none text-white"
