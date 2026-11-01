@@ -47,8 +47,10 @@ export const printCurrency = (value, currency = 'USDFIAT') =>
  * also the green figure printed directly above the sentence. Grouped into one alternation for
  * that reason — a caller that passes the wrong amount would get both wrong together rather
  * than only one of them, which is the failure that is easy to see. */
-export const fill = (text, amount) =>
+export const fill = (text, amount, rate = '25%') =>
   text
+    // THIS BUILD'S: the copy's literal 25% is the site admin's commission rate (`useReferralProgram`).
+    .replace(/\b25%/g, rate)
     .replace(/__localAmountStr__|__local_amount__|__friendAmount__/g, amount)
     .replace(/__ENV_HOST__/g, HOST)
     .replace(/__email__/g, BUSINESS_EMAIL);

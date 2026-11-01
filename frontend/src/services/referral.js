@@ -178,8 +178,6 @@ export const getAffiliateDashboard = ({ reloads } = {}) => {
           /* hash.game's "Locked Rewards": friends' referral steps not unlocked yet (USD), from
              `GET /user/affiliate` → `lockedRewards`. `ratio`/`maxRatio`/`todayWagerUsd` keep zeros. */
           remainingRewardUsd: String(num(info?.lockedRewards?.lockedUsd)),
-          /* The invite headline: the admin's referral steps summed (USD); 0 = not answered, the page keeps its default. */
-          perFriendUsd: String(num(info?.lockedRewards?.perFriendUsd)),
         },
         /* Rewards Activities: one Commission Rewards line per credited commission, newest first. */
         topCommissions: (earned?.rows ?? []).map((row) => ({ commissionUsd: String(num(row.amount)) })),
@@ -534,6 +532,31 @@ export const getCommissionRates = () => {
   return typeof read?.then === 'function'
     ? read.then(toCommissionRates, () => CAPTURE_RATES)
     : toCommissionRates(read);
+};
+
+/* The invite headline and the copy's commission rate — the site admin's, off the same
+ * `site-config/public` read: the referral steps summed, in the currency they are paid in (the
+ * site's reward currency, e.g. INR), and `commissionRate`. Not answered or no steps: bc.game's
+ * $1,000 and 25%. */
+export const CAPTURE_PROGRAM = { perFriend: 1000, currency: 'USD', commissionRate: 25 };
+
+export const toReferralProgram = (config) => {
+  const tiers = config?.referralUnlocks?.tiers;
+  const total = Array.isArray(tiers) ? tiers.reduce((sum, t) => sum + (Number(t?.unlockAmount) || 0), 0) : 0;
+  const rate = config?.commissionRate == null ? NaN : Number(config.commissionRate);
+  if (!(total > 0)) return { ...CAPTURE_PROGRAM, commissionRate: Number.isFinite(rate) ? rate : CAPTURE_PROGRAM.commissionRate };
+  return {
+    perFriend: total,
+    currency: String(config.referralUnlocks.currency || config?.rewardCurrency || 'USDT').toUpperCase(),
+    commissionRate: Number.isFinite(rate) ? rate : CAPTURE_PROGRAM.commissionRate,
+  };
+};
+
+export const getReferralProgram = () => {
+  const read = request(PLATFORM.site.config, { live: true, fixture: UNLOCKS_FIXTURE });
+  return typeof read?.then === 'function'
+    ? read.then(toReferralProgram, () => CAPTURE_PROGRAM)
+    : toReferralProgram(read);
 };
 
 export default getReferral;

@@ -31,10 +31,10 @@ const ChevronIcon = ({ className }) => (
 
 /* A `<T>` default rendered out — the segment forms are described in referral.js. `brand` is the
    green span inside a heading, `plain` a bare `<span>`, `action` the green clickable one. */
-export const Segments = ({ parts, amount, onAction }) =>
+export const Segments = ({ parts, amount, rate, onAction }) =>
   parts.map((part, i) => {
     if (part.br) return <br key={i} />;
-    const text = fill(part.text, amount);
+    const text = fill(part.text, amount, rate);
     if (part.brand)
       return (
         <span key={i} className="text-brand">
@@ -64,7 +64,7 @@ export const Segments = ({ parts, amount, onAction }) =>
  * Collapsible, so the flag never reaches the primitive. That is why every row in the capture is
  * closed including the first — the same class of finding as `bg-from-special` on the VIP page,
  * and reproducing it means starting closed, not open. */
-const FaqRow = ({ item, amount, onAction }) => {
+const FaqRow = ({ item, amount, rate, onAction }) => {
   const [open, setOpen] = React.useState(false);
 
   return (
@@ -80,9 +80,9 @@ const FaqRow = ({ item, amount, onAction }) => {
       {open && (
         <div className="mt-1 font-semibold text-secondary">
           {typeof item.answer === 'string' ? (
-            fill(item.answer, amount)
+            fill(item.answer, amount, rate)
           ) : (
-            <Segments parts={item.answer} amount={amount} onAction={onAction} />
+            <Segments parts={item.answer} amount={amount} rate={rate} onAction={onAction} />
           )}
         </div>
       )}
@@ -91,13 +91,13 @@ const FaqRow = ({ item, amount, onAction }) => {
 };
 
 /* `Q` — the FAQ card. */
-export function Faq({ faq, amount, onAction }) {
+export function Faq({ faq, amount, rate, onAction }) {
   return (
     <div className="flex flex-col gap-3 rounded-xl bg-layer4 p-6">
       <p className="text-xl font-extrabold">{faq.title}</p>
       <div className="flex flex-col gap-4">
         {faq.items.map((item) => (
-          <FaqRow key={item.question} item={item} amount={amount} onAction={onAction} />
+          <FaqRow key={item.question} item={item} amount={amount} rate={rate} onAction={onAction} />
         ))}
       </div>
     </div>

@@ -12,7 +12,7 @@ const { affiliateSettings } = require('./affiliateSettings');
 const { WalletService } = require('../wallet/wallet.service');
 const { REASON } = require('../wallet/wallet.constants');
 const { resolveReferrerOwner, referralLinkFor } = require('./referrerResolver');
-const { createRewardMoney } = require('../../lib/rewardMoney');
+const { createRewardMoney, USD_CODES } = require('../../lib/rewardMoney');
 const { notifyPlayer, notifyBonus, afterBonus } = require('../notifications/notifyPlayer');
 const { settleItem } = require('../wager/stakeShare');
 
@@ -774,9 +774,10 @@ class AffiliateService {
     await assertPlayerCapability(member.id, 'promotions');
 
     const wagerRow = await this.models.Userwager.findOne({ where: { uid: member.id }, raw: true });
-    const wager = this.#wagerAmount(wagerRow);
-
-    const tiers = await this.unlockTiers();
+    const { currency, tiers } = await this.#tiersInReward();
+    // `userwager` is USD; the steps are the admin's figures in the reward currency (INR).
+    const wager = await this.rewardMoney.convert(this.#wagerAmount(wagerRow), 'USD', currency);
+    if (wager == null) return { unlocked: false, reason: `No exchange rate for ${currency}` };
     if (!tiers.some((t) => money.gte(wager, t.wager))) {
       return { unlocked: false, reason: 'The member has not reached the first tier', wager };
     }
@@ -805,8 +806,8 @@ class AffiliateService {
 
       const granted = [];
       for (const tier of due) {
-        // Tier rewards are USD; priced in the site's reward currency.
-        const quote = await this.rewardMoney.fromUsd(tier.reward);
+        // The admin's figure, paid as is in the reward currency.
+        const quote = { currency, amount: money.toDecimalString(money.toMinor(tier.reward)) };
         const created = await this.models.UnlockedRewards.create(
           {
             uid: owner.id,
@@ -824,7 +825,7 @@ class AffiliateService {
           },
           { transaction }
         );
-        granted.push({ rewardId: created.id, level: tier.level, tier: tier.wager, amount: quote.amount, amountUsd: tier.reward, currency: quote.currency });
+        granted.push({ rewardId: created.id, level: tier.level, tier: tier.wager, amount: quote.amount, amountUsd: await this.rewardMoney.toUsd(tier.reward, currency), currency: quote.currency });
       }
 
       this.logger?.info({ owner: owner.name, member: memberName, steps: granted.length, staffId }, 'Affiliate reward unlocked');
@@ -859,7 +860,8 @@ class AffiliateService {
    * The referral unlock table that PAYS: the site admin's (`siteconfig.referral_unlock_tiers`,
    * read through affiliate settings), else `UNLOCK_TIERS`. Each row pays at its OWN total wager,
    * the figure the admin saves and /referral/rules prints; the level name is only a label (taking
-   * the VIP ladder's threshold for it silently ignored the admin's edit). USD both sides.
+   * the VIP ladder's threshold for it silently ignored the admin's edit). The admin's figures are
+   * in the site's reward currency (INR on an INR site); the built-in defaults are USD.
    */
   async unlockTiers() {
     const settings = await this.settings.read();
@@ -867,15 +869,29 @@ class AffiliateService {
     return [...table].sort((a, b) => Number(a.wager) - Number(b.wager));
   }
 
+  /** `{ currency, tiers }`: the steps with wager and reward in the reward currency. */
+  async #tiersInReward() {
+    const settings = await this.settings.read();
+    const currency = await this.rewardMoney.currency();
+    const tiers = await this.unlockTiers();
+    if (settings.unlockTiers || USD_CODES.includes(currency)) return { currency, tiers };
+    const inReward = async (usd) => (await this.rewardMoney.convert(usd, 'USD', currency)) ?? usd;
+    return {
+      currency,
+      tiers: await Promise.all(tiers.map(async (t) => ({ ...t, wager: await inReward(t.wager), reward: await inReward(t.reward) }))),
+    };
+  }
+
   /**
    * hash.game's "Locked Rewards": what this referrer's friends have not unlocked yet — per friend,
    * the table's total less the steps already granted — in USD and in the reward currency.
    */
   async lockedRewards({ ownerName }) {
-    const tiers = await this.unlockTiers();
+    const { currency, tiers } = await this.#tiersInReward();
     const perFriend = tiers.reduce((acc, t) => money.toDecimalString(money.add(acc, t.reward)), '0');
+    const usd = async (amount) => money.toDecimalString(money.toMinor((await this.rewardMoney.toUsd(amount, currency)) ?? '0'));
     const members = await this.models.Team.findAll({ where: { ownername: ownerName }, attributes: ['membername'], raw: true });
-    if (!members.length) return { friends: 0, perFriendUsd: perFriend, lockedUsd: '0.00000000', locked: '0.00000000', currency: (await this.rewardMoney.fromUsd('0')).currency };
+    if (!members.length) return { friends: 0, perFriend, perFriendUsd: await usd(perFriend), lockedUsd: '0.00000000', locked: '0.00000000', currency };
     const highest = await this.models.UnlockedRewards.findAll({
       where: { ownername: ownerName },
       attributes: ['membername', [fn('MAX', col('wager_amount')), 'top']],
@@ -888,8 +904,7 @@ class AffiliateService {
       const floor = topOf.get(membername) ?? '0';
       for (const t of tiers) if (money.gt(t.wager, floor)) locked = money.toDecimalString(money.add(locked, t.reward));
     }
-    const quote = await this.rewardMoney.fromUsd(locked);
-    return { friends: members.length, perFriendUsd: perFriend, lockedUsd: money.toDecimalString(money.toMinor(locked)), locked: quote.amount, currency: quote.currency };
+    return { friends: members.length, perFriend, perFriendUsd: await usd(perFriend), lockedUsd: await usd(locked), locked: money.toDecimalString(money.toMinor(locked)), currency };
   }
 
   // ══════════════════════════════════════════════════════════════════════

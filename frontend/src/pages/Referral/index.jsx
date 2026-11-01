@@ -1,11 +1,10 @@
 import { Navigate, useNavigate } from 'react-router-dom';
-import { getReferral } from '../../services/referral';
+import { getReferral, getReferralProgram, CAPTURE_PROGRAM } from '../../services/referral';
 import { useResource } from '../../hooks/useResource';
 import Loading from '../../components/shared/Loading';
 import { useSession } from '../../context/session';
 import useMediaQuery from '../../hooks/useMediaQuery';
-import { REFERRAL_AMOUNT } from './referral';
-import { fill } from './format';
+import { fill, walletCode } from './format';
 import { useSelectedCurrency } from '../../hooks/useSelectedCurrency';
 import { LiveRewards, ProgramBand, Faq, Segments } from './blocks';
 import * as globMaps from './index.globs.js';
@@ -63,9 +62,10 @@ export default function Referral() {
      Same caveat as VIP: the original's flag is a DEVICE test, so a phone in landscape is mobile
      to it at any width. No media query can express that. */
   const isDesktop = useMediaQuery('(min-width: 640px)');
-  /* `REFERRAL_AMOUNT` is USD-designed; shown in the selected currency (a hook, so above the returns). */
+  /* The headline amount is USD; shown in the selected currency (a hook, so above the returns). */
   const cur = useSelectedCurrency();
-
+  // The headline amount and the commission rate are the site admin's (Affiliate rates).
+  const { data: referralProgram } = useResource(getReferralProgram);
 
   const size = isDesktop ? ' button-m' : '';
 
@@ -87,7 +87,9 @@ export default function Referral() {
 
   const { hero, cards, program, faq, live } = data;
 
-  const amount = cur.show(REFERRAL_AMOUNT, 'USDFIAT');
+  const { perFriend, currency, commissionRate } = referralProgram ?? CAPTURE_PROGRAM;
+  const amount = cur.show(perFriend, walletCode(currency));
+  const rate = `${commissionRate}%`;
 
   /* The FAQ's two clickable spans. The chunk sends a signed-out visitor to registration from
      either of them and only routes for real once logged in — `if (!a.login) { n("/login/regist"); return }`
@@ -134,7 +136,7 @@ export default function Referral() {
               literal " + 25% " text node and "Commission" is appended after it. */}
           <p className="text-nowrap text-2xl font-extrabold text-brand">
             {amount}
-            {hero.plus}
+            {fill(hero.plus, amount, rate)}
             {hero.commission}
           </p>
           {/* `p-6` on a `.button-m`: the height stays 2.5rem, so the 24px is horizontal padding
@@ -184,10 +186,10 @@ export default function Referral() {
                   order is title, copy, art, button. */}
               <div className="flex flex-col gap-3 sm:w-1/2">
                 <p className="text-2xl font-extrabold">
-                  <Segments parts={card.title} amount={amount} />
+                  <Segments parts={card.title} amount={amount} rate={rate} />
                 </p>
                 <p className="text-base font-semibold text-secondary">
-                  {fill(card.desc, amount)}
+                  {fill(card.desc, amount, rate)}
                 </p>
                 <img
                   className="right-4 w-full sm:absolute sm:top-1/2 sm:w-2/5 sm:-translate-y-1/2"
@@ -211,7 +213,7 @@ export default function Referral() {
             the identical trio from the same chunk, which is why they moved to ./blocks.jsx. */}
         <LiveRewards live={live} />
         <ProgramBand program={program} isDesktop={isDesktop} size={size} />
-        <Faq faq={faq} amount={amount} onAction={onAction} />
+        <Faq faq={faq} amount={amount} rate={rate} onAction={onAction} />
       </div>
     </div>
   );

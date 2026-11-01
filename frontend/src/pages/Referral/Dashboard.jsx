@@ -1,13 +1,13 @@
 import { useEffect, useRef } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { getReferral, getInvitationCode, getAffiliateDashboard } from '../../services/referral';
+import { getReferral, getInvitationCode, getAffiliateDashboard, getReferralProgram, CAPTURE_PROGRAM } from '../../services/referral';
 import { useResource } from '../../hooks/useResource';
 import Loading from '../../components/shared/Loading';
 import { useSession } from '../../context/session';
 import { useIsDialog } from '../../context/dialogRoute';
 import useMediaQuery from '../../hooks/useMediaQuery';
-import { REFERRAL_AMOUNT, INVITE, DASHBOARD_COPY, TABS } from './referral';
-import { fill, useRewardCurrency } from './format';
+import { INVITE, DASHBOARD_COPY, TABS } from './referral';
+import { fill, useRewardCurrency, walletCode } from './format';
 import { useSelectedCurrency } from '../../hooks/useSelectedCurrency';
 import { LiveRewards, ProgramBand, Faq } from './blocks';
 import EmptyPlaceholder from '../../components/shared/EmptyPlaceholder';
@@ -93,7 +93,7 @@ const TAB_ICON = {
  *
  * The `$1,000.00` is `printCurrency(1000)` and appears twice — once as the green figure and once
  * interpolated into the sentence below it — so the two can never disagree. */
-function InviteCard({ invite, amount, size }) {
+function InviteCard({ invite, amount, rate, size }) {
   const navigate = useNavigate();
   /* `try { W(value), Q(a("Copied")) } catch {}` — the clipboard write and a bare `F("Copied")`.
      The button keeps saying "Copy"; the toast is the confirmation. */
@@ -121,14 +121,14 @@ function InviteCard({ invite, amount, size }) {
             </p>
             <div className="h-[30px] w-[1px] bg-secondary/10" />
             <p className="flex flex-col sm:flex-row sm:items-center sm:gap-2">
-              <span className="text-xl font-extrabold text-brand">{invite.commissionRate}</span>
+              <span className="text-xl font-extrabold text-brand">{fill(invite.commissionRate, amount, rate)}</span>
               <span>{invite.commissionLabel}</span>
             </p>
           </div>
         </div>
       </div>
 
-      <p className="text-secondary">{fill(invite.description, amount)}</p>
+      <p className="text-secondary">{fill(invite.description, amount, rate)}</p>
 
       <div className="flex flex-col gap-4 md:flex-row">
         <div className="flex-1">
@@ -303,12 +303,14 @@ export default function ReferralDashboard() {
   const { data } = useResource(getReferral);
   const { data: invite } = useResource(getInvitationCode);
   const { data: dashboardInfo } = useResource(getAffiliateDashboard);
+  // The headline amount and the commission rate are the site admin's (Affiliate rates).
+  const { data: referralProgram } = useResource(getReferralProgram);
 
   /* Read as the 640 line for the reason the exhibition page documents at length — the artwork
      the programme band swaps has to move with the layout that uses it, and that layout is
      `sm:`. */
   const isDesktop = useMediaQuery('(min-width: 640px)');
-  /* The invite headline (`REFERRAL_AMOUNT`) is a USD-designed figure, shown in the selected
+  /* The invite headline (the admin's referral steps, `getReferralProgram`) is a USD figure, shown in the selected
      currency. Above the early returns, being a hook. */
   const cur = useSelectedCurrency();
   const size = isDesktop ? ' button-m' : '';
@@ -354,7 +356,9 @@ export default function ReferralDashboard() {
   const active = TABS.some((t) => t.id === section) ? section : 'referral';
   const { paneClass } = TABS.find((t) => t.id === active);
   const { program, faq, live } = data;
-  const amount = cur.show(Number(dashboardInfo?.dashboard?.perFriendUsd) || REFERRAL_AMOUNT, 'USDFIAT');
+  const { perFriend, currency, commissionRate } = referralProgram ?? CAPTURE_PROGRAM;
+  const amount = cur.show(perFriend, walletCode(currency));
+  const rate = `${commissionRate}%`;
 
   const onAction = (target) => navigate(target === 'dashboard' ? '/referral' : target);
 
@@ -447,6 +451,7 @@ export default function ReferralDashboard() {
               <InviteCard
                 invite={{ ...INVITE, url: invite.invitationUrl, code: invite.aliasCode }}
                 amount={amount}
+                rate={rate}
                 size={size}
               />
               <Stats dashboard={dashboardInfo.dashboard} copy={DASHBOARD_COPY} />
@@ -458,7 +463,7 @@ export default function ReferralDashboard() {
             />
             <LiveRewards live={live} />
             <ProgramBand program={program} isDesktop={isDesktop} size={size} />
-            <Faq faq={faq} amount={amount} onAction={onAction} />
+            <Faq faq={faq} amount={amount} rate={rate} onAction={onAction} />
           </div>
         ) : active === 'my-rewards' ? (
           <MyRewards />
