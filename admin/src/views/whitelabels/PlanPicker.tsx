@@ -38,10 +38,12 @@ export const planError = (plan: Plan) =>
       ? 'Choose manual payments, a payment gateway or both'
       : ''
 
-type Props = { value: Plan; onChange: (plan: Plan) => void; disabled?: boolean }
+type Group = 'products' | 'features' | 'payments'
+
+type Props = { value: Plan; onChange: (plan: Plan) => void; disabled?: boolean; groups?: Group[] }
 
 /** The products (at least one) and features a whitelabel runs; everything left out is off on the copy. */
-const PlanPicker = ({ value, onChange, disabled }: Props) => {
+const PlanPicker = ({ value, onChange, disabled, groups = ['products', 'features', 'payments'] }: Props) => {
   const option = <G extends 'products' | 'features'>(group: G, key: string, label: string, hint: string) => (
     <label key={key} className='flex items-start gap-3 rounded-md border p-3'>
       <Checkbox
@@ -82,14 +84,19 @@ const PlanPicker = ({ value, onChange, disabled }: Props) => {
 
   return (
     <div className='grid gap-4'>
-      <div className='grid gap-2'>
-        <span className='text-sm font-medium'>Products (at least one)</span>
-        <div className='grid gap-2 sm:grid-cols-3'>{PRODUCTS.map(p => option('products', p.key, p.label, p.hint))}</div>
-      </div>
-      <div className='grid gap-2'>
-        <span className='text-sm font-medium'>Features</span>
-        <div className='grid gap-2 sm:grid-cols-3'>{FEATURES.map(f => option('features', f.key, f.label, f.hint))}</div>
-      </div>
+      {groups.includes('products') && (
+        <div className='grid gap-2'>
+          <span className='text-sm font-medium'>Products (at least one)</span>
+          <div className='grid gap-2 sm:grid-cols-3'>{PRODUCTS.map(p => option('products', p.key, p.label, p.hint))}</div>
+        </div>
+      )}
+      {groups.includes('features') && (
+        <div className='grid gap-2'>
+          <span className='text-sm font-medium'>Features</span>
+          <div className='grid gap-2 sm:grid-cols-3'>{FEATURES.map(f => option('features', f.key, f.label, f.hint))}</div>
+        </div>
+      )}
+      {groups.includes('payments') && (
       <div className='grid gap-2'>
         <span className='text-sm font-medium'>Payments (manual, a gateway or both)</span>
         <div className='grid gap-2 sm:grid-cols-3'>
@@ -97,6 +104,7 @@ const PlanPicker = ({ value, onChange, disabled }: Props) => {
           {GATEWAYS.map(g => payment(g, GATEWAY_LABELS[g], 'Runs on your gateway account; charged per the rates below.'))}
         </div>
       </div>
+      )}
     </div>
   )
 }

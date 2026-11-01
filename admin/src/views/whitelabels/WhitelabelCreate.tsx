@@ -245,6 +245,7 @@ const WhitelabelCreate = () => {
 
       <Section title='Products & features' description='What the whitelabel runs. Choose at least one product; anything left out stays off and hidden on its site. You can change it later.'>
         <PlanPicker
+          groups={['products', 'features']}
           value={plan}
           onChange={next => {
             setPlan(next)
@@ -255,10 +256,31 @@ const WhitelabelCreate = () => {
       </Section>
 
       <Section
-        title='Charges & revenue share'
-        description='Yours only: the whitelabel never sees these settings, only the charges on its statement.'
+        title='Payments & gateway charges'
+        description='Manual payments, a payment gateway or both. Gateways run on your gateway account; each deposit or withdrawal through one is charged to the whitelabel company at the rates you set.'
       >
+        <PlanPicker
+          groups={['payments']}
+          value={plan}
+          onChange={next => {
+            setPlan(next)
+            setErrors(e => ({ ...e, plan: '' }))
+          }}
+        />
         <TermsEditor
+          parts={['fees']}
+          value={terms}
+          plan={plan}
+          onChange={next => {
+            setTerms(next)
+            setErrors(e => ({ ...e, terms: '' }))
+          }}
+        />
+      </Section>
+
+      <Section title='GGR revenue share' description='Your share of each product’s GGR. Yours only: the whitelabel sees it on its revenue-share statement.'>
+        <TermsEditor
+          parts={['share']}
           value={terms}
           plan={plan}
           onChange={next => {
