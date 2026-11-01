@@ -23,6 +23,8 @@ import path from 'node:path';
 
 import whitelabelPlan from '../../backend/packages/common/src/whitelabelPlan.js';
 
+import { copyCatalogue } from './catalogue.mjs';
+
 import {
   ACME_ROOT,
   ARCHIVE_DIR,
@@ -210,6 +212,8 @@ export async function createWhitelabel(ctx, wl) {
   const copy = await ctx.copyDb({ host: '127.0.0.1', port: Number(ctx.parentEnv.DB_PORT || 5432), database: dbName, user: dbName, password: ctx.secrets.dbPassword });
   try {
     await setUpCompany(ctx, copy, wl);
+    // Its games are the parent's: it plays on the parent's provider accounts (casino wl-hub).
+    await copyCatalogue(ctx.parent, copy, ctx.log);
   } finally {
     await copy.end();
   }
