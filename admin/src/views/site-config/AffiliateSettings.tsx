@@ -384,7 +384,7 @@ const AffiliateSettings = ({ embedded = false }: { embedded?: boolean }) => {
           <CardDescription>
             The “Friend’s Level / Total Wager / Unlock Amount” table on the player site’s Referral › Rate &amp; Rules
             page: what a referrer unlocks as a referred friend’s wagering reaches each VIP level. Amounts are in{' '}
-            {unlocks.data?.currency ?? 'the default currency'} (the owner panel's default currency). This is the table players read and
+            {unlocks.data?.currency ?? 'the default currency'} (the owner panel&apos;s default currency). This is the table players read and
             what each step pays.
           </CardDescription>
         </CardHeader>
