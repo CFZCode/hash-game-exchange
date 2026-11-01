@@ -1,6 +1,9 @@
 # Whitelabel: product plan + Casino Hub
 
-Status: Part A built 2026-11-01. Part B (Casino Hub) planned, not built.
+Status (2026-11-01): everything planned is built and tested on a test DB — Part A (plan incl.
+payments), Part B (casino hub), Part C (gateways incl. CCPayment), Part D (settings + GGR reports).
+Migrations 169 + 170 are on the live DB; 171, 172 are not. Not yet tried against the real
+providers (F2Pay, CCPayment, Slotegrator, original games) or on a real whitelabel.
 
 ## Rules from the owner
 
@@ -18,7 +21,8 @@ Status: Part A built 2026-11-01. Part B (Casino Hub) planned, not built.
 ```
 plan = {
   products: { casino: bool, sports: bool, originals: bool },        // at least one true
-  features: { branch_management, bonus, affiliate, vip, promotions } // bool each
+  features: { branch_management, bonus, affiliate, vip, promotions }, // bool each
+  payments: { manual, gateways: { ccpayment, f2pay, apay, waypay, cricpay, upi } } // manual or a gateway
 }
 ```
 
@@ -29,6 +33,8 @@ plan = {
 | `products.originals` | flag `originals` |
 | `features.bonus / affiliate / vip / promotions` | feature of the same key (vip also flag `vipclub`) |
 | `features.branch_management` | policy `branch_management` on/off |
+| `payments.gateways.<g>` off | flag `gateway_<g>` off |
+| `payments` | policies `deposit_mode` / `withdrawal_mode`: manual + gateway = both, gateway only = automatic, manual only = manual |
 | always | policy `whitelabel` off |
 
 - Parent: `whitelabels.plan` (migration 169), required on create, `PUT /admin/whitelabels/:id/plan`
@@ -40,7 +46,15 @@ plan = {
   hidden and its APIs answer `403 NOT_ENTITLED`. The two policies are written to `site_features`.
 - A copy with no stored plan (made before this change) is unchanged.
 
-## Part B: Casino Hub (to build)
+## Part B: Casino Hub (built)
+
+Built as below with one simplification: no API of games of its own — the copy's Slotegrator and
+original-games clients are replaced on a copy by hub stand-ins (wl-hub/hubProvider, ogHubProvider)
+that send each provider call to the parent (`POST /api/v1/casino/wl-hub/gis/provider`, `/og/provider`,
+allow-listed: open a game, demo, lobby, catalogue reads). The parent writes `wl<id>_<player>` into
+the player id; the providers' callbacks with that id are passed on (wl-hub/forward.js) to the copy's
+`/in/gis` / `/in/og`, settled by the copy's own code, answered back unchanged, and recorded in
+`whitelabel_casino_rounds`. Freespins / vouchers are not offered to copies.
 
 ```
 Player (copy) ─launch─▶ copy casino-svc ─key + HMAC─▶ PARENT hub ─▶ Slotegrator / Originals
@@ -75,7 +89,12 @@ Prerequisite: Slotegrator allowlists the parent's IP (72.62.251.4).
 Open decisions: billing model (GGR % / fixed / none); copies only on this server or also remote
 (the HMAC design works for both; remote needs HTTPS between sites).
 
-## Part C: Payment gateways through the parent (to build)
+## Part C: Payment gateways through the parent (psp gateways built; CCPayment next)
+
+Built: user-service `modules/wl-hub` (routes, hubCredentials, hubGateway, hubOrders, companyWallet,
+delivery + job `wl-hub:deliver`), payment-orders `hubDeposit` / `hubPayout` and hub mode in
+`#gateway`, psp whitelabel branches + `applyHubEvent`, admin `POST /whitelabels/:id/hub-key`, link
+`PUT /hub`, setup writes PARENT_HUB_*. End-to-end test: wl-hub/__tests__/wlHub.test.js (F2Pay).
 
 Checked 2026-11-01 against `services/user/src/modules/{payment-orders,psp,crypto}`:
 
@@ -83,8 +102,9 @@ Checked 2026-11-01 against `services/user/src/modules/{payment-orders,psp,crypto
 |---|---|---|---|
 | F2Pay INR (fiat) | yes | yes (BANK_INR payout) | every order carries our `notifyUrl` and our `mchOrderNo` |
 | F2Pay crypto | yes | no (F2Pay crypto has no payout) | same |
-| CCPayment (crypto) | yes | not today | webhook URL is set once in the CCPayment dashboard (the parent's); we route by `orderId`. Payout was never wired, so crypto withdrawals are a manual review queue |
-| WayPay / A-Pay / CricPay / UPI | same pattern, possible | possible | per-order notify / our reference |
+| CCPayment (crypto) | yes (built) | yes (built) | webhook URL is the parent's; routed by `orderId`. Withdrawals: staff press "CCPayment" in the crypto review queue → `Sending` → `ApiWithdrawal` (confirmed with `getAppWithdrawRecord`) → Sent / Rejected + refund. Deposits credit what ARRIVED (`settled_amount`, may come in parts) |
+| UPI (EkQR) | same pattern, possible | — | per-order notify / our reference |
+| A-Pay / WayPay / CricPay | **never** | **never** | not integrated on the parent (owner, 2026-11-01): always off on copies |
 
 Only the parent holds gateway keys and is allowlisted; a copy's `F2PAY_*` / `CCPAYMENT_*` stay blank.
 
@@ -93,30 +113,40 @@ Player (copy) ─deposit─▶ copy user-svc ─key + HMAC─▶ PARENT pay-hub 
 Gateway ─callback─▶ PARENT (reference "wl<id>-…") ─signed forward─▶ copy ─▶ credit player, debit company
 ```
 
-Money on the copy (owner's rule: the company cannot create money):
+Money on the copy (owner confirmed 2026-11-01). The company's Direct balance is the money the
+parent holds for it: the parent's transfers in, gateway money collected for it in, gateway money
+paid out for it out, gateway charges out.
 
-| Event | Player | Company Direct balance | Statement rows |
+| Event (example: company had 1,00,000) | Player | Company Direct balance | Statement rows |
 |---|---|---|---|
-| Gateway deposit A, fee d% | +A | −A − A·d% | `gateway_deposit` (A), `gateway_charge` (A·d%) |
-| Gateway withdrawal A, fee w% | −A (held at request) | +A − A·w% on success; nothing on failure (player refunded) | `gateway_withdrawal` (A), `gateway_charge` (A·w%) |
+| Gateway deposit 10,000, deposit charge 4% | +10,000 | +9,600 → 1,09,600 | `gateway_deposit` +10,000, `gateway_charge` −400 |
+| Gateway withdrawal 10,000, withdrawal charge 5% | −10,000 (held at request) | −10,500 on success; nothing on failure (player refunded) | `gateway_withdrawal` −10,000, `gateway_charge` −500 |
 | Manual deposit / withdrawal | as today | as today | no charge |
 
-- A deposit order **reserves** A + fee on the company balance when it is created (refused if the
-  balance is short), released if the order fails or expires — the player has already paid when the
-  callback lands, so it must never be refused then.
-- The parent keeps the real money. Each copy has a **gateway settlement** figure: collected − paid out,
-  i.e. cash the parent holds for that copy. Shown on its report; the Super Admin settles it.
-- Parent ledger: `whitelabel_gateway_orders` (copy, gateway, flow, reference, amount, fee, status),
-  and fee income per copy.
+- Charges are set **per gateway** (deposit % and withdrawal %) in the parent's `whitelabels.terms`;
+  the rate used is stored on each order, so a later change never re-prices old ones.
+- A withdrawal is refused up front if the company balance cannot cover amount + charge; the
+  amount + charge is reserved while the payout is pending.
+- **CCPayment withdrawals get connected** (crypto payout via CCPayment's withdraw API), on the
+  parent and for copies. Until then crypto withdrawals stay a manual review queue.
+- Parent ledger: `whitelabel_gateway_orders` (copy, gateway, flow, reference, amount, charge %,
+  charge, status) and the copy's statement rows above.
 
-## Part D: Super Admin control + GGR revenue share (to build)
+## Part D: Super Admin control + GGR revenue share (built)
 
-Per whitelabel (extends the Part A plan; Super Admin only):
-- Payments: which gateways (CCPayment, F2Pay INR, F2Pay crypto, …), manual payments on/off,
-  deposit fee %, withdrawal fee %.
-- Revenue share: GGR % (per product: casino, originals, sports, or one rate).
+Reports built: common/whitelabelReport (ledgerFigures + assemble + toCsv, shared by both sides);
+parent `GET /admin/whitelabels/report[.csv]`, `/:id/report[.csv]`; copy link `GET /ggr` (its P&L,
+in INR); parent user-service hub `GET /report`; copy `GET /admin/whitelabel-statement[/csv]`.
+Admin pages: whitelabel detail "Revenue share" card, /whitelabels/report, copy /revenue-share.
+Monthly (calendar month, UTC); share on positive GGR per product only.
 
-GGR = stakes − wins on settled bets per copy per period (casino/originals from the hub ledger,
-sports from the copy's settled bets via the link `/summary`). Statement per copy and period:
-GGR by product, share %, amount due, gateway charges, gateway settlement, balance transfers.
-Collected by debiting the company Direct balance (row `ggr_share`) — or invoiced only — owner's choice.
+Per whitelabel, Super Admin only (built 2026-11-01 as `plan.payments` + `whitelabels.terms`):
+- Payments in the plan: manual on/off and each gateway on/off — CCPayment, F2Pay, UPI (at least one route). Off gateways
+  are `NOT_ENTITLED` on the copy; deposit/withdrawal mode follows (manual / automatic / both).
+- Terms (parent only): deposit % and withdrawal % per gateway; GGR revenue share % per product.
+
+GGR = stakes − wins on settled bets per copy, per product (casino, original games, sports), per
+period. **Reported only, not collected** (owner, 2026-11-01). Reports:
+- Super Admin: per whitelabel and all together — GGR by product, share % and share amount,
+  gateway deposits / withdrawals / charges, balance transfers. Downloadable (CSV / PDF).
+- Whitelabel company: its own statement (same rows except the parent's settings), downloadable.

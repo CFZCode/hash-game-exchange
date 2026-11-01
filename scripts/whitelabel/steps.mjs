@@ -174,7 +174,7 @@ export async function createWhitelabel(ctx, wl) {
   await ctx.fs.write(path.join(target, 'ecosystem.config.cjs'), ecosystem({ slug, ports }));
   // Fresh secrets for every file (JWT, internal keys, owner panel login, owner signing pair).
   await ctx.run('node', ['scripts/make-env.mjs'], { cwd: target });
-  const env = copyEnv({ wl, slug, ports, redisDb, parentEnv: ctx.parentEnv, parentFrontendEnv: ctx.parentFrontendEnv, linkKey: ctx.linkKey, secrets: ctx.secrets });
+  const env = copyEnv({ wl, slug, ports, redisDb, parentEnv: ctx.parentEnv, parentFrontendEnv: ctx.parentFrontendEnv, linkKey: ctx.linkKey, hub: ctx.hub, secrets: ctx.secrets });
   for (const [file, patch] of [
     ['backend/.env', env.backend],
     ['frontend/.env.local', env.frontend],
