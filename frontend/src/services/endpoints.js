@@ -940,6 +940,11 @@ export const PLATFORM = {
        maps it onto bc.game's Basic Verification and says why that is the whole of it rather than
        half a ladder. `submit` and the document read are declared and not called — the KYC form is
        not built. */
+    /* Live TV on a match: may this player watch (Site config → Features → Live TV)? */
+    liveTv: {
+      access: '/api/v1/user/live-tv/access',
+    },
+
     kyc: {
       status: '/api/v1/user/kyc/status',
       submit: '/api/v1/user/kyc/submit',

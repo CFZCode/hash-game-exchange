@@ -41,6 +41,9 @@ import { marketLabel } from '../../Wallet/BetHistory/sportsBets';
 import { markMatchGone, reviveMatch } from '../../../services/exchange/deadMatches';
 import CricketScorecard from '../../../components/exchange/CricketScorecard';
 import CricketScoreEmbed from '../../../components/exchange/CricketScoreEmbed';
+import PopCenter from '../../../components/shared/PopCenter';
+import { IconTv } from '../../../components/exchange/icons';
+import { getLiveTvAccess } from '../../../services/liveTv';
 
 const SPORTS_STREAM_BASE = process.env.NEXT_PUBLIC_SPORTS_STREAM_BASE || '';
 const SCORECARD_BASE = process.env.NEXT_PUBLIC_SCORECARD_BASE || '';
@@ -125,6 +128,8 @@ export default function ExchangeMatchPage() {
   const [stakeError, setStakeError] = React.useState(null);
   const [score, setScore] = React.useState({ key: null, url: null });
   const [showTv, setShowTv] = React.useState(false);
+  // Live TV refused (Site config → Features → Live TV): the reason the popup shows.
+  const [tvRefusal, setTvRefusal] = React.useState(null);
   const [coveredFor, setCoveredFor] = React.useState(null);
   // Read once per mount; `iplay` flips a live match on its own, this covers a late iplay.
   const [mountedAt] = React.useState(() => Date.now());
@@ -161,6 +166,33 @@ export default function ExchangeMatchPage() {
   const scoreCovered = isCricket || gtvNow || coveredFor === gmid;
   const hasTv = signedIn && Number(match?.tv) > 0 && Boolean(SPORTS_STREAM_BASE);
   const tvOn = hasTv && showTv;
+
+  /* Live TV is the site's to give: asked on every switch-on, and every 5 minutes while it plays
+     (a balance spent or the hours passing turn it off, with the reason). No answer = no stream. */
+  const toggleTv = React.useCallback(async (next) => {
+    if (!next) {
+      setShowTv(false);
+      return;
+    }
+    try {
+      const access = await getLiveTvAccess();
+      if (access?.allowed) setShowTv(true);
+      else setTvRefusal(access?.message || 'Live TV is not available right now.');
+    } catch {
+      setTvRefusal('Live TV is not available right now. Please try again.');
+    }
+  }, []);
+  React.useEffect(() => {
+    if (!tvOn) return undefined;
+    const timer = setInterval(async () => {
+      const access = await getLiveTvAccess().catch(() => null);
+      if (access && !access.allowed) {
+        setShowTv(false);
+        setTvRefusal(access.message || 'Live TV is not available right now.');
+      }
+    }, 5 * 60_000);
+    return () => clearInterval(timer);
+  }, [tvOn]);
   const matchStarted = Boolean(match?.iplay) || (() => {
     const t = new Date(match?.stime || '').getTime();
     return !Number.isNaN(t) && t <= mountedAt;
@@ -350,7 +382,7 @@ export default function ExchangeMatchPage() {
       onBack={() => navigate('/sports')}
       tvAvailable={hasTv}
       showTv={tvOn}
-      onToggleTv={setShowTv}
+      onToggleTv={toggleTv}
       scoreSlot={
         isTournament ? null : cricketSocket || tvOn || scoreUrl ? (
           <>
@@ -520,6 +552,32 @@ export default function ExchangeMatchPage() {
           onSave={saveStakes}
         />
       )}
+
+      <PopCenter open={Boolean(tvRefusal)} onClose={() => setTvRefusal(null)} title="Live TV">
+        <div className="flex flex-col">
+          <div className="flex-1 p-4">
+            <IconTv className="mx-auto mb-4 h-10 w-10 fill-warning" />
+            <div className="text-center text-sm text-secondary">{tvRefusal}</div>
+          </div>
+          <div className="flex gap-3 border-layer3 p-4">
+            {/recharge/i.test(tvRefusal || '') && (
+              <button
+                type="button"
+                className="button button-m button-brand flex-1"
+                onClick={() => {
+                  setTvRefusal(null);
+                  navigate('/deposit');
+                }}
+              >
+                Deposit
+              </button>
+            )}
+            <button type="button" className="button button-m button-second flex-1" onClick={() => setTvRefusal(null)}>
+              OK
+            </button>
+          </div>
+        </div>
+      </PopCenter>
     </div>
   );
 }
