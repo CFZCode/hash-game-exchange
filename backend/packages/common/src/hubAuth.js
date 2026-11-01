@@ -38,14 +38,15 @@ function sameHex(a, b) {
 
 /**
  * Is this request signed by `secret` in `direction`? `req.rawBody` (createApp keeps it) is what
- * was signed; the path is `req.originalUrl` without its query.
+ * was signed; the path is `req.originalUrl` WITH its query, exactly as `hubRequest` signs it
+ * (a GET's parameters are part of what is authenticated).
  */
 function verifyRequest(req, { secret, direction, now = Date.now() }) {
   if (!secret) return false;
   if (req.get('x-forwarded-for')) return false;
   const ts = Number(req.get('x-hub-ts'));
   if (!Number.isFinite(ts) || Math.abs(now - ts) > WINDOW_MS) return false;
-  const path = String(req.originalUrl ?? '').split('?')[0];
+  const path = String(req.originalUrl ?? '');
   const body = req.rawBody ? req.rawBody.toString('utf8') : '';
   const expected = signature({ secret, direction, method: req.method, path, ts, body });
   return sameHex(String(req.get('x-hub-sign') ?? ''), expected);

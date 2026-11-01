@@ -36,7 +36,7 @@ test('hub signatures: direction, age, proxy and body all count', () => {
   const sign = (direction, b = body, at = ts) => hubAuth.signature({ secret, direction, method: 'POST', path: '/api/v1/user/wl-hub/x', ts: at, body: b });
   const req = (headers, raw = body) => ({
     method: 'POST',
-    originalUrl: '/api/v1/user/wl-hub/x?y=1',
+    originalUrl: '/api/v1/user/wl-hub/x',
     rawBody: Buffer.from(raw),
     get: (h) => headers[h.toLowerCase()],
   });
@@ -48,6 +48,12 @@ test('hub signatures: direction, age, proxy and body all count', () => {
   const old = ts - hubAuth.WINDOW_MS - 1000;
   assert.equal(hubAuth.verifyRequest(req({ 'x-hub-ts': String(old), 'x-hub-sign': sign('c2p', body, old) }), { secret, direction: 'c2p' }), false, 'too old');
   assert.equal(hubAuth.verifyRequest(req(ok), { secret: 'b'.repeat(64), direction: 'c2p' }), false, 'another secret');
+  // A GET's query is signed too (the copy's /report?from&to, /payments/order?flow&…).
+  const getPath = '/api/v1/user/wl-hub/report?from=2026-11-01&to=2026-12-01';
+  const signedGet = hubAuth.signature({ secret, direction: 'c2p', method: 'GET', path: getPath, ts, body: '' });
+  const get = (url) => ({ method: 'GET', originalUrl: url, rawBody: undefined, get: (h) => ({ 'x-hub-ts': String(ts), 'x-hub-sign': signedGet })[h.toLowerCase()] });
+  assert.equal(hubAuth.verifyRequest(get(getPath), { secret, direction: 'c2p' }), true, 'a GET with a query verifies');
+  assert.equal(hubAuth.verifyRequest(get(getPath.replace('2026-11-01', '2020-01-01')), { secret, direction: 'c2p' }), false, 'its query cannot be changed');
 });
 
 test('gateway charges round half-up to the paisa', () => {
@@ -304,6 +310,9 @@ test('whitelabel gateway payments through the parent', async (t) => {
       () => parentOrders.hubPayout({ whitelabel, provider: 'f2pay', copyReference: 'WD_X_1', userId: String(uid), currency: 'INR', amount: '100', method: 'imps', details: BANK, chargePct: '1' }),
       (err) => err.code === 'HUB_CHARGE_CHANGED'
     );
+    // A GET with a query, signed by the copy, end to end (its revenue-share report, order lookups).
+    const report = await hubAuth.hubRequest({ baseUrl: `http://127.0.0.1:${parentPort}`, key: hubKey, secret: hubSecret, direction: 'c2p', method: 'GET', path: '/api/v1/user/wl-hub/report?from=2026-01-01&to=2027-01-01' });
+    assert.ok(report.ledger && report.revenueShare, 'the parent answers a signed GET with a query');
     const forged = await hubAuth
       .hubRequest({ baseUrl: `http://127.0.0.1:${parentPort}`, key: hubKey, secret: 'f'.repeat(64), direction: 'c2p', method: 'GET', path: '/api/v1/user/wl-hub/payments/terms' })
       .catch((e) => e);
