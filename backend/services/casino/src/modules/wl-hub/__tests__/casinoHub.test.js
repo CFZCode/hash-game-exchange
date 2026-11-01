@@ -240,3 +240,19 @@ test('whitelabel casino through the parent', async (t) => {
     assert.equal(wrongWay.status, 401, 'the copy only takes the parent’s signature');
   });
 });
+
+test('casino-service reads the secret box key the hub secrets are sealed with', () => {
+  // The parent seals each whitelabel's hub secret with TOTP_ENCRYPTION_KEY (admin-service, setup
+  // worker); a casino config without it falls back to another key and refuses every copy (401).
+  const before = process.env.TOTP_ENCRYPTION_KEY;
+  process.env.TOTP_ENCRYPTION_KEY = 'c'.repeat(64);
+  try {
+    const { loadEnv, secretEncryptionEnvShape } = require('@ibitplay/common');
+    assert.equal(loadEnv(secretEncryptionEnvShape).TOTP_ENCRYPTION_KEY, 'c'.repeat(64));
+    const source = require('node:fs').readFileSync(require.resolve('../../../config'), 'utf8');
+    assert.match(source, /\.\.\.secretEncryptionEnvShape/);
+  } finally {
+    if (before === undefined) delete process.env.TOTP_ENCRYPTION_KEY;
+    else process.env.TOTP_ENCRYPTION_KEY = before;
+  }
+});
