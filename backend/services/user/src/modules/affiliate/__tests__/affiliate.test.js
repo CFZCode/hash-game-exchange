@@ -683,7 +683,7 @@ test('affiliate', async (t) => {
   });
 });
 
-test("an INR site: the admin's referral steps are rupees, shown and paid as is", async () => {
+test("default currency INR: the admin's referral steps are rupees, shown and paid as is", async () => {
   const { AffiliateService: Service } = require('../affiliate.service');
   const rate = '0.0105'; // 1 INR in USD
   const rewardMoney = {
@@ -692,7 +692,7 @@ test("an INR site: the admin's referral steps are rupees, shown and paid as is",
     convert: async (amount, from, to) => (from === to ? String(amount) : from === 'USD' && to === 'INR' ? String(Number(amount) / Number(rate)) : null),
   };
   const service = new Service({
-    models: { Team: { findAll: async () => [] } },
+    models: { Team: { findAll: async () => [] }, SiteFeature: { findByPk: async (key) => (key === 'default_currency' ? { variant: 'INR' } : null) } },
     db: {},
     logger: null,
     config: {},
