@@ -26,7 +26,7 @@ import { TxnPasswordLabel } from '@/views/finance/StaffFloat'
 import ImageField, { POSTER, type PickedImage } from './ImageField'
 import PaletteEditor, { paletteError, type ThemeValue } from './PaletteEditor'
 import PlanPicker, { EMPTY_PLAN, planError } from './PlanPicker'
-import { CsvButton, MonthPicker, StatementView, monthPeriod, thisMonth, type Statement } from './RevenueShare'
+import { CsvButton, MonthPicker, PdfButton, StatementView, monthPeriod, thisMonth, type Statement } from './RevenueShare'
 import TermsEditor, { termsError } from './TermsEditor'
 import { TEMPLATE_PALETTES } from './palettes'
 import { PALETTE_KEYS, type GatewayOrder, type Palette, type Plan, type Terms, type WhitelabelDetail as Detail, type WhitelabelTransfer } from './types'
@@ -422,6 +422,11 @@ const RevenueShareCard = ({ wl }: { wl: Detail }) => {
         </div>
         <div className='flex items-center gap-2'>
           <MonthPicker value={month} onChange={setMonth} />
+          <PdfButton
+            title={`Revenue share — ${wl.name} — ${month}`}
+            fileName={`${wl.slug}-revenue-share-${month}`}
+            get={() => (report.data ? { statements: [{ ...report.data, name: wl.name, slug: wl.slug }] } : null)}
+          />
           <CsvButton path={`admin/whitelabels/${wl.id}/report.csv`} period={period} fileName={`${wl.slug}-revenue-share-${month}.csv`} />
         </div>
       </CardHeader>

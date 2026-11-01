@@ -6,7 +6,7 @@ import PageHeader from '@/components/shared/PageHeader'
 import { Card, CardContent } from '@/components/ui/card'
 import { useApi } from '@/hooks/use-api'
 
-import { CsvButton, MonthPicker, StatementView, monthPeriod, thisMonth, type Statement } from './RevenueShare'
+import { CsvButton, MonthPicker, PdfButton, StatementView, monthPeriod, thisMonth, type Statement } from './RevenueShare'
 
 /**
  * A whitelabel company's own revenue-share statement (whitelabel builds only): the same numbers the
@@ -25,6 +25,7 @@ const CompanyStatement = () => {
         actions={
           <div className='flex items-center gap-2'>
             <MonthPicker value={month} onChange={setMonth} />
+            <PdfButton title={`Revenue share statement — ${month}`} fileName={`revenue-share-${month}`} get={() => (report.data ? { statements: [report.data] } : null)} />
             <CsvButton path='admin/whitelabel-statement/csv' period={period} fileName={`revenue-share-${month}.csv`} />
           </div>
         }

@@ -100,6 +100,8 @@ async function ledgerFigures(db, { whitelabelId, from, to }) {
     window
   );
 
+  const account = await accountWithParent(db, window, inr);
+
   const out = (g) => ({
     bets: dec(g.bets),
     wins: dec(g.wins),
@@ -119,7 +121,70 @@ async function ledgerFigures(db, { whitelabelId, from, to }) {
       charges: dec(toPaisa(gateway.charges)),
     },
     transfers: { amount: money.fromStored(sent?.amount ?? '0'), count: sent?.count ?? 0 },
+    account,
     unconverted: [...unconverted],
+  };
+}
+
+const ENTRY_CAP = 5000;
+
+/**
+ * The account between the parent and the whitelabel's company, as a balance sheet: what the parent
+ * gave (balance transfers) and what gateway payments on the parent's account moved, entry by
+ * entry, with the running balance — exactly the movements the company's Direct balance got from
+ * the parent (wl-hub/companyWallet): a transfer +A, a gateway deposit +A − charge, a gateway
+ * withdrawal −A − charge. Opening = every such movement before the period.
+ */
+async function accountWithParent(db, { whitelabelId, from, to }, inr) {
+  const rowsSql = (when) => `
+    SELECT 'transfer' AS kind, NULL AS provider, id::text AS reference, 'INR' AS currency, amount, 0 AS charge_pct, created_at AS at
+      FROM whitelabel_transfers WHERE whitelabel_id = :whitelabelId AND status = 'done' AND ${when('created_at')}
+    UNION ALL
+    SELECT CASE flow WHEN 'deposit' THEN 'gateway_deposit' ELSE 'gateway_withdrawal' END, provider, copy_reference, currency,
+           COALESCE(settled_amount, amount), charge_pct, updated_at
+      FROM whitelabel_gateway_orders WHERE whitelabel_id = :whitelabelId AND status = 'success' AND ${when('updated_at')}`;
+
+  const effect = (r) => {
+    const amount = inr(r.currency, r.amount);
+    const charge = r.kind === 'transfer' ? 0n : toPaisa(money.percentOf(dec(amount), String(r.charge_pct ?? '0')));
+    const net = r.kind === 'gateway_withdrawal' ? -(amount + charge) : amount - charge;
+    return { amount, charge, net };
+  };
+
+  let opening = 0n;
+  for (const r of await select(db, rowsSql((c) => `${c} < :from`), { whitelabelId, from })) opening += effect(r).net;
+
+  // Every entry counts toward the balances and totals; only the first ENTRY_CAP are listed.
+  const rows = await select(db, `${rowsSql((c) => `${c} >= :from AND ${c} < :to`)} ORDER BY at, reference`, { whitelabelId, from, to });
+  const totals = { given: 0n, deposits: 0n, withdrawals: 0n, charges: 0n };
+  let balance = opening;
+  const entries = [];
+  for (const r of rows) {
+    const { amount, charge, net } = effect(r);
+    balance += net;
+    if (r.kind === 'transfer') totals.given += amount;
+    else if (r.kind === 'gateway_deposit') totals.deposits += amount;
+    else totals.withdrawals += amount;
+    totals.charges += charge;
+    if (entries.length >= ENTRY_CAP) continue;
+    entries.push({
+      at: new Date(r.at).toISOString(),
+      kind: r.kind,
+      provider: r.provider,
+      reference: r.reference,
+      currency: r.currency,
+      amount: dec(amount),
+      charge: dec(charge),
+      net: dec(net),
+      balance: dec(balance),
+    });
+  }
+  return {
+    opening: dec(opening),
+    closing: dec(balance),
+    entries,
+    truncated: rows.length > ENTRY_CAP,
+    totals: { given: dec(totals.given), deposits: dec(totals.deposits), withdrawals: dec(totals.withdrawals), charges: dec(totals.charges) },
   };
 }
 
@@ -161,6 +226,7 @@ function assemble({ from, to, ledger, sports, sportsError = null, revenueShare =
     sportsError,
     gateway: ledger.gateway,
     transfers: ledger.transfers,
+    account: ledger.account ?? null,
     unconverted: ledger.unconverted,
   };
 }
@@ -185,6 +251,18 @@ function toCsv(report, { name } = {}) {
   lines.push(['Gateway withdrawals', report.gateway.withdrawals, `${report.gateway.withdrawalCount} order(s)`]);
   lines.push(['Gateway charges', report.gateway.charges]);
   lines.push(['Balance sent by the parent', report.transfers.amount, `${report.transfers.count} transfer(s)`]);
+  if (report.account) {
+    const a = report.account;
+    const KIND = { transfer: 'Balance sent by the parent', gateway_deposit: 'Gateway deposit', gateway_withdrawal: 'Gateway withdrawal' };
+    lines.push([]);
+    lines.push(['Account with the parent']);
+    lines.push(['Date (UTC)', 'Entry', 'Gateway', 'Reference', 'Amount', 'Charge', 'Net', 'Balance']);
+    lines.push([report.from, 'Opening balance', '', '', '', '', '', a.opening]);
+    for (const e of a.entries) lines.push([e.at.replace('T', ' ').slice(0, 19), KIND[e.kind] ?? e.kind, e.provider ?? '', e.reference, e.amount, e.charge, e.net, e.balance]);
+    lines.push([report.to, 'Closing balance', '', '', '', '', '', a.closing]);
+    lines.push(['Totals', `given ${a.totals.given}`, `deposits ${a.totals.deposits}`, `withdrawals ${a.totals.withdrawals}`, `charges ${a.totals.charges}`]);
+    if (a.truncated) lines.push(['Note', 'more than 5000 entries: the first 5000 are listed']);
+  }
   if (report.unconverted.length) lines.push(['Left out (no exchange rate)', report.unconverted.join(' ')]);
   if (report.sportsError) lines.push(['Sports', `not available: ${report.sportsError}`]);
   return lines.map((cells) => cells.map((c) => `"${String(c ?? '').replace(/"/g, '""').replace(/^[=+\-@\t\r]/, (m) => (/^-\d/.test(String(c)) ? m : `'${m}`))}"`).join(',')).join('\r\n');

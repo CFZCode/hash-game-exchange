@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useApi, usePagedApi } from '@/hooks/use-api'
 
-import { CsvButton, MonthPicker, StatementView, monthPeriod, thisMonth, type Statement } from './RevenueShare'
+import { CsvButton, MonthPicker, PdfButton, StatementView, monthPeriod, thisMonth, type Statement } from './RevenueShare'
 
 type Named = Statement & { id: number; name: string; slug: string; status: string }
 
@@ -98,6 +98,19 @@ const WhitelabelsReport = () => {
               </SelectContent>
             </Select>
             <MonthPicker value={month} onChange={setMonth} />
+            <PdfButton
+              title={id === 'all' ? `Revenue share — all whitelabels — ${month}` : `Revenue share — ${one.data?.name ?? `whitelabel ${id}`} — ${month}`}
+              fileName={id === 'all' ? `whitelabels-revenue-share-${month}` : `${one.data?.slug ?? `whitelabel-${id}`}-revenue-share-${month}`}
+              get={() =>
+                id === 'all'
+                  ? all.data
+                    ? { statements: all.data.whitelabels, totals: { totalGgr: all.data.totalGgr, totalShare: all.data.totalShare } }
+                    : null
+                  : one.data
+                    ? { statements: [one.data] }
+                    : null
+              }
+            />
             <CsvButton
               path={id === 'all' ? 'admin/whitelabels/report.csv' : `admin/whitelabels/${id}/report.csv`}
               period={period}

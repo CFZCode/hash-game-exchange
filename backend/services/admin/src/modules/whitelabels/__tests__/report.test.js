@@ -147,6 +147,26 @@ test('statement from the database', async (t) => {
   assert.equal(report.transfers.amount, '100000.00000000');
   assert.deepEqual(report.copyFigures, { currency: 'INR', casinoGgr: '1100.00000000', originalsGgr: '-200.00000000' });
 
+  // The balance sheet: every movement between the parent and the company, by date, running balance.
+  const { account } = report;
+  assert.equal(account.opening, '0.00000000');
+  assert.deepEqual(
+    account.entries.map((e) => [e.kind, e.amount, e.charge, e.net, e.balance]),
+    [
+      ['transfer', '100000.00000000', '0.00000000', '100000.00000000', '100000.00000000'],
+      ['gateway_deposit', '10000.00000000', '400.00000000', '9600.00000000', '109600.00000000'],
+      ['gateway_withdrawal', '2000.00000000', '100.00000000', '-2100.00000000', '107500.00000000'],
+    ]
+  );
+  assert.equal(account.closing, '107500.00000000');
+  assert.deepEqual(account.totals, { given: '100000.00000000', deposits: '10000.00000000', withdrawals: '2000.00000000', charges: '500.00000000' });
+  // The next month opens where this one closed.
+  const next = await service.report(wlId, { from: '2026-11-01', to: '2026-12-01' });
+  assert.deepEqual([next.account.opening, next.account.entries.length, next.account.closing], ['107500.00000000', 0, '107500.00000000']);
+  const csv = whitelabelReport.toCsv(report, { name: 'Report Test' });
+  assert.match(csv, /"Opening balance"/);
+  assert.match(csv, /"-2100\.00000000","107500\.00000000"/);
+
   // A deleted whitelabel with nothing in the month is left out; one with activity stays (its month is owed).
   await q(
     `INSERT INTO whitelabels (id, slug, name, site_domain, admin_domain, api_domain, template, company_role_name, company_name, company_email, link_key, status)
