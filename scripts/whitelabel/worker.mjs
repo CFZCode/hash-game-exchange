@@ -13,6 +13,7 @@
  * read the copy's own files and can never reach the parent's database.
  */
 import { spawn, execFileSync } from 'node:child_process';
+import crypto from 'node:crypto';
 import dns from 'node:dns';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
@@ -187,6 +188,7 @@ async function runJob(job, { query, box }) {
     const ctx = makeCtx(job, wl, { query, box, log });
     if (job.kind === 'create') {
       await query(`UPDATE whitelabels SET status = 'creating', updated_at = NOW() WHERE id = $1`, [wl.id]);
+      ctx.hub = await hubCredentials(wl, { query, box });
       await createWhitelabel(ctx, wl);
     } else {
       await removeWhitelabel(ctx, wl, { archive: true });
@@ -199,6 +201,24 @@ async function runJob(job, { query, box }) {
     await query(`UPDATE whitelabel_jobs SET status = 'failed', finished_at = NOW() WHERE id = $1`, [job.id]);
     if (wl) await query(`UPDATE whitelabels SET status = 'failed', updated_at = NOW() WHERE id = $1`, [wl.id]);
   }
+}
+
+/**
+ * The copy's hub link (user-service modules/wl-hub, common/hubAuth): its API key and secret —
+ * kept from an earlier attempt, else made now and stored sealed on the row — and this site's
+ * user-service and casino-service on this machine. They go into the copy's PARENT_HUB_* env.
+ */
+async function hubCredentials(wl, { query, box }) {
+  let key = wl.hub_key;
+  let secret = wl.hub_secret ? box.open(wl.hub_secret) : null;
+  if (!key || !secret) {
+    key = `wlk_${crypto.randomBytes(12).toString('hex')}`;
+    secret = crypto.randomBytes(32).toString('hex');
+    await query(`UPDATE whitelabels SET hub_key = $2, hub_secret = $3, updated_at = NOW() WHERE id = $1`, [wl.id, key, box.seal(secret)]);
+  }
+  const port = new URL(parentEnv.USER_SERVICE_URL || `http://127.0.0.1:${parentEnv.USER_SERVICE_PORT || 4001}`).port;
+  const casinoPort = new URL(parentEnv.CASINO_SERVICE_URL || `http://127.0.0.1:${parentEnv.CASINO_SERVICE_PORT || 4003}`).port;
+  return { url: `http://127.0.0.1:${port}`, casinoUrl: `http://127.0.0.1:${casinoPort}`, key, secret };
 }
 
 function makeCtx(job, wl, { query, box, log }) {

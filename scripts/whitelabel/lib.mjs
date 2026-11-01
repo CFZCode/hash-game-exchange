@@ -180,7 +180,7 @@ export const BLANK_ON_COPY = [
  * Everything one copy's env files need beyond make-env.mjs's local defaults. `secrets` are made
  * by the caller (crypto) so a test can pin them.
  */
-export function copyEnv({ wl, slug, ports, redisDb, parentEnv, parentFrontendEnv = {}, linkKey, secrets }) {
+export function copyEnv({ wl, slug, ports, redisDb, parentEnv, parentFrontendEnv = {}, linkKey, hub, secrets }) {
   const site = `https://${wl.site_domain}`;
   const admin = `https://${wl.admin_domain}`;
   const api = `https://${wl.api_domain}`;
@@ -224,6 +224,8 @@ export function copyEnv({ wl, slug, ports, redisDb, parentEnv, parentFrontendEnv
     SEED_ADMIN_PASSWORD: secrets.seedAdminPassword,
     WHITELABEL_MODE: 'true',
     WHITELABEL_LINK_KEY: linkKey,
+    // Gateway payments and casino games run on the parent's accounts (user- and casino-service modules/wl-hub).
+    ...(hub ? { PARENT_HUB_URL: hub.url, PARENT_HUB_CASINO_URL: hub.casinoUrl, PARENT_HUB_KEY: hub.key, PARENT_HUB_SECRET: hub.secret } : {}),
   };
 
   const frontend = {

@@ -65,9 +65,14 @@ const WhitelabelsList = () => {
         title='Whitelabels'
         description='Full copies of this site on their own domains. Each is run by its company, whose balance comes only from your transfers.'
         actions={
-          <Button nativeButton={false} render={<Link href='/whitelabels/new' />}>
-            <PlusIcon /> New whitelabel
-          </Button>
+          <div className='flex gap-2'>
+            <Button variant='outline' nativeButton={false} render={<Link href='/whitelabels/report' />}>
+              Revenue share report
+            </Button>
+            <Button nativeButton={false} render={<Link href='/whitelabels/new' />}>
+              <PlusIcon /> New whitelabel
+            </Button>
+          </div>
         }
       />
       <DataTable
