@@ -54,51 +54,55 @@ export default function DataTable({ columns, data, empty, bordered = true, class
   const rule = bordered ? 'border-b border-solid border-b-third' : '';
 
   return (
-    <table className={cx(className, 'w-full')}>
-      <thead>
-        <tr className={rule}>
-          {columns.map((column, index) =>
-            column.title ? (
-              <th
-                key={column.dataIndex}
-                className={cx(
-                  'px-3 py-2 align-middle text-xs font-semibold leading-none text-secondary',
-                  column.class,
-                  align(index, columns.length)
-                )}
-              >
-                {column.title}
-              </th>
-            ) : null
-          )}
-        </tr>
-      </thead>
-
-      {data?.length > 0 ? (
-        <tbody>
-          {data.map((row, rowIndex) => (
-            <tr key={row.id ?? rowIndex} className={rule}>
-              {columns.map((column, index) => (
-                <td
+    /* THIS BUILD'S: a scroll box around the table, so a phone swipes the wide columns instead of the
+       table spilling out of its card (Commission by Friends is six columns). */
+    <div className="w-full overflow-x-auto">
+      <table className={cx(className, 'w-full')}>
+        <thead>
+          <tr className={rule}>
+            {columns.map((column, index) =>
+              column.title ? (
+                <th
                   key={column.dataIndex}
                   className={cx(
-                    'px-3 py-2 align-middle leading-none',
+                    'px-3 py-2 align-middle text-xs font-semibold leading-none text-secondary',
+                    column.class,
                     align(index, columns.length)
                   )}
                 >
-                  {column.render ? column.render(row[column.dataIndex], row) : row[column.dataIndex]}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      ) : (
-        <tbody>
-          <tr>
-            <td colSpan={columns.length}>{empty}</td>
+                  {column.title}
+                </th>
+              ) : null
+            )}
           </tr>
-        </tbody>
-      )}
-    </table>
+        </thead>
+
+        {data?.length > 0 ? (
+          <tbody>
+            {data.map((row, rowIndex) => (
+              <tr key={row.id ?? rowIndex} className={rule}>
+                {columns.map((column, index) => (
+                  <td
+                    key={column.dataIndex}
+                    className={cx(
+                      'px-3 py-2 align-middle leading-none',
+                      align(index, columns.length)
+                    )}
+                  >
+                    {column.render ? column.render(row[column.dataIndex], row) : row[column.dataIndex]}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        ) : (
+          <tbody>
+            <tr>
+              <td colSpan={columns.length}>{empty}</td>
+            </tr>
+          </tbody>
+        )}
+      </table>
+    </div>
   );
 }
