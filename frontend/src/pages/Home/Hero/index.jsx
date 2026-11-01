@@ -16,6 +16,7 @@ const WHITELABEL = process.env.NEXT_PUBLIC_WHITELABEL_MODE === 'true';
 const DEFAULT_HERO_ART_MOBILE = '/brand/parker567-hero-mobile.jpg';
 import googleIcon from '../../../assets/google.png';
 import GoogleSignUpConfirm from '../../../components/shared/GoogleSignUpConfirm';
+import { useGoogleLogin } from '../../../services/googleAuth';
 import telegramIcon from '../../../assets/telegram.png';
 import './Hero.css';
 
@@ -33,6 +34,8 @@ const HeroCopy = () => {
   const { agentPlayer } = useGates();
   // "Or Register With Google" is a sign-up: the reference's confirmation first.
   const [googleConfirm, setGoogleConfirm] = useState(false);
+  // The owner's `google_signin` switch and the server's keys (GET /user/auth/google/status).
+  const googleOn = useGoogleLogin();
   if (agentPlayer) return null;
 
   return (
@@ -52,14 +55,16 @@ const HeroCopy = () => {
         Sign Up
       </button>
 
-      {/* "Or Register With" — Google only, always drawn (user's request, 2026-10-19); the press
-          checks the backend's keys (services/googleAuth.js). Telegram stays hidden (SOCIAL_SIGN_IN). */}
+      {/* "Or Register With" — Google only, shown while the owner's switch is on and the server has
+          its keys (user's request, 2026-11-01). Telegram stays hidden (SOCIAL_SIGN_IN). */}
+      {(googleOn || SOCIAL_SIGN_IN) && (
       <>
       <p className="mt-3 p-0 font-semibold leading-[150%] text-secondary">Or Register With</p>
 
       <div className="mt-1.5 h-8">
         <div dir="ltr" className="contents">
           <div className="flex items-center gap-2">
+            {googleOn && (
             <button
               className="button h-8 w-[5.5rem] flex-none gap-1 rounded-lg border border-third bg-black_alpha5 p-0 text-xs backdrop-blur-sm sm:h-10 sm:w-[120px] sm:text-base"
               type="button"
@@ -68,6 +73,7 @@ const HeroCopy = () => {
               <img alt="google" className="size-[0.875rem] sm:size-5" src={googleIcon} />
               <span className="font-extrabold text-primary">Google</span>
             </button>
+            )}
             {SOCIAL_SIGN_IN && (
             <button
               className="button relative h-8 w-[5.5rem] flex-none gap-1 overflow-hidden rounded-lg border border-third bg-black_alpha5 p-0 text-xs backdrop-blur-sm sm:h-10 sm:w-[120px] sm:text-base"
@@ -83,6 +89,7 @@ const HeroCopy = () => {
         </div>
       </div>
       </>
+      )}
         </>
       )}
       <GoogleSignUpConfirm open={googleConfirm} onClose={() => setGoogleConfirm(false)} />

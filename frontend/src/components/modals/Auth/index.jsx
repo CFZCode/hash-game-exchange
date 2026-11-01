@@ -33,7 +33,7 @@ import './Auth.css';
    arms. */
 import '../../shared/DialogShell/DialogShell.css';
 import { PASSKEY_ENABLED, SOCIAL_LOGINS } from '../../../config/hiddenFeatures';
-import { startGoogleLogin } from '../../../services/googleAuth';
+import { startGoogleLogin, useGoogleLogin } from '../../../services/googleAuth';
 import { underAgentBase } from '../../../services/agentBase';
 import DemoButton from './DemoButton';
 
@@ -229,12 +229,13 @@ function DirectRow({ heading, children }) {
 
 function SignInForm({ onSubmit, pending, error, onForgot }) {
   /* /agent: an agent's players sign in with the username their agent gave them, so no Email tab
-     and no Google (which would open a new account). Google is always drawn, as on the home hero
-     (user's request, 2026-10-31): the press checks the backend's keys (services/googleAuth.js). */
+     and no Google (which would open a new account). Google shows while the owner's `google_signin`
+     switch is on and the server has its keys (GET /user/auth/google/status, user's request 2026-11-01). */
   const agentSite = underAgentBase();
   // B2C only: hidden on the agent site and wherever public sign-up is closed (B2B).
   const canSignUp = useCanSignUp();
-  const googleOn = !agentSite && canSignUp;
+  const googleEnabled = useGoogleLogin();
+  const googleOn = googleEnabled && !agentSite && canSignUp;
   const thirdParty = SHOWN_THIRD_PARTY.filter((item) => item.label !== 'Google' || googleOn);
   /* Username vs Email — THIS BUILD'S TABS (user's request, 2026-10-16), in place of bc.game's
      Password / One-time Code: the platform has no one-time code, and its login takes either an
@@ -433,8 +434,8 @@ const USERNAME_RULE = /^[A-Za-z0-9_.-]{3,30}$/;
 const EMAIL_RULE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 function SignUpForm({ onSubmit, error, onClearError }) {
-  // Always drawn, like the Sign In tab and the hero; the press checks the backend's keys.
-  const googleOn = true;
+  // The owner's `google_signin` switch and the server's keys, as on the Sign In tab and the hero.
+  const googleOn = useGoogleLogin();
   const othersShown = SHOWN_THIRD_PARTY.some((item) => item.label !== 'Google');
   /* Username AND Email, both required (user's request, 2026-10-31) — no Username / Email tabs
      here; the Sign In tab keeps its pair. */
