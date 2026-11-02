@@ -364,6 +364,7 @@ function vhost(domain, routes, { ssl, extra = [] }) {
     listen 80;
     listen [::]:80;
     server_name ${domain};
+    include snippets/geo-block.conf;
     location /.well-known/acme-challenge/ { root ${ACME_ROOT}; }
     location / { return 301 https://$host$request_uri; }
 }
@@ -379,6 +380,7 @@ server {
     listen [::]:443 ssl;
     http2 on;
     server_name ${domain};
+    include snippets/geo-block.conf;
     ssl_certificate     /etc/letsencrypt/live/${domain}/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/${domain}/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
