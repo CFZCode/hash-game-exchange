@@ -10,7 +10,8 @@ import racingImg from '../../../assets/racing.png';
 import racingLightImg from '../../../assets/racing_w.png';
 import bingoImg from '../../../assets/bingo.png';
 import cricketImg from '../../../assets/sports/sport-cricket-color.svg';
-import { SportIcon } from '../../Sports/icons';
+/* A 32px two-tone mark drawn here to match the colour-icon sprite (green shape, grey twin). */
+import cricketIcon from '../../../assets/cricket_icon.svg';
 
 /* The category cards under Recent Big Wins — two feature panels over a row of four.
  *
@@ -204,7 +205,7 @@ export default function CategoryCards() {
             for it yet, swap the import when the client supplies one. */}
         {routeOn('/sports') && <FeatureCard src={cricketImg} href="/sports?sport=cricket" artClass="right-3 top-[22%] h-[70%]">
           <div className="flex items-center">
-            <SportIcon sport="cricket" className="size-8 fill-current" />
+            <img src={cricketIcon} alt="" className="size-8" />
             <h2 className="ml-0.5 text-sm sm:text-[22px]">CRICKET</h2>
           </div>
           <FeatureCopy isWide={isWide}>
