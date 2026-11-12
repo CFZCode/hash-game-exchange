@@ -9,6 +9,11 @@ import PayYourWay from './PayYourWay';
 import Highlights from './Highlights';
 import LatestBets from './LatestBets';
 import { getHomeSections } from '../../services/home';
+import { getLiveProviders } from '../../services/catalog';
+import { USE_FIXTURES } from '../../services/client';
+import { providerLogo } from '../../data/providers';
+import { ALL_PROVIDERS } from '../Casino/catalogue';
+import { ProviderRow } from '../Casino/ChipRow';
 import { useResource } from '../../hooks/useResource';
 import { useGates } from '../../context/gates';
 import useScrollReveal from '../../hooks/useScrollReveal';
@@ -18,7 +23,8 @@ import './Home.css';
    applied to its section array — Originals, Hot Games, Highlights, Exclusive, Slots,
    Upcoming Lottery Draw, Live Casino, Pay Your Way, Bingo, Latest round & Race. Upcoming Lottery
    Draw is removed on the user's request (a deliberate departure; this platform has no lottery),
-   so Slots is followed directly by Live Casino. */
+   so Slots is followed directly by Live Casino. Then, on the owner's request (2026-11-13): a
+   Providers row takes Originals' slot and Originals sits under Live Casino. */
 export default function Home() {
   /* One call for all six game rows, which is how `recommend/batch/selections/` returns them.
      `?? {}` rather than a loading branch: while fixtures are on this is populated on the first
@@ -27,6 +33,15 @@ export default function Home() {
   const { data: sections } = useResource(getHomeSections);
   const gates = useGates();
   const casino = gates.on('casino');
+
+  /* The Providers row, asked for in place of Originals (which moved under Live Casino). Same
+     list the casino lobby's Game Providers strip reads; studios with a mark lead so the strip
+     opens on logos, the name-only ones follow. */
+  const { data: liveProviders } = useResource(getLiveProviders);
+  const providers = React.useMemo(() => {
+    const names = USE_FIXTURES ? ALL_PROVIDERS : liveProviders ?? [];
+    return [...names].sort((a, b) => Number(Boolean(providerLogo(b))) - Number(Boolean(providerLogo(a))));
+  }, [liveProviders]);
 
   /* Each card below the hero plays the site's own entrance as it reaches the fold — the
      trigger is this build's addition, the motion is `.game-tile-animate`'s; the rules and the
@@ -131,7 +146,7 @@ export default function Home() {
       {casino && <RecentFavorites />}
       {casino && gates.flag('home_latestwins') && <RecentBigWins />}
       {gates.flag('home_gamingcards') && <CategoryCards />}
-      {gates.on('originals') && <GameSection title={brandLabel('BC Originals')} {...section('originals')} />}
+      {casino && providers.length > 0 && <ProviderRow title="Providers" providers={providers} />}
       {casino && <GameSection title="Hot Games" {...section('hotGames')} />}
       {gates.on('sportsexchange') && gates.flag('home_livesports') && <Highlights />}
       {/* BC.GAME's exclusive tables have no Parker567 equivalent; the live feed answers []. Drawn
@@ -139,6 +154,7 @@ export default function Home() {
       {casino && section('exclusive').games?.length !== 0 && <GameSection title={brandLabel('BC Exclusive')} {...section('exclusive')} />}
       {casino && gates.flag('home_popularslots') && <GameSection title="Slots" {...section('slots')} />}
       {casino && gates.flag('home_livecasino') && <GameSection title="Live Casino" {...section('liveCasino')} />}
+      {gates.on('originals') && <GameSection title={brandLabel('BC Originals')} {...section('originals')} />}
       {/* Admin ka home_paymentbanner, aur agent ke player ko nahi (wo deposit nahi kar sakta). */}
       {gates.flag('home_paymentbanner') && gates.on('deposit') && <PayYourWay />}
       {/* compact: this row sits under Pay Your Way's fixed-height panel, which leaves empty

@@ -54,10 +54,10 @@ export default function ChipRow({ title, href, items, renderItem, chipClass, gap
 
 /* `/provider/:provider` is the site's own route for one provider's catalogue
    (Enter-MsmOuq5R.js:8693), and the Explore panel's provider grid already targets it. */
-export function ProviderRow({ providers }) {
+export function ProviderRow({ providers, title = 'Game Providers' }) {
   return (
     <ChipRow
-      title="Game Providers"
+      title={title}
       href="/casino/provider"
       /* EIGHT ACROSS ON A DESKTOP, AND THE WIDTH IS DERIVED RATHER THAN MEASURED. The capture
          shows exactly eight chips filling the content column with the eighth flush against its
