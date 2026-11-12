@@ -9,7 +9,7 @@ import pokerImg from '../../../assets/poker.png';
 import racingImg from '../../../assets/racing.png';
 import racingLightImg from '../../../assets/racing_w.png';
 import bingoImg from '../../../assets/bingo.png';
-import cricketImg from '../../../assets/sports/sport-cricket-color.svg';
+import cricketImg from '../../../assets/cricket.png';
 /* A 32px two-tone mark drawn here to match the colour-icon sprite (green shape, grey twin). */
 import cricketIcon from '../../../assets/cricket_icon.svg';
 
@@ -201,9 +201,8 @@ export default function CategoryCards() {
 
         {/* CRICKET between Casino and Sports, on the client's request (their list, points 7 and 15):
             the exchange lobby reads `?sport=` (pages/Exchange/Lobby), so this lands on the cricket
-            board. The art is the lobby's own colour cricket glyph; no banner-style render exists
-            for it yet, swap the import when the client supplies one. */}
-        {routeOn('/sports') && <FeatureCard src={cricketImg} href="/sports?sport=cricket" artClass="right-3 top-[22%] h-[70%]">
+            board. The art is the client's own render, cut to 600px like the two beside it. */}
+        {routeOn('/sports') && <FeatureCard src={cricketImg} href="/sports?sport=cricket">
           <div className="flex items-center">
             <img src={cricketIcon} alt="" className="size-8" />
             <h2 className="ml-0.5 text-sm sm:text-[22px]">CRICKET</h2>
