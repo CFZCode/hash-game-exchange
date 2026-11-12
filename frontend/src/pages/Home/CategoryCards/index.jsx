@@ -9,6 +9,8 @@ import pokerImg from '../../../assets/poker.png';
 import racingImg from '../../../assets/racing.png';
 import racingLightImg from '../../../assets/racing_w.png';
 import bingoImg from '../../../assets/bingo.png';
+import cricketImg from '../../../assets/sports/sport-cricket-color.svg';
+import { SportIcon } from '../../Sports/icons';
 
 /* The category cards under Recent Big Wins — two feature panels over a row of four.
  *
@@ -69,7 +71,7 @@ const SpriteIcon = ({ name }) => <div className={`color_icon_img ${name}`} />;
    utilities on a flex child and resolve to nothing. `hover:bg-layer4` is kept even though it
    restates the base colour — the original declares it, and it is what makes these cards
    deliberately inert on hover. */
-function FeatureCard({ src, href, children }) {
+function FeatureCard({ src, href, children, artClass = 'right-0 top-0 h-full' }) {
   const navigate = useNavigate();
 
   return (
@@ -77,7 +79,7 @@ function FeatureCard({ src, href, children }) {
       onClick={() => navigate(href)}
       className="relative flex h-32 flex-1 cursor-pointer items-center justify-center overflow-hidden rounded-xl bg-layer4 p-1.5 font-extrabold hover:bg-layer4 sm:h-[176px] sm:p-5"
     >
-      <img className="absolute right-0 top-0 h-full" alt="image" src={src} />
+      <img className={`absolute ${artClass}`} alt="image" src={src} />
       <div className="relative z-10 flex h-full flex-auto flex-col">{children}</div>
     </div>
   );
@@ -130,7 +132,8 @@ function CategoryCard({ src, icon, title, href, isWide }) {
 
 const CATEGORIES = [
   { key: 'poker', icon: 'bcpoker', title: 'POKER', src: pokerImg, href: '/casino/poker' },
-  { key: 'racing', icon: 'racing', title: 'RACING', src: racingImg, href: '/sports?sport=horse-racing' },
+  /* "HORSE RACING", not the original's "RACING": the client's list, point 15. */
+  { key: 'racing', icon: 'racing', title: 'HORSE RACING', src: racingImg, href: '/sports?sport=horse-racing' },
   /* LOTTERY (`/lottery`) sat here on the original; removed on the user's request, a deliberate
      departure — see .claude/skills/hash-ui-fidelity. The three remaining cards share the row. */
   /* The Bingo card's art, relabelled SLOTS on the user's request (hash.game has no slots render);
@@ -192,6 +195,20 @@ export default function CategoryCards() {
           </div>
           <FeatureCopy isWide={isWide}>
             Dive into our in-house games, live casino and slots
+          </FeatureCopy>
+        </FeatureCard>}
+
+        {/* CRICKET between Casino and Sports, on the client's request (their list, points 7 and 15):
+            the exchange lobby reads `?sport=` (pages/Exchange/Lobby), so this lands on the cricket
+            board. The art is the lobby's own colour cricket glyph; no banner-style render exists
+            for it yet, swap the import when the client supplies one. */}
+        {routeOn('/sports') && <FeatureCard src={cricketImg} href="/sports?sport=cricket" artClass="right-3 top-[22%] h-[70%]">
+          <div className="flex items-center">
+            <SportIcon sport="cricket" className="size-8 fill-current" />
+            <h2 className="ml-0.5 text-sm sm:text-[22px]">CRICKET</h2>
+          </div>
+          <FeatureCopy isWide={isWide}>
+            Match odds, fancy and session markets on every big game
           </FeatureCopy>
         </FeatureCard>}
 
