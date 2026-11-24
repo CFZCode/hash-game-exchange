@@ -95,9 +95,15 @@ export function onSiteEpoch(fn) {
   return () => epochListeners.delete(fn);
 }
 
-export function publishLiveState(state, token, askedAt = Date.now()) {
+/**
+ * `sitePushed`: this state answers a sync asked after an owner / operator push. The epoch then
+ * moves even when the site half reads the same — a save of something the state does not carry
+ * (payment methods, withdrawal limits, region, a feature's options) still has to make the pages
+ * read again. Returns true when the epoch moved.
+ */
+export function publishLiveState(state, token, askedAt = Date.now(), { sitePushed = false } = {}) {
   // A reply to a sync asked before the last write may already be out of date: drop it for reads.
-  if (askedAt < staleBefore) return;
+  if (askedAt < staleBefore) return false;
   const sig = siteSigOf(state);
   const siteChanged = siteSig !== null && sig !== siteSig;
   siteSig = sig;
@@ -107,10 +113,10 @@ export function publishLiveState(state, token, askedAt = Date.now()) {
   for (const w of waiters) w(state);
   waiters.clear();
   listeners.forEach((fn) => fn(state));
-  if (siteChanged) {
-    siteEpoch += 1;
-    epochListeners.forEach((fn) => fn(siteEpoch));
-  }
+  if (!siteChanged && !sitePushed) return false;
+  siteEpoch += 1;
+  epochListeners.forEach((fn) => fn(siteEpoch));
+  return true;
 }
 
 export const liveState = () => last;

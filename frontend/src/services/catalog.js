@@ -87,6 +87,9 @@ const SET_QUERY = {
   'crash-games': { category: 'crash' },
   fishing: { category: 'fishing' },
   bingo: { search: 'bingo' },
+  /* The Poker tab's Teen Patti panel: the catalogue files these under live/table, not poker,
+     so the panel reads them by name (9 games locally). */
+  'teen-patti': { search: 'patti' },
   new: null,
   feature: null,
   'feature-buy-in': null,

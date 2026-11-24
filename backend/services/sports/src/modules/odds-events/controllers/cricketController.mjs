@@ -280,12 +280,16 @@ var CricketController = {
     try {
       const treeData = await CricketService_default.fetchTreeData();
       console.log("\u2705 Tree Data:", treeData);
+      /* A slow feed can be answered by the request timeout first; a second answer throws, and
+         from the catch below it was an unhandled rejection that shut the whole service down. */
+      if (res.headersSent) return undefined;
       return res.status(200).json({
         success: true,
         data: treeData
       });
     } catch (error) {
       console.error("\u274C Error:", error.message);
+      if (res.headersSent) return undefined;
       return res.status(500).json({
         success: false,
         error: error.message

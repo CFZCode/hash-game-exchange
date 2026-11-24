@@ -30,7 +30,7 @@
 import { useSyncExternalStore } from 'react';
 import { fetchSharedJson } from './client';
 import { onLiveState } from './liveStore';
-import { API_BASE, BRANDING_PATH, BRANDING_STORAGE_KEY, LIVE, cleanBranding } from './siteBrandingCore.js';
+import { API_BASE, BRANDING_PATH, BRANDING_STORAGE_KEY, LIVE, cleanBranding, withLocalIdentity } from './siteBrandingCore.js';
 
 /**
  * The static images under public/brand/. The NAME IS THE SITE KEY, exactly as
@@ -81,7 +81,7 @@ const absolute = (path) => (path ? `${API_BASE}${path}` : null);
 function readCache() {
   try {
     const raw = localStorage.getItem(BRANDING_STORAGE_KEY);
-    return raw ? cleanBranding(JSON.parse(raw)) : null;
+    return raw ? withLocalIdentity(cleanBranding(JSON.parse(raw))) : null;
   } catch {
     return null;
   }
@@ -260,7 +260,7 @@ export function applySiteBranding() {
 let loading = null;
 
 function adoptBranding(data) {
-  const next = cleanBranding(data);
+  const next = withLocalIdentity(cleanBranding(data));
   if (JSON.stringify(next) === JSON.stringify(runtime)) return;
   runtime = next;
   writeCache(next);

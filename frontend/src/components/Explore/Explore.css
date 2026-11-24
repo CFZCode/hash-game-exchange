@@ -85,3 +85,63 @@
     animation-duration: 0.01ms;
   }
 }
+
+/* The search overlay (SearchOverlay.jsx): the page stays visible, blurred and dimmed, behind the
+   bar, the tabs and the results. The tint is the theme's own darkest layer, so every template
+   and the light theme get their own. */
+.search-backdrop {
+  background: color-mix(in srgb, var(--color-layer1) 55%, transparent);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+
+.search-overlay-tab {
+  border: 1.5px solid transparent;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+
+.search-overlay-tab:hover {
+  background: var(--color-layer4);
+}
+
+.search-overlay-tab.is-active {
+  border-color: var(--color-brand);
+  background: color-mix(in srgb, var(--color-brand) 10%, var(--color-layer3));
+}
+
+.search-overlay-tab.is-active .search-overlay-count {
+  background: var(--color-brand);
+  color: var(--color-layer1);
+}
+
+.search-overlay-tab:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+.search-overlay-bar {
+  border: 1.5px solid transparent;
+  transition: border-color 0.15s;
+}
+
+.search-overlay-bar:focus-within {
+  border-color: color-mix(in srgb, var(--color-brand) 60%, transparent);
+}
+
+/* Below 1024 the tab row is one swipeable line. */
+.search-overlay-tabs {
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+}
+
+.search-overlay-tabs::-webkit-scrollbar {
+  height: 0;
+}
+
+.search-overlay-tab {
+  scroll-snap-align: start;
+}
+
+.search-match:hover {
+  background: var(--color-layer5);
+}

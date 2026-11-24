@@ -60,6 +60,7 @@ export const TILE_CLASS =
    hover and nothing covers the artwork. */
 export default function GameTile({
   name,
+  provider,
   image,
   players = 0,
   slug,
@@ -68,6 +69,7 @@ export default function GameTile({
   overlay = true,
   autoTag,
   isRecItem = false,
+  catalogueStyle = false,
 }) {
   /* `/game/${slug}` is the original's own href (`{path:"/game/:gameUnique"}`), and it is a page
      here now. `href` still wins when a caller passes one — the View All tile does — and a tile
@@ -116,7 +118,7 @@ export default function GameTile({
   return (
     <Tag
       {...linkProps}
-      className={`${TILE_CLASS} ${delay ? 'game-tile-animate' : ''}`}
+      className={`${TILE_CLASS} ${catalogueStyle ? 'game-item-catalogue' : ''} ${delay ? 'game-tile-animate' : ''}`}
       style={delay ? { '--game-tile-animation-delay': `${delay}ms` } : undefined}
     >
       {/* The placeholder covers BOTH ways a tile can end up without artwork: no file for the
@@ -172,6 +174,13 @@ export default function GameTile({
           }}
         />
       </Skeleton>
+
+      {catalogueStyle && (
+        <div className="game-tile-caption">
+          <span className="game-tile-name">{name}</span>
+          {provider && <span className="game-tile-provider">{provider}</span>}
+        </div>
+      )}
 
       {/* `r(D, { when: !isRecItem, children: [history badge, favorite badge] })` — the corner
           badge that says WHY this card is in this strip. It is not a control and not a state:

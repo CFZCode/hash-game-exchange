@@ -1,22 +1,19 @@
 import React from 'react';
 import useResource from '../../hooks/useResource';
 import { getOriginals } from '../../services/originals';
-import { getCasinoCategories, getCasinoPage, getCasinoSets, getLiveProviders, isLiveSet } from '../../services/catalog';
+import { getCasinoCategories, getCasinoPage, getCasinoSet, getCasinoSets, getLiveProviders, isLiveSet } from '../../services/catalog';
 import { USE_FIXTURES } from '../../services/client';
 import { useGates } from '../../context/gates';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import RecentFavorites from '../Home/RecentFavorites';
-import Hero from '../Home/Hero';
 import GameSection from '../Home/GameSection';
 import LatestBets from '../Home/LatestBets';
-import SectionHeader from '../../components/shared/SectionHeader';
 import CasinoTabStrip from './TabStrip';
 import { ProviderRow, ThemeRow } from './ChipRow';
-import GameGrid, { Empty, ProviderGrid } from '../../components/Explore/GameGrid';
+import GameGrid, { ProviderGrid } from '../../components/Explore/GameGrid';
 import FilterBar from '../../components/Explore/FilterBar';
 import PokerTab from './PokerTab';
-import ShowBlocked from './ShowBlocked';
-import Pagination from '../../components/shared/Pagination';
+import { LobbyPromoBanner, PayYourWay } from './LobbyExtras';
 import { SearchIcon, CloseIcon } from '../../components/Explore/icons';
 import { searchGames, sortGames } from '../../components/Explore/catalogue';
 import { canonicalProvider } from '../../data/providers';
@@ -115,6 +112,65 @@ function SearchBar({ query, setQuery }) {
   );
 }
 
+const CASINO_PROMOS = [
+  { image: 'casino-promo-award.png', label: '$40 000 award — Western Wager Tournament', to: '/promotions/promotion' },
+  { image: 'casino-promo-rakeback.png', label: 'Rakeback — VIP Club', to: '/vip' },
+  { image: 'casino-promo-drops.png', label: '2 000 000€ Drops & Wins', to: '/promotions/promotion' },
+];
+
+function CasinoPromoRow() {
+  return (
+    <div className="casino-promotions" aria-label="Casino promotions">
+      {CASINO_PROMOS.map((promo) => (
+        <Link key={promo.image} className="casino-promo-card" to={promo.to} aria-label={promo.label}>
+          <img src={`/jack55-reference-assets/${promo.image}`} alt={promo.label} />
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+/* "40 of 392", a thin progress bar and a "View More" pill under the grid (Jack55 reference),
+   in place of the numbered pager. The button goes once every game is shown. */
+function ViewMore({ shown, total, loading, onMore }) {
+  if (!total) return null;
+  const pct = Math.min(100, (shown / total) * 100);
+  return (
+    <div className="casino-view-more">
+      <span className="casino-view-more-count">
+        {shown.toLocaleString()} of {total.toLocaleString()}
+      </span>
+      <span className="casino-view-more-bar" aria-hidden="true">
+        <span style={{ width: `${pct}%` }} />
+      </span>
+      {shown < total && (
+        <button type="button" className="casino-view-more-btn" onClick={onMore} disabled={loading}>
+          {loading ? 'Loading…' : 'View More'}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function ResultsTitle({ title }) {
+  if (!title) return null;
+
+  return (
+    <header className="mb-4 flex items-center gap-2 px-4 sm:px-0" aria-label={`${title} results`}>
+      <Link
+        className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-layer4 text-secondary"
+        to="/casino"
+        aria-label="Lobby"
+      >
+        <svg width="17" height="17" viewBox="0 0 17 17" fill="none" aria-hidden="true">
+          <path d="M10.3792 2.81384L5.88265 7.31038C5.35162 7.84141 5.35162 8.71037 5.88265 9.2414L10.3792 13.7379" stroke="currentColor" strokeWidth="2" strokeMiterlimit="10" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </Link>
+      <h1 className="text-xl font-extrabold">{title}</h1>
+    </header>
+  );
+}
+
 /* The lobby: the twelve rows of the default tab. A row with no games still renders — the
    empty state under its own header is the site's behaviour and the only honest thing to show
    for New Releases, whose selection the mirror never captured. */
@@ -143,12 +199,19 @@ function Lobby({ rows, originals, live, providerRow }) {
     if (row.type === 'themes') return <ThemeRow key="themes" themes={themesFor(gates)} />;
 
     const games = rowGames(row.key, originals, live);
-    return games === undefined || games.length ? (
+    /* A row whose feed answered with no games is left out of the lobby (user's request) instead
+       of drawing its header over the "Stay tuned" placeholder — New Releases, while the site
+       admin has picked nothing for it. It comes back by itself once it has games. `undefined`
+       is still loading and keeps its skeleton row. */
+    const section = games === undefined || games.length ? (
       <GameSection key={row.key} title={row.title} games={games} href={row.href} />
-    ) : (
-      <EmptyRow key={row.key} title={row.title} href={row.href} />
-    );
-    }),
+    ) : null;
+    /* Jack55 lobby: a promotion banner after Hot Games, "Pay Your Way" after Live Casino
+       (LobbyExtras.jsx). */
+    if (row.key === 'hot') return [section, <LobbyPromoBanner key="promo-banner" />];
+    if (row.key === 'live') return [section, <PayYourWay key="pay-your-way" />];
+    return section;
+    }).flat(),
   ];
 }
 
@@ -178,19 +241,6 @@ function ThemeGrid({ themes }) {
   );
 }
 
-/* GameSection owns its own header, so a row with nothing to scroll needs one on its own. No
-   controller is passed: there is no strip for it to drive. */
-function EmptyRow({ title, href }) {
-  return (
-    <>
-      <SectionHeader className="px-4 sm:px-0" href={href}>
-        {title}
-      </SectionHeader>
-      <Empty />
-    </>
-  );
-}
-
 export default function Casino() {
   const { tab = '' } = useParams();
   const gates = useGates();
@@ -217,12 +267,12 @@ export default function Casino() {
      survives a tab change, which is what the two selects beside it already do — the Poker tab
      keeps its own copy because that one belongs to `PokerTab`'s own filter row. Inert until a
      feed carries a blocked flag; see the note on the component. */
-  const [showBlocked, setShowBlocked] = React.useState(false);
 
   /* The tab strip is route-driven, so an unknown segment is possible — `/casino/anything`
      still matches. Fall back to the lobby rather than rendering a strip with nothing lit. */
   const known = tabs.some((entry) => entry.tab === tab);
   const active = known ? tab : '';
+  const activeTitle = tabs.find((entry) => entry.tab === active)?.label;
 
   const searching = query.trim().length > 0;
   const tooShort = searching && query.trim().length < 2;
@@ -253,16 +303,18 @@ export default function Casino() {
         searching ? query.trim() : '',
         FILTER_TABS.has(active) && !searching ? providers : [],
         FILTER_TABS.has(active) && !searching ? sort : '',
-        requestedPage,
       ])
     : '';
   const readGrid = React.useCallback(() => {
     if (!gridKey) return null;
-    const [set, search, chosen, order, at] = JSON.parse(gridKey);
-    return getCasinoPage(set, { search: search || undefined, providers: chosen, sort: order, page: at, limit: GRID_PAGE_SIZE });
+    const [set, search, chosen, order] = JSON.parse(gridKey);
+    return getCasinoPage(set, { search: search || undefined, providers: chosen, sort: order, page: 1, limit: GRID_PAGE_SIZE });
   }, [gridKey]);
   const { data: livePage } = useResource(readGrid);
   const { data: liveProviders } = useResource(getLiveProviders);
+  /* The Poker tab's Teen Patti panel reads its own set from the API (none are in `poker`). */
+  const readTeenPatti = React.useCallback(() => (active === 'poker' ? getCasinoSet('teen-patti', { limit: 20 }) : null), [active]);
+  const { data: teenPatti } = useResource(readTeenPatti);
   const live = active ? { [active]: livePage?.games } : liveLobby;
   const liveSearch = livePage?.games;
 
@@ -305,26 +357,45 @@ export default function Casino() {
     return sortGames(narrowed, sort);
   }, [filtered, base, providers, sort]);
 
-  /* The browse grid pages at GRID_PAGE_SIZE. The page number RESETS whenever the thing being
-     paged changes — a different tab, a different search, a different sort or provider set —
-     otherwise switching from page 2 of BC Originals to a nine-game tab lands on an empty grid.
-     That reset is derived during render, keyed on those inputs, rather than done in an effect:
-     `react-hooks/set-state-in-effect` forbids the effect, and the derived form has no
-     intermediate frame showing the stale page. */
-  /* Live, the grid already holds one server page: the pager counts the real total and nothing is
-     sliced. While a page is in flight the pager keeps the page asked for. */
-  const pages = liveGrid
-    ? Math.max(1, requestedPage, Math.ceil((livePage?.total ?? 0) / GRID_PAGE_SIZE))
-    : Math.max(1, Math.ceil(games.length / GRID_PAGE_SIZE));
-  /* Clamped as well as reset: a set can shrink under the current page without the key moving
-     (it cannot today, but the clamp is what makes that safe). */
-  const page = Math.min(requestedPage, pages);
-  const setPage = (next) => setPageBox({ key: pageKey, page: next });
+  /* The browse grid shows GRID_PAGE_SIZE games and grows by that much on each "View More"
+     (Jack55 reference). The count resets whenever the thing being browsed changes — a different
+     tab, search, sort or provider set — derived during render from `pageKey`, as before.
+
+     Fixtures: the whole set is in memory, so View More only widens the slice. Live: page 1 comes
+     from `readGrid`, and each further page is fetched by the button itself and appended to
+     `more`, keyed on the same `gridKey` so a stale answer for another tab is dropped. */
+  const [more, setMore] = React.useState({ key: '', games: [], loading: false });
+  const moreGames = React.useMemo(() => (liveGrid && more.key === gridKey ? more.games : []), [liveGrid, more, gridKey]);
+  const moreLoading = liveGrid && more.key === gridKey && more.loading;
 
   const pageGames = React.useMemo(
-    () => (liveGrid ? games : games.slice((page - 1) * GRID_PAGE_SIZE, page * GRID_PAGE_SIZE)),
-    [liveGrid, games, page],
+    () => (liveGrid ? [...games, ...moreGames] : games.slice(0, requestedPage * GRID_PAGE_SIZE)),
+    [liveGrid, games, moreGames, requestedPage],
   );
+  const total = liveGrid ? Math.max(livePage?.total ?? 0, pageGames.length) : games.length;
+
+  const viewMore = () => {
+    if (!liveGrid) {
+      setPageBox({ key: pageKey, page: requestedPage + 1 });
+      return;
+    }
+    const key = gridKey;
+    const loaded = games.length + moreGames.length;
+    const nextPage = Math.floor(loaded / GRID_PAGE_SIZE) + 1;
+    const [set, search, chosen, order] = JSON.parse(key);
+    setMore({ key, games: moreGames, loading: true });
+    Promise.resolve(
+      getCasinoPage(set, { search: search || undefined, providers: chosen, sort: order, page: nextPage, limit: GRID_PAGE_SIZE }),
+    ).then(
+      (answer) =>
+        setMore((prev) => {
+          const kept = prev.key === key ? prev.games : [];
+          const seen = new Set([...games, ...kept].map((game) => game.slug));
+          return { key, games: [...kept, ...(answer?.games ?? []).filter((game) => !seen.has(game.slug))], loading: false };
+        }),
+      () => setMore((prev) => (prev.key === key ? { ...prev, loading: false } : prev)),
+    );
+  };
 
   /* Only the lobby, and only when nothing is being searched, shows the row layout. Everything
      else is the browse grid — one tab's games, or a search's results. */
@@ -379,16 +450,30 @@ export default function Casino() {
        content wrapper as `-mx-4 min-h-screen bg-layer2 px-4` — so this whole line is this
        build's, on both arms, and both are requested rather than transcribed. */
     <div className="casino-page w-full pb-0 lg:pb-2">
-      {/* The banner belongs to the Lobby only — every other tab opens straight onto the search
-          field and its strip. `active` is the empty string on /casino and on any unknown
-          segment, so a bad URL still falls back to the full lobby rather than a headless one.
-          A search does not hide it: the tab is still Lobby, and the results replace the rows
-          below rather than the page. */}
-      {!active && <Hero />}
-      <SearchBar query={query} setQuery={setQuery} />
-      {/* `tight` where a filter bar follows the strip instead of a grid — that bar brings its
-          own 16px and does not need the strip's 32 on top of it. */}
-      <CasinoTabStrip tabs={tabs} active={active} compact={!showLobby} tight={filtered} linkTab={linkTab} />
+      <CasinoPromoRow />
+      {/* Jack55 reference: from `lg` up the tab pills, the provider filter and the search share
+          ONE row (`.casino-controls` in Casino.css re-orders them). Below `lg` the wrapper is
+          `display: contents`, so search → sticky strip → filter keep their phone flow. */}
+      <div className="casino-controls">
+        <SearchBar query={query} setQuery={setQuery} />
+        {/* `tight` where a filter bar follows the strip instead of a grid — that bar brings its
+            own 16px and does not need the strip's 32 on top of it. */}
+        <CasinoTabStrip tabs={tabs} active={active} compact={!showLobby} tight={filtered} linkTab={linkTab} />
+        {/* Poker draws its own filter row inside PokerTab. */}
+        {filtered && active !== 'poker' && (
+          <div className="casino-controls-filter px-4 sm:px-0">
+            <FilterBar
+              sort={sort}
+              setSort={setSort}
+              providers={available}
+              selectedProviders={providers}
+              setSelectedProviders={setProviders}
+            />
+          </div>
+        )}
+      </div>
+
+      {!showLobby && !searching && <ResultsTitle title={activeTitle} />}
 
       {showLobby ? (
         <Lobby rows={rows} originals={originals} live={liveLobby} providerRow={USE_FIXTURES ? PROVIDERS : (liveProviders ?? []).slice(0, 8)} />
@@ -403,6 +488,7 @@ export default function Casino() {
       ) : active === 'poker' && !searching ? (
         <PokerTab
           games={games}
+          teenPatti={teenPatti}
           sort={sort}
           setSort={setSort}
           providers={available}
@@ -411,31 +497,6 @@ export default function Casino() {
         />
       ) : (
         <div className="w-full px-4 sm:px-0">
-          {/* THE SWITCH IS THE FILTER ROW'S THIRD CHILD, NOT A SIBLING UNDER IT, which is the
-              original's own structure and is what a capture of the Slots tab shows: the two
-              pills at the left of the content column and Show Blocked hard against its right
-              edge, all on one line.
-
-              It used to render as a block below the bar carrying `mt-2`, which was a
-              reconstruction of a gap it should never have lost — as a flex item it picks up the
-              row's `gap-2` when it wraps, and 8px of row gap over its own `py-2` is the same
-              16px that `mt-2` was restating. So the phone is unchanged by construction and only
-              the desktop line moves.
-
-              Its own `sm:ml-auto` is what pushes it right, and that class has been sitting in
-              the markup since it was transcribed — inert for as long as the element was not a
-              flex item of this row. The fragment that used to wrap these two went with it. */}
-          {filtered && (
-            <FilterBar
-              sort={sort}
-              setSort={setSort}
-              providers={available}
-              selectedProviders={providers}
-              setSelectedProviders={setProviders}
-              trailing={<ShowBlocked on={showBlocked} setOn={setShowBlocked} />}
-            />
-          )}
-
           {tooShort ? (
             <div className="mt-4 flex h-16 w-full items-center justify-center px-4">
               <span className="text-center font-semibold text-error">
@@ -449,17 +510,15 @@ export default function Casino() {
                   neighbour's. Reachable since the BC Originals tab went live — five of the
                   platform's twenty have no bc.game original of that name. No transcribed tab
                   loses a single image to it, checked across all twelve. */}
-              <GameGrid games={pageGames} exactArt loading={!USE_FIXTURES && livePage === undefined} />
-              <Pagination page={page} pages={pages} onChange={setPage} />
+              <GameGrid games={pageGames} exactArt loading={!USE_FIXTURES && livePage === undefined} catalogueStyle />
+              <ViewMore shown={pageGames.length} total={total} loading={moreLoading} onMore={viewMore} />
             </>
           )}
         </div>
       )}
 
-      {/* The bet table belongs to the Lobby alone; every other tab ends on its own grid. Keyed
-          on `active` rather than `showLobby`, so searching from the Lobby keeps it — the tab is
-          still the Lobby, only the body below the strip has changed. */}
-      {!active && <LatestBets />}
+      {/* Live Bets closes every casino view, the tab grids included (Jack55 reference). */}
+      <LatestBets />
     </div>
   );
 }

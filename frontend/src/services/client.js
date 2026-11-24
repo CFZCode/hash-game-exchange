@@ -1,5 +1,5 @@
 import { ENC_ACCEPT, openSealed } from './apiCrypto';
-import { SOCKET_READS, liveRead, markLiveStale, markLiveWritten, setLiveActive } from './liveStore';
+import { SOCKET_READS, liveRead, markLiveStale, markLiveWritten, onSiteEpoch, setLiveActive } from './liveStore';
 import {
   adoptStoredTokens,
   clearTokens,
@@ -330,6 +330,12 @@ const copyBody = (body) => {
 export function invalidateSharedReads() {
   shared.clear();
 }
+
+/* The owner / operator changed the site: every page reads again (hooks/useResource.js), and a
+   copy cached under SHARED_TTL is from before the change — the default currency on
+   site-config/public stayed the old one until a reload. Registered at import, so it runs before
+   any component's own epoch listener starts its re-read. */
+onSiteEpoch(invalidateSharedReads);
 
 const MAX_429_RETRIES = 3;
 const MAX_RETRY_AFTER_MS = 10000;

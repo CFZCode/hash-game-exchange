@@ -9,7 +9,7 @@ import '../src/theme/sprites.css';
 import { BOOT_CSS } from './boot-style';
 import ClientApp from './[[...slug]]/client';
 import { THEME_BOOT_SCRIPT } from '../src/theme/applyTheme';
-import { BRANDING_BOOT_SCRIPT, BRANDING_PATH, cleanBranding } from '../src/services/siteBrandingCore.js';
+import { BRANDING_BOOT_SCRIPT, BRANDING_LOCAL, BRANDING_PATH, cleanBranding } from '../src/services/siteBrandingCore.js';
 
 /* Fixture build = the pixel reference: never themed. Same rule as services/client.js. */
 const LIVE = String(process.env.NEXT_PUBLIC_USE_FIXTURES ?? 'true') === 'false';
@@ -61,7 +61,8 @@ const PUBLIC_BASE = String(process.env.NEXT_PUBLIC_API_BASE ?? '').replace(/\/+$
 /* Live mode: the owner's branding (docs/OWNER-PANEL.md §8), so the first HTML already carries the
    right title, description, OG tags and favicon. Short timeout, cached 30 s; any failure = none. */
 async function serverBranding(): Promise<Branding | null> {
-  if (!LIVE || !/^https?:\/\//.test(GATEWAY)) return null;
+  // NEXT_PUBLIC_BRANDING_SOURCE=local: the build's own title, favicon and metadata, not the owner's.
+  if (!LIVE || BRANDING_LOCAL || !/^https?:\/\//.test(GATEWAY)) return null;
   try {
     const res = await fetch(`${GATEWAY}${BRANDING_PATH}`, { next: { revalidate: 30 }, signal: AbortSignal.timeout(1500) });
     if (!res.ok) return null;
@@ -113,7 +114,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <head>
         <style dangerouslySetInnerHTML={{ __html: BOOT_CSS }} />
         {LIVE && <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />}
-        {LIVE && <script dangerouslySetInnerHTML={{ __html: BRANDING_BOOT_SCRIPT }} />}
+        {LIVE && !BRANDING_LOCAL && <script dangerouslySetInnerHTML={{ __html: BRANDING_BOOT_SCRIPT }} />}
       </head>
       <body className="app-root dark" suppressHydrationWarning>
         {/* Every path renders the same client-only shell; React Router inside it owns routing,

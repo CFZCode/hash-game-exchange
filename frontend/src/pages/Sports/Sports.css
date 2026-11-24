@@ -1247,6 +1247,57 @@
   margin-top: 2.5rem;
 }
 
+/* Desktop sportsbook composition from the Jack55 reference. Keep every existing control and
+   data component; this only changes where the existing navigation, filters, event list and slip
+   sit. The slip becomes the persistent right-hand panel shown in the reference instead of a
+   bottom-corner overlay. Smaller screens retain the existing stacked layout. */
+@media (min-width: 1280px) {
+  .sports-lobby {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    grid-template-areas:
+      'tabs tabs'
+      'rail rail'
+      'filter filter'
+      'events slip'
+      'feature feature'
+      'feed feed'
+      'footer footer';
+    align-items: start;
+    column-gap: 12px;
+    row-gap: 12px;
+  }
+
+  .sports-lobby > * + *,
+  .sports-lobby .sports-filter,
+  .sports-lobby .sports-lobby-footer {
+    margin-top: 0;
+  }
+
+  .sports-rail-dock { grid-area: rail; }
+  .sports-tabs { grid-area: tabs; }
+  .sports-filter { grid-area: filter; }
+  .sports-event-list { grid-area: events; min-width: 0; }
+  .sports-grid { grid-template-columns: minmax(0, 1fr); }
+  .sports-feature { grid-area: feature; }
+  .sports-feed { grid-area: feed; }
+  .sports-lobby-footer { grid-area: footer; }
+
+  .sports-lobby > .sports-betslip {
+    grid-area: slip;
+    position: sticky;
+    top: 72px;
+    right: auto;
+    bottom: auto;
+    z-index: 1;
+    width: 100%;
+    max-width: none;
+    align-self: start;
+    border-radius: 6px;
+  }
+
+}
+
 /* ─── The bet slip ──────────────────────────────────────────────────────────────────────────
  *
  * EVERY NUMBER HERE IS A LINE OF THE LIVE SLIP'S PAINT LIST — the widget's own computed boxes at

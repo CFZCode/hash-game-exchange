@@ -138,6 +138,7 @@ export default function MainLayout({ children }) {
         <Sidebar
           sidebarExpanded={sidebarExpanded}
           mobileOpen={mobileMenuOpen}
+          onToggleSidebar={() => setSidebarExpanded((value) => !value)}
           onCloseMobile={() => setMobileMenuOpen(false)}
         />
         <main className={`main-layout-content ${sidebarExpanded ? 'sidebar-expanded' : 'sidebar-collapsed'}`}>

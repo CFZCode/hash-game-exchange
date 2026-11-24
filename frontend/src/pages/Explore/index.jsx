@@ -1,5 +1,5 @@
 import { Navigate, useSearchParams } from 'react-router-dom';
-import { ExplorePanel } from '../../components/Explore';
+import SearchOverlay from '../../components/Explore/SearchOverlay';
 import { useIsDesktop } from '../../hooks/useMediaQuery';
 
 /* `/explore` — Explore as a PAGE, which is what it is on a phone.
@@ -73,8 +73,12 @@ export default function ExplorePage() {
           `/explore?type=sports` opens on Sports; `autofocus=1` puts the caret in the field on
           arrival, which is how a link that means "search now" differs from one that means "show
           me Explore". Neither is passed by the overlay, which is why both default. */}
-      <ExplorePanel
-        initialType={params.get('type')}
+      {/* The site's own search (the same component the desktop overlay draws), laid out for a
+          phone by its `page` arm. It replaces the original's `ur` panel here at the owner's
+          request, so search is one design at every width; `type` now picks the tab it opens on. */}
+      <SearchOverlay
+        page
+        initialTab={['casino', 'sports'].includes(params.get('type')) ? params.get('type') : 'all'}
         autoFocus={params.get('autofocus') === '1'}
       />
     </div>

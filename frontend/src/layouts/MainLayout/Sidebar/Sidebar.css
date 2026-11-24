@@ -63,6 +63,157 @@
   overflow: hidden;
 }
 
+/* Jack55 desktop rail: inset panel, brand mark, section switch and a persistent fold control. */
+@media (min-width: 1024px) {
+  .sidebar-container {
+    left: 8px;
+    top: 8px;
+    bottom: 8px;
+    /* Above the fixed header (z 99): the header spans the full width with an opaque fill, so at
+       98 it painted over the top of this inset rail and cut the JACK logo in half. */
+    z-index: 100;
+    border: 0;
+    border-radius: 24px;
+    background: #1a202d;
+  }
+
+  .sidebar-container .Sidebar-Unit_bg {
+    background: #1a202d;
+  }
+
+  .sidebar-container .toggle-link-item,
+  .sidebar-container .nav-link-item {
+    color: #9aa6c4;
+  }
+
+  .sidebar-container .toggle-link-item-active,
+  .sidebar-container .nav-link-active,
+  .sidebar-container .nav-link-item:hover,
+  .sidebar-container .toggle-link-item:hover {
+    border-radius: 16px;
+    background: #151b28;
+    color: #00ec66;
+  }
+
+  .sidebar-container .sidebar-scrollable > div {
+    min-height: 100%;
+    padding: 12px;
+    background: #1a202d;
+  }
+
+  .sidebar-container nav {
+    display: flex;
+    min-height: 100%;
+    flex-direction: column;
+  }
+
+  .jack55-sidebar-logo {
+    display: flex;
+    height: 64px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 4px;
+  }
+
+  .jack55-sidebar-logo img {
+    display: block;
+    width: 136px;
+    max-width: 100%;
+    height: 32px;
+    object-fit: contain;
+  }
+
+  .jack55-mode-switch {
+    display: flex;
+    height: 48px;
+    flex: none;
+    align-items: center;
+    gap: 4px;
+    margin: 0 0 10px;
+    padding: 4px;
+    border-radius: 999px;
+    background: #151b28;
+  }
+
+  .jack55-mode-switch a {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    border-radius: 999px;
+    color: #9aa6c4;
+    font-size: 14px;
+    font-weight: 700;
+    text-decoration: none;
+  }
+
+  .jack55-mode-switch a.is-active {
+    background: #00ec66;
+    color: #07131a;
+  }
+
+  .sidebar-collapse-control {
+    display: flex;
+    height: 48px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin: 8px 12px 0;
+    border: 0;
+    border-radius: 999px;
+    background: #151b28;
+    color: #9aa6c4;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .sidebar-collapse-control svg {
+    width: 20px;
+    height: 20px;
+    flex: none;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .sidebar-container.collapsed .jack55-sidebar-logo img {
+    width: 42px;
+    height: 32px;
+    object-fit: cover;
+    object-position: left;
+  }
+
+  .sidebar-container.collapsed .jack55-mode-switch {
+    height: auto;
+    flex-direction: column;
+    padding: 4px;
+  }
+
+  .sidebar-container.collapsed .jack55-mode-switch a {
+    min-height: 36px;
+    width: 100%;
+    overflow: hidden;
+    font-size: 0;
+  }
+
+  .sidebar-container.collapsed .sidebar-collapse-control {
+    margin-right: 8px;
+    margin-left: 8px;
+    padding: 0;
+  }
+
+  .sidebar-container.collapsed .sidebar-collapse-label {
+    display: none;
+  }
+}
+
 .sidebar-container.expanded {
   width: 240px;
 }

@@ -231,6 +231,253 @@
   }
 }
 
+/* Jack55 account surfaces. Scoped to the auth dialog, so the other dialogs and every sign-in /
+   sign-up behaviour stay as implemented; this is look only. */
+.dialog-list:has(.login-layout-dialog) {
+  overflow: hidden;
+  border: 1px solid #232c3d;
+  border-radius: 1.5rem;
+  background: #131a28;
+  box-shadow: 0 30px 90px #000a, 0 0 0 1px #00e76512;
+}
+
+.login-layout-dialog,
+.login-layout-dialog .dialog-content,
+.login-layout-dialog .sticky {
+  background-color: #131a28;
+}
+
+/* Tabs: a segmented pill instead of an underlined row. */
+.login-layout-dialog .sticky {
+  height: 4.5rem;
+  border-color: transparent;
+}
+
+.login-layout-dialog .tabs-title {
+  height: 2.75rem !important;
+  padding: 4px;
+  border-radius: 999px;
+  background: #0b111c;
+  color: #8e9bbd;
+}
+
+.login-layout-dialog .tabs-btn-group {
+  position: relative;
+  z-index: 2;
+  height: 100%;
+}
+
+.login-layout-dialog .tabs-btn {
+  height: 100%;
+  border-radius: 999px;
+  transition: color 160ms ease;
+}
+
+.login-layout-dialog .tabs-btn[aria-selected='true'],
+.login-layout-dialog .tabs-btn[aria-selected='true'] span {
+  color: #07111b;
+}
+
+.login-layout-dialog .tabs-indicator {
+  z-index: 0;
+  top: 4px;
+  bottom: 4px;
+  height: auto;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #22f283, #00c957);
+  box-shadow: 0 6px 18px #00e76540;
+}
+
+/* Fields */
+.login-layout-dialog label,
+.login-layout-dialog .text-secondary {
+  color: #aab6d3;
+}
+
+.login-layout-dialog input,
+.login-layout-dialog .input {
+  min-height: 3rem;
+  border: 1px solid #263045;
+  border-radius: 0.875rem;
+  background-color: #0b111c;
+  color: #e8edff;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.login-layout-dialog .input input {
+  min-height: 0;
+  border: 0;
+  background: transparent;
+}
+
+.login-layout-dialog .input:focus-within,
+.login-layout-dialog .input[data-focus],
+.login-layout-dialog input:focus {
+  border-color: #00e765;
+  box-shadow: 0 0 0 3px #00e76526;
+}
+
+.login-layout-dialog .input input:focus {
+  box-shadow: none;
+}
+
+.login-layout-dialog input::placeholder {
+  color: #6f7c9c;
+}
+
+/* Primary action */
+.login-layout-dialog button.button-brand {
+  min-height: 3.25rem;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #2bf58a, #00c957);
+  color: #07111b;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  box-shadow: 0 10px 26px #00e76533;
+  transition: transform 150ms ease, box-shadow 150ms ease, filter 150ms ease;
+}
+
+.login-layout-dialog button.button-brand:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 30px #00e76547;
+  filter: brightness(1.05);
+}
+
+.login-layout-dialog button.button-brand:disabled {
+  background: #1d3a2d;
+  color: #7fae95;
+  box-shadow: none;
+}
+
+/* The Referral / Promo Code drawer: a dashed card in the field palette, green on hover. */
+.login-layout-dialog .auth-referral-toggle {
+  border: 1px dashed #2c374d;
+  border-radius: 0.875rem;
+  background: #0f1624;
+  transition: border-color 160ms ease;
+}
+
+.login-layout-dialog .auth-referral-toggle:hover {
+  border-color: #00e76580;
+}
+
+/* The close cross: a soft round chip. */
+.login-layout-dialog button[aria-label='Close'] {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  background: #1c2434 !important;
+  transition: background 150ms ease;
+}
+
+.login-layout-dialog button[aria-label='Close']:hover {
+  background: #263045 !important;
+}
+
+/* Desktop: a wide two-panel card — art on the left, the forms on the right. */
+.auth-hero {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .dialog-list.login-layout-dialog-size {
+    width: 58rem;
+    height: 40rem;
+  }
+
+  .login-layout-dialog {
+    display: flex;
+    flex-direction: row;
+  }
+
+  .login-layout-dialog > .dialog-content {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .auth-hero {
+    position: relative;
+    display: block;
+    flex: 0 0 25rem;
+    overflow: hidden;
+    background: #0b111c;
+  }
+
+  .auth-hero-art {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    /* The art's own lettering sits in its lower third; anchor high and let the shade take it. */
+    object-position: 38% 0%;
+    transform: scale(1.12);
+    transform-origin: 40% 0%;
+  }
+
+  .auth-hero-shade {
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(180deg, #0b111c00 25%, #0b111ce6 58%, #0b111c 72%),
+      linear-gradient(90deg, #0b111c00 70%, #131a28 100%);
+  }
+
+  .auth-hero-copy {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 2rem;
+  }
+
+  .auth-hero-logo {
+    width: 7.5rem;
+    height: auto;
+  }
+
+  .auth-hero-title {
+    color: #fff;
+    font-size: 1.75rem;
+    font-weight: 800;
+    line-height: 1.15;
+  }
+
+  .auth-hero-perks {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    color: #c5cee3;
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+
+  .auth-hero-perks li {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .auth-hero-perks li::before {
+    display: inline-flex;
+    flex: none;
+    width: 1.125rem;
+    height: 1.125rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: #00e765;
+    color: #07111b;
+    font-size: 0.7rem;
+    font-weight: 900;
+    content: '✓';
+  }
+}
+
 /* The password field's reveal toggle is inside the input box, and the box already sets
    `padding-inline-end: .5rem`; the markup overrides that with `!pr-3`. Nothing else to add —
    this file deliberately stops at the shell. */

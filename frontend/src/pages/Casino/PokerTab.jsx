@@ -107,7 +107,7 @@ function VariantPanel({ title, games }) {
   );
 }
 
-export default function PokerTab({ games, sort, setSort, providers, selectedProviders, setSelectedProviders }) {
+export default function PokerTab({ games, teenPatti, sort, setSort, providers, selectedProviders, setSelectedProviders }) {
   const [showBlocked, setShowBlocked] = React.useState(false);
 
   return (
@@ -121,7 +121,7 @@ export default function PokerTab({ games, sort, setSort, providers, selectedProv
           heading's own `mt-5`. Where each panel's games come from is documented on
           POKER_PANELS. */}
       <div className="mt-4 grid w-full grid-cols-1 gap-x-3 gap-y-6 sm:grid-cols-2 lg:grid-cols-3">
-        {pokerPanels(games).map((panel) => (
+        {pokerPanels(games, teenPatti).map((panel) => (
           <VariantPanel key={panel.title} title={panel.title} games={panel.games} />
         ))}
       </div>
@@ -161,7 +161,7 @@ export default function PokerTab({ games, sort, setSort, providers, selectedProv
         setSelectedProviders={setSelectedProviders}
       />
 
-      <GameGrid games={games} exactArt />
+      <GameGrid games={games} exactArt catalogueStyle />
     </div>
   );
 }

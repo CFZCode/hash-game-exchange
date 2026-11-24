@@ -213,7 +213,7 @@ export const ROWS = [
   { title: 'Slots', key: 'slots', href: '/casino/slots' },
   { title: 'Live Casino', key: 'live', href: '/casino/live' },
   { title: 'Game Shows', key: 'game-shows', href: '/casino/game-shows' },
-  { title: 'New Releases', key: 'new', href: '/casino/new' },
+//   { title: 'New Releases', key: 'new', href: '/casino/new' },
   { title: 'Poker', key: 'poker', href: '/tagname/Poker' },
   { type: 'providers' },
   { title: 'Blackjack', key: 'blackjack', href: '/casino/blackjack' },
@@ -232,12 +232,13 @@ export const LOBBY_KEYS = lobbyKeys(ROWS);
 
 /* The Poker tab's two panels. Fixtures: the transcription. Live: the tab's own games split by
    name, since the platform has no variant feed. */
-export function pokerPanels(games) {
+export function pokerPanels(games, teenPatti) {
   if (!isLiveSet('poker')) return POKER_PANELS;
-  const by = (re) => toRow((games ?? []).filter((game) => re.test(game.name)));
+  const by = (list, re) => toRow((list ?? []).filter((game) => re.test(game.name)));
   return [
-    { title: "Hold'em", games: by(/hold.?em/i) },
-    { title: 'Teen Patti', games: by(/teen ?patti/i) },
+    { title: "Hold'em", games: by(games, /hold.?em/i) },
+    /* Its own API read (`teen-patti` in services/catalog.js) — none of these are in the poker set. */
+    { title: 'Teen Patti', games: by([...(teenPatti ?? []), ...(games ?? [])], /teen ?patti/i) },
   ];
 }
 

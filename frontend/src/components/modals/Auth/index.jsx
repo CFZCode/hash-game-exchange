@@ -36,6 +36,31 @@ import { PASSKEY_ENABLED, SOCIAL_LOGINS } from '../../../config/hiddenFeatures';
 import { startGoogleLogin, useGoogleLogin } from '../../../services/googleAuth';
 import { underAgentBase } from '../../../services/agentBase';
 import DemoButton from './DemoButton';
+import { useBrandName } from '../../../services/siteBranding';
+
+/* Jack55 auth look: the art panel on the left of the desktop card (hidden below lg by Auth.css).
+   Decorative only — the forms, tabs and every handler are untouched. The perks name things the
+   site really offers. */
+const AUTH_PERKS = ['Thousands of slots & live tables', 'Sports exchange with live odds', 'Fast INR & crypto payments'];
+
+function AuthHero({ signUp }) {
+  const brand = useBrandName();
+  return (
+    <aside className="auth-hero" aria-hidden="true">
+      <img className="auth-hero-art" src="/jack55-reference-assets/casino-promo-award.png" alt="" />
+      <div className="auth-hero-shade" />
+      <div className="auth-hero-copy">
+        <img className="auth-hero-logo" src="/brand/jack55.svg" alt="" />
+        <strong className="auth-hero-title">{signUp ? `Join ${brand || 'us'} today` : 'Welcome back'}</strong>
+        <ul className="auth-hero-perks">
+          {AUTH_PERKS.map((perk) => (
+            <li key={perk}>{perk}</li>
+          ))}
+        </ul>
+      </div>
+    </aside>
+  );
+}
 
 /* The sign-in / sign-up dialog.
  *
@@ -570,7 +595,7 @@ function SignUpForm({ onSubmit, error, onClearError }) {
             grid-template-rows 0fr -> 1fr trick over an `overflow-hidden` child, which animates
             to the content's natural height without anyone measuring it. */}
         <div
-          className="mt-7 rounded-lg bg-layer3 px-3 py-2 sm:cursor-pointer"
+          className="auth-referral-toggle mt-7 rounded-lg bg-layer3 px-3 py-2 sm:cursor-pointer"
           onClick={() => setReferralOpen((open) => !open)}
         >
           <div className="flex h-[38px] items-center justify-between text-secondary">
@@ -1033,8 +1058,8 @@ export default function Auth({ mode: requested, onClose, enter = 'open' }) {
   const isDesktop = useIsDesktop();
 
   const tabs = [
-    { key: SIGN_IN, label: 'Sign In', path: '/login/signin' },
-    { key: SIGN_UP, label: 'Sign Up', path: '/login/regist' },
+    { key: SIGN_IN, label: 'Log In', path: '/login/signin' },
+    { key: SIGN_UP, label: 'Register', path: '/login/regist' },
   ].filter((tab) => !(signUpClosed && tab.key === SIGN_UP));
   /* `forgot` and `reset` are Sign In's own sub-screens, so its tab stays selected. */
   const active = Math.max(
@@ -1245,6 +1270,7 @@ export default function Auth({ mode: requested, onClose, enter = 'open' }) {
       <div className={listClass}>
         <div className={overlayerClass}>
           <div className="dialog-item dialog-transparent-title dialog-no-title login-layout-dialog">
+            <AuthHero signUp={mode === SIGN_UP} />
             {/* THE DIALOG SCROLLS AND SHOWS NO BAR FOR IT, which is the live dialog's own
                 behaviour and is easy to read as a bug in either direction.
                 ---------------------------------------------------------------------------

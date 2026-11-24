@@ -14,18 +14,22 @@ import { LIVE_SUPPORT_AVAILABLE } from '../../../services/availability';
  */
 
 export const COLUMNS = [
+  /* Parker567's footer columns (user's screenshot), in the Jack55 panel. The Casino links open
+     the casino page's own tabs, so each one lands on the same API-fed section the body shows
+     (services/catalog.js): Recommended is the Hot Games collection. A link whose section is
+     switched off is dropped by the route gate in index.jsx, and a column left empty goes too. */
   {
     title: 'Casino',
     links: [
       { label: 'Casino Home', href: '/casino' },
-      { label: 'Slots', href: '/gamelist/slots' },
-      { label: 'Live Casino', href: '/gamelist/live' },
-      { label: 'New Releases', href: '/section/new' },
-      { label: 'Recommended', href: '/section/hot_games?label=Recommended' },
-      { label: 'Table Game', href: '/section/table_games' },
-      { label: 'BlackJack', href: '/section/blackjack' },
-      { label: 'Roulette', href: '/tagname/roulette' },
-      { label: 'Baccarat', href: '/tagname/baccarat' },
+      { label: 'Slots', href: '/casino/slots' },
+      { label: 'Live Casino', href: '/casino/live' },
+      { label: 'New Releases', href: '/casino/new' },
+      { label: 'Recommended', href: '/casino/hot' },
+      { label: 'Table Game', href: '/casino/table-game' },
+      { label: 'BlackJack', href: '/casino/blackjack' },
+      { label: 'Roulette', href: '/casino/roulette' },
+      { label: 'Baccarat', href: '/casino/baccarat' },
     ],
   },
   {
@@ -34,7 +38,6 @@ export const COLUMNS = [
       { label: 'Sports Home', href: '/sports' },
       { label: 'Live', href: '/sports/live' },
       { label: 'Rules', href: '/help/terms-sports' },
-      // Sport Betting Insights (betting.bc.game) removed on the user's request.
     ],
   },
   {
@@ -43,16 +46,12 @@ export const COLUMNS = [
       { label: 'VIP Club', href: '/vip' },
       { label: 'Referral', href: '/referral' },
       { label: 'Promotions', href: '/promotions/promotion' },
-      /* A dead button here before (the original opens a share dialog this footer never wired);
-         it now goes to the Referral page, where the link and code are. Still gated on the
-         affiliate section through `href`. */
       { label: 'Refer a friend', href: '/referral' },
     ],
   },
   {
     title: 'Support/Legal',
     links: [
-      /* Licenses removed: no such page exists, and Parker567 has no licence text to show. */
       { label: 'Help Center', href: '/help' },
       { label: 'Gamble Aware', href: '/help/gameble-aware' },
       { label: 'Fairness', href: '/help/provably-fair' },
@@ -62,17 +61,10 @@ export const COLUMNS = [
       { label: 'Law Enforcement', href: '/help/law-enforcement' },
       { label: 'Responsible Gambling', href: '/responsible/faq' },
       { label: 'AML', href: '/help/aml' },
-      /* Design Resources (BC.GAME's Google Drive brand kit) removed: not Parker567's. */
-      /* Live Support: no support provider on this platform, so the inert button is left out
-         (services/availability.js). */
       ...(LIVE_SUPPORT_AVAILABLE ? [{ label: 'Live Support', button: true }] : []),
     ],
   },
-  /* "About Us" carries only News now: on the original that is BC.GAME's external blog, and here
-     it is the site's own `/blog` (a deliberate departure, the user's request) — so the column
-     comes and goes with the owner's `blog` feature through the route gate. Its other rows stay
-     out: Help Desk (BC.GAME's help site), Business Contacts and Verify This Site (dead buttons)
-     and Verify Representative (no page). */
+  /* Only with the owner's `blog` feature on (route gate), as in Parker567. */
   {
     title: 'About Us',
     links: [{ label: 'News', href: '/blog' }],
@@ -107,3 +99,13 @@ export const legal = (brand) => ({
   ],
   copyright: `Copyright ©${new Date().getFullYear()} ${brand}. ALL RIGHTS RESERVED.`,
 });
+
+/* The Jack55 footer's social row (X, Discord, Telegram, Instagram). The site has no channel URLs
+   yet, so each `href` is empty and the icon renders as a non-navigating button; put the real
+   link in its `href` and it becomes an outbound link. */
+export const SOCIALS = [
+  { key: 'x', label: 'X', href: '' },
+  { key: 'discord', label: 'Discord', href: '' },
+  { key: 'telegram', label: 'Telegram', href: '' },
+  { key: 'instagram', label: 'Instagram', href: '' },
+];

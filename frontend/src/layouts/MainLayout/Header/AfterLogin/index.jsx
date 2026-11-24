@@ -3,8 +3,6 @@ import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSession } from '../../../../context/session';
 import { useGates } from '../../../../context/gates';
-import { useSettings } from '../../../../context/settings';
-import { siteName, useSiteMark } from '../../../../services/siteBranding';
 import useResource from '../../../../hooks/useResource';
 import useMediaQuery from '../../../../hooks/useMediaQuery';
 import { getRewards } from '../../../../services/rewards';
@@ -21,7 +19,6 @@ import BonusPanel, { BonusLayer } from './BonusPanel';
 import SendTip from '../../../../components/shared/SendTip';
 import { IconGift, IconArrow, IconAdd } from './icons';
 import { avatarSrc } from '../../../../services/avatars';
-import logoSmall from '../../../../assets/logo_small.png';
 import './AfterLogin.css';
 
 /* The signed-in header — `AfterLogin-Xr01UEkM.js`, recovered from `hash.game/assets/` along with
@@ -281,7 +278,7 @@ function Wallet({ mobile = false }) {
            SAME colour in the light theme (both 255 255 255) and `dark:bg-layer3` is the same as
            `bg-layer3` in the dark one, so the fill is identical on both arms in both themes and
            only the BORDER actually branches. Checked against the palette rather than assumed. */
-        className={`relative flex h-10 w-52 rounded-lg border-2 bg-layer3 p-0.5 sm:w-[16.5rem] ${
+        className={`header-wallet relative flex h-10 w-52 rounded-lg border-2 bg-layer3 p-0.5 sm:w-[16.5rem] ${
           mobile ? 'border-third' : 'border-input'
         }`}
         onClick={() => setOpen((value) => !value)}
@@ -406,7 +403,7 @@ function AccountMenu() {
   };
 
   return (
-    <div className="relative ml-3 flex-none" ref={ref}>
+    <div className="header-account relative ml-3 flex-none" ref={ref}>
       <button
         type="button"
         className="button relative h-11 w-11 rounded-full bg-layer5 p-[3px]"
@@ -495,12 +492,12 @@ export default function AfterLogin({ onToggleChat, onToggleNotice }) {
   const bonusOn = on('bonus');
   const unread = useUnreadNotices();
   return (
-    <div className="ml-3 flex items-center">
+    <div className="desktop-after-login ml-3 flex items-center">
       {demo && <DemoBadge className="mr-3" />}
       <Wallet />
 
       {bonusOn && (
-      <div className="button center relative ml-3 h-auto rounded-lg bg-layer5 p-0 text-secondary">
+      <div className="header-bonus button center relative ml-3 h-auto rounded-lg bg-layer5 p-0 text-secondary">
         {/* No handler on the Button — `insert(n, Button(class="center relative size-10 p-0",
             Suspense(BonusNotifications)))`. The click is inside; see BonusNotifications above. */}
         <button type="button" className="button center relative size-10 p-0" aria-label="Bonuses">
@@ -520,7 +517,7 @@ export default function AfterLogin({ onToggleChat, onToggleNotice }) {
                  isOfflineAgent ? "w-10" : "w-30") */}
       {/* A demo account gets no notifications (user, 2026-10-27), so no bell. */}
       {!demo && (
-      <div className="button relative ml-3 flex h-10 flex-none rounded-lg bg-layer5 p-0">
+      <div className="header-notice button relative ml-3 flex h-10 flex-none rounded-lg bg-layer5 p-0">
         {/* First child, so `first:left-10` wins over `left-20` and the rule sits at 40px. */}
         {/* No chat on this platform (services/availability.js): the group drops to the bell
             alone — the original's own one-button arm, the `w-10` its chunk line names. */}
@@ -581,14 +578,12 @@ export function MobileAfterLogin() {
   const { session } = useSession();
   const { on, demo } = useGates();
   const bonusOn = on('bonus');
-  /* The owner panel's square mark (live mode) at h-10, the wallet pill's height; else the original at h-9. */
-  const { darken } = useSettings();
-  const mark = useSiteMark({ light: !darken });
+  const mark = '/brand/jack55.svg';
 
   return (
     <div className="flex size-full items-center justify-between px-3">
       <Link to="/" className="flex-none text-[0]">
-        <img alt={(mark && siteName()) || 'logo'} className={mark ? 'h-10 w-10 object-contain' : 'h-9 w-9'} src={mark ?? logoSmall} />
+        <img alt="Jack55" className="h-8 w-auto max-w-36 object-contain" src={mark} />
       </Link>
 
       <div className="flex items-center gap-2">

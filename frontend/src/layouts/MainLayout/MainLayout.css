@@ -237,7 +237,7 @@
   }
 
   .main-layout-content.sidebar-expanded {
-    padding-left: calc(240px + var(--content-gap-x));
+    padding-left: calc(248px + var(--content-gap-x));
   }
 
   /* THE CONTENT TAKES THE SPACE THE RAIL GAVE UP, which is a REVERSAL of what this rule used to
@@ -254,7 +254,7 @@
      Above 1280 the two arms already agreed to the pixel (x = 256, w = 1008 at 1280), so this is
      the only band that ever differed. 72px must match .sidebar-container.collapsed width. */
   .main-layout-content.sidebar-collapsed {
-    padding-left: calc(72px + var(--content-gap-x));
+    padding-left: calc(80px + var(--content-gap-x));
     padding-right: var(--content-gap-x);
   }
 }

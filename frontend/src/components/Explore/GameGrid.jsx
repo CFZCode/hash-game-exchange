@@ -43,12 +43,12 @@ export function Empty({ children, className = '' }) {
  * `common.png` placeholder, so there is no cover of their own to download, and the fallback
  * handed them Evolution's Poker art. With `exactArt` they resolve to nothing and GameTile draws
  * the BC brand placeholder, which is the truth. */
-export default function GameGrid({ games, exactArt = false, loading = false }) {
+export default function GameGrid({ games, exactArt = false, loading = false, catalogueStyle = false }) {
   /* Still reading the tab's page: pulse tiles in the grid's own shape, not the "Stay tuned"
      empty state (which used to show for the seconds a slow page took and read as "no games"). */
   if (loading && !games.length) {
     return (
-      <div className="mt-4 grid gap-2 grid-col-3" style={{ '--grid-gap': '.5rem', '--aspect-ratio': 0.75 }} aria-busy="true">
+      <div className={`mt-4 grid gap-2 grid-col-3${catalogueStyle ? ' casino-catalogue-grid' : ''}`} style={{ '--grid-gap': '.5rem', '--aspect-ratio': catalogueStyle ? 1 : 0.75 }} aria-busy="true">
         {Array.from({ length: 24 }, (_, i) => (
           <div key={i}>
             <div className="aspect-[3/4] w-full animate-pulse rounded-lg bg-layer4" />
@@ -63,8 +63,8 @@ export default function GameGrid({ games, exactArt = false, loading = false }) {
 
   return (
     <div
-      className="mt-4 grid gap-2 grid-col-3"
-      style={{ '--grid-gap': '.5rem', '--aspect-ratio': 0.75 }}
+      className={`mt-4 grid gap-2 grid-col-3${catalogueStyle ? ' casino-catalogue-grid' : ''}`}
+      style={{ '--grid-gap': '.5rem', '--aspect-ratio': catalogueStyle ? 1 : 0.75 }}
     >
       {games.map((game, i) => (
         <div key={game.slug}>
@@ -73,6 +73,8 @@ export default function GameGrid({ games, exactArt = false, loading = false }) {
             name={game.name}
             image={game.image ?? art(game.slug)}
             players={game.players}
+            provider={game.provider}
+            catalogueStyle={catalogueStyle}
             index={i}
           />
         </div>

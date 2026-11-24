@@ -29,15 +29,21 @@ const LOGS = path.join(ROOT, 'logs')
 const RUN = path.join(ROOT, '.run')
 const BE = path.join(ROOT, 'backend')
 
+/**
+ * A package's CLI run through node itself, not node_modules/.bin: on Windows .bin holds shell
+ * shims (next, next.cmd) that spawn() cannot exec, while the JS entry runs the same everywhere.
+ */
+const CLI_ENTRY = { next: 'next/dist/bin/next', vite: 'vite/bin/vite.js' }
+const nodeCli = (dir, name, args) => [process.execPath, [path.join(dir, 'node_modules', CLI_ENTRY[name]), ...args]]
+
 /** How to start the frontend, decided at start time: it is being moved from Vite to Next.js. */
 function frontendCommand() {
   const dir = path.join(ROOT, 'frontend')
   const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'))
   const dev = pkg.scripts?.dev ?? ''
-  const bin = name => path.join(dir, 'node_modules', '.bin', name)
 
-  if (/\bnext\b/.test(dev)) return [bin('next'), ['dev', '-p', String(PORTS.frontend)]]
-  return [bin('vite'), ['--port', String(PORTS.frontend), '--strictPort']]
+  if (/\bnext\b/.test(dev)) return nodeCli(dir, 'next', ['dev', '-p', String(PORTS.frontend)])
+  return nodeCli(dir, 'vite', ['--port', String(PORTS.frontend), '--strictPort'])
 }
 
 const PROCS = [
@@ -49,8 +55,8 @@ const PROCS = [
   { name: 'user-worker', port: PORTS.userWorker, cwd: path.join(BE, 'services/user'), cmd: () => [process.execPath, ['src/worker.js']] },
   // Last of the backend: it probes the others on /health.
   { name: 'gateway', port: PORTS.gateway, cwd: path.join(BE, 'gateway'), cmd: () => [process.execPath, ['src/index.js']], after: 2000 },
-  { name: 'site-admin', port: PORTS.siteAdmin, cwd: path.join(ROOT, 'admin'), cmd: () => [path.join(ROOT, 'admin/node_modules/.bin/next'), ['dev', '-p', String(PORTS.siteAdmin)]] },
-  { name: 'owner-panel', port: PORTS.ownerPanel, cwd: path.join(ROOT, 'owner-panel'), cmd: () => [path.join(ROOT, 'owner-panel/node_modules/.bin/next'), ['dev', '-H', '127.0.0.1', '-p', String(PORTS.ownerPanel)]] },
+  { name: 'site-admin', port: PORTS.siteAdmin, cwd: path.join(ROOT, 'admin'), cmd: () => nodeCli(path.join(ROOT, 'admin'), 'next', ['dev', '-p', String(PORTS.siteAdmin)]) },
+  { name: 'owner-panel', port: PORTS.ownerPanel, cwd: path.join(ROOT, 'owner-panel'), cmd: () => nodeCli(path.join(ROOT, 'owner-panel'), 'next', ['dev', '-H', '127.0.0.1', '-p', String(PORTS.ownerPanel)]) },
   {
     name: 'frontend',
     port: PORTS.frontend,
@@ -122,8 +128,9 @@ async function start(names) {
       continue
     }
     const [cmd, args] = p.cmd()
-    if (!fs.existsSync(cmd) && cmd !== process.execPath) {
-      const msg = `  ${p.name.padEnd(13)} SKIPPED: ${path.relative(ROOT, cmd)} not found (npm ci in ${path.relative(ROOT, p.cwd)})`
+    const entry = cmd === process.execPath ? path.resolve(p.cwd, args[0]) : cmd
+    if (!fs.existsSync(entry)) {
+      const msg = `  ${p.name.padEnd(13)} SKIPPED: ${path.relative(ROOT, entry)} not found (npm ci in ${path.relative(ROOT, p.cwd)})`
       if (p.optional) {
         console.log(msg)
         continue
@@ -132,20 +139,45 @@ async function start(names) {
       process.exit(1)
     }
     if (p.after) await sleep(p.after)
-    const out = fs.openSync(path.join(LOGS, `${p.name}.log`), 'a')
-    const child = spawn(cmd, args, {
-      cwd: p.cwd,
-      env: { ...process.env, LOG_PRETTY: 'false', ...(p.env ?? {}) },
-      stdio: ['ignore', out, out],
-      detached: true // own process group, so stop takes next's children down too
-    })
-    child.unref()
-    fs.writeFileSync(pidFile(p.name), String(child.pid))
-    console.log(`  ${p.name.padEnd(13)} started (pid ${child.pid}, :${p.port}) → logs/${p.name}.log`)
+    const env = { ...process.env, LOG_PRETTY: 'false', ...(p.env ?? {}) }
+    const pid = process.platform === 'win32' ? startHiddenWindows(p, cmd, args, env) : startDetached(p, cmd, args, env)
+    fs.writeFileSync(pidFile(p.name), String(pid))
+    console.log(`  ${p.name.padEnd(13)} started (pid ${pid}, :${p.port}) → logs/${p.name}.log`)
   }
 
   await waitHealthy()
   printUrls()
+}
+
+/** Own process group, so stop takes next's children down too. */
+function startDetached(p, cmd, args, env) {
+  const out = fs.openSync(path.join(LOGS, `${p.name}.log`), 'a')
+  const child = spawn(cmd, args, { cwd: p.cwd, env, stdio: ['ignore', out, out], detached: true })
+  child.unref()
+  return child.pid
+}
+
+/**
+ * Windows: neither spawn mode works. A non-detached child sits in node's kill-on-close job and
+ * dies when this script exits; a detached one has no console, so every process it starts
+ * (next's workers) opens a visible window. Start-Process -WindowStyle Hidden gives the server
+ * its own hidden console, which its children share, outside this script's job.
+ * stdout and stderr go to separate files (Start-Process cannot merge them).
+ */
+function startHiddenWindows(p, cmd, args, env) {
+  const q = s => `'${String(s).replace(/'/g, "''")}'`
+  const quoteArg = a => (/[\s"]/.test(a) ? `"${a.replace(/"/g, '\\"')}"` : a)
+  const script = [
+    `$p = Start-Process -FilePath ${q(cmd)}`,
+    `-ArgumentList ${q(args.map(quoteArg).join(' '))}`,
+    `-WorkingDirectory ${q(p.cwd)} -WindowStyle Hidden -PassThru`,
+    `-RedirectStandardOutput ${q(path.join(LOGS, `${p.name}.log`))}`,
+    `-RedirectStandardError ${q(path.join(LOGS, `${p.name}.err.log`))};`,
+    `Set-Content -Path ${q(pidFile(p.name))} -Value $p.Id -NoNewline`
+  ].join(' ')
+  // No stdout pipe: the server would inherit it and execFileSync would wait for it forever.
+  execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], { env, stdio: 'ignore', windowsHide: true })
+  return readPid(p.name)
 }
 
 async function waitHealthy() {
@@ -170,7 +202,12 @@ async function stop(names) {
       fs.rmSync(pidFile(p.name), { force: true })
       continue
     }
-    try {
+    if (process.platform === 'win32') {
+      // No process groups on Windows: kill the whole tree, or next's workers keep the port.
+      try {
+        execFileSync('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore' })
+      } catch {}
+    } else try {
       process.kill(-pid, 'SIGTERM')
     } catch {
       try {

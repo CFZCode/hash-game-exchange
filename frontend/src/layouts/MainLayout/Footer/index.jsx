@@ -1,11 +1,8 @@
 import { Link, useLocation } from 'react-router-dom';
-import logoPureImg from '../../../assets/footer/logo-pure.png';
-import logoPureLightImg from '../../../assets/footer/logo-pure_w.png';
-import { COLUMNS, SEO, legal } from './links';
+import { COLUMNS, SEO, SOCIALS, legal } from './links';
 import { PARTNERS } from './badges';
-import { useSettings } from '../../../context/settings';
 import { useGates } from '../../../context/gates';
-import { siteName, useBrandName, useSiteLogo } from '../../../services/siteBranding';
+import { useBrandName } from '../../../services/siteBranding';
 import './Footer.css';
 
 /* The site footer, from the live DOM.
@@ -50,6 +47,56 @@ const ExternalIcon = () => (
     />
   </svg>
 );
+
+/* Brand glyphs for the social row, drawn in their own colours on a dark circle (Jack55 reference). */
+const SOCIAL_ICONS = {
+  x: (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="#fff" d="M17.75 3h3.07l-6.7 7.66L22 21h-6.17l-4.83-6.32L5.47 21H2.4l7.17-8.2L2 3h6.32l4.37 5.78L17.75 3Zm-1.08 16.18h1.7L7.4 4.73H5.58l11.09 14.45Z" />
+    </svg>
+  ),
+  discord: (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="#5865F2" d="M19.6 5.3A16.4 16.4 0 0 0 15.5 4l-.5 1a15.2 15.2 0 0 0-6 0L8.5 4a16.4 16.4 0 0 0-4.1 1.3C1.8 9.2 1.1 13 1.4 16.7a16.6 16.6 0 0 0 5 2.5l1.1-1.7c-.6-.2-1.2-.5-1.7-.9l.4-.3a11.8 11.8 0 0 0 11.6 0l.4.3c-.5.4-1.1.7-1.7.9l1.1 1.7a16.5 16.5 0 0 0 5-2.5c.4-4.3-.7-8.1-3-11.4ZM8.7 14.5c-1 0-1.8-.9-1.8-2s.8-2 1.8-2 1.8.9 1.8 2-.8 2-1.8 2Zm6.6 0c-1 0-1.8-.9-1.8-2s.8-2 1.8-2 1.8.9 1.8 2-.8 2-1.8 2Z" />
+    </svg>
+  ),
+  telegram: (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="#29A9EB" d="M21.4 3.6 2.9 10.7c-1.3.5-1.2 1.2-.2 1.5l4.7 1.5 1.8 5.6c.2.6.4.8.8.8.4 0 .6-.2.9-.4l2.3-2.2 4.7 3.5c.9.5 1.5.2 1.7-.8l3.1-14.6c.3-1.3-.5-1.9-1.3-1.5Zm-3.5 3.6-8.6 7.8-.3 3.4-1.6-4.9 10.1-6.4c.5-.3.8 0 .4.1Z" />
+    </svg>
+  ),
+  instagram: (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <defs>
+        <linearGradient id="footer-ig" x1="0" y1="1" x2="1" y2="0">
+          <stop offset="0" stopColor="#FEDA75" />
+          <stop offset=".35" stopColor="#FA7E1E" />
+          <stop offset=".6" stopColor="#D62976" />
+          <stop offset="1" stopColor="#962FBF" />
+        </linearGradient>
+      </defs>
+      <path fill="url(#footer-ig)" d="M7.5 2h9A5.5 5.5 0 0 1 22 7.5v9a5.5 5.5 0 0 1-5.5 5.5h-9A5.5 5.5 0 0 1 2 16.5v-9A5.5 5.5 0 0 1 7.5 2Zm0 2A3.5 3.5 0 0 0 4 7.5v9A3.5 3.5 0 0 0 7.5 20h9a3.5 3.5 0 0 0 3.5-3.5v-9A3.5 3.5 0 0 0 16.5 4h-9ZM12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10Zm0 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6Zm5.25-3.25a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5Z" />
+    </svg>
+  ),
+};
+
+function SocialRow() {
+  return (
+    <div className="footer-socials" aria-label="Social channels">
+      {SOCIALS.map(({ key, label, href }) =>
+        href ? (
+          <a key={key} className="footer-social" href={href} target="_blank" rel="noreferrer" aria-label={label} title={label}>
+            {SOCIAL_ICONS[key]}
+          </a>
+        ) : (
+          <button key={key} type="button" className="footer-social" aria-label={label} title={label}>
+            {SOCIAL_ICONS[key]}
+          </button>
+        )
+      )}
+    </div>
+  );
+}
 
 const LINK_LABEL =
   'text-sm font-semibold text-secondary hover:text-brand hover:underline sm:max-w-60';
@@ -123,12 +170,6 @@ const BLURB_SHOWN_ON = ['/'];
 export default function Footer() {
   /* A link into a section the site or the account has off is not drawn (services/gates.js). */
   const { routeOn, on } = useGates();
-  /* Two things in this footer are per-theme FILES rather than per-theme colours: the awards
-     strip (`d-*` / `l-*`) and the wordmark (`logo_pure` / `logo_pure_w`). Both pairs are the
-     original's own; see badges.js for how the first was recovered. */
-  const { darken } = useSettings();
-  /* The owner panel's logo (live mode) in the original's 288x64-at-h-8 box; else the pair. */
-  const brandLogo = useSiteLogo({ own: 'hash-games' });
   /* Keyed on the path rather than a prop because the footer is mounted once by MainLayout,
      OUTSIDE <Routes>; there is no page above it to hand it a flag. Everything below this band —
      awards, partners, link columns, licence — is unchanged on every route. */
@@ -145,7 +186,7 @@ export default function Footer() {
 
        Safe to express as utilities because Footer.css sets no `display` of its own — the
        cascade hazard in CLAUDE.md is an unlayered rule silently beating one of these. */
-    <footer className="footer-bg hidden w-full flex-col items-center justify-center divide-y divide-third py-6 lg:flex">
+    <footer className="footer-bg w-full flex flex-col items-center justify-center divide-y divide-third py-6">
       {/* Prose + feedback. basis-[34rem] with flex-grow on both is what sits them side by
           side and stacks them when the row runs out of room. Home page only — see
           `BLURB_SHOWN_ON` above. */}
@@ -227,8 +268,8 @@ export default function Footer() {
           </div>
         ))}
 
-        {/* "Join Our Global/Local Community" (BC.GAME's socials and hash.game/telegram) is not
-            drawn: Parker567 has no social channels to list. */}
+        {/* Jack55's social row, the band's last cell (right-hand column on desktop). */}
+        <SocialRow />
       </div>
 
       {/* Legal. `text-xs` here is the whole answer to the 12px question — the logo row, both
@@ -241,22 +282,10 @@ export default function Footer() {
           style={{ gridTemplateRows: '1fr' }}
         >
           <div className="flex min-h-15 items-center gap-4">
-            <img
-              className={brandLogo ? `h-8 w-36 object-contain object-left${darken ? '' : ' brand-logo-on-light'}` : 'h-8'}
-              alt={(brandLogo && siteName()) || 'logo'}
-              src={brandLogo ?? (darken ? logoPureImg : logoPureLightImg)}
-            />
+            <img className="jack55-footer-logo h-8 w-36 object-contain object-left" alt="Jack55" src="/brand/jack55.svg" />
           </div>
-          {/* The Anjouan licence seal (BC.GAME's licence, verifying hash.game) is not drawn. The
-              cell stays so the 2x2 legal grid keeps its shape. */}
-          <div className="flex min-h-15" />
-          <div className="flex flex-col gap-y-4">
-            {LEGAL.brand.map((text) => (
-              <p key={text.slice(0, 24)}>{text}</p>
-            ))}
-          </div>
-          <div className="flex flex-col gap-y-2">
-            {LEGAL.licence.map((text) => (
+          <div className="jack55-legal-copy flex flex-col gap-y-2">
+            {[...LEGAL.brand, ...LEGAL.licence].map((text) => (
               <p key={text.slice(0, 24)}>{text}</p>
             ))}
           </div>

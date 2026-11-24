@@ -2,13 +2,9 @@ import { getAlias } from '../../../utils/currency';
 import { CHAT_AVAILABLE } from '../../../services/availability';
 import React from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import logoImg from '../../../assets/logo.png';
-import logoLightImg from '../../../assets/logo_w.png';
 import LanguageCurrencyModal from '../../../components/modals/LanguageCurrencyModal';
 import { useSession } from '../../../context/session';
 import { useCanSignUp, useGates } from '../../../context/gates';
-import { useSettings } from '../../../context/settings';
-import { siteName, useSiteLogo } from '../../../services/siteBranding';
 import AfterLogin, { MobileAfterLogin } from './AfterLogin';
 import './Header.css';
 import { useSiteCurrency } from '../../../hooks/useSiteCurrency';
@@ -86,7 +82,6 @@ function useHeaderScrollOpacity() {
 
 export default function Header({
   sidebarExpanded,
-  onToggleSidebar,
   onOpenExplore,
   onToggleNotice,
   onToggleChat,
@@ -100,26 +95,7 @@ export default function Header({
   /* Off on a B2B site (context/gates.js): Sign In stays, Sign Up is not rendered. */
   const canSignUp = useCanSignUp();
 
-  /* THE LOGO IS A PNG PAIR, NOT ONE FILE TINTED — `logo.png` is near-white ink (mean luminance 222
-     over its opaque pixels) and disappears on the light theme's white header. The original keys
-     the swap off the same flag everything else does: its image registry stores every entry as a
-     `[dark, light]` tuple behind `new Proxy(Rc, _h(t => Ce.darken ? t[0] : t[1] || t[0]))`, and
-     `logo.base` is `[logo-CBzjipjR.png, logo_w-Vb58juxx.png]`. `logo_w.png` is that second file,
-     288x64 like its twin and luminance 41 — the same mark drawn in near-black.
-
-     Picked in JS rather than with a `dark:hidden` pair of `<img>`s, which would make every visitor
-     download both. Note `logo.small` is the SAME file on both sides of its tuple, so the square
-     mark needs no twin and none was fetched. */
-  const { darken } = useSettings();
-  /* The owner panel's uploaded logo (live mode), or another brand's by name; nothing set answers
-     null and the pair above is drawn as before. A brand logo is fitted to the box the pair draws
-     in (288x64 at h-8 = 144x32), so only the picture changes. */
-  const brandLogo = useSiteLogo({ own: 'hash-games' });
-  const logo = brandLogo ?? (darken ? logoImg : logoLightImg);
-  const logoAlt = (brandLogo && siteName()) || 'logo';
-  /* The owner uploads ONE logo, drawn for the dark theme (white "PARKER"); on the light theme it
-     vanishes against the light header, so it is inverted there (index.css `.brand-logo-on-light`). */
-  const logoTone = brandLogo && !darken ? ' brand-logo-on-light' : '';
+  const logo = '/brand/jack55.svg';
 
   const [langModalOpen, setLangModalOpen] = React.useState(false);
   const [langModalTab, setLangModalTab] = React.useState('language');
@@ -135,34 +111,14 @@ export default function Header({
       {/* Desktop Header: Hidden on mobile/tablet (< 1024px), Flex on desktop (>= 1024px) */}
       {/* ========================================================================= */}
       <div className="header hidden lg:flex fixed left-0 top-0 w-full z-[99]">
-        <div className="relative flex h-full flex-1 items-center border-b border-solid border-black_alpha10">
+        <div className="relative flex h-full flex-1 items-center">
           
           {/* Left Section: Menu Toggle + Logo. The original narrows this block to
               72px whenever the sidebar is folded, so the two stay in lockstep. */}
-          <div className={`relative z-10 flex h-full flex-none items-center px-4 ${sidebarExpanded ? 'w-60' : 'w-[72px]'}`}>
-            
-            {/* Hamburger Menu Toggle */}
-            <button 
-              className="button button-m size-10 flex-none rounded-lg bg-layer5 p-0" 
-              type="button" 
-              aria-label="Toggle Navigation"
-              onClick={onToggleSidebar}
-            >
-              <span className="center size-8">
-                <div className="color_icon_img scale-[80%] menu"></div>
-              </span>
-            </button>
-            
-            {/* Logo container. */}
-            <div className="center h-full w-48 flex-none text-[0] absolute left-16 top-0">
-              <NavLink to="/">
-                <img alt={logoAlt} className={(brandLogo ? 'h-10 w-44 object-contain' : 'h-8 w-auto object-contain') + logoTone} src={logo} />
-              </NavLink>
-            </div>
-          </div>
+          <div aria-hidden="true" className={`header-sidebar-spacer h-full flex-none ${sidebarExpanded ? 'w-[248px]' : 'w-20'}`} />
 
           {/* Right Section: Actions, Search, Chat, Language */}
-          <div className="relative mx-auto h-full w-full max-w-[1248px] px-4">
+          <div className="relative mx-0 h-full w-full px-4">
             {/* `overflow-hidden` IS THE SIGNED-OUT ARM'S ONLY, and the difference is load-bearing
                 rather than cosmetic. The original does not share this div between the two states
                 — it swaps the whole row, and the two templates differ in exactly one class:
@@ -180,14 +136,14 @@ export default function Header({
                 unconditionally. The confirm dialog was never affected — `.pop-overlayer` is
                 `position: fixed` and this div sets no transform, so it is not clipped by it. */}
             <div
-              className={`absolute left-0 top-0 flex size-full items-center justify-end px-3 ${
+              className={`header-action-row absolute left-0 top-0 flex size-full items-center justify-between px-3 ${
                 session.login ? '' : 'overflow-hidden'
               }`}
             >
               
               {/* Search Button */}
               <button
-                className="button button-m size-10 rounded-lg bg-layer5 p-0 flex-none"
+                className="button button-m header-search-trigger size-10 rounded-lg bg-layer5 p-0 flex-none"
                 type="button"
                 aria-label="Search"
                 onClick={onOpenExplore}
@@ -216,20 +172,20 @@ export default function Header({
                 <>
               {/* Sign In / Sign Up */}
               <button
-                className="button button-m ml-3 h-10 min-w-24 rounded-lg border-2 border-solid border-third px-4 text-base font-semibold"
+                className="button button-m header-auth-login ml-3 h-10 min-w-24 rounded-lg border-2 border-solid border-third px-4 text-base font-semibold"
                 type="button"
                 onClick={() => navigate('/login/signin')}
               >
-                Sign In
+                Log In
               </button>
 
               {canSignUp && (
               <button
-                className="button button-brand button-m ml-1 h-10 min-w-24 rounded-lg px-4 text-base"
+                className="button button-brand button-m header-auth-register ml-1 h-10 min-w-24 rounded-lg px-4 text-base"
                 type="button"
                 onClick={() => navigate('/login/regist')}
               >
-                Sign Up
+                Register
               </button>
               )}
 
@@ -308,7 +264,7 @@ export default function Header({
         <div className="flex size-full items-center overflow-hidden px-4">
           <div className="text-[0] flex-none">
             <NavLink to="/">
-              <img alt={logoAlt} className={`mobile-logo-img object-contain${logoTone}`} src={logo} />
+              <img alt="Jack55" className="mobile-logo-img object-contain" src={logo} />
             </NavLink>
           </div>
           <button
@@ -316,7 +272,7 @@ export default function Header({
             type="button"
             onClick={() => navigate('/login/signin')}
           >
-            Sign In
+            Log In
           </button>
           {canSignUp && (
           <button
@@ -324,7 +280,7 @@ export default function Header({
             type="button"
             onClick={() => navigate('/login/regist')}
           >
-            Sign Up
+            Register
           </button>
           )}
         </div>

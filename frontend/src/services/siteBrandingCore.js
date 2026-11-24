@@ -7,6 +7,20 @@
 export const LIVE = String(process.env.NEXT_PUBLIC_USE_FIXTURES ?? 'true') === 'false';
 export const API_BASE = String(process.env.NEXT_PUBLIC_API_BASE ?? '').replace(/\/+$/, '');
 
+/* `NEXT_PUBLIC_BRANDING_SOURCE=local`: this front end shows its OWN identity (Parker567's name,
+   title, logo, mark) whatever the owner panel's branding says. The owner's chat buttons
+   (WhatsApp / Telegram) still apply. Unset = the owner panel decides, as before. */
+export const BRANDING_LOCAL = String(process.env.NEXT_PUBLIC_BRANDING_SOURCE ?? '').trim() === 'local';
+const IDENTITY_KEYS = ['siteName', 'title', 'titleTemplate', 'description', 'ogTitle', 'ogDescription', 'themeColor', 'logoUrl', 'markUrl', 'ogImageUrl'];
+
+/** A cleaned branding with its identity fields blanked under BRANDING_LOCAL, else unchanged. */
+export function withLocalIdentity(branding) {
+  if (!BRANDING_LOCAL || !branding) return branding;
+  const out = { ...branding, keywords: [] };
+  for (const key of IDENTITY_KEYS) out[key] = null;
+  return out;
+}
+
 export const BRANDING_STORAGE_KEY = 'hge.branding';
 export const BRANDING_PATH = '/api/v1/admin/branding/public';
 const ASSET_PATH_RE = /^\/api\/v1\/admin\/branding\/asset\/[0-9a-f]{64}\.(png|webp|svg)$/;

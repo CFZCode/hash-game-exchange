@@ -745,6 +745,16 @@ export default function GamePage() {
       className={`game-page px-4 sm:px-0${isSlots ? ' is-slots' : ''}${isOriginal ? ' is-original' : ''}`}
       style={isOriginal ? { '--og-frame-h': `${originalHeight}px` } : undefined}
     >
+      {game && (
+        <header className="game-page-heading">
+          {game.image && <img src={game.image} alt="" className="game-page-heading-art" />}
+          <div className="min-w-0">
+            <h1 className="game-page-heading-title">{title}</h1>
+            <p className="game-page-heading-provider">{brandLabel(game.provider)}</p>
+          </div>
+        </header>
+      )}
+
       <div className="game-page-row">
         <section className="game-stage">
           <div className={`game-frame${frameUrl ? ' is-playing' : ''}`}>

@@ -75,3 +75,482 @@
 .casino-tab-sprite.roulette   { -webkit-mask-position: -180px -160px; mask-position: -180px -160px }
 .casino-tab-sprite.baccarat   { -webkit-mask-position: 0 -40px;       mask-position: 0 -40px }
 .casino-tab-sprite.themes     { -webkit-mask-position: -200px -80px;  mask-position: -200px -80px }
+
+/* Jack55 casino lobby promotions and page palette from the supplied reference. */
+.casino-page {
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 100vh;
+  background: #0d1320;
+}
+
+.app-root:has(.casino-page),
+body:has(.casino-page) {
+  --site-bg: #0d1320;
+  background-color: #0d1320;
+}
+
+.casino-promotions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  width: 100%;
+}
+
+.casino-promo-card {
+  display: block;
+  overflow: hidden;
+  aspect-ratio: 510 / 293;
+  border-radius: 22px;
+  background: #171e2d;
+}
+
+.casino-promo-card img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 180ms ease;
+}
+
+.casino-promo-card:hover img {
+  transform: scale(1.025);
+}
+
+/* API-backed catalogue cards: use the Jack55 landscape covers and put the API name/provider
+   beneath each cover. GameTile still owns the existing link, hover and player-count behavior. */
+.casino-page .casino-catalogue-grid {
+  --grid-column: 8;
+  --grid-cols: 8;
+  --aspect-ratio: 1 !important;
+  gap: 0.75rem !important;
+  margin-top: 1rem !important;
+}
+
+.casino-page .casino-catalogue-grid > div > .game-item-catalogue {
+  align-items: flex-start;
+  overflow: visible;
+  border-radius: 0;
+  color: #ccd6f6;
+  text-decoration: none;
+}
+
+.casino-page .casino-catalogue-grid .game-item-catalogue > .skeleton,
+.casino-page .casino-catalogue-grid .game-item-catalogue > div:first-child {
+  width: 100%;
+  flex: 0 0 auto;
+}
+
+.casino-page .casino-catalogue-grid .game-item-catalogue img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1.23;
+  border-radius: 0.75rem;
+  object-fit: cover;
+}
+
+.casino-page .casino-catalogue-grid .game-tile-caption {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+  padding: 0.25rem 0.2rem 0.1rem;
+  line-height: 1.2;
+}
+
+.casino-page .casino-catalogue-grid .game-tile-name,
+.casino-page .casino-catalogue-grid .game-tile-provider {
+  overflow: hidden;
+  max-width: 100%;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.casino-page .casino-catalogue-grid .game-tile-name {
+  color: #d6def7;
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.casino-page .casino-catalogue-grid .game-tile-provider {
+  color: #8e9bbd;
+  font-size: 0.75rem;
+}
+
+.casino-page .casino-catalogue-grid .game-item-catalogue > .absolute {
+  border-radius: 0.75rem;
+  bottom: auto;
+  height: auto;
+  aspect-ratio: 1.23;
+}
+
+@media (max-width: 1100px) {
+  .casino-page .casino-catalogue-grid { --grid-column: 5; --grid-cols: 5; }
+}
+
+@media (max-width: 680px) {
+  .casino-page .casino-catalogue-grid { --grid-column: 3; --grid-cols: 3; }
+}
+
+@media (max-width: 390px) {
+  .casino-page .casino-catalogue-grid { --grid-column: 2; --grid-cols: 2; }
+}
+
+@media (max-width: 767px) {
+  .casino-promotions {
+    grid-auto-columns: minmax(80%, 1fr);
+    grid-auto-flow: column;
+    grid-template-columns: none;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scroll-snap-type: x mandatory;
+  }
+
+  .casino-promo-card {
+    scroll-snap-align: start;
+  }
+}
+
+/* --item-width is computed from --grid-gap, so the gap the catalogue grid DRAWS (0.75rem above)
+   must be the one it COUNTS. GameGrid passes `--grid-gap: .5rem` inline; with the wider real gap
+   eight columns overflowed the row and `auto-fill` dropped to seven, leaving a strip on the
+   right. !important because the inline custom property otherwise wins. */
+.casino-page .casino-catalogue-grid {
+  --grid-gap: 0.75rem !important;
+}
+
+/* ---- Jack55 controls row: [tab pills] [provider filter] [search] -------------------------- */
+.casino-controls {
+  display: contents;
+}
+
+@media (min-width: 1024px) {
+  .casino-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 20px 0 16px;
+  }
+
+  /* The strip: a rounded pill group sized to its tabs, scrolling inside itself when the admin
+     configures more tabs than fit. Its own sticky/margins are for the phone layout. */
+  .casino-controls > :nth-child(2) {
+    order: 1;
+    position: static;
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 60%;
+    margin: 0 !important;
+    padding: 4px !important;
+    border-radius: 999px;
+    background: #1a202d;
+  }
+
+  .casino-controls > :nth-child(2) a {
+    height: 32px;
+    padding: 0 12px;
+    border-radius: 999px;
+    font-size: 13px;
+  }
+
+  .casino-controls > :nth-child(2) a span {
+    margin-left: 0;
+    color: #9aa6c4;
+  }
+
+  .casino-controls > :nth-child(2) a.scroll-button-active {
+    background: #00ec66 !important;
+  }
+
+  .casino-controls > :nth-child(2) a.scroll-button-active span {
+    color: #07131a;
+    font-weight: 700;
+  }
+
+  /* The reference pills are text only. */
+  .casino-controls > :nth-child(2) a .icon,
+  .casino-controls > :nth-child(2) a .casino-tab-sprite {
+    display: none;
+  }
+
+  .casino-controls-filter {
+    order: 2;
+    flex: none;
+  }
+
+  .casino-controls-filter > div {
+    flex-wrap: nowrap;
+    width: auto;
+    margin-top: 0;
+  }
+
+  .casino-controls-filter [class*='w-[288px]'] {
+    width: 190px;
+  }
+
+  .casino-controls-filter .select,
+  .casino-controls-filter button {
+    border-radius: 999px;
+  }
+
+  /* Search takes what is left of the row. */
+  .casino-controls > :first-child {
+    order: 3;
+    flex: 1 1 260px;
+    min-width: 220px;
+    margin: 0;
+  }
+
+  .casino-controls > :first-child .input {
+    height: 48px;
+    border-radius: 999px;
+    background: #1a202d;
+    padding-inline: 16px;
+  }
+}
+
+/* ---- View More ----------------------------------------------------------------------------- */
+.casino-view-more {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin: 28px 0 32px;
+}
+
+.casino-view-more-count {
+  color: #8e9bbd;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.casino-view-more-bar {
+  position: relative;
+  width: 140px;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #222a3a;
+}
+
+.casino-view-more-bar > span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: #00ec66;
+  transition: width 200ms ease;
+}
+
+.casino-view-more-btn {
+  height: 44px;
+  min-width: 160px;
+  padding: 0 32px;
+  border: 0;
+  border-radius: 999px;
+  background: #1a202d;
+  color: #d6def7;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.casino-view-more-btn:hover:not(:disabled) {
+  background: #232b3c;
+}
+
+.casino-view-more-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* ---- Lobby promotion banner (after Hot Games) --------------------------------------------- */
+.lobby-promo-banner {
+  position: relative;
+  display: flex;
+  overflow: hidden;
+  min-height: 168px;
+  margin-top: 24px;
+  border-radius: 22px;
+  background: radial-gradient(120% 140% at 0% 0%, #123b2a 0%, #101826 55%, #0d1320 100%);
+  color: #fff;
+  text-decoration: none;
+  isolation: isolate;
+}
+
+.lobby-promo-banner::after {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border: 1px solid rgba(0, 236, 102, 0.18);
+  border-radius: inherit;
+  content: '';
+}
+
+.lobby-promo-copy {
+  display: flex;
+  flex: 1 1 55%;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 24px 28px;
+}
+
+.lobby-promo-eyebrow {
+  color: #00ec66;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.lobby-promo-title {
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.lobby-promo-text {
+  max-width: 34rem;
+  color: #9aa6c4;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.lobby-promo-cta {
+  margin-top: 8px;
+  padding: 10px 22px;
+  border-radius: 999px;
+  background: #00ec66;
+  color: #07131a;
+  font-size: 14px;
+  font-weight: 800;
+  transition: transform 150ms ease;
+}
+
+.lobby-promo-banner:hover .lobby-promo-cta {
+  transform: translateY(-1px);
+}
+
+.lobby-promo-art {
+  position: relative;
+  flex: 0 1 45%;
+  min-width: 0;
+}
+
+.lobby-promo-art img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* Keep the artwork's own lettering in view on a wide, short banner. */
+  object-position: center 78%;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 28%);
+  mask-image: linear-gradient(90deg, transparent 0, #000 28%);
+  transition: transform 220ms ease;
+}
+
+.lobby-promo-banner:hover .lobby-promo-art img {
+  transform: scale(1.03);
+}
+
+@media (max-width: 639px) {
+  .lobby-promo-banner {
+    min-height: 150px;
+    margin-inline: 16px;
+  }
+
+  .lobby-promo-copy {
+    flex-basis: 62%;
+    padding: 18px 16px;
+  }
+
+  .lobby-promo-title {
+    font-size: 19px;
+  }
+
+  .lobby-promo-text {
+    display: none;
+  }
+}
+
+/* ---- Pay Your Way (after Live Casino) ------------------------------------------------------ */
+.pay-your-way {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px 32px;
+  margin-top: 24px;
+  padding: 26px 32px;
+  border-radius: 16px;
+  background: #161c2a;
+}
+
+.pay-your-way-title {
+  color: #fff;
+  font-size: 22px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.pay-your-way-rails {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 28px;
+  color: #8e9bbd;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.pay-your-way-coins {
+  display: flex;
+  align-items: center;
+}
+
+.pay-your-way-coins li {
+  width: 28px;
+  height: 28px;
+  margin-left: -4px;
+  overflow: hidden;
+  border: 2px solid #161c2a;
+  border-radius: 999px;
+  background: #161c2a;
+}
+
+.pay-your-way-coins li:first-child {
+  margin-left: 0;
+}
+
+.pay-your-way-coins img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+@media (max-width: 639px) {
+  .pay-your-way {
+    flex-direction: column;
+    align-items: flex-start;
+    margin-inline: 16px;
+    padding: 20px;
+  }
+
+  .pay-your-way-title {
+    font-size: 18px;
+  }
+
+  .pay-your-way-rails {
+    gap: 18px;
+    font-size: 15px;
+  }
+}

@@ -39,7 +39,10 @@ export const SOCKET_BASE = (process.env.NEXT_PUBLIC_SOCKET_BASE || API_BASE || '
 
 const SYNC_STATE = '3b84d3951808e13e1b8c65a67d6b7235';
 const CREDIT = '660cb6fe7737d7b70e7a07b706b93f70';
-const PUSHES = [CREDIT, 'accountUpdated', 'featuresUpdated', 'siteConfigUpdated', 'currenciesUpdated'];
+/* The owner / operator saved: every page reads again once a state from after the push lands. */
+const SITE_PUSHES = ['featuresUpdated', 'siteConfigUpdated', 'currenciesUpdated'];
+const PUSHES = [CREDIT, 'accountUpdated', ...SITE_PUSHES];
+const RETRY_MS = 2000;
 const SALT = 'p567.sync.v1';
 const TICK_MS = 30000;
 
@@ -52,6 +55,10 @@ let keyFor = { id: null, key: null };
 let openedWith = null;
 /** When the last C.CREDIT push landed: a sync asked before it carries the balances from before it. */
 let pushedAt = 0;
+/** When the last site push landed, and the last one the pages have re-read for. */
+let sitePushedAt = 0;
+let siteHandledAt = 0;
+let retry = null;
 
 /* Every socket event in the browser console: on in development, and on a live site after
    `localStorage.socketDebug = '1'` in the console (then reload). Off for players otherwise. */
@@ -98,21 +105,38 @@ function sync() {
       again = false;
       sync();
     }
-    if (err) return;
-    let body;
-    try {
-      body = JSON.parse(frameText(reply));
-    } catch {
+    let body = null;
+    if (!err) {
+      try {
+        body = JSON.parse(frameText(reply));
+      } catch {
+        body = null;
+      }
+    }
+    if (!body?.status || typeof body.d !== 'string') {
+      /* Timed out or refused (the event's rate limit). With a site push still unanswered, waiting
+         for the tick is not enough — it does not run in a background tab, which is where this
+         site sits while the owner panel is being used — so ask once more. */
+      debug('sync failed:', err?.message ?? body?.error?.code ?? 'bad reply');
+      if (sitePushedAt > siteHandledAt && !retry) {
+        retry = setTimeout(() => {
+          retry = null;
+          syncSoon();
+        }, RETRY_MS);
+      }
       return;
     }
-    if (!body?.status || typeof body.d !== 'string') return;
     const token = openedWith;
     unscramble(body.d, id).then(
       (state) => {
         // Asked before a balance push: keep the pushed balances, not this older read's.
         const pushed = askedAt < pushedAt ? storedState()?.balances : null;
         debug('sync reply', state);
-        publishLiveState(pushed ? { ...state, balances: pushed } : state, token, askedAt);
+        const sitePushed = sitePushedAt > siteHandledAt && askedAt >= sitePushedAt;
+        const moved = publishLiveState(pushed ? { ...state, balances: pushed } : state, token, askedAt, { sitePushed });
+        // One re-read per save: its two or three pushes land together, and a state that already
+        // moved the pages (the site half changed) has answered them all.
+        if (moved || sitePushed) siteHandledAt = Date.now();
       },
       () => {},
     );
@@ -183,7 +207,15 @@ export function startRealtime() {
   socket.on('connect_error', (error) => debug('connect error:', error?.message));
   socket.onAny((event) => debug('push', event === CREDIT ? 'C.CREDIT (balance moved)' : event));
   socket.on('connect', sync);
-  PUSHES.forEach((name) => socket.on(name, sync));
+  // Stamped BEFORE the sync below is asked, so that sync counts as one from after the push.
+  SITE_PUSHES.forEach((name) =>
+    socket.on(name, () => {
+      sitePushedAt = Date.now();
+    }),
+  );
+  /* syncSoon, not sync: a push that lands while a sync is in flight must not be dropped — that
+     reply may predate the change, and nothing else asks again until the tick. */
+  PUSHES.forEach((name) => socket.on(name, syncSoon));
   socket.on(CREDIT, applyCredit);
   timer = setInterval(syncIfVisible, TICK_MS);
   document.addEventListener('visibilitychange', syncIfVisible);
@@ -193,6 +225,10 @@ export function startRealtime() {
 export function stopRealtime() {
   clearInterval(timer);
   timer = null;
+  clearTimeout(retry);
+  retry = null;
+  sitePushedAt = 0;
+  siteHandledAt = 0;
   if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', syncIfVisible);
   inFlight = false;
   again = false;

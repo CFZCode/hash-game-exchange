@@ -4,10 +4,10 @@ import { useLocation } from 'react-router-dom';
 import Select from '../shared/Select';
 import CasinoExplore from './CasinoExplore';
 import SearchHistory from './SearchHistory';
+import SearchOverlay from './SearchOverlay';
 import { readHistory, remember } from './history';
 import { Empty } from './GameGrid';
 import { SearchIcon, CloseIcon, ArrowIcon } from './icons';
-import { useSettings } from '../../context/settings';
 import { useGates } from '../../context/gates';
 import './Explore.css';
 
@@ -227,7 +227,6 @@ export function ExplorePanel({ initialType, autoFocus = false }) {
 }
 
 export default function Explore({ open, onClose }) {
-  const { darken } = useSettings();
   /* Mounted while open OR while the exit tween is still running, so the panel fades out
      instead of vanishing. `.explore-pop` collapses to 0x0 the instant `explore-open` leaves
      <body>, so the body class has to outlive the unmount by exactly that animation.
@@ -288,41 +287,21 @@ export default function Explore({ open, onClose }) {
   return createPortal(
     <div className="explore-pop">
       <div
-        className={`h-full w-full ${open ? 'explore-enter' : 'explore-exit'}`}
-        /* `q.darken ? "rgba(35, 38, 38, 0.96)" : "rgba(244,244,244,0.96)"`, and BOTH ARMS ARE
-           WRITTEN — this panel covers the whole viewport, so the dark-only arm was a full-screen
-           slab of #232626 over the light theme.
-
-           It is inline on the original rather than a class because it is theme-dependent, and it
-           stays inline here for the same reason: the alpha makes it a one-off rather than a token.
-           Note the two are NOT the same token at two values. The dark arm is `layer2` (#232626)
-           at 96%; the light arm is #F4F4F4, which is `--site_bg` — the page's own background, not
-           light layer2 (#F7F9FA). So the panel sits on the page colour in one theme and on the
-           content colour in the other, which is the original's own choice and not a slip. */
-        style={{
-          background: darken ? 'rgba(35, 38, 38, 0.96)' : 'rgba(244, 244, 244, 0.96)',
-        }}
+        className={`search-backdrop h-full w-full ${open ? 'explore-enter' : 'explore-exit'}`}
+        /* The dim + blur is `.search-backdrop` (Explore.css): the theme's own tint, both themes. */
         onAnimationEnd={() => {
           if (!open) setExiting(false);
         }}
       >
-        <div className="mx-auto h-full w-full max-w-[1248px]">
-          <div className="hidden-scroll-bar scroll-y h-full w-full">
-            <div className="center sticky left-0 top-0 z-10 h-16 w-full bg-layer2 px-6 py-4">
-              <span className="text-base font-extrabold">Explore</span>
-              <button
-                type="button"
-                className="button button-m absolute right-6 top-4 size-8 rounded-lg bg-layer6 p-0"
-                onClick={onClose}
-              >
-                <CloseIcon className="size-5 fill-secondary" />
-              </button>
-            </div>
-
-            <div className="w-full px-6">
-              <ExplorePanel />
-            </div>
-          </div>
+        {/* The site's own search (./SearchOverlay.jsx) over the blurred page; a click on the
+            blurred part closes it. `ExplorePanel` above is still what `/explore` renders. */}
+        <div
+          className="hidden-scroll-bar scroll-y h-full w-full"
+          onPointerDown={(event) => {
+            if (event.target === event.currentTarget) onClose();
+          }}
+        >
+          <SearchOverlay onClose={onClose} />
         </div>
       </div>
     </div>,

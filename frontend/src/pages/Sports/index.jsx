@@ -145,30 +145,27 @@ export default function Sports() {
           <FeaturedBanner />
           <BetsFeed />
           <SportFilter active={sport} onChange={setSport} />
-          <EventGrid
-            page={page}
-            onPageChange={setPage}
-            selected={selected}
-            onToggleOutcome={toggleOutcome}
+          <div className="sports-event-list">
+            <EventGrid
+              page={page}
+              onPageChange={setPage}
+              selected={selected}
+              onToggleOutcome={toggleOutcome}
+            />
+          </div>
+          <BetSlip
+            selections={selections}
+            onRemove={removeSelection}
+            onClear={() => setSelections([])}
+            signedIn={session.login}
+            currencyName={session.setting?.localeCurrencyName ?? session.setting?.currencyName}
           />
           <LobbyFooter />
         </div>
         )}
       </div>
-      {/* Outside `.sports-lobby`, because it is `position: fixed` and the lobby's own
-          `> * + *` margin rule would otherwise count it as another block in the column. On the
-          widget it is mounted in a fixed container of its own for the same reason. */}
-      <BetSlip
-        selections={selections}
-        onRemove={removeSelection}
-        onClear={() => setSelections([])}
-        signedIn={session.login}
-        /* The DISPLAY fiat, not the wallet coin: the live slip's ₹ is its session's locale
-           currency (that account is INR), and this build's equivalent is `localeCurrencyName` —
-           USDFIAT for a visitor, which the header's own selector already shows as USD. Handing
-           it the wallet coin printed "BTC" in front of a stake. */
-        currencyName={session.setting?.localeCurrencyName ?? session.setting?.currencyName}
-      />
+      {/* The bet slip stays inside the lobby grid on desktop and retains its fixed mobile
+          position through the existing narrow-screen rules. */}
     </div>
   );
 }

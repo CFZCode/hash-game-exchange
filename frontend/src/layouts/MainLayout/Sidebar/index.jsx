@@ -276,7 +276,7 @@ const isRowActive = (pathname, item) =>
    other reason to be hidden. */
 const visibleItems = (items = [], login) => items.filter((i) => !i.needLogin || login);
 
-export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) {
+export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile, onToggleSidebar }) {
   /* The rows the original guards with `needLogin`. Read straight off the session rather than
      threaded down from MainLayout — the sidebar is the only consumer. */
   const { session } = useSession();
@@ -336,6 +336,7 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
     setLangModalOpen(true);
   };
   const { pathname } = useLocation();
+  const isSportsMode = pathname.startsWith('/sports');
 
   /* The group that owns the page you are on. Landing on /promotions/promotion with the
      Promotions group collapsed would hide the very row that is meant to be highlighted, so a
@@ -434,7 +435,7 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
   // Main nav items with submenu data from original HTML
   const mainNavItems = [
     {
-      id: 'casino', label: 'Casino', colorIcon: 'casino', hasArrow: true, href: '/casino',
+      id: 'casino', label: 'Instant Games', colorIcon: 'casino', hasArrow: true, href: '/casino',
       subItems: [
         // needLogin entries are hidden until there is an auth state to gate them on.
         { label: 'Favorites', menuIcon: 'favorites1', href: '/favorite', needLogin: true },
@@ -468,7 +469,7 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
       row: { label: brandLabel('BC Originals'), icon: 'bc-originals-svg', href: '/casino/brand', hasSubArrow: true, flyout: 'originals' },
     },
     {
-      id: 'sports', label: 'Sports', colorIcon: 'sports', hasArrow: true, href: '/sports',
+      id: 'sports', label: 'Prematch', colorIcon: 'sports', hasArrow: true, href: '/sports',
       /* The exchange's sports tree, not a fixed list — see SportsMenu.jsx. The original's
          "Provider Betby" / "Provider BTi" rows are gone: this platform has neither. */
       tree: 'sports',
@@ -579,6 +580,27 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
             three `background-color: … !important` overrides in Sidebar.css it replaces. */}
         <div className="overflow-hidden p-4 max-lg:bg-transparent lg:bg-layer3">
           <nav>
+            <Link to="/" className="jack55-sidebar-logo" onClick={onCloseMobile} aria-label="Jack55 home">
+              <img src="/brand/jack55.svg" alt="Jack55" />
+            </Link>
+            <div className="jack55-mode-switch" aria-label="Choose game section">
+              <Link
+                to="/casino"
+                className={!isSportsMode ? 'is-active' : ''}
+                aria-current={!isSportsMode ? 'page' : undefined}
+                onClick={onCloseMobile}
+              >
+                Casino
+              </Link>
+              <Link
+                to="/sports"
+                className={isSportsMode ? 'is-active' : ''}
+                aria-current={isSportsMode ? 'page' : undefined}
+                onClick={onCloseMobile}
+              >
+                Sports
+              </Link>
+            </div>
             <div className="overflow-hidden w-full lg:w-[208px]">
 
               {/* ============================================================ */}
@@ -679,7 +701,7 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
               {/* 3. MAIN NAV ITEMS (color_icon_img sprite)                     */}
               {/* ============================================================ */}
               {mainNavItems.filter((item) => gates.routeOn(item.single ? item.row.href : item.href)).map(item => item.single ? (
-                <div key={item.id} className="Sidebar-Unit_bg mt-1 overflow-hidden rounded-lg">
+                <div key={item.id} className={`sidebar-primary-group sidebar-primary-${item.id} Sidebar-Unit_bg mt-1 overflow-hidden rounded-lg`}>
                   <SubNavLink
                     item={item.row}
                     topLevel
@@ -690,7 +712,7 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
                   />
                 </div>
               ) : (
-                <div key={item.id} className="Sidebar-Unit_bg mt-1 overflow-hidden rounded-lg">
+                <div key={item.id} className={`sidebar-primary-group sidebar-primary-${item.id} Sidebar-Unit_bg mt-1 overflow-hidden rounded-lg`}>
                   {/* Header row */}
                   <div
                     className={`toggle-link-item flex h-10 w-full cursor-pointer items-center px-3 lg:px-0 ${isOpen(item.id) ? 'toggle-link-item-open' : ''} ${activeMenu === item.id || item.id === routeGroup ? 'toggle-link-item-active' : ''}`}
@@ -977,6 +999,18 @@ export default function Sidebar({ sidebarExpanded, mobileOpen, onCloseMobile }) 
           </nav>
         </div>
       </div>
+
+      <button
+        className="sidebar-collapse-control"
+        type="button"
+        onClick={onToggleSidebar}
+        aria-label={sidebarExpanded ? 'Collapse menu' : 'Expand menu'}
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M3 6h13M3 12h10M3 18h13M20 8l-4 4 4 4" />
+        </svg>
+        <span className="sidebar-collapse-label">{sidebarExpanded ? 'Collapse Menu' : 'Expand Menu'}</span>
+      </button>
 
       <LanguageCurrencyModal
         isOpen={langModalOpen}

@@ -16,6 +16,11 @@ export const DEFAULT_THEME = 'hash_game';
 const CUSTOM_THEME = 'custom';
 const KEY_RE = /^[a-z0-9_]{1,40}$/;
 const COLOR_RE = /^#[0-9a-fA-F]{6}$/;
+
+/* `NEXT_PUBLIC_THEME_LOCK=<key>` (e.g. neon_navy): this front end always paints that palette,
+   whatever template the owner panel picks. Unset (or not a valid key) = the owner decides. */
+const LOCK_RAW = String(process.env.NEXT_PUBLIC_THEME_LOCK ?? '').trim();
+export const THEME_LOCK = KEY_RE.test(LOCK_RAW) ? LOCK_RAW : null;
 export const PALETTE_KEYS = ['bg', 's1', 's2', 's3', 'border', 'text', 'muted', 'primary', 'ink', 'accent', 'live', 'hi', 'lo'];
 
 let customActive = false;
@@ -39,7 +44,7 @@ const store = (key, value) => {
 
 export function applyTheme(key) {
   if (typeof document === 'undefined') return;
-  lastTemplate = key && KEY_RE.test(key) ? key : DEFAULT_THEME;
+  lastTemplate = THEME_LOCK ?? (key && KEY_RE.test(key) ? key : DEFAULT_THEME);
   const theme = customActive ? CUSTOM_THEME : lastTemplate;
   const root = document.documentElement;
   if (theme === DEFAULT_THEME) root.removeAttribute('data-theme');
@@ -66,4 +71,4 @@ export function applyPalette(palette) {
 }
 
 /** Runs in <head> before first paint: the last known theme (and custom palette), nothing else. */
-export const THEME_BOOT_SCRIPT = `try{var d=document.documentElement,t=localStorage.getItem('${THEME_STORAGE_KEY}'),p=JSON.parse(localStorage.getItem('${PALETTE_STORAGE_KEY}')||'null');if(p&&typeof p==='object')for(var k in p)if(/^[a-z0-9]{1,8}$/.test(k)&&/^#[0-9a-fA-F]{6}$/.test(p[k]))d.style.setProperty('--p-'+k,p[k]);if(t&&/^[a-z0-9_]{1,40}$/.test(t)&&t!=='${DEFAULT_THEME}')d.setAttribute('data-theme',t)}catch(e){}`;
+export const THEME_BOOT_SCRIPT = `try{var d=document.documentElement,t=localStorage.getItem('${THEME_STORAGE_KEY}'),p=JSON.parse(localStorage.getItem('${PALETTE_STORAGE_KEY}')||'null');if(p&&typeof p==='object')for(var k in p)if(/^[a-z0-9]{1,8}$/.test(k)&&/^#[0-9a-fA-F]{6}$/.test(p[k]))d.style.setProperty('--p-'+k,p[k]);${THEME_LOCK ? `t='${THEME_LOCK}';` : ''}if(t&&/^[a-z0-9_]{1,40}$/.test(t)&&t!=='${DEFAULT_THEME}')d.setAttribute('data-theme',t)}catch(e){}`;
